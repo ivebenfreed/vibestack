@@ -12,16 +12,16 @@ import { plainToInstance } from 'class-transformer';
 import { DataSource, Repository } from 'typeorm';
 
 // Import directly from dataforge
-import { 
-  User, 
-  Project, 
-  Task, 
+import {
+  User,
+  Project,
+  Task,
   Comment,
   TaskStatus,
   TaskPriority,
   ProjectStatus,
   UserRole
-} from '@repo/dataforge/server-entities';
+} from '@repo/dataforge/generated/server-entities';
 
 import { EntityType, DEPENDENCY_ORDER, getEntityClass } from './entity-adapter.ts';
 import { createLogger } from '../../core/logger.js';
@@ -337,7 +337,7 @@ export async function createTasksWithRelationships(
  * Create a comment entity
  */
 export async function createComment(
-  options: { author?: User; parent?: Comment; entity?: Project | Task } = {},
+  options: { author?: User; parent?: Comment; task?: Task; project?: Project } = {},
   overrides: Partial<Comment> = {}
 ): Promise<Comment> {
   const comment = new Comment();
@@ -352,25 +352,24 @@ export async function createComment(
   // parentId is optional
   comment.parentId = overrides.parentId || options.parent?.id || undefined;
   
-  // Set entity references (both entityId and entityType are required)
-  if (overrides.entityId && overrides.entityType) {
-    comment.entityId = overrides.entityId;
-    comment.entityType = overrides.entityType;
-  } else if (options.entity) {
-    // Check if the entity is a Project or Task and set references accordingly
-    if (options.entity instanceof Project) {
-      comment.entityId = options.entity.id;
-      comment.entityType = 'project';
-    } else if (options.entity instanceof Task) {
-      comment.entityId = options.entity.id;
-      comment.entityType = 'task';
-    } else {
-      throw new Error('Invalid entity type for comment');
-    }
+  // Set task or project reference
+  if (overrides.taskId) {
+    comment.taskId = overrides.taskId;
+  } else if (overrides.projectId) {
+    comment.projectId = overrides.projectId;
+  } else if (options.task) {
+    comment.taskId = options.task.id;
+  } else if (options.project) {
+    comment.projectId = options.project.id;
   } else {
-    // If no entity reference is provided, create a dummy one
-    comment.entityId = uuidv4();
-    comment.entityType = faker.helpers.arrayElement(['project', 'task']);
+    // If no specific entity is provided, create a dummy reference
+    // This maintains previous behavior where a comment might not be strictly linked
+    // Consider making this stricter if a comment MUST always have a task or project.
+    if (faker.datatype.boolean()) {
+      comment.taskId = uuidv4(); // Dummy task ID
+    } else {
+      comment.projectId = uuidv4(); // Dummy project ID
+    }
   }
   
   // Set timestamps with proper Date objects
@@ -450,13 +449,14 @@ export async function createCommentsWithRelationships(
       continue;
     }
     
-    const comment = await createComment({}, { 
-      ...overrides, 
-      authorId, 
-      parentId,
-      entityId,
-      entityType
-    });
+    const commentOverrides: Partial<Comment> = { ...overrides, authorId, parentId };
+    if (entityType === 'task') {
+      commentOverrides.taskId = entityId;
+    } else if (entityType === 'project') {
+      commentOverrides.projectId = entityId;
+    }
+
+    const comment = await createComment({}, commentOverrides);
     
     comments.push(comment);
   }

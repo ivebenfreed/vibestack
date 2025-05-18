@@ -10,3 +10,5 @@ API_URL=http://localhost:8787
 # Logging configuration
 LOG_TIMESTAMP_FORMAT=iso
 NODE_ENV=development 
+# For initial super admin user creation via bootstrap API
+BOOTSTRAP_SECRET="your-strong-random-secret-here"

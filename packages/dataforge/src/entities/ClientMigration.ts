@@ -71,6 +71,5 @@ export class ClientMigration extends BaseSystemEntity {
   @IsNumber()
   timestamp!: number;
 
-  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
-  createdAt!: Date;
+  // createdAt is inherited from BaseSystemEntity
 } 

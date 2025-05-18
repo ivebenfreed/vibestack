@@ -53,6 +53,5 @@ export class ClientMigrationStatus extends BaseSystemEntity {
   @IsNumber()
   timestamp!: number;  // For ordering
 
-  @CreateDateColumn({ type: "timestamptz", name: "created_at" })
-  createdAt!: Date;
+  // createdAt is inherited from BaseSystemEntity
 } 

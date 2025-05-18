@@ -5,7 +5,7 @@ const { defineConfig } = require('tsup');
 const config = {
   entry: ['src/index.ts', 'src/generated/client-entities.ts', 'src/generated/server-entities.ts'],
   format: ['esm'],
-  experimentalDts: true,
+  dts: true, // Changed from experimentalDts to generate individual .d.ts files
   clean: true,
   platform: 'node',
   target: 'es2020',

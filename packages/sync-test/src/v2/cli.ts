@@ -1,10 +1,12 @@
 #!/usr/bin/env node
+import 'reflect-metadata';
 import { config as dotenvConfig } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import inquirer from 'inquirer';
 import { createLogger } from './core/logger.ts';
 import { Scenario, ScenarioRunner } from './core/scenario-runner.ts';
+import { main as seedUsersMain } from './seed/seed-users.ts';
 
 // Set up global error handlers to ensure we never hang
 process.on('unhandledRejection', (reason, promise) => {
@@ -322,36 +324,62 @@ async function main() {
     }
   };
   
+  // Register seed-users command
+  commands['seed-users'] = {
+    name: 'seed-users',
+    description: 'Bootstrap SUPER_ADMIN and seed test users.',
+    handler: async () => {
+      console.log('Starting user seeding process...');
+      try {
+        // Load environment variables specifically for seeding if needed
+        // The main .env in this dir is loaded at the top.
+        // For seed-users, we might need vars from the server's .dev.vars
+        const serverDevVarsPath = path.resolve(__dirname, '..', '..', '..', 'apps', 'server', '.dev.vars');
+        dotenvConfig({ path: serverDevVarsPath, override: true }); // override to ensure these take precedence
+        logger.info(`Attempting to load .dev.vars for seeding from: ${serverDevVarsPath}`);
+
+        await seedUsersMain();
+        console.log('User seeding command finished.');
+      } catch (error) {
+        console.error('Error during user seeding command:', error);
+        process.exit(1);
+      }
+    },
+  };
+  
   // Simple argument parsing for direct execution
   const args = process.argv.slice(2); // Remove 'tsx' and script path
   
-  if (args[0] === 'test' && args.includes('--scenario')) {
-    const scenarioIndex = args.indexOf('--scenario');
-    const scenarioName = args[scenarioIndex + 1];
-    
-    if (scenarioName) {
-        // Pass all remaining args to parseCommandOptions
-        const cliOptions = parseCommandOptions(args);
+  if (args.length === 0 || args[0] === 'interactive') {
+    await showInteractiveMenu();
+  } else if (commands[args[0]]) {
+    const command = commands[args[0]];
+    const commandArgs = args.slice(1);
+    // Special handling for 'test --scenario' as it has complex option parsing
+    if (args[0] === 'test' && commandArgs.includes('--scenario')) {
+      const scenarioIndex = commandArgs.indexOf('--scenario');
+      const scenarioName = commandArgs[scenarioIndex + 1];
+      if (scenarioName) {
+        const cliOptions = parseCommandOptions(commandArgs);
         await runTestScenario(scenarioName, cliOptions);
-    } else {
+      } else {
         console.error('Missing scenario name after --scenario');
-        showHelp();
+        showHelp('test'); // Show help for the test command
         process.exit(1);
+      }
+    } else {
+      // For other commands, including 'seed-users' and 'help'
+      await command.handler(commandArgs);
     }
-  } else if (args[0] === 'help') {
-     showHelp(args[1]);
-     process.exit(0);
-  } else if (args[0] === 'interactive' || args.length === 0) {
-     await showInteractiveMenu(); 
   } else {
     console.log(`Unknown command: ${args.join(' ')}`);
     showHelp();
     process.exit(1);
   }
-} // Added missing closing brace for main function
+}
 
 // Execute main function
 main().catch(error => {
   console.error("\n❌ An unexpected error occurred in the CLI:", error);
   process.exit(1);
-}); 
+});

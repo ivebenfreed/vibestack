@@ -1,6 +1,5 @@
 import { TableChange } from '@repo/sync-types';
-import { Comment } from '@repo/dataforge/client-entities'; // Added
-import { In } from 'typeorm'; // Added for _processCommentChanges logic
+import { Comment } from '@repo/dataforge/client-entities';
 
 /**
  * Interface for legacy Change objects still used by adapters
@@ -45,18 +44,53 @@ class BaseSyncAdapter<T> {
 
     for (const key in newObj) {
       if (Object.prototype.hasOwnProperty.call(newObj, key)) {
+        // Date conversion
         if (datePropertyNames.includes(key) && typeof newObj[key] === 'string') {
           try {
             const dateValue = new Date(newObj[key]);
             if (!isNaN(dateValue.getTime())) {
               newObj[key] = dateValue;
             } else {
-              console.warn(`[DataTypeMapper] Invalid date string for key ${key}: '${newObj[key]}'`);
-              newObj[key] = null;
+              console.warn(`[DataTypeMapper] Invalid date string for key ${key}: '${newObj[key]}' in entity ${entityName}`);
+              newObj[key] = null; 
             }
           } catch (e) {
-            console.warn(`[DataTypeMapper] Failed to parse date string for key ${key}:`, newObj[key]);
-            newObj[key] = null;
+            console.warn(`[DataTypeMapper] Failed to parse date string for key ${key}: '${newObj[key]}' in entity ${entityName}`);
+            newObj[key] = null; 
+          }
+        }
+        // Boolean conversion for 'emailVerified' in 'users' entity
+        // Check for both camelCase and snake_case versions of emailVerified field for users entity
+        else if (entityName && entityName.toLowerCase() === 'users' &&
+                (key === 'emailVerified' || key === 'email_verified')) {
+          
+          const val = newObj[key];
+          
+          // Convert any value to proper boolean
+          if (typeof val === 'string') {
+            if (val.toLowerCase() === 'true' || val === '1') {
+              newObj[key] = true;
+            } else if (val.toLowerCase() === 'false' || val === '0') {
+              newObj[key] = false;
+            } else {
+              console.warn(`[DataTypeMapper] Invalid string for boolean conversion for key ${key}: '${val}' in entity ${entityName}. Setting to false.`);
+              newObj[key] = false;
+            }
+          } else if (typeof val === 'number') {
+            if (val === 1) {
+              newObj[key] = true;
+            } else if (val === 0) {
+              newObj[key] = false;
+            } else {
+              console.warn(`[DataTypeMapper] Invalid number for boolean conversion for key ${key}: '${val}' in entity ${entityName}. Setting to false.`);
+              newObj[key] = false;
+            }
+          } else if (val === null || typeof val === 'undefined') {
+            console.warn(`[DataTypeMapper] Null or undefined value for boolean conversion for key ${key} in entity ${entityName}. Setting to false.`);
+            newObj[key] = false;
+          } else if (typeof val !== 'boolean') {
+            console.warn(`[DataTypeMapper] Unexpected type for boolean conversion for key ${key}: type ${typeof val}, value '${val}' in entity ${entityName}. Setting to false.`);
+            newObj[key] = false;
           }
         }
       }
@@ -278,84 +312,7 @@ export class CommentSyncAdapter extends BaseSyncAdapter<'comment'> {
     console.log(`[CommentSyncAdapter] Successfully processed insert for comment: ${commentToInsert.id}`);
   }
 
-  // Placeholder for the more complex iterative logic if we were to handle batches directly here.
-  // For now, the above _processCommentInserts handles one at a time.
-  /*
-  private async _processCommentBatchInserts(
-    inserts: Comment[]
-  ): Promise<void> {
-    const commentRepo = this.service.repository; // Accessing repository via service
-    const INCOMING_BATCH_SIZE = 50; // Or get from config
-
-    // Get IDs of potential parents within this batch
-    const parentIdsToCheck = inserts
-      .map(c => c.parentId)
-      .filter((id): id is string => !!id);
-
-    let existingParentIds = new Set<string>();
-    if (parentIdsToCheck.length > 0) {
-        try {
-            const existingParents = await commentRepo.find({ // TypeORM's find
-                where: { id: In(parentIdsToCheck) },
-                select: ['id']
-            });
-            existingParentIds = new Set(existingParents.map(p => p.id));
-        } catch (dbError) {
-            console.error("[CommentSyncAdapter] Error checking existing parent comments:", dbError);
-            throw dbError;
-        }
-    }
-
-    const pendingInserts = new Map<string, Comment>(inserts.map(c => [c.id, c]));
-    const savedInThisRun = new Set<string>();
-    let insertedCount = 0;
-    let iteration = 0;
-    const MAX_ITERATIONS = inserts.length + 1; // Safety break
-
-    while (pendingInserts.size > 0 && iteration < MAX_ITERATIONS) {
-      iteration++;
-      const batchToSave: Comment[] = [];
-
-      for (const [commentId, comment] of pendingInserts.entries()) {
-        if (!comment.parentId ||
-            savedInThisRun.has(comment.parentId) ||
-            existingParentIds.has(comment.parentId))
-        {
-          batchToSave.push(comment);
-        }
-      }
-
-      if (batchToSave.length === 0) {
-        console.error(`[CommentSyncAdapter] Cannot insert remaining ${pendingInserts.size} comments due to missing parents or circular dependency.`);
-        console.error("[CommentSyncAdapter] Pending inserts:", JSON.stringify(Array.from(pendingInserts.values()), null, 2));
-        throw new Error("Comment insertion failed due to unresolved dependencies.");
-      }
-
-      console.log(`[CommentSyncAdapter] Iteration ${iteration}: Attempting to save ${batchToSave.length} comments.`);
-      try {
-          // Assuming service.createFromSync can handle an array or we call it iteratively
-          // For TypeORM, repository.save can handle an array.
-          await commentRepo.save(batchToSave, { chunk: INCOMING_BATCH_SIZE });
-          batchToSave.forEach(comment => {
-            pendingInserts.delete(comment.id);
-            savedInThisRun.add(comment.id);
-            insertedCount++;
-          });
-          console.log(`[CommentSyncAdapter] Iteration ${iteration}: Successfully saved ${batchToSave.length} comments.`);
-      } catch (error) {
-          console.error(`[CommentSyncAdapter] Iteration ${iteration}: Error saving comment batch:`, error);
-          console.error("[CommentSyncAdapter] Batch data:", JSON.stringify(batchToSave, null, 2));
-          throw error;
-      }
-    }
-
-    if (pendingInserts.size > 0) {
-        console.error(`[CommentSyncAdapter] Failed to insert all comments after ${iteration} iterations. ${pendingInserts.size} remain.`);
-        throw new Error("Comment insertion failed after max iterations.");
-    }
-    console.log(`[CommentSyncAdapter] Successfully inserted all ${inserts.length} comments in batch.`);
-  }
-  */
+  // Future implementation: Add batch processing support for comments if needed
 }
 
 /**
@@ -368,4 +325,4 @@ export function createSyncAdapters(services: any) {
     tasks: new TaskSyncAdapter(services.tasks),
     comments: new CommentSyncAdapter(services.comments)
   };
-} 
+}

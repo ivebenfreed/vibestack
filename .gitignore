@@ -61,3 +61,7 @@ logs
 docs/
 
 local-neon/
+# CLI package specific
+packages/cli/.env
+packages/cli/dist
+packages/cli/node_modules

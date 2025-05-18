@@ -18,6 +18,7 @@ import { getAuth, AuthType, initializeAuth } from './lib/auth';
 import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
 import authRouter from './api/auth';
+import bootstrapRouter from './api/bootstrap'; // Adjust path if necessary
 
 // Remove temporary auth instance
 
@@ -56,13 +57,18 @@ apiApp.use('*', cors({
 // Use our structured logger middleware
 apiApp.use('*', createStructuredLogger());
 
+// Mount the bootstrap router BEFORE authMiddleware
+// This ensures it's not protected by standard authentication
+apiApp.route('/bootstrap', bootstrapRouter);
+
 // Apply the authentication middleware to check session status on all requests
+// for routes mounted AFTER this middleware.
 apiApp.use('*', authMiddleware);
 
-// Mount the auth router
+// Mount the auth router (which will be protected by authMiddleware)
 apiApp.route('/auth', authRouter);
 
-// Mount OTHER public API routes 
+// Mount OTHER public API routes (which will also be protected by authMiddleware)
 apiApp.route('/', api);
 
 /**
@@ -164,7 +170,7 @@ const worker = {
         
         // Session is valid, proceed with WebSocket logic
         // Optionally: log user ID or other details from sessionData.user
-        console.log(`[${requestId}] [Sync Auth] User ${sessionData.user?.id} authenticated for sync.`);
+        console.log(`[${requestId}] [Sync Auth] User ${(sessionData.user as { id?: any })?.id ?? 'ID_UNKNOWN'} authenticated for sync.`);
       } catch (error) {
         console.error(`[${requestId}] [Sync Auth] Error during session check:`, error);
         return new Response('Internal Server Error during authentication.', { status: 500 });

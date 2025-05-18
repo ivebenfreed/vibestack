@@ -61,9 +61,10 @@ export async function getClientPGliteInstance() {
 }
 
 // For debug purposes
-if (process.env.DEBUG) {
-  console.log("Client entities:", clientEntities.map((e: any) => e.name));
-  console.log("Client datasource initialized");
-}
+// For debug purposes (original, can be restored if needed, or kept minimal)
+// if (process.env.DEBUG) {
+//   console.log("Client entities loaded:", clientEntities && clientEntities.length > 0);
+//   console.log("Client datasource initialized");
+// }
 
-export default clientDataSource; 
+export default clientDataSource;

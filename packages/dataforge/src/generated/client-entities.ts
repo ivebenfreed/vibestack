@@ -526,10 +526,10 @@ export const UserSchema = new EntitySchema<User>({
             length: 255
         },
         'role': {
-            name: 'role', // Explicit DB Name
-            type: 'enum', // Use helper
-            default: "member",
-            enum: UserRole, // Use name from decorator
+          name: 'role', // Explicit DB Name
+          type: 'enum', // Use helper
+          default: "member",
+          enum: UserRole, // Use name from decorator
         }
     },
     relations: {

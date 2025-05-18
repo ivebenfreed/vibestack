@@ -6,13 +6,11 @@
   "exports": {
     "./client-entities": {
       "types": "./dist/client-entities.d.ts",
-      "import": "./dist/client-entities.js",
-      "require": "./dist/client-entities.js"
+      "import": "./dist/client-entities.js"
     },
-    "./generated/*": {
-      "types": "./dist/generated/*.d.ts",
-      "import": "./dist/generated/*.js",
-      "require": "./dist/generated/*.js"
+    "./server-entities": {
+      "types": "./dist/server-entities.d.ts",
+      "import": "./dist/server-entities.js"
     },
     "./entities/*": {
       "types": "./dist/entities/*.d.ts",
@@ -51,7 +49,7 @@
     "debug:changes": "node --loader ts-node/esm src/scripts/debug-changes.ts"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.2.17",
+    "@electric-sql/pglite": "^0.3.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^16.5.0",

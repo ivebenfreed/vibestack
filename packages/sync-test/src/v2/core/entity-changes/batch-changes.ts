@@ -7,7 +7,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { faker } from '@faker-js/faker';
-import { TaskStatus } from '@repo/dataforge/server-entities';
+import { TaskStatus, Comment } from '@repo/dataforge/generated/server-entities';
 
 import { createLogger } from '../logger.ts';
 import { EntityType, DEPENDENCY_ORDER, TABLE_TO_ENTITY } from './entity-adapter.ts';
@@ -420,8 +420,15 @@ export async function generateMixedChanges(options: MixedChangesOptions = {}): P
         }
         
         // Create comment with author, entity reference, and batch ID
-        const commentData = {};
-        const comment = await createComment(commentData, { authorId, entityId, entityType });
+        const commentData = {}; // This can hold other direct comment properties if needed
+        const commentOverrides: Partial<Comment> = { authorId };
+        if (entityType === 'task') {
+          commentOverrides.taskId = entityId;
+        } else if (entityType === 'project') {
+          commentOverrides.projectId = entityId;
+        }
+        // Pass an empty object as the first argument if no specific options like parent/task/project instances are needed here
+        const comment = await createComment({}, commentOverrides);
         
         // Create change record with batch ID
         const change = entityToChange(comment, 'insert', { batchId });

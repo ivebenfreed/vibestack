@@ -6,16 +6,16 @@
  */
 
 // Direct imports from dataforge
-import { 
-  User, 
-  Project, 
-  Task, 
+import {
+  User,
+  Project,
+  Task,
   Comment,
   TaskStatus,
   TaskPriority,
   ProjectStatus,
   UserRole
-} from '@repo/dataforge/server-entities';
+} from '@repo/dataforge/generated/server-entities';
 import { In } from 'typeorm';
 import { getDataSource } from './change-applier.ts';
 import { createLogger } from '../logger.ts';
@@ -390,7 +390,7 @@ export async function getCommentsForTask(taskId: string): Promise<Comment[]> {
     const commentRepo = dataSource.getRepository(Comment);
     
     return commentRepo.find({
-      where: { entityId: taskId }
+      where: { taskId: taskId }
     });
   } catch (error) {
     logger.error(`Error getting comments for task ${taskId}: ${error}`);

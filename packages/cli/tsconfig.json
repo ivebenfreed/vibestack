@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist", // Though not building initially, good to have
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "noEmit": true // Since we are using tsx for now
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

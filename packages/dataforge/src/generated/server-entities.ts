@@ -444,11 +444,11 @@ export const JWKSSchema = new EntitySchema<JWKS>({
         id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
         createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
         'publicKey': {
-            name: 'public_key', // Explicit DB Name
+            name: 'publicKey', // Explicit DB Name
             type: 'text', // Use helper
         },
         'privateKey': {
-            name: 'private_key', // Explicit DB Name
+            name: 'privateKey', // Explicit DB Name
             type: 'text', // Use helper
         }
     },

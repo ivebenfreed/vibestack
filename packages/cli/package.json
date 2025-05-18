@@ -1,0 +1,27 @@
+{
+  "name": "@repo/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cli": "tsx src/cli.ts",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "@repo/dataforge": "workspace:*",
+    "dotenv": "^16.4.5",
+    "commander": "^12.0.0",
+    "inquirer": "^9.2.20"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "~5.3.3",
+    "@types/node": "^20.11.20",
+    "@types/node-fetch": "^2.6.11",
+    "@types/inquirer": "^9.0.7",
+    "@repo/eslint-config": "workspace:*",
+    "eslint": "^8.56.0"
+  }
+}

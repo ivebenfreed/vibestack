@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { jwt } from "better-auth/plugins";
+// import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { NeonHTTPDialect } from "kysely-neon";
 import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
@@ -93,15 +93,51 @@ export function initializeAuth(env: Env) {
     emailAndPassword: {
       enabled: true,
     },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (userData: any, hookContext: any) => {
+            // kyselyInstance is accessible from the initializeAuth scope
+            const db = kyselyInstance;
+
+            try {
+              const userCountResult = await db
+                .selectFrom('users')
+                .select(({ fn }) => [
+                  fn.count<string>('id').as('count')
+                ])
+                .executeTakeFirst();
+              const count = parseInt(userCountResult?.count || "0", 10);
+
+              if (count === 0) {
+                console.log('[Auth Hook] First user detected. Promoting to SUPER_ADMIN.');
+                return {
+                  data: {
+                    ...userData,
+                    role: 'super_admin', // As per UserRole.SUPER_ADMIN string value
+                  },
+                };
+              }
+            } catch (error) {
+              console.error('[Auth Hook] Error checking for first user:', error);
+              // It's important to let the user know if this critical step fails.
+              // Depending on policy, you might want to prevent user creation entirely.
+              throw new Error("Failed to verify user count for super admin promotion during hook execution.");
+            }
+            return { data: userData };
+          },
+        },
+      },
+    },
     // Add JWT plugin properly
     plugins: [
-      jwt({
-        jwt: {
-          issuer: 'vibestack',
-          audience: 'vibestack',
-          expirationTime: '7d' // 7 days
-        }
-      })
+      // jwt({ // JWT plugin removed
+      //   jwt: {
+      //     issuer: 'vibestack',
+      //     audience: 'vibestack',
+      //     expirationTime: '7d' // 7 days
+      //   }
+      // })
     ],
     // Define core model names directly
     user: {
@@ -144,6 +180,14 @@ export function initializeAuth(env: Env) {
         updatedAt: 'updated_at'
       }
     },
+    // Add JWKS model configuration at the top level
+    // jwks: { // Removed jwks config as JWT plugin is removed
+    //   modelName: 'jwks',
+    //   fields: {
+    //     createdAt: 'created_at',
+    //     updatedAt: 'updated_at'
+    //   }
+    // },
     // JWKS configuration removed - using default camelCase names
     schema: {
       /* Commented out - Kysely should infer types from DB
@@ -168,10 +212,11 @@ export function initializeAuth(env: Env) {
   // Log the core model names being used
   console.log('[AUTH Runtime Init] Using core model names:', 
     JSON.stringify({ 
-      user: runtimeAuthConfig.user.modelName, 
+      user: runtimeAuthConfig.user.modelName,
       session: runtimeAuthConfig.session.modelName,
       account: runtimeAuthConfig.account.modelName,
       verification: runtimeAuthConfig.verification.modelName
+      // jwks: runtimeAuthConfig.jwks.modelName // Removed jwks from log
     })
   );
 

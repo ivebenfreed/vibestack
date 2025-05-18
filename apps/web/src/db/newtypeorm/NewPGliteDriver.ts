@@ -564,7 +564,8 @@ export class NewPGliteDriver implements Driver {
                 return value;
             case "bool":
             case "boolean":
-                return value ? 1 : 0;
+                // Return true/false instead of 1/0 since PostgreSQL/PGLite expects actual booleans
+                return value === true || value === "true" || value === 1 || value === "1" ? true : false;
             case "bytea":
                  if (typeof value === "string") {
                     // If it's a hex string from PGLite, convert it back

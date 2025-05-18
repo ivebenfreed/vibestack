@@ -22,7 +22,8 @@ import { Account } from './Account.js';
 export enum UserRole {
   ADMIN = 'admin',
   MEMBER = 'member',
-  VIEWER = 'viewer'
+  VIEWER = 'viewer',
+  SUPER_ADMIN = 'super_admin'
 }
 
 /**
