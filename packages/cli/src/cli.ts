@@ -19,8 +19,10 @@ console.log('process.env.BOOTSTRAP_SECRET after dotenv.config() in cli.ts:', pro
 
 // Now import other modules AFTER environment variables are loaded
 import { program } from 'commander';
-import { seedUsersCommand } from './commands/seed-users.js'; // Note the .js extension for ESM
-import { clearUsersCommand } from './commands/clear-users.js'; // Note the .js extension for ESM
+import inquirer from 'inquirer';
+import { logoutCommand } from './commands/logout.js';
+import { createSuperAdminCommand } from './commands/create-super-admin.js';
+import { seedUsersCommand } from './commands/seed-users.js';
 
 program
   .name('@repo/cli')
@@ -28,31 +30,91 @@ program
   .version('0.1.0');
 
 program
-  .command('seed-users')
-  .description('Seeds the database with an initial set of users, including a super admin and batch users.')
+  .command('create-super-admin')
+  .description('Creates a new super admin user and logs them in.')
   .action(async () => {
     try {
-      await seedUsersCommand();
-      console.log('Seed users command completed successfully.');
+      await createSuperAdminCommand();
       process.exit(0);
     } catch (error) {
-      console.error('Error executing seed users command:', error);
+      // The command itself should do detailed logging.
+      // console.error('An error occurred executing create-super-admin:', error); // Optional: generic catcher
       process.exit(1);
     }
   });
 
 program
-  .command('clear-users')
-  .description('Clears all users from the database via admin API, except for the super admin.')
+  .command('seed-users')
+  .description('Seeds the database with batch users. Prompts for login if no active session.')
   .action(async () => {
     try {
-      await clearUsersCommand();
-      console.log('Clear users command completed successfully.');
+      await seedUsersCommand();
       process.exit(0);
     } catch (error) {
-      console.error('Error executing clear users command:', error);
       process.exit(1);
     }
   });
 
-program.parse(process.argv);
+
+program
+  .command('logout')
+  .description('Logs out the super admin by clearing the stored session token.')
+  .action(async () => {
+    try {
+      await logoutCommand();
+      process.exit(0);
+    } catch (error) {
+      process.exit(1);
+    }
+  });
+
+async function main() {
+  // Check if any command is passed as an argument
+  // process.argv contains: [node_executable, script_path, ...args]
+  // So, if length > 2, arguments are present.
+  if (process.argv.length > 2) {
+    program.parse(process.argv);
+  } else {
+    // No arguments, show interactive menu
+    const answers = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'command',
+        message: 'What would you like to do?',
+        choices: [
+          { name: 'Create Super Admin (and auto-login)', value: 'create-super-admin' },
+          { name: 'Seed Batch Users (prompts for login if needed)', value: 'seed-users' },
+          { name: 'Logout Super Admin', value: 'logout' },
+          new inquirer.Separator(),
+          { name: 'Exit', value: 'exit' },
+        ],
+      },
+    ]);
+
+    try {
+      switch (answers.command) {
+        case 'create-super-admin':
+          await createSuperAdminCommand();
+          break;
+        case 'seed-users':
+          await seedUsersCommand();
+          break;
+        case 'logout':
+          await logoutCommand();
+          break;
+        case 'exit':
+          console.log('Exiting CLI.');
+          process.exit(0);
+          return; // Explicit return
+      }
+      process.exit(0); // Success for executed commands
+    } catch (error) {
+        // Individual commands should log their specific errors.
+        // This is a fallback.
+        // console.error("An error occurred:", error);
+        process.exit(1); // Failure
+    }
+  }
+}
+
+main();

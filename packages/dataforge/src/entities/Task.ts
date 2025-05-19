@@ -55,12 +55,12 @@ export class Task extends BaseDomainEntity {
   
   @Column({ type: "enum", enum: TaskStatus })
   @IsEnum(TaskStatus)
-  @EnumTypeName('TaskStatus')
+  @EnumTypeName({ name: 'TaskStatus', sourcePath: './Task' })
   status!: TaskStatus;
   
   @Column({ type: "enum", enum: TaskPriority, default: TaskPriority.MEDIUM })
   @IsEnum(TaskPriority)
-  @EnumTypeName('TaskPriority')
+  @EnumTypeName({ name: 'TaskPriority', sourcePath: './Task' })
   priority!: TaskPriority;
   
   @Column({ type: "timestamptz", nullable: true, name: "due_date" })
@@ -105,17 +105,14 @@ export class Task extends BaseDomainEntity {
   @JoinColumn({ name: "assignee_id" })
   assignee?: Promise<import('./User.js').User>;
   
-  @ManyToMany(() => Task)
+  @ManyToMany(() => Task, task => task.tasksDependentOnThis) // Updated to point to the new inverse property
   @JoinTable({
     name: 'task_dependencies',
-    joinColumn: {
-      name: 'dependent_task_id',
-      referencedColumnName: 'id'
-    },
-    inverseJoinColumn: {
-      name: 'dependency_task_id',
-      referencedColumnName: 'id'
-    }
+    joinColumn: { name: 'dependent_task_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'dependency_task_id', referencedColumnName: 'id' }
   })
   dependencies!: Promise<import('./Task.js').Task[]>;
-} 
+
+  @ManyToMany(() => Task, task => task.dependencies)
+  tasksDependentOnThis!: Promise<Task[]>;
+}

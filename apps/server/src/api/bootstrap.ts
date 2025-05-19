@@ -49,7 +49,7 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     throw new HTTPException(400, { message: 'Invalid JSON request body.' });
   }
   
-  const { email, password, name } = requestBody;
+  const { email, password, name, role } = requestBody;
   if (!email || !password || !name) {
     throw new HTTPException(400, { message: 'Email, password, and name required.' });
   }
@@ -58,7 +58,15 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
   try {
     // The `authInstance.api.signUpEmail` is the correct way to call it.
     // The `body` property is part of the options object for `signUpEmail`.
-    const result = await authInstance.api.signUpEmail({ body: { email, password, name } });
+    // Use type assertion to satisfy the TypeScript compiler
+    // When role is undefined, it won't be included in the API call
+    const signUpParams = {
+      body: role !== undefined
+        ? { email, password, name, role }
+        : { email, password, name }
+    } as any; // Type assertion to bypass strict typing
+    
+    const result = await authInstance.api.signUpEmail(signUpParams);
     
     // If signUpEmail is successful, result will contain user and token.
     // Errors from signUpEmail (like user already exists) are expected to be thrown.
@@ -75,66 +83,6 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     
     console.error('[Bootstrap] Super admin creation error:', error);
     throw new HTTPException(500, { message: error.message || 'Internal error creating super admin.' });
-  }
-});
-
-bootstrapRouter.post('/clear-all-users', async (c) => {
-  const bootstrapKeyHeader = c.req.header('X-Bootstrap-Key');
-  const { BOOTSTRAP_SECRET, DATABASE_URL } = c.env;
-
-  if (!BOOTSTRAP_SECRET) {
-    console.error('[Bootstrap] BOOTSTRAP_SECRET not set for clear-all-users.');
-    throw new HTTPException(500, { message: 'Bootstrap (clear all users) not configured.' });
-  }
-  if (bootstrapKeyHeader !== BOOTSTRAP_SECRET) {
-    throw new HTTPException(403, { message: 'Invalid bootstrap key for clear-all-users.' });
-  }
-
-  const neonDialect = new NeonHTTPDialect({ connectionString: DATABASE_URL });
-  const db = new Kysely<any>({ dialect: neonDialect }); // Use 'any' or your DB schema type
-
-  let clearedCount = 0;
-  let failedCount = 0;
-  let totalUsersBeforeDelete = 0;
-
-  try {
-    // Get a count of users before deletion for reporting
-    const usersBeforeDeleteResult = await db.selectFrom('users').select(db.fn.count('id').as('count')).executeTakeFirst();
-    totalUsersBeforeDelete = Number(usersBeforeDeleteResult?.count || 0);
-
-    if (totalUsersBeforeDelete === 0) {
-      return c.json({ message: 'No users found to clear.', clearedCount: 0, failedCount: 0, totalUsersBeforeDelete: 0 }, 200);
-    }
-
-    // Execute the delete operation for all users
-    const deleteResults = await db.deleteFrom('users').execute(); // Returns DeleteResult[]
-
-    // Sum up numAffectedRows from all results
-    // numAffectedRows is typically a bigint, so convert to Number
-    for (const result of deleteResults) {
-      if (result.numAffectedRows !== undefined) { // Kysely uses numAffectedRows
-        clearedCount += Number(result.numAffectedRows);
-      }
-    }
-    
-    // If clearedCount is less than totalUsersBeforeDelete, it implies some deletions might not have occurred as expected,
-    // though a single `DELETE FROM users` without a WHERE clause should ideally delete all or fail.
-    if (clearedCount < totalUsersBeforeDelete) {
-        failedCount = totalUsersBeforeDelete - clearedCount;
-        console.warn(`[Bootstrap] Attempted to delete ${totalUsersBeforeDelete} users, ${clearedCount} reported as deleted. Potential discrepancies.`);
-    }
-
-    console.log(`[Bootstrap] Cleared ${clearedCount} user(s) out of ${totalUsersBeforeDelete}.`);
-    return c.json({
-      message: `User clearing process complete. Users reported as cleared: ${clearedCount}. Total users before operation: ${totalUsersBeforeDelete}. Failures (discrepancy): ${failedCount}`,
-      clearedCount,
-      failedCount,
-      totalUsersBeforeDelete
-    }, 200);
-
-  } catch (error) {
-    console.error('[Bootstrap] Error clearing all users:', error);
-    throw new HTTPException(500, { message: 'Error during user clearing process.' });
   }
 });
 

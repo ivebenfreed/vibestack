@@ -34,7 +34,7 @@
   "scripts": {
     "prebuild": "pnpm run generate:entities",
     "build": "tsup",
-    "generate:entities": "node --loader ts-node/esm src/build/generate-entities.ts",
+    "generate:entities": "node --loader ts-node/esm src/scripts/generate-entities.ts",
     "test": "vitest",
     "typeorm": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts",
     "typeorm:client": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/client.ts",

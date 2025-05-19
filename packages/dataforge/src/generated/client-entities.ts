@@ -133,6 +133,8 @@ export class Task extends BaseDomainEntity {
 
   dependencies!: Task[];
 
+  tasksDependentOnThis!: Task[];
+
 }
 
 export class User extends BaseDomainEntity {
@@ -344,12 +346,14 @@ export const ProjectSchema = new EntitySchema<Project>({
         'owner': {
             target: 'User', // Target Entity Name (String)
             type: 'many-to-one',
+            inverseSide: 'ownedProjects',
             joinColumn: { name: 'owner_id' },
             nullable: true
         },
         'members': {
             target: 'User', // Target Entity Name (String)
             type: 'many-to-many',
+            inverseSide: 'memberProjects',
             joinTable: {
                 name: 'project_members',
                 joinColumns: [{ name: 'project_id', referencedColumnName: 'id' }],
@@ -358,7 +362,8 @@ export const ProjectSchema = new EntitySchema<Project>({
         },
         'tasks': {
             target: 'Task', // Target Entity Name (String)
-            type: 'one-to-many'
+            type: 'one-to-many',
+            inverseSide: 'project'
         }
     },
 });
@@ -472,23 +477,31 @@ export const TaskSchema = new EntitySchema<Task>({
         'project': {
             target: 'Project', // Target Entity Name (String)
             type: 'many-to-one',
+            inverseSide: 'tasks',
             joinColumn: { name: 'project_id' },
             nullable: true
         },
         'assignee': {
             target: 'User', // Target Entity Name (String)
             type: 'many-to-one',
+            inverseSide: 'tasks',
             joinColumn: { name: 'assignee_id' },
             nullable: true
         },
         'dependencies': {
             target: 'Task', // Target Entity Name (String)
             type: 'many-to-many',
+            inverseSide: 'tasksDependentOnThis',
             joinTable: {
                 name: 'task_dependencies',
                 joinColumns: [{ name: 'dependent_task_id', referencedColumnName: 'id' }],
                 inverseJoinColumns: [{ name: 'dependency_task_id', referencedColumnName: 'id' }],
             }
+        },
+        'tasksDependentOnThis': {
+            target: 'Task', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'dependencies'
         }
     },
 });
@@ -526,24 +539,27 @@ export const UserSchema = new EntitySchema<User>({
             length: 255
         },
         'role': {
-          name: 'role', // Explicit DB Name
-          type: 'enum', // Use helper
-          default: "member",
-          enum: UserRole, // Use name from decorator
+            name: 'role', // Explicit DB Name
+            type: 'enum', // Use helper
+            default: "member",
+            enum: UserRole, // Use name from decorator
         }
     },
     relations: {
         'tasks': {
             target: 'Task', // Target Entity Name (String)
-            type: 'one-to-many'
+            type: 'one-to-many',
+            inverseSide: 'assignee'
         },
         'ownedProjects': {
             target: 'Project', // Target Entity Name (String)
-            type: 'one-to-many'
+            type: 'one-to-many',
+            inverseSide: 'owner'
         },
         'memberProjects': {
             target: 'Project', // Target Entity Name (String)
-            type: 'many-to-many'
+            type: 'many-to-many',
+            inverseSide: 'members'
         }
     },
 });
@@ -569,14 +585,17 @@ export const CLIENT_DOMAIN_TABLES = [
   '"users"',
 ];
 
-// Table hierarchy levels for client domain tables
-// Level 0 = root tables (no dependencies)
-// Level 1+ = tables with dependencies
-export const CLIENT_TABLE_HIERARCHY = {
+
+/**
+ * Provides entity dependency levels for 'CLIENT_DOMAIN' tables, useful for ordered operations like seeding or data processing.
+ * Key: Entity Class Name, Value: Level (0 = no dependencies/root, 1+ = depends on other tables).
+ * Calculated based on many-to-one relationships.
+ */
+export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
   '"users"': 0,
   '"projects"': 1,
   '"tasks"': 2,
-  '"comments"': 0,
+  '"comments"': 3,
 } as const;
 
 // system tables for client context

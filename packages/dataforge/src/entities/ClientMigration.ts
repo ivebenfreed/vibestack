@@ -44,12 +44,12 @@ export class ClientMigration extends BaseSystemEntity {
 
   @Column({ type: 'enum', enum: MigrationType, name: 'migration_type' })
   @IsEnum(MigrationType)
-  @EnumTypeName('MigrationType')
+  @EnumTypeName({ name: 'MigrationType', sourcePath: './ClientMigration' })
   migrationType!: MigrationType;
 
   @Column({ type: 'enum', enum: MigrationState, default: MigrationState.PENDING })
   @IsEnum(MigrationState)
-  @EnumTypeName('MigrationState')
+  @EnumTypeName({ name: 'MigrationState', sourcePath: './ClientMigration' })
   state!: MigrationState;
 
   @Column({ type: 'text', array: true, name: 'up_queries' })

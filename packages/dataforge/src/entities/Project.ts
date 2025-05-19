@@ -47,7 +47,7 @@ export class Project extends BaseDomainEntity {
   
   @Column({ type: "enum", enum: ProjectStatus, default: ProjectStatus.ACTIVE })
   @IsEnum(ProjectStatus)
-  @EnumTypeName('ProjectStatus')
+  @EnumTypeName({ name: 'ProjectStatus', sourcePath: './Project' })
   status!: ProjectStatus;
   
   @Column({ type: "uuid", name: "owner_id", nullable: true })

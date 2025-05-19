@@ -33,7 +33,7 @@ export class ClientMigrationStatus extends BaseSystemEntity {
 
   @Column({ type: "enum", enum: MigrationStatus })
   @IsEnum(MigrationStatus)
-  @EnumTypeName('MigrationStatus')
+  @EnumTypeName({ name: 'MigrationStatus', sourcePath: './ClientMigrationStatus' })
   status!: MigrationStatus;
 
   @Column({ type: "timestamptz", nullable: true, name: "started_at" })

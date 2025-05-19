@@ -5,7 +5,9 @@ node_modules/
 dist/
 
 # Generated files
-
+generated/
+client-entities.ts
+server-entities.ts
 
 # Environment variables
 .env

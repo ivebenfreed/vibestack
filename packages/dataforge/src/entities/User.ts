@@ -58,7 +58,7 @@ export class User extends BaseDomainEntity {
   
   @Column({ type: "enum", enum: UserRole, default: UserRole.MEMBER })
   @IsEnum(UserRole)
-  @EnumTypeName('UserRole')
+  @EnumTypeName({ name: 'UserRole', sourcePath: './User' })
   role!: UserRole;
   
   // Relationship fields using Relation wrapper to avoid circular dependencies

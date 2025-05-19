@@ -97,33 +97,11 @@ export function initializeAuth(env: Env) {
       user: {
         create: {
           before: async (userData: any, hookContext: any) => {
-            // kyselyInstance is accessible from the initializeAuth scope
-            const db = kyselyInstance;
-
-            try {
-              const userCountResult = await db
-                .selectFrom('users')
-                .select(({ fn }) => [
-                  fn.count<string>('id').as('count')
-                ])
-                .executeTakeFirst();
-              const count = parseInt(userCountResult?.count || "0", 10);
-
-              if (count === 0) {
-                console.log('[Auth Hook] First user detected. Promoting to SUPER_ADMIN.');
-                return {
-                  data: {
-                    ...userData,
-                    role: 'super_admin', // As per UserRole.SUPER_ADMIN string value
-                  },
-                };
-              }
-            } catch (error) {
-              console.error('[Auth Hook] Error checking for first user:', error);
-              // It's important to let the user know if this critical step fails.
-              // Depending on policy, you might want to prevent user creation entirely.
-              throw new Error("Failed to verify user count for super admin promotion during hook execution.");
-            }
+            console.log('[Auth Hook - user.create.before] Received userData:', JSON.stringify(userData, null, 2)); // Added log
+            console.log('User data in hook after type change:', JSON.stringify(userData));
+            // Simply pass through userData, respecting any role set by calling code
+            // If userData.role is set, it will be used
+            // If userData.role is not set, the DB default ('member') will apply
             return { data: userData };
           },
         },
@@ -146,6 +124,18 @@ export function initializeAuth(env: Env) {
         emailVerified: 'email_verified',
         createdAt: 'created_at',
         updatedAt: 'updated_at'
+        // 'role' is a native column in the 'users' table,
+        // so it doesn't need to be in 'fields' for mapping if the column name matches the property name.
+        // However, to ensure better-auth processes it from input to hooks and then to DB,
+        // we declare it in additionalFields.
+      },
+      additionalFields: {
+        role: {
+          type: "string" as const, // Matches UserRole enum (string values)
+          required: false, // The DB has a default
+          defaultValue: "member", // Default if not provided; DB default is also 'member'
+          input: true // Allow 'role' to be passed in the body of signUpEmail
+        }
       }
     },
     session: {

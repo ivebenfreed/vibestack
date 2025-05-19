@@ -18,7 +18,7 @@ const config = {
     'pg',
   ],
   treeshake: false,
-  esbuildOptions(options) {
+  esbuildOptions(options: import('esbuild').BuildOptions) {
     options.tsconfig = 'tsconfig.json';
   }
 };
