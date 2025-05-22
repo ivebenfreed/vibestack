@@ -16,7 +16,11 @@
     "prebuild": "pnpm quality",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "preinstall": "npx only-allow pnpm",
-    "cli": "pnpm --filter @repo/cli cli"
+    "cli": "pnpm --filter @repo/cli cli",
+    "forge:build": "pnpm --filter @repo/dataforge forge:build",
+    "forge:migrate:generate": "pnpm --filter @repo/dataforge forge:migrate generate",
+    "forge:migrate:run": "pnpm --filter @repo/dataforge forge:migrate run",
+    "forge:deploy": "pnpm --filter @repo/dataforge deploy"
   },
   "devDependencies": {
     "@repo/code-quality": "workspace:*",

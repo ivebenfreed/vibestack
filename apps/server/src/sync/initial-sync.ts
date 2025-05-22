@@ -9,7 +9,7 @@ import type {
 import type { MinimalContext } from '../types/hono';
 import { syncLogger } from '../middleware/logger';
 import { sql } from '../lib/db';
-import { SERVER_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
 import type { QueryResultRow } from '@neondatabase/serverless';
 import { getDBClient } from '../lib/db';
 import type { WebSocket } from '../types/cloudflare';
@@ -23,7 +23,7 @@ const MODULE_NAME = 'initial-sync';
 const WS_CHUNK_SIZE = 500;  // Reduced from 2000 to 500 for better client performance
 const DEFAULT_CHUNK_SIZE = 500;  // Also reduced default chunk size for better performance
 
-type TableName = keyof typeof SERVER_TABLE_HIERARCHY;
+type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 interface ChunkOptions {
   chunkSize?: number;
@@ -273,9 +273,9 @@ export async function performInitialSync(
     await stateManager.saveInitialSyncProgress(clientId, syncState);
 
     // Get ordered tables for sync
-    const sortedTables = Object.keys(SERVER_TABLE_HIERARCHY).sort((a, b) => {
-      const levelA = SERVER_TABLE_HIERARCHY[a as TableName];
-      const levelB = SERVER_TABLE_HIERARCHY[b as TableName];
+    const sortedTables = Object.keys(SERVER_DOMAIN_TABLE_HIERARCHY).sort((a, b) => {
+      const levelA = SERVER_DOMAIN_TABLE_HIERARCHY[a as TableName];
+      const levelB = SERVER_DOMAIN_TABLE_HIERARCHY[b as TableName];
       return levelA - levelB;
     });
 

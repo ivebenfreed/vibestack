@@ -1,8 +1,14 @@
-import * as React from 'react'
+leimport * as React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, RefreshCw } from 'lucide-react'
-import { useDataTable } from './data-table-provider'
+// import { useDataTable } from './data-table-provider' // Removed
+
+// Hardcoded defaults
+const DEFAULT_ERROR_MESSAGE = "An error occurred."
+const DEFAULT_RETRY_ON_ERROR = true;
+const DEFAULT_MAX_RETRY_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY = 1000; // ms
 
 /**
  * Error state component for the data table
@@ -18,7 +24,7 @@ export function DataTableError({
   title?: string
   description?: string
 }) {
-  const { config } = useDataTable?.() || { config: { errorMessage: 'An error occurred while loading data.' } }
+  // const { config } = useDataTable?.() || { config: { errorMessage: 'An error occurred while loading data.' } } // Removed
   
   // Extract error message
   const errorMessage = error instanceof Error ? error.message : error
@@ -30,7 +36,7 @@ export function DataTableError({
           <AlertCircle className="h-10 w-10 text-destructive mb-4 sm:mb-0 sm:mr-6" />
           <div>
             <h3 className="text-lg font-medium text-destructive">
-              {title || config.errorMessage}
+              {title || DEFAULT_ERROR_MESSAGE}
             </h3>
             
             {description && (
@@ -135,17 +141,18 @@ export function useDataFetchWithErrorHandling<T>(
     retryDelay?: number
   }
 ) {
-  const { config } = useDataTable?.() || { 
-    config: { retryOnError: true, maxRetryAttempts: 3 } 
-  }
+  // const { config } = useDataTable?.() || { // Removed
+  //   config: { retryOnError: true, maxRetryAttempts: 3 }
+  // }
   
   const [data, setData] = React.useState<T | undefined>(options?.initialData)
   const [error, setError] = React.useState<Error | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [retryCount, setRetryCount] = React.useState(0)
   
-  const maxRetries = options?.maxRetries ?? config.maxRetryAttempts ?? 3
-  const retryDelay = options?.retryDelay ?? 1000
+  const shouldRetryOnError = options?.onError !== undefined ? !!options.maxRetries : DEFAULT_RETRY_ON_ERROR;
+  const maxRetries = options?.maxRetries ?? DEFAULT_MAX_RETRY_ATTEMPTS
+  const retryDelay = options?.retryDelay ?? DEFAULT_RETRY_DELAY
   
   // Function to fetch data
   const fetchData = React.useCallback(async () => {
@@ -162,7 +169,7 @@ export function useDataFetchWithErrorHandling<T>(
       options?.onError?.(error)
       
       // Auto-retry if configured
-      if (config.retryOnError && retryCount < maxRetries) {
+      if (shouldRetryOnError && retryCount < maxRetries) {
         setTimeout(() => {
           setRetryCount(prev => prev + 1)
           fetchData()
@@ -171,7 +178,7 @@ export function useDataFetchWithErrorHandling<T>(
     } finally {
       setLoading(false)
     }
-  }, [fetchFn, retryCount, config.retryOnError, maxRetries, retryDelay, options])
+  }, [fetchFn, retryCount, shouldRetryOnError, maxRetries, retryDelay, options])
   
   // Retry function for manual retry
   const retry = React.useCallback(() => {

@@ -22,8 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { DataTablePagination } from '../components/data-table-pagination'
-import { DataTableToolbar } from '../components/data-table-toolbar'
+import { DataTablePagination } from '../components/data-table-pagination' // Reverted path
+import { DataTableMainToolbar } from '@/components/data-table/toolbar/data-table-main-toolbar' // Adjusted path
+import { priorities, statuses } from '../data/data' // Added for toolbar config
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -69,7 +70,22 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className='space-y-4'>
-      <DataTableToolbar table={table} />
+      <DataTableMainToolbar
+        table={table}
+        textFilterConfig={{ columnId: 'title', placeholder: 'Filter tasks...' }}
+        facetedFilterConfigs={[
+          {
+            columnId: 'status',
+            title: 'Status',
+            options: statuses,
+          },
+          {
+            columnId: 'priority',
+            title: 'Priority',
+            options: priorities,
+          },
+        ]}
+      />
       <div className='rounded-md border'>
         <Table>
           <TableHeader>

@@ -14,6 +14,8 @@
     "knip": "knip"
   },
   "dependencies": {
+    "@casl/ability": "^6.7.3",
+    "@casl/react": "^5.0.0",
     "@electric-sql/pglite": "^0.2.17",
     "@electric-sql/pglite-react": "^0.2.17",
     "@electric-sql/pglite-repl": "^0.2.17",

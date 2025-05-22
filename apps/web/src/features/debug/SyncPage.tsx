@@ -9,13 +9,7 @@ import { ThemeSwitch } from '@/components/theme-switch';
 export function SyncPage() {
   return (
     <>
-      <Header fixed>
-        <Search />
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header fixed />
       <Main>
         <div className="mb-2 flex items-center justify-between space-y-2">
           <h1 className='text-2xl font-bold tracking-tight'>Sync Debug</h1>

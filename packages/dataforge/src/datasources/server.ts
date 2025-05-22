@@ -9,8 +9,14 @@ import { isServerEntity } from '../utils/context.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from .env file
-config();
+// Determine the current environment
+const currentEnv = process.env.NODE_ENV || 'development';
+
+// Load environment-specific .env file
+config({ path: path.resolve(__dirname, `../../.env.${currentEnv}`) });
+
+// Load general .env file (environment-specific variables will take precedence)
+config({ path: path.resolve(__dirname, '../../.env'), override: false });
 
 // Create server datasource
 const serverDataSource = new DataSource({

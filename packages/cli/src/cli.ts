@@ -23,6 +23,7 @@ import inquirer from 'inquirer';
 import { logoutCommand } from './commands/logout.js';
 import { createSuperAdminCommand } from './commands/create-super-admin.js';
 import { seedUsersCommand } from './commands/seed-users.js';
+import { initDataforgeCommand } from './commands/init-dataforge.js';
 
 program
   .name('@repo/cli')
@@ -68,6 +69,21 @@ program
     }
   });
 
+program
+  .command('init-dataforge')
+  .description('Initializes Dataforge: builds, generates "InitialSchema" migrations and triggers, and runs all migrations.')
+  .action(async () => {
+    try {
+      console.log('Executing init-dataforge command...');
+      await initDataforgeCommand();
+      console.log('init-dataforge command completed successfully.');
+      process.exit(0);
+    } catch (error) {
+      console.error('Error executing init-dataforge command. See details above.');
+      process.exit(1);
+    }
+  });
+
 async function main() {
   // Check if any command is passed as an argument
   // process.argv contains: [node_executable, script_path, ...args]
@@ -84,6 +100,7 @@ async function main() {
         choices: [
           { name: 'Create Super Admin (and auto-login)', value: 'create-super-admin' },
           { name: 'Seed Batch Users (prompts for login if needed)', value: 'seed-users' },
+          { name: 'Initialize Dataforge (uses "InitialSchema")', value: 'init-dataforge' },
           { name: 'Logout Super Admin', value: 'logout' },
           new inquirer.Separator(),
           { name: 'Exit', value: 'exit' },
@@ -101,6 +118,16 @@ async function main() {
           break;
         case 'logout':
           await logoutCommand();
+          break;
+        case 'init-dataforge':
+          try {
+            console.log('Executing init-dataforge command via interactive menu...');
+            await initDataforgeCommand();
+            console.log('init-dataforge command completed successfully via interactive menu.');
+          } catch (error) {
+            console.error('Error executing init-dataforge command from interactive menu. See details above.');
+            throw error; // Re-throw to be caught by the main try/catch
+          }
           break;
         case 'exit':
           console.log('Exiting CLI.');

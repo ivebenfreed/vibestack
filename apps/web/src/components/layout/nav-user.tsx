@@ -30,7 +30,7 @@ import { useSignOut } from '@/hooks/use-sign-out'
 export function NavUser({
   user: propUser, // Keep the original prop for backward compatibility
 }: {
-  user: {
+  user?: { // Make user prop optional
     name: string
     email: string
     avatar: string
@@ -42,9 +42,9 @@ export function NavUser({
   
   // Use the database profile if available, otherwise fall back to props/auth store
   const user = {
-    name: userProfile?.name || propUser.name || 'User',
-    email: userProfile?.email || propUser.email || '',
-    avatar: userProfile?.image || propUser.avatar,
+    name: userProfile?.name || propUser?.name || 'User', // Safely access propUser.name
+    email: userProfile?.email || propUser?.email || '', // Safely access propUser.email
+    avatar: userProfile?.image || propUser?.avatar, // Safely access propUser.avatar
   }
 
   return (

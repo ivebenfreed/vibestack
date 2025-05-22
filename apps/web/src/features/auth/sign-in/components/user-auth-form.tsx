@@ -64,7 +64,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       console.log("[AUTH] Sign In Result Object:", result); 
 
       if ('data' in result && result.data?.user) {
-        setAuthenticated({ id: result.data.user.id, email: result.data.user.email });
+        setAuthenticated({ id: result.data.user.id, email: result.data.user.email, role: result.data.user.role });
         toast.success("Login successful!");
         navigate({ to: '/', replace: true });
       } else if ('error' in result) {

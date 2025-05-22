@@ -1,5 +1,7 @@
-import { ReactNode } from 'react'
+import { ReactNode, useContext } from 'react' // Added useContext
 import { Link, useLocation } from '@tanstack/react-router'
+import { Can } from '@casl/react'; // Added Can
+import { AbilityContext } from '../../contexts/AbilityContext'; // Added AbilityContext
 import { ChevronRight } from 'lucide-react'
 import {
   Collapsible,
@@ -38,15 +40,22 @@ export function NavGroup({ title, items }: NavGroup) {
         {items.map((item) => {
           const key = `${item.title}-${item.url}`
 
-          if (!item.items)
-            return <SidebarMenuLink key={key} item={item} href={href} />
+          const menuItemContent = () => {
+            if (!item.items)
+              return <SidebarMenuLink key={key} item={item} href={href} />;
+            if (state === 'collapsed')
+              return <SidebarMenuCollapsedDropdown key={key} item={item} href={href} />;
+            return <SidebarMenuCollapsible key={key} item={item} href={href} />;
+          };
 
-          if (state === 'collapsed')
+          if (item.title === 'Debug') {
             return (
-              <SidebarMenuCollapsedDropdown key={key} item={item} href={href} />
-            )
-
-          return <SidebarMenuCollapsible key={key} item={item} href={href} />
+              <Can I="access" a="debug_features" ability={useContext(AbilityContext)} key={key}>
+                {menuItemContent()}
+              </Can>
+            );
+          }
+          return menuItemContent();
         })}
       </SidebarMenu>
     </SidebarGroup>

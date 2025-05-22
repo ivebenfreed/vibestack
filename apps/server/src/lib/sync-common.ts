@@ -1,5 +1,5 @@
 import type { TableChange } from '@repo/sync-types';
-import { SERVER_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
 import { getDBClient, sql } from './db'; // Import necessary DB helpers
 import type { MinimalContext } from '../types/hono'; // Import context type
 import { syncLogger } from '../middleware/logger'; // Import logger
@@ -250,7 +250,7 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
   };
 }
 
-type TableName = keyof typeof SERVER_TABLE_HIERARCHY;
+type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 /**
  * Order changes based on table hierarchy and operation type
@@ -267,8 +267,8 @@ export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
   // Create a new copy to sort to avoid modifying the original array
   const ordered = [...changes].sort((a, b) => {
     // Add quotes to match SERVER_TABLE_HIERARCHY keys
-    const aLevel = SERVER_TABLE_HIERARCHY[`"${a.table}"` as TableName] ?? 0;
-    const bLevel = SERVER_TABLE_HIERARCHY[`"${b.table}"` as TableName] ?? 0;
+    const aLevel = SERVER_DOMAIN_TABLE_HIERARCHY[`"${a.table}"` as TableName] ?? 0;
+    const bLevel = SERVER_DOMAIN_TABLE_HIERARCHY[`"${b.table}"` as TableName] ?? 0;
 
     // For deletes, reverse the hierarchy
     if (a.operation === 'delete' && b.operation === 'delete') {

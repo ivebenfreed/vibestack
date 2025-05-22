@@ -1,70 +1,46 @@
-import React, { Suspense, useMemo } from 'react' // Removed useState
-import { CellContext, ColumnDef } from '@tanstack/react-table' // Removed SortingState
+import React, { Suspense, useMemo } from 'react'
+import { CellContext, ColumnDef } from '@tanstack/react-table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   EditableTextCell,
   EditableSelectCell,
   EditableDateCell,
-  // EditableCheckboxCell, // Not used in current columns
-  // ProjectCell, // Not used directly
-  EditableProjectCell, // Still used, but will need rework due to cache removal
-  EditableUserCell,   // Still used, but will need rework due to cache removal
-} from '@/components/data-table/data-table-cells'
+  // EditableRelationshipCell, // No longer directly imported, used via factory
+  createEditableEntityCell as createEditableEntityCellV2
+} from '@/components/data-table/data-table-logic' // Updated import path
 import { usePGliteContext } from '@/db/pglite-provider'
-// import { Badge } from '@/components/ui/badge' // Not used
-import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
+import { Task, TaskStatus, TaskPriority, Project, User } from '@repo/dataforge/client-entities' // Added Project, User
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { SearchProvider } from '@/context/search-context'
-import { DebugNavigation } from './components/DebugNavigation'
 import { format } from 'date-fns'
-import { DataTableProvider } from '@/components/data-table/data-table-provider'
-import { DataTableErrorBoundary } from '@/components/data-table/data-table-error' // DataTableError removed as EntityDataTable handles it
-import { pluginRegistry } from '@/components/data-table/data-table-plugins'
 import { DataTableSkeleton } from '@/components/ui/table-skeleton'
-import { RepositoryDataTable } from '@/components/data-table/data-table-entity' // Changed to RepositoryDataTable
+import { EntityDataTable } from '@/components/data-table/data-table-entity' // Updated import path and component name
 
-// Register plugins for Task-specific cell renderers
-pluginRegistry.registerCellPlugin({
-  id: 'task-status-cell',
-  name: 'Task Status Cell',
-  canHandle: (context) =>
-    context.column.id === 'status' &&
-    typeof context.getValue() === 'string',
-  render: (context) => {
-    const options = Object.values(TaskStatus).map(status => ({
-      label: status,
-      value: status
-    }))
-    return <EditableSelectCell {...context} options={options} />
-  }
-})
+// Note: V1 pluginRegistry and DataTableErrorBoundary removed for initial V2 testing.
+// These may need to be re-introduced or adapted if V2 components require them.
 
-pluginRegistry.registerCellPlugin({
-  id: 'task-priority-cell',
-  name: 'Task Priority Cell',
-  canHandle: (context) =>
-    context.column.id === 'priority' &&
-    typeof context.getValue() === 'string',
-  render: (context) => {
-    const options = Object.values(TaskPriority).map(priority => ({
-      label: priority,
-      value: priority
-    }))
-    return <EditableSelectCell {...context} options={options} />
-  }
-})
+// V2 Cell Factories for Project and User
+const EditableProjectCellV2 = createEditableEntityCellV2<Project>({
+  serviceName: 'projects', // This key must match the key in PGliteContext services
+  getDisplayValue: (project) => project?.name || 'N/A',
+  emptyLabel: 'No Project',
+});
 
-function DataTableDebugPanel() {
-  // const [sorting, setSorting] = useState<SortingState>([]) // Removed, RepositoryDataTable handles its own sorting state
+const EditableUserCellV2 = createEditableEntityCellV2<User>({
+  serviceName: 'users', // This key must match the key in PGliteContext services
+  getDisplayValue: (user) => user?.name || user?.email || 'N/A',
+  emptyLabel: 'Unassigned',
+});
+
+function DataTableV2DebugPanel() {
   const { services, isLoading: servicesLoading, repositories } = usePGliteContext()
 
   const ormTaskRepository = useMemo(() => {
     if (repositories?.tasks) {
-      // Ensure getOrmRepository is callable
       if (typeof (repositories.tasks as any).getOrmRepository === 'function') {
         return (repositories.tasks as any).getOrmRepository();
       }
@@ -73,9 +49,6 @@ function DataTableDebugPanel() {
     return undefined;
   }, [repositories]);
   
-  // Define columns with all available task fields
-  // Note: EditableProjectCell and EditableUserCell will require rework
-  // as globalEntityCache has been removed.
   const columns = useMemo<ColumnDef<Task, any>[]>(() => [
     {
       accessorKey: 'id',
@@ -86,7 +59,7 @@ function DataTableDebugPanel() {
     {
       accessorKey: 'title',
       header: 'Title',
-      enableHiding: false, // Don't allow hiding the title
+      enableHiding: false,
       cell: (props: CellContext<Task, string>) => <EditableTextCell {...props} />,
     },
     {
@@ -142,17 +115,13 @@ function DataTableDebugPanel() {
       accessorKey: 'projectId',
       header: 'Project',
       enableHiding: true,
-      // This cell will likely not work correctly until EntityDataTable's relationship handling
-      // is configured or the cell is adapted.
-      cell: (props: CellContext<Task, string>) => <EditableProjectCell {...props} />,
+      cell: (props: CellContext<Task, string>) => <EditableProjectCellV2 {...props} />,
     },
     {
       accessorKey: 'assigneeId',
       header: 'Assignee',
       enableHiding: true,
-      // This cell will likely not work correctly until EntityDataTable's relationship handling
-      // is configured or the cell is adapted.
-      cell: (props: CellContext<Task, string>) => <EditableUserCell {...props} />,
+      cell: (props: CellContext<Task, string>) => <EditableUserCellV2 {...props} />,
     },
     {
       accessorKey: 'tags',
@@ -183,103 +152,79 @@ function DataTableDebugPanel() {
     },
   ], [])
 
-  // Show skeleton while PGlite services are loading or if the ormTaskRepository isn't ready
   if (servicesLoading || !ormTaskRepository) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Tasks with Editable Cells
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <DataTableSkeleton />
-            <div className="text-xs text-muted-foreground">
-              {servicesLoading ? "Loading database services..." :
-               !repositories ? "Initializing repositories..." :
-               !repositories.tasks ? "Initializing task repository..." :
-               !ormTaskRepository ? "Obtaining ORM task repository..." :
-               "Loading tasks..."}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <SearchProvider>
+        <Header />
+        <Main className="flex flex-col pt-4 px-4">
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>
+                Tasks - V2 Data Table Test
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <DataTableSkeleton />
+                <div className="text-xs text-muted-foreground">
+                  {servicesLoading ? "Loading database services..." :
+                   !repositories ? "Initializing repositories..." :
+                   !repositories.tasks ? "Initializing task repository..." :
+                   !ormTaskRepository ? "Obtaining ORM task repository..." :
+                   "Loading tasks..."}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Main>
+      </SearchProvider>
     );
   }
-  
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Tasks with Editable Cells
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <RepositoryDataTable<Task>
-            tableId="debug-tasks-table"
-            entityType="Task"
-            repository={ormTaskRepository}
-            customColumns={columns}
-            title=""
-            showCard={false}
-            tableConfig={{
-              pageSize: 10,
-              enableSorting: true,
-              showColumnVisibility: true,
-              enablePagination: true,
-            }}
-            additionalTableProps={{
-              columnVisibilityButtonClassName:"ml-auto",
-            }}
-            customEditableColumns={['title', 'description', 'status', 'priority', 'dueDate', 'projectId', 'assigneeId']} // ADDED
-            // onEntityUpdated, onEntityDeleted, onEntityCreated can be added if needed
-            relatedServices={ services?.projects && services?.users ? {
-                project: services.projects, // Assuming services.projects is the service for Project entities
-                user: services.users        // Assuming services.users is the service for User entities
-              } : {} }
-            // typeormOptions would be needed to configure how 'project' and 'user' relationships are handled
-            // e.g. typeormOptions={{ relationshipConfigs: { projectId: { serviceKey: 'project', displayField: 'name' }, assigneeId: { serviceKey: 'user', displayField: 'name' } } }}
-          />
-        </CardContent>
-      </Card>
-    </>
-  )
-}
 
-export default function DataTablePage() {
   return (
     <SearchProvider>
-      <Header fixed>
-        <Search />
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
+      <Header />
+      <Main className="flex flex-col pt-4 px-4">
+        <div className="mt-4">
+          <EntityDataTable<Task>
+            tableId="debug-tasks-table-v2"
+            // repository prop might not be directly applicable to EntityDataTable,
+            // it expects liveQueryBuilder and service props.
+            // For now, keeping ormTaskRepository to see if it's used internally by EntityDataTable
+            // or if it needs to be adapted to service/liveQueryBuilder.
+            // This will likely cause a type error if EntityDataTable doesn't accept 'repository'.
+            // The 'service' and 'liveQueryBuilder' props will be critical.
+            // We need to pass the entityType as well.
+            entityType="Task" // Added entityType
+            liveQueryBuilder={services.tasks?.getRepo()?.getOrmRepository?.()?.createQueryBuilder('task')}
+            service={{
+              getRepo: () => services.tasks.getRepo(),
+              create: (data) => services.tasks.createTask(data),
+              update: (id, data) => services.tasks.updateTask(id, data),
+              delete: (id) => services.tasks.deleteTask(id),
+              getById: (id) => services.tasks.get(id), // Assuming EntityDataTable might use this
+            }}
+            customColumns={columns}
+            title="Tasks - V2 Data Table Test"
+            showCard={true}
+            textFilterConfig={{ columnId: 'title', placeholder: 'Filter tasks by title...' }}
+            retryOnError={true}
+            maxRetryAttempts={3}
+            tableConfig={{
+              enableSorting: true,
+              enablePagination: true,
+              pageSize: 10 // Also moving defaultPageSize here as pageSize
+            }}
+            customEditableColumns={['title', 'description', 'status', 'priority', 'dueDate', 'projectId', 'assigneeId']}
+            relatedServices={ services?.projects && services?.users ? {
+                project: services.projects,
+                user: services.users
+              } : {} }
+          />
         </div>
-      </Header>
-      <Main>
-        <div className="mb-2 flex items-center justify-between space-y-2">
-          <h1 className='text-2xl font-bold tracking-tight'>DataTable Debug</h1>
-        </div>
-        
-        <DataTableProvider
-          initialConfig={{
-            defaultPageSize: 10,
-            cacheExpiryTime: 5 * 60 * 1000, // 5 minutes
-            retryOnError: true,
-            maxRetryAttempts: 3
-          }}
-        >
-          <DataTableErrorBoundary>
-          <Suspense fallback={<div>Loading data table debug panel...</div>}>
-            <DataTableDebugPanel />
-          </Suspense>
-          </DataTableErrorBoundary>
-        </DataTableProvider>
-        
-        <DebugNavigation />
       </Main>
     </SearchProvider>
-  )
-} 
+  );
+}
+
+export default DataTableV2DebugPanel;

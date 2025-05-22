@@ -72,7 +72,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
       console.log("[AUTH] Sign Up Result:", result);
 
       if ('data' in result && result.data?.user) {
-        setAuthenticated({ id: result.data.user.id, email: result.data.user.email });
+        setAuthenticated({ id: result.data.user.id, email: result.data.user.email, role: result.data.user.role });
         toast.success("Account created successfully!");
         navigate({ to: '/', replace: true });
       } else if ('error' in result) {

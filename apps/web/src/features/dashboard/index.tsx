@@ -11,15 +11,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { TopNav } from '@/components/layout/top-nav'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
+// ProfileDropdown is now in the main Header
+// Search, ThemeSwitch, and SyncStatusIcon are now in the main Header
 import { RecentTasks } from './components/recent-tasks'
-import { TypeORMTest } from './components/typeorm-test'
 import { getNewPGliteDataSource, NewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
 import type { Task, User, Project, Comment } from '@dataforge/generated/client-entities'
 import { Repository } from 'typeorm'
 import { SyncVisualizer } from '../sync/components/SyncVisualizer'
+// SyncStatusIcon is now in the main Header
 
 export default function Dashboard() {
   const [tableCounts, setTableCounts] = useState<{ [key: string]: number }>({});
@@ -92,10 +91,10 @@ export default function Dashboard() {
       {/* ===== Top Heading ===== */}
       <Header>
         <TopNav links={topNav} />
+        {/* Search, SyncStatusIcon, ThemeSwitch, and ProfileDropdown are now in the main Header */}
+        {/* The div below is now empty and can be removed or left for future header-specific items */}
         <div className='ml-auto flex items-center space-x-4'>
-          <Search />
-          <ThemeSwitch />
-          <ProfileDropdown />
+          {/* Content removed as ProfileDropdown is in the main header */}
         </div>
       </Header>
 
@@ -117,7 +116,6 @@ export default function Dashboard() {
           <div className='w-full overflow-x-auto pb-2'>
             <TabsList>
               <TabsTrigger value='overview'>Overview</TabsTrigger>
-              <TabsTrigger value='typeorm'>TypeORM Test</TabsTrigger>
               <TabsTrigger value='analytics' disabled>
                 Analytics
               </TabsTrigger>
@@ -249,12 +247,6 @@ export default function Dashboard() {
             </div>
           </TabsContent>
           
-          {/* TypeORM Test Tab */}
-          <TabsContent value='typeorm' className='space-y-4'>
-            <div className='grid grid-cols-1 gap-4'>
-              <TypeORMTest />
-            </div>
-          </TabsContent>
         </Tabs>
       </Main>
     </>

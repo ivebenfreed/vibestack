@@ -77,22 +77,34 @@ export const fetchMigrationsFromServer = async (): Promise<Migration[] | null> =
   try {
     console.log('Fetching migrations from server...');
     
+    // Get the API base URL
     const baseUrl = getApiBaseUrl();
-    const apiUrl = `${baseUrl}/api/migrations`;
+    console.log(`API base URL: ${baseUrl}`);
     
-    console.log(`Fetching migrations from: ${apiUrl}`);
+    // Use a relative URL instead of a fully qualified URL
+    // This lets the browser and Vite handle the proper URL construction
+    const apiUrl = `/api/migrations`;
+    
+    console.log(`Fetching migrations using relative path: ${apiUrl}`);
+    console.log(`Document location: ${window.location.href}`);
+    console.log(`Cookie available: ${!!document.cookie}`);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
       },
-      credentials: 'same-origin',
+      credentials: 'include',
       // Add a timeout to prevent hanging
       signal: AbortSignal.timeout(10000),
     });
     
+    console.log(`Response status: ${response.status}`);
+    console.log(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response body:`, errorText);
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);
     }
     

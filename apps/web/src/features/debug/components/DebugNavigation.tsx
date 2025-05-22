@@ -10,6 +10,7 @@ export function DebugNavigation() {
     { path: '/debug/live-query', label: 'Live Query' },
     { path: '/debug/data-table', label: 'Data Table' },
     { path: '/debug/auth', label: 'Auth' },
+    { path: '/debug/typeorm-test', label: 'TypeORM Test' },
   ];
   
   return (

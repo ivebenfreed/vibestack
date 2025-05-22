@@ -22,8 +22,8 @@ import { useEffect } from 'react'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
+import { AbilityProvider } from './contexts/AbilityContext'; // Adjust path
 // Import the Mini Sync Visualizer
-import { MiniSyncVisualizer } from './features/sync/components/MiniSyncVisualizer';
 
 // Import the database functions
 
@@ -109,7 +109,6 @@ function AuthAwareProviders({ children }: { children: React.ReactNode }) {
       <VibestackPGliteProvider>
         <SyncProvider autoConnect={true}>
           {children}
-          <MiniSyncVisualizer />
         </SyncProvider>
       </VibestackPGliteProvider>
     )
@@ -129,7 +128,9 @@ if (!rootElement.innerHTML) {
       <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
         <FontProvider>
           <AuthAwareProviders>
-            <RouterProvider router={router} />
+            <AbilityProvider>
+              <RouterProvider router={router} />
+            </AbilityProvider>
           </AuthAwareProviders>
         </FontProvider>
       </ThemeProvider>

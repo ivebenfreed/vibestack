@@ -169,7 +169,7 @@ export const Route = createRootRouteWithContext<{
           if (!isAuthenticated || isLoading || useAuthStore.getState().user?.id !== sessionData.user.id) {
             console.log("[AUTH] Session data received. Setting authenticated state.", sessionData.user);
             setAuthenticated(
-              { id: sessionData.user.id, email: sessionData.user.email },
+              { id: sessionData.user.id, email: sessionData.user.email, role: sessionData.user.role },
               sessionExpiryString
             );
           } else if (sessionExpiryString && sessionExpiresAt !== sessionExpiryString) {

@@ -5,9 +5,10 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 // import Cookies from 'js-cookie';
 
 // Define a simpler state focused on auth status and user data
-interface UserInfo {
+export interface UserInfo {
   id: string;
   email?: string;
+  role?: string; // <--- ADD THIS
   // Add other relevant fields from your User model
 }
 

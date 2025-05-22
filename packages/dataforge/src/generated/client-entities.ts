@@ -115,6 +115,8 @@ export class Task extends BaseDomainEntity {
 
   dueDate?: Date;
 
+  startDate?: Date;
+
   completedAt?: Date;
 
   timeRange?: any;
@@ -438,6 +440,11 @@ export const TaskSchema = new EntitySchema<Task>({
         },
         'dueDate': {
             name: 'due_date', // Explicit DB Name
+            type: 'timestamptz', // Use helper
+            nullable: true
+        },
+        'startDate': {
+            name: 'start_date', // Explicit DB Name
             type: 'timestamptz', // Use helper
             nullable: true
         },

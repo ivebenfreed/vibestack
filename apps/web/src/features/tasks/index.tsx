@@ -7,13 +7,9 @@ import { TasksMutateDrawer } from './components/tasks-mutate-drawer';
 import { useTasks as useTasksUI } from './context/tasks-context';
 import TasksProvider from './context/tasks-context';
 import { Main } from '@/components/layout/main';
-import { Header } from '@/components/layout/header';
 import { TopNav } from '@/components/layout/top-nav';
 import { Button } from '@/components/ui/button';
 import { Task } from '@repo/dataforge/client-entities'; // Corrected path
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { TasksDialogs } from './components/tasks-dialogs'
 import { TasksPrimaryButtons } from './components/tasks-primary-buttons'
 import { SortingState } from '@tanstack/react-table'
@@ -85,14 +81,6 @@ const Tasks: React.FC = () => {
 
   return (
     <TasksProvider>
-      <Header fixed>
-        <Search />
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
       <Main>
         <div className='mb-2 flex flex-wrap items-center justify-between space-y-2 gap-x-4'>
           <div>

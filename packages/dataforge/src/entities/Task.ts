@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, ManyToMany, JoinTable, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, ManyToMany, JoinTable, JoinColumn, Check } from 'typeorm';
 import { 
   IsString, 
   MinLength, 
@@ -38,6 +38,7 @@ export enum TaskPriority {
  * Extends BaseDomainEntity for common fields and behavior
  */
 @Entity('tasks')
+@Check('chk_task_start_date_before_due_date', '("start_date" IS NULL OR "due_date" IS NULL) OR ("start_date" < "due_date")')
 export class Task extends BaseDomainEntity {
   // No need for id, created_at, updated_at, client_id as they're in BaseDomainEntity
   
@@ -67,6 +68,11 @@ export class Task extends BaseDomainEntity {
   @IsOptional()
   @IsDate()
   dueDate?: Date;
+
+  @Column({ type: "timestamptz", nullable: true, name: "start_date" })
+  @IsOptional()
+  @IsDate()
+  startDate?: Date | undefined;
   
   @Column({ type: "timestamptz", nullable: true, name: "completed_at" })
   @IsOptional()

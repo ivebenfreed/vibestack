@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource';
 import { useAuthStore } from '@/stores/authStore';
+import type { UserInfo } from '@/stores/authStore';
 import { User } from '@repo/dataforge/client-entities';
 
 export type CurrentUserState = {
@@ -49,6 +50,13 @@ export function useCurrentUser(): CurrentUserState {
         });
         
         console.log('[useCurrentUser] User profile found:', user);
+        
+        if (user) {
+          // --- BEGIN MODIFICATION ---
+          // The following block has been removed as per instructions
+          // to prevent useCurrentUser from updating authStore.
+          // --- END MODIFICATION ---
+        }
         
         setState({
           data: user as User,

@@ -212,6 +212,10 @@ export const sidebarData: SidebarData = {
               title: 'Live Query',
               url: '/debug/live-query',
             },
+            {
+              title: 'TypeORM Test',
+              url: '/debug/typeorm-test',
+            },
           ],
         },
       ],

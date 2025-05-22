@@ -1,6 +1,5 @@
 import React, { ErrorInfo, Suspense } from 'react';
 import { LiveQueryDebugPanel } from './components/LiveQueryDebugPanel';
-import { DebugNavigation } from './components/DebugNavigation';
 import { Header } from '@/components/layout/header';
 import { Main } from '@/components/layout/main';
 import { ProfileDropdown } from '@/components/profile-dropdown';
@@ -54,13 +53,7 @@ class ErrorBoundary extends React.Component<
 export function LiveQueryDebugPage() {
   return (
     <>
-      <Header fixed>
-        <Search />
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header fixed />
       <Main>
         <div className="mb-2 flex items-center justify-between space-y-2">
           <h1 className='text-2xl font-bold tracking-tight'>Live Query Debug</h1>
@@ -72,7 +65,6 @@ export function LiveQueryDebugPage() {
           </Suspense>
         </ErrorBoundary>
         
-        <DebugNavigation />
       </Main>
     </>
   );

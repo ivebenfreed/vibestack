@@ -36,6 +36,7 @@ import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_aut
 import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedDebugTypeormTestImport } from './routes/_authenticated/debug/typeorm-test'
 import { Route as AuthenticatedDebugSyncChangesImport } from './routes/_authenticated/debug/sync-changes'
 import { Route as AuthenticatedDebugSyncImport } from './routes/_authenticated/debug/sync'
 import { Route as AuthenticatedDebugLiveQueryImport } from './routes/_authenticated/debug/live-query'
@@ -203,6 +204,13 @@ const AuthenticatedSettingsAccountRoute =
     id: '/account',
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
+
+const AuthenticatedDebugTypeormTestRoute =
+  AuthenticatedDebugTypeormTestImport.update({
+    id: '/typeorm-test',
+    path: '/typeorm-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
 const AuthenticatedDebugSyncChangesRoute =
@@ -390,6 +398,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugSyncChangesImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/typeorm-test': {
+      id: '/_authenticated/debug/typeorm-test'
+      path: '/typeorm-test'
+      fullPath: '/debug/typeorm-test'
+      preLoaderRoute: typeof AuthenticatedDebugTypeormTestImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/settings/account': {
       id: '/_authenticated/settings/account'
       path: '/account'
@@ -479,6 +494,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugLiveQueryRoute: typeof AuthenticatedDebugLiveQueryRoute
   AuthenticatedDebugSyncRoute: typeof AuthenticatedDebugSyncRoute
   AuthenticatedDebugSyncChangesRoute: typeof AuthenticatedDebugSyncChangesRoute
+  AuthenticatedDebugTypeormTestRoute: typeof AuthenticatedDebugTypeormTestRoute
 }
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
@@ -489,6 +505,7 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugLiveQueryRoute: AuthenticatedDebugLiveQueryRoute,
     AuthenticatedDebugSyncRoute: AuthenticatedDebugSyncRoute,
     AuthenticatedDebugSyncChangesRoute: AuthenticatedDebugSyncChangesRoute,
+    AuthenticatedDebugTypeormTestRoute: AuthenticatedDebugTypeormTestRoute,
   }
 
 const AuthenticatedDebugRouteRouteWithChildren =
@@ -567,6 +584,7 @@ export interface FileRoutesByFullPath {
   '/debug/live-query': typeof AuthenticatedDebugLiveQueryRoute
   '/debug/sync': typeof AuthenticatedDebugSyncRoute
   '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesRoute
+  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -599,6 +617,7 @@ export interface FileRoutesByTo {
   '/debug/live-query': typeof AuthenticatedDebugLiveQueryRoute
   '/debug/sync': typeof AuthenticatedDebugSyncRoute
   '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesRoute
+  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -634,6 +653,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/live-query': typeof AuthenticatedDebugLiveQueryRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncRoute
   '/_authenticated/debug/sync-changes': typeof AuthenticatedDebugSyncChangesRoute
+  '/_authenticated/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -670,6 +690,7 @@ export interface FileRouteTypes {
     | '/debug/live-query'
     | '/debug/sync'
     | '/debug/sync-changes'
+    | '/debug/typeorm-test'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -701,6 +722,7 @@ export interface FileRouteTypes {
     | '/debug/live-query'
     | '/debug/sync'
     | '/debug/sync-changes'
+    | '/debug/typeorm-test'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -734,6 +756,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/live-query'
     | '/_authenticated/debug/sync'
     | '/_authenticated/debug/sync-changes'
+    | '/_authenticated/debug/typeorm-test'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
@@ -822,7 +845,8 @@ export const routeTree = rootRoute
         "/_authenticated/debug/database",
         "/_authenticated/debug/live-query",
         "/_authenticated/debug/sync",
-        "/_authenticated/debug/sync-changes"
+        "/_authenticated/debug/sync-changes",
+        "/_authenticated/debug/typeorm-test"
       ]
     },
     "/_authenticated/settings": {
@@ -892,6 +916,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/sync-changes": {
       "filePath": "_authenticated/debug/sync-changes.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/typeorm-test": {
+      "filePath": "_authenticated/debug/typeorm-test.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/settings/account": {

@@ -1,9 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Main } from '@/components/layout/main';
-import { Header } from '@/components/layout/header';
-import { Search } from '@/components/search';
-import { ThemeSwitch } from '@/components/theme-switch';
-import { ProfileDropdown } from '@/components/profile-dropdown';
 import ProjectsProvider from './context/projects-context';
 import { ProjectGrid } from './components/project-grid';
 import { ProjectsDialogs } from './components/projects-dialogs';
@@ -92,14 +88,6 @@ const Projects: React.FC = () => {
 
   return (
     <ProjectsProvider>
-      <Header fixed>
-        <Search />
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
       <Main>
         <div className='mb-4 flex flex-wrap items-center justify-between space-y-2 gap-x-4'>
           <div>

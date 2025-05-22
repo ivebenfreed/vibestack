@@ -1,6 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router';
-import DataTablePage from '@/features/debug/DataTablePage';
+import { createFileRoute } from '@tanstack/react-router'
+import DataTableDebugPanel from '@/features/debug/DataTablePage'
+import React from 'react'
 
 export const Route = createFileRoute('/_authenticated/debug/data-table')({
-  component: DataTablePage,
-}); 
+  component: DebugDataTableComponent,
+})
+
+function DebugDataTableComponent() {
+  return <DataTableDebugPanel />
+}
