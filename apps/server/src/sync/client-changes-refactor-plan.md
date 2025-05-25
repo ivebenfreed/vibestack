@@ -827,17 +827,18 @@ apps/server/src/
 
 ## Migration Timeline
 
-- **Week 1**: 🎯 **Quick Wins** - Eliminate junction table raw SQL, immediate consistency improvements
-- **Week 2**: Repository standardization and enhanced CRDT framework  
-- **Week 3**: Optional modular architecture and performance optimization
-- **Week 4**: Testing, validation, and documentation
+- **Week 1**: 🎯 **Quick Wins** - Eliminate junction table raw SQL, begin file structure refactor  
+- **Week 2**: 🏗️ **File Structure & Repositories** - Complete modular structure and repository standardization
+- **Week 3**: ⚡ **Enhanced CRDT & Performance** - Advanced conflict resolution and optimization
+- **Week 4**: ✅ **Testing & Validation** - Comprehensive testing and documentation
 
 ## Success Metrics
 
-### Immediate Wins (Week 1)
+### Immediate Wins (Week 1-2)
 - [ ] Zero raw SQL in junction table operations
 - [ ] Consistent use of repository methods for relationship management
 - [ ] Remove all SQL fallback code paths
+- [ ] Well-organized file structure with focused responsibilities
 - [ ] Maintain current performance (no regression)
 
 ### Enhanced Goals (Week 2-4)  
@@ -850,6 +851,12 @@ apps/server/src/
 
 ## Summary
 
-This refined plan focuses on **pragmatic, incremental improvements** rather than a complete architectural overhaul. The current implementation already has good foundations with repository usage for relationship management - we just need to **eliminate inconsistencies** and **complete the migration** to TypeORM patterns.
+This refined plan focuses on **pragmatic, incremental improvements** with **better file organization**. The approach combines eliminating SQL inconsistencies with creating a more maintainable codebase structure.
 
-The **Week 1 quick wins** will provide immediate value with minimal risk, while the **later phases** add enhanced capabilities for teams that need advanced CRDT resolution and performance optimization. 
+Key improvements:
+- **Immediate consistency** by eliminating junction table raw SQL
+- **Better organization** with `IncomingChangeProcessor` and focused modules  
+- **Incremental refactor** that builds on existing repository foundations
+- **Clear separation of concerns** between data operations, conflict resolution, and orchestration
+
+The **Week 1-2 implementation** provides immediate value with minimal risk, while the **later phases** add enhanced capabilities for advanced CRDT resolution and performance optimization. 
