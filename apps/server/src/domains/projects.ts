@@ -1,10 +1,11 @@
 import { Client } from '@neondatabase/serverless';
 import { Project, ProjectStatus } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
-import { FindOptionsWhere, DeepPartial } from 'typeorm';
+import { FindOptionsWhere, DeepPartial, In } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
+import { User } from "@repo/dataforge/server-entities";
 
 // Re-export enums for convenience
 export { ProjectStatus };
@@ -106,6 +107,117 @@ export class ProjectRepository {
     const result = await this.neonService.delete(Project, { id } as FindOptionsWhere<Project>);
     return (result.affected !== null && result.affected !== undefined && result.affected > 0);
   }
+
+  /**
+   * Get project members using TypeORM relations via query builder
+   */
+  async getMembers(projectId: string): Promise<User[]> {
+    const queryBuilder = await this.neonService.createQueryBuilder(User, 'u');
+    return await queryBuilder
+      .innerJoin('project_members', 'pm', 'u.id = pm.user_id')
+      .where('pm.project_id = :projectId', { projectId })
+      .getMany();
+  }
+
+  /**
+   * Update project members using direct SQL since NeonService doesn't support relation loading/saving
+   * This will generate WAL entries for the junction table operations
+   */
+  async updateMembers(projectId: string, userIds: string[]): Promise<User[]> {
+    // Check if project exists
+    const project = await this.neonService.findOne(Project, { id: projectId } as FindOptionsWhere<Project>);
+    if (!project) {
+      throw new Error(`Project with ID ${projectId} not found`);
+    }
+
+    // Validate that all users exist
+    if (userIds.length > 0) {
+      const existingUsers = await this.neonService.find(User, {
+        id: In(userIds)
+      } as FindOptionsWhere<User>);
+      
+      if (existingUsers.length !== userIds.length) {
+        throw new Error('One or more user IDs are invalid');
+      }
+    }
+
+    // Start transaction using raw SQL
+    await this.neonService.query('BEGIN');
+    
+    try {
+      // Remove all existing members
+      await this.neonService.query(
+        'DELETE FROM project_members WHERE project_id = $1',
+        [projectId]
+      );
+      
+      // Add new members
+      if (userIds.length > 0) {
+        const values = userIds.map((userId, index) => 
+          `($${index * 2 + 1}, $${index * 2 + 2})`
+        ).join(', ');
+        
+        const params = userIds.flatMap(userId => [projectId, userId]);
+        
+        await this.neonService.query(
+          `INSERT INTO project_members (project_id, user_id) VALUES ${values}`,
+          params
+        );
+      }
+      
+      await this.neonService.query('COMMIT');
+    } catch (error) {
+      await this.neonService.query('ROLLBACK');
+      throw error;
+    }
+
+    // Return the updated members
+    return await this.getMembers(projectId);
+  }
+
+  /**
+   * Add a single member to project
+   */
+  async addMember(projectId: string, userId: string): Promise<User[]> {
+    // Check if project exists
+    const project = await this.neonService.findOne(Project, { id: projectId } as FindOptionsWhere<Project>);
+    if (!project) {
+      throw new Error(`Project with ID ${projectId} not found`);
+    }
+
+    // Check if user exists
+    const user = await this.neonService.findOne(User, { id: userId } as FindOptionsWhere<User>);
+    if (!user) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+
+    // Add member (ON CONFLICT DO NOTHING to avoid duplicates)
+    await this.neonService.query(
+      'INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [projectId, userId]
+    );
+
+    return await this.getMembers(projectId);
+  }
+
+  /**
+   * Remove a single member from project
+   */
+  async removeMember(projectId: string, userId: string): Promise<User[]> {
+    // Check if project exists
+    const project = await this.neonService.findOne(Project, { id: projectId } as FindOptionsWhere<Project>);
+    if (!project) {
+      throw new Error(`Project with ID ${projectId} not found`);
+    }
+
+    // Remove member
+    await this.neonService.query(
+      'DELETE FROM project_members WHERE project_id = $1 AND user_id = $2',
+      [projectId, userId]
+    );
+
+    return await this.getMembers(projectId);
+  }
 }
 
 // Helper to create a NeonService instance from a Neon client
@@ -119,8 +231,10 @@ const createServiceFromClient = (client: Client): NeonService => {
     finalized: false,
     error: null,
     get executionCtx() { return null; },
-    get event() { return null; }
-  } as unknown as Context<{ Bindings: Env }>;
+    get event() { return null; },
+    // Add Variables property to match AppBindings
+    var: {} // Mock variables object
+  } as unknown as Context<{ Bindings: Env; Variables: any }>;
   
   return new NeonService(context);
 };

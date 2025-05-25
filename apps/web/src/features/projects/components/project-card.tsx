@@ -3,9 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction, 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckSquare, Edit2, Trash2 } from 'lucide-react';
+import { CheckSquare, Edit2, Trash2, ExternalLink } from 'lucide-react';
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { useProjects } from '../context/projects-context';
+import { Link } from '@tanstack/react-router';
 
 interface ProjectCardProps {
   project: Project;
@@ -18,12 +19,16 @@ export function ProjectCard({ project }: ProjectCardProps) {
     setIsDeleteDialogOpen 
   } = useProjects();
 
-  const handleEditClick = () => {
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setSelectedProject(project);
     setIsUpdateDrawerOpen(true);
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setSelectedProject(project);
     setIsDeleteDialogOpen(true);
   };
@@ -45,29 +50,50 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const titleMinHeight = "h-14"; // For 2 lines of text-xl
 
   return (
-    <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow flex flex-col">
-      <CardHeader className="p-4 relative"> {/* Changed padding to p-4, removed pb-2 */}
-        {/* Actions positioned absolutely */}
-        <CardAction className="absolute top-4 right-4 flex space-x-1"> {/* Adjusted top/right to match new padding */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={handleEditClick}>
-                <Edit2 className="h-4 w-4" />
-                <span className="sr-only">Edit Project</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Edit</p></TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="destructive" size="icon" onClick={handleDeleteClick}>
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete Project</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Delete</p></TooltipContent>
-          </Tooltip>
-        </CardAction>
+    <Link to="/projects/$projectId" params={{ projectId: project.id }}>
+      <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow flex flex-col cursor-pointer">
+        <CardHeader className="p-4 relative"> {/* Changed padding to p-4, removed pb-2 */}
+          {/* Actions positioned absolutely */}
+          <CardAction className="absolute top-4 right-4 flex space-x-1"> {/* Adjusted top/right to match new padding */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={handleEditClick}
+                >
+                  <Edit2 className="h-4 w-4" />
+                  <span className="sr-only">Edit Project</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Edit</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  size="icon" 
+                  onClick={handleDeleteClick}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Delete Project</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Delete</p></TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="sr-only">View Project Details</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>View Details</p></TooltipContent>
+            </Tooltip>
+          </CardAction>
         
         {/* Title - fixed height for 2 lines, with padding to avoid actions */}
         <CardTitle className={`text-xl font-bold line-clamp-2 pr-16 ${titleMinHeight}`}> {/* Adjusted pr-16 for tighter spacing with p-4 overall */}
@@ -93,5 +119,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
       </CardFooter>
     </Card>
+    </Link>
   );
 }

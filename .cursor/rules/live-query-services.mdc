@@ -3,3 +3,84 @@ description:
 globs:
 alwaysApply: false
 ---
+# Live Query System with Services API
+
+## Architecture Overview
+
+This project uses a live query system that works in conjunction with our services layer. To properly implement and maintain this system, follow these guidelines.
+
+## Key Components
+
+- **Service Layer**: [apps/web/src/db/services.ts](mdc:apps/web/src/db/services.ts) - Contains all service methods for CRUD operations
+- **Live Query Hook**: [apps/web/src/db/hooks/useLiveEntity.ts](mdc:apps/web/src/db/hooks/useLiveEntity.ts) - React hook for live queries
+- **SyncChangeManager**: [apps/web/src/sync/SyncChangeManager.typeorm.ts](mdc:apps/web/src/sync/SyncChangeManager.typeorm.ts) - Manages change tracking and synchronization
+
+## Best Practices
+
+### 1. Always Use Service Methods for Data Modifications
+
+Always use the service methods from `services.ts` for any data modifications. These methods will:
+- Perform the database operation
+- Track the change via the SyncChangeManager
+- Trigger live query updates
+
+```typescript
+// CORRECT: Use service methods
+await services.tasks.createTask({
+  title: "New Task",
+  description: "Task created via service method"
+});
+
+// INCORRECT: Direct database access won't trigger proper synchronization
+await repository.create(task);
+```
+
+### 2. Proper Live Query Setup
+
+When setting up a live query, use the `useLiveEntity` hook with a properly configured TypeORM query builder:
+
+```typescript
+// Get a query builder for the entity you want to watch
+const queryBuilder = dataSource.getRepository(Task)
+  .createQueryBuilder("task")
+  .orderBy("task.updatedAt", "DESC");
+
+// Use the hook with the query builder
+const { data, loading, error } = useLiveEntity<Task>(
+  queryBuilder,
+  { enabled: true }
+);
+```
+
+### 3. Entity ID Field Handling
+
+Be aware that the entity ID fields in live query results might use a different naming convention:
+- Entity name may be prefixed to the ID field (e.g., `task_id` instead of just `id`)
+- When extracting IDs, check for both formats:
+
+```typescript
+// Handle both formats when getting IDs
+const entityId = entity.id || entity.task_id;
+
+// For more robust handling in a table-agnostic way:
+const idField = tableName.endsWith('s')
+  ? tableName.substring(0, tableName.length - 1) + '_id'
+  : tableName + '_id';
+const entityId = entity[idField] || entity.id;
+```
+
+### 4. Debug Tools
+
+For debugging live queries, refer to the `LiveQueryDebugPanel` component:
+[apps/web/src/features/debug/components/LiveQueryDebugPanel.tsx](mdc:apps/web/src/features/debug/components/LiveQueryDebugPanel.tsx)
+
+This component demonstrates:
+- How to set up live queries for different entity types
+- How to trigger changes using service methods
+- How to observe changes in real-time
+
+## Troubleshooting
+
+1. **Live updates not triggering**: Ensure you're using service methods, not direct repository calls
+2. **ID field issues**: Check for the correct ID field format (e.g., `task_id` vs `id`)
+3. **Query builder problems**: Verify your query builder is correctly configured with proper selection and conditions

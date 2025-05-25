@@ -728,6 +728,9 @@ function generateContextOutput(
     });
     footerOutput += `];\n\n`;
 
+    // ✨ NEW: Extract junction table information
+    const { junctionTables, junctionMapping } = extractJunctionTableInfo(validEntities, filter);
+    
     // Generate categorized table lists (using includedEntityNames and validEntities)
     const entityMap = new Map(validEntities.map(e => [e.name, e])); // Use validEntities for the map
     const categorizedEntities = new Map<TableCategory, Function[]>();
@@ -790,9 +793,150 @@ function generateContextOutput(
              footerOutput += `} as const;\n\n`;
         }
     }
+    
+    // ✨ NEW: Generate junction table constants
+    const contextUpper = context.toUpperCase();
+    footerOutput += `// Junction tables for ${context} context\n`;
+    footerOutput += `export const ${contextUpper}_JUNCTION_TABLES = [\n`;
+    if (junctionTables.length > 0) {
+        junctionTables.forEach(tableName => {
+            footerOutput += `  ${tableName},\n`;
+        });
+    }
+    footerOutput += `];\n\n`;
+    
+    // Generate combined tracked tables
+    footerOutput += `// Combined entity and junction tables for replication tracking\n`;
+    footerOutput += `export const ${contextUpper}_TRACKED_TABLES = [\n`;
+    
+    // Add all domain tables
+    const domainEntities = categorizedEntities.get('domain') || [];
+    domainEntities.forEach(entity => {
+        const tableName = filter.getTableName(entity);
+        if (tableName) {
+            footerOutput += `  '"${tableName}"',\n`;
+        }
+    });
+    
+    // Add all junction tables
+    junctionTables.forEach(tableName => {
+        footerOutput += `  ${tableName},\n`;
+    });
+    
+    footerOutput += `];\n\n`;
+    
+    // Generate junction table mapping
+    footerOutput += `// Junction table mapping for relationship transformation\n`;
+    footerOutput += `export const ${contextUpper}_JUNCTION_TABLE_MAPPING = {\n`;
+    for (const [tableName, mapping] of Object.entries(junctionMapping)) {
+        footerOutput += `  ${tableName}: {\n`;
+        footerOutput += `    sourceEntity: '${mapping.sourceEntity}',\n`;
+        footerOutput += `    sourceTable: ${mapping.sourceTable},\n`;
+        footerOutput += `    sourceColumn: '${mapping.sourceColumn}',\n`;
+        footerOutput += `    targetEntity: '${mapping.targetEntity}',\n`;
+        footerOutput += `    targetColumn: '${mapping.targetColumn}',\n`;
+        footerOutput += `    relationName: '${mapping.relationName}'\n`;
+        footerOutput += `  },\n`;
+    }
+    footerOutput += `} as const;\n\n`;
 
     // Combine all parts (include enumExportOutput)
     return headerOutput + enumImportOutput + enumExportOutput + classOutput + bodyOutput + footerOutput;
+}
+
+/**
+ * Extract junction table information from entity metadata
+ */
+function extractJunctionTableInfo(entities: Function[], filter: MetadataFilter): {
+    junctionTables: string[],
+    junctionMapping: Record<string, any>
+} {
+    const storage = getMetadataArgsStorage();
+    const junctionTables = new Set<string>();
+    const junctionMapping: Record<string, any> = {};
+    
+    entities.forEach(entity => {
+        const entityName = entity.name;
+        const tableName = filter.getTableName(entity);
+        const { relations } = filter.filterEntityMetadata(entity, 'server');
+        
+        relations.forEach(relation => {
+            // Only process many-to-many relations with joinTable
+            if (relation.relationType !== 'many-to-many') return;
+            
+            const joinTableMeta = storage.joinTables.find(j => 
+                j.target === entity && j.propertyName === relation.propertyName
+            );
+            
+            if (joinTableMeta) {
+                const relationTypeFn = relation.type as () => Function;
+                const targetEntityClass = relationTypeFn();
+                const targetEntityName = targetEntityClass?.name;
+                const targetTableName = filter.getTableName(targetEntityClass);
+                
+                if (!targetEntityName || !targetTableName) return;
+                
+                // Determine junction table name
+                const namingStrategy = new DefaultNamingStrategy();
+                let junctionTableName = joinTableMeta.name;
+                
+                if (!junctionTableName) {
+                    // Need to determine the inverse property name for naming
+                    let inverseSideString = 'undefined';
+                    if (relation.inverseSideProperty) {
+                        if (typeof relation.inverseSideProperty === 'string') {
+                            inverseSideString = relation.inverseSideProperty;
+                        } else if (typeof relation.inverseSideProperty === 'function') {
+                            const targetRelations = filter.filterEntityMetadata(targetEntityClass, 'server').relations;
+                            const targetRelation = targetRelations.find(r => r.type === entity);
+                            inverseSideString = targetRelation?.propertyName || targetEntityName.charAt(0).toLowerCase() + targetEntityName.slice(1);
+                        }
+                    } else {
+                        inverseSideString = targetEntityName.charAt(0).toLowerCase() + targetEntityName.slice(1);
+                    }
+                    
+                    junctionTableName = namingStrategy.joinTableName(
+                        tableName as string, 
+                        targetTableName as string, 
+                        relation.propertyName, 
+                        inverseSideString
+                    );
+                }
+                
+                // Add to junction tables set
+                junctionTables.add(`"${junctionTableName}"`);
+                
+                // Extract column information
+                let sourceColumn = 'id';
+                let targetColumn = 'id';
+                
+                if (joinTableMeta.joinColumns && joinTableMeta.joinColumns.length > 0) {
+                    sourceColumn = joinTableMeta.joinColumns[0].name || `${entityName.toLowerCase()}_id`;
+                }
+                
+                if (joinTableMeta.inverseJoinColumns && joinTableMeta.inverseJoinColumns.length > 0) {
+                    targetColumn = joinTableMeta.inverseJoinColumns[0].name || `${targetEntityName.toLowerCase()}_id`;
+                }
+                
+                // Add to mapping (only if not already added to avoid duplicates)
+                if (!junctionMapping[`"${junctionTableName}"`]) {
+                    junctionMapping[`"${junctionTableName}"`] = {
+                        sourceEntity: entityName,
+                        sourceTable: `"${tableName}"`,
+                        sourceColumn,
+                        targetEntity: targetEntityName,
+                        targetColumn,
+                        relationName: relation.propertyName
+                    };
+                }
+            }
+        });
+    });
+    
+    return {
+        junctionTables: Array.from(junctionTables).sort(),
+        junctionMapping
+    };
 }
 
 // Run the generator

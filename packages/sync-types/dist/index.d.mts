@@ -1,12 +1,24 @@
 /**
+ * Relationship update information for junction table operations
+ */
+interface RelationshipUpdate {
+    relationName: string;
+    operation: 'set' | 'add' | 'remove';
+    targetIds: string[];
+}
+/**
  * Core change type for replication
  * Represents a change to a table that needs to be replicated
  */
-interface TableChange$1 {
+interface TableChange {
     table: string;
     operation: 'insert' | 'update' | 'delete';
     data: Record<string, unknown>;
     updated_at: string;
+    lsn?: string;
+    client_id?: string;
+    relationshipUpdates?: RelationshipUpdate[];
+    entityRelations?: string[];
 }
 
 type SrvMessageType = 'srv_send_changes' | 'srv_catchup_changes' | 'srv_live_changes' | 'srv_init_start' | 'srv_init_changes' | 'srv_init_complete' | 'srv_heartbeat' | 'srv_error' | 'srv_state_change' | 'srv_lsn_update' | 'srv_changes_received' | 'srv_changes_applied' | 'srv_sync_completed' | 'srv_catchup_completed' | 'srv_live_start' | 'srv_sync_stats';
@@ -21,7 +33,7 @@ interface ServerMessage extends BaseMessage {
 }
 interface ServerChangesMessage extends ServerMessage {
     type: 'srv_send_changes' | 'srv_catchup_changes' | 'srv_live_changes';
-    changes: TableChange$1[];
+    changes: TableChange[];
     lastLSN: string;
     sequence?: {
         chunk: number;
@@ -30,7 +42,7 @@ interface ServerChangesMessage extends ServerMessage {
 }
 interface ServerInitChangesMessage extends ServerMessage {
     type: 'srv_init_changes';
-    changes: TableChange$1[];
+    changes: TableChange[];
     sequence: {
         table: string;
         chunk: number;
@@ -138,7 +150,7 @@ interface ClientMessage extends BaseMessage {
 }
 interface ClientChangesMessage extends ClientMessage {
     type: 'clt_send_changes';
-    changes: TableChange$1[];
+    changes: TableChange[];
 }
 interface ClientHeartbeatMessage extends ClientMessage {
     type: 'clt_heartbeat';
@@ -166,17 +178,6 @@ interface ClientInitProcessedMessage extends ClientMessage {
 }
 type Message = ServerMessage | ServerCatchupCompletedMessage | ServerLiveStartMessage | ServerSyncStatsMessage | ClientMessage;
 
-/**
- * Core change type for replication
- * Represents a change to a table that needs to be replicated
- */
-interface TableChange {
-    table: string;
-    operation: 'insert' | 'update' | 'delete';
-    data: Record<string, unknown>;
-    lsn?: string;
-    updated_at: string;
-}
 /**
  * Strongly typed record data for sync operations
  * Represents the common fields expected in all records
@@ -215,4 +216,4 @@ interface ClientDeregistration {
 declare function isTableChange(payload: unknown): payload is TableChange;
 declare function isClientMessageType(type: string): type is CltMessageType;
 
-export { type BaseMessage, type ClientAppliedMessage, type ClientChangesMessage, type ClientDeregistration, type ClientHeartbeatMessage, type ClientInitProcessedMessage, type ClientInitReceivedMessage, type ClientMessage, type ClientReceivedMessage, type ClientRegistration, type CltMessageType, type ExecutionResult, type Message, type RecordData, type ServerAppliedMessage, type ServerCatchupCompletedMessage, type ServerChangesMessage, type ServerInitChangesMessage, type ServerInitCompleteMessage, type ServerInitStartMessage, type ServerLSNUpdateMessage, type ServerLiveStartMessage, type ServerMessage, type ServerReceivedMessage, type ServerStateChangeMessage, type ServerSyncCompletedMessage, type ServerSyncStatsMessage, type SrvMessageType, type TableChange, isClientMessageType, isTableChange };
+export { type BaseMessage, type ClientAppliedMessage, type ClientChangesMessage, type ClientDeregistration, type ClientHeartbeatMessage, type ClientInitProcessedMessage, type ClientInitReceivedMessage, type ClientMessage, type ClientReceivedMessage, type ClientRegistration, type CltMessageType, type ExecutionResult, type Message, type RecordData, type RelationshipUpdate, type ServerAppliedMessage, type ServerCatchupCompletedMessage, type ServerChangesMessage, type ServerInitChangesMessage, type ServerInitCompleteMessage, type ServerInitStartMessage, type ServerLSNUpdateMessage, type ServerLiveStartMessage, type ServerMessage, type ServerReceivedMessage, type ServerStateChangeMessage, type ServerSyncCompletedMessage, type ServerSyncStatsMessage, type SrvMessageType, type TableChange, isClientMessageType, isTableChange };

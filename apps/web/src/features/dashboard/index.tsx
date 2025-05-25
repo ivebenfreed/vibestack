@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { TopNav } from '@/components/layout/top-nav'
 // ProfileDropdown is now in the main Header
@@ -88,20 +87,13 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* ===== Top Heading ===== */}
-      <Header>
-        <TopNav links={topNav} />
-        {/* Search, SyncStatusIcon, ThemeSwitch, and ProfileDropdown are now in the main Header */}
-        {/* The div below is now empty and can be removed or left for future header-specific items */}
-        <div className='ml-auto flex items-center space-x-4'>
-          {/* Content removed as ProfileDropdown is in the main header */}
-        </div>
-      </Header>
-
       {/* ===== Main ===== */}
       <Main>
         <div className='mb-2 flex items-center justify-between space-y-2'>
-          <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
+          <div>
+            <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
+            <TopNav links={topNav} className="mt-2" />
+          </div>
           <div className='flex items-center space-x-2'>
             <Button>Download</Button>
           </div>

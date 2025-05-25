@@ -6,6 +6,10 @@ import { Search } from '@/components/search'
 import SyncStatusIcon from '../../features/sync/components/SyncStatusIcon'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown' // Changed NavUser to ProfileDropdown
+import { useGlobalSidebar } from '@/contexts/global-sidebar-context'
+import { GLOBAL_SIDEBAR_WIDTH } from './global-sidebar'
+
+export const HEADER_HEIGHT = 64 // pixels
 
 interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   fixed?: boolean
@@ -19,6 +23,8 @@ export const Header = ({
   ...props
 }: HeaderProps) => {
   const [offset, setOffset] = React.useState(0)
+  const { shouldShowMainSidebar } = useGlobalSidebar()
+  const showSidebarTrigger = shouldShowMainSidebar()
 
   React.useEffect(() => {
     const onScroll = () => {
@@ -35,15 +41,26 @@ export const Header = ({
   return (
     <header
       className={cn(
-        'bg-background flex h-16 items-center gap-3 p-4 sm:gap-4',
-        fixed && 'header-fixed peer/header fixed z-50 w-[inherit] rounded-md',
+        'bg-background flex items-center gap-3 p-4 sm:gap-4',
+        fixed && 'header-fixed peer/header fixed top-0 right-0 z-50',
+        fixed && 'left-0 md:left-[var(--global-sidebar-width)]',
         offset > 10 && fixed ? 'shadow-sm' : 'shadow-none',
         className
       )}
+      style={fixed ? { 
+        '--global-sidebar-width': `${GLOBAL_SIDEBAR_WIDTH}px`,
+        height: 'var(--header-height)'
+      } as React.CSSProperties : {
+        height: 'var(--header-height)'
+      }}
       {...props}
     >
-      <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
-      <Separator orientation='vertical' className='h-6' />
+      {showSidebarTrigger && (
+        <>
+          <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
+          <Separator orientation='vertical' className='h-6' />
+        </>
+      )}
       {children}
       <div className='ml-auto flex items-center space-x-4'>
         <Search />

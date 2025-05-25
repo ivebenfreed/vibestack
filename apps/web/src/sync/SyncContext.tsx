@@ -24,6 +24,7 @@ export interface SyncContextState {
   serverUrl: string;
   setServerUrl: (url: string) => void;
   isLoading: boolean;
+  isSyncManagerReady?: boolean; // Added for more explicit SyncManager status
   processQueuedChanges: () => Promise<void>;
   setAutoConnect: (value: boolean) => void;
   resyncAllEntities: () => Promise<number>;
@@ -43,6 +44,7 @@ const SyncContext = createContext<SyncContextState>({
   serverUrl: '',
   setServerUrl: () => {},
   isLoading: true,
+  isSyncManagerReady: false, // Added default for SyncManager status
   processQueuedChanges: async () => {},
   setAutoConnect: () => {},
   resyncAllEntities: async () => 0
@@ -53,6 +55,7 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
   // State to track database and sync initialization
   const [isLoading, setIsLoading] = useState(true);
   const [syncManager, setSyncManager] = useState<SyncManager | null>(null);
+  const [isSyncManagerReady, setIsSyncManagerReady] = useState(false); // Added state for SyncManager readiness
   
   // Use the PGlite context to check database status
   const { isReady: isDatabaseReady, isLoading: isDatabaseLoading } = usePGliteContext();
@@ -136,6 +139,7 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
       try {
         // Wait for sync manager to fully initialize
         await syncManager.initialize();
+        setIsSyncManagerReady(true); // SyncManager is now ready
         
         // Set our initial state now that everything is initialized
         latestSyncState.current = syncManager.getStatus();
@@ -229,6 +233,7 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
         };
       } catch (error) {
         console.error('SyncContext: Error during initialization', error);
+        setIsSyncManagerReady(false); // SyncManager failed to initialize
         setIsLoading(false);
       }
     };
@@ -303,6 +308,7 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
         serverUrl,
         setServerUrl,
         isLoading: true,
+        isSyncManagerReady, // Expose SyncManager readiness
         processQueuedChanges: handleProcessQueuedChanges,
         setAutoConnect: handleSetAutoConnect,
         resyncAllEntities: handleResyncAllEntities
@@ -322,6 +328,7 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
       serverUrl,
       setServerUrl,
       isLoading: isLoading || !syncManager,
+      isSyncManagerReady, // Expose SyncManager readiness
       processQueuedChanges: handleProcessQueuedChanges,
       setAutoConnect: handleSetAutoConnect,
       resyncAllEntities: handleResyncAllEntities
@@ -332,4 +339,4 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
 };
 
 // Custom hook for consuming the context
-export const useSyncContext = () => useContext(SyncContext); 
+export const useSyncContext = () => useContext(SyncContext);

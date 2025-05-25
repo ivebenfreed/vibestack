@@ -325,8 +325,14 @@ export function createNeonDataSource(options: NeonDataSourceOptions): NeonDataSo
         },
         
         async query(query: string, parameters?: any[]): Promise<any> {
-            if (!this.manager) throw new Error("DataSource is not initialized or EntityManager is not available.");
-            return this.manager.query(query, parameters);
+            if (!this.driver || !this.isInitialized) throw new Error("DataSource is not initialized or driver is not available.");
+            // Use the driver's query method directly to avoid recursion with EntityManager.query
+            const queryRunner = this.createQueryRunner();
+            try {
+                return await queryRunner.query(query, parameters);
+            } finally {
+                await queryRunner.release();
+            }
         }
     };
 

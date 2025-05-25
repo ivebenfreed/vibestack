@@ -50,7 +50,7 @@ function pluralize(word: string): string {
 // --- Driver Options --- 
 export interface NewPGliteDriverOptions extends Omit<PostgresConnectionCredentialsOptions, 'type'> {
     readonly database: string;
-    readonly dataDir?: string;
+    readonly dataDir?: string; // Note: Included to satisfy TypeORM's driver option structure and for potential Node.js contexts; not used for data storage by PGLite in the browser/worker, which relies on IndexedDB.
     readonly extensions?: Record<string, any>;
     readonly schema?: string;
     readonly namingStrategy?: NamingStrategyInterface; // Allow passing naming strategy

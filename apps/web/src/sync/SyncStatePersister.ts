@@ -41,8 +41,8 @@ export class SyncStatePersister {
         throw new Error("SyncStatePersister: Failed to get DataSource.");
     }
     this.metadataRepo = this.dataSource.getRepository(SyncMetadata);
-    this.currentStateData = await this.loadMetadata(); // Load initial state
     this.isInitialized = true;
+    this.currentStateData = await this.loadMetadata(); // Load initial state
     console.log(`SyncStatePersister: Initialized. ClientID: ${this.currentStateData.clientId}, LSN: ${this.currentStateData.currentLsn}`);
     return this.currentStateData;
   }

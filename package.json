@@ -47,6 +47,7 @@
     "@modelcontextprotocol/server-brave-search": "^0.6.2",
     "@modelcontextprotocol/server-postgres": "^0.6.2",
     "hono": "^4.7.8",
+    "rich-textarea": "^0.26.4",
     "tailwindcss": "^4.1.4"
   },
   "pnpm": {

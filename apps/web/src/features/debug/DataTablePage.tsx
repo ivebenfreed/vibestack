@@ -5,25 +5,25 @@ import {
   EditableTextCell,
   EditableSelectCell,
   EditableDateCell,
-  // EditableRelationshipCell, // No longer directly imported, used via factory
-  createEditableEntityCell as createEditableEntityCellV2
-} from '@/components/data-table/data-table-logic' // Updated import path
+  createEditableEntityCell as createEditableEntityCellV2,
+  TaskEntityMetadata
+} from '@/components/data-table/data-table-logic'
 import { usePGliteContext } from '@/db/pglite-provider'
-import { Task, TaskStatus, TaskPriority, Project, User } from '@repo/dataforge/client-entities' // Added Project, User
-import { Header } from '@/components/layout/header'
+import { Task, TaskStatus, TaskPriority, Project, User } from '@repo/dataforge/client-entities'
 import { Main } from '@/components/layout/main'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { ProfileDropdown } from '@/components/profile-dropdown'
-import { SearchProvider } from '@/context/search-context'
+import { toast } from 'sonner'
+
 import { format } from 'date-fns'
 import { DataTableSkeleton } from '@/components/ui/table-skeleton'
-import { EntityDataTable } from '@/components/data-table/data-table-entity' // Updated import path and component name
+import { EntityDataTable } from '@/components/data-table/data-table-entity'
 
-// Note: V1 pluginRegistry and DataTableErrorBoundary removed for initial V2 testing.
-// These may need to be re-introduced or adapted if V2 components require them.
+// Clean separation of concerns:
+// - data-table-logic.tsx: TypeORM integration, metadata utilities, column generation
+// - data-table-entity.tsx: Main EntityDataTable component logic  
+// - data-table-editing.tsx: Editable cell components
+// - This file: Usage-specific configuration and column definitions
 
-// V2 Cell Factories for Project and User
+// Cell factories for relationship columns (Project and User)
 const EditableProjectCellV2 = createEditableEntityCellV2<Project>({
   serviceName: 'projects', // This key must match the key in PGliteContext services
   getDisplayValue: (project) => project?.name || 'N/A',
@@ -76,7 +76,7 @@ function DataTableV2DebugPanel() {
         <EditableSelectCell
           {...props}
           options={Object.values(TaskStatus).map(status => ({
-            label: status,
+            label: status.replace('_', ' ').toUpperCase(),
             value: status
           }))}
         />
@@ -90,7 +90,7 @@ function DataTableV2DebugPanel() {
         <EditableSelectCell
           {...props}
           options={Object.values(TaskPriority).map(priority => ({
-            label: priority,
+            label: priority.charAt(0).toUpperCase() + priority.slice(1),
             value: priority
           }))}
         />
@@ -152,11 +152,26 @@ function DataTableV2DebugPanel() {
     },
   ], [])
 
+  // Event handlers for inline operations
+  const handleEntityCreated = (newTask: Task) => {
+    console.log('New task created:', newTask);
+    toast.success(`Task "${newTask.title}" created successfully!`);
+  };
+
+  const handleEntityUpdated = (updatedTask: Task) => {
+    console.log('Task updated:', updatedTask);
+    toast.success(`Task "${updatedTask.title}" updated successfully!`);
+  };
+
+  const handleEntityDeleted = (taskId: string) => {
+    console.log('Task deleted:', taskId);
+    toast.success('Task deleted successfully!');
+  };
+
   if (servicesLoading || !ormTaskRepository) {
     return (
-      <SearchProvider>
-        <Header />
-        <Main className="flex flex-col pt-4 px-4">
+      <>
+        <Main className="flex flex-col">
           <Card className="mt-4">
             <CardHeader>
               <CardTitle>
@@ -177,53 +192,85 @@ function DataTableV2DebugPanel() {
             </CardContent>
           </Card>
         </Main>
-      </SearchProvider>
+      </>
     );
   }
 
   return (
-    <SearchProvider>
-      <Header />
-      <Main className="flex flex-col pt-4 px-4">
+    <>
+      <Main className="flex flex-col">
         <div className="mt-4">
           <EntityDataTable<Task>
             tableId="debug-tasks-table-v2"
-            // repository prop might not be directly applicable to EntityDataTable,
-            // it expects liveQueryBuilder and service props.
-            // For now, keeping ormTaskRepository to see if it's used internally by EntityDataTable
-            // or if it needs to be adapted to service/liveQueryBuilder.
-            // This will likely cause a type error if EntityDataTable doesn't accept 'repository'.
-            // The 'service' and 'liveQueryBuilder' props will be critical.
-            // We need to pass the entityType as well.
-            entityType="Task" // Added entityType
+            entityType="Task"
+            entityMetadata={TaskEntityMetadata}
             liveQueryBuilder={services.tasks?.getRepo()?.getOrmRepository?.()?.createQueryBuilder('task')}
             service={{
               getRepo: () => services.tasks.getRepo(),
               create: (data) => services.tasks.createTask(data),
               update: (id, data) => services.tasks.updateTask(id, data),
               delete: (id) => services.tasks.deleteTask(id),
-              getById: (id) => services.tasks.get(id), // Assuming EntityDataTable might use this
+              getById: (id) => services.tasks.get(id),
             }}
             customColumns={columns}
-            title="Tasks - V2 Data Table Test"
+            title="Tasks - V2 Data Table Test (with Inline Create)"
             showCard={true}
             textFilterConfig={{ columnId: 'title', placeholder: 'Filter tasks by title...' }}
+            facetedFilterConfigs={[
+              {
+                columnId: 'status',
+                title: 'Status',
+                options: Object.values(TaskStatus).map(status => ({
+                  label: status.replace('_', ' ').toUpperCase(),
+                  value: status
+                }))
+              },
+              {
+                columnId: 'priority',
+                title: 'Priority',
+                options: Object.values(TaskPriority).map(priority => ({
+                  label: priority.charAt(0).toUpperCase() + priority.slice(1),
+                  value: priority
+                }))
+              }
+            ]}
             retryOnError={true}
             maxRetryAttempts={3}
             tableConfig={{
               enableSorting: true,
               enablePagination: true,
-              pageSize: 10 // Also moving defaultPageSize here as pageSize
+              pageSize: 10
             }}
             customEditableColumns={['title', 'description', 'status', 'priority', 'dueDate', 'projectId', 'assigneeId']}
-            relatedServices={ services?.projects && services?.users ? {
-                project: services.projects,
-                user: services.users
-              } : {} }
+            relatedServices={services?.projects && services?.users ? {
+              project: services.projects,
+              user: services.users
+            } : {}}
+            // Inline create functionality
+            enableInlineCreate={true}
+            initialNewRecordData={{
+              status: TaskStatus.OPEN,
+              priority: TaskPriority.MEDIUM,
+              tags: []
+            }}
+            onEntityCreated={handleEntityCreated}
+            onEntityUpdated={handleEntityUpdated}
+            onEntityDeleted={handleEntityDeleted}
+            // Empty state customization
+            emptyState={
+              <div className="text-center py-12">
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                  No tasks found
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Get started by creating your first task using the "Add Record" button below.
+                </p>
+              </div>
+            }
           />
         </div>
       </Main>
-    </SearchProvider>
+    </>
   );
 }
 

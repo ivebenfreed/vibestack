@@ -12,7 +12,7 @@ import type {
 import type { MinimalContext } from '../types/hono';
 import { syncLogger } from '../middleware/logger';
 import type { WebSocketHandler } from './types';
-import { SERVER_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
 import { getDBClient } from '../lib/db';
 import { compareLSN, deduplicateChanges, orderChangesByDomain as baseOrderChangesByDomain } from '../lib/sync-common';
 import { sql } from '../lib/db';
@@ -25,7 +25,7 @@ import type { SyncStateManager } from './state-manager';
 // - Matches the page size used in database queries for consistency
 const DEFAULT_CHUNK_SIZE = 500;
 
-type TableName = keyof typeof SERVER_TABLE_HIERARCHY;
+type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 const MODULE_NAME = 'server-changes';
 
@@ -35,14 +35,32 @@ const MODULE_NAME = 'server-changes';
  * 
  * @param rawChanges The raw changes array from change_history.
  * @param clientId The ID of the client requesting the sync, to filter out their own changes.
- * @returns Processed and filtered array of TableChange.
+ * @returns Object containing processed changes and processing statistics.
  */
 function processRawChangesBatch(
   rawChanges: TableChange[],
   clientId: string
-): TableChange[] {
+): { 
+  changes: TableChange[]; 
+  stats: {
+    rawCount: number;
+    deduplicatedCount: number;
+    echoedCount: number;
+    filteredCount: number;
+    echoedChanges: Array<{ table: string; operation: string; entityId?: string; }>;
+  }
+} {
   if (rawChanges.length === 0) {
-    return [];
+    return {
+      changes: [],
+      stats: {
+        rawCount: 0,
+        deduplicatedCount: 0,
+        echoedCount: 0,
+        filteredCount: 0,
+        echoedChanges: []
+      }
+    };
   }
 
   // 1. Deduplicate changes
@@ -63,7 +81,16 @@ function processRawChangesBatch(
   }
 
   if (dedupChanges.length === 0) {
-    return [];
+    return {
+      changes: [],
+      stats: {
+        rawCount: rawChanges.length,
+        deduplicatedCount: 0,
+        echoedCount: 0,
+        filteredCount: 0,
+        echoedChanges: []
+      }
+    };
   }
   
   // 2. Order changes by domain hierarchy
@@ -71,20 +98,65 @@ function processRawChangesBatch(
   // If it doesn't exist, this step needs implementation or removal.
   const orderedChanges = baseOrderChangesByDomain(dedupChanges); // Using imported base function
 
-  // 3. Filter out changes originated by the requesting client
+  // 3. Filter out changes originated by the requesting client (anti-echo)
+  const echoedChanges: TableChange[] = [];
+  const echoedChangesSummary: Array<{ table: string; operation: string; entityId?: string; }> = [];
+  
   const filteredChanges = orderedChanges.filter(change => {
-    return !change.data?.client_id || change.data.client_id !== clientId;
+    const originatingClientId = change.data?.client_id;
+    const isEcho = originatingClientId === clientId;
+    
+    if (isEcho) {
+      echoedChanges.push(change);
+      echoedChangesSummary.push({
+        table: change.table,
+        operation: change.operation,
+        entityId: change.data?.id ? String(change.data.id) : undefined
+      });
+      
+      syncLogger.debug('Echo cancelled', {
+        clientId,
+        table: change.table,
+        operation: change.operation,
+        entityId: change.data?.id,
+        originatingClientId,
+        changeUpdatedAt: change.updated_at
+      }, MODULE_NAME);
+      return false; // Filter out echoed change
+    }
+    
+    return true; // Keep non-echoed change
   });
+
+  // Log echo cancellation summary
+  if (echoedChanges.length > 0) {
+    syncLogger.info('Anti-echo filtering applied', {
+      clientId,
+      totalChanges: orderedChanges.length,
+      echoedChanges: echoedChanges.length,
+      filteredChanges: filteredChanges.length,
+      echoedChangesSummary: echoedChangesSummary
+    }, MODULE_NAME);
+  }
+
+  const stats = {
+    rawCount: rawChanges.length,
+    deduplicatedCount: dedupChanges.length,
+    echoedCount: echoedChanges.length,
+    filteredCount: filteredChanges.length,
+    echoedChanges: echoedChangesSummary
+  };
 
   syncLogger.debug('Processed raw changes batch', {
     clientId,
-    rawCount: rawChanges.length,
-    deduplicatedCount: dedupChanges.length,
-    orderedCount: orderedChanges.length, // Usually same as deduped
-    filteredCount: filteredChanges.length
+    ...stats,
+    orderedCount: orderedChanges.length // Usually same as deduped
   }, MODULE_NAME);
 
-  return filteredChanges;
+  return {
+    changes: filteredChanges,
+    stats
+  };
 }
 
 /**
@@ -360,14 +432,14 @@ export async function performCatchupSync(
       const processStartTime = Date.now();
       syncLogger.debug(`[TIMING] Phase 1: Processing raw changes for batch #${phase1Iteration}`, { clientId, rawCount: rawBatchChanges.length, timestamp: processStartTime });
       const processedBatchChanges = processRawChangesBatch(rawBatchChanges, clientId);
-      syncLogger.debug(`[TIMING] Phase 1: Processing raw changes finished for batch #${phase1Iteration} (took ${Date.now() - processStartTime}ms)`, { clientId, processedCount: processedBatchChanges.length, timestamp: Date.now() });
+      syncLogger.debug(`[TIMING] Phase 1: Processing raw changes finished for batch #${phase1Iteration} (took ${Date.now() - processStartTime}ms)`, { clientId, processedCount: processedBatchChanges.changes.length, timestamp: Date.now() });
 
-      if (processedBatchChanges.length > 0) {
+      if (processedBatchChanges.changes.length > 0) {
         const sendStartTime = Date.now();
-        syncLogger.debug(`[TIMING] Phase 1: Calling sendCatchupChanges for batch #${phase1Iteration}`, { clientId, changeCount: processedBatchChanges.length, timestamp: sendStartTime });
+        syncLogger.debug(`[TIMING] Phase 1: Calling sendCatchupChanges for batch #${phase1Iteration}`, { clientId, changeCount: processedBatchChanges.changes.length, timestamp: sendStartTime });
         const batchSuccess = await sendCatchupChanges(
-          processedBatchChanges,
-          processedBatchChanges[processedBatchChanges.length - 1].lsn || initialServerLSN, 
+          processedBatchChanges.changes,
+          processedBatchChanges.changes[processedBatchChanges.changes.length - 1].lsn || initialServerLSN, 
           clientId,
           messageHandler
         );
@@ -380,8 +452,8 @@ export async function performCatchupSync(
         }
         
         // Update LSN based on the LAST PROCESSED change sent
-        currentLSN = processedBatchChanges[processedBatchChanges.length - 1].lsn || currentLSN;
-        totalChangeCount += processedBatchChanges.length;
+        currentLSN = processedBatchChanges.changes[processedBatchChanges.changes.length - 1].lsn || currentLSN;
+        totalChangeCount += processedBatchChanges.changes.length;
       } else {
         // If all changes were filtered/deduped, update LSN based on the last RAW change fetched
         // Ensure currentLSN only moves forward
@@ -963,12 +1035,32 @@ export async function processLiveUpdateNotification(
     } else {
       // 2. Process raw changes (dedupe, order, filter)
       const processedChanges = processRawChangesBatch(rawDeltaChanges, clientId);
-      processedChangeCount = processedChanges.length;
-      syncLogger.info(`Fetched ${rawDeltaChanges.length} raw changes, processed to ${processedChangeCount} for live update`, { clientId });
+      processedChangeCount = processedChanges.changes.length;
+      
+      // Enhanced logging with echo cancellation details
+      if (processedChanges.stats.echoedCount > 0) {
+        syncLogger.info(`Fetched ${rawDeltaChanges.length} raw changes, processed to ${processedChangeCount} for live update (${processedChanges.stats.echoedCount} echoed changes cancelled)`, { 
+          clientId,
+          rawCount: processedChanges.stats.rawCount,
+          deduplicatedCount: processedChanges.stats.deduplicatedCount,
+          echoedCount: processedChanges.stats.echoedCount,
+          filteredCount: processedChangeCount,
+          echoedChanges: processedChanges.stats.echoedChanges.map(echo => 
+            `${echo.table}:${echo.operation}${echo.entityId ? `:${echo.entityId}` : ''}`
+          ).join(', ')
+        });
+      } else {
+        syncLogger.info(`Fetched ${rawDeltaChanges.length} raw changes, processed to ${processedChangeCount} for live update`, { 
+          clientId,
+          rawCount: processedChanges.stats.rawCount,
+          deduplicatedCount: processedChanges.stats.deduplicatedCount,
+          filteredCount: processedChangeCount
+        });
+      }
 
       if (processedChangeCount > 0) {
         // 3. Determine final LSN for this batch
-        finalLSN = processedChanges[processedChanges.length - 1].lsn || serverLSN;
+        finalLSN = processedChanges.changes[processedChanges.changes.length - 1].lsn || serverLSN;
 
         // 4. Send processed changes via sendLiveChanges
         // This may throw a WebSocketUnavailableError which we want to propagate to the caller
@@ -977,7 +1069,7 @@ export async function processLiveUpdateNotification(
           const result = await sendLiveChanges(
             context,
             clientId,
-            processedChanges,
+            processedChanges.changes,
             messageHandler,
             finalLSN
           );

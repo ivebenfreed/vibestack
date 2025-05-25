@@ -8,6 +8,8 @@ import NotFoundError from '@/features/errors/not-found-error'
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore' // Import Zustand store hook
 import { authClient } from '@/lib/auth' // Import authClient instead of useSession hook directly
+import { usePGliteContext } from '@/db/pglite-provider' // Import PGlite context
+import { useSyncContext } from '@/sync/SyncContext'   // Import Sync context
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarMenuSkeleton } from '@/components/ui/sidebar'
 
@@ -72,11 +74,26 @@ export const Route = createRootRouteWithContext<{
       setUnauthenticated,
       setLoading,
       isAuthenticated,
-      isLoading,
+      isLoading: isAuthLoading, // Renamed to avoid conflict
       sessionExpiresAt,
       isSessionExpired,
       updateSessionExpiry
     } = useAuthStore();
+
+    // Get PGlite context states
+    const {
+      isReady: isDbReady,
+      isLoading: isDbLoading,
+      error: dbError
+    } = usePGliteContext();
+
+    // Get Sync context states
+    const {
+      isLoading: isSyncManagerInitializing, // Renamed for clarity
+      syncState,
+      lsn
+      // syncError is not available in SyncContext, omitting for now
+    } = useSyncContext();
     
     // Get router for navigation
     const router = useRouter();
@@ -102,35 +119,35 @@ export const Route = createRootRouteWithContext<{
     }, []);
 
     // Use Better Auth session hook via the client instance
-    const { data: sessionData, isPending, error: sessionError } = authClient.useSession(); 
+    const { data: sessionData, isPending, error: sessionError } = authClient.useSession();
     
     // Handle redirection for authenticated users on auth pages
     useEffect(() => {
-      if (isAuthenticated && !isLoading) {
+      if (isAuthenticated && !isAuthLoading) {
         // If we're authenticated but on an auth page, redirect to dashboard
         const currentPath = location.pathname;
-        if (currentPath === '/sign-in' || currentPath === '/sign-up' || 
+        if (currentPath === '/sign-in' || currentPath === '/sign-up' ||
             currentPath === '/sign-in-2' || currentPath === '/forgot-password') {
           console.log('[AUTH] Detected authenticated user on auth page, redirecting to dashboard');
           router.navigate({ to: '/', replace: true });
         }
       }
-    }, [isAuthenticated, isLoading, location.pathname, router]);
-
+    }, [isAuthenticated, isAuthLoading, location.pathname, router]);
+  
     useEffect(() => {
-      console.log(`[AUTH] RootComponent effect: Session isPending=${isPending}, Store isLoading=${isLoading}, Error=${sessionError}, Online=${isOnline}`);
-
+      console.log(`[AUTH] RootComponent effect: Session isPending=${isPending}, Store isLoading=${isAuthLoading}, Error=${sessionError}, Online=${isOnline}`);
+  
       if (isPending) {
         // We are waiting for the session check
         if (!isOnline && isAuthenticated && !isSessionExpired()) {
           // Offline with a valid cached session, show content immediately.
-          if (isLoading) { // Only change if currently true
+          if (isAuthLoading) { // Only change if currently true
             console.log("[AUTH] Offline & Pending: Using cached session, setting loading to false.");
             setLoading(false);
           }
         } else {
           // Online, or offline without a valid cache. We must wait for the session check.
-          if (!isLoading) { // Only change if currently false and we need to load
+          if (!isAuthLoading) { // Only change if currently false and we need to load
             setLoading(true);
           }
         }
@@ -144,14 +161,14 @@ export const Route = createRootRouteWithContext<{
           // we should trust the persisted state and NOT set unauthenticated due to a network error.
           if (!isOnline && useAuthStore.getState().isAuthenticated && !useAuthStore.getState().isSessionExpired()) {
             console.log("[AUTH] Offline: Server check failed but cached session is valid. Maintaining auth state.");
-            if (isLoading) setLoading(false); // Ensure loading is false
+            if (isAuthLoading) setLoading(false); // Ensure loading is false
           } else {
             // Online with an error, or offline without a valid cached session:
             // This implies a real authentication issue or an expired/missing offline session.
             if (useAuthStore.getState().isAuthenticated || useAuthStore.getState().isLoading) {
               console.log("[AUTH] Session error implies unauthenticated (or offline with no/invalid cache). Setting store state.");
               setUnauthenticated();
-            } else if (isLoading) { // If already unauth but was loading
+            } else if (isAuthLoading) { // If already unauth but was loading
               setLoading(false);
             }
           }
@@ -166,72 +183,119 @@ export const Route = createRootRouteWithContext<{
             }
           }
           
-          if (!isAuthenticated || isLoading || useAuthStore.getState().user?.id !== sessionData.user.id) {
+          if (!isAuthenticated || isAuthLoading || useAuthStore.getState().user?.id !== sessionData.user.id) {
             console.log("[AUTH] Session data received. Setting authenticated state.", sessionData.user);
             setAuthenticated(
-              { id: sessionData.user.id, email: sessionData.user.email, role: sessionData.user.role },
+              { id: sessionData.user.id, email: sessionData.user.email, role: (sessionData.user as any).role ?? null },
               sessionExpiryString
             );
           } else if (sessionExpiryString && sessionExpiresAt !== sessionExpiryString) {
             console.log("[AUTH] Session expiry updated:", sessionExpiryString);
             updateSessionExpiry(sessionExpiryString);
           } else {
-            if (isLoading) setLoading(false);
+            if (isAuthLoading) setLoading(false);
           }
         } else {
           // No sessionError, but no sessionData.user (e.g., valid response, but user is not logged in)
           // This means the user is genuinely not authenticated on the server.
-          if (isAuthenticated || isLoading) {
+          if (isAuthenticated || isAuthLoading) {
             console.log("[AUTH] Session check successful but no user data (unauthenticated). Setting store state.");
             setUnauthenticated();
-          } else if (isLoading) { // If already unauth but was loading
+          } else if (isAuthLoading) { // If already unauth but was loading
              setLoading(false);
           }
         }
       }
     }, [
-      sessionData, 
-      isPending, 
-      sessionError, 
+      sessionData,
+      isPending,
+      sessionError,
       isOnline,
-      setAuthenticated, 
-      setUnauthenticated, 
-      setLoading, 
-      isAuthenticated, 
-      isLoading,
+      setAuthenticated,
+      setUnauthenticated,
+      setLoading,
+      isAuthenticated,
+      isAuthLoading, // Updated
       isSessionExpired,
       sessionExpiresAt,
       updateSessionExpiry
     ]);
 
-    // Show loading indicator 
-    if (isLoading) {
-      return <AuthLoadingSkeleton />;
-    }
-
-    // If authenticated, render the main app layout
-    if (isAuthenticated) {
+    // 1. Check for critical errors first
+    if (dbError) {
+      // You can create a more sophisticated error component later
       return (
-        <>
-          <NavigationProgress />
-          <Outlet />
-          <Toaster duration={50000} />
-          {import.meta.env.MODE === 'development' && (
-            <>
-              <TanStackRouterDevtools position='bottom-right' />
-            </>
-          )}
-        </>
+        <div className="flex flex-col items-center justify-center h-screen p-4 text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">Database Error</h1>
+          <p className="text-lg mb-4">The application database failed to initialize.</p>
+          <p className="text-sm text-muted-foreground mb-6">Details: {dbError.message || 'Unknown database error'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            Try Refreshing
+          </button>
+        </div>
       );
     }
+    // Add syncError check here if it becomes available and is critical
+    // if (syncError) { ... }
 
-    // Otherwise (not loading, not authenticated), render the public part of the app
-    // This could be public routes, or handled by beforeLoad redirect for protected ones.
-    // Rendering Outlet allows public routes (like /sign-in) to work.
+    // 2. If authenticated, decide between app skeleton or actual app
+    if (isAuthenticated) {
+        // User is authenticated. Now check if DB or Sync systems are still loading.
+        const isNewSyncSession = lsn === '0/0';
+        let showAppSkeleton = false;
+
+        // Core initializations for the authenticated app state
+        if (isAuthLoading || isDbLoading || !isDbReady || isSyncManagerInitializing) {
+            showAppSkeleton = true;
+        } else if (isNewSyncSession && (syncState === 'initial_sync' || syncState === 'connecting')) {
+            // Specific condition for new sync session's initial phases
+            showAppSkeleton = true;
+        }
+
+        if (showAppSkeleton) {
+            return <AuthLoadingSkeleton />;
+        } else {
+            // Authenticated and all essential services ready for the main app
+            return (
+              <>
+                <div className="flex flex-col min-h-screen">
+                  <NavigationProgress />
+                  <div className="flex flex-1 relative">
+                    <div className="flex-1">
+                      <Outlet /> {/* Main authenticated app content */}
+                    </div>
+                  </div>
+                </div>
+                <Toaster duration={3000} />
+                {import.meta.env.MODE === 'development' && (
+                  <>
+                    <TanStackRouterDevtools position='bottom-right' />
+                  </>
+                )}
+              </>
+            );
+        }
+    }
+
+    // 3. Not authenticated (this includes the initial state where auth is still loading,
+    //    and isAuthLoading from the store might be true).
+    //    Render public routes (e.g., /sign-in). The Outlet will handle this.
+    //    The useEffect for auth state (lines 137-222) manages isAuthLoading and isAuthenticated.
+    //    If isAuthLoading is true and isAuthenticated is false, this path is taken,
+    //    allowing public routes to render without the main app's AuthLoadingSkeleton.
     return (
       <>
-        <Outlet /> 
-        <Toaster duration={50000} />
+        <div className="flex flex-col min-h-screen">
+          <div className="flex flex-1 relative">
+            <div className="flex-1">
+              <Outlet />
+            </div>
+          </div>
+        </div>
+        <Toaster duration={3000} />
       </>
     );
   },

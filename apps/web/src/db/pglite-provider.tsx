@@ -49,113 +49,130 @@ export function VibestackPGliteProvider({ children }: PGliteProviderProps) {
   const [error, setError] = useState<Error | null>(null);
   const [repositories, setRepositories] = useState<any>(null);
   const [services, setServices] = useState<any>(null);
-  const [typeormInitialized, setTypeormInitialized] = useState(false);
+  // const [typeormInitialized, setTypeormInitialized] = useState(false); // No longer strictly needed at this level
 
   useEffect(() => {
     let isMounted = true;
-    
-    // Set up event listeners
-    const unsubInitialized = dbMessageBus.subscribe('initialized', () => {
+
+    // Initialize states
+    setIsLoading(true);
+    setIsReady(false);
+    setError(null);
+
+    // Initialize TypeORM repositories and services (can be defined outside fullInitialize if preferred)
+    async function initializeTypeormInternal() {
+      // Get DataSource
+      const dataSource = await getNewPGliteDataSource(); // eslint-disable-line @typescript-eslint/no-unused-vars
+      // Create repositories
+      const repos = await createRepositories();
+      // Get SyncChangeManager
+      const syncManager = SyncManager.getInstance();
+      // Ensure SyncManager's own initialization is complete before accessing OutgoingChangeProcessor
+      await syncManager.initialize();
+      const outgoingChangeProcessor = syncManager.getOutgoingChangeProcessor();
+      // Create services
+      const svcs = createServices(repos, outgoingChangeProcessor);
+      
       if (isMounted) {
-        setIsReady(true);
-        setIsLoading(false);
-        
-        // Initialize TypeORM after PGlite is ready
-        if (!typeormInitialized) {
-          initializeTypeorm().catch(err => {
-            console.error('Error initializing TypeORM:', err);
+        setRepositories(repos);
+        setServices(svcs);
+        // setTypeormInitialized(true); // Not needed here, fullInitialize handles overall readiness
+      }
+    }
+
+    async function fullInitialize() {
+      try {
+        console.log('PGlite Provider: Starting full initialization...');
+
+        // Step 1: Await PGlite worker & migration readiness
+        await new Promise<void>((resolve, reject) => {
+          const unsubInitialized = dbMessageBus.subscribe('initialized', () => {
+            if (isMounted) {
+              console.log('PGlite Provider: PGlite worker and migrations complete.');
+              cleanupSubscriptions();
+              resolve();
+            }
           });
-        }
-      }
-    });
-    
-    const unsubError = dbMessageBus.subscribe('error', (data) => {
-      if (isMounted) {
-        setError(data.error || new Error('Unknown database error'));
-        setIsLoading(false);
-      }
-    });
-    
-    // Initialize the database (legacy PGlite)
-    async function init() {
-      try {
-        console.log('PGlite Provider initializing database...');
-        await initializeDatabase();
-        
-        if (isMounted) {
-          setIsReady(true);
-          setIsLoading(false);
-          
-          // Initialize TypeORM after PGlite is ready
-          if (!typeormInitialized) {
-            await initializeTypeorm();
-          }
-        }
-      } catch (err) {
-        console.error('Error initializing database in provider:', err);
-        
-        if (isMounted) {
-          setError(err instanceof Error ? err : new Error(String(err)));
-          setIsLoading(false);
-        }
-      }
-    }
-    
-    // Initialize TypeORM repositories and services
-    async function initializeTypeorm() {
-      try {
-        console.log('Initializing TypeORM repositories and services...');
-        
-        // Get DataSource
-        const dataSource = await getNewPGliteDataSource();
-        
-        // Create repositories
-        const repos = await createRepositories();
-        
-        // Get SyncChangeManager
-        const syncManager = SyncManager.getInstance();
-        // Ensure SyncManager's own initialization is complete before accessing OutgoingChangeProcessor
-        await syncManager.initialize();
-        const outgoingChangeProcessor = syncManager.getOutgoingChangeProcessor();
-        
-        // Create services
-        const svcs = createServices(repos, outgoingChangeProcessor);
-        
-        if (isMounted) {
-          setRepositories(repos);
-          setServices(svcs);
-          setTypeormInitialized(true);
-          console.log('TypeORM repositories and services initialized');
-        }
-      } catch (err) {
-        console.error('Error initializing TypeORM in provider:', err);
-      }
-    }
-    
-    // Check if database is already initialized
-    getDatabase()
-      .then(() => {
-        if (isMounted) {
-          setIsReady(true);
-          setIsLoading(false);
-          
-          // Initialize TypeORM after PGlite is ready
-          if (!typeormInitialized) {
-            initializeTypeorm().catch(err => {
-              console.error('Error initializing TypeORM:', err);
+
+          const unsubError = dbMessageBus.subscribe('error', (data) => {
+            if (isMounted) {
+              console.error('PGlite Provider: PGlite worker initialization error.', data.error);
+              cleanupSubscriptions();
+              reject(data.error || new Error('Unknown PGlite database error'));
+            }
+          });
+
+          const cleanupSubscriptions = () => {
+            unsubInitialized();
+            unsubError();
+          };
+
+          // Check if database is already initialized, otherwise initialize
+          getDatabase()
+            .then(() => {
+              if (isMounted) {
+                // Already initialized by a previous instance or faster path
+                console.log('PGlite Provider: PGlite worker was already initialized.');
+                cleanupSubscriptions();
+                resolve();
+              }
+            })
+            .catch(async () => {
+              // Not initialized, start initialization
+              if (isMounted) {
+                console.log('PGlite Provider: PGlite worker not initialized, starting initialization...');
+                try {
+                  await initializeDatabase();
+                  // Success will be handled by the 'initialized' event listener
+                } catch (initDbError) {
+                  if (isMounted) {
+                    console.error('PGlite Provider: initializeDatabase() call failed.', initDbError);
+                    cleanupSubscriptions();
+                    reject(initDbError);
+                  }
+                }
+              }
             });
-          }
+        });
+
+        if (!isMounted) return;
+
+        // Step 2: Await TypeORM layer initialization
+        console.log('PGlite Provider: Initializing TypeORM layer...');
+        await initializeTypeormInternal();
+
+        if (!isMounted) return;
+        console.log('PGlite Provider: TypeORM layer initialized.');
+        
+        // Set final ready state
+        if (isMounted) {
+          setIsReady(true);
+          setIsLoading(false);
+          setError(null);
+          console.log('PGlite Provider: Full initialization successful. isReady: true');
         }
-      })
-      .catch(() => {
-        // If not already initialized, start initialization
-        init();
-      });
-    
+
+      } catch (err) {
+        if (isMounted) {
+          console.error('PGlite Provider: Full initialization failed:', err);
+          setError(err instanceof Error ? err : new Error(String(err)));
+          setIsReady(false);
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fullInitialize();
+
     return () => {
       isMounted = false;
-      unsubInitialized();
-      unsubError();
+      // Note: dbMessageBus subscriptions are cleaned up within the Promise logic
+      // or if fullInitialize completes/errors before unmount.
+      // If there's a desire for a more robust global unsubscription,
+      // dbMessageBus would need to support returning unsubscribe functions
+      // that can be called here regardless of the promise state.
+      // For now, the local cleanup in the promise should cover most cases.
+      console.log('PGlite Provider: Unmounted.');
     };
   }, []);
 

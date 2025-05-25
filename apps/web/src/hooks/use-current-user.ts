@@ -16,6 +16,7 @@ export type CurrentUserState = {
  * @returns {CurrentUserState} The user data, loading state, and any error
  */
 export function useCurrentUser(): CurrentUserState {
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - useCurrentUser: Start`);
   const { user: authUser, isAuthenticated } = useAuthStore();
   const [state, setState] = useState<CurrentUserState>({
     data: null,
@@ -23,6 +24,7 @@ export function useCurrentUser(): CurrentUserState {
     error: null
   });
 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - useCurrentUser.useEffect: Start. isAuthenticated: ${isAuthenticated}, authUser.id: ${authUser?.id}`);
   useEffect(() => {
     if (!isAuthenticated || !authUser?.id) {
       setState({
@@ -38,7 +40,9 @@ export function useCurrentUser(): CurrentUserState {
         console.log('[useCurrentUser] Fetching user profile for ID:', authUser.id);
         setState(prev => ({ ...prev, loading: true, error: null }));
         
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - useCurrentUser.fetchUserProfile: Before getNewPGliteDataSource()`);
         // Get the TypeORM data source
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - useCurrentUser.fetchUserProfile: After getNewPGliteDataSource()`);
         const dataSource = await getNewPGliteDataSource();
         
         // Get the user repository - use the actual table name from database

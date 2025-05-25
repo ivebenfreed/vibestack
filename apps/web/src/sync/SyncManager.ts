@@ -174,6 +174,7 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
   }
   
   public async initialize(): Promise<void> {
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Start`);
     if (this.isInitialized) {
       if (SyncManager.debugMode) console.log('[SyncManager.initialize] Already initialized.');
       return;
@@ -189,14 +190,21 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
 
     this.initPromise = (async () => {
       try {
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before syncStatePersister.initialize()`);
         await this.syncStatePersister.initialize();
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After syncStatePersister.initialize()`);
         const clientId = this.syncStatePersister.getClientId();
         const lsn = this.syncStatePersister.getLSN();
         if (SyncManager.debugMode) console.log(`[SyncManager.initialize] SyncStatePersister initialized. ClientID: ${clientId}, LSN: ${lsn}`);
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before databaseInitializer.initialize()`);
 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After databaseInitializer.initialize()`);
 await this.databaseInitializer.initialize(); 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before new IncomingChangeProcessor()`);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] DatabaseInitializer initialized.');
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After new IncomingChangeProcessor()`);
 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before new OutgoingChangeProcessor()`);
         // Now instantiate dependent modules
         this.incomingChangeProcessor = new IncomingChangeProcessor(this.events);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] IncomingChangeProcessor instantiated.');
@@ -207,13 +215,16 @@ await this.databaseInitializer.initialize();
           this.webSocketConnector // as IMessageSender
         );
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] OutgoingChangeProcessor instantiated.');
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After new OutgoingChangeProcessor()`);
 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before new SyncMessageHandler()`);
         this.syncMessageHandler = new SyncMessageHandler(
           this.events,
           this.webSocketConnector, // as IMessageSender & for connection status
           this.incomingChangeProcessor, // Now instantiated
           this.syncStatePersister // Already initialized
         );
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After new SyncMessageHandler()`);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] SyncMessageHandler instantiated.');
         
         this.webSocketConnector.setConnectionParams(clientId, lsn);
@@ -228,6 +239,7 @@ await this.databaseInitializer.initialize();
             lastSyncTime: null // Or get from persister if available/needed
         };
         this.syncMessageHandler.syncInitialState(initialStateData);
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: End`);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] SyncMessageHandler initial state synced.');
 
         this.isInitialized = true;

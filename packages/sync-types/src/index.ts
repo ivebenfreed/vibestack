@@ -25,17 +25,9 @@ import type {
   Message
 } from './messages';
 
-/**
- * Core change type for replication
- * Represents a change to a table that needs to be replicated
- */
-export interface TableChange {
-  table: string;
-  operation: 'insert' | 'update' | 'delete';
-  data: Record<string, unknown>;
-  lsn?: string;  // Optional LSN since it's only needed for WAL-based changes
-  updated_at: string;  // ISO timestamp of when the record was updated
-}
+// Export enhanced types from table-changes
+export type { TableChange, RelationshipUpdate } from './table-changes';
+import type { TableChange } from './table-changes';
 
 /**
  * Strongly typed record data for sync operations

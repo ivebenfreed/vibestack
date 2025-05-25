@@ -26,6 +26,8 @@ export interface IMessageSender {
   setConnectionParams(clientId: ClientId, lsn: LSN): void;
   setAutoReconnect(enabled: boolean): void;
   isOnline(): boolean; // Added to IMessageSender if WebSocketConnector implements it
+  // Added for OutgoingChangeProcessor to access client ID for anti-echo
+  getClientId(): ClientId;
 }
 
 export interface IOnlineStatusProvider {

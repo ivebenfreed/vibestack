@@ -3,3 +3,100 @@ description:
 globs:
 alwaysApply: false
 ---
+# Tasks Feature Pattern Guide
+
+## Architecture Overview
+
+The tasks feature uses a React components structure with live queries for real-time updates and service methods for data manipulation.
+
+## Key Components
+
+- **Tasks Main Component**: [apps/web/src/features/tasks/index.tsx](mdc:apps/web/src/features/tasks/index.tsx) - Entry point that sets up live queries
+- **Tasks Context**: [apps/web/src/features/tasks/context/tasks-context.tsx](mdc:apps/web/src/features/tasks/context/tasks-context.tsx) - Provides service method access
+- **Task Service**: [apps/web/src/db/services.ts](mdc:apps/web/src/db/services.ts) - Implements CRUD operations for tasks
+
+## Implementation Pattern
+
+### 1. Use Live Queries for Real-time Data
+
+Always use the `useLiveEntity` hook with a properly configured query builder to get real-time updates:
+
+```typescript
+// 1. Set up a query builder state
+const [taskQueryBuilder, setTaskQueryBuilder] = useState<SelectQueryBuilder<Task> | null>(null);
+
+// 2. Initialize the query builder in useEffect
+useEffect(() => {
+  const initializeQueryBuilder = async () => {
+    const dataSource = await getNewPGliteDataSource();
+    if (!dataSource.isInitialized) {
+      await dataSource.initialize();
+    }
+    
+    const tasksQB = dataSource.getRepository(Task)
+      .createQueryBuilder("task")
+      .orderBy("task.updatedAt", "DESC");
+      
+    setTaskQueryBuilder(tasksQB);
+  };
+  
+  initializeQueryBuilder();
+}, []);
+
+// 3. Use the live entity hook to get real-time data
+const { data: tasks, loading, error } = useLiveEntity<Task>(
+  taskQueryBuilder,
+  { enabled: !!taskQueryBuilder }
+);
+```
+
+### 2. Use Service Methods for Data Modification
+
+Always use the service methods to modify data, which will automatically trigger live query updates:
+
+```typescript
+// Example from TasksContext
+const createTask = async (taskData) => {
+  if (!taskService) {
+    throw new Error('Task service not available');
+  }
+  
+  return await taskService.createTask(taskData);
+};
+```
+
+### 3. No Need for Manual Event Handling
+
+The live query system will automatically update when using services:
+
+```typescript
+// INCORRECT: Don't use event listeners for database changes
+window.addEventListener('task-created', handleTaskCreated);
+
+// CORRECT: Just use the live query data directly
+const { data: tasks } = useLiveEntity<Task>(queryBuilder);
+```
+
+### 4. Handle Entity ID Properly
+
+Be aware that entity ID fields in query results might use a different naming format:
+
+```typescript
+// Get the ID correctly in table operations
+const idField = activeTab.endsWith('s') 
+  ? activeTab.substring(0, activeTab.length - 1) + '_id' 
+  : activeTab + '_id';
+const recordId = getProperty(record, 'id', idField);
+```
+
+## Feature Component Structure
+
+1. **Main Entry Component**: Sets up live queries and renders layout
+2. **Context Provider**: Wraps service methods for component use
+3. **UI Components**: Use context methods for operations, display live data
+
+## Troubleshooting
+
+1. **Live updates not triggering**: Ensure you're using service methods from TaskService
+2. **ID field issues**: Check for correct format (task_id vs id) when referencing IDs
+3. **Missing data**: Verify your query builder includes all needed fields

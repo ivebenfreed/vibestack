@@ -42,7 +42,31 @@ export class WebSocketConnector implements IMessageSender {
         messageId: this.generateMessageId(),
         timestamp: Date.now(),
       };
+
+      // Add debugging for outgoing changes to track client_id
+      if (messageData.type === 'clt_send_changes') {
+        console.log(`[WebSocketConnector] Sending clt_send_changes message:`, {
+          messageId: fullMessage.messageId,
+          clientId: fullMessage.clientId,
+          changesCount: (messageData as any).changes?.length || 0,
+          currentClientId: this.currentClientId
+        });
+
+        // Log details about each change's client_id
+        if ((messageData as any).changes) {
+          const changes = (messageData as any).changes;
+          console.log(`[WebSocketConnector] Changes client_id details:`);
+          changes.forEach((change: any, index: number) => {
+            console.log(`  Change ${index + 1}: ${change.table} ${change.operation} entity=${change.data?.id} client_id="${change.data?.client_id || 'MISSING'}"`);
+          });
+        }
+      }
+
       this.webSocket.send(JSON.stringify(fullMessage));
+      
+      if (messageData.type === 'clt_send_changes') {
+        console.log(`[WebSocketConnector] ✅ Successfully sent clt_send_changes message to server`);
+      }
     } catch (error) {
       console.error(`[WebSocketConnector] Failed to send message:`, error);
       // Optionally throw an error or emit a specific event
@@ -53,6 +77,13 @@ export class WebSocketConnector implements IMessageSender {
   // public getClientId(): string {
   //   return this.currentClientId;
   // }
+
+  /**
+   * Get the current client ID - used by OutgoingChangeProcessor for anti-echo
+   */
+  public getClientId(): string {
+    return this.currentClientId;
+  }
 
   public setConnectionParams(clientId: string, lsn: string): void {
     this.currentClientId = clientId;

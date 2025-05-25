@@ -3,6 +3,15 @@ import { getDatabase, Results } from '@/db/db';
 // import { PGliteQueryBuilder } from '../typeorm/PGliteQueryBuilder'; // REMOVED - Use standard TypeORM QB
 import { SelectQueryBuilder, ObjectLiteral } from 'typeorm'; // Import standard SelectQueryBuilder & ObjectLiteral
 
+// Try to import performance context, but make it optional
+let usePerformanceMonitor: any = null;
+try {
+  const perfModule = require('@/contexts/performance-monitor-context');
+  usePerformanceMonitor = perfModule.usePerformanceMonitor;
+} catch (e) {
+  // Performance monitoring not available, continue without it
+}
+
 // Define the QueryState interface locally
 interface QueryState<T> {
   data: T[] | null;
@@ -61,7 +70,18 @@ export function useLiveEntity<T extends ObjectLiteral & { id: string; updatedAt?
     error: null
   });
 
+  // Optional performance monitoring
+  let performanceMonitor: any = null;
+  try {
+    if (usePerformanceMonitor) {
+      performanceMonitor = usePerformanceMonitor();
+    }
+  } catch (e) {
+    // Performance monitoring not available
+  }
+
   const unsubscribeRef = useRef<(() => Promise<void>) | null>(null);
+  const queryIdRef = useRef<string | null>(null);
   const enabled = !!queryBuilder && options?.enabled !== false;
   const shouldTransform = options?.transform !== false; // Default to true if not specified
 
@@ -77,6 +97,19 @@ export function useLiveEntity<T extends ObjectLiteral & { id: string; updatedAt?
 
     let isMounted = true;
     console.log('[useLiveEntity] Setting up live query with PGlite...');
+
+    // Generate unique query ID for performance tracking
+    const queryId = `live-query-${entityName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    queryIdRef.current = queryId;
+
+    // Start performance tracking
+    if (performanceMonitor?.startQuery) {
+      const [sql] = queryBuilder.getQueryAndParameters();
+      performanceMonitor.startQuery(queryId, `LiveEntity: ${entityName}`, 'live-query', {
+        entityType: entityName,
+        sql: sql.substring(0, 100) + '...' // Truncate for readability
+      });
+    }
 
     const setupLiveQuery = async () => {
       try {
@@ -123,6 +156,18 @@ export function useLiveEntity<T extends ObjectLiteral & { id: string; updatedAt?
               
               if (stringifiedNew !== stringifiedOld) {
                 console.log('[useLiveEntity] Data changed, updating state');
+                
+                // Track performance for data update
+                if (performanceMonitor?.endQuery && queryIdRef.current) {
+                  performanceMonitor.endQuery(queryIdRef.current, true, {
+                    dataSize: formattedResults.length,
+                    updateType: 'data-change'
+                  });
+                  // Start a new tracking for the next update
+                  queryIdRef.current = `live-query-update-${entityName}-${Date.now()}`;
+                  performanceMonitor.startQuery(queryIdRef.current, `LiveEntity Update: ${entityName}`, 'live-query');
+                }
+                
                 return { data: formattedResults, loading: false, error: null };
               }
               console.log('[useLiveEntity] No changes in data');
@@ -153,11 +198,26 @@ export function useLiveEntity<T extends ObjectLiteral & { id: string; updatedAt?
             loading: false, 
             error: null 
           });
+
+          // Track successful initial query completion
+          if (performanceMonitor?.endQuery && queryIdRef.current) {
+            performanceMonitor.endQuery(queryIdRef.current, true, {
+              dataSize: initialResults.length,
+              updateType: 'initial-load'
+            });
+          }
         }
         
         console.log('[useLiveEntity] Live query setup complete');
       } catch (error) {
         console.error('[useLiveEntity] Error setting up live query:', error);
+        
+        // Track error
+        if (performanceMonitor?.endQuery && queryIdRef.current) {
+          performanceMonitor.endQuery(queryIdRef.current, false, {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
         
         if (isMounted) {
           setState({ 
@@ -198,13 +258,17 @@ export function useLiveEntity<T extends ObjectLiteral & { id: string; updatedAt?
       
       if (unsubscribeRef.current) {
         console.log('[useLiveEntity] Unsubscribing from live query');
-        unsubscribeRef.current().catch(err => {
-          console.error('[useLiveEntity] Error unsubscribing from live query:', err);
-        });
+        unsubscribeRef.current().catch(console.error);
         unsubscribeRef.current = null;
       }
+      
+      // End any pending performance tracking
+      if (performanceMonitor?.endQuery && queryIdRef.current) {
+        performanceMonitor.endQuery(queryIdRef.current, false, { reason: 'cleanup' });
+        queryIdRef.current = null;
+      }
     };
-  }, [enabled, shouldTransform, entityName, queryBuilder && queryBuilder.getSql(), JSON.stringify(queryBuilder?.getParameters())]);
+  }, [enabled, queryBuilder, entityName, shouldTransform, performanceMonitor]);
   
   return state;
 } 

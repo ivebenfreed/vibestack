@@ -8,6 +8,8 @@ export function DebugNavigation() {
     { path: '/debug/sync', label: 'Sync' },
     { path: '/debug/sync-changes', label: 'Sync Changes' },
     { path: '/debug/live-query', label: 'Live Query' },
+    { path: '/debug/performance', label: 'Live Query Performance' },
+    { path: '/debug/multi-query', label: 'Multi-Query Test' },
     { path: '/debug/data-table', label: 'Data Table' },
     { path: '/debug/auth', label: 'Auth' },
     { path: '/debug/typeorm-test', label: 'TypeORM Test' },

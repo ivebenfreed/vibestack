@@ -3,6 +3,7 @@ import { OutgoingChangeProcessor } from '../sync/OutgoingChangeProcessor';
 import { DeepPartial } from 'typeorm';
 import { User, Project, Task, Comment, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
 import { UserRepository, ProjectRepository, TaskRepository, CommentRepository } from './repositories';
+import { RelationshipChangeEncoder } from './relationship-change-encoder';
 
 /**
  * Data service error class
@@ -135,12 +136,14 @@ export class UserService extends BaseService<User> {
 
       const createdUser = await this.repository.create(newUser);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'insert',
         createdUser as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[UserService] Sync tracking failed (non-blocking):', error);
+      });
       
       return createdUser;
     } catch (error) {
@@ -166,12 +169,14 @@ export class UserService extends BaseService<User> {
       
       const updatedUser = await this.repository.update(id, updatedData);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'update',
         updatedUser as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[UserService] Sync tracking failed (non-blocking):', error);
+      });
       
       return updatedUser;
     } catch (error) {
@@ -192,13 +197,15 @@ export class UserService extends BaseService<User> {
       
       const success = await this.repository.delete(id);
       
-      // Track change for sync
+      // Track change for sync - NON-BLOCKING (fire and forget)
       if (success) {
-        await this.syncChangeManager.trackChange(
+        this.syncChangeManager.trackChange(
           this.tableName,
           'delete',
           { id } as unknown as Record<string, unknown>
-        );
+        ).catch(error => {
+          console.error('[UserService] Sync tracking failed (non-blocking):', error);
+        });
       }
       
       return success;
@@ -252,12 +259,14 @@ export class ProjectService extends BaseService<Project> {
 
       const createdProject = await this.repository.create(newProject);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'insert',
         createdProject as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[ProjectService] Sync tracking failed (non-blocking):', error);
+      });
       
       // Dispatch custom event to notify UI of project creation
       const event = new CustomEvent('project-created', { 
@@ -290,12 +299,14 @@ export class ProjectService extends BaseService<Project> {
       
       const updatedProject = await this.repository.update(id, updatedData);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'update',
         updatedProject as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[ProjectService] Sync tracking failed (non-blocking):', error);
+      });
       
       // Dispatch custom event to notify UI of project update
       const event = new CustomEvent('project-updated', { 
@@ -323,13 +334,15 @@ export class ProjectService extends BaseService<Project> {
       
       const success = await this.repository.delete(id);
       
-      // Track change for sync
+      // Track change for sync - NON-BLOCKING (fire and forget)
       if (success) {
-        await this.syncChangeManager.trackChange(
+        this.syncChangeManager.trackChange(
           this.tableName,
           'delete',
           { id } as unknown as Record<string, unknown>
-        );
+        ).catch(error => {
+          console.error('[ProjectService] Sync tracking failed (non-blocking):', error);
+        });
         
         // Dispatch custom event to notify UI of project deletion
         const event = new CustomEvent('project-deleted', { 
@@ -344,6 +357,195 @@ export class ProjectService extends BaseService<Project> {
       throw new DatabaseServiceError(
         `Failed to delete project with ID ${id}`,
         'deleteProject',
+        error
+      );
+    }
+  }
+
+  // Project Member Management Methods
+
+  async getProjectMembers(projectId: string): Promise<User[]> {
+    try {
+      return await this.projectRepository.getMembers(projectId);
+    } catch (error) {
+      throw new DatabaseServiceError(
+        `Failed to get members for project with ID ${projectId}`,
+        'getProjectMembers',
+        error
+      );
+    }
+  }
+
+  async updateProjectMembers(projectId: string, userIds: string[]): Promise<User[]> {
+    try {
+      // Check if project exists
+      const project = await this.repository.findById(projectId);
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+
+      // Update the members using repository
+      await this.projectRepository.updateMembers(projectId, userIds);
+
+      // Get the updated members list
+      const updatedMembers = await this.projectRepository.getMembers(projectId);
+
+      // ✨ NEW: Use RelationshipChangeEncoder for TypeORM-native sync
+      const relationshipChange = RelationshipChangeEncoder.encodeRelationshipChange(
+        'projects',
+        projectId,
+        'members',
+        'set',
+        userIds
+      );
+
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      // Now pass both entity data AND relationship metadata
+      this.syncChangeManager.trackChange(
+        relationshipChange.table,
+        relationshipChange.operation as 'insert' | 'update' | 'delete',
+        {
+          id: projectId,
+          updated_at: relationshipChange.updated_at,
+          client_id: relationshipChange.client_id
+        },
+        undefined, // originalData
+        {
+          relationshipUpdates: relationshipChange.relationshipUpdates,
+          entityRelations: relationshipChange.entityRelations
+        }
+      ).catch(error => {
+        console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
+      });
+
+      // Dispatch custom event to notify UI of member changes
+      const event = new CustomEvent('project-members-updated', { 
+        detail: { projectId, members: updatedMembers } 
+      });
+      window.dispatchEvent(event);
+      console.log('[ProjectService] Dispatched project-members-updated event');
+
+      return updatedMembers;
+    } catch (error) {
+      throw new DatabaseServiceError(
+        `Failed to update members for project with ID ${projectId}`,
+        'updateProjectMembers',
+        error
+      );
+    }
+  }
+
+  async addProjectMember(projectId: string, userId: string): Promise<User[]> {
+    try {
+      // Check if project exists
+      const project = await this.repository.findById(projectId);
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+
+      // Add the member using repository
+      await this.projectRepository.addMember(projectId, userId);
+
+      // Get the updated members list
+      const updatedMembers = await this.projectRepository.getMembers(projectId);
+
+      // ✨ NEW: Use RelationshipChangeEncoder for TypeORM-native sync
+      const relationshipChange = RelationshipChangeEncoder.encodeRelationshipChange(
+        'projects',
+        projectId,
+        'members',
+        'add',
+        [userId]
+      );
+
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      // Now pass both entity data AND relationship metadata
+      this.syncChangeManager.trackChange(
+        relationshipChange.table,
+        relationshipChange.operation as 'insert' | 'update' | 'delete',
+        {
+          id: projectId,
+          updated_at: relationshipChange.updated_at,
+          client_id: relationshipChange.client_id
+        },
+        undefined, // originalData
+        {
+          relationshipUpdates: relationshipChange.relationshipUpdates,
+          entityRelations: relationshipChange.entityRelations
+        }
+      ).catch(error => {
+        console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
+      });
+
+      // Dispatch custom event to notify UI of member changes
+      const event = new CustomEvent('project-members-updated', { 
+        detail: { projectId, members: updatedMembers } 
+      });
+      window.dispatchEvent(event);
+
+      return updatedMembers;
+    } catch (error) {
+      throw new DatabaseServiceError(
+        `Failed to add member to project with ID ${projectId}`,
+        'addProjectMember',
+        error
+      );
+    }
+  }
+
+  async removeProjectMember(projectId: string, userId: string): Promise<User[]> {
+    try {
+      // Check if project exists
+      const project = await this.repository.findById(projectId);
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+
+      // Remove the member using repository
+      await this.projectRepository.removeMember(projectId, userId);
+
+      // Get the updated members list
+      const updatedMembers = await this.projectRepository.getMembers(projectId);
+
+      // ✨ NEW: Use RelationshipChangeEncoder for TypeORM-native sync
+      const relationshipChange = RelationshipChangeEncoder.encodeRelationshipChange(
+        'projects',
+        projectId,
+        'members',
+        'remove',
+        [userId]
+      );
+
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      // Now pass both entity data AND relationship metadata
+      this.syncChangeManager.trackChange(
+        relationshipChange.table,
+        relationshipChange.operation as 'insert' | 'update' | 'delete',
+        {
+          id: projectId,
+          updated_at: relationshipChange.updated_at,
+          client_id: relationshipChange.client_id
+        },
+        undefined, // originalData
+        {
+          relationshipUpdates: relationshipChange.relationshipUpdates,
+          entityRelations: relationshipChange.entityRelations
+        }
+      ).catch(error => {
+        console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
+      });
+
+      // Dispatch custom event to notify UI of member changes
+      const event = new CustomEvent('project-members-updated', { 
+        detail: { projectId, members: updatedMembers } 
+      });
+      window.dispatchEvent(event);
+
+      return updatedMembers;
+    } catch (error) {
+      throw new DatabaseServiceError(
+        `Failed to remove member from project with ID ${projectId}`,
+        'removeProjectMember',
         error
       );
     }
@@ -432,12 +634,14 @@ export class TaskService extends BaseService<Task> {
 
       const createdTask = await this.repository.create(newTask);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'insert',
         createdTask as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[TaskService] Sync tracking failed (non-blocking):', error);
+      });
       
       // Dispatch custom event to notify UI of task creation
       const event = new CustomEvent('task-created', { 
@@ -463,19 +667,27 @@ export class TaskService extends BaseService<Task> {
         throw new Error(`Task with ID ${id} not found`);
       }
       
+      // Handle completedAt automatically when status changes
       const updatedData = {
         ...changes,
         updatedAt: new Date()
       } as DeepPartial<Task>;
       
+      // If status is being changed, handle completedAt logic
+      if (changes.status !== undefined && changes.status !== task.status) {
+        updatedData.completedAt = (changes.status === TaskStatus.COMPLETED ? new Date() : undefined) as DeepPartial<Date | undefined>;
+      }
+      
       const updatedTask = await this.repository.update(id, updatedData);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'update',
         updatedTask as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[TaskService] Sync tracking failed (non-blocking):', error);
+      });
       
       // Dispatch custom event to notify UI of task update
       const event = new CustomEvent('task-updated', { 
@@ -503,13 +715,15 @@ export class TaskService extends BaseService<Task> {
       
       const success = await this.repository.delete(id);
       
-      // Track change for sync
+      // Track change for sync - NON-BLOCKING (fire and forget)
       if (success) {
-        await this.syncChangeManager.trackChange(
+        this.syncChangeManager.trackChange(
           this.tableName,
           'delete',
           { id } as unknown as Record<string, unknown>
-        );
+        ).catch(error => {
+          console.error('[TaskService] Sync tracking failed (non-blocking):', error);
+        });
         
         // Dispatch custom event to notify UI of task deletion
         const event = new CustomEvent('task-deleted', { 
@@ -536,24 +750,30 @@ export class TaskService extends BaseService<Task> {
         throw new Error(`Task with ID ${id} not found`);
       }
       
-      const updatedTask = await this.repository.update(id, { 
+      // Handle completedAt automatically
+      const updatedData = {
         status,
+        completedAt: (status === TaskStatus.COMPLETED ? new Date() : undefined),
         updatedAt: new Date()
-      } as DeepPartial<Task>);
+      } as DeepPartial<Task>;
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      const updatedTask = await this.repository.update(id, updatedData);
+      
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'update',
         updatedTask as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[TaskService] Sync tracking failed (non-blocking):', error);
+      });
       
       // Dispatch custom event to notify UI of task status update
-      const event = new CustomEvent('task-updated', { 
-        detail: { task: updatedTask, statusChanged: true } 
+      const event = new CustomEvent('task-status-updated', { 
+        detail: { task: updatedTask } 
       });
       window.dispatchEvent(event);
-      console.log('[TaskService] Dispatched task-updated event (status change)');
+      console.log('[TaskService] Dispatched task-status-updated event');
       
       return updatedTask;
     } catch (error) {
@@ -623,12 +843,14 @@ export class CommentService extends BaseService<Comment> {
 
       const createdComment = await this.repository.create(newComment);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'insert',
         createdComment as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[CommentService] Sync tracking failed (non-blocking):', error);
+      });
       
       return createdComment;
     } catch (error) {
@@ -654,12 +876,14 @@ export class CommentService extends BaseService<Comment> {
       
       const updatedComment = await this.repository.update(id, updatedData);
       
-      // Track change for sync
-      await this.syncChangeManager.trackChange(
+      // Track change for sync - NON-BLOCKING (fire and forget)
+      this.syncChangeManager.trackChange(
         this.tableName,
         'update',
         updatedComment as unknown as Record<string, unknown>
-      );
+      ).catch(error => {
+        console.error('[CommentService] Sync tracking failed (non-blocking):', error);
+      });
       
       return updatedComment;
     } catch (error) {
@@ -680,13 +904,15 @@ export class CommentService extends BaseService<Comment> {
       
       const success = await this.repository.delete(id);
       
-      // Track change for sync
+      // Track change for sync - NON-BLOCKING (fire and forget)
       if (success) {
-        await this.syncChangeManager.trackChange(
+        this.syncChangeManager.trackChange(
           this.tableName,
           'delete',
           { id } as unknown as Record<string, unknown>
-        );
+        ).catch(error => {
+          console.error('[CommentService] Sync tracking failed (non-blocking):', error);
+        });
       }
       
       return success;

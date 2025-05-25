@@ -40,6 +40,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       lastOnlineCheck: null,
 
       setAuthenticated: (user, expiresAt = null) => {
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - authStore.setAuthenticated: User: ${JSON.stringify(user)}, expiresAt: ${expiresAt}`);
         console.log("[AUTH] Setting state to AUTHENTICATED. User:", user);
         set({ 
           isAuthenticated: true, 
@@ -52,6 +53,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       setUnauthenticated: () => {
         console.log("[AUTH] Setting state to UNAUTHENTICATED.");
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - authStore.setUnauthenticated: Called`);
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - authStore.setUnauthenticated: Called`);
         set({ 
           isAuthenticated: false, 
           user: null, 

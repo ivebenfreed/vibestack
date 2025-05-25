@@ -37,6 +37,8 @@
   --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
+  --global-sidebar-width: 64px;
+  --header-height: 64px;
 }
 
 .dark {
@@ -104,6 +106,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-global-sidebar-width: var(--global-sidebar-width);
 }
 
 @layer base {

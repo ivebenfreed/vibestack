@@ -3,3 +3,67 @@ description:
 globs:
 alwaysApply: false
 ---
+# Live Entity Transformation Guide
+
+## Overview
+
+The `useLiveEntity` hook provides real-time database updates but requires special handling to convert raw database fields (snake_case) to TypeScript entity objects (camelCase).
+
+## Key Files
+
+- **Live Entity Hook**: [apps/web/src/db/hooks/useLiveEntity.ts](mdc:apps/web/src/db/hooks/useLiveEntity.ts) - Provides the transformation capability
+- **Tasks Component**: [apps/web/src/features/tasks/index.tsx](mdc:apps/web/src/features/tasks/index.tsx) - Example implementation
+
+## Using Transformation
+
+When using the `useLiveEntity` hook, always enable the transformation option to ensure proper field mapping:
+
+```typescript
+const { data: tasks, loading, error } = useLiveEntity<Task>(
+  taskQueryBuilder,
+  { 
+    enabled: !!taskQueryBuilder,
+    transform: true // Enable snake_case to camelCase transformation
+  }
+);
+```
+
+## Setting up the Query Builder
+
+Ensure your query builder has a proper alias that matches the entity name for transformation to work correctly:
+
+```typescript
+// CORRECT: Use the entity name as the alias
+const tasksQB = dataSource.getRepository(Task)
+  .createQueryBuilder("task") // "task" matches the Task entity
+  .orderBy("task.updatedAt", "DESC");
+
+// INCORRECT: Mismatched alias will cause transformation issues
+const tasksQB = dataSource.getRepository(Task)
+  .createQueryBuilder("t") // "t" doesn't match entity name
+  .orderBy("t.updatedAt", "DESC");
+```
+
+## How Transformation Works
+
+The transformation handles two types of field names:
+
+1. **Prefixed Fields**: `task_id` → `id`, `task_created_at` → `createdAt`
+2. **Direct Fields**: `created_at` → `createdAt`, `name` → `name`
+
+## Debugging Transformation
+
+If your components aren't receiving properly formatted data:
+
+1. Check console logs for `[useLiveEntity] Transforming snake_case to camelCase entities`
+2. Verify the query builder alias matches the entity name (e.g., "task" for Task entity)
+3. Examine a sample of transformed data by adding:
+   ```typescript
+   console.log('[Component] First item sample:', data[0]);
+   ```
+
+## Benefits
+
+- **Transparency**: Components receive properly typed entities
+- **Consistency**: Same property format as service methods
+- **Simplicity**: No need for manual field mapping in components

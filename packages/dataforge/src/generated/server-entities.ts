@@ -819,3 +819,39 @@ export const SERVER_SYSTEM_TABLES = [
 export const SERVER_UTILITY_TABLES = [
 ];
 
+// Junction tables for server context
+export const SERVER_JUNCTION_TABLES = [
+  "project_members",
+  "task_dependencies",
+];
+
+// Combined entity and junction tables for replication tracking
+export const SERVER_TRACKED_TABLES = [
+  '"comments"',
+  '"projects"',
+  '"tasks"',
+  '"users"',
+  "project_members",
+  "task_dependencies",
+];
+
+// Junction table mapping for relationship transformation
+export const SERVER_JUNCTION_TABLE_MAPPING = {
+  "project_members": {
+    sourceEntity: 'Project',
+    sourceTable: "projects",
+    sourceColumn: 'project_id',
+    targetEntity: 'User',
+    targetColumn: 'user_id',
+    relationName: 'members'
+  },
+  "task_dependencies": {
+    sourceEntity: 'Task',
+    sourceTable: "tasks",
+    sourceColumn: 'dependent_task_id',
+    targetEntity: 'Task',
+    targetColumn: 'dependency_task_id',
+    relationName: 'dependencies'
+  },
+} as const;
+

@@ -1,12 +1,9 @@
 import React, { Suspense } from 'react';
 import { SyncChangesDebugPanel } from './components/SyncChangesDebugPanel';
-import { Header } from '@/components/layout/header';
+import { DebugNavigation } from './components/DebugNavigation';
 import { Main } from '@/components/layout/main';
-import { ProfileDropdown } from '@/components/profile-dropdown';
-import { Search } from '@/components/search';
-import { ThemeSwitch } from '@/components/theme-switch';
 import { Card, CardContent } from '@/components/ui/card';
-import { SearchProvider } from '@/context/search-context';
+
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
@@ -53,8 +50,7 @@ class ErrorBoundary extends React.Component<
 
 export function SyncChangesPage() {
   return (
-    <SearchProvider>
-      <Header fixed />
+    <>
       <Main>
         <div className="mb-2 flex items-center justify-between space-y-2">
           <h1 className='text-2xl font-bold tracking-tight'>Sync Changes Debug</h1>
@@ -66,8 +62,9 @@ export function SyncChangesPage() {
           </Suspense>
         </ErrorBoundary>
         
+        <DebugNavigation />
       </Main>
-    </SearchProvider>
+    </>
   );
 }
 

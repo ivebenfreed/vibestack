@@ -1,24 +1,152 @@
-import type { TableChange } from '@repo/sync-types';
+import type { TableChange, RelationshipUpdate } from '@repo/sync-types';
 import { replicationLogger } from '../middleware/logger';
 import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';
+
+// Helper type for WAL change records
+type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
 import { sql, getDBClient } from '../lib/db';
 import { StateManager } from './state-manager';
-import { SERVER_DOMAIN_TABLES, SERVER_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+import { 
+  SERVER_DOMAIN_TABLES, 
+  SERVER_DOMAIN_TABLE_HIERARCHY,
+  SERVER_TRACKED_TABLES,
+  SERVER_JUNCTION_TABLE_MAPPING
+} from '@repo/dataforge/server-entities';
 import type { Env } from '../types/env';
 
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'process-changes';
 
-type TableName = keyof typeof SERVER_TABLE_HIERARCHY;
+type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 // ====== Constants ======
 const DEFAULT_STORE_BATCH_SIZE = 500;
 
 // Create a Set of tracked tables for O(1) lookup performance
-const TRACKED_TABLES_SET = new Set(SERVER_DOMAIN_TABLES);
+// ✨ NEW: Now includes both domain tables and junction tables
+const TRACKED_TABLES_SET = new Set(SERVER_TRACKED_TABLES);
 
 // ====== Helper Functions ======
+
+// ✨ NEW: Junction table detection and transformation
+function isJunctionTable(tableName: string): boolean {
+  return Object.prototype.hasOwnProperty.call(SERVER_JUNCTION_TABLE_MAPPING, tableName);
+}
+
+function extractColumnValue(change: WALChangeRecord, columnName: string): string | null {
+  if (change.columnnames && change.columnvalues) {
+    const index = change.columnnames.indexOf(columnName);
+    if (index !== -1 && index < change.columnvalues.length) {
+      return String(change.columnvalues[index]);
+    }
+  }
+  
+  // For delete operations, check oldkeys
+  if (change.oldkeys?.keynames && change.oldkeys?.keyvalues) {
+    const index = change.oldkeys.keynames.indexOf(columnName);
+    if (index !== -1 && index < change.oldkeys.keyvalues.length) {
+      return String(change.oldkeys.keyvalues[index]);
+    }
+  }
+  
+  return null;
+}
+
+async function getCurrentRelationshipIds(
+  context: MinimalContext,
+  sourceTable: string, 
+  sourceId: string, 
+  relationName: string
+): Promise<string[]> {
+  try {
+    // Find the junction table mapping for this relationship
+    const junctionTableName = Object.keys(SERVER_JUNCTION_TABLE_MAPPING).find(tableName => {
+      const mapping = (SERVER_JUNCTION_TABLE_MAPPING as any)[tableName];
+      return mapping.sourceTable === sourceTable && mapping.relationName === relationName;
+    });
+    
+    if (!junctionTableName) {
+      replicationLogger.warn('No junction table mapping found', {
+        sourceTable,
+        relationName
+      }, MODULE_NAME);
+      return [];
+    }
+    
+    const mapping = (SERVER_JUNCTION_TABLE_MAPPING as any)[junctionTableName];
+    const client = getDBClient(context);
+    
+    const query = `
+      SELECT ${mapping.targetColumn} 
+      FROM ${junctionTableName.replace(/"/g, '')} 
+      WHERE ${mapping.sourceColumn} = $1
+    `;
+    
+    const result = await client.query(query, [sourceId]);
+    return result.rows.map(row => row[mapping.targetColumn]);
+  } catch (error) {
+    replicationLogger.error('Failed to get current relationship IDs', {
+      error: error instanceof Error ? error.message : String(error),
+      sourceTable,
+      sourceId,
+      relationName
+    }, MODULE_NAME);
+    return [];
+  }
+}
+
+async function transformJunctionTableChange(
+  context: MinimalContext,
+  change: WALChangeRecord, 
+  lsn: string
+): Promise<TableChange | null> {
+  const junctionInfo = (SERVER_JUNCTION_TABLE_MAPPING as any)[change.table];
+  if (!junctionInfo) return null;
+  
+  try {
+    // Extract entity IDs from junction table operation
+    const sourceId = extractColumnValue(change, junctionInfo.sourceColumn);
+    const targetId = extractColumnValue(change, junctionInfo.targetColumn);
+    
+    if (!sourceId) {
+      replicationLogger.warn('Could not extract source ID from junction table change', {
+        table: change.table,
+        sourceColumn: junctionInfo.sourceColumn
+      }, MODULE_NAME);
+      return null;
+    }
+    
+    // Query current relationship state
+    const currentTargetIds = await getCurrentRelationshipIds(
+      context,
+      junctionInfo.sourceTable,
+      sourceId,
+      junctionInfo.relationName
+    );
+    
+    return {
+      table: junctionInfo.sourceTable.replace(/"/g, ''), // Remove quotes for consistency
+      operation: 'update',
+      data: { id: sourceId },
+      relationshipUpdates: [{
+        relationName: junctionInfo.relationName,
+        operation: 'set',
+        targetIds: currentTargetIds
+      }],
+      entityRelations: [junctionInfo.relationName],
+      updated_at: new Date().toISOString(),
+      lsn
+    };
+  } catch (error) {
+    replicationLogger.error('Failed to transform junction table change', {
+      error: error instanceof Error ? error.message : String(error),
+      table: change.table
+    }, MODULE_NAME);
+    return null;
+  }
+}
+
 export function shouldTrackTable(tableName: string): boolean {
   // Remove special case check for change_history as it's not in TRACKED_TABLES_SET anyway
   
@@ -30,15 +158,18 @@ export function shouldTrackTable(tableName: string): boolean {
 }
 
 // Static list of tracked tables to be logged once on module initialization
-const TRACKED_TABLES = SERVER_DOMAIN_TABLES.join(', ');
+// ✨ NEW: Now includes both domain tables and junction tables
+const TRACKED_TABLES = SERVER_TRACKED_TABLES.join(', ');
 replicationLogger.info('Replication tracking tables', { 
-  count: SERVER_DOMAIN_TABLES.length,
-  tables: TRACKED_TABLES
+  count: SERVER_TRACKED_TABLES.length,
+  tables: TRACKED_TABLES,
+  domainTableCount: SERVER_DOMAIN_TABLES.length,
+  junctionTableCount: SERVER_TRACKED_TABLES.length - SERVER_DOMAIN_TABLES.length
 }, MODULE_NAME);
 
 /**
  * Get list of all client IDs from KV
- * No longer filters or removes clients as sync clients now handle their own cleanup
+ * Filters out inactive clients to prevent repeated notification attempts
  */
 export async function getAllClientIds(env: Env, timeout = 10 * 60 * 1000): Promise<string[]> {
   try {
@@ -53,9 +184,17 @@ export async function getAllClientIds(env: Env, timeout = 10 * 60 * 1000): Promi
         const state = JSON.parse(value);
         const clientId = key.name.replace('client:', '');
         
-        // Include all clients regardless of activity or last seen time
-        // Sync clients now handle their own cleanup
-        clientIds.push(clientId);
+        // Only include active clients to prevent notifying disconnected clients
+        if (state.active === true) {
+          clientIds.push(clientId);
+        } else {
+          // Log when we skip inactive clients for debugging
+          replicationLogger.debug('Skipping inactive client', {
+            clientId,
+            active: state.active,
+            disconnectedAt: state.disconnectedAt
+          }, MODULE_NAME);
+        }
       } catch (err) {
         replicationLogger.error('Client parse error', {
           key: key.name
@@ -73,12 +212,17 @@ export async function getAllClientIds(env: Env, timeout = 10 * 60 * 1000): Promi
 }
 
 // ====== Core Processing Functions ======
-export function transformWALChanges(changes: WALData[]): { 
+export async function transformWALChanges(
+  changes: WALData[], 
+  context: MinimalContext
+): Promise<{ 
   tableChanges: TableChange[], 
   filteredReasons: Record<string, number> 
-} {
+}> {
   const tableChanges: TableChange[] = [];
   const filteredReasons: Record<string, number> = {};
+  // ✨ NEW: Track relationship updates by entity for accumulation
+  const relationshipUpdates = new Map<string, RelationshipUpdate[]>();
   // Track change count per WAL entry to improve logging
   let totalChangesInWAL = 0;
   // Track changes by table and operation for summary logging
@@ -146,6 +290,21 @@ export function transformWALChanges(changes: WALData[]): {
         }
         changesByTable[change.table][change.kind]++;
 
+        // ✨ NEW: Check if this is a junction table operation
+        if (isJunctionTable(change.table)) {
+          const relationshipChange = await transformJunctionTableChange(context, change, wal.lsn);
+          if (relationshipChange) {
+            // Accumulate relationship updates by entity
+            const entityKey = `${relationshipChange.table}:${relationshipChange.data.id}`;
+            if (!relationshipUpdates.has(entityKey)) {
+              relationshipUpdates.set(entityKey, []);
+            }
+            relationshipUpdates.get(entityKey)!.push(...(relationshipChange.relationshipUpdates || []));
+          }
+          continue; // Don't add junction table as separate change
+        }
+
+        // Regular entity processing (existing logic)
         // Extract data efficiently
         const data: Record<string, unknown> = {};
         
@@ -191,6 +350,20 @@ export function transformWALChanges(changes: WALData[]): {
         );
       }
     }
+  }
+
+  // ✨ NEW: Convert accumulated relationship updates to TableChange objects
+  for (const [entityKey, relUpdates] of relationshipUpdates.entries()) {
+    const [table, entityId] = entityKey.split(':');
+    tableChanges.push({
+      table,
+      operation: 'update',
+      data: { id: entityId },
+      relationshipUpdates: relUpdates,
+      entityRelations: relUpdates.map(ru => ru.relationName),
+      updated_at: new Date().toISOString(),
+      lsn: changes[changes.length - 1]?.lsn // Use the last LSN from the batch
+    });
   }
 
   // Only log detailed transformation results when there are actual changes or errors
@@ -381,7 +554,7 @@ export async function processChanges(
     // Step 1: Transform
     // Reduced to a single debug log
     replicationLogger.debug(`Processing ${changes.length} WAL entries`, {}, MODULE_NAME);
-    const { tableChanges, filteredReasons } = transformWALChanges(changes);
+    const { tableChanges, filteredReasons } = await transformWALChanges(changes, context);
     const filteredCount = changes.length - tableChanges.length;
     
     // Only log filtering info if there are actual changes or non-expected filters

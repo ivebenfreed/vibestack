@@ -2,15 +2,18 @@ import * as React from 'react'
 import { ColumnDef, CellContext } from '@tanstack/react-table'
 import { EntityMetadata } from 'typeorm' // Used by generateColumnsFromTypeORM
 import { cn } from '@/lib/utils'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { format } from 'date-fns'
-import { CalendarIcon } from '@radix-ui/react-icons'
-import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
 import { usePGliteContext } from '@/db/pglite-provider' // Used by createEntityCell factories
+import { Checkbox } from '@/components/ui/checkbox'
+
+// Import editable components from the new editing file
+import {
+  EditableTextCell,
+  EditableSelectCell,
+  EditableCheckboxCell,
+  EditableDateCell,
+  EditableNumberCell,
+  EditableRelationshipCell,
+} from './data-table-editing'
 
 // --- TypeORM Integration ---
 export interface TypeORMColumnMetadata {
@@ -23,6 +26,8 @@ export interface TypeORMColumnMetadata {
   isArray?: boolean
   isPrimary?: boolean
   isGenerated?: boolean
+  hasDefault?: boolean
+  defaultValue?: any
   length?: number
   options?: any // Consider a more specific type
   relationMetadata?: any // Consider a more specific type, e.g., TypeORMRelationMetadata
@@ -43,6 +48,8 @@ export interface TypeORMColumnOptions {
   excludeColumns?: string[]
   editableColumns?: string[]
   visibleColumns?: string[] | 'all'
+  showIdColumn?: boolean // New option to control ID field visibility, defaults to false
+  enableRowSelection?: boolean // Enable row selection column
   columnOverrides?: {
     [key: string]: Partial<ColumnDef<any, any>>
   }
@@ -211,11 +218,11 @@ class DataTablePluginRegistry {
   }
 
   getCellPlugin(id: string) {
-    return this.cellPlugins.get(id) || null
+    return this.cellPlugins.get(id)
   }
 
   getColumnPlugin(id: string) {
-    return this.columnPlugins.get(id) || null
+    return this.columnPlugins.get(id)
   }
 
   getAllCellPlugins() {
@@ -225,18 +232,15 @@ class DataTablePluginRegistry {
   getAllColumnPlugins() {
     return Array.from(this.columnPlugins.values())
   }
-  
+
   getPluginsForEntity(entityType: string) {
-    return {
-      cellPlugins: this.getAllCellPlugins().filter(plugin => 
-        !plugin.entityTypes || 
-        plugin.entityTypes.includes(entityType)
-      ),
-      columnPlugins: this.getAllColumnPlugins().filter(plugin => 
-        !plugin.entityTypes || 
-        plugin.entityTypes.includes(entityType)
-      )
-    }
+    return this.entityPluginMap.get(entityType) || []
+  }
+
+  clearPlugins() {
+    this.cellPlugins.clear()
+    this.columnPlugins.clear()
+    this.entityPluginMap.clear()
   }
 
   findCellPluginForContext<TData, TValue>(
@@ -244,16 +248,15 @@ class DataTablePluginRegistry {
     entityType?: string
   ) {
     if (entityType) {
-      for (const plugin of this.getAllCellPlugins()) {
-        if (
-          plugin.entityTypes?.includes(entityType) &&
-          plugin.canHandle(context)
-        ) {
+      const pluginIds = this.getPluginsForEntity(entityType)
+      for (const pluginId of pluginIds) {
+        const plugin = this.getCellPlugin(pluginId)
+        if (plugin && plugin.canHandle(context)) {
           return plugin
         }
       }
     }
-    for (const plugin of this.cellPlugins.values()) {
+    for (const plugin of this.getAllCellPlugins()) {
       if (plugin.canHandle(context)) {
         return plugin
       }
@@ -262,21 +265,25 @@ class DataTablePluginRegistry {
   }
 }
 
-const pluginRegistry = new DataTablePluginRegistry() // Module-level, not exported
+const pluginRegistry = new DataTablePluginRegistry()
 
-// --- Helper Functions ---
 export function formatHeader(key: string): string {
+  if (key.includes('_')) {
+    return key
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  }
   return key
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, str => str.toUpperCase())
-    .trim()
 }
 
 export function formatColumnName(name: string): string {
   if (name.includes('_')) {
     return name
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ')
   }
   return name
@@ -284,308 +291,173 @@ export function formatColumnName(name: string): string {
     .replace(/^./, str => str.toUpperCase())
 }
 
-// --- Cell Renderer Components ---
-export function EditableTextCell<TData, TValue>({
-  getValue,
-  row,
-  column,
-  table,
-}: CellContext<TData, TValue>) {
-  const initialValue = getValue() as string
-  const [value, setValue] = React.useState(initialValue)
-  const [isEditing, setIsEditing] = React.useState(false)
-  const meta = table.options.meta
-  const editable = meta?.editableColumns?.includes(column.id)
-
-  React.useEffect(() => {
-    setValue(initialValue)
-  }, [initialValue])
-
-  const onSave = async () => {
-    if (value === initialValue) {
-      setIsEditing(false)
-      return
-    }
-    try {
-      await meta?.onUpdate?.(row.id, column.id, value)
-      setIsEditing(false)
-    } catch (error) {
-      console.error('Failed to update cell:', error)
-      setValue(initialValue)
-      setIsEditing(false)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      onSave()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      setValue(initialValue)
-      setIsEditing(false)
-    }
-  }
-
-  if (!editable) {
-    return <div>{String(value ?? '')}</div>
-  }
-
-  if (isEditing) {
-    return (
-      <Input
-        value={String(value ?? '')}
-        onChange={(e) => setValue(e.target.value as any)}
-        onBlur={onSave}
-        onKeyDown={handleKeyDown}
-        className="m-0 h-8 w-full"
-        autoFocus
-      />
-    )
-  }
-
-  return (
-    <div
-      className={cn(
-        "truncate py-2",
-        editable && "cursor-pointer hover:bg-muted/30 rounded px-2"
-      )}
-      onClick={() => setIsEditing(true)}
-    >
-      {String(value ?? '')}
-    </div>
-  )
-}
-
-export function EditableSelectCell<TData, TValue>({
-  getValue,
-  row,
-  column,
-  table,
-  options,
-}: CellContext<TData, TValue> & { options: { label: string; value: string }[] }) {
-  const initialValue = getValue() as string
-  const [value, setValue] = React.useState(initialValue)
-  const meta = table.options.meta
-  const editable = meta?.editableColumns?.includes(column.id)
-
-  React.useEffect(() => {
-    setValue(initialValue)
-  }, [initialValue])
-
-  const onSave = async (newValue: string) => {
-    if (newValue === initialValue) return
-    try {
-      await meta?.onUpdate?.(row.id, column.id, newValue)
-      setValue(newValue as any) // Assuming TValue is compatible with string here
-    } catch (error) {
-      console.error('Failed to update cell:', error)
-      setValue(initialValue as any) // Assuming TValue is compatible with string here
-    }
-  }
-
-  const currentOption = options.find((option) => option.value === value)
-  const displayLabel = currentOption?.label || String(value ?? '')
-
-  if (!editable) {
-    return <div>{displayLabel}</div>
-  }
-
-  return (
-    <Select
-      value={String(value ?? '')}
-      onValueChange={onSave}
-    >
-      <SelectTrigger className="h-8 w-full truncate border-0 bg-transparent focus:ring-transparent py-0 hover:bg-muted/30 focus:bg-muted/30">
-        <SelectValue>{displayLabel}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
-
-export function EditableCheckboxCell<TData, TValue>({
-  getValue,
-  row,
-  column,
-  table,
-}: CellContext<TData, TValue>) {
-  const initialValue = getValue() as boolean
-  const meta = table.options.meta
-  const editable = meta?.editableColumns?.includes(column.id)
-
-  const onToggle = async (checked: boolean) => {
-    if (checked === initialValue) return
-    try {
-      await meta?.onUpdate?.(row.id, column.id, checked)
-    } catch (error) {
-      console.error('Failed to update cell:', error)
-    }
-  }
-
-  if (!editable) {
-    return (
-      <div className="flex items-center justify-center">
-        <Checkbox checked={initialValue} disabled />
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex items-center justify-center">
+// --- Selection Column Utilities ---
+export function createSelectionColumn<T>(): ColumnDef<T, any> {
+  return {
+    id: "select",
+    header: ({ table }) => (
       <Checkbox
-        checked={initialValue}
-        onCheckedChange={onToggle}
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Select all rows"
+        className="translate-y-[2px]"
       />
-    </div>
-  )
-}
-
-export function EditableDateCell<TData, TValue>({
-  getValue,
-  row,
-  column,
-  table,
-}: CellContext<TData, TValue>) {
-  const initialValue = getValue() as Date | null
-  const [date, setDate] = React.useState<Date | undefined>(initialValue || undefined)
-  const [isPopoverOpen, setIsPopoverOpen] = React.useState(false)
-  const meta = table.options.meta
-  const editable = meta?.editableColumns?.includes(column.id)
-
-  React.useEffect(() => {
-    setDate(initialValue || undefined)
-  }, [initialValue])
-
-  const onSave = async (newDate?: Date) => {
-    if (newDate?.getTime() === initialValue?.getTime()) {
-      setIsPopoverOpen(false)
-      return
-    }
-    try {
-      await meta?.onUpdate?.(row.id, column.id, newDate || null)
-      setDate(newDate)
-      setIsPopoverOpen(false)
-    } catch (error) {
-      console.error('Failed to update cell:', error)
-      setDate(initialValue || undefined)
-      setIsPopoverOpen(false)
-    }
-  }
-
-  const formattedDate = date ? format(date, 'PPP') : 'Not set'
-
-  if (!editable) {
-    return <div>{formattedDate}</div>
-  }
-
-  return (
-    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          className={cn(
-            "w-full justify-start text-left font-normal hover:bg-muted/30",
-            !date && "text-muted-foreground"
-          )}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {formattedDate}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={(newDate) => {
-            onSave(newDate)
-          }}
-          initialFocus
-        />
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-export function EditableNumberCell<TData, TValue>({
-  getValue,
-  row,
-  column,
-  table,
-}: CellContext<TData, TValue>) {
-  const initialValue = getValue() as number
-  const [value, setValue] = React.useState(initialValue)
-  const [isEditing, setIsEditing] = React.useState(false)
-  const meta = table.options.meta
-  const editable = meta?.editableColumns?.includes(column.id)
-
-  React.useEffect(() => {
-    setValue(initialValue)
-  }, [initialValue])
-
-  const onSave = async () => {
-    if (value === initialValue) {
-      setIsEditing(false)
-      return
-    }
-    try {
-      await meta?.onUpdate?.(row.id, column.id, value)
-      setIsEditing(false)
-    } catch (error) {
-      console.error('Failed to update cell:', error)
-      setValue(initialValue)
-      setIsEditing(false)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      onSave()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      setValue(initialValue)
-      setIsEditing(false)
-    }
-  }
-
-  if (!editable) {
-    return <div>{String(value ?? '')}</div>
-  }
-
-  if (isEditing) {
-    return (
-      <Input
-        type="number"
-        value={String(value ?? '')}
-        onChange={(e) => setValue(Number(e.target.value) as any)}
-        onBlur={onSave}
-        onKeyDown={handleKeyDown}
-        className="m-0 h-8 w-full"
-        autoFocus
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Select row"
+        className="translate-y-[2px]"
       />
-    )
+    ),
+    enableSorting: false,
+    enableHiding: false,
+    size: 40,
+    minSize: 40,
+    maxSize: 40,
   }
-
-  return (
-    <div
-      className={cn(
-        "truncate py-2",
-        editable && "cursor-pointer hover:bg-muted/30 rounded px-2"
-      )}
-      onClick={() => setIsEditing(true)}
-    >
-      {String(value ?? '')}
-    </div>
-  )
 }
 
+// --- Bulk Action Utilities ---
+export interface BulkActionConfig<T> {
+  label: string
+  icon?: React.ComponentType<{ className?: string }>
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
+  onClick: (selectedRows: T[], selectedIds: string[]) => void | Promise<void>
+}
+
+export interface BulkEditField {
+  key: string
+  label: string
+  type: 'enum' | 'relationship'
+  options?: Array<{ label: string; value: any }>
+  relationshipConfig?: {
+    service: any
+    displayField: string
+    fetchAll: () => Promise<any[]>
+  }
+}
+
+export interface BulkActionHandlers<T> {
+  onBulkDelete?: (selectedIds: string[]) => Promise<void>
+  onEntityDeleted?: (id: string) => void
+  customActions?: BulkActionConfig<T>[]
+  entityType: string
+}
+
+export function createBulkEditHandlers<T extends { id: string }>(
+  service: {
+    update: (id: string, data: Partial<T>) => Promise<T>
+  },
+  entityType: string,
+  toast: {
+    success: (message: string) => void
+    error: (message: string) => void
+  }
+) {
+  const handleBulkUpdate = async (selectedIds: string[], updates: Partial<T>) => {
+    if (selectedIds.length === 0 || !Object.keys(updates).length) return
+    
+    try {
+      // Apply updates to all selected entities
+      await Promise.all(selectedIds.map(id => service.update(id, updates)))
+      
+      // Show success message
+      const updateFields = Object.keys(updates).join(', ')
+      toast.success(`Successfully updated ${updateFields} for ${selectedIds.length} ${entityType}${selectedIds.length > 1 ? 's' : ''}`)
+      
+    } catch (error: any) {
+      console.error('Bulk update error:', error)
+      toast.error(`Error updating ${entityType}s: ${error.message}`)
+      throw error // Re-throw for component to handle loading state
+    }
+  }
+
+  return {
+    handleBulkUpdate
+  }
+}
+
+export function createBulkActionHandlers<T extends { id: string }>(
+  service: {
+    delete?: (id: string) => Promise<void>
+  },
+  handlers: BulkActionHandlers<T>,
+  toast: {
+    success: (message: string) => void
+    error: (message: string) => void
+  }
+) {
+  const handleBulkDelete = async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) return
+    
+    try {
+      if (handlers.onBulkDelete) {
+        // Use custom bulk delete handler
+        await handlers.onBulkDelete(selectedIds)
+      } else if (service.delete) {
+        // Use individual delete calls
+        await Promise.all(selectedIds.map(id => service.delete!(id)))
+      } else {
+        throw new Error('No delete function available')
+      }
+      
+      // Notify parent for each deleted entity
+      selectedIds.forEach(id => handlers.onEntityDeleted?.(id))
+      
+      // Show success message
+      toast.success(`Successfully deleted ${selectedIds.length} ${handlers.entityType}${selectedIds.length > 1 ? 's' : ''}`)
+      
+    } catch (error: any) {
+      console.error('Bulk delete error:', error)
+      toast.error(`Error deleting ${handlers.entityType}s: ${error.message}`)
+      throw error // Re-throw for component to handle loading state
+    }
+  }
+
+  const handleCustomBulkAction = async (
+    action: BulkActionConfig<T>, 
+    selectedData: T[], 
+    selectedIds: string[]
+  ) => {
+    if (selectedIds.length === 0) return
+    
+    try {
+      await action.onClick(selectedData, selectedIds)
+    } catch (error: any) {
+      console.error(`Bulk action "${action.label}" error:`, error)
+      toast.error(`Error performing ${action.label}: ${error.message}`)
+      throw error // Re-throw for component to handle loading state
+    }
+  }
+
+  return {
+    handleBulkDelete,
+    handleCustomBulkAction
+  }
+}
+
+// Re-export editable components for backwards compatibility
+export {
+  EditableTextCell,
+  EditableSelectCell,
+  EditableCheckboxCell,
+  EditableDateCell,
+  EditableNumberCell,
+  EditableRelationshipCell,
+}
+
+// Re-export enhanced relationship components
+// Note: EditableFilterableRelationshipCell is re-exported from data-table-editing.tsx as EditableRelationshipCell
+export {
+  EditableMultiSelectRelationshipCell,
+} from './data-table-relationship-cells'
+
+// --- Simple RelationshipCell for non-editable display ---
 export function RelationshipCell<TData, TEntity>({
   getValue,
   row, // Keep row for potential future use or consistency
@@ -654,162 +526,6 @@ export function RelationshipCell<TData, TEntity>({
   return <div>{displayValue}</div>
 }
 
-export function EditableRelationshipCell<TData, TEntity>({
-  getValue,
-  row,
-  column,
-  table,
-  relationshipConfig,
-}: CellContext<TData, string> & {
-  relationshipConfig: RelationshipConfig<TEntity> & { fetchAll: () => Promise<TEntity[]> }
-}) {
-  if (!relationshipConfig) {
-    console.error(
-      `EditableRelationshipCell for column "${column.id}" (row ID: ${row.id}) was rendered without a relationshipConfig prop. This is a configuration issue.`,
-      { rowData: row.original, columnDef: column.columnDef }
-    );
-    return <div className="text-destructive text-xs p-1">Cell Config Error</div>;
-  }
-
-  const meta = table.options.meta
-  const editable = meta?.editableColumns?.includes(column.id)
-  const initialEntityId = getValue() as string | null
-  const [localEntityId, setLocalEntityId] = React.useState<string | undefined>(initialEntityId || undefined)
-  const [currentEntity, setCurrentEntity] = React.useState<TEntity | null>(null)
-  const [saveInProgress, setSaveInProgress] = React.useState(false)
-  const [dropdownOpen, setDropdownOpen] = React.useState(false)
-  const cacheKey = `${RELATIONSHIP_CACHE_KEYPREFIX}${column.id}`;
-  const getEntityId = relationshipConfig.getEntityId || ((entity: any) => entity.id)
-  const [entities, isLoading, cacheError, refreshCache] = useCachedEntities<TEntity>(
-    cacheKey,
-    relationshipConfig.fetchAll
-  )
-
-  const filteredEntities = React.useMemo(() => {
-    return relationshipConfig.filterEntities
-      ? relationshipConfig.filterEntities(entities)
-      : entities
-  }, [entities, relationshipConfig.filterEntities])
-
-  const tableIsReady = meta?.tableReady === true;
-
-  React.useEffect(() => {
-    if (initialEntityId !== localEntityId && !saveInProgress) {
-      setLocalEntityId(initialEntityId || undefined)
-    }
-  }, [initialEntityId, localEntityId, saveInProgress]);
-
-  React.useEffect(() => {
-    if (!localEntityId) {
-      setCurrentEntity(null)
-      return
-    }
-    const entityFromList = filteredEntities.find(e =>
-      getEntityId(e) === localEntityId
-    )
-    if (entityFromList) {
-      setCurrentEntity(entityFromList)
-      return
-    }
-    const loadEntityById = async () => {
-      try {
-        const entity = await relationshipConfig.fetchOne(localEntityId)
-        if (entity) {
-          setCurrentEntity(entity)
-        }
-      } catch (error) {
-        console.error('Failed to load entity by ID:', error)
-      }
-    }
-    loadEntityById()
-  }, [localEntityId, filteredEntities, relationshipConfig.fetchOne, getEntityId])
-
-  React.useEffect(() => {
-    if (dropdownOpen) {
-      refreshCache();
-    }
-  }, [dropdownOpen, refreshCache]);
-
-  const onSave = async (newEntityId: string) => {
-    if (newEntityId === localEntityId) return
-    if (!meta?.onUpdate) {
-      console.error(`Missing onUpdate handler in table meta!`)
-      return
-    }
-    try {
-      setSaveInProgress(true)
-      const finalValue = newEntityId === 'none' ? null : newEntityId
-      await meta.onUpdate(row.id, column.id, finalValue)
-      setLocalEntityId(finalValue || undefined)
-      if (newEntityId !== 'none') {
-        const newEntity = filteredEntities.find(e => getEntityId(e) === newEntityId) || null
-        setCurrentEntity(newEntity)
-      } else {
-        setCurrentEntity(null)
-      }
-    } catch (error) {
-      console.error(`Failed to update ${column.id}:`, error)
-      alert(`Failed to update: ${error instanceof Error ? error.message : String(error)}`)
-    } finally {
-      setSaveInProgress(false)
-    }
-  }
-
-  const displayName = currentEntity
-    ? relationshipConfig.getDisplayValue(currentEntity)
-    : (localEntityId ? `${relationshipConfig.emptyLabel || ''} (${localEntityId})` : (relationshipConfig.emptyLabel || '-'))
-
-  if (localEntityId && isLoading && !tableIsReady && !dropdownOpen) {
-    return <div className="text-muted-foreground text-xs">Loading...</div>
-  }
-  if (saveInProgress) {
-    return <div className="text-muted-foreground text-xs">Saving...</div>
-  }
-  if (!editable) {
-    return <div>{displayName}</div>
-  }
-
-  return (
-    <Select
-      value={localEntityId || 'none'}
-      onValueChange={onSave}
-      disabled={saveInProgress}
-      onOpenChange={setDropdownOpen}
-    >
-      <SelectTrigger className="h-8 w-full truncate border-0 bg-transparent focus:ring-transparent py-0 hover:bg-muted/30 focus:bg-muted/30">
-        <SelectValue>{displayName}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {isLoading && (
-          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-            Loading options...
-          </div>
-        )}
-        {!isLoading && (
-          <>
-            <SelectItem value="none">{relationshipConfig.emptyLabel || 'None'}</SelectItem>
-            {filteredEntities.map((entity) => (
-              <SelectItem key={getEntityId(entity)} value={getEntityId(entity)}>
-                {relationshipConfig.getDisplayValue(entity)}
-              </SelectItem>
-            ))}
-            {filteredEntities.length === 0 && !cacheError && (
-              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                No options available
-              </div>
-            )}
-            {cacheError && (
-              <div className="px-2 py-4 text-center text-sm text-destructive">
-                Error loading options
-              </div>
-            )}
-          </>
-        )}
-      </SelectContent>
-    </Select>
-  )
-}
-
 // --- SmartCellRenderer (uses module-scoped pluginRegistry) ---
 export function SmartCellRenderer<TData, TValue>({
   context,
@@ -828,7 +544,6 @@ export function SmartCellRenderer<TData, TValue>({
   return <>{fallback || (value != null ? String(value) : '')}</>
 }
 
-// --- generateColumnsFromTypeORM (uses module-scoped pluginRegistry and cell renderers) ---
 export function generateColumnsFromTypeORM<T>(
   entityMetadata: TypeORMEntityMetadata | EntityMetadata, // Allow original TypeORM EntityMetadata as well
   options: TypeORMColumnOptions = {}
@@ -837,24 +552,29 @@ export function generateColumnsFromTypeORM<T>(
     excludeColumns = [],
     editableColumns = [],
     visibleColumns = 'all',
+    showIdColumn = false, // Default to false - ID columns hidden by default
+    enableRowSelection = false, // Default to false - selection column disabled by default
     columnOverrides = {},
     enumMappings = {},
     relationshipConfigs = {},
-    enableEntityPlugins = true, // Default to true as per original
-    entityName // This will be the entityMetadata.name if not overridden
+    enableEntityPlugins = false,
+    entityName: currentEntityName
   } = options
-
-  const currentEntityName = entityName || entityMetadata.name;
 
   const columns = (entityMetadata.columns as TypeORMColumnMetadata[]) // Cast to local interface
     .filter(column => !excludeColumns.includes(column.propertyName))
     .map(column => {
+      const isIdColumn = column.propertyName === 'id' || column.isPrimary === true
+      
       const columnDef: ColumnDef<T, any> = {
         accessorKey: column.propertyName,
         header: formatHeader(column.propertyName),
-        enableHiding: true,
+        enableHiding: isIdColumn ? showIdColumn : true, // ID columns can only be hidden if showIdColumn is true
         enableSorting: true,
       }
+
+      // Handle ID column visibility - hidden by default unless showIdColumn is true
+      // Initial visibility will be handled in the component based on column name
 
       if (visibleColumns !== 'all' && !visibleColumns.includes(column.propertyName)) {
         columnDef.enableHiding = false // This seems to be the opposite of what it should be. If not in visibleColumns, it should be hidden by default.
@@ -957,10 +677,8 @@ export function generateColumnsFromTypeORM<T>(
                 {...props}
                 relationshipConfig={{
                   fetchOne: (id) => relationConfig.service.findOne(id) as Promise<any>,
-                  // fetchAll is not needed for non-editable RelationshipCell
                   getDisplayValue: (entity) => entity[relationConfig.displayField],
-                  emptyLabel: relationConfig.emptyLabel || `No ${formatHeader(relation.propertyName)}`,
-                  // filterEntities is not typically used for non-editable display
+                  emptyLabel: relationConfig.emptyLabel || `No ${formatHeader(relation.propertyName)}`
                 }}
               />
             );
@@ -995,6 +713,13 @@ export function generateColumnsFromTypeORM<T>(
       })
     })
   }
+
+  // Add selection column at the beginning if enabled
+  if (enableRowSelection) {
+    const selectionColumn = createSelectionColumn<T>()
+    return [selectionColumn, ...columns]
+  }
+
   return columns
 }
 
@@ -1046,3 +771,70 @@ export function createEditableEntityCell<TEntity>(entityConfig: EntityConfig<TEn
     )
   }
 }
+
+// --- Entity Metadata Utilities ---
+
+// Utility function to create entity metadata for common entities
+export function createEntityMetadata(entityName: string, columnDefinitions: Partial<TypeORMColumnMetadata>[]): TypeORMEntityMetadata {
+  const baseColumns: TypeORMColumnMetadata[] = [
+    { propertyName: 'id', type: 'uuid', propertyType: 'string', isNullable: false, isGenerated: true },
+    { propertyName: 'createdAt', type: 'timestamptz', propertyType: 'Date', isNullable: false, isGenerated: true },
+    { propertyName: 'updatedAt', type: 'timestamptz', propertyType: 'Date', isNullable: false, isGenerated: true },
+    { propertyName: 'client_id', type: 'uuid', propertyType: 'string', isNullable: true, isGenerated: false },
+  ];
+
+  const customColumns = columnDefinitions.map(def => ({
+    propertyName: def.propertyName || '',
+    propertyType: def.propertyType || def.type || 'string',
+    isNullable: def.isNullable ?? true,
+    isGenerated: def.isGenerated ?? false,
+    hasDefault: def.hasDefault ?? (def.defaultValue !== undefined),
+    defaultValue: def.defaultValue,
+    type: def.type,
+    isEnum: def.isEnum,
+    enumName: def.enumName,
+    isArray: def.isArray,
+    isPrimary: def.isPrimary,
+    length: def.length,
+    options: def.options,
+    relationMetadata: def.relationMetadata,
+    ...def
+  }));
+
+  return {
+    name: entityName,
+    columns: [...customColumns, ...baseColumns],
+    relations: []
+  };
+}
+
+// Pre-built metadata for common entities
+export const TaskEntityMetadata = createEntityMetadata('Task', [
+  { propertyName: 'title', type: 'varchar', propertyType: 'string', isNullable: false, isGenerated: false, length: 100 },
+  { propertyName: 'description', type: 'text', propertyType: 'string', isNullable: true, isGenerated: false },
+  { propertyName: 'status', type: 'enum', propertyType: 'string', isNullable: false, isGenerated: false, hasDefault: true },
+  { propertyName: 'priority', type: 'enum', propertyType: 'string', isNullable: false, isGenerated: false, defaultValue: 'medium' },
+  { propertyName: 'dueDate', type: 'timestamptz', propertyType: 'Date', isNullable: true, isGenerated: false },
+  { propertyName: 'startDate', type: 'timestamptz', propertyType: 'Date', isNullable: true, isGenerated: false },
+  { propertyName: 'completedAt', type: 'timestamptz', propertyType: 'Date', isNullable: true, isGenerated: false },
+  { propertyName: 'timeRange', type: 'tsrange', propertyType: 'string', isNullable: true, isGenerated: false },
+  { propertyName: 'estimatedDuration', type: 'interval', propertyType: 'string', isNullable: true, isGenerated: false },
+  { propertyName: 'tags', type: 'text[]', propertyType: 'string[]', isNullable: true, isGenerated: false, defaultValue: [] },
+  { propertyName: 'projectId', type: 'uuid', propertyType: 'string', isNullable: true, isGenerated: false },
+  { propertyName: 'assigneeId', type: 'uuid', propertyType: 'string', isNullable: true, isGenerated: false },
+]);
+
+export const ProjectEntityMetadata = createEntityMetadata('Project', [
+  { propertyName: 'name', type: 'varchar', propertyType: 'string', isNullable: false, isGenerated: false, length: 100 },
+  { propertyName: 'description', type: 'text', propertyType: 'string', isNullable: true, isGenerated: false },
+  { propertyName: 'status', type: 'enum', propertyType: 'string', isNullable: false, isGenerated: false, defaultValue: 'active' },
+  { propertyName: 'ownerId', type: 'uuid', propertyType: 'string', isNullable: true, isGenerated: false },
+]);
+
+export const UserEntityMetadata = createEntityMetadata('User', [
+  { propertyName: 'name', type: 'varchar', propertyType: 'string', isNullable: false, isGenerated: false, length: 100 },
+  { propertyName: 'email', type: 'varchar', propertyType: 'string', isNullable: false, isGenerated: false, length: 255 },
+  { propertyName: 'emailVerified', type: 'boolean', propertyType: 'boolean', isNullable: false, isGenerated: false, defaultValue: false },
+  { propertyName: 'image', type: 'varchar', propertyType: 'string', isNullable: true, isGenerated: false, length: 255 },
+  { propertyName: 'role', type: 'enum', propertyType: 'string', isNullable: false, isGenerated: false, defaultValue: 'member' },
+]);

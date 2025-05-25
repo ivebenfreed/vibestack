@@ -16,6 +16,7 @@ import { PGliteDriver } from 'typeorm-pglite'; // Assuming the typeorm-pglite dr
 // import { Task, User, Project, Comment, BaseDomainEntity } from '@repo/dataforge'; // Keep commented or remove if unused elsewhere
 // Import the generated client entities array using the exported path
 import { clientEntities } from '@repo/dataforge/client-entities'; // Use the defined export path
+import { DB_NAME } from '../db';
 
 /**
  * Configuration options for creating a new PGLite data source
@@ -110,12 +111,16 @@ export function createNewPGliteDataSource(options: NewPGliteDataSourceOptions): 
             if (this.isInitialized) return this;
             try {
                 console.log("Initializing driver...");
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: Before driver.connect()`);
                 await this.driver.connect();
                 this.driver.connection = this as any; // Assign connection reference AFTER connect
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: After driver.connect()`);
                 await this.driver.afterConnect();
                 console.log("Driver connected.");
 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: Before buildMetadatas()`);
                 console.log("Building metadata...");
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: After buildMetadatas()`);
                 await this.buildMetadatas(); // Call separate metadata build
                 console.log(`Metadata built. Found ${this.entityMetadatas.length} entities.`);
 
@@ -125,6 +130,7 @@ export function createNewPGliteDataSource(options: NewPGliteDataSourceOptions): 
                 // console.log("Broadcaster created.");
 
                 console.log("Creating EntityManager...");
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: End`);
                 this.manager = new EntityManager(this as any); // Create manager AFTER metadata is ready
                 console.log("EntityManager created.");
 
@@ -278,6 +284,7 @@ export function createNewPGliteDataSource(options: NewPGliteDataSourceOptions): 
 
 let dataSource: NewPGliteDataSource | null = null;
 
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - getNewPGliteDataSource: Start`);
 export async function getNewPGliteDataSource(
     config?: NewPGliteDataSourceOptions
 ): Promise<NewPGliteDataSource> {
@@ -295,8 +302,8 @@ export async function getNewPGliteDataSource(
         // Merge provided config with the imported clientEntities
         const effectiveConfig: NewPGliteDataSourceOptions = {
             ...(config || {}), // Spread provided config first
-            // Use the imported clientEntities directly
-            entities: clientEntities, 
+            database: config?.database || DB_NAME, // Use config.database if present, else default to DB_NAME
+            entities: clientEntities,
         };
         
         const ds = createNewPGliteDataSource(effectiveConfig);
@@ -304,6 +311,7 @@ export async function getNewPGliteDataSource(
         console.log("Initializing NewPGliteDataSource object...");
         await ds.initialize(); 
         console.log("NewPGliteDataSource object initialized successfully.");
+console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - getNewPGliteDataSource: End`);
         
         dataSource = ds;
         return dataSource;

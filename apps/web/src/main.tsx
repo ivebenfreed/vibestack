@@ -2,7 +2,7 @@
 import './db/newtypeorm/applyPatches';
 
 import "reflect-metadata"; // Required for TypeORM decorators
-import { StrictMode } from 'react'
+import React, { useEffect, useState, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { AxiosError } from 'axios'
 import {
@@ -16,16 +16,26 @@ import { useAuthStore } from '@/stores/authStore'
 import { handleServerError } from '@/utils/handle-server-error'
 import { FontProvider } from './context/font-context'
 import { ThemeProvider } from './context/theme-context'
-import { SyncProvider } from './sync/SyncContext'
-import { VibestackPGliteProvider } from './db/pglite-provider'
-import { useEffect } from 'react'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 import { AbilityProvider } from './contexts/AbilityContext'; // Adjust path
 // Import the Mini Sync Visualizer
+import { PerformanceMonitorProvider } from './contexts/performance-monitor-context'
+import { GlobalPerformanceMonitor } from './components/debug/GlobalPerformanceMonitor'
 
-// Import the database functions
+// Lazy load heavy providers for better performance
+const LazyVibestackPGliteProvider = lazy(() => 
+  import('./db/pglite-provider').then(module => ({ 
+    default: module.VibestackPGliteProvider 
+  }))
+);
+
+const LazySyncProvider = lazy(() => 
+  import('./sync/SyncContext').then(module => ({ 
+    default: module.SyncProvider 
+  }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,20 +112,53 @@ declare module '@tanstack/react-router' {
 // Auth-aware wrapper component for database and sync services
 function AuthAwareProviders({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
+  const [showProviders, setShowProviders] = useState(false);
   
-  // For authenticated users, initialize database and sync
-  if (isAuthenticated) {
+  // Track provider initialization performance
+  useEffect(() => {
+    if (isAuthenticated) {
+      window.dispatchEvent(new CustomEvent('provider-db-init-start'));
+      const startTime = performance.now();
+      
+      // Delay provider initialization to not block initial render
+      const timer = setTimeout(() => {
+        setShowProviders(true);
+      }, 50); // Reduced from 100ms to 50ms since it's working well
+      
+      return () => {
+        clearTimeout(timer);
+        const endTime = performance.now();
+        window.dispatchEvent(new CustomEvent('provider-db-init-complete', {
+          detail: { duration: endTime - startTime }
+        }));
+      };
+    } else {
+      setShowProviders(false);
+    }
+  }, [isAuthenticated]);
+  
+  // For authenticated users, initialize database and sync with lazy loading
+  if (isAuthenticated && showProviders) {
     return (
-      <VibestackPGliteProvider>
-        <SyncProvider autoConnect={true}>
-          {children}
-        </SyncProvider>
-      </VibestackPGliteProvider>
+      <React.Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+            <p className="text-sm text-muted-foreground">Initializing database...</p>
+          </div>
+        </div>
+      }>
+        <LazyVibestackPGliteProvider>
+          <LazySyncProvider>
+            {children}
+          </LazySyncProvider>
+        </LazyVibestackPGliteProvider>
+      </React.Suspense>
     )
   }
   
-  // For unauthenticated users, just render the children
-  // This allows the auth flow to work normally
+  // For unauthenticated users or during lazy loading, just render the children
+  // This allows the auth flow and initial UI to work normally
   return children
 }
 
@@ -124,16 +167,19 @@ const rootElement = document.getElementById('root')!
 if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
-        <FontProvider>
-          <AuthAwareProviders>
-            <AbilityProvider>
-              <RouterProvider router={router} />
-            </AbilityProvider>
-          </AuthAwareProviders>
-        </FontProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <PerformanceMonitorProvider enabled={true}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
+          <FontProvider>
+            <AuthAwareProviders>
+              <AbilityProvider>
+                <RouterProvider router={router} />
+              </AbilityProvider>
+            </AuthAwareProviders>
+          </FontProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+      <GlobalPerformanceMonitor defaultVisible={true} position="top-center" />
+    </PerformanceMonitorProvider>
   )
 }

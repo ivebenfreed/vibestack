@@ -60,13 +60,9 @@ export class OutgoingChangeProcessor {
     this.messageSender = messageSender;
 
     this.initializeEventListeners();
-    this.loadUnprocessedChanges().catch(error => {
-      console.error("[OutgoingChangeProcessor] Error loading unprocessed changes on init:", error);
-    });
   }
 
   private initializeEventListeners(): void {
-    this.messageSender.on('websocket:open', this.handleWebSocketOpen.bind(this));
     // Assuming 'stateChange' from IMessageSender is now 'websocket:status' or similar
     // Or SyncManager translates 'websocket:status' to a 'connection:stateChanged' if needed by OCP
     this.events.on('websocket:status', (status: 'connected' | 'disconnected' | 'connecting' | 'error') => {
@@ -102,16 +98,6 @@ export class OutgoingChangeProcessor {
     });
   }
 
-  private handleWebSocketOpen(): void {
-    console.log('[OutgoingChangeProcessor] WebSocket opened. Scheduling change processing.');
-    setTimeout(() => {
-      this.loadUnprocessedChanges().then(() => {
-        this.scheduleProcessing();
-      }).catch(error => {
-        console.error('[OutgoingChangeProcessor] Error loading unprocessed changes on WebSocket open:', error);
-      });
-    }, 1000);
-  }
 
   private handleConnectionStateChange(state: string): void {
     console.log(`[OutgoingChangeProcessor] Connection state changed to: ${state}`);
@@ -127,11 +113,34 @@ export class OutgoingChangeProcessor {
     }
   }
 
+  /**
+   * Get the current client ID from the message sender
+   */
+  private getClientId(): string {
+    // Access client ID through the IMessageSender interface
+    try {
+      const clientId = this.messageSender.getClientId() || '';
+      console.log(`[OutgoingChangeProcessor] getClientId() returning: "${clientId}"`);
+      return clientId;
+    } catch (error) {
+      console.warn('[OutgoingChangeProcessor] Failed to get client ID from message sender:', error);
+      return '';
+    }
+  }
+
   public async trackChange(
     tableName: string, // Renamed from 'table' to avoid conflict with LocalChanges.table
     operationType: 'insert' | 'update' | 'delete', // Renamed from 'operation'
     dataPayload: Record<string, any>, // Renamed from 'data'
-    originalData?: Record<string, any>
+    originalData?: Record<string, any>,
+    metadata?: {
+      relationshipUpdates?: Array<{
+        relationName: string;
+        operation: 'set' | 'add' | 'remove';
+        targetIds: string[];
+      }>;
+      entityRelations?: string[];
+    }
   ): Promise<string> {
     const localChangeId = uuidv4(); // This is the ID for the LocalChanges record itself
 
@@ -144,6 +153,16 @@ export class OutgoingChangeProcessor {
       let processedData = { ...dataPayload };
       // The entity's actual ID is expected to be in dataPayload.id
       const entityId = dataPayload.id || originalData?.id;
+
+      console.log(`[OutgoingChangeProcessor] trackChange() called:`, {
+        localChangeId,
+        tableName,
+        operationType,
+        entityId,
+        originalDataPayload: dataPayload,
+        hasMetadata: !!metadata,
+        metadata
+      });
 
       if (operationType === 'update') {
         if (originalData) {
@@ -163,6 +182,7 @@ export class OutgoingChangeProcessor {
             return dataPayload.id; // Return entity id
           }
           processedData = modifiedFields;
+          console.log(`[OutgoingChangeProcessor] Update operation processed data:`, processedData);
         }
         if (!processedData.id && dataPayload.id) { // Ensure entity ID is in the final data for update
           processedData.id = dataPayload.id;
@@ -173,14 +193,37 @@ export class OutgoingChangeProcessor {
         console.warn(`[OutgoingChangeProcessor] Insert operation for table ${tableName} is missing an 'id' in dataPayload. LocalChange ID: ${localChangeId}`);
       }
 
+      // Add client_id to the processed data for anti-echo functionality
+      const clientId = this.getClientId();
+      console.log(`[OutgoingChangeProcessor] Adding client_id for anti-echo:`, {
+        clientId,
+        hasClientId: !!clientId,
+        clientIdLength: clientId ? clientId.length : 0
+      });
+      
+      if (clientId) {
+        processedData.client_id = clientId;
+        console.log(`[OutgoingChangeProcessor] ✅ Successfully added client_id "${clientId}" to change data for anti-echo`);
+        console.log(`[OutgoingChangeProcessor] Final processedData:`, processedData);
+      } else {
+        console.error(`[OutgoingChangeProcessor] ❌ NO CLIENT_ID AVAILABLE! Anti-echo will not work!`);
+      }
+
+      // Store the complete change data including metadata
+      const changeDataToStore = {
+        ...processedData,
+        ...(metadata && {
+          __metadata: metadata  // Store metadata in a special field
+        })
+      };
 
       const now = new Date();
       const newChange = this.localChangesRepo.create({
         id: localChangeId, // Primary key for LocalChanges table
         table: tableName,
         operation: operationType,
-        // data field in LocalChanges stores the actual data payload
-        data: processedData,
+        // data field in LocalChanges stores the actual data payload plus metadata
+        data: changeDataToStore,
         lsn: '', // LSN must be a string; use empty if not applicable for client-originated changes
         // createdAt will be set by DB or TypeORM
         updatedAt: now, // Explicitly set updatedAt
@@ -190,7 +233,7 @@ export class OutgoingChangeProcessor {
 
       await this.localChangesRepo.save(newChange);
       this.changeQueue.add(localChangeId);
-      console.log(`[OutgoingChangeProcessor] Tracked change ${localChangeId} (entity: ${entityId}) for ${operationType} on ${tableName}`);
+      console.log(`[OutgoingChangeProcessor] Tracked change ${localChangeId} (entity: ${entityId}) for ${operationType} on ${tableName} with client_id: ${processedData.client_id || 'MISSING'} and metadata: ${!!metadata}`);
       this.scheduleProcessing();
       this.events.emit('local_change_tracked', { changeId: localChangeId, table: tableName, operation: operationType, entityId });
       this.pendingChangesCount++;
@@ -297,8 +340,13 @@ export class OutgoingChangeProcessor {
         return;
       }
 
-      // ClientId will be added by WebSocketConnector.send()
-      const tableChangesPayload: TableChange[] = optimizedChanges.map(change => {
+      // Get current client ID for anti-echo
+      const currentClientId = this.getClientId();
+
+      console.log(`[OutgoingChangeProcessor] processChanges() - About to process ${optimizedChanges.length} changes with currentClientId: "${currentClientId}"`);
+
+      // ClientId will be added by WebSocketConnector.send() for the message envelope
+      const tableChangesPayload: TableChange[] = optimizedChanges.map((change, index) => {
         let rowData = change.data;
         if (typeof rowData === 'string') {
           try {
@@ -309,23 +357,76 @@ export class OutgoingChangeProcessor {
           }
         }
         
-        const entityId = (rowData as Record<string, any>)?.id;
+        // Extract metadata if present
+        const metadata = (rowData as Record<string, any>)?.__metadata;
+        const { __metadata, ...actualRowData } = (rowData as Record<string, any>) || {};
+        
+        console.log(`[OutgoingChangeProcessor] Processing change ${index + 1}/${optimizedChanges.length}:`, {
+          localChangeId: change.id,
+          table: change.table,
+          operation: change.operation,
+          originalRowData: actualRowData,
+          hasClientIdInOriginal: !!actualRowData?.client_id,
+          originalClientId: actualRowData?.client_id,
+          hasMetadata: !!metadata,
+          metadata
+        });
+        
+        const entityId = actualRowData?.id;
         if (!entityId && change.operation !== 'delete') {
             console.warn(`[OutgoingChangeProcessor] Entity ID missing in data for change ${change.id}, table ${change.table}, op ${change.operation}`);
         }
 
-        const changeDataForServer = this.convertKeysToSnakeCase(rowData || {});
+        const changeDataForServer = this.convertKeysToSnakeCase(actualRowData || {});
         
-        return {
+        console.log(`[OutgoingChangeProcessor] After snake_case conversion:`, {
+          changeDataForServer,
+          hasClientIdAfterConversion: !!changeDataForServer.client_id,
+          clientIdAfterConversion: changeDataForServer.client_id
+        });
+        
+        // Ensure client_id is included in the data for anti-echo functionality
+        if (currentClientId && !changeDataForServer.client_id) {
+          changeDataForServer.client_id = currentClientId;
+          console.log(`[OutgoingChangeProcessor] ✅ Added missing client_id "${currentClientId}" to change data`);
+        } else if (currentClientId && changeDataForServer.client_id) {
+          console.log(`[OutgoingChangeProcessor] ✅ client_id already present: "${changeDataForServer.client_id}"`);
+        } else if (!currentClientId) {
+          console.error(`[OutgoingChangeProcessor] ❌ NO currentClientId available for change ${change.id}!`);
+        }
+        
+        const finalData = {
+          ...changeDataForServer,
+          id: entityId,
+        };
+        
+        console.log(`[OutgoingChangeProcessor] Final data being sent to server:`, {
+          localChangeId: change.id,
+          table: change.table,
+          operation: change.operation,
+          finalData,
+          hasClientIdInFinal: !!finalData.client_id,
+          finalClientId: finalData.client_id,
+          includingMetadata: !!metadata
+        });
+        
+        // Construct TableChange object with metadata if present
+        const tableChange: TableChange = {
           table: change.table,
           operation: change.operation as 'insert' | 'update' | 'delete',
-          data: {
-            ...changeDataForServer,
-            id: entityId,
-            // client_id is not typically part of TableChange.data; it's a top-level message property
-          },
+          data: finalData,
           updated_at: change.updatedAt.toISOString(),
+          client_id: finalData.client_id,
+          ...(metadata?.relationshipUpdates && { relationshipUpdates: metadata.relationshipUpdates }),
+          ...(metadata?.entityRelations && { entityRelations: metadata.entityRelations })
         };
+        
+        return tableChange;
+      });
+
+      console.log(`[OutgoingChangeProcessor] About to send ${tableChangesPayload.length} changes to server. Summary:`);
+      tableChangesPayload.forEach((change, index) => {
+        console.log(`  Change ${index + 1}: ${change.table} ${change.operation} entity=${change.data.id} client_id=${change.data.client_id || 'MISSING'}`);
       });
 
       // Construct the message payload *without* common fields, as per IMessageSender
@@ -338,6 +439,15 @@ export class OutgoingChangeProcessor {
           changes: tableChangesPayload
           // lsn: this.currentLsn, // Add LSN if applicable for outgoing changes
       };
+
+      console.log(`[OutgoingChangeProcessor] Final message payload being sent:`, {
+        type: messagePayloadToSend.type,
+        messageId: messagePayloadToSend.messageId,
+        changesCount: messagePayloadToSend.changes.length,
+        currentClientId: currentClientId,
+        changesWithClientId: messagePayloadToSend.changes.filter((c: TableChange) => c.data.client_id).length,
+        changesWithoutClientId: messagePayloadToSend.changes.filter((c: TableChange) => !c.data.client_id).length
+      });
 
       // Call send, which returns void. Assume success if no error is thrown by the sender.
       this.messageSender.send(messagePayloadToSend);

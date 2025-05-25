@@ -174,9 +174,9 @@ export class SyncMessageHandler {
 
   private handleInitStartMessage(message: ServerMessage): void {
      console.log('[SyncMessageHandler] Initial sync starting', { serverLSN: message.serverLSN });
-     if (message.serverLSN && !message.serverLSN.includes('(resuming)')) {
-         this.handleLSNUpdateMessage({ ...message, lsn: message.serverLSN });
-     }
+     // if (message.serverLSN && !message.serverLSN.includes('(resuming)')) {
+     //     this.handleLSNUpdateMessage({ ...message, lsn: message.serverLSN });
+     // }
      this.handleStateChangeMessage({ ...message, state: 'initial_sync' });
      this.sendInitStartReceivedAck(message.messageId);
   }

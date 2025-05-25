@@ -14,6 +14,9 @@ import type { MinimalContext } from '../types/hono';
 import type { WebSocketHandler } from './types';
 import { deduplicateChanges } from '../lib/sync-common';
 import { SyncConfig, DEFAULT_SYNC_CONFIG } from '../types/sync';
+import { ProjectRepository } from '../domains/projects';
+import { TaskRepository } from '../domains/tasks';
+import { NeonService } from '../lib/neon-orm/neon-service';
 
 const MODULE_NAME = 'client-changes';
 
@@ -45,17 +48,104 @@ class ValidationError extends Error {
  * Main change processor that handles all operations
  */
 export class ChangeProcessor {
+  private neonService: NeonService;
+  private projectRepository: ProjectRepository;
+  private taskRepository: TaskRepository;
+  
   constructor(
     private client: Client,
     private messageHandler: WebSocketHandler,
+    private env: { DATABASE_URL: string; NODE_ENV?: string },
     private config: SyncConfig = DEFAULT_SYNC_CONFIG
-  ) {}
+  ) {
+    // Create NeonService instance using the real DATABASE_URL from the environment
+    this.neonService = this.createNeonServiceFromEnvironment();
+    
+    // Initialize repositories
+    this.projectRepository = new ProjectRepository(this.neonService);
+    this.taskRepository = new TaskRepository(this.neonService);
+  }
+
+  /**
+   * Create NeonService instance using the real DATABASE_URL from environment
+   * This allows TypeORM to create proper Neon connections as intended
+   */
+  private createNeonServiceFromEnvironment(): NeonService {
+    // Create a STABLE mock Hono context with the REAL DATABASE_URL from the Cloudflare Worker context
+    // IMPORTANT: Use stable values to avoid triggering DataSource re-initialization
+    const stableRequestId = `sync-${this.env.DATABASE_URL?.slice(-10) || 'default'}`;
+    
+    const context = {
+      req: { 
+        header: (name: string) => {
+          // Mock header method - return STABLE values for expected headers
+          if (name === 'cf-request-id') {
+            return stableRequestId; // Use stable ID instead of random
+          }
+          return undefined;
+        }
+      },
+      env: { 
+        DATABASE_URL: this.env.DATABASE_URL,
+        NODE_ENV: this.env.NODE_ENV || "development"
+      },
+      finalized: false,
+      error: null,
+      get executionCtx() { return null; },
+      get event() { return null; },
+      var: {}, // Mock variables object
+      // Add common Hono context methods that might be called
+      get: (key: string) => undefined,
+      set: (key: string, value: any) => {},
+      json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
+      text: (text: string) => Promise.resolve(new Response(text))
+    } as unknown as any;
+    
+    return new NeonService(context);
+  }
 
   /**
    * Process client changes - main entry point
    */
   async processChanges(message: ClientChangesMessage): Promise<void> {
     const { clientId, changes } = message;
+    
+    // ✨ NEW: Add detailed logging of received TableChange objects
+    syncLogger.info(`🔍 [SERVER] Received ${changes.length} TableChange objects from client ${clientId}`, {
+      clientId,
+      messageId: message.messageId,
+      changesCount: changes.length
+    }, MODULE_NAME);
+    
+    // Log each TableChange object in detail
+    changes.forEach((change, index) => {
+      const data = change.data as RecordData;
+      const hasRelationshipUpdates = !!(change.relationshipUpdates && change.relationshipUpdates.length > 0);
+      const hasEntityRelations = !!(change.entityRelations && change.entityRelations.length > 0);
+      
+      syncLogger.info(`🔍 [SERVER] TableChange ${index + 1}/${changes.length} details:`, {
+        clientId,
+        index,
+        table: change.table,
+        operation: change.operation,
+        entityId: data.id,
+        hasClientId: !!data.client_id,
+        clientIdValue: data.client_id,
+        hasRelationshipUpdates,
+        relationshipUpdatesCount: change.relationshipUpdates?.length || 0,
+        relationshipUpdates: change.relationshipUpdates,
+        hasEntityRelations,
+        entityRelations: change.entityRelations,
+        updatedAt: change.updated_at,
+        topLevelClientId: change.client_id,
+        dataKeys: Object.keys(data),
+        // Check for snake_case versions in data
+        hasSnakeCaseEntityRelations: !!(data as any).entity_relations,
+        hasSnakeCaseRelationshipUpdates: !!(data as any).relationship_updates,
+        snakeCaseEntityRelations: (data as any).entity_relations,
+        snakeCaseRelationshipUpdates: (data as any).relationship_updates
+      }, MODULE_NAME);
+    });
     
     try {
       // Set statement timeout
@@ -146,26 +236,37 @@ export class ChangeProcessor {
       try {
         let batchResults: any[] = [];
         
-        switch (group.operation) {
-          case 'insert':
-            // Use true batch insert for better performance
-            if (group.changes.length > 1) {
-              batchResults = await this.executeBatchInsert(group.table, group.changes);
-            } else {
-              batchResults = await this.executeBatch(group.table, group.changes, this.executeInsert.bind(this));
-            }
-            break;
-          case 'update':
-            // We can use batch for updates too since we're already grouping by table
-            batchResults = await this.executeBatch(group.table, group.changes, this.executeUpdate.bind(this));
-            break;
-          case 'delete':
-            batchResults = await this.executeBatch(
-              group.table, 
-              group.changes, 
-              (table, data) => this.executeDelete(table, data.id, data.updated_at)
-            );
-            break;
+        // ✨ NEW: Check if any changes in this group have relationship updates
+        const hasRelationshipUpdates = group.changes.some(change => 
+          change.relationshipUpdates && change.relationshipUpdates.length > 0
+        );
+        
+        if (hasRelationshipUpdates) {
+          // Process relationship changes individually
+          batchResults = await this.processRelationshipChanges(group.table, group.changes);
+        } else {
+          // Process regular entity changes as before
+          switch (group.operation) {
+            case 'insert':
+              // Use true batch insert for better performance
+              if (group.changes.length > 1) {
+                batchResults = await this.executeBatchInsert(group.table, group.changes);
+              } else {
+                batchResults = await this.executeBatch(group.table, group.changes, this.executeInsert.bind(this));
+              }
+              break;
+            case 'update':
+              // We can use batch for updates too since we're already grouping by table
+              batchResults = await this.executeBatch(group.table, group.changes, this.executeUpdate.bind(this));
+              break;
+            case 'delete':
+              batchResults = await this.executeBatch(
+                group.table, 
+                group.changes, 
+                (table, data) => this.executeDelete(table, data.id, data.updated_at)
+              );
+              break;
+          }
         }
         
         // Mark successful changes
@@ -176,58 +277,33 @@ export class ChangeProcessor {
           }
         }
       } catch (error) {
-        syncLogger.error(`Group processing failed: ${group.table} ${group.operation}: ${
+        syncLogger.error(`Failed to process ${group.operation} for table ${group.table}: ${
           error instanceof Error ? error.message : String(error)
         }`, {
-          error: error instanceof Error ? error.stack : String(error)
+          table: group.table,
+          operation: group.operation,
+          changeCount: group.changes.length
         }, MODULE_NAME);
         
-        // Fall back to individual processing
-        try {
-          const individualResults = await this.processIndividually(
-            group.table, 
-            group.changes, 
-            group.operation
-          );
-          
-          // Mark successful individual changes
-          for (const result of individualResults) {
-            if (result && result.id) {
-              processingMap.set(result.id, true); // Mark as processed
-              results.push({ success: true, data: result });
-            }
+        // Mark as failed but continue processing other groups
+        for (const change of group.changes) {
+          const data = change.data as RecordData;
+          if (!processingMap.get(data.id)) {
+            results.push({ 
+              success: false, 
+              error: {
+                code: 'PROCESSING_ERROR',
+                message: error instanceof Error ? error.message : String(error),
+                details: {
+                  table: group.table,
+                  operation: group.operation,
+                  entityId: data.id
+                }
+              },
+              data: data
+            });
           }
-        } catch (individualError) {
-          syncLogger.error(`Individual processing also failed: ${
-            individualError instanceof Error ? individualError.message : String(individualError)
-          }`, {
-            error: individualError instanceof Error ? individualError.stack : String(individualError)
-          }, MODULE_NAME);
         }
-      }
-    }
-    
-    // Add results for skipped changes (likely CRDT conflicts)
-    let skippedCount = 0;
-    for (const change of changes) {
-      const data = change.data as RecordData;
-      if (!processingMap.get(data.id)) {
-        skippedCount++;
-        // This change was skipped - likely a database-level CRDT conflict
-        results.push({
-          success: true, // Not an error, just skipped
-          skipped: true,
-          isConflict: true,
-          error: {
-            code: 'CRDT_CONFLICT',
-            message: 'Change skipped due to database-level CRDT rules',
-            details: {
-              table: change.table,
-              operation: change.operation,
-              id: data.id
-            }
-          }
-        });
       }
     }
     
@@ -398,120 +474,336 @@ export class ChangeProcessor {
   }
   
   /**
-   * Execute an insert operation
-   */
-  private async executeInsert(table: string, data: RecordData): Promise<any> {
-    // Validate data
-    if (!data.id) {
-      throw new ValidationError('Missing id in insert operation');
-    }
-    
-    const { metadata, ...insertData } = data as any;
-    
-    // Ensure client_id is included
-    insertData.client_id = data.client_id;
-    
-    const fields = Object.keys(insertData);
-    const values = Object.values(insertData);
-    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-    
-    // Build upsert query - CRDT timestamp check is handled by trigger
-    const query = `
-      INSERT INTO "${table}" (${fields.map(f => `"${f}"`).join(', ')})
-      VALUES (${placeholders})
-      ON CONFLICT (id) DO UPDATE 
-      SET ${fields
-        .filter(f => f !== 'id')
-        .map(f => `"${f}" = EXCLUDED."${f}"`)
-        .join(', ')}
-      RETURNING *
-    `;
-
-    try {
-      const result = await this.client.query(query, values);
-      
-      // If no rows returned, it was likely rejected by the CRDT trigger
-      if (result.rowCount === 0) {
-        // Just report as a conflict without extra fetch
-        return null;
-      }
-      
-      return result.rows[0];
-    } catch (error) {
-      throw new DatabaseError(
-        error instanceof Error ? error.message : String(error),
-        { table, operation: 'insert', id: data.id }
-      );
-    }
+ * Execute an insert operation
+ */
+private async executeInsert(table: string, data: RecordData): Promise<any> {
+  // Handle junction tables specially
+  if (this.isJunctionTable(table)) {
+    return this.executeJunctionInsert(table, data);
   }
   
-  /**
-   * Execute an update operation
-   */
-  private async executeUpdate(table: string, data: RecordData): Promise<any> {
-    // Validate data
-    if (!data.id) {
-      throw new ValidationError('Missing id in update operation');
-    }
-    
-    const { metadata, id, ...updateData } = data as any;
-    
-    // Ensure client_id is included
-    updateData.client_id = data.client_id;
-    
-    const fields = Object.keys(updateData);
-    const values = Object.values(updateData);
-    const setClause = fields.map((f, i) => `"${f}" = $${i + 1}`).join(', ');
-    
-    // Build update query - CRDT timestamp check is handled by trigger
-    const query = `
-      UPDATE "${table}"
-      SET ${setClause}
-      WHERE id = $${values.length + 1}
-      RETURNING *
-    `;
-
-    try {
-      const result = await this.client.query(query, [...values, id]);
-      
-      // If no rows affected, the record doesn't exist or CRDT trigger rejected it
-      if (result.rowCount === 0) {
-        // Just return null, let caller handle it
-        return null;
-      }
-      
-      return result.rows[0];
-    } catch (error) {
-      throw new DatabaseError(
-        error instanceof Error ? error.message : String(error),
-        { table, operation: 'update', id: data.id }
-      );
-    }
+  // Validate data
+  if (!data.id) {
+    throw new ValidationError('Missing id in insert operation');
   }
   
-  /**
-   * Execute a delete operation
-   */
-  private async executeDelete(table: string, id: string, timestamp: string): Promise<any> {
-    // For deletes, we still need the timestamp check in WHERE clause
-    // since triggers don't prevent DELETE operations the same way
-    const query = `
-      DELETE FROM "${table}"
-      WHERE id = $1
-      AND updated_at <= $2
-      RETURNING *
-    `;
+  const { metadata, ...insertData } = data as any;
+  
+  // Ensure client_id is included
+  insertData.client_id = data.client_id;
+  
+  const fields = Object.keys(insertData);
+  const values = Object.values(insertData);
+  const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+  
+  // Build upsert query - CRDT timestamp check is handled by trigger
+  const query = `
+    INSERT INTO "${table}" (${fields.map(f => `"${f}"`).join(', ')})
+    VALUES (${placeholders})
+    ON CONFLICT (id) DO UPDATE 
+    SET ${fields
+      .filter(f => f !== 'id')
+      .map(f => `"${f}" = EXCLUDED."${f}"`)
+      .join(', ')}
+    RETURNING *
+  `;
 
-    try {
-      const result = await this.client.query(query, [id, timestamp]);
-      return result.rows[0] || null;
-    } catch (error) {
-      throw new DatabaseError(
-        error instanceof Error ? error.message : String(error),
-        { table, operation: 'delete', id }
-      );
+  try {
+    const result = await this.client.query(query, values);
+    
+    // If no rows returned, it was likely rejected by the CRDT trigger
+    if (result.rowCount === 0) {
+      // Just report as a conflict without extra fetch
+      return null;
     }
+    
+    return result.rows[0];
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table, operation: 'insert', id: data.id }
+    );
   }
+}
+  
+  /**
+ * Execute an update operation
+ */
+private async executeUpdate(table: string, data: RecordData): Promise<any> {
+  // Junction tables don't support update operations
+  if (this.isJunctionTable(table)) {
+    throw new ValidationError(`Update operations not supported on junction table: ${table}`);
+  }
+  
+  // Validate data
+  if (!data.id) {
+    throw new ValidationError('Missing id in update operation');
+  }
+  
+  const { 
+    metadata, 
+    id, 
+    entityRelations, 
+    relationshipUpdates, 
+    entity_relations,     // ✨ NEW: Handle snake_case version
+    relationship_updates, // ✨ NEW: Handle snake_case version
+    ...updateData 
+  } = data as any;
+  
+  // Ensure client_id is included
+  updateData.client_id = data.client_id;
+  
+  const fields = Object.keys(updateData);
+  const values = Object.values(updateData);
+  const setClause = fields.map((f, i) => `"${f}" = $${i + 1}`).join(', ');
+  
+  // Build update query - CRDT timestamp check is handled by trigger
+  const query = `
+    UPDATE "${table}"
+    SET ${setClause}
+    WHERE id = $${values.length + 1}
+    RETURNING *
+  `;
+
+  try {
+    const result = await this.client.query(query, [...values, id]);
+    
+    // If no rows affected, the record doesn't exist or CRDT trigger rejected it
+    if (result.rowCount === 0) {
+      // Just return null, let caller handle it
+      return null;
+    }
+    
+    return result.rows[0];
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table, operation: 'update', id: data.id }
+    );
+  }
+}
+  
+  /**
+ * Execute a delete operation
+ */
+private async executeDelete(table: string, id: string, timestamp: string): Promise<any> {
+  // Handle junction tables specially
+  if (this.isJunctionTable(table)) {
+    return this.executeJunctionDelete(table, id);
+  }
+  
+  // For deletes, we still need the timestamp check in WHERE clause
+  // since triggers don't prevent DELETE operations the same way
+  const query = `
+    DELETE FROM "${table}"
+    WHERE id = $1
+    AND updated_at <= $2
+    RETURNING *
+  `;
+
+  try {
+    const result = await this.client.query(query, [id, timestamp]);
+    return result.rows[0] || null;
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table, operation: 'delete', id }
+    );
+  }
+}
+
+/**
+ * Check if a table is a junction table (many-to-many relationship table)
+ */
+private isJunctionTable(table: string): boolean {
+  // Define known junction tables
+  const junctionTables = ['project_members', 'task_dependencies'];
+  return junctionTables.includes(table);
+}
+
+/**
+ * Execute an insert operation on a junction table
+ */
+private async executeJunctionInsert(table: string, data: RecordData): Promise<any> {
+  if (table === 'project_members') {
+    return this.executeProjectMemberInsert(data);
+  }
+  if (table === 'task_dependencies') {
+    return this.executeTaskDependencyInsert(data);
+  }
+  
+  throw new ValidationError(`Unsupported junction table: ${table}`);
+}
+
+/**
+ * Execute a delete operation on a junction table
+ */
+private async executeJunctionDelete(table: string, syntheticId: string): Promise<any> {
+  if (table === 'project_members') {
+    return this.executeProjectMemberDelete(syntheticId);
+  }
+  if (table === 'task_dependencies') {
+    return this.executeTaskDependencyDelete(syntheticId);
+  }
+  
+  throw new ValidationError(`Unsupported junction table: ${table}`);
+}
+
+/**
+ * Execute project member insert
+ */
+private async executeProjectMemberInsert(data: RecordData): Promise<any> {
+  const projectId = (data as any).project_id;
+  const userId = (data as any).user_id;
+  
+  if (!projectId || !userId) {
+    throw new ValidationError('Missing project_id or user_id in project_members insert');
+  }
+  
+  const query = `
+    INSERT INTO "project_members" (project_id, user_id)
+    VALUES ($1, $2)
+    ON CONFLICT (project_id, user_id) DO NOTHING
+    RETURNING project_id, user_id
+  `;
+  
+  try {
+    const result = await this.client.query(query, [projectId, userId]);
+    
+    // Return synthetic record for consistency
+    if (result.rowCount && result.rowCount > 0) {
+      return {
+        id: `${projectId}_${userId}`,
+        project_id: projectId,
+        user_id: userId
+      };
+    }
+    
+    return null; // Conflict or already exists
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table: 'project_members', operation: 'insert', project_id: projectId, user_id: userId }
+    );
+  }
+}
+
+/**
+ * Execute project member delete
+ */
+private async executeProjectMemberDelete(syntheticId: string): Promise<any> {
+  // Parse synthetic ID: "projectId_userId"
+  const parts = syntheticId.split('_');
+  if (parts.length !== 2) {
+    throw new ValidationError(`Invalid synthetic ID format for project_members: ${syntheticId}`);
+  }
+  
+  const [projectId, userId] = parts;
+  
+  const query = `
+    DELETE FROM "project_members"
+    WHERE project_id = $1 AND user_id = $2
+    RETURNING project_id, user_id
+  `;
+  
+  try {
+    const result = await this.client.query(query, [projectId, userId]);
+    
+    // Return synthetic record for consistency
+    if (result.rowCount && result.rowCount > 0) {
+      return {
+        id: syntheticId,
+        project_id: projectId,
+        user_id: userId
+      };
+    }
+    
+    return null; // Nothing to delete
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table: 'project_members', operation: 'delete', synthetic_id: syntheticId }
+    );
+  }
+}
+
+/**
+ * Execute task dependency insert
+ */
+private async executeTaskDependencyInsert(data: RecordData): Promise<any> {
+  const dependentTaskId = (data as any).dependent_task_id;
+  const dependencyTaskId = (data as any).dependency_task_id;
+  
+  if (!dependentTaskId || !dependencyTaskId) {
+    throw new ValidationError('Missing dependent_task_id or dependency_task_id in task_dependencies insert');
+  }
+  
+  const query = `
+    INSERT INTO "task_dependencies" (dependent_task_id, dependency_task_id)
+    VALUES ($1, $2)
+    ON CONFLICT (dependent_task_id, dependency_task_id) DO NOTHING
+    RETURNING dependent_task_id, dependency_task_id
+  `;
+  
+  try {
+    const result = await this.client.query(query, [dependentTaskId, dependencyTaskId]);
+    
+    // Return synthetic record for consistency
+    if (result.rowCount && result.rowCount > 0) {
+      return {
+        id: `${dependentTaskId}_${dependencyTaskId}`,
+        dependent_task_id: dependentTaskId,
+        dependency_task_id: dependencyTaskId
+      };
+    }
+    
+    return null; // Conflict or already exists
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table: 'task_dependencies', operation: 'insert', dependent_task_id: dependentTaskId, dependency_task_id: dependencyTaskId }
+    );
+  }
+}
+
+/**
+ * Execute task dependency delete
+ */
+private async executeTaskDependencyDelete(syntheticId: string): Promise<any> {
+  // Parse synthetic ID: "dependentTaskId_dependencyTaskId"
+  const parts = syntheticId.split('_');
+  if (parts.length !== 2) {
+    throw new ValidationError(`Invalid synthetic ID format for task_dependencies: ${syntheticId}`);
+  }
+  
+  const [dependentTaskId, dependencyTaskId] = parts;
+  
+  const query = `
+    DELETE FROM "task_dependencies"
+    WHERE dependent_task_id = $1 AND dependency_task_id = $2
+    RETURNING dependent_task_id, dependency_task_id
+  `;
+  
+  try {
+    const result = await this.client.query(query, [dependentTaskId, dependencyTaskId]);
+    
+    // Return synthetic record for consistency
+    if (result.rowCount && result.rowCount > 0) {
+      return {
+        id: syntheticId,
+        dependent_task_id: dependentTaskId,
+        dependency_task_id: dependencyTaskId
+      };
+    }
+    
+    return null; // Nothing to delete
+  } catch (error) {
+    throw new DatabaseError(
+      error instanceof Error ? error.message : String(error),
+      { table: 'task_dependencies', operation: 'delete', synthetic_id: syntheticId }
+    );
+  }
+}
   
   /**
    * Fetch a record from the database - only used when absolutely necessary
@@ -688,7 +980,12 @@ export class ChangeProcessor {
     for (const change of changes) {
       const data = change.data as RecordData;
       Object.keys(data).forEach(key => {
-        if (key !== 'metadata') { // Skip metadata as it's not a DB field
+        // ✨ NEW: Filter out all metadata fields (both camelCase and snake_case)
+        if (key !== 'metadata' && 
+            key !== 'entityRelations' && 
+            key !== 'relationshipUpdates' &&
+            key !== 'entity_relations' &&      // ✨ NEW: Handle snake_case
+            key !== 'relationship_updates') {  // ✨ NEW: Handle snake_case
           allFields.add(key);
         }
       });
@@ -782,6 +1079,301 @@ export class ChangeProcessor {
       return this.executeBatch(table, changes, this.executeInsert.bind(this));
     }
   }
+
+  /**
+   * ✨ NEW: Process changes that include relationship updates
+   */
+  private async processRelationshipChanges(table: string, changes: TableChange[]): Promise<any[]> {
+    const results: any[] = [];
+    
+    for (const change of changes) {
+      try {
+        const data = change.data as RecordData;
+        
+        // First, handle any regular entity data updates (if there are fields other than just 'id')
+        const entityFields = Object.keys(data).filter(key => key !== 'id');
+        if (entityFields.length > 0) {
+          const entityResult = await this.executeUpdate(table, data);
+          if (entityResult) {
+            results.push(entityResult);
+          }
+        }
+        
+        // Then, handle relationship updates
+        if (change.relationshipUpdates && change.relationshipUpdates.length > 0) {
+          await this.processEntityRelationshipUpdates(table, data.id, change.relationshipUpdates);
+          
+          // For relationship updates, we still need to return a result to mark as processed
+          // Use the existing entity data or fetch it if we didn't update entity fields
+          const relationshipResult = entityFields.length > 0 ? 
+            results[results.length - 1] : 
+            await this.fetchCurrentRecord(table, data.id);
+            
+          if (relationshipResult && !entityFields.length) {
+            results.push(relationshipResult);
+          }
+        }
+        
+        syncLogger.debug(`Processed relationship change for ${table}:${data.id}`, {
+          table,
+          entityId: data.id,
+          relationshipCount: change.relationshipUpdates?.length || 0
+        }, MODULE_NAME);
+        
+      } catch (error) {
+        syncLogger.error(`Error processing relationship change for ${table}: ${
+          error instanceof Error ? error.message : String(error)
+        }`, {
+          table,
+          entityId: (change.data as RecordData).id
+        }, MODULE_NAME);
+        
+        // Don't throw - continue processing other changes
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * ✨ NEW: Process relationship updates for a specific entity
+   */
+  private async processEntityRelationshipUpdates(
+    table: string, 
+    entityId: string, 
+    relationshipUpdates: Array<{
+      relationName: string;
+      operation: 'set' | 'add' | 'remove';
+      targetIds: string[];
+    }>
+  ): Promise<void> {
+    for (const relUpdate of relationshipUpdates) {
+      switch (table) {
+        case 'projects':
+          await this.processProjectRelationshipUpdate(entityId, relUpdate);
+          break;
+        case 'tasks':
+          await this.processTaskRelationshipUpdate(entityId, relUpdate);
+          break;
+        default:
+          syncLogger.warn(`Unknown entity table for relationship updates: ${table}`, {
+            table,
+            entityId,
+            relationName: relUpdate.relationName
+          }, MODULE_NAME);
+      }
+    }
+  }
+
+  /**
+   * ✨ NEW: Process project relationship updates
+   */
+  private async processProjectRelationshipUpdate(
+    projectId: string, 
+    relUpdate: {
+      relationName: string;
+      operation: 'set' | 'add' | 'remove';
+      targetIds: string[];
+    }
+  ): Promise<void> {
+    switch (relUpdate.relationName) {
+      case 'members':
+        await this.updateProjectMembers(projectId, relUpdate);
+        break;
+      default:
+        syncLogger.warn(`Unknown project relationship: ${relUpdate.relationName}`, {
+          projectId,
+          relationName: relUpdate.relationName
+        }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * ✨ NEW: Process task relationship updates
+   */
+  private async processTaskRelationshipUpdate(
+    taskId: string, 
+    relUpdate: {
+      relationName: string;
+      operation: 'set' | 'add' | 'remove';
+      targetIds: string[];
+    }
+  ): Promise<void> {
+    switch (relUpdate.relationName) {
+      case 'dependencies':
+        await this.updateTaskDependencies(taskId, relUpdate);
+        break;
+      case 'assignees':
+        // TODO: TaskRepository doesn't have assignee management methods yet
+        syncLogger.warn(`Task assignee relationship updates not yet implemented`, {
+          taskId,
+          relationName: relUpdate.relationName,
+          operation: relUpdate.operation,
+          targetCount: relUpdate.targetIds.length
+        }, MODULE_NAME);
+        break;
+      default:
+        syncLogger.warn(`Unknown task relationship: ${relUpdate.relationName}`, {
+          taskId,
+          relationName: relUpdate.relationName
+        }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * ✨ NEW: Update project members based on relationship operation using repositories
+   * (now with proper DATABASE_URL so TypeORM can create proper connections)
+   */
+  private async updateProjectMembers(
+    projectId: string,
+    relUpdate: {
+      operation: 'set' | 'add' | 'remove';
+      targetIds: string[];
+    }
+  ): Promise<void> {
+    try {
+      switch (relUpdate.operation) {
+        case 'set':
+          // Replace entire member list using repository method
+          await this.projectRepository.updateMembers(projectId, relUpdate.targetIds);
+          break;
+          
+        case 'add':
+          // Add specific members using repository method
+          for (const userId of relUpdate.targetIds) {
+            await this.projectRepository.addMember(projectId, userId);
+          }
+          break;
+          
+        case 'remove':
+          // Remove specific members using repository method
+          for (const userId of relUpdate.targetIds) {
+            await this.projectRepository.removeMember(projectId, userId);
+          }
+          break;
+      }
+      
+      syncLogger.debug(`Updated project members via repository`, {
+        projectId,
+        operation: relUpdate.operation,
+        memberCount: relUpdate.targetIds.length
+      }, MODULE_NAME);
+      
+    } catch (error) {
+      syncLogger.error(`Failed to update project members via repository`, {
+        projectId,
+        operation: relUpdate.operation,
+        memberCount: relUpdate.targetIds.length,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
+  /**
+   * ✨ NEW: Update task dependencies based on relationship operation using repositories where possible
+   * (now with proper DATABASE_URL so TypeORM can create proper connections)
+   */
+  private async updateTaskDependencies(
+    taskId: string,
+    relUpdate: {
+      operation: 'set' | 'add' | 'remove';
+      targetIds: string[];
+    }
+  ): Promise<void> {
+    try {
+      switch (relUpdate.operation) {
+        case 'set':
+          // Replace entire dependency list - use direct SQL for now since TaskRepository might not have this method
+          await this.client.query('BEGIN');
+          try {
+            await this.client.query(
+              'DELETE FROM task_dependencies WHERE dependent_task_id = $1',
+              [taskId]
+            );
+            
+            // Add new dependencies
+            if (relUpdate.targetIds.length > 0) {
+              for (const depTaskId of relUpdate.targetIds) {
+                await this.client.query(
+                  'INSERT INTO task_dependencies (dependent_task_id, dependency_task_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                  [taskId, depTaskId]
+                );
+              }
+            }
+            
+            await this.client.query('COMMIT');
+          } catch (error) {
+            await this.client.query('ROLLBACK');
+            throw error;
+          }
+          break;
+          
+        case 'add':
+          // Add specific dependencies - try to use repository method if available
+          for (const depTaskId of relUpdate.targetIds) {
+            try {
+              // Check if the repository has an addDependency method
+              if (typeof this.taskRepository.addDependency === 'function') {
+                await this.taskRepository.addDependency(taskId, depTaskId);
+              } else {
+                // Fallback to direct SQL
+                await this.client.query(
+                  'INSERT INTO task_dependencies (dependent_task_id, dependency_task_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                  [taskId, depTaskId]
+                );
+              }
+            } catch (error) {
+              // Fallback to direct SQL if repository method fails
+              await this.client.query(
+                'INSERT INTO task_dependencies (dependent_task_id, dependency_task_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [taskId, depTaskId]
+              );
+            }
+          }
+          break;
+          
+        case 'remove':
+          // Remove specific dependencies - try to use repository method if available
+          for (const depTaskId of relUpdate.targetIds) {
+            try {
+              // Check if the repository has a removeDependency method
+              if (typeof this.taskRepository.removeDependency === 'function') {
+                await this.taskRepository.removeDependency(taskId, depTaskId);
+              } else {
+                // Fallback to direct SQL
+                await this.client.query(
+                  'DELETE FROM task_dependencies WHERE dependent_task_id = $1 AND dependency_task_id = $2',
+                  [taskId, depTaskId]
+                );
+              }
+            } catch (error) {
+              // Fallback to direct SQL if repository method fails
+              await this.client.query(
+                'DELETE FROM task_dependencies WHERE dependent_task_id = $1 AND dependency_task_id = $2',
+                [taskId, depTaskId]
+              );
+            }
+          }
+          break;
+      }
+      
+      syncLogger.debug(`Updated task dependencies via repository/SQL hybrid`, {
+        taskId,
+        operation: relUpdate.operation,
+        dependencyCount: relUpdate.targetIds.length
+      }, MODULE_NAME);
+      
+    } catch (error) {
+      syncLogger.error(`Failed to update task dependencies via repository/SQL hybrid`, {
+        taskId,
+        operation: relUpdate.operation,
+        dependencyCount: relUpdate.targetIds.length,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
 }
 
 /**
@@ -799,7 +1391,7 @@ export async function processClientChanges(
     // Connect to the database before processing
     await dbClient.connect();
     
-    const processor = new ChangeProcessor(dbClient, messageHandler, config);
+    const processor = new ChangeProcessor(dbClient, messageHandler, context.env, config);
     
     await processor.processChanges(message);
     
