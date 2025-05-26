@@ -458,9 +458,10 @@ export class NeonDriver implements Driver {
         // insertResult here is the raw row object returned by RETURNING *
         if (!insertResult) return undefined;
 
-        // Just return the raw row object directly. TypeORM's PlainObjectToDatabaseEntityTransformer
-        // used later in the process will handle mapping these raw values to the entity.
-        return insertResult; 
+        // Since we're now passing camelCase property names to TypeORM,
+        // and TypeORM handles the database column mapping internally,
+        // we can return the insertResult as-is in most cases
+        return insertResult;
     }
 
     findChangedColumns(tableColumns: TableColumn[], columnMetadatas: ColumnMetadata[]): ColumnMetadata[] {

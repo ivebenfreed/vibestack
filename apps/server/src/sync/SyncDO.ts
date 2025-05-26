@@ -12,7 +12,7 @@
 import { SyncStateManager } from './state-manager';
 import { performInitialSync } from './initial-sync';
 import { performCatchupSync, sendLiveChanges, createLiveSyncConfirmation, processLiveUpdateNotification } from './server-changes';
-import { processClientChanges } from './client-changes';
+import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
 import type { 
   ServerMessage, 
   ClientMessage,
@@ -173,16 +173,75 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }, MODULE_NAME);
       
       try {
-        // Process client changes
-        await processClientChanges(
-          message as ClientChangesMessage,
-          this.getContext(),
-          this
-        );
+        // Get database connection
+        const dbClient = getDBClient(this.getContext());
+        
+        try {
+          // Connect to the database before processing
+          await dbClient.connect();
+          
+          // Use the new IncomingChangeProcessor
+          const processor = new IncomingChangeProcessor(
+            dbClient, 
+            this, // WebSocketHandler
+            this.env,
+            undefined // Use default config
+          );
+          
+          await processor.processIncomingChanges(message as ClientChangesMessage);
+          
+          // Small delay to ensure acknowledgments are fully processed by client
+          // before we start sending any live updates
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Notify that processing is complete (only after all acknowledgments are sent)
+          syncLogger.info('Notifying client changes complete', {
+            clientId: (message as ClientChangesMessage).clientId,
+            messageId: message.messageId
+          }, MODULE_NAME);
+          await this.notifyClientChangesComplete(message.messageId);
+          
+        } finally {
+          // Ensure we always close the connection
+          try {
+            await dbClient.end();
+          } catch (err) {
+            // Just silently close the connection - no need to log errors here
+          }
+        }
       } catch (error) {
-        syncLogger.error('Error processing client changes', {
-          error: error instanceof Error ? error.message : String(error)
-        }, MODULE_NAME);
+        // Check if this is a WebSocket unavailability error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isWebSocketUnavailable = errorMessage.includes('WebSocketUnavailable') || 
+                                     errorMessage.includes('No active WebSocket connections');
+        
+        if (isWebSocketUnavailable) {
+          // Log with more specific error about client disconnection
+          syncLogger.warn(`Client appears to be disconnected, cannot acknowledge changes: ${errorMessage}`, {
+            clientId: (message as ClientChangesMessage).clientId,
+            messageId: message.messageId
+          }, MODULE_NAME);
+        } else {
+          // Log regular processing errors
+          syncLogger.error('Error processing client changes', {
+            clientId: (message as ClientChangesMessage).clientId,
+            messageId: message.messageId,
+            error: errorMessage
+          }, MODULE_NAME);
+        }
+        
+        // Make sure we still release the lock in case of error
+        try {
+          await this.notifyClientChangesComplete(message.messageId);
+        } catch (notifyError) {
+          // Just log, don't throw
+          syncLogger.error(`Failed to notify client changes completion: ${
+            notifyError instanceof Error ? notifyError.message : String(notifyError)
+          }`, {
+            clientId: (message as ClientChangesMessage).clientId,
+            messageId: message.messageId
+          }, MODULE_NAME);
+        }
       }
     });
 

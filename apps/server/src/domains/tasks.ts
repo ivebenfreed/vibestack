@@ -5,6 +5,8 @@ import { FindOptionsWhere, DeepPartial } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
+import type { AppBindings } from '../types/hono';
+import { BaseServerRepository } from './BaseServerRepository';
 
 // Re-export enums for convenience
 export { TaskStatus, TaskPriority };
@@ -17,13 +19,12 @@ export type TaskCreateInput = Partial<Omit<TaskInstance, 'id' | 'created_at' | '
 export type TaskUpdateInput = Partial<TaskCreateInput>;
 
 /**
- * TaskRepository class that uses TypeORM
+ * TaskRepository class that extends BaseServerRepository
  */
-export class TaskRepository {
-  private neonService: NeonService;
+export class TaskRepository extends BaseServerRepository<Task> {
   
   constructor(neonService: NeonService) {
-    this.neonService = neonService;
+    super(neonService, Task);
   }
 
   /**
@@ -62,7 +63,7 @@ export class TaskRepository {
   }
 
   /**
-   * Create a new task
+   * Create a new task with defaults
    */
   async create(data: TaskCreateInput): Promise<Task> {
     // Set default values if not provided
@@ -72,18 +73,8 @@ export class TaskRepository {
       priority: data.priority || TaskPriority.MEDIUM
     };
     
-    // Create a new task entity
-    const task = new Task();
-    Object.assign(task, taskData);
-    
-    // Validate the task
-    const errors = await validate(task, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Insert and return the task
-    return await this.neonService.insert(Task, taskData as DeepPartial<Task>);
+    // Use parent class create method (handles validation)
+    return await super.create(taskData as DeepPartial<Task>);
   }
 
   /**
@@ -108,94 +99,57 @@ export class TaskRepository {
   }
 
   /**
-   * Update task status
+   * Update task status (specialized method)
    */
   async updateStatus(id: string, status: TaskStatus): Promise<Task | null> {
-    try {
-      // Set completedAt based on status
-      const completedAt = status === TaskStatus.COMPLETED ? new Date() : null;
-      
-      // Use the simple update method - TypeORM will handle parameter ordering correctly
-      await this.neonService.update(
-        Task,
-        { id } as FindOptionsWhere<Task>,
-        {
-          status,
-          completedAt
-        } as DeepPartial<Task>
-      );
-      
-      // Return the updated task
-      return await this.findById(id);
-    } catch (error) {
-      console.error('Error updating task status:', error);
-      throw error;
-    }
+    // Set completedAt based on status
+    const completedAt = status === TaskStatus.COMPLETED ? new Date() : null;
+    
+    // Use parent class update method
+    return await this.update(id, { status, completedAt } as TaskUpdateInput);
   }
 
   /**
-   * Update task time range
+   * Update task time range (specialized method)
    */
   async updateTimeRange(id: string, timeRange: string): Promise<Task | null> {
-    // Update the task
-    await this.neonService.update(
-      Task, 
-      { id } as FindOptionsWhere<Task>, 
-      { timeRange } as DeepPartial<Task>
-    );
-    
-    // Return the updated task
-    return await this.findById(id);
+    // Use parent class update method
+    return await this.update(id, { timeRange } as TaskUpdateInput);
   }
 
   /**
-   * Add dependency to task
+   * Add dependency to task using TypeORM query builder
    */
   async addDependency(taskId: string, dependencyId: string): Promise<Task | null> {
-    try {
-      // Use a direct insert query instead of raw SQL to avoid recursion
-      // This uses a custom query with ON CONFLICT DO NOTHING to handle duplicates
-      const queryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
-      await queryBuilder
-        .insert()
-        .into('task_dependencies')
-        .values({
-          dependent_task_id: taskId,
-          dependency_task_id: dependencyId
-        })
-        .orIgnore() // This adds ON CONFLICT DO NOTHING
-        .execute();
-      
-      // Return updated task
-      return await this.findById(taskId);
-    } catch (error) {
-      console.error('Error adding dependency:', error);
-      throw error;
-    }
+    const queryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
+    await queryBuilder
+      .insert()
+      .into('task_dependencies')
+      .values({
+        dependent_task_id: taskId,
+        dependency_task_id: dependencyId
+      })
+      .orIgnore() // ON CONFLICT DO NOTHING
+      .execute();
+    
+    return await this.findById(taskId);
   }
 
   /**
-   * Remove dependency from task
+   * Remove dependency from task using TypeORM query builder
    */
   async removeDependency(taskId: string, dependencyId: string): Promise<Task | null> {
-    try {
-      // Use the delete query builder instead of raw SQL
-      const queryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
-      await queryBuilder
-        .delete()
-        .from('task_dependencies')
-        .where(
-          'dependent_task_id = $1 AND dependency_task_id = $2',
-          [taskId, dependencyId]
-        )
-        .execute();
-      
-      // Return updated task
-      return await this.findById(taskId);
-    } catch (error) {
-      console.error('Error removing dependency:', error);
-      throw error;
-    }
+    const queryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
+    await queryBuilder
+      .delete()
+      .from('task_dependencies')
+      .where('dependent_task_id = :taskId AND dependency_task_id = :dependencyId', { 
+        taskId, 
+        dependencyId 
+      })
+      .execute();
+    
+    return await this.findById(taskId);
   }
 
   /**
@@ -293,7 +247,7 @@ const createServiceFromClient = (client: Client): NeonService => {
     error: null,
     get executionCtx() { return null; },
     get event() { return null; }
-  } as unknown as Context<{ Bindings: Env }>;
+  } as unknown as Context<{ Bindings: Env; Variables: any }>;
   
   return new NeonService(context);
 };

@@ -131,8 +131,12 @@ export class NeonQueryRunner implements QueryRunner {
             const result = new QueryResult();
             
             if (raw) {
+                // Let TypeORM handle column name mapping - no transformation needed
+                // since we're now converting property names in EntityOperations layer
+                const rows = raw.rows || [];
+                
                 if (raw.hasOwnProperty("rows")) {
-                    result.records = raw.rows;
+                    result.records = rows;
                 }
                 
                 if (raw.hasOwnProperty("rowCount")) {
@@ -143,19 +147,18 @@ export class NeonQueryRunner implements QueryRunner {
                     case "DELETE":
                     case "UPDATE":
                         // for UPDATE and DELETE query additionally return number of affected rows
-                        result.raw = [raw.rows, raw.rowCount];
+                        result.raw = [rows, raw.rowCount];
                         break;
                     default:
-                        result.raw = raw.rows;
+                        result.raw = rows;
                 }
                 
-                if (!useStructuredResult) {
-                    console.log(`[${queryId}] NeonQueryRunner.query: END (returning raw result)`);
-                    return result.raw;
-                }
+                // Return structured QueryResult - TypeORM handles column mapping
+                console.log(`[${queryId}] NeonQueryRunner.query: END (returning QueryResult)`);
+                return result;
             }
             
-            console.log(`[${queryId}] NeonQueryRunner.query: END (returning structured QueryResult)`);
+            console.log(`[${queryId}] NeonQueryRunner.query: END (returning empty QueryResult)`);
             return result;
             
         } catch (err: any) {

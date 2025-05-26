@@ -5,6 +5,7 @@ import { FindOptionsWhere, DeepPartial } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
+import { BaseServerRepository } from './BaseServerRepository';
 
 // Re-export enums for convenience
 export { UserRole };
@@ -17,27 +18,12 @@ export type UserCreateInput = Partial<Omit<UserInstance, 'id' | 'created_at' | '
 export type UserUpdateInput = Partial<UserCreateInput>;
 
 /**
- * UserRepository class that uses TypeORM
+ * UserRepository class that extends BaseServerRepository
  */
-export class UserRepository {
-  private neonService: NeonService;
+export class UserRepository extends BaseServerRepository<User> {
   
   constructor(neonService: NeonService) {
-    this.neonService = neonService;
-  }
-
-  /**
-   * Find all users
-   */
-  async findAll(): Promise<User[]> {
-    return await this.neonService.find(User);
-  }
-
-  /**
-   * Find user by ID
-   */
-  async findById(id: string): Promise<User | null> {
-    return await this.neonService.findOne(User, { id } as FindOptionsWhere<User>);
+    super(neonService, User);
   }
 
   /**
@@ -66,7 +52,7 @@ export class UserRepository {
   }
 
   /**
-   * Create a new user
+   * Create a new user with defaults
    */
   async create(data: UserCreateInput): Promise<User> {
     // Set default values if not provided
@@ -76,59 +62,24 @@ export class UserRepository {
       emailVerified: data.emailVerified !== undefined ? data.emailVerified : false
     };
     
-    // Create a new user entity
-    const user = new User();
-    Object.assign(user, userData);
-    
-    // Validate the user
-    const errors = await validate(user, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Insert and return the user
-    return await this.neonService.insert(User, userData as DeepPartial<User>);
+    // Use parent class create method (handles validation)
+    return await super.create(userData as DeepPartial<User>);
   }
 
   /**
-   * Update a user
-   */
-  async update(id: string, data: UserUpdateInput): Promise<User | null> {
-    // Create user for validation
-    const user = new User();
-    Object.assign(user, { id, ...data });
-    
-    // Validate user
-    const errors = await validate(user, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Update the user using TypeORM
-    await this.neonService.update(User, { id } as FindOptionsWhere<User>, data as DeepPartial<User>);
-    
-    // Return the updated user
-    return await this.findById(id);
-  }
-
-  /**
-   * Delete user
+   * Delete user with cleanup using TypeORM query builder
    */
   async delete(id: string): Promise<boolean> {
-    try {
-      // First delete project memberships using direct query
-      await this.neonService.query(
-        `DELETE FROM project_members WHERE user_id = $1`,
-        [id]
-      );
-      
-      // Then delete the user
-      const result = await this.neonService.delete(User, { id } as FindOptionsWhere<User>);
-      return (result.affected !== null && result.affected !== undefined && result.affected > 0);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
-    }
+    // First delete project memberships using TypeORM query builder
+    const deleteBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+    await deleteBuilder
+      .delete()
+      .from('project_members')
+      .where('user_id = :userId', { userId: id })
+      .execute();
+    
+    // Then delete the user using parent class method
+    return await super.delete(id);
   }
 }
 
@@ -144,7 +95,7 @@ const createServiceFromClient = (client: Client): NeonService => {
     error: null,
     get executionCtx() { return null; },
     get event() { return null; }
-  } as unknown as Context<{ Bindings: Env }>;
+  } as unknown as Context<{ Bindings: Env; Variables: any }>;
   
   return new NeonService(context);
 };

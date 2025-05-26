@@ -6,6 +6,7 @@ import { NeonService } from '../lib/neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 import { User } from "@repo/dataforge/server-entities";
+import { BaseServerRepository } from './BaseServerRepository';
 
 // Re-export enums for convenience
 export { ProjectStatus };
@@ -18,27 +19,12 @@ export type ProjectCreateInput = Partial<Omit<ProjectInstance, 'id' | 'created_a
 export type ProjectUpdateInput = Partial<ProjectCreateInput>;
 
 /**
- * ProjectRepository class that uses TypeORM
+ * ProjectRepository class that extends BaseServerRepository
  */
-export class ProjectRepository {
-  private neonService: NeonService;
+export class ProjectRepository extends BaseServerRepository<Project> {
   
   constructor(neonService: NeonService) {
-    this.neonService = neonService;
-  }
-
-  /**
-   * Find all projects
-   */
-  async findAll(): Promise<Project[]> {
-    return await this.neonService.find(Project);
-  }
-
-  /**
-   * Find project by ID
-   */
-  async findById(id: string): Promise<Project | null> {
-    return await this.neonService.findOne(Project, { id } as FindOptionsWhere<Project>);
+    super(neonService, Project);
   }
 
   /**
@@ -56,7 +42,7 @@ export class ProjectRepository {
   }
 
   /**
-   * Create a new project
+   * Create a new project with defaults
    */
   async create(data: ProjectCreateInput): Promise<Project> {
     // Set default values if not provided
@@ -65,47 +51,8 @@ export class ProjectRepository {
       status: data.status || ProjectStatus.ACTIVE
     };
     
-    // Create a new project entity
-    const project = new Project();
-    Object.assign(project, projectData);
-    
-    // Validate the project
-    const errors = await validate(project, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Insert and return the project
-    return await this.neonService.insert(Project, projectData as DeepPartial<Project>);
-  }
-
-  /**
-   * Update a project
-   */
-  async update(id: string, data: ProjectUpdateInput): Promise<Project | null> {
-    // Create project for validation
-    const project = new Project();
-    Object.assign(project, { id, ...data });
-    
-    // Validate project
-    const errors = await validate(project, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Update the project using TypeORM
-    await this.neonService.update(Project, { id } as FindOptionsWhere<Project>, data as DeepPartial<Project>);
-    
-    // Return the updated project
-    return await this.findById(id);
-  }
-
-  /**
-   * Delete project
-   */
-  async delete(id: string): Promise<boolean> {
-    const result = await this.neonService.delete(Project, { id } as FindOptionsWhere<Project>);
-    return (result.affected !== null && result.affected !== undefined && result.affected > 0);
+    // Use parent class create method (handles validation)
+    return await super.create(projectData as DeepPartial<Project>);
   }
 
   /**
@@ -120,12 +67,11 @@ export class ProjectRepository {
   }
 
   /**
-   * Update project members using direct SQL since NeonService doesn't support relation loading/saving
-   * This will generate WAL entries for the junction table operations
+   * Update project members using TypeORM query builders
    */
   async updateMembers(projectId: string, userIds: string[]): Promise<User[]> {
     // Check if project exists
-    const project = await this.neonService.findOne(Project, { id: projectId } as FindOptionsWhere<Project>);
+    const project = await this.findById(projectId);
     if (!project) {
       throw new Error(`Project with ID ${projectId} not found`);
     }
@@ -141,34 +87,24 @@ export class ProjectRepository {
       }
     }
 
-    // Start transaction using raw SQL
-    await this.neonService.query('BEGIN');
+    // Remove all existing members using TypeORM query builder
+    const deleteBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+    await deleteBuilder
+      .delete()
+      .from('project_members')
+      .where('project_id = :projectId', { projectId })
+      .execute();
     
-    try {
-      // Remove all existing members
-      await this.neonService.query(
-        'DELETE FROM project_members WHERE project_id = $1',
-        [projectId]
-      );
+    // Add new members using TypeORM query builder
+    if (userIds.length > 0) {
+      const insertBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+      const memberValues = userIds.map(userId => ({ project_id: projectId, user_id: userId }));
       
-      // Add new members
-      if (userIds.length > 0) {
-        const values = userIds.map((userId, index) => 
-          `($${index * 2 + 1}, $${index * 2 + 2})`
-        ).join(', ');
-        
-        const params = userIds.flatMap(userId => [projectId, userId]);
-        
-        await this.neonService.query(
-          `INSERT INTO project_members (project_id, user_id) VALUES ${values}`,
-          params
-        );
-      }
-      
-      await this.neonService.query('COMMIT');
-    } catch (error) {
-      await this.neonService.query('ROLLBACK');
-      throw error;
+      await insertBuilder
+        .insert()
+        .into('project_members')
+        .values(memberValues)
+        .execute();
     }
 
     // Return the updated members
@@ -176,11 +112,11 @@ export class ProjectRepository {
   }
 
   /**
-   * Add a single member to project
+   * Add a single member to project using TypeORM query builder
    */
   async addMember(projectId: string, userId: string): Promise<User[]> {
     // Check if project exists
-    const project = await this.neonService.findOne(Project, { id: projectId } as FindOptionsWhere<Project>);
+    const project = await this.findById(projectId);
     if (!project) {
       throw new Error(`Project with ID ${projectId} not found`);
     }
@@ -191,30 +127,35 @@ export class ProjectRepository {
       throw new Error(`User with ID ${userId} not found`);
     }
 
-    // Add member (ON CONFLICT DO NOTHING to avoid duplicates)
-    await this.neonService.query(
-      'INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [projectId, userId]
-    );
+    // Add member using TypeORM query builder with ON CONFLICT handling
+    const insertBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+    await insertBuilder
+      .insert()
+      .into('project_members')
+      .values({ project_id: projectId, user_id: userId })
+      .orIgnore() // ON CONFLICT DO NOTHING equivalent
+      .execute();
 
     return await this.getMembers(projectId);
   }
 
   /**
-   * Remove a single member from project
+   * Remove a single member from project using TypeORM query builder
    */
   async removeMember(projectId: string, userId: string): Promise<User[]> {
     // Check if project exists
-    const project = await this.neonService.findOne(Project, { id: projectId } as FindOptionsWhere<Project>);
+    const project = await this.findById(projectId);
     if (!project) {
       throw new Error(`Project with ID ${projectId} not found`);
     }
 
-    // Remove member
-    await this.neonService.query(
-      'DELETE FROM project_members WHERE project_id = $1 AND user_id = $2',
-      [projectId, userId]
-    );
+    // Remove member using TypeORM query builder
+    const deleteBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+    await deleteBuilder
+      .delete()
+      .from('project_members')
+      .where('project_id = :projectId AND user_id = :userId', { projectId, userId })
+      .execute();
 
     return await this.getMembers(projectId);
   }
