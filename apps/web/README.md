@@ -1,67 +1,40 @@
-# Shadcn Admin Dashboard
+# Vibestack Web App
 
-Admin Dashboard UI crafted with Shadcn and Vite. Built with responsiveness and accessibility in mind.
-
-![alt text](public/images/shadcn-admin.png)
-
-I've been creating dashboard UIs at work and for my personal projects. I always wanted to make a reusable collection of dashboard UI for future projects; and here it is now. While I've created a few custom components, some of the code is directly adapted from ShadcnUI examples.
-
-> This is not a starter project (template) though. I'll probably make one in the future.
+The web frontend for Vibestack - a modern full-stack application with real-time sync capabilities.
 
 ## Features
 
-- Light/dark mode
-- Responsive
-- Accessible
-- With built-in Sidebar component
-- Global Search Command
-- 10+ pages
-- Extra custom components
+- Real-time data synchronization
+- Modern React UI with ShadcnUI components
+- TypeScript throughout
+- Responsive design with dark/light mode
+- Database integration with PGlite
+- State management with XState
 
 ## Tech Stack
 
-**UI:** [ShadcnUI](https://ui.shadcn.com) (TailwindCSS + RadixUI)
+- **Framework:** React + Vite
+- **UI:** ShadcnUI (TailwindCSS + RadixUI)
+- **Routing:** TanStack Router
+- **Database:** PGlite (PostgreSQL in WebAssembly)
+- **Sync:** WebSocket-based real-time sync
+- **State Management:** XState for complex state machines
+- **Type Safety:** TypeScript
 
-**Build Tool:** [Vite](https://vitejs.dev/)
+## Development
 
-**Routing:** [TanStack Router](https://tanstack.com/router/latest)
-
-**Type Checking:** [TypeScript](https://www.typescriptlang.org/)
-
-**Linting/Formatting:** [Eslint](https://eslint.org/) & [Prettier](https://prettier.io/)
-
-**Icons:** [Tabler Icons](https://tabler.io/icons)
-
-## Run Locally
-
-Clone the project
+This is part of the Vibestack monorepo. To run the web app:
 
 ```bash
-  git clone https://github.com/satnaing/shadcn-admin.git
+# From the monorepo root
+pnpm install
+pnpm run dev:web
 ```
 
-Go to the project directory
+## Architecture
 
-```bash
-  cd shadcn-admin
-```
-
-Install dependencies
-
-```bash
-  pnpm install
-```
-
-Start the server
-
-```bash
-  pnpm run dev
-```
-
-## Author
-
-Crafted with 🤍 by [@satnaing](https://github.com/satnaing)
-
-## License
-
-Licensed under the [MIT License](https://choosealicense.com/licenses/mit/)
+The web app features:
+- Modular sync services for real-time data synchronization
+- State machines for complex sync flow management
+- PGlite for client-side PostgreSQL database
+- Component-based UI architecture
