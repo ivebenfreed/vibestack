@@ -221,7 +221,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
       await dependencyQueryBuilder
         .delete()
         .from('task_dependencies')
-        .where('dependent_task_id = $1 OR dependency_task_id = $1', [id])
+        .where('dependent_task_id = :id OR dependency_task_id = :id', { id })
         .execute();
       
       // Then delete the task

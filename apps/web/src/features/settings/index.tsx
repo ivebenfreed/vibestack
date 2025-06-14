@@ -1,66 +1,60 @@
-import { Outlet } from '@tanstack/react-router'
-import {
-  IconBrowserCheck,
-  IconNotification,
-  IconPalette,
-  IconTool,
-  IconUser,
-} from '@tabler/icons-react'
 import { Separator } from '@/components/ui/separator'
-import { Main } from '@/components/layout/main'
+import { ContentContainer } from '@/components/layout/content-container'
 import SidebarNav from './components/sidebar-nav'
-
-export default function Settings() {
-  return (
-    <>
-      {/* ===== Top Heading ===== */}
-      <Main fixed>
-        <div className='space-y-0.5'>
-          <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
-            Settings
-          </h1>
-          <p className='text-muted-foreground'>
-            Manage your account settings and set e-mail preferences.
-          </p>
-        </div>
-        <Separator className='my-4 lg:my-6' />
-        <div className='flex flex-1 flex-col space-y-2 overflow-hidden md:space-y-2 lg:flex-row lg:space-y-0 lg:space-x-12'>
-          <aside className='top-0 lg:sticky lg:w-1/5'>
-            <SidebarNav items={sidebarNavItems} />
-          </aside>
-          <div className='flex w-full overflow-y-hidden p-1'>
-            <Outlet />
-          </div>
-        </div>
-      </Main>
-    </>
-  )
-}
+import { User, Settings as SettingsIcon, Palette, Bell, Monitor } from 'lucide-react'
 
 const sidebarNavItems = [
   {
     title: 'Profile',
-    icon: <IconUser size={18} />,
     href: '/settings',
+    icon: <User className="w-4 h-4" />,
   },
   {
-    title: 'Account',
-    icon: <IconTool size={18} />,
+    title: 'Account', 
     href: '/settings/account',
+    icon: <SettingsIcon className="w-4 h-4" />,
   },
   {
     title: 'Appearance',
-    icon: <IconPalette size={18} />,
     href: '/settings/appearance',
+    icon: <Palette className="w-4 h-4" />,
   },
   {
     title: 'Notifications',
-    icon: <IconNotification size={18} />,
     href: '/settings/notifications',
+    icon: <Bell className="w-4 h-4" />,
   },
   {
     title: 'Display',
-    icon: <IconBrowserCheck size={18} />,
     href: '/settings/display',
+    icon: <Monitor className="w-4 h-4" />,
   },
 ]
+
+export default function Settings() {
+  return (
+    <ContentContainer>
+      <div className='space-y-6'>
+        <div>
+          <h3 className='text-lg font-medium'>Settings</h3>
+          <p className='text-sm text-muted-foreground'>
+            Manage your account settings and set e-mail preferences.
+          </p>
+        </div>
+        <Separator />
+        <div className='flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0'>
+          <aside className='-mx-4 lg:w-1/5'>
+            <SidebarNav items={sidebarNavItems} />
+          </aside>
+          <div className='flex-1 lg:max-w-2xl'>
+            <div className='space-y-6'>
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">Settings forms coming soon...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ContentContainer>
+  )
+}

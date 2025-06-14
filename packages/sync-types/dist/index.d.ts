@@ -14,9 +14,9 @@ interface TableChange {
     table: string;
     operation: 'insert' | 'update' | 'delete';
     data: Record<string, unknown>;
-    updated_at: string;
+    updatedAt: string;
     lsn?: string;
-    client_id?: string;
+    clientId?: string;
     relationshipUpdates?: RelationshipUpdate[];
     entityRelations?: string[];
 }
@@ -184,8 +184,8 @@ type Message = ServerMessage | ServerCatchupCompletedMessage | ServerLiveStartMe
  */
 interface RecordData {
     id: string;
-    client_id: string;
-    updated_at: string;
+    clientId: string;
+    updatedAt: string;
     [key: string]: unknown;
 }
 /**

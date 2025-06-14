@@ -16,12 +16,48 @@ import type { WebSocket } from '../types/cloudflare';
 import type { StateManager } from './state-manager';
 import type { InitialSyncState, WebSocketHandler } from './types';
 import { SERVER_DOMAIN_TABLES } from '@repo/dataforge/server-entities';
+import { NeonService } from '../lib/neon-orm/neon-service';
+import { RepositoryContainer } from '../domains/RepositoryContainer';
+import { transformPostgreSQLFields } from '../lib/sync-common';
 
 const MODULE_NAME = 'initial-sync';
 // Smaller chunk sizes help avoid overwhelming the client-side IndexedDB
 // and improve the reliability of the sync process
 const WS_CHUNK_SIZE = 500;  // Reduced from 2000 to 500 for better client performance
 const DEFAULT_CHUNK_SIZE = 500;  // Also reduced default chunk size for better performance
+
+/**
+ * Create a RepositoryContainer instance from context
+ * Helper function to initialize repository for initial-sync operations
+ */
+function createRepositoryContainer(context: MinimalContext): RepositoryContainer {
+  // Create a mock Hono context from MinimalContext (similar to EntityOperations pattern)
+  const stableRequestId = `sync-${context.env.DATABASE_URL?.slice(-10) || 'default'}`;
+  
+  const honoContext = {
+    req: { 
+      header: (name: string) => {
+        if (name === 'cf-request-id') {
+          return stableRequestId;
+        }
+        return undefined;
+      }
+    },
+    env: context.env,
+    finalized: false,
+    error: null,
+    get executionCtx() { return null; },
+    get event() { return null; },
+    var: {},
+    get: (key: string) => undefined,
+    set: (key: string, value: any) => {},
+    json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
+    text: (text: string) => Promise.resolve(new Response(text))
+  } as unknown as any;
+  
+  const neonService = new NeonService(honoContext);
+  return new RepositoryContainer(neonService);
+}
 
 type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
@@ -53,15 +89,20 @@ function cleanTableName(table: string): string {
 }
 
 /**
- * Convert table records to TableChange format
+ * Convert table records to TableChange format with PostgreSQL field transformations
  */
 function recordsToChanges(table: string, records: QueryResultRow[]): TableChange[] {
-  return records.map(record => ({
-    table: cleanTableName(table),
-    operation: 'insert' as const,
-    data: record,
-    updated_at: (record as any).updated_at?.toISOString() || new Date().toISOString()
-  }));
+  return records.map(record => {
+    // Transform PostgreSQL fields before creating TableChange
+    const transformedRecord = transformPostgreSQLFields(record, cleanTableName(table));
+    
+    return {
+      table: cleanTableName(table),
+      operation: 'insert' as const,
+      data: transformedRecord,
+      updatedAt: (transformedRecord as any).updated_at?.toISOString() || new Date().toISOString()
+    };
+  });
 }
 
 /**
@@ -73,42 +114,73 @@ async function getTableChunk<T extends QueryResultRow>(
   options: ChunkOptions = {}
 ): Promise<ChunkResult<T>> {
   const { chunkSize = DEFAULT_CHUNK_SIZE, cursor = null } = options;
-  
-  // Build the query with cursor
-  const query = `
-    SELECT *
-    FROM ${table}
-    ${cursor ? 'WHERE id > $1' : ''}
-    ORDER BY id ASC
-    LIMIT ${chunkSize + 1}
-  `;
-
-  // Create new client for this query
-  const client = getDBClient(context);
+  const cleanedTable = cleanTableName(table);
   
   try {
-    await client.connect();
+    // Try using repository first
+    const repositories = createRepositoryContainer(context);
+    const repository = repositories.getRepository(cleanedTable);
     
-    const result = await client.query<T>(
-      query,
-      cursor ? [cursor] : []
-    );
-
-    // Check if there are more records
-    const hasMore = result.rows.length > chunkSize;
-    const items = hasMore ? result.rows.slice(0, chunkSize) : result.rows;
-    const nextCursor = items.length > 0 ? items[items.length - 1].id : null;
-
-    return {
-      items,
-      nextCursor,
-      hasMore
-    };
+    if (repository) {
+      syncLogger.debug('Using repository for table chunk', { table: cleanedTable, cursor, chunkSize }, MODULE_NAME);
+      
+      const result = await repository.findWithCursor({
+        cursor,
+        limit: chunkSize,
+        orderBy: 'id' as any,
+        orderDirection: 'ASC'
+      });
+      
+      return {
+        items: result.items as T[],
+        nextCursor: result.nextCursor,
+        hasMore: result.hasMore
+      };
+    } else {
+      syncLogger.warn('No repository found for table, falling back to raw SQL', { table: cleanedTable }, MODULE_NAME);
+      throw new Error(`No repository for table ${cleanedTable}`);
+    }
   } catch (error) {
-    syncLogger.error('Database query error', { table: cleanTableName(table), error: error instanceof Error ? error.message : String(error) }, MODULE_NAME);
-    throw error;
-  } finally {
-    await client.end();
+    syncLogger.warn('Repository query failed, falling back to raw SQL', { 
+      table: cleanedTable, 
+      error: error instanceof Error ? error.message : String(error) 
+    }, MODULE_NAME);
+    
+    // Fallback to raw SQL
+    const query = `
+      SELECT *
+      FROM ${table}
+      ${cursor ? 'WHERE id > $1' : ''}
+      ORDER BY id ASC
+      LIMIT ${chunkSize + 1}
+    `;
+
+    const client = getDBClient(context);
+    
+    try {
+      await client.connect();
+      
+      const result = await client.query<T>(
+        query,
+        cursor ? [cursor] : []
+      );
+
+      // Check if there are more records
+      const hasMore = result.rows.length > chunkSize;
+      const items = hasMore ? result.rows.slice(0, chunkSize) : result.rows;
+      const nextCursor = items.length > 0 ? items[items.length - 1].id : null;
+
+      return {
+        items,
+        nextCursor,
+        hasMore
+      };
+    } catch (fallbackError) {
+      syncLogger.error('Database query error', { table: cleanedTable, error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) }, MODULE_NAME);
+      throw fallbackError;
+    } finally {
+      await client.end();
+    }
   }
 }
 
@@ -152,40 +224,84 @@ async function processTable(
   table: string,
   messageHandler: WebSocketHandler
 ): Promise<number> {
-  let totalRecords = 0;
+  const cleanedTable = cleanTableName(table);
   
-  // Process table in chunks
-  totalRecords = await processTableInChunks(
-    context,
-    table,
-    async (records, chunkNum, total) => {
-      const changes = recordsToChanges(table, records);
+  try {
+    // Try using repository for more efficient streaming
+    const repositories = createRepositoryContainer(context);
+    const repository = repositories.getRepository(cleanedTable);
+    
+    if (repository) {
+      syncLogger.debug('Using repository for table processing', { table: cleanedTable }, MODULE_NAME);
       
-      const initChangesMsg: ServerInitChangesMessage = {
-        type: 'srv_init_changes',
-        messageId: `srv_${Date.now()}`,
-        timestamp: Date.now(),
-        clientId,
-        changes,
-        sequence: {
-          table,
-          chunk: chunkNum,
-          total
+      return await repository.getAllInChunks({
+        chunkSize: WS_CHUNK_SIZE,
+        onChunk: async (records, chunkNum, totalProcessed) => {
+          const changes = recordsToChanges(table, records as QueryResultRow[]);
+          
+          const initChangesMsg: ServerInitChangesMessage = {
+            type: 'srv_init_changes',
+            messageId: `srv_${Date.now()}`,
+            timestamp: Date.now(),
+            clientId,
+            changes,
+            sequence: {
+              table: cleanedTable,
+              chunk: chunkNum,
+              total: totalProcessed
+            }
+          };
+          await messageHandler.send(initChangesMsg);
+          
+          // Wait for client to acknowledge receipt
+          await messageHandler.waitForMessage(
+            'clt_init_received',
+            (msg) => msg.table === cleanedTable && msg.chunk === chunkNum,
+            300000  // 5 minute timeout for large table chunks
+          );
         }
-      };
-      await messageHandler.send(initChangesMsg);
-      
-      // Wait for client to acknowledge receipt
-      await messageHandler.waitForMessage(
-        'clt_init_received',
-        (msg) => msg.table === table && msg.chunk === chunkNum,
-        300000  // 5 minute timeout for large table chunks
-      );
-    },
-    { chunkSize: WS_CHUNK_SIZE }
-  );
-  
-  return totalRecords;
+      });
+    } else {
+      syncLogger.warn('No repository found, falling back to legacy processing', { table: cleanedTable }, MODULE_NAME);
+      throw new Error(`No repository for table ${cleanedTable}`);
+    }
+  } catch (error) {
+    syncLogger.warn('Repository processing failed, falling back to legacy method', { 
+      table: cleanedTable, 
+      error: error instanceof Error ? error.message : String(error) 
+    }, MODULE_NAME);
+    
+    // Fallback to legacy processTableInChunks method
+    return await processTableInChunks(
+      context,
+      table,
+      async (records, chunkNum, total) => {
+        const changes = recordsToChanges(table, records);
+        
+        const initChangesMsg: ServerInitChangesMessage = {
+          type: 'srv_init_changes',
+          messageId: `srv_${Date.now()}`,
+          timestamp: Date.now(),
+          clientId,
+          changes,
+          sequence: {
+            table: cleanedTable,
+            chunk: chunkNum,
+            total
+          }
+        };
+        await messageHandler.send(initChangesMsg);
+        
+        // Wait for client to acknowledge receipt
+        await messageHandler.waitForMessage(
+          'clt_init_received',
+          (msg) => msg.table === cleanedTable && msg.chunk === chunkNum,
+          300000  // 5 minute timeout for large table chunks
+        );
+      },
+      { chunkSize: WS_CHUNK_SIZE }
+    );
+  }
 }
 
 /**

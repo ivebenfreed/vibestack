@@ -872,7 +872,8 @@ export class NewPGliteDriver implements Driver {
 
         // Handle different potential result formats from the query runner
         let resultRow: any;
-        console.log(">>> [createGeneratedMap] Received raw result:", JSON.stringify(insertResult, null, 2));
+        // Removed excessive logging - uncomment below for debugging if needed
+        // console.log(">>> [createGeneratedMap] Received raw result:", JSON.stringify(insertResult, null, 2));
 
         // Standard TypeORM result structure (QueryResult)
         if (insertResult.records && Array.isArray(insertResult.records) && insertResult.records.length > 0) {
@@ -889,11 +890,11 @@ export class NewPGliteDriver implements Driver {
         }
 
         if (!resultRow || typeof resultRow !== 'object') {
-            console.log(">>> [createGeneratedMap] Could not extract a valid result row.");
+            // console.log(">>> [createGeneratedMap] Could not extract a valid result row.");
             return undefined;
         }
 
-        console.log(">>> [createGeneratedMap] Processing resultRow:", JSON.stringify(resultRow));
+        // console.log(">>> [createGeneratedMap] Processing resultRow:", JSON.stringify(resultRow));
 
         const generatedMap = {} as ObjectLiteral;
 
@@ -908,19 +909,19 @@ export class NewPGliteDriver implements Driver {
 
                 if (columnMetadata) {
                     const value = resultRow[dbColumnName];
-                    console.log(`>>> [createGeneratedMap] Found match for DB col '${dbColumnName}' -> Entity prop '${columnMetadata.propertyName}'. Raw Value:`, value);
+                    // console.log(`>>> [createGeneratedMap] Found match for DB col '${dbColumnName}' -> Entity prop '${columnMetadata.propertyName}'. Raw Value:`, value);
                     if (value !== undefined && value !== null) {
                         // Use prepareHydratedValue to convert DB value back to JS value
                         try {
                             generatedMap[columnMetadata.propertyName] = this.prepareHydratedValue(value, columnMetadata);
-                            console.log(`>>> [createGeneratedMap]   Hydrated Value for ${columnMetadata.propertyName}:`, generatedMap[columnMetadata.propertyName]);
+                            // console.log(`>>> [createGeneratedMap]   Hydrated Value for ${columnMetadata.propertyName}:`, generatedMap[columnMetadata.propertyName]);
                         } catch (e) {
                              console.error(`>>> [createGeneratedMap] Error hydrating value for ${columnMetadata.propertyName}:`, e);
                              // Decide if we should assign raw value or skip
                              // generatedMap[columnMetadata.propertyName] = value; // Assign raw on error?
                         }
                     } else {
-                         console.log(`>>> [createGeneratedMap]   Value for ${dbColumnName} is undefined or null, skipping hydration.`);
+                         // console.log(`>>> [createGeneratedMap]   Value for ${dbColumnName} is undefined or null, skipping hydration.`);
                          // Assign null if that's the intended value and the property allows it
                          if (value === null && columnMetadata.isNullable) {
                              generatedMap[columnMetadata.propertyName] = null;
@@ -932,7 +933,7 @@ export class NewPGliteDriver implements Driver {
             }
         }
 
-        console.log(">>> [createGeneratedMap] Final generatedMap:", JSON.stringify(generatedMap));
+        // console.log(">>> [createGeneratedMap] Final generatedMap:", JSON.stringify(generatedMap));
         return generatedMap;
     }
 
@@ -967,7 +968,6 @@ export class NewPGliteDriver implements Driver {
      */
     isReturningSqlSupported(operation?: "insert" | "update" | "delete"): boolean { 
         // Always return true for all operations since PGlite supports RETURNING for all operations
-        console.log(`>>> [isReturningSqlSupported] Called for operation: ${operation || 'unknown'}`);
         return true;
     }
 

@@ -1,32 +1,36 @@
 /**
  * Cron Tester
  * 
- * This script sends periodic requests to the scheduled handler endpoint
+ * This script sends periodic requests to the replication initialization endpoint
  * to keep the replication DO active during local development.
  */
 const http = require('http');
 
 // Configuration
-const POLL_INTERVAL_MS = 60000; // 1 minute
+const POLL_INTERVAL_MS = 30000; // 30 seconds
 const INITIAL_DELAY_MS = 5000;  // 5 seconds before first trigger
 const SERVER_PORT = 8787;       // Default Cloudflare Workers port for wrangler dev
 
 /**
- * Triggers the scheduled handler endpoint
+ * Triggers the replication initialization endpoint directly
+ * This is more reliable than using the scheduled handler in local development
  */
 function triggerCron() {
   const options = {
     hostname: 'localhost',
     port: SERVER_PORT,
-    path: '/cdn-cgi/handler/scheduled',
-    method: 'GET'
+    path: '/api/replication/init', // Direct API endpoint instead of scheduled handler
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
   };
 
   const req = http.request(options, (res) => {
     const timestamp = new Date().toISOString();
-    console.log(`[CRON-TESTER] ${timestamp} - Triggered replication DO heartbeat - Status: ${res.statusCode}`);
+    console.log(`[CRON-TESTER] ${timestamp} - Triggered replication heartbeat - Status: ${res.statusCode}`);
     
-    // Optionally read and log the response body
+    // Read and log the response body
     let data = '';
     res.on('data', (chunk) => {
       data += chunk;
@@ -35,7 +39,13 @@ function triggerCron() {
       if (data) {
         try {
           const parsed = JSON.parse(data);
-          console.log(`[CRON-TESTER] Response: Success=${parsed.success}, AlreadyInitialized=${parsed.alreadyInitialized}`);
+          console.log(`[CRON-TESTER] Response: Success=${parsed.success}${parsed.alreadyInitialized ? ', AlreadyInitialized=true' : ''}${parsed.pollingStarted ? ', PollingStarted=true' : ''}`);
+          
+          // Log first WAL poll results if available
+          if (parsed.firstWALPoll) {
+            const wal = parsed.firstWALPoll;
+            console.log(`[CRON-TESTER] First WAL Poll: Changes=${wal.changesFound ? 'YES' : 'NO'}${wal.changesFound ? `, Count=${wal.changeCount}, WALEntries=${wal.walEntries}, Filtered=${wal.filteredCount}` : ''}${wal.error ? `, Error=${wal.error}` : ''}`);
+          }
         } catch (parseError) {
           console.error(`[CRON-TESTER] Failed to parse JSON response. Error: ${parseError.message}`);
           // Log the first 200 chars of the problematic data

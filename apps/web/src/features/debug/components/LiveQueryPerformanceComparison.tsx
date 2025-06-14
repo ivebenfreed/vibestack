@@ -49,6 +49,9 @@ export function LiveQueryPerformanceComparison() {
     incremental: null
   });
 
+  // Test mode state
+  const [testMode, setTestMode] = useState<'both' | 'regular' | 'incremental'>('both');
+
   // Performance metrics for both approaches
   const [regularMetrics, setRegularMetrics] = useState<PerformanceMetrics>({
     updateCount: 0,
@@ -74,6 +77,12 @@ export function LiveQueryPerformanceComparison() {
 
   // Initialize query builders when config changes
   useEffect(() => {
+    console.log('[LiveQueryPerformanceComparison] Config or services changed, rebuilding queries:', {
+      config,
+      servicesAvailable: !!services,
+      timestamp: Date.now()
+    });
+
     const initializeQueryBuilders = async () => {
       try {
         const dataSource = await getNewPGliteDataSource();
@@ -88,49 +97,54 @@ export function LiveQueryPerformanceComparison() {
           case 'tasks':
             regularQB = dataSource.getRepository(Task)
               .createQueryBuilder("task")
-              .orderBy("task.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("task.updatedAt", "DESC");
             incrementalQB = dataSource.getRepository(Task)
               .createQueryBuilder("task")
-              .orderBy("task.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("task.id", "ASC");
             break;
           case 'projects':
             regularQB = dataSource.getRepository(Project)
               .createQueryBuilder("project")
-              .orderBy("project.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("project.updatedAt", "DESC");
             incrementalQB = dataSource.getRepository(Project)
               .createQueryBuilder("project")
-              .orderBy("project.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("project.id", "ASC");
             break;
           case 'users':
             regularQB = dataSource.getRepository(User)
               .createQueryBuilder("user")
-              .orderBy("user.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("user.updatedAt", "DESC");
             incrementalQB = dataSource.getRepository(User)
               .createQueryBuilder("user")
-              .orderBy("user.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("user.id", "ASC");
             break;
           case 'comments':
             regularQB = dataSource.getRepository(Comment)
               .createQueryBuilder("comment")
-              .orderBy("comment.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("comment.updatedAt", "DESC");
             incrementalQB = dataSource.getRepository(Comment)
               .createQueryBuilder("comment")
-              .orderBy("comment.updatedAt", "DESC")
-              .limit(config.limit);
+              .orderBy("comment.id", "ASC");
             break;
         }
+
+        console.log('[LiveQueryPerformanceComparison] About to set new query builders');
 
         setQueryBuilders({
           regular: regularQB,
           incremental: incrementalQB
         });
+
+        // Debug: Log the actual SQL queries being used
+        if (regularQB && incrementalQB) {
+          console.log('[LiveQueryPerformanceComparison] Query setup complete:', {
+            entityType: config.entityType,
+            regularSQL: regularQB.getSql(),
+            incrementalSQL: incrementalQB.getSql(),
+            regularParams: regularQB.getParameters(),
+            incrementalParams: incrementalQB.getParameters()
+          });
+        }
 
         // Reset metrics when query changes
         const now = Date.now();
@@ -157,19 +171,24 @@ export function LiveQueryPerformanceComparison() {
     };
 
     if (services) {
-      initializeQueryBuilders();
+      // Add small delay to prevent rapid rebuilds
+      const timeoutId = setTimeout(initializeQueryBuilders, 100);
+      return () => clearTimeout(timeoutId);
     }
-  }, [config, services]);
+  }, [config.entityType, config.keyColumn, services]);
 
   // Hook for regular live query with performance tracking
+  const regularQuery = useMemo(() => queryBuilders.regular, [queryBuilders.regular]);
+  const incrementalQuery = useMemo(() => queryBuilders.incremental, [queryBuilders.incremental]);
+
   const { 
     data: regularData, 
     loading: regularLoading, 
     error: regularError 
   } = useLiveEntity<any>(
-    queryBuilders.regular,
+    regularQuery,
     { 
-      enabled: !!queryBuilders.regular,
+      enabled: !!regularQuery && (testMode === 'both' || testMode === 'regular'),
       transform: true 
     }
   );
@@ -180,10 +199,10 @@ export function LiveQueryPerformanceComparison() {
     loading: incrementalLoading, 
     error: incrementalError 
   } = useLiveEntityIncremental<any>(
-    queryBuilders.incremental,
+    incrementalQuery,
     config.keyColumn,
     { 
-      enabled: !!queryBuilders.incremental,
+      enabled: !!incrementalQuery && (testMode === 'both' || testMode === 'incremental'),
       transform: true 
     }
   );
@@ -191,14 +210,15 @@ export function LiveQueryPerformanceComparison() {
   // Debug logging for incremental hook
   useEffect(() => {
     console.log('[LiveQueryPerformanceComparison] Incremental hook debug:', {
-      incrementalQueryBuilder: !!queryBuilders.incremental,
+      testMode,
+      incrementalQueryBuilder: !!incrementalQuery,
       keyColumn: config.keyColumn,
-      enabled: !!queryBuilders.incremental,
+      enabled: !!incrementalQuery && (testMode === 'both' || testMode === 'incremental'),
       incrementalData: incrementalData?.length || 'null',
       incrementalLoading,
       incrementalError: incrementalError?.message || 'none'
     });
-  }, [queryBuilders.incremental, config.keyColumn, incrementalData, incrementalLoading, incrementalError]);
+  }, [testMode, incrementalQuery, config.keyColumn, incrementalData, incrementalLoading, incrementalError]);
 
   // Track performance metrics for regular query
   useEffect(() => {
@@ -275,13 +295,25 @@ export function LiveQueryPerformanceComparison() {
 
     try {
       // Mark the start time for both queries when we trigger an update
-      regularUpdateStartRef.current = Date.now();
-      incrementalUpdateStartRef.current = Date.now();
+      if (testMode === 'both' || testMode === 'regular') {
+        regularUpdateStartRef.current = Date.now();
+      }
+      if (testMode === 'both' || testMode === 'incremental') {
+        incrementalUpdateStartRef.current = Date.now();
+      }
+      
+      // Use data from whichever hook is active
+      const activeData = testMode === 'incremental' ? incrementalData : regularData;
+      
+      if (!activeData || activeData.length === 0) {
+        console.warn('No data available to trigger update');
+        return;
+      }
       
       switch (config.entityType) {
         case 'tasks':
-          if (services.tasks && regularData && regularData.length > 0) {
-            const randomTask = regularData[Math.floor(Math.random() * regularData.length)];
+          if (services.tasks) {
+            const randomTask = activeData[Math.floor(Math.random() * activeData.length)];
             await services.tasks.updateTask(randomTask.id, {
               title: `Updated Task ${Date.now()}`,
               description: 'Performance test update'
@@ -289,8 +321,8 @@ export function LiveQueryPerformanceComparison() {
           }
           break;
         case 'projects':
-          if (services.projects && regularData && regularData.length > 0) {
-            const randomProject = regularData[Math.floor(Math.random() * regularData.length)];
+          if (services.projects) {
+            const randomProject = activeData[Math.floor(Math.random() * activeData.length)];
             await services.projects.updateProject(randomProject.id, {
               name: `Updated Project ${Date.now()}`,
               description: 'Performance test update'
@@ -469,27 +501,61 @@ export function LiveQueryPerformanceComparison() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="testMode">Test Mode</Label>
+              <Select
+                value={testMode}
+                onValueChange={(value: 'both' | 'regular' | 'incremental') => setTestMode(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="both">Both Hooks (Compare)</SelectItem>
+                  <SelectItem value="regular">Regular Only</SelectItem>
+                  <SelectItem value="incremental">Incremental Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="flex gap-2">
             <Button onClick={createTestData}>Create Test Data</Button>
             <Button onClick={triggerTestUpdate} variant="outline">
-              Trigger Update
+              Trigger Update ({testMode === 'incremental' ? 'Incremental' : testMode === 'regular' ? 'Regular' : 'Both'})
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Performance Comparison */}
+      <Alert className="mb-6">
+        <AlertTitle>⚠️ Performance Testing Notes</AlertTitle>
+        <AlertDescription>
+          <div className="space-y-2">
+            <p><strong>Why are there so many changes?</strong></p>
+            <ul className="list-disc list-inside space-y-1 text-sm">
+              <li><strong>Sync System Interference:</strong> External database changes from the sync system invalidate PGlite's internal state tracking</li>
+              <li><strong>ORDER BY updatedAt Issues:</strong> When records are updated, they change position in ordered results, breaking incremental diffing</li>
+              <li><strong>Different Query Testing:</strong> Regular query uses <code>ORDER BY updatedAt DESC</code> (realistic), incremental uses <code>ORDER BY id ASC</code> (stable for testing)</li>
+            </ul>
+            <p className="text-sm font-semibold">Result: Incremental queries return full datasets instead of deltas, making them slower than regular queries.</p>
+          </div>
+        </AlertDescription>
+      </Alert>
+      
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {renderMetricsCard(
-          "Regular Live Query", 
+        {(testMode === 'both' || testMode === 'regular') && renderMetricsCard(
+          `Regular Live Query (ORDER BY updatedAt DESC)`, 
           regularMetrics, 
           regularLoading, 
           regularError, 
           regularData
         )}
         
-        {renderMetricsCard(
-          "Incremental Live Query", 
+        {(testMode === 'both' || testMode === 'incremental') && renderMetricsCard(
+          `Incremental Live Query (ORDER BY id ASC)`, 
           incrementalMetrics, 
           incrementalLoading, 
           incrementalError, 
@@ -498,39 +564,41 @@ export function LiveQueryPerformanceComparison() {
       </div>
 
       {/* Performance Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Performance Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">Update Count Difference</div>
-              <div className="text-2xl font-bold">
-                {incrementalMetrics.updateCount - regularMetrics.updateCount}
+      {testMode === 'both' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-sm text-muted-foreground">Update Count Difference</div>
+                <div className="text-2xl font-bold">
+                  {incrementalMetrics.updateCount - regularMetrics.updateCount}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-muted-foreground">Avg Time Difference</div>
+                <div className="text-2xl font-bold">
+                  {regularMetrics.avgUpdateTime > 0 && incrementalMetrics.avgUpdateTime > 0
+                    ? `${(regularMetrics.avgUpdateTime - incrementalMetrics.avgUpdateTime).toFixed(2)}ms`
+                    : 'N/A'
+                  }
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-muted-foreground">Performance Winner</div>
+                <div className="text-2xl font-bold">
+                  {regularMetrics.avgUpdateTime > 0 && incrementalMetrics.avgUpdateTime > 0
+                    ? (incrementalMetrics.avgUpdateTime < regularMetrics.avgUpdateTime ? 'Incremental' : 'Regular')
+                    : 'TBD'
+                  }
+                </div>
               </div>
             </div>
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">Avg Time Difference</div>
-              <div className="text-2xl font-bold">
-                {regularMetrics.avgUpdateTime > 0 && incrementalMetrics.avgUpdateTime > 0
-                  ? `${(regularMetrics.avgUpdateTime - incrementalMetrics.avgUpdateTime).toFixed(2)}ms`
-                  : 'N/A'
-                }
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">Performance Winner</div>
-              <div className="text-2xl font-bold">
-                {regularMetrics.avgUpdateTime > 0 && incrementalMetrics.avgUpdateTime > 0
-                  ? (incrementalMetrics.avgUpdateTime < regularMetrics.avgUpdateTime ? 'Incremental' : 'Regular')
-                  : 'TBD'
-                }
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 } 

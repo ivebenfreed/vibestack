@@ -50,6 +50,7 @@ export interface TypeORMColumnOptions {
   visibleColumns?: string[] | 'all'
   showIdColumn?: boolean // New option to control ID field visibility, defaults to false
   enableRowSelection?: boolean // Enable row selection column
+  optimisticUpdates?: boolean // Enable optimistic updates for editable cells (default true)
   columnOverrides?: {
     [key: string]: Partial<ColumnDef<any, any>>
   }
@@ -554,6 +555,7 @@ export function generateColumnsFromTypeORM<T>(
     visibleColumns = 'all',
     showIdColumn = false, // Default to false - ID columns hidden by default
     enableRowSelection = false, // Default to false - selection column disabled by default
+    optimisticUpdates = true, // Default to true - optimistic updates enabled by default
     columnOverrides = {},
     enumMappings = {},
     relationshipConfigs = {},
@@ -602,17 +604,17 @@ export function generateColumnsFromTypeORM<T>(
             />
           )
         } else if (column.type === 'boolean' || column.propertyType === 'boolean') {
-          columnDef.cell = (props) => <EditableCheckboxCell {...props} />
+          columnDef.cell = (props) => <EditableCheckboxCell {...props} optimisticUpdates={optimisticUpdates} />
         } else if (column.type === 'date' || column.propertyType === 'date' || column.type === 'datetime' || column.propertyType === 'datetime' ) {
-          columnDef.cell = (props) => <EditableDateCell {...props} />
+          columnDef.cell = (props) => <EditableDateCell {...props} optimisticUpdates={optimisticUpdates} />
         } else if (column.type === 'number' || column.propertyType === 'number' || column.type === 'int' || column.propertyType === 'int' || column.type === 'float' || column.propertyType === 'float') {
-          columnDef.cell = (props) => <EditableNumberCell {...props} />
+          columnDef.cell = (props) => <EditableNumberCell {...props} optimisticUpdates={optimisticUpdates} />
         } else if (enumMappings[column.propertyName]) {
           columnDef.cell = (props) => (
-            <EditableSelectCell {...props} options={enumMappings[column.propertyName]} />
+            <EditableSelectCell {...props} optimisticUpdates={optimisticUpdates} options={enumMappings[column.propertyName]} />
           )
         } else {
-          columnDef.cell = (props) => <EditableTextCell {...props} />
+          columnDef.cell = (props) => <EditableTextCell {...props} optimisticUpdates={optimisticUpdates} />
         }
       } else {
         // Non-editable columns

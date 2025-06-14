@@ -1,3 +1,4 @@
+import React from 'react'
 import {
   Sidebar,
   SidebarContent,
@@ -7,44 +8,67 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { NavGroup } from '@/components/layout/nav-group'
-import { sidebarData, getSidebarDataForSection } from './data/sidebar-data'
 import { AppLogoHeader } from './app-logo-header'
-import { useGlobalSidebar } from '@/contexts/global-sidebar-context'
+import { useLayoutStore } from '@/stores/layoutStore'
+import { useSidebarNavigation, useSidebarNavigationStats } from '@/stores/sidebarNavigationStore'
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  // Get the raw state directly from the sidebar context instead of using isCollapsed
+// 🎯 PERFORMANCE: Memoize the expensive sidebar component with React.memo comparison
+const AppSidebarInternal = React.memo(function AppSidebarInternal({ collapsible = 'icon', variant = 'floating', ...props }: React.ComponentProps<typeof Sidebar>) {
+  // Use Shadcn's sidebar state directly (no competing state)
   const { state } = useSidebar()
-  const { getActiveSectionData, activeSection, projects } = useGlobalSidebar()
   
-  // Derive isCollapsed from the state value, making sure it's a boolean
+  // Use layout store for section data only - ONLY use activeSection for content
+  // This prevents content from changing before route navigation completes
+  const activeSection = useLayoutStore.activeSection()
+  
+  // Derive isCollapsed from Shadcn's state
   const isCollapsed = state === 'collapsed'
   
-  // Get the active section data for dynamic content
-  const activeSectionData = getActiveSectionData()
-  // Use dynamic sidebar data that includes projects for the projects section
-  const navGroups = activeSection === 'projects' 
-    ? getSidebarDataForSection(activeSection, projects)
-    : (activeSectionData?.navGroups || sidebarData.navGroups)
+  // 🎯 PERFORMANCE: Get pre-computed navigation from XState hooks
+  const navigation = useSidebarNavigation()
+  const navGroups = navigation.sections[activeSection] || []
   
-  // Debug info to verify collapse state
-  console.log('Sidebar state:', state, 'isCollapsed:', isCollapsed)
-  console.log('Active section:', activeSectionData?.title, 'navGroups:', navGroups.length)
-  console.log('Projects count:', projects.length)
+  // 🎯 PERFORMANCE: Optional stats for debugging (pass navigation to avoid double computation)
+  const stats = useSidebarNavigationStats(navigation)
   
+
+  
+  // Debug logging removed - navigation is working correctly
+  
+  // Only log in dev mode and reduce frequency for cleaner logs
+  if (import.meta.env.DEV && Math.random() < 0.001) { // Reduced to 0.1% for navigation performance
+    console.log('[AppSidebar] Render cycle:', {
+      sidebarState: state,
+      isCollapsed,
+      activeSection,
+      collapsible,
+      projectsCount: stats.projectsCount,
+      navGroupsCount: navGroups.length,
+      totalNavItems: stats.totalNavItems
+    })
+  }
+
   return (
-    <Sidebar collapsible='icon' variant='floating' {...props}>
+    <Sidebar collapsible={collapsible} variant={variant} {...props}>
       <SidebarHeader>
         <AppLogoHeader isCollapsed={isCollapsed} />
       </SidebarHeader>
       <SidebarContent>
-        {navGroups.map((groupProps) => (
-          <NavGroup key={groupProps.title} {...groupProps} />
+        {navGroups.map((group, index) => (
+          <NavGroup key={`${group.title}-${index}`} {...group} />
         ))}
       </SidebarContent>
       <SidebarFooter>
-        {/* Settings icon moved to header */}
+        {/* Footer content goes here */}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  return prevProps.collapsible === nextProps.collapsible && 
+         prevProps.variant === nextProps.variant
+})
+
+// 🎯 PERFORMANCE: Export the memoized component
+export { AppSidebarInternal as AppSidebar }

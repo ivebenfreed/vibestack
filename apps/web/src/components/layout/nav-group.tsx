@@ -29,10 +29,12 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
 import { NavCollapsible, NavItem, NavLink, type NavGroup } from './types'
+import { SidebarProjectItem } from './sidebar-project-item'
 
 export function NavGroup({ title, items }: NavGroup) {
   const { state } = useSidebar()
   const href = useLocation({ select: (location) => location.href })
+  
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{title}</SidebarGroupLabel>
@@ -68,6 +70,10 @@ const NavBadge = ({ children }: { children: ReactNode }) => (
 
 const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
   const { setOpenMobile } = useSidebar()
+  
+  // Use intent-based preloading for project detail links (hover to preload)
+  const isProjectDetailLink = item.url?.includes('/projects/') && item.url.split('/').length > 2
+  
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -75,7 +81,11 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
         isActive={checkIsActive(href, item)}
         tooltip={item.title}
       >
-        <Link to={item.url} onClick={() => setOpenMobile(false)}>
+        <Link 
+          to={item.url} 
+          onClick={() => setOpenMobile(false)}
+          preload={isProjectDetailLink ? "intent" : undefined}
+        >
           {item.icon && <item.icon />}
           <span>{item.title}</span>
           {item.badge && <NavBadge>{item.badge}</NavBadge>}
@@ -93,6 +103,7 @@ const SidebarMenuCollapsible = ({
   href: string
 }) => {
   const { setOpenMobile } = useSidebar()
+  
   return (
     <Collapsible
       asChild
@@ -110,20 +121,39 @@ const SidebarMenuCollapsible = ({
         </CollapsibleTrigger>
         <CollapsibleContent className='CollapsibleContent'>
           <SidebarMenuSub>
-            {item.items.map((subItem) => (
-              <SidebarMenuSubItem key={subItem.title}>
-                <SidebarMenuSubButton
-                  asChild
-                  isActive={checkIsActive(href, subItem)}
-                >
-                  <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
-                    {subItem.icon && <subItem.icon />}
-                    <span>{subItem.title}</span>
-                    {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
-                  </Link>
-                </SidebarMenuSubButton>
-              </SidebarMenuSubItem>
-            ))}
+            {item.items.map((subItem) => {
+              // 🎯 ATOMIZED: Use individual project atoms for surgical updates
+              if (subItem.projectId) {
+                return (
+                  <SidebarProjectItem 
+                    key={subItem.projectId} 
+                    projectId={subItem.projectId} 
+                  />
+                )
+              }
+              
+              // Regular nav items (non-project)
+              const isProjectDetailLink = subItem.url?.includes('/projects/') && subItem.url.split('/').length > 2
+              
+              return (
+                <SidebarMenuSubItem key={`${subItem.title}-${subItem.url}`}>
+                  <SidebarMenuSubButton
+                    asChild
+                    isActive={checkIsActive(href, subItem)}
+                  >
+                    <Link 
+                      to={subItem.url} 
+                      onClick={() => setOpenMobile(false)}
+                      preload={isProjectDetailLink ? "intent" : undefined}
+                    >
+                      {subItem.icon && <subItem.icon />}
+                      <span>{subItem.title}</span>
+                      {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              )
+            })}
           </SidebarMenuSub>
         </CollapsibleContent>
       </SidebarMenuItem>
@@ -157,20 +187,26 @@ const SidebarMenuCollapsedDropdown = ({
             {item.title} {item.badge ? `(${item.badge})` : ''}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {item.items.map((sub) => (
-            <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
-              <Link
-                to={sub.url}
-                className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
-              >
-                {sub.icon && <sub.icon />}
-                <span className='max-w-52 text-wrap'>{sub.title}</span>
-                {sub.badge && (
-                  <span className='ml-auto text-xs'>{sub.badge}</span>
-                )}
-              </Link>
-            </DropdownMenuItem>
-          ))}
+          {item.items.map((sub) => {
+            // Use intent-based preloading for project detail links (hover to preload)
+            const isProjectDetailLink = sub.url?.includes('/projects/') && sub.url.split('/').length > 2
+            
+            return (
+              <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
+                <Link
+                  to={sub.url}
+                  className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
+                  preload={isProjectDetailLink ? "intent" : undefined}
+                >
+                  {sub.icon && <sub.icon />}
+                  <span className='max-w-52 text-wrap'>{sub.title}</span>
+                  {sub.badge && (
+                    <span className='ml-auto text-xs'>{sub.badge}</span>
+                  )}
+                </Link>
+              </DropdownMenuItem>
+            )
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </SidebarMenuItem>

@@ -7,12 +7,15 @@ export function DebugNavigation() {
     { path: '/debug/database', label: 'Database' },
     { path: '/debug/sync', label: 'Sync' },
     { path: '/debug/sync-changes', label: 'Sync Changes' },
+    { path: '/debug/sync-test', label: 'Sync Testing' },
     { path: '/debug/live-query', label: 'Live Query' },
     { path: '/debug/performance', label: 'Live Query Performance' },
     { path: '/debug/multi-query', label: 'Multi-Query Test' },
     { path: '/debug/data-table', label: 'Data Table' },
-    { path: '/debug/auth', label: 'Auth' },
+    { path: '/debug/data-table-v2', label: 'Data Table V2' },
+    { path: '/debug/data-table-atom', label: 'Data Table Atom' },
     { path: '/debug/typeorm-test', label: 'TypeORM Test' },
+    { path: '/debug/tasks-new-pattern', label: 'Tasks New Pattern' },
   ];
   
   return (

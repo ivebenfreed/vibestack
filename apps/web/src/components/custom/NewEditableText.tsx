@@ -116,7 +116,10 @@ const NewEditableText: React.FC<NewEditableTextProps> = ({
 
   // react-edit-text handles Escape for cancel by reverting to its own initial value for the edit session.
   // We can augment this with its onEditMode and onBlur if needed, but for now, its default is fine.
-  // Enter (single-line) and Ctrl/Meta+Enter (multiline) are handled by react-edit-text for save.
+  // NOTE: react-edit-text uses Ctrl/Meta+Enter for multiline save by default.
+  // To change this to Enter for save and Shift+Enter for new lines, we would need to 
+  // implement custom keyboard handling or use a different component.
+  // For now, keeping the library's default behavior: Enter (single-line) and Ctrl/Meta+Enter (multiline).
 
   const commonInputStyles =
     'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]';

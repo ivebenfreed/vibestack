@@ -1,12 +1,12 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarTrigger, SidebarContext } from '@/components/ui/sidebar'
 import { Search } from '@/components/search'
 import SyncStatusIcon from '../../features/sync/components/SyncStatusIcon'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { ProfileDropdown } from '@/components/profile-dropdown' // Changed NavUser to ProfileDropdown
-import { useGlobalSidebar } from '@/contexts/global-sidebar-context'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { useLayoutStore, shouldShowSidebarForSection } from '@/stores/layoutStore'
 import { GLOBAL_SIDEBAR_WIDTH } from './global-sidebar'
 
 export const HEADER_HEIGHT = 64 // pixels
@@ -23,8 +23,24 @@ export const Header = ({
   ...props
 }: HeaderProps) => {
   const [offset, setOffset] = React.useState(0)
-  const { shouldShowMainSidebar } = useGlobalSidebar()
-  const showSidebarTrigger = shouldShowMainSidebar()
+  const activeSection = useLayoutStore.activeSection()
+  const pendingSection = useLayoutStore.pendingSection()
+  
+  // Memoize effective section calculation
+  const effectiveSection = React.useMemo(() => 
+    pendingSection || activeSection, 
+    [pendingSection, activeSection]
+  )
+  
+  // Check if we're within a SidebarProvider context
+  const sidebarContext = React.useContext(SidebarContext)
+  const hasSidebarContext = !!sidebarContext
+  
+  // Memoize sidebar trigger visibility calculation
+  const showSidebarTrigger = React.useMemo(() => 
+    shouldShowSidebarForSection(effectiveSection) && hasSidebarContext,
+    [effectiveSection, hasSidebarContext]
+  )
 
   React.useEffect(() => {
     const onScroll = () => {
@@ -48,7 +64,6 @@ export const Header = ({
         className
       )}
       style={fixed ? { 
-        '--global-sidebar-width': `${GLOBAL_SIDEBAR_WIDTH}px`,
         height: 'var(--header-height)'
       } as React.CSSProperties : {
         height: 'var(--header-height)'

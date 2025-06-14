@@ -72,8 +72,17 @@ export function getSyncWebSocketUrl(): string {
     return `${PROD_WS_PROTOCOL}://${PREVIEW_API_HOST}/api/sync`;
   }
   
-  // Default to local development
-  return `${DEV_WS_PROTOCOL}://${DEV_API_HOST}/api/sync`;
+  // Default to local development using Vite proxy
+  try {
+    // Use the same origin as the current page (Vite will proxy to the server)
+    // This matches the behavior of getDefaultServerUrl() that was working before
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    return `${protocol}//${host}/api/sync`;
+  } catch (e) {
+    // Fallback for environments without window
+    return `${DEV_WS_PROTOCOL}://${DEV_API_HOST}/api/sync`;
+  }
 }
 
 /**
@@ -88,16 +97,16 @@ export function getSyncApiUrl(): string {
  */
 export const syncConfig = {
   // How often to send heartbeats to the server (ms)
-  heartbeatInterval: 30000,
+  heartbeatInterval: isProduction ? 30000 : 15000,
   
   // How long to wait before considering a connection dead (ms)
-  connectionTimeout: 60000,
+  connectionTimeout: isProduction ? 60000 : 30000,
   
   // Maximum reconnection attempts
-  maxReconnectAttempts: 10,
+  maxReconnectAttempts: isProduction ? 10 : 5,
   
   // Base reconnection delay before applying backoff (ms)
-  reconnectBaseDelay: 1000,
+  reconnectBaseDelay: isProduction ? 1000 : 500,
   
   // Whether to use UUIDs for primary keys
   useUuidKeys: true,
@@ -106,7 +115,7 @@ export const syncConfig = {
   syncMechanism: 'websocket',
   
   // How many operations to batch before sending to server
-  batchSize: 50,
+  batchSize: isProduction ? 50 : 25,
   
   // URLs
   webSocketUrl: getSyncWebSocketUrl(),
@@ -124,7 +133,8 @@ export function getDefaultServerUrl(): string {
   try {
     // Dynamically use the same protocol that the page is loaded with
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host || '127.0.0.1:8787';
+    // Use the same host as the current page (which includes Vite proxy)
+    const host = window.location.host;
     return `${protocol}//${host}/api/sync`;
   } catch (e) {
     // Fallback for environments without window

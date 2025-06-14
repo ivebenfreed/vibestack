@@ -2,6 +2,7 @@ import type { TableChange, RelationshipUpdate } from '@repo/sync-types';
 import { replicationLogger } from '../middleware/logger';
 import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';
+import { parsePostgreSQLValue } from '../lib/postgresql-type-parser';
 
 // Helper type for WAL change records
 type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
@@ -14,6 +15,8 @@ import {
   SERVER_JUNCTION_TABLE_MAPPING
 } from '@repo/dataforge/server-entities';
 import type { Env } from '../types/env';
+import { NeonService } from '../lib/neon-orm/neon-service';
+import { RepositoryContainer } from '../domains/RepositoryContainer';
 
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'process-changes';
@@ -60,33 +63,117 @@ async function getCurrentRelationshipIds(
   relationName: string
 ): Promise<string[]> {
   try {
-    // Find the junction table mapping for this relationship
-    const junctionTableName = Object.keys(SERVER_JUNCTION_TABLE_MAPPING).find(tableName => {
-      const mapping = (SERVER_JUNCTION_TABLE_MAPPING as any)[tableName];
-      return mapping.sourceTable === sourceTable && mapping.relationName === relationName;
-    });
+    // Import the relationship configuration helpers
+    const { getJunctionRelationships } = await import('@repo/dataforge/server-entities');
     
-    if (!junctionTableName) {
-      replicationLogger.warn('No junction table mapping found', {
-        sourceTable,
-        relationName
+    // Convert quoted table name to entity name (remove quotes, capitalize first letter)
+    const entityName = sourceTable.replace(/"/g, '').toLowerCase();
+    
+    replicationLogger.info('getCurrentRelationshipIds using repository methods', {
+      sourceTable,
+      entityName,
+      sourceId,
+      relationName
+    }, MODULE_NAME);
+    
+    // Get junction relationships for this entity
+    const junctionRelationships = getJunctionRelationships(entityName);
+    
+    // Find the specific relationship we're looking for
+    const relationshipConfig = junctionRelationships.find(rel => rel.relationName === relationName);
+    
+    if (!relationshipConfig) {
+      replicationLogger.warn('No junction relationship config found', {
+        entityName,
+        relationName,
+        availableRelationships: junctionRelationships.map(r => r.relationName)
       }, MODULE_NAME);
       return [];
     }
     
-    const mapping = (SERVER_JUNCTION_TABLE_MAPPING as any)[junctionTableName];
-    const client = getDBClient(context);
+    replicationLogger.info('Found junction relationship config', {
+      junctionTable: relationshipConfig.junctionTable,
+      sourceColumn: relationshipConfig.sourceColumn,
+      targetColumn: relationshipConfig.targetColumn,
+      targetEntity: relationshipConfig.targetEntity
+    }, MODULE_NAME);
     
-    const query = `
-      SELECT ${mapping.targetColumn} 
-      FROM ${junctionTableName.replace(/"/g, '')} 
-      WHERE ${mapping.sourceColumn} = $1
-    `;
+    // Use repository methods instead of raw SQL
+    const repositoryContainer = createRepositoryContainer(context);
+    let targetIds: string[] = [];
     
-    const result = await client.query(query, [sourceId]);
-    return result.rows.map(row => row[mapping.targetColumn]);
+    // Handle different entity types with their specific repository methods
+    switch (entityName) {
+      case 'projects':
+        if (relationName === 'members') {
+          const members = await repositoryContainer.projects.getMembers(sourceId);
+          targetIds = members.map(member => member.id);
+          replicationLogger.debug('Got project members via repository', {
+            projectId: sourceId,
+            memberCount: members.length,
+            memberIds: targetIds
+          }, MODULE_NAME);
+        }
+        break;
+        
+      case 'tasks':
+        if (relationName === 'dependencies') {
+          // For task dependencies, we need to implement a getDependencies method
+          // For now, fall back to the raw SQL as a temporary measure
+          replicationLogger.debug('Task dependencies not yet implemented via repository, using fallback', {
+            taskId: sourceId,
+            relationName
+          }, MODULE_NAME);
+          
+          const neonService = (repositoryContainer as any).neonService;
+          const query = `
+            SELECT ${relationshipConfig.targetColumn} 
+            FROM "${relationshipConfig.junctionTable}" 
+            WHERE ${relationshipConfig.sourceColumn} = $1
+          `;
+          
+          const result = await neonService.query(query, [sourceId]);
+          
+          // Handle different result formats from NeonService
+          let rows;
+          if (Array.isArray(result)) {
+            rows = result;
+          } else if (result && result.rows && Array.isArray(result.rows)) {
+            rows = result.rows;
+          } else if (result && Array.isArray(result.result)) {
+            rows = result.result;
+          } else {
+            replicationLogger.warn('Unexpected query result format for task dependencies', {
+              resultType: typeof result,
+              result: result
+            }, MODULE_NAME);
+            return [];
+          }
+          
+          targetIds = rows.map((row: any) => row[relationshipConfig.targetColumn]);
+        }
+        break;
+        
+      default:
+        replicationLogger.warn('Unsupported entity type for relationship query', {
+          entityName,
+          relationName,
+          supportedEntities: ['projects', 'tasks']
+        }, MODULE_NAME);
+        return [];
+    }
+    
+    replicationLogger.debug('Repository relationship query result', {
+      entityName,
+      sourceId,
+      relationName,
+      targetCount: targetIds.length,
+      targetIds: targetIds
+    }, MODULE_NAME);
+    
+    return targetIds;
   } catch (error) {
-    replicationLogger.error('Failed to get current relationship IDs', {
+    replicationLogger.error('Failed to get current relationship IDs via repository', {
       error: error instanceof Error ? error.message : String(error),
       sourceTable,
       sourceId,
@@ -135,7 +222,7 @@ async function transformJunctionTableChange(
         targetIds: currentTargetIds
       }],
       entityRelations: [junctionInfo.relationName],
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),  // Use camelCase as per TableChange interface
       lsn
     };
   } catch (error) {
@@ -306,7 +393,7 @@ export async function transformWALChanges(
 
         // Regular entity processing (existing logic)
         // Extract data efficiently
-        const data: Record<string, unknown> = {};
+        const snakeCaseData: Record<string, unknown> = {};
         
         // Column data extraction
         if (change.columnnames && Array.isArray(change.columnnames) && 
@@ -314,7 +401,13 @@ export async function transformWALChanges(
           const colCount = Math.min(change.columnnames.length, change.columnvalues.length);
           
           for (let i = 0; i < colCount; i++) {
-            data[change.columnnames[i]] = change.columnvalues[i];
+            const columnName = change.columnnames[i];
+            let columnValue = change.columnvalues[i];
+            
+            // Parse PostgreSQL-specific data types using comprehensive type detection
+            columnValue = parsePostgreSQLValue(columnName, columnValue, change.table);
+            
+            snakeCaseData[columnName] = columnValue;
           }
         }
         
@@ -325,22 +418,31 @@ export async function transformWALChanges(
           const keyCount = Math.min(change.oldkeys.keynames.length, change.oldkeys.keyvalues.length);
           
           for (let i = 0; i < keyCount; i++) {
-            data[change.oldkeys.keynames[i]] = change.oldkeys.keyvalues[i];
+            const keyName = change.oldkeys.keynames[i];
+            let keyValue = change.oldkeys.keyvalues[i];
+            
+            // Parse PostgreSQL-specific data types for oldkeys as well
+            keyValue = parsePostgreSQLValue(keyName, keyValue, change.table);
+            
+            snakeCaseData[keyName] = keyValue;
           }
         }
         
-        // Set timestamp - either from the data or current time
+        // Convert snake_case data to camelCase for TableChange format
+        const camelCaseData = convertSnakeToCamelCase(snakeCaseData);
+        
+        // Set timestamp - either from the data or current time (convert to camelCase)
         const timestamp = 
-          (data.updated_at as string) || 
+          (snakeCaseData.updated_at as string) || 
           new Date().toISOString();
 
-        // Add to result array
+        // Add to result array with proper TableChange format (camelCase)
         tableChanges.push({
           table: change.table,
           operation: change.kind,
-          data,
+          data: camelCaseData,
           lsn: wal.lsn,
-          updated_at: timestamp
+          updatedAt: timestamp  // Use camelCase as per TableChange interface
         });
       } catch (error) {
         // More focused error handling at the change level
@@ -361,7 +463,7 @@ export async function transformWALChanges(
       data: { id: entityId },
       relationshipUpdates: relUpdates,
       entityRelations: relUpdates.map(ru => ru.relationName),
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),  // Use camelCase as per TableChange interface
       lsn: changes[changes.length - 1]?.lsn // Use the last LSN from the batch
     });
   }
@@ -407,6 +509,54 @@ function addFilterReason(reasons: Record<string, number>, reason: string) {
   reasons[reason] = (reasons[reason] || 0) + 1;
 }
 
+// Helper function to convert snake_case to camelCase
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// Helper function to convert snake_case object keys to camelCase
+function convertSnakeToCamelCase(obj: Record<string, unknown>): Record<string, unknown> {
+  const converted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = snakeToCamel(key);
+    converted[camelKey] = value;
+  }
+  return converted;
+}
+
+/**
+ * Create a RepositoryContainer instance from context
+ * Helper function to initialize repository for replication operations
+ */
+function createRepositoryContainer(context: MinimalContext): RepositoryContainer {
+  // Create a mock Hono context from MinimalContext (similar to EntityOperations pattern)
+  const stableRequestId = `repl-${context.env.DATABASE_URL?.slice(-10) || 'default'}`;
+  
+  const honoContext = {
+    req: { 
+      header: (name: string) => {
+        if (name === 'cf-request-id') {
+          return stableRequestId;
+        }
+        return undefined;
+      }
+    },
+    env: context.env,
+    finalized: false,
+    error: null,
+    get executionCtx() { return null; },
+    get event() { return null; },
+    var: {},
+    get: (key: string) => undefined,
+    set: (key: string, value: any) => {},
+    json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
+    text: (text: string) => Promise.resolve(new Response(text))
+  } as unknown as any;
+  
+  const neonService = new NeonService(honoContext);
+  return new RepositoryContainer(neonService);
+}
+
 export async function storeChangesInHistory(
   context: MinimalContext, 
   changes: TableChange[],
@@ -436,100 +586,122 @@ export async function storeChangesInHistory(
     tables: tablesStr
   }, MODULE_NAME);
   
-  const client = getDBClient(context);
-  let connected = false;
-  
   try {
-    await client.connect();
-    connected = true;
+    // Try using repository first
+    const repositories = createRepositoryContainer(context);
+    const success = await repositories.changeHistory.bulkInsertChanges(changes, storeBatchSize);
     
-    // Use a single transaction for all batches
-    await client.query('BEGIN');
-    
-    // Track success count
-    let successCount = 0;
-    let failureCount = 0;
-    const totalBatches = Math.ceil(changes.length / storeBatchSize);
-    
-    for (let i = 0; i < changes.length; i += storeBatchSize) {
-      const batch = changes.slice(i, i + storeBatchSize);
-      
-      // Create a multi-row insert with parameterized values
-      const valueRows = batch.map((_, idx) => {
-        const base = idx * 5;
-        return `($${base + 1}, $${base + 2}, $${base + 3}::jsonb, $${base + 4}::pg_lsn, $${base + 5}::timestamptz)`;
-      }).join(',\n');
-      
-      const params: any[] = [];
-      batch.forEach(change => {
-        const timestamp = (change.data as any).updated_at || new Date().toISOString();
-        
-        params.push(
-          change.table,
-          change.operation,
-          JSON.stringify(change.data),
-          change.lsn,
-          timestamp
-        );
-      });
-      
-      // Execute the multi-row insert in a single query
-      const query = `
-        INSERT INTO change_history 
-          (table_name, operation, data, lsn, timestamp) 
-        VALUES 
-          ${valueRows};
-      `;
-      
-      try {
-        await client.query(query, params);
-        successCount += batch.length;
-      } catch (insertError) {
-        failureCount += batch.length;
-        replicationLogger.error('Batch insert error', {
-          batchSize: batch.length,
-          error: insertError instanceof Error ? insertError.message : String(insertError),
-          batchNumber: Math.floor(i / storeBatchSize) + 1
-        }, MODULE_NAME);
-        
-        // Continue with next batch - we'll commit what succeeded
-      }
+    if (success) {
+      return true;
+    } else {
+      replicationLogger.warn('Repository bulk insert returned false, falling back to raw SQL', {
+        count: changes.length
+      }, MODULE_NAME);
+      throw new Error('Repository bulk insert failed');
     }
-    
-    // Commit the transaction
-    await client.query('COMMIT');
-    
-    // Single log at end with summary results
-    replicationLogger.info('Changes stored', { 
-      success: successCount,
-      failed: failureCount,
-      totalBatches
-    }, MODULE_NAME);
-    
-    return successCount > 0;
   } catch (error) {
-    // If we have an open transaction, roll it back
-    if (connected) {
-      try {
-        await client.query('ROLLBACK');
-      } catch (rollbackError) {
-        // Ignore rollback errors
-      }
-    }
-    
-    replicationLogger.error('Store changes failed', {
-      count: changes.length,
-      error: error instanceof Error ? error.message : String(error)
+    replicationLogger.warn('Repository storage failed, falling back to raw SQL', { 
+      error: error instanceof Error ? error.message : String(error),
+      count: changes.length
     }, MODULE_NAME);
     
-    return false;
-  } finally {
-    // Always ensure we close the connection
-    if (connected) {
-      try {
-        await client.end();
-      } catch (endError) {
-        replicationLogger.error('DB connection close error', {}, MODULE_NAME);
+    // Fallback to raw SQL
+    const client = getDBClient(context);
+    let connected = false;
+    
+    try {
+      await client.connect();
+      connected = true;
+      
+      // Use a single transaction for all batches
+      await client.query('BEGIN');
+      
+      // Track success count
+      let successCount = 0;
+      let failureCount = 0;
+      const totalBatches = Math.ceil(changes.length / storeBatchSize);
+      
+      for (let i = 0; i < changes.length; i += storeBatchSize) {
+        const batch = changes.slice(i, i + storeBatchSize);
+        
+        // Create a multi-row insert with parameterized values
+        const valueRows = batch.map((_, idx) => {
+          const base = idx * 5;
+          return `($${base + 1}, $${base + 2}, $${base + 3}::jsonb, $${base + 4}::pg_lsn, $${base + 5}::timestamptz)`;
+        }).join(',\n');
+        
+        const params: any[] = [];
+        batch.forEach(change => {
+          // Now TableChange uses camelCase format - get timestamp from updatedAt field
+          const timestamp = change.updatedAt || new Date().toISOString();
+          
+          params.push(
+            change.table,
+            change.operation,
+            JSON.stringify(change.data), // This now contains camelCase data
+            change.lsn,
+            timestamp
+          );
+        });
+        
+        // Execute the multi-row insert in a single query
+        const query = `
+          INSERT INTO change_history 
+            (table_name, operation, data, lsn, timestamp) 
+          VALUES 
+            ${valueRows};
+        `;
+        
+        try {
+          await client.query(query, params);
+          successCount += batch.length;
+        } catch (insertError) {
+          failureCount += batch.length;
+          replicationLogger.error('Batch insert error', {
+            batchSize: batch.length,
+            error: insertError instanceof Error ? insertError.message : String(insertError),
+            batchNumber: Math.floor(i / storeBatchSize) + 1
+          }, MODULE_NAME);
+          
+          // Continue with next batch - we'll commit what succeeded
+        }
+      }
+      
+      // Commit the transaction
+      await client.query('COMMIT');
+      
+      // Single log at end with summary results
+      replicationLogger.info('Changes stored via fallback SQL', { 
+        success: successCount,
+        failed: failureCount,
+        totalBatches
+      }, MODULE_NAME);
+      
+      return successCount > 0;
+    } catch (fallbackError) {
+      // If we have an open transaction, roll it back
+      if (connected) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          // Ignore rollback errors
+        }
+      }
+      
+      replicationLogger.error('Fallback SQL storage also failed', {
+        count: changes.length,
+        error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+      }, MODULE_NAME);
+      
+      return false;
+    } finally {
+      // Always ensure we close the connection
+      if (connected) {
+        try {
+          await client.end();
+        } catch (endError) {
+          replicationLogger.error('DB connection close error', {}, MODULE_NAME);
+        }
       }
     }
   }

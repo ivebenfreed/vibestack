@@ -1,304 +1,329 @@
-import { QueryClient } from '@tanstack/react-query'
-import { createRootRouteWithContext, Outlet, useRouter, useLocation } from '@tanstack/react-router'
+// import { QueryClient } from '@tanstack/react-query' // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { Toaster } from '@/components/ui/sonner'
-import { NavigationProgress } from '@/components/navigation-progress'
 import GeneralError from '@/features/errors/general-error'
 import NotFoundError from '@/features/errors/not-found-error'
 import { useEffect, useState } from 'react'
-import { useAuthStore } from '@/stores/authStore' // Import Zustand store hook
-import { authClient } from '@/lib/auth' // Import authClient instead of useSession hook directly
-import { usePGliteContext } from '@/db/pglite-provider' // Import PGlite context
-import { useSyncContext } from '@/sync/SyncContext'   // Import Sync context
-import { Skeleton } from '@/components/ui/skeleton'
-import { SidebarMenuSkeleton } from '@/components/ui/sidebar'
+import { InitializationErrorBoundary } from '@/components/error-boundary'
+import { AuthAwareProviders } from '@/components/providers/AuthAwareProviders'
+import { Task, Project, User } from '@repo/dataforge/client-entities'
+import { useAuth } from '@/hooks/useSimpleAuth'
+import { authClient } from '@/lib/auth'
+import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
+import { usePGliteContext } from '@/db/pglite-provider'
+import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
+// 🔥 NEW: Import XState orchestrator
+import { createActor } from 'xstate'
+import { orchestrator } from '@/state-machines/orchestrator'
+import { OrchestratorProvider, useSystemReadiness } from '@/state-machines/orchestrator-hooks'
+import React from 'react'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 
-// Loading skeleton component for authentication
-function AuthLoadingSkeleton() {
-  return (
-    <div className="h-svh w-full flex flex-col p-4 md:p-8">
-      {/* App header skeleton */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center">
-          <Skeleton className="h-8 w-8 rounded-md mr-3" />
-          <Skeleton className="h-6 w-32" />
-        </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <Skeleton className="h-8 w-8 rounded-full" />
-        </div>
-      </div>
+// Router context interface with atom setters
+interface RouterContext {
+  // queryClient?: QueryClient // ❌ DISABLED: Made optional since we moved away from traditional queries per universal-reactive-data-pattern
+  setTaskAtoms: (tasks: Task[]) => void
+  setProjectAtoms: (projects: Project[]) => void
+  setUserAtoms: (users: User[]) => void
+}
+
+// 🔥 NEW: XState native persistence (simplified)
+const ORCHESTRATOR_STORAGE_KEY = 'orchestrator-state'
+
+const loadPersistedOrchestratorState = () => {
+  try {
+    const stored = localStorage.getItem(ORCHESTRATOR_STORAGE_KEY)
+    if (stored) {
+      const persistedSnapshot = JSON.parse(stored)
       
-      {/* Main content area skeleton */}
-      <div className="flex flex-1 gap-4">
-        {/* Sidebar skeleton */}
-        <div className="hidden md:flex flex-col w-60 gap-2 pr-4">
-          <Skeleton className="h-10 w-full mb-4" />
-          <SidebarMenuSkeleton showIcon={true} />
-          <SidebarMenuSkeleton showIcon={true} />
-          <SidebarMenuSkeleton showIcon={true} />
-          <SidebarMenuSkeleton showIcon={true} />
-          <SidebarMenuSkeleton showIcon={true} />
-          <div className="mt-4">
-            <SidebarMenuSkeleton showIcon={true} />
-            <SidebarMenuSkeleton showIcon={true} />
-          </div>
+      // Validate that persisted state has required structure
+      if (!persistedSnapshot.value || !persistedSnapshot.context) {
+        console.log('[XSTATE] Persisted state missing required structure, forcing clean start')
+        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+        return null
+      }
+      
+      // Validate that context has essential properties (only what we actually persist)
+      const ctx = persistedSnapshot.context
+      const hasRequiredContext = typeof ctx === 'object' && 
+                                 ctx !== null &&
+                                 typeof ctx.syncClientId === 'string' &&
+                                 ctx.syncState && 
+                                 typeof ctx.syncState.currentLSN === 'string'
+      
+      if (!hasRequiredContext) {
+        console.log('[XSTATE] Persisted state has corrupted context, forcing clean start')
+        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+        return null
+      }
+      
+      // Check age based on auth session expiry if available, otherwise fallback to 7 days
+      const sessionExpiry = persistedSnapshot.sessionExpiry
+      const lastActivity = ctx.lastActivity
+      const now = Date.now()
+      
+      // Use session expiry if available, otherwise default to 7 days
+      const maxAge = sessionExpiry ? 
+        new Date(sessionExpiry).getTime() - now : 
+        7 * 24 * 60 * 60 * 1000 // 7 days default
+      
+      if (sessionExpiry && now >= new Date(sessionExpiry).getTime()) {
+        console.log('[XSTATE] Persisted state expired with auth session, forcing clean start')
+        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+        return null
+      } else if (!sessionExpiry && lastActivity && (now - lastActivity) > maxAge) {
+        console.log('[XSTATE] Persisted state is stale (no session expiry), forcing clean start')
+        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+        return null
+      }
+      
+      console.log('[XSTATE] Loading valid persisted orchestrator state:', persistedSnapshot.value)
+      console.log(`[XSTATE] 📥 Restored LSN: ${persistedSnapshot.context?.syncState?.currentLSN}, ClientID: ${persistedSnapshot.context?.syncClientId}`)
+      return persistedSnapshot
+    }
+  } catch (error) {
+    console.warn('[XSTATE] Failed to parse persisted state, forcing clean start:', error)
+    localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+  }
+  return null
+}
+
+const saveOrchestratorState = async (snapshot: any) => {
+  try {
+    // Only persist if we have a complete, valid snapshot
+    if (!snapshot || !snapshot.context || !snapshot.value) {
+      console.warn('[XSTATE] Skipping save - incomplete snapshot')
+      return
+    }
+    
+    const ctx = snapshot.context
+    
+    // Only persist meaningful states with complete context (only what we actually persist)
+    const hasValidContext = typeof ctx.syncClientId === 'string' &&
+                           ctx.syncState &&
+                           typeof ctx.syncState.currentLSN === 'string'
+    
+    if (!hasValidContext) {
+      console.warn('[XSTATE] Skipping save - incomplete context')
+      return
+    }
+    
+    // Only persist stable states (not transient loading states)
+    const isPersistableState = ctx.user || 
+                              snapshot.value === 'initializing.auth.unauthenticated' ||
+                              ctx.isDatabaseInitialized
+
+    if (isPersistableState) {
+      // Use session expiry from orchestrator context instead of making additional HTTP requests
+      // The orchestrator already captured this from the checkAuth actor
+      const sessionExpiry = ctx.sessionExpiry
+      
+      // Persist complete, validated state with session expiry
+      const stateToPersist = {
+        value: 'initializing', // 🔥 ALWAYS START WITH INITIALIZATION - don't persist machine state
+        context: {
+          // 🔥 PERSIST: Auth state (needed for route guards)
+          user: ctx.user || null,
+          authToken: ctx.authToken || null,
+          authError: ctx.authError || null,
+          sessionExpiry: ctx.sessionExpiry || null,
+          
+          // 🚫 DON'T PERSIST: System state flags (these should reset on each app start)
+          // isDatabaseInitialized: false, // Always reset
+          // isSystemReady: false, // Always reset  
+          // isOnline: navigator.onLine, // Always use current status
+          // isSyncLive: false, // Always reset
+          // liveChangesActive: false, // Always reset
+          
+          lastActivity: Date.now(), // Update to current time
+          
+          // 🔥 PERSIST: Sync client metadata (needed for continuity)
+          syncClientId: ctx.syncClientId,
+          syncPendingChangesCount: ctx.syncPendingChangesCount || 0,
+          syncLastSyncTime: ctx.syncLastSyncTime,
+          
+          // 🔥 PERSIST: Only the LSN from sync state (the critical piece for avoiding re-sync)
+          syncState: {
+            phase: null, // Reset - will be determined fresh
+            progress: 0, // Reset
+            currentLSN: ctx.syncState?.currentLSN || '0/0', // 🔥 PRESERVE LSN!
+            error: null, // Reset
+            machineState: 'idle', // Reset
+            phaseProgress: {
+              initial: { completedTables: 0, totalTables: 0, currentTable: null, tablesRemaining: [] },
+              catchup: { batchesProcessed: 0, changesProcessed: 0, estimatedRemaining: 0 },
+              live: { messagesProcessed: 0, lastActivity: null, throughputPerSec: 0 }
+            }
+          }
+        },
+        sessionExpiry, // Include session expiry for TTL management
+      }
+      localStorage.setItem(ORCHESTRATOR_STORAGE_KEY, JSON.stringify(stateToPersist))
+      const ttlInfo = sessionExpiry ? `expires with session at ${sessionExpiry}` : 'no session expiry'
+      console.log(`[XSTATE] Persisted complete orchestrator state: ${stateToPersist.value} (${ttlInfo})`)
+      console.log(`[XSTATE] 💾 Persisted LSN: ${stateToPersist.context.syncState.currentLSN}, ClientID: ${stateToPersist.context.syncClientId}`)
+    }
+  } catch (error) {
+    console.warn('[XSTATE] Failed to persist orchestrator state:', error)
+  }
+}
+
+// Create the orchestrator actor with built-in state restoration
+const persistedSnapshot = loadPersistedOrchestratorState()
+
+console.log('[XSTATE] Creating orchestrator actor with persistence support...')
+const orchestratorActor = createActor(orchestrator, {
+  input: { snapshot: persistedSnapshot }
+})
+
+// Start the orchestrator
+orchestratorActor.start()
+
+// Subscribe to state changes for persistence
+orchestratorActor.subscribe((snapshot) => {
+  saveOrchestratorState(snapshot)
+})
+
+// Make orchestrator globally accessible for auth guards
+;(window as any).orchestratorActor = orchestratorActor
+
+// Clear persisted state on sign-out events
+window.addEventListener('auth:signout', () => {
+  console.log('[XSTATE] Clearing persisted state on sign-out')
+  localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+})
+
+// Note: DB_INIT_START is sent from AuthAwareProviders when user is authenticated
+// and PGlite Provider is actually mounted to handle the database events
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  // 🎯 LOADING COMPONENT: Show loading during navigation (intent preloading)
+  pendingComponent: () => (
+    <div className="h-svh w-full flex items-center justify-center">
+      <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <h1 className="text-xl font-semibold">Loading Page</h1>
         </div>
-        
-        {/* Main content skeleton */}
-        <div className="flex-1">
-          <Skeleton className="h-8 w-1/3 mb-4" />
-          <Skeleton className="h-32 w-full mb-4" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-28 w-full" />
-          </div>
-          <div className="grid grid-cols-1 gap-2">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
+        <div className="text-center space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">
+            Loading components...
+          </p>
+          <p className="text-xs text-muted-foreground">
+            This will be faster next time
+          </p>
         </div>
       </div>
     </div>
-  );
-}
-
-export const Route = createRootRouteWithContext<{
-  queryClient: QueryClient
-}>()({
+  ),
   component: function RootComponent() {
-    // Get actions and state from Zustand store
-    const {
-      setAuthenticated,
-      setUnauthenticated,
-      setLoading,
-      isAuthenticated,
-      isLoading: isAuthLoading, // Renamed to avoid conflict
-      sessionExpiresAt,
-      isSessionExpired,
-      updateSessionExpiry
-    } = useAuthStore();
-
-    // Get PGlite context states
-    const {
-      isReady: isDbReady,
-      isLoading: isDbLoading,
-      error: dbError
-    } = usePGliteContext();
-
-    // Get Sync context states
-    const {
-      isLoading: isSyncManagerInitializing, // Renamed for clarity
-      syncState,
-      lsn
-      // syncError is not available in SyncContext, omitting for now
-    } = useSyncContext();
-    
-    // Get router for navigation
-    const router = useRouter();
-    
-    // Get current location
-    const location = useLocation();
-
-    // Check online status
-    const [isOnline, setIsOnline] = useState(navigator.onLine);
-    
-    // Listen for online/offline events
-    useEffect(() => {
-      const handleOnline = () => setIsOnline(true);
-      const handleOffline = () => setIsOnline(false);
-      
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-      
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }, []);
-
-    // Use Better Auth session hook via the client instance
-    const { data: sessionData, isPending, error: sessionError } = authClient.useSession();
-    
-    // Handle redirection for authenticated users on auth pages
-    useEffect(() => {
-      if (isAuthenticated && !isAuthLoading) {
-        // If we're authenticated but on an auth page, redirect to dashboard
-        const currentPath = location.pathname;
-        if (currentPath === '/sign-in' || currentPath === '/sign-up' ||
-            currentPath === '/sign-in-2' || currentPath === '/forgot-password') {
-          console.log('[AUTH] Detected authenticated user on auth page, redirecting to dashboard');
-          router.navigate({ to: '/', replace: true });
-        }
-      }
-    }, [isAuthenticated, isAuthLoading, location.pathname, router]);
-  
-    useEffect(() => {
-      console.log(`[AUTH] RootComponent effect: Session isPending=${isPending}, Store isLoading=${isAuthLoading}, Error=${sessionError}, Online=${isOnline}`);
-  
-      if (isPending) {
-        // We are waiting for the session check
-        if (!isOnline && isAuthenticated && !isSessionExpired()) {
-          // Offline with a valid cached session, show content immediately.
-          if (isAuthLoading) { // Only change if currently true
-            console.log("[AUTH] Offline & Pending: Using cached session, setting loading to false.");
-            setLoading(false);
-          }
-        } else {
-          // Online, or offline without a valid cache. We must wait for the session check.
-          if (!isAuthLoading) { // Only change if currently false and we need to load
-            setLoading(true);
-          }
-        }
-      } else { // Session check is NOT pending (!isPending)
-        // Logic for when session check has completed (successfully or with error)
-        if (sessionError) {
-          console.error("[AUTH] Session check error:", sessionError);
-          
-          // CRITICAL OFFLINE HANDLING:
-          // If we are offline AND we have a persisted authenticated session that's not expired,
-          // we should trust the persisted state and NOT set unauthenticated due to a network error.
-          if (!isOnline && useAuthStore.getState().isAuthenticated && !useAuthStore.getState().isSessionExpired()) {
-            console.log("[AUTH] Offline: Server check failed but cached session is valid. Maintaining auth state.");
-            if (isAuthLoading) setLoading(false); // Ensure loading is false
-          } else {
-            // Online with an error, or offline without a valid cached session:
-            // This implies a real authentication issue or an expired/missing offline session.
-            if (useAuthStore.getState().isAuthenticated || useAuthStore.getState().isLoading) {
-              console.log("[AUTH] Session error implies unauthenticated (or offline with no/invalid cache). Setting store state.");
-              setUnauthenticated();
-            } else if (isAuthLoading) { // If already unauth but was loading
-              setLoading(false);
-            }
-          }
-        } else if (sessionData?.user) {
-          // Handle successful authentication
-          let sessionExpiryString: string | null = null;
-          if (sessionData.session?.expiresAt) {
-            if (sessionData.session.expiresAt instanceof Date) {
-              sessionExpiryString = sessionData.session.expiresAt.toISOString();
-            } else if (typeof sessionData.session.expiresAt === 'string') {
-              sessionExpiryString = sessionData.session.expiresAt;
-            }
-          }
-          
-          if (!isAuthenticated || isAuthLoading || useAuthStore.getState().user?.id !== sessionData.user.id) {
-            console.log("[AUTH] Session data received. Setting authenticated state.", sessionData.user);
-            setAuthenticated(
-              { id: sessionData.user.id, email: sessionData.user.email, role: (sessionData.user as any).role ?? null },
-              sessionExpiryString
-            );
-          } else if (sessionExpiryString && sessionExpiresAt !== sessionExpiryString) {
-            console.log("[AUTH] Session expiry updated:", sessionExpiryString);
-            updateSessionExpiry(sessionExpiryString);
-          } else {
-            if (isAuthLoading) setLoading(false);
-          }
-        } else {
-          // No sessionError, but no sessionData.user (e.g., valid response, but user is not logged in)
-          // This means the user is genuinely not authenticated on the server.
-          if (isAuthenticated || isAuthLoading) {
-            console.log("[AUTH] Session check successful but no user data (unauthenticated). Setting store state.");
-            setUnauthenticated();
-          } else if (isAuthLoading) { // If already unauth but was loading
-             setLoading(false);
-          }
-        }
-      }
-    }, [
-      sessionData,
-      isPending,
-      sessionError,
-      isOnline,
-      setAuthenticated,
-      setUnauthenticated,
-      setLoading,
-      isAuthenticated,
-      isAuthLoading, // Updated
-      isSessionExpired,
-      sessionExpiresAt,
-      updateSessionExpiry
-    ]);
-
-    // 1. Check for critical errors first
-    if (dbError) {
-      // You can create a more sophisticated error component later
-      return (
-        <div className="flex flex-col items-center justify-center h-screen p-4 text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-2">Database Error</h1>
-          <p className="text-lg mb-4">The application database failed to initialize.</p>
-          <p className="text-sm text-muted-foreground mb-6">Details: {dbError.message || 'Unknown database error'}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-          >
-            Try Refreshing
-          </button>
-        </div>
-      );
-    }
-    // Add syncError check here if it becomes available and is critical
-    // if (syncError) { ... }
-
-    // 2. If authenticated, decide between app skeleton or actual app
-    if (isAuthenticated) {
-        // User is authenticated. Now check if DB or Sync systems are still loading.
-        const isNewSyncSession = lsn === '0/0';
-        let showAppSkeleton = false;
-
-        // Core initializations for the authenticated app state
-        if (isAuthLoading || isDbLoading || !isDbReady || isSyncManagerInitializing) {
-            showAppSkeleton = true;
-        } else if (isNewSyncSession && (syncState === 'initial_sync' || syncState === 'connecting')) {
-            // Specific condition for new sync session's initial phases
-            showAppSkeleton = true;
-        }
-
-        if (showAppSkeleton) {
-            return <AuthLoadingSkeleton />;
-        } else {
-            // Authenticated and all essential services ready for the main app
-            return (
-              <>
-                <div className="flex flex-col min-h-screen">
-                  <NavigationProgress />
-                  <div className="flex flex-1 relative">
-                    <div className="flex-1">
-                      <Outlet /> {/* Main authenticated app content */}
-                    </div>
-                  </div>
-                </div>
-                <Toaster duration={3000} />
-                {import.meta.env.MODE === 'development' && (
-                  <>
-                    <TanStackRouterDevtools position='bottom-right' />
-                  </>
-                )}
-              </>
-            );
-        }
-    }
-
-    // 3. Not authenticated (this includes the initial state where auth is still loading,
-    //    and isAuthLoading from the store might be true).
-    //    Render public routes (e.g., /sign-in). The Outlet will handle this.
-    //    The useEffect for auth state (lines 137-222) manages isAuthLoading and isAuthenticated.
-    //    If isAuthLoading is true and isAuthenticated is false, this path is taken,
-    //    allowing public routes to render without the main app's AuthLoadingSkeleton.
     return (
-      <>
-        <div className="flex flex-col min-h-screen">
-          <div className="flex flex-1 relative">
-            <div className="flex-1">
-              <Outlet />
-            </div>
-          </div>
-        </div>
-        <Toaster duration={3000} />
-      </>
+      <InitializationErrorBoundary>
+        {/* 🔥 NEW: Provide XState orchestrator at the top level */}
+        <OrchestratorProvider actor={orchestratorActor}>
+          <RootComponentInternal />
+        </OrchestratorProvider>
+      </InitializationErrorBoundary>
     );
   },
   notFoundComponent: NotFoundError,
   errorComponent: GeneralError,
-})
+});
+
+function RootComponentInternal() {
+  const { isAuthenticated } = useAuth()
+  
+  // Simple online/offline detection 
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  return (
+    <AuthAwareProviders>
+      <AppWithInitialization />
+    </AuthAwareProviders>
+  )
+}
+
+function AppWithInitialization() {
+  // 🔥 NEW: Use orchestrator system coordination  
+  const { isAuthenticated } = useAuth()
+  const { isSystemReady, canLoadRoutes, readinessChecks } = useSystemReadiness()
+  const navigate = useNavigate()
+  const router = useRouter()
+  
+  // 🔥 NEW: Listen for auth state changes to handle navigation
+  React.useEffect(() => {
+    const handleAuthStateChange = (event: CustomEvent) => {
+      const { authenticated, reason } = event.detail
+      console.log('[Root] Auth state changed:', { authenticated, reason })
+      
+      if (!authenticated && reason === 'sign-out') {
+        console.log('[Root] Sign-out detected, checking current route...')
+        const currentPath = window.location.pathname
+        
+        // If on an authenticated route, redirect to sign-in
+        if (currentPath.startsWith('/_authenticated') || currentPath === '/') {
+          console.log('[Root] Redirecting to sign-in after sign-out')
+          navigate({ 
+            to: '/sign-in', 
+            search: { redirect: currentPath },
+            replace: true 
+          })
+        }
+      }
+    }
+    
+    window.addEventListener('auth:state-changed', handleAuthStateChange as EventListener)
+    
+    return () => {
+      window.removeEventListener('auth:state-changed', handleAuthStateChange as EventListener)
+    }
+  }, [navigate])
+  
+  // 🔥 DEBUG: Log orchestrator state in development (only on changes)
+  const prevStateRef = React.useRef<string>('')
+  React.useEffect(() => {
+    if (import.meta.env.MODE === 'development') {
+      const currentState = JSON.stringify({
+        isSystemReady,
+        canLoadRoutes,
+        isAuthenticated
+      })
+      
+      // Only log if state actually changed
+      if (currentState !== prevStateRef.current) {
+        console.log('[Orchestrator Debug] System state changed:', {
+          isSystemReady,
+          canLoadRoutes,
+          readinessChecks,
+          isAuthenticated
+        });
+        prevStateRef.current = currentState
+      }
+    }
+  }, [isSystemReady, canLoadRoutes, readinessChecks, isAuthenticated]);
+  
+  // Remove UnifiedLoadingScreen from root - it should only be on authenticated routes
+  return (
+    <>
+      <Outlet />
+      <Toaster duration={3000} />
+      {import.meta.env.MODE === 'development' && (
+        <TanStackRouterDevtools position='bottom-right' />
+      )}
+    </>
+  )
+}

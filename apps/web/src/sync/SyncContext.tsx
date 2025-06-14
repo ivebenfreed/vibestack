@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { SyncManager } from './SyncManager';
-import { SyncStatus } from './interfaces';
+import type { SyncStatus } from './interfaces';
 import { getSyncWebSocketUrl } from './config';
-import { usePGliteContext } from '../db/pglite-provider';
+import { useAppState } from '@/state-machines/hooks';
 
 // Define props for the SyncProvider component
 interface SyncProviderProps {
@@ -31,24 +31,10 @@ export interface SyncContextState {
 }
 
 // Create context with default values
-const SyncContext = createContext<SyncContextState>({
-  isConnected: false,
-  syncState: 'disconnected' as SyncStatus,
-  lsn: '0/0',
-  pendingChanges: 0,
-  lastSyncTime: null,
-  clientId: '',
-  connect: async () => false,
-  disconnect: () => {},
-  resetLSN: async () => {},
-  serverUrl: '',
-  setServerUrl: () => {},
-  isLoading: true,
-  isSyncManagerReady: false, // Added default for SyncManager status
-  processQueuedChanges: async () => {},
-  setAutoConnect: () => {},
-  resyncAllEntities: async () => 0
-});
+const SyncContext = createContext<SyncContextState | undefined>(undefined);
+
+// ⚡ PERFORMANCE: Initialize managers early
+let _manager: SyncManager | null = null;
 
 // Provider component
 export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnect = true }) => {
@@ -57,8 +43,8 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
   const [syncManager, setSyncManager] = useState<SyncManager | null>(null);
   const [isSyncManagerReady, setIsSyncManagerReady] = useState(false); // Added state for SyncManager readiness
   
-  // Use the PGlite context to check database status
-  const { isReady: isDatabaseReady, isLoading: isDatabaseLoading } = usePGliteContext();
+  // Use XState for database readiness instead of usePGliteContext
+  const { isDatabaseReady, send } = useAppState();
   
   // Initialize sync managers only after database is ready
   useEffect(() => {
@@ -128,52 +114,162 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
     });
   };
   
-  // Initialize sync system and set up listeners when syncManager is available
+  // Set up sync context state and listeners when syncManager is available
   useEffect(() => {
     if (!syncManager) return;
     
-    console.log('SyncContext: Starting initialization sequence with SyncManager');
+    console.log('SyncContext: Setting up React state management for already-initialized SyncManager');
     
-    // Initialize the sync manager asynchronously 
-    const init = async () => {
+    // Since PGliteProvider has already initialized SyncManager, just set up React state
+    const setupStateManagement = async () => {
       try {
-        // Wait for sync manager to fully initialize
-        await syncManager.initialize();
-        setIsSyncManagerReady(true); // SyncManager is now ready
+        // Verify SyncManager is initialized (it should be, since PGliteProvider finished)
+        if (!syncManager.getIsInitialized()) {
+          console.error('SyncContext: Expected SyncManager to be initialized by PGliteProvider, but it is not');
+          setIsSyncManagerReady(false);
+          setIsLoading(false);
+          return;
+        }
         
-        // Set our initial state now that everything is initialized
-        latestSyncState.current = syncManager.getStatus();
-        latestLSN.current = syncManager.getLSN();
-        latestConnected.current = syncManager.isConnected();
-        latestClientId.current = syncManager.getClientId();
-        latestPendingChanges.current = syncManager.getPendingChangesCount();
+        console.log('SyncContext: SyncManager is initialized, setting up React state management');
+        setIsSyncManagerReady(true);
         
-        console.log(`SyncContext: Context initialization complete - clientId: ${latestClientId.current}, LSN: ${latestLSN.current}`);
+        // Use multiple async chunks to avoid blocking React's message handler
+        setTimeout(() => {
+          try {
+            // Read state in small chunks with yields between each call
+            const readStateAsync = async () => {
+              latestSyncState.current = syncManager.getStatus();
+              await new Promise(resolve => setTimeout(resolve, 0));
+              
+              latestLSN.current = syncManager.getLSN();
+              await new Promise(resolve => setTimeout(resolve, 0));
+              
+              latestConnected.current = syncManager.isConnected();
+              await new Promise(resolve => setTimeout(resolve, 0));
+              
+              latestClientId.current = syncManager.getClientId();
+              await new Promise(resolve => setTimeout(resolve, 0));
+              
+              latestPendingChanges.current = syncManager.getPendingChangesCount();
+              
+              console.log(`SyncContext: Context initialization complete - clientId: ${latestClientId.current}, LSN: ${latestLSN.current}`);
+              
+              updateState(true);
+              setIsLoading(false);
+            };
+            
+            readStateAsync().catch((stateError) => {
+              console.error('SyncContext: Error reading initial state:', stateError);
+              setIsLoading(false);
+            });
+          } catch (stateError) {
+            console.error('SyncContext: Error setting up async state reading:', stateError);
+            setIsLoading(false);
+          }
+        }, 0);
         
-        updateState(true);
-        setIsLoading(false);
+      } catch (error) {
+        console.error('SyncContext: Error during initialization', error);
         
+        // During HMR, the SyncManager might already be initialized
+        if (import.meta.hot && error instanceof Error && 
+            (error.message.includes('Already initialized') || 
+             error.message.includes('already initialized') ||
+             error.message.includes('Shared datasource must be set'))) {
+          console.log('SyncContext: HMR detected - attempting to proceed with existing SyncManager state');
+          
+          try {
+            // Use async chunks for HMR state reading as well
+            setTimeout(() => {
+              try {
+                const readHMRStateAsync = async () => {
+                  // Try to get the current state from SyncManager in chunks
+                  const clientId = syncManager.getClientId();
+                  await new Promise(resolve => setTimeout(resolve, 0));
+                  
+                  const lsn = syncManager.getLSN();
+                  await new Promise(resolve => setTimeout(resolve, 0));
+                  
+                  if (clientId && lsn) {
+                    console.log('SyncContext: HMR - SyncManager appears to be already initialized, proceeding');
+                    setIsSyncManagerReady(true);
+                    
+                    // Set our initial state from the existing SyncManager
+                    latestSyncState.current = syncManager.getStatus();
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    
+                    latestLSN.current = lsn;
+                    latestConnected.current = syncManager.isConnected();
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                    
+                    latestClientId.current = clientId;
+                    latestPendingChanges.current = syncManager.getPendingChangesCount();
+                    
+                    console.log(`SyncContext: HMR recovery complete - clientId: ${clientId}, LSN: ${lsn}`);
+                    
+                    updateState(true);
+                    setIsLoading(false);
+                  } else {
+                    console.error('SyncContext: HMR - SyncManager not properly initialized, cannot proceed');
+                    setIsSyncManagerReady(false);
+                    setIsLoading(false);
+                    return;
+                  }
+                };
+                
+                readHMRStateAsync().catch((hmrStateError) => {
+                  console.error('SyncContext: HMR state reading error:', hmrStateError);
+                  setIsSyncManagerReady(false);
+                  setIsLoading(false);
+                });
+              } catch (hmrStateError) {
+                console.error('SyncContext: HMR setup error:', hmrStateError);
+                setIsSyncManagerReady(false);
+                setIsLoading(false);
+              }
+            }, 0);
+          } catch (recoveryError) {
+            console.error('SyncContext: HMR recovery failed:', recoveryError);
+            setIsSyncManagerReady(false);
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          setIsSyncManagerReady(false);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Set up event handlers (this code runs for both successful init and HMR recovery)
+      try {
         // Set up direct event handlers for state-critical events
         const handleStateChange = (state: SyncStatus) => {
+          console.log(`[SyncContext] State change event received: ${state}`);
           latestSyncState.current = state;
           updateState(true);
         };
         
         const handleLSNUpdate = (lsn: string) => {
+          console.log(`[SyncContext] LSN update event received: ${lsn}`);
           latestLSN.current = lsn;
           updateState();
         };
         
         const handleConnection = (connected: boolean) => {
+          console.log(`[SyncContext] Connection status event received: ${connected}`);
           latestConnected.current = connected;
           updateState();
         };
         
         const handleWebSocketOpen = (event: any) => {
+          console.log(`[SyncContext] WebSocket open event received`);
           handleConnection(true);
         };
         
         const handleWebSocketClose = (event: any) => {
+          console.log(`[SyncContext] WebSocket close event received`);
           handleConnection(false);
         };
         
@@ -185,65 +281,161 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
           updateState();
         };
         
-        // Register for all relevant events
+        // Register for all relevant events - listen to both event names for compatibility
         syncManager.on('stateChange', handleStateChange);
+        syncManager.on('sync:statusChanged', handleStateChange); // Also listen to this event
         syncManager.on('lsnUpdate', handleLSNUpdate);
         syncManager.on('connection:status', handleConnection);
         syncManager.on('websocket:open', handleWebSocketOpen);
         syncManager.on('websocket:close', handleWebSocketClose);
         syncManager.on('pendingChangesUpdate', handlePendingChangesUpdate);
         
-        // If auto-connect is enabled, trigger it now
+        // Set up periodic state synchronization to ensure we stay in sync
+        const syncStateInterval = setInterval(() => {
+          const currentManagerState = syncManager.getStatus();
+          const currentManagerLSN = syncManager.getLSN();
+          const currentManagerConnected = syncManager.isConnected();
+          const currentManagerPendingChanges = syncManager.getPendingChangesCount();
+          
+          let hasChanges = false;
+          
+          if (latestSyncState.current !== currentManagerState) {
+            console.log(`[SyncContext] Periodic sync: State mismatch detected. Context: ${latestSyncState.current}, Manager: ${currentManagerState}`);
+            latestSyncState.current = currentManagerState;
+            hasChanges = true;
+          }
+          
+          if (latestLSN.current !== currentManagerLSN) {
+            console.log(`[SyncContext] Periodic sync: LSN mismatch detected. Context: ${latestLSN.current}, Manager: ${currentManagerLSN}`);
+            latestLSN.current = currentManagerLSN;
+            hasChanges = true;
+          }
+          
+          if (latestConnected.current !== currentManagerConnected) {
+            console.log(`[SyncContext] Periodic sync: Connection mismatch detected. Context: ${latestConnected.current}, Manager: ${currentManagerConnected}`);
+            latestConnected.current = currentManagerConnected;
+            hasChanges = true;
+          }
+          
+          if (latestPendingChanges.current !== currentManagerPendingChanges) {
+            latestPendingChanges.current = currentManagerPendingChanges;
+            hasChanges = true;
+          }
+          
+          if (hasChanges) {
+            updateState(true);
+          }
+        }, 1000); // Check every second
+        
+        // 🔥 XSTATE COORDINATION: Auto-connect is now handled by XState machine
+        // Disable SyncContext auto-connect to prevent racing with XState coordination
         if (autoConnect) {
-          console.debug('SyncContext: Auto-connect enabled');
-          // Wait a moment for event handlers to be properly registered
-          setTimeout(async () => {
-            try {
-              // Call the proper auto-connect method which has internal checks
-              await syncManager.autoConnectToServer();
-              
-              // No additional success log - SyncManager already logs this
-            } catch (err) {
-              console.error('SyncContext: Auto-connect failed, scheduling retry');
-              
-              // Schedule a single retry after 3 seconds
-              setTimeout(async () => {
-                try {
-                  // Retry with the auto-connect method as well
-                  await syncManager.autoConnectToServer();
-                  // No additional success log
-                } catch (retryErr) {
-                  console.error('SyncContext: Auto-connect retry also failed');
-                  // No more retries - user will need to connect manually
-                }
-              }, 3000);
-            }
-          }, 1000); // Delay slightly to ensure listeners are attached
+          console.log('SyncContext: Auto-connect disabled - XState will coordinate sync start');
+          // Removed auto-connect logic - XState will send sync:start event when ready
         }
         
         // Cleanup on unmount
         return () => {
+          // Clear the periodic sync interval
+          clearInterval(syncStateInterval);
+          
           // Unregister all event listeners
           syncManager.off('stateChange', handleStateChange);
+          syncManager.off('sync:statusChanged', handleStateChange);
           syncManager.off('lsnUpdate', handleLSNUpdate);
           syncManager.off('connection:status', handleConnection);
           syncManager.off('websocket:open', handleWebSocketOpen);
           syncManager.off('websocket:close', handleWebSocketClose);
           syncManager.off('pendingChangesUpdate', handlePendingChangesUpdate);
         };
-      } catch (error) {
-        console.error('SyncContext: Error during initialization', error);
-        setIsSyncManagerReady(false); // SyncManager failed to initialize
+      } catch (eventSetupError) {
+        console.error('SyncContext: Error setting up event handlers:', eventSetupError);
+        setIsSyncManagerReady(false);
         setIsLoading(false);
       }
     };
     
-    // Start the initialization process
-    init();
+    // Start the state management setup
+    setupStateManagement();
     
     // No immediate cleanup needed since it's handled in the inner async function
     return () => {};
   }, [syncManager, autoConnect, serverUrl]);
+  
+  // 🔥 XSTATE INTEGRATION: Listen for sync start events from XState
+  useEffect(() => {
+    const handleSyncStart = (event: CustomEvent) => {
+      if (syncManager && isDatabaseReady) {
+        console.log('[SyncContext] XState requesting sync start:', event.detail);
+        // Auto-connect to start sync
+        syncManager.autoConnectToServer().catch(error => {
+          console.error('[SyncContext] Auto-connect failed:', error);
+          window.dispatchEvent(new CustomEvent('sync:error', { 
+            detail: { error: error.message } 
+          }));
+        });
+      }
+    };
+    
+    window.addEventListener('sync:start', handleSyncStart as EventListener);
+    
+    return () => {
+      window.removeEventListener('sync:start', handleSyncStart as EventListener);
+    };
+  }, [syncManager, isDatabaseReady]);
+  
+  // 🔥 XSTATE INTEGRATION: Monitor sync manager state and notify XState when live
+  useEffect(() => {
+    if (!syncManager) return;
+    
+    const handleSyncStateChange = (status: SyncStatus) => {
+      console.log('[SyncContext] 🔥 Sync state changed to:', status);
+      
+      // Notify XState when sync reaches live state
+      if (status === 'live') {
+        console.log('[SyncContext] 🎉 Sync reached LIVE state - notifying XState');
+        window.dispatchEvent(new CustomEvent('sync:live', { 
+          detail: { status: 'live', timestamp: Date.now() } 
+        }));
+      } else if (status === 'initial_sync') {
+        console.log('[SyncContext] 🔄 Sync in initial_sync state - waiting for live...');
+      } else {
+        console.log('[SyncContext] 📊 Sync status update:', status);
+      }
+    };
+    
+    // 🔥 NEW: Check initial state and notify XState if already live
+    const initialStatus = syncManager.getStatus();
+    console.log('[SyncContext] 🔍 Initial sync status check:', initialStatus);
+    if (initialStatus === 'live') {
+      console.log('[SyncContext] 🚀 Sync already LIVE on initialization - notifying XState');
+      window.dispatchEvent(new CustomEvent('sync:live', { 
+        detail: { status: 'live', timestamp: Date.now(), initial: true } 
+      }));
+    }
+    
+    // Listen to sync manager state changes
+    syncManager.on('sync:statusChanged', handleSyncStateChange);
+    syncManager.on('stateChange', handleSyncStateChange);
+    
+    // 🔥 NEW: Delayed recheck to catch fast transitions that happen during setup
+    const recheckTimer = setTimeout(() => {
+      const currentStatus = syncManager.getStatus();
+      console.log('[SyncContext] 🔄 Delayed status recheck:', currentStatus);
+      if (currentStatus === 'live' && initialStatus !== 'live') {
+        console.log('[SyncContext] 🏃 Fast transition detected - sync reached LIVE during setup');
+        window.dispatchEvent(new CustomEvent('sync:live', { 
+          detail: { status: 'live', timestamp: Date.now(), fastTransition: true } 
+        }));
+      }
+    }, 100); // Small delay to let transition complete
+    
+    return () => {
+      clearTimeout(recheckTimer); // Clean up the recheck timer
+      syncManager.off('sync:statusChanged', handleSyncStateChange);
+      syncManager.off('stateChange', handleSyncStateChange);
+    };
+  }, [syncManager]);
   
   // Define handlers for context actions
   const handleConnect = async (url?: string): Promise<boolean> => {
@@ -298,7 +490,7 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
   };
   
   // Show a loading state if database or sync is still loading
-  if (isDatabaseLoading || (isLoading && !syncManager)) {
+  if (isLoading && !syncManager) {
     return (
       <SyncContext.Provider value={{
         ...state,
@@ -339,4 +531,32 @@ export const SyncProvider: React.FC<SyncProviderProps> = ({ children, autoConnec
 };
 
 // Custom hook for consuming the context
-export const useSyncContext = () => useContext(SyncContext);
+export const useSyncContext = () => {
+  // 🔥 TEMPORARY STUB: Return default values for debug components
+  // TODO: Remove this entirely once all components are migrated to XState
+  console.warn('🚨 useSyncContext is deprecated - use useAppState() instead');
+  
+  return {
+    isConnected: false,
+    syncState: 'disconnected' as const,
+    lsn: '0/0',
+    pendingChanges: 0,
+    lastSyncTime: null,
+    clientId: '',
+    connect: async () => false,
+    disconnect: () => {},
+    resetLSN: async () => {},
+    serverUrl: '',
+    setServerUrl: () => {},
+    isLoading: false,
+    isSyncManagerReady: false,
+    processQueuedChanges: async () => {},
+    setAutoConnect: () => {},
+    resyncAllEntities: async () => 0,
+  };
+};
+
+// HMR: Accept hot updates for this module
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}

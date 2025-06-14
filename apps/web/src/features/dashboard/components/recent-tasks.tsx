@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-// import { getPGliteRepository } from '@/db/typeorm/typeorm-service'; // REMOVE OLD IMPORT
-import { NewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'; // ADD DataSource TYPE IMPORT
-import { Repository } from 'typeorm'; // ADD Repository IMPORT
 import { Task } from '@repo/dataforge/client-entities'; // Corrected path
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { List } from 'lucide-react'; // Using List icon as a placeholder
+import { usePGliteContext } from '@/db/pglite-provider';
 
 // Type for task data
 interface TaskData {
@@ -27,17 +25,20 @@ const getInitials = (title: string) => {
 };
 
 interface RecentTasksProps {
-  dataSource: NewPGliteDataSource | null; // Accept DataSource as prop
+  // No props needed - using centralized context
 }
 
-export function RecentTasks({ dataSource }: RecentTasksProps) { // Destructure dataSource from props
+export function RecentTasks({}: RecentTasksProps = {}) { // No props needed
   const [recentTasks, setRecentTasks] = useState<TaskData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // Add error state
+  
+  // Use centralized DataSource access
+  const { getRepository, isDataSourceReady } = usePGliteContext();
 
   useEffect(() => {
     async function fetchRecentTasks() {
-      if (!dataSource || !dataSource.isInitialized) {
+      if (!isDataSourceReady || !getRepository) {
         setLoading(false);
         setError('DataSource not available or not initialized.');
         console.warn('RecentTasks: DataSource not available.');
@@ -47,8 +48,7 @@ export function RecentTasks({ dataSource }: RecentTasksProps) { // Destructure d
       try {
         setLoading(true);
         setError(null);
-        // const taskRepo = await getPGliteRepository(Task); // REMOVE OLD WAY
-        const taskRepo = dataSource.getRepository(Task); // Get repo from DataSource prop
+        const taskRepo = getRepository(Task); // Get repo from centralized context
         
         // Use query builder to get recent tasks
         const tasks = await taskRepo.createQueryBuilder("task")
@@ -75,7 +75,7 @@ export function RecentTasks({ dataSource }: RecentTasksProps) { // Destructure d
     }
     
     fetchRecentTasks();
-  }, [dataSource]); // Re-run effect if dataSource changes
+  }, [isDataSourceReady, getRepository]); // Re-run effect if dataSource changes
 
   // Loading state
   if (loading) {

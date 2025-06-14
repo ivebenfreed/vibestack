@@ -1,71 +1,91 @@
-import React, { Suspense } from 'react';
-import { SyncChangesDebugPanel } from './components/SyncChangesDebugPanel';
-import { DebugNavigation } from './components/DebugNavigation';
-import { Main } from '@/components/layout/main';
-import { Card, CardContent } from '@/components/ui/card';
-
-
-// Error boundary component
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error in component:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Card className="mt-4">
-          <CardContent className="pt-6">
-            <h3 className="text-xl font-medium text-destructive">Error Loading Sync Changes Debug Panel</h3>
-            <p className="mt-2">There was an error loading the debug panel:</p>
-            <pre className="mt-2 p-2 bg-muted rounded-md text-xs overflow-auto">
-              {this.state.error?.message || 'Unknown error'}
-            </pre>
-            <button 
-              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"
-              onClick={() => this.setState({ hasError: false, error: null })}
-            >
-              Try Again
-            </button>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+import React, { useState } from 'react';
+import { useAtomValue } from 'jotai';
+import { ContentContainer } from '@/components/layout/content-container';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { syncChangesAtom } from '@/stores/syncStore';
+import { format } from 'date-fns';
 
 export function SyncChangesPage() {
-  return (
-    <>
-      <Main>
-        <div className="mb-2 flex items-center justify-between space-y-2">
-          <h1 className='text-2xl font-bold tracking-tight'>Sync Changes Debug</h1>
-        </div>
-        
-        <ErrorBoundary>
-          <Suspense fallback={<div>Loading sync changes debug panel...</div>}>
-            <SyncChangesDebugPanel />
-          </Suspense>
-        </ErrorBoundary>
-        
-        <DebugNavigation />
-      </Main>
-    </>
-  );
-}
+  const changes = useAtomValue(syncChangesAtom);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'synced'>('all');
 
-export default SyncChangesPage; 
+  const filteredChanges = changes.filter(change => {
+    if (filter === 'all') return true;
+    if (filter === 'pending') return !change.synced;
+    if (filter === 'synced') return change.synced;
+    return true;
+  });
+
+  return (
+    <ContentContainer>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Sync Changes</h1>
+          <p className="text-muted-foreground">
+            Track pending and completed sync operations
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button 
+            variant={filter === 'all' ? 'default' : 'outline'}
+            onClick={() => setFilter('all')}
+          >
+            All ({changes.length})
+          </Button>
+          <Button 
+            variant={filter === 'pending' ? 'default' : 'outline'}
+            onClick={() => setFilter('pending')}
+          >
+            Pending ({changes.filter(c => !c.synced).length})
+          </Button>
+          <Button 
+            variant={filter === 'synced' ? 'default' : 'outline'}
+            onClick={() => setFilter('synced')}
+          >
+            Synced ({changes.filter(c => c.synced).length})
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          {filteredChanges.length === 0 ? (
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-muted-foreground text-center">No changes found</p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredChanges.map((change) => (
+              <Card key={change.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm">
+                        {change.operation} on {change.tableName}
+                      </CardTitle>
+                      <CardDescription>
+                        {format(new Date(change.timestamp), 'PPpp')}
+                      </CardDescription>
+                    </div>
+                    <Badge variant={change.synced ? 'default' : 'secondary'}>
+                      {change.synced ? 'Synced' : 'Pending'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                {change.data && (
+                  <CardContent>
+                    <pre className="text-xs bg-muted p-2 rounded overflow-auto">
+                      {JSON.stringify(change.data, null, 2)}
+                    </pre>
+                  </CardContent>
+                )}
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    </ContentContainer>
+  );
+} 

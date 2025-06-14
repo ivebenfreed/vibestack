@@ -84,6 +84,7 @@ export function NewChat({ users, onOpenChange, open }: Props) {
                 {users.map((user) => (
                   <CommandItem
                     key={user.id}
+                    value={`${user.fullName}-${user.id}`}
                     onSelect={() => handleSelectUser(user)}
                     className='flex items-center justify-between gap-2'
                   >

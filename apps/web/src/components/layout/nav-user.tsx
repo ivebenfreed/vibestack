@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { useCurrentUser } from '@/hooks/use-current-user'
+import { useAuth } from '@/hooks/useSimpleAuth'
 import { useSignOut } from '@/hooks/use-sign-out'
 
 export function NavUser({
@@ -37,14 +37,14 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const { data: userProfile, loading } = useCurrentUser()
+  const { user: authUser, isLoading, displayName } = useAuth()
   const { signOut } = useSignOut()
   
-  // Use the database profile if available, otherwise fall back to props/auth store
+  // Use the auth session first, then props as fallback - single source of truth
   const user = {
-    name: userProfile?.name || propUser?.name || 'User', // Safely access propUser.name
-    email: userProfile?.email || propUser?.email || '', // Safely access propUser.email
-    avatar: userProfile?.image || propUser?.avatar, // Safely access propUser.avatar
+    name: authUser?.name || displayName || propUser?.name || 'User',
+    email: authUser?.email || propUser?.email || '', 
+    avatar: authUser?.image || propUser?.avatar,
   }
 
   return (
@@ -66,8 +66,8 @@ export function NavUser({
                 )}
               </Avatar>
               <div className='grid flex-1 text-left text-sm leading-tight'>
-                <span className='truncate font-semibold'>{loading ? '...' : user.name}</span>
-                <span className='truncate text-xs'>{loading ? '...' : user.email}</span>
+                <span className='truncate font-semibold'>{isLoading ? '...' : user.name}</span>
+                <span className='truncate text-xs'>{isLoading ? '...' : user.email}</span>
               </div>
               <ChevronsUpDown className='ml-auto size-4' />
             </SidebarMenuButton>
@@ -90,8 +90,8 @@ export function NavUser({
                   )}
                 </Avatar>
                 <div className='grid flex-1 text-left text-sm leading-tight'>
-                  <span className='truncate font-semibold'>{loading ? '...' : user.name}</span>
-                  <span className='truncate text-xs'>{loading ? '...' : user.email}</span>
+                  <span className='truncate font-semibold'>{isLoading ? '...' : user.name}</span>
+                  <span className='truncate text-xs'>{isLoading ? '...' : user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>

@@ -8,6 +8,8 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
@@ -30,6 +32,7 @@ import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/
 import { Route as AuthenticatedSettingsIndexImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedProjectsIndexImport } from './routes/_authenticated/projects/index'
 import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedDebugIndexImport } from './routes/_authenticated/debug/index'
 import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
@@ -37,15 +40,45 @@ import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
-import { Route as AuthenticatedDebugTypeormTestImport } from './routes/_authenticated/debug/typeorm-test'
-import { Route as AuthenticatedDebugSyncChangesImport } from './routes/_authenticated/debug/sync-changes'
-import { Route as AuthenticatedDebugSyncImport } from './routes/_authenticated/debug/sync'
-import { Route as AuthenticatedDebugPerformanceImport } from './routes/_authenticated/debug/performance'
-import { Route as AuthenticatedDebugMultiQueryImport } from './routes/_authenticated/debug/multi-query'
-import { Route as AuthenticatedDebugLiveQueryImport } from './routes/_authenticated/debug/live-query'
-import { Route as AuthenticatedDebugDatabaseImport } from './routes/_authenticated/debug/database'
-import { Route as AuthenticatedDebugDataTableImport } from './routes/_authenticated/debug/data-table'
-import { Route as AuthenticatedDebugAuthImport } from './routes/_authenticated/debug/auth'
+
+// Create Virtual Routes
+
+const AuthenticatedDebugTypeormTestLazyImport = createFileRoute(
+  '/_authenticated/debug/typeorm-test',
+)()
+const AuthenticatedDebugTasksNewPatternLazyImport = createFileRoute(
+  '/_authenticated/debug/tasks-new-pattern',
+)()
+const AuthenticatedDebugSyncTestLazyImport = createFileRoute(
+  '/_authenticated/debug/sync-test',
+)()
+const AuthenticatedDebugSyncChangesLazyImport = createFileRoute(
+  '/_authenticated/debug/sync-changes',
+)()
+const AuthenticatedDebugSyncLazyImport = createFileRoute(
+  '/_authenticated/debug/sync',
+)()
+const AuthenticatedDebugPerformanceLazyImport = createFileRoute(
+  '/_authenticated/debug/performance',
+)()
+const AuthenticatedDebugMultiQueryLazyImport = createFileRoute(
+  '/_authenticated/debug/multi-query',
+)()
+const AuthenticatedDebugLiveQueryLazyImport = createFileRoute(
+  '/_authenticated/debug/live-query',
+)()
+const AuthenticatedDebugIntegrityLazyImport = createFileRoute(
+  '/_authenticated/debug/integrity',
+)()
+const AuthenticatedDebugDatabaseLazyImport = createFileRoute(
+  '/_authenticated/debug/database',
+)()
+const AuthenticatedDebugDataTableAtomLazyImport = createFileRoute(
+  '/_authenticated/debug/data-table-atom',
+)()
+const AuthenticatedDebugDataTableLazyImport = createFileRoute(
+  '/_authenticated/debug/data-table',
+)()
 
 // Create/Update Routes
 
@@ -169,6 +202,12 @@ const AuthenticatedHelpCenterIndexRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
+const AuthenticatedDebugIndexRoute = AuthenticatedDebugIndexImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedDebugRouteRoute,
+} as any)
+
 const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexImport.update({
   id: '/chats/',
   path: '/chats/',
@@ -180,6 +219,131 @@ const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexImport.update({
   path: '/apps/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+
+const AuthenticatedDebugTypeormTestLazyRoute =
+  AuthenticatedDebugTypeormTestLazyImport.update({
+    id: '/typeorm-test',
+    path: '/typeorm-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/typeorm-test.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugTasksNewPatternLazyRoute =
+  AuthenticatedDebugTasksNewPatternLazyImport.update({
+    id: '/tasks-new-pattern',
+    path: '/tasks-new-pattern',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/tasks-new-pattern.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugSyncTestLazyRoute =
+  AuthenticatedDebugSyncTestLazyImport.update({
+    id: '/sync-test',
+    path: '/sync-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/sync-test.lazy').then((d) => d.Route),
+  )
+
+const AuthenticatedDebugSyncChangesLazyRoute =
+  AuthenticatedDebugSyncChangesLazyImport.update({
+    id: '/sync-changes',
+    path: '/sync-changes',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/sync-changes.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugSyncLazyRoute = AuthenticatedDebugSyncLazyImport.update(
+  {
+    id: '/sync',
+    path: '/sync',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any,
+).lazy(() =>
+  import('./routes/_authenticated/debug/sync.lazy').then((d) => d.Route),
+)
+
+const AuthenticatedDebugPerformanceLazyRoute =
+  AuthenticatedDebugPerformanceLazyImport.update({
+    id: '/performance',
+    path: '/performance',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/performance.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugMultiQueryLazyRoute =
+  AuthenticatedDebugMultiQueryLazyImport.update({
+    id: '/multi-query',
+    path: '/multi-query',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/multi-query.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugLiveQueryLazyRoute =
+  AuthenticatedDebugLiveQueryLazyImport.update({
+    id: '/live-query',
+    path: '/live-query',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/live-query.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugIntegrityLazyRoute =
+  AuthenticatedDebugIntegrityLazyImport.update({
+    id: '/integrity',
+    path: '/integrity',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/integrity.lazy').then((d) => d.Route),
+  )
+
+const AuthenticatedDebugDatabaseLazyRoute =
+  AuthenticatedDebugDatabaseLazyImport.update({
+    id: '/database',
+    path: '/database',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/database.lazy').then((d) => d.Route),
+  )
+
+const AuthenticatedDebugDataTableAtomLazyRoute =
+  AuthenticatedDebugDataTableAtomLazyImport.update({
+    id: '/data-table-atom',
+    path: '/data-table-atom',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/data-table-atom.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugDataTableLazyRoute =
+  AuthenticatedDebugDataTableLazyImport.update({
+    id: '/data-table',
+    path: '/data-table',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/data-table.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsImport.update({
@@ -215,68 +379,6 @@ const AuthenticatedProjectsProjectIdRoute =
     path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-
-const AuthenticatedDebugTypeormTestRoute =
-  AuthenticatedDebugTypeormTestImport.update({
-    id: '/typeorm-test',
-    path: '/typeorm-test',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
-const AuthenticatedDebugSyncChangesRoute =
-  AuthenticatedDebugSyncChangesImport.update({
-    id: '/sync-changes',
-    path: '/sync-changes',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
-const AuthenticatedDebugSyncRoute = AuthenticatedDebugSyncImport.update({
-  id: '/sync',
-  path: '/sync',
-  getParentRoute: () => AuthenticatedDebugRouteRoute,
-} as any)
-
-const AuthenticatedDebugPerformanceRoute =
-  AuthenticatedDebugPerformanceImport.update({
-    id: '/performance',
-    path: '/performance',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
-const AuthenticatedDebugMultiQueryRoute =
-  AuthenticatedDebugMultiQueryImport.update({
-    id: '/multi-query',
-    path: '/multi-query',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
-const AuthenticatedDebugLiveQueryRoute =
-  AuthenticatedDebugLiveQueryImport.update({
-    id: '/live-query',
-    path: '/live-query',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
-const AuthenticatedDebugDatabaseRoute = AuthenticatedDebugDatabaseImport.update(
-  {
-    id: '/database',
-    path: '/database',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any,
-)
-
-const AuthenticatedDebugDataTableRoute =
-  AuthenticatedDebugDataTableImport.update({
-    id: '/data-table',
-    path: '/data-table',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
-const AuthenticatedDebugAuthRoute = AuthenticatedDebugAuthImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => AuthenticatedDebugRouteRoute,
-} as any)
 
 // Populate the FileRoutesByPath interface
 
@@ -380,69 +482,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
-    '/_authenticated/debug/auth': {
-      id: '/_authenticated/debug/auth'
-      path: '/auth'
-      fullPath: '/debug/auth'
-      preLoaderRoute: typeof AuthenticatedDebugAuthImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/data-table': {
-      id: '/_authenticated/debug/data-table'
-      path: '/data-table'
-      fullPath: '/debug/data-table'
-      preLoaderRoute: typeof AuthenticatedDebugDataTableImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/database': {
-      id: '/_authenticated/debug/database'
-      path: '/database'
-      fullPath: '/debug/database'
-      preLoaderRoute: typeof AuthenticatedDebugDatabaseImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/live-query': {
-      id: '/_authenticated/debug/live-query'
-      path: '/live-query'
-      fullPath: '/debug/live-query'
-      preLoaderRoute: typeof AuthenticatedDebugLiveQueryImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/multi-query': {
-      id: '/_authenticated/debug/multi-query'
-      path: '/multi-query'
-      fullPath: '/debug/multi-query'
-      preLoaderRoute: typeof AuthenticatedDebugMultiQueryImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/performance': {
-      id: '/_authenticated/debug/performance'
-      path: '/performance'
-      fullPath: '/debug/performance'
-      preLoaderRoute: typeof AuthenticatedDebugPerformanceImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/sync': {
-      id: '/_authenticated/debug/sync'
-      path: '/sync'
-      fullPath: '/debug/sync'
-      preLoaderRoute: typeof AuthenticatedDebugSyncImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/sync-changes': {
-      id: '/_authenticated/debug/sync-changes'
-      path: '/sync-changes'
-      fullPath: '/debug/sync-changes'
-      preLoaderRoute: typeof AuthenticatedDebugSyncChangesImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/typeorm-test': {
-      id: '/_authenticated/debug/typeorm-test'
-      path: '/typeorm-test'
-      fullPath: '/debug/typeorm-test'
-      preLoaderRoute: typeof AuthenticatedDebugTypeormTestImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
     '/_authenticated/projects/$projectId': {
       id: '/_authenticated/projects/$projectId'
       path: '/projects/$projectId'
@@ -478,6 +517,90 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsImport
       parentRoute: typeof AuthenticatedSettingsRouteImport
     }
+    '/_authenticated/debug/data-table': {
+      id: '/_authenticated/debug/data-table'
+      path: '/data-table'
+      fullPath: '/debug/data-table'
+      preLoaderRoute: typeof AuthenticatedDebugDataTableLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/data-table-atom': {
+      id: '/_authenticated/debug/data-table-atom'
+      path: '/data-table-atom'
+      fullPath: '/debug/data-table-atom'
+      preLoaderRoute: typeof AuthenticatedDebugDataTableAtomLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/database': {
+      id: '/_authenticated/debug/database'
+      path: '/database'
+      fullPath: '/debug/database'
+      preLoaderRoute: typeof AuthenticatedDebugDatabaseLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/integrity': {
+      id: '/_authenticated/debug/integrity'
+      path: '/integrity'
+      fullPath: '/debug/integrity'
+      preLoaderRoute: typeof AuthenticatedDebugIntegrityLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/live-query': {
+      id: '/_authenticated/debug/live-query'
+      path: '/live-query'
+      fullPath: '/debug/live-query'
+      preLoaderRoute: typeof AuthenticatedDebugLiveQueryLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/multi-query': {
+      id: '/_authenticated/debug/multi-query'
+      path: '/multi-query'
+      fullPath: '/debug/multi-query'
+      preLoaderRoute: typeof AuthenticatedDebugMultiQueryLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/performance': {
+      id: '/_authenticated/debug/performance'
+      path: '/performance'
+      fullPath: '/debug/performance'
+      preLoaderRoute: typeof AuthenticatedDebugPerformanceLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/sync': {
+      id: '/_authenticated/debug/sync'
+      path: '/sync'
+      fullPath: '/debug/sync'
+      preLoaderRoute: typeof AuthenticatedDebugSyncLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/sync-changes': {
+      id: '/_authenticated/debug/sync-changes'
+      path: '/sync-changes'
+      fullPath: '/debug/sync-changes'
+      preLoaderRoute: typeof AuthenticatedDebugSyncChangesLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/sync-test': {
+      id: '/_authenticated/debug/sync-test'
+      path: '/sync-test'
+      fullPath: '/debug/sync-test'
+      preLoaderRoute: typeof AuthenticatedDebugSyncTestLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/tasks-new-pattern': {
+      id: '/_authenticated/debug/tasks-new-pattern'
+      path: '/tasks-new-pattern'
+      fullPath: '/debug/tasks-new-pattern'
+      preLoaderRoute: typeof AuthenticatedDebugTasksNewPatternLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/typeorm-test': {
+      id: '/_authenticated/debug/typeorm-test'
+      path: '/typeorm-test'
+      fullPath: '/debug/typeorm-test'
+      preLoaderRoute: typeof AuthenticatedDebugTypeormTestLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
@@ -491,6 +614,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/chats'
       preLoaderRoute: typeof AuthenticatedChatsIndexImport
       parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/debug/': {
+      id: '/_authenticated/debug/'
+      path: '/'
+      fullPath: '/debug/'
+      preLoaderRoute: typeof AuthenticatedDebugIndexImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
@@ -533,28 +663,42 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedDebugRouteRouteChildren {
-  AuthenticatedDebugAuthRoute: typeof AuthenticatedDebugAuthRoute
-  AuthenticatedDebugDataTableRoute: typeof AuthenticatedDebugDataTableRoute
-  AuthenticatedDebugDatabaseRoute: typeof AuthenticatedDebugDatabaseRoute
-  AuthenticatedDebugLiveQueryRoute: typeof AuthenticatedDebugLiveQueryRoute
-  AuthenticatedDebugMultiQueryRoute: typeof AuthenticatedDebugMultiQueryRoute
-  AuthenticatedDebugPerformanceRoute: typeof AuthenticatedDebugPerformanceRoute
-  AuthenticatedDebugSyncRoute: typeof AuthenticatedDebugSyncRoute
-  AuthenticatedDebugSyncChangesRoute: typeof AuthenticatedDebugSyncChangesRoute
-  AuthenticatedDebugTypeormTestRoute: typeof AuthenticatedDebugTypeormTestRoute
+  AuthenticatedDebugDataTableLazyRoute: typeof AuthenticatedDebugDataTableLazyRoute
+  AuthenticatedDebugDataTableAtomLazyRoute: typeof AuthenticatedDebugDataTableAtomLazyRoute
+  AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
+  AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
+  AuthenticatedDebugLiveQueryLazyRoute: typeof AuthenticatedDebugLiveQueryLazyRoute
+  AuthenticatedDebugMultiQueryLazyRoute: typeof AuthenticatedDebugMultiQueryLazyRoute
+  AuthenticatedDebugPerformanceLazyRoute: typeof AuthenticatedDebugPerformanceLazyRoute
+  AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
+  AuthenticatedDebugSyncChangesLazyRoute: typeof AuthenticatedDebugSyncChangesLazyRoute
+  AuthenticatedDebugSyncTestLazyRoute: typeof AuthenticatedDebugSyncTestLazyRoute
+  AuthenticatedDebugTasksNewPatternLazyRoute: typeof AuthenticatedDebugTasksNewPatternLazyRoute
+  AuthenticatedDebugTypeormTestLazyRoute: typeof AuthenticatedDebugTypeormTestLazyRoute
+  AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
 }
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
-    AuthenticatedDebugAuthRoute: AuthenticatedDebugAuthRoute,
-    AuthenticatedDebugDataTableRoute: AuthenticatedDebugDataTableRoute,
-    AuthenticatedDebugDatabaseRoute: AuthenticatedDebugDatabaseRoute,
-    AuthenticatedDebugLiveQueryRoute: AuthenticatedDebugLiveQueryRoute,
-    AuthenticatedDebugMultiQueryRoute: AuthenticatedDebugMultiQueryRoute,
-    AuthenticatedDebugPerformanceRoute: AuthenticatedDebugPerformanceRoute,
-    AuthenticatedDebugSyncRoute: AuthenticatedDebugSyncRoute,
-    AuthenticatedDebugSyncChangesRoute: AuthenticatedDebugSyncChangesRoute,
-    AuthenticatedDebugTypeormTestRoute: AuthenticatedDebugTypeormTestRoute,
+    AuthenticatedDebugDataTableLazyRoute: AuthenticatedDebugDataTableLazyRoute,
+    AuthenticatedDebugDataTableAtomLazyRoute:
+      AuthenticatedDebugDataTableAtomLazyRoute,
+    AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
+    AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
+    AuthenticatedDebugLiveQueryLazyRoute: AuthenticatedDebugLiveQueryLazyRoute,
+    AuthenticatedDebugMultiQueryLazyRoute:
+      AuthenticatedDebugMultiQueryLazyRoute,
+    AuthenticatedDebugPerformanceLazyRoute:
+      AuthenticatedDebugPerformanceLazyRoute,
+    AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
+    AuthenticatedDebugSyncChangesLazyRoute:
+      AuthenticatedDebugSyncChangesLazyRoute,
+    AuthenticatedDebugSyncTestLazyRoute: AuthenticatedDebugSyncTestLazyRoute,
+    AuthenticatedDebugTasksNewPatternLazyRoute:
+      AuthenticatedDebugTasksNewPatternLazyRoute,
+    AuthenticatedDebugTypeormTestLazyRoute:
+      AuthenticatedDebugTypeormTestLazyRoute,
+    AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
   }
 
 const AuthenticatedDebugRouteRouteWithChildren =
@@ -629,22 +773,26 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
-  '/debug/auth': typeof AuthenticatedDebugAuthRoute
-  '/debug/data-table': typeof AuthenticatedDebugDataTableRoute
-  '/debug/database': typeof AuthenticatedDebugDatabaseRoute
-  '/debug/live-query': typeof AuthenticatedDebugLiveQueryRoute
-  '/debug/multi-query': typeof AuthenticatedDebugMultiQueryRoute
-  '/debug/performance': typeof AuthenticatedDebugPerformanceRoute
-  '/debug/sync': typeof AuthenticatedDebugSyncRoute
-  '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesRoute
-  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/debug/data-table': typeof AuthenticatedDebugDataTableLazyRoute
+  '/debug/data-table-atom': typeof AuthenticatedDebugDataTableAtomLazyRoute
+  '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
+  '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
+  '/debug/live-query': typeof AuthenticatedDebugLiveQueryLazyRoute
+  '/debug/multi-query': typeof AuthenticatedDebugMultiQueryLazyRoute
+  '/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
+  '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
+  '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesLazyRoute
+  '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
+  '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
+  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/debug/': typeof AuthenticatedDebugIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/projects': typeof AuthenticatedProjectsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
@@ -653,7 +801,6 @@ export interface FileRoutesByFullPath {
 }
 
 export interface FileRoutesByTo {
-  '/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -665,22 +812,26 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
-  '/debug/auth': typeof AuthenticatedDebugAuthRoute
-  '/debug/data-table': typeof AuthenticatedDebugDataTableRoute
-  '/debug/database': typeof AuthenticatedDebugDatabaseRoute
-  '/debug/live-query': typeof AuthenticatedDebugLiveQueryRoute
-  '/debug/multi-query': typeof AuthenticatedDebugMultiQueryRoute
-  '/debug/performance': typeof AuthenticatedDebugPerformanceRoute
-  '/debug/sync': typeof AuthenticatedDebugSyncRoute
-  '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesRoute
-  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/debug/data-table': typeof AuthenticatedDebugDataTableLazyRoute
+  '/debug/data-table-atom': typeof AuthenticatedDebugDataTableAtomLazyRoute
+  '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
+  '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
+  '/debug/live-query': typeof AuthenticatedDebugLiveQueryLazyRoute
+  '/debug/multi-query': typeof AuthenticatedDebugMultiQueryLazyRoute
+  '/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
+  '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
+  '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesLazyRoute
+  '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
+  '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
+  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/debug': typeof AuthenticatedDebugIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/projects': typeof AuthenticatedProjectsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
@@ -704,22 +855,26 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/debug/auth': typeof AuthenticatedDebugAuthRoute
-  '/_authenticated/debug/data-table': typeof AuthenticatedDebugDataTableRoute
-  '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseRoute
-  '/_authenticated/debug/live-query': typeof AuthenticatedDebugLiveQueryRoute
-  '/_authenticated/debug/multi-query': typeof AuthenticatedDebugMultiQueryRoute
-  '/_authenticated/debug/performance': typeof AuthenticatedDebugPerformanceRoute
-  '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncRoute
-  '/_authenticated/debug/sync-changes': typeof AuthenticatedDebugSyncChangesRoute
-  '/_authenticated/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/_authenticated/debug/data-table': typeof AuthenticatedDebugDataTableLazyRoute
+  '/_authenticated/debug/data-table-atom': typeof AuthenticatedDebugDataTableAtomLazyRoute
+  '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
+  '/_authenticated/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
+  '/_authenticated/debug/live-query': typeof AuthenticatedDebugLiveQueryLazyRoute
+  '/_authenticated/debug/multi-query': typeof AuthenticatedDebugMultiQueryLazyRoute
+  '/_authenticated/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
+  '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
+  '/_authenticated/debug/sync-changes': typeof AuthenticatedDebugSyncChangesLazyRoute
+  '/_authenticated/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
+  '/_authenticated/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
+  '/_authenticated/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
@@ -744,22 +899,26 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
-    | '/debug/auth'
-    | '/debug/data-table'
-    | '/debug/database'
-    | '/debug/live-query'
-    | '/debug/multi-query'
-    | '/debug/performance'
-    | '/debug/sync'
-    | '/debug/sync-changes'
-    | '/debug/typeorm-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
+    | '/debug/data-table'
+    | '/debug/data-table-atom'
+    | '/debug/database'
+    | '/debug/integrity'
+    | '/debug/live-query'
+    | '/debug/multi-query'
+    | '/debug/performance'
+    | '/debug/sync'
+    | '/debug/sync-changes'
+    | '/debug/sync-test'
+    | '/debug/tasks-new-pattern'
+    | '/debug/typeorm-test'
     | '/apps'
     | '/chats'
+    | '/debug/'
     | '/help-center'
     | '/projects'
     | '/settings/'
@@ -767,7 +926,6 @@ export interface FileRouteTypes {
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/debug'
     | '/forgot-password'
     | '/otp'
     | '/sign-in'
@@ -779,22 +937,26 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
-    | '/debug/auth'
-    | '/debug/data-table'
-    | '/debug/database'
-    | '/debug/live-query'
-    | '/debug/multi-query'
-    | '/debug/performance'
-    | '/debug/sync'
-    | '/debug/sync-changes'
-    | '/debug/typeorm-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
+    | '/debug/data-table'
+    | '/debug/data-table-atom'
+    | '/debug/database'
+    | '/debug/integrity'
+    | '/debug/live-query'
+    | '/debug/multi-query'
+    | '/debug/performance'
+    | '/debug/sync'
+    | '/debug/sync-changes'
+    | '/debug/sync-test'
+    | '/debug/tasks-new-pattern'
+    | '/debug/typeorm-test'
     | '/apps'
     | '/chats'
+    | '/debug'
     | '/help-center'
     | '/projects'
     | '/settings'
@@ -816,22 +978,26 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
-    | '/_authenticated/debug/auth'
-    | '/_authenticated/debug/data-table'
-    | '/_authenticated/debug/database'
-    | '/_authenticated/debug/live-query'
-    | '/_authenticated/debug/multi-query'
-    | '/_authenticated/debug/performance'
-    | '/_authenticated/debug/sync'
-    | '/_authenticated/debug/sync-changes'
-    | '/_authenticated/debug/typeorm-test'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/debug/data-table'
+    | '/_authenticated/debug/data-table-atom'
+    | '/_authenticated/debug/database'
+    | '/_authenticated/debug/integrity'
+    | '/_authenticated/debug/live-query'
+    | '/_authenticated/debug/multi-query'
+    | '/_authenticated/debug/performance'
+    | '/_authenticated/debug/sync'
+    | '/_authenticated/debug/sync-changes'
+    | '/_authenticated/debug/sync-test'
+    | '/_authenticated/debug/tasks-new-pattern'
+    | '/_authenticated/debug/typeorm-test'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
+    | '/_authenticated/debug/'
     | '/_authenticated/help-center/'
     | '/_authenticated/projects/'
     | '/_authenticated/settings/'
@@ -910,15 +1076,19 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/route.tsx",
       "parent": "/_authenticated",
       "children": [
-        "/_authenticated/debug/auth",
         "/_authenticated/debug/data-table",
+        "/_authenticated/debug/data-table-atom",
         "/_authenticated/debug/database",
+        "/_authenticated/debug/integrity",
         "/_authenticated/debug/live-query",
         "/_authenticated/debug/multi-query",
         "/_authenticated/debug/performance",
         "/_authenticated/debug/sync",
         "/_authenticated/debug/sync-changes",
-        "/_authenticated/debug/typeorm-test"
+        "/_authenticated/debug/sync-test",
+        "/_authenticated/debug/tasks-new-pattern",
+        "/_authenticated/debug/typeorm-test",
+        "/_authenticated/debug/"
       ]
     },
     "/_authenticated/settings": {
@@ -966,42 +1136,6 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/index.tsx",
       "parent": "/_authenticated"
     },
-    "/_authenticated/debug/auth": {
-      "filePath": "_authenticated/debug/auth.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/data-table": {
-      "filePath": "_authenticated/debug/data-table.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/database": {
-      "filePath": "_authenticated/debug/database.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/live-query": {
-      "filePath": "_authenticated/debug/live-query.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/multi-query": {
-      "filePath": "_authenticated/debug/multi-query.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/performance": {
-      "filePath": "_authenticated/debug/performance.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/sync": {
-      "filePath": "_authenticated/debug/sync.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/sync-changes": {
-      "filePath": "_authenticated/debug/sync-changes.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/typeorm-test": {
-      "filePath": "_authenticated/debug/typeorm-test.tsx",
-      "parent": "/_authenticated/debug"
-    },
     "/_authenticated/projects/$projectId": {
       "filePath": "_authenticated/projects/$projectId.tsx",
       "parent": "/_authenticated"
@@ -1022,6 +1156,54 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/settings/notifications.tsx",
       "parent": "/_authenticated/settings"
     },
+    "/_authenticated/debug/data-table": {
+      "filePath": "_authenticated/debug/data-table.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/data-table-atom": {
+      "filePath": "_authenticated/debug/data-table-atom.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/database": {
+      "filePath": "_authenticated/debug/database.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/integrity": {
+      "filePath": "_authenticated/debug/integrity.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/live-query": {
+      "filePath": "_authenticated/debug/live-query.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/multi-query": {
+      "filePath": "_authenticated/debug/multi-query.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/performance": {
+      "filePath": "_authenticated/debug/performance.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/sync": {
+      "filePath": "_authenticated/debug/sync.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/sync-changes": {
+      "filePath": "_authenticated/debug/sync-changes.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/sync-test": {
+      "filePath": "_authenticated/debug/sync-test.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/tasks-new-pattern": {
+      "filePath": "_authenticated/debug/tasks-new-pattern.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/typeorm-test": {
+      "filePath": "_authenticated/debug/typeorm-test.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/apps/": {
       "filePath": "_authenticated/apps/index.tsx",
       "parent": "/_authenticated"
@@ -1029,6 +1211,10 @@ export const routeTree = rootRoute
     "/_authenticated/chats/": {
       "filePath": "_authenticated/chats/index.tsx",
       "parent": "/_authenticated"
+    },
+    "/_authenticated/debug/": {
+      "filePath": "_authenticated/debug/index.tsx",
+      "parent": "/_authenticated/debug"
     },
     "/_authenticated/help-center/": {
       "filePath": "_authenticated/help-center/index.tsx",

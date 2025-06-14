@@ -66,6 +66,10 @@ export class ReplicationDO implements DurableObject {
       this.stateManager
     );
     
+    // Reset polling state on DO initialization to handle restarts/hibernation
+    // The polling interval is always null when the DO starts up
+    this.pollingManager.hasCompletedFirstPoll = false;
+    
     // Auto-initialization removed - replication will only start when explicitly
     // requested through the API endpoint
     replicationLogger.info('ReplicationDO created - awaiting explicit initialization', {}, MODULE_NAME);
@@ -82,10 +86,12 @@ export class ReplicationDO implements DurableObject {
   /**
    * Initialize replication and start polling immediately
    * This ensures polling is active as soon as the DO is created
+   * Also performs the first WAL poll and returns the results
    */
   private async initializeAndStartPolling(): Promise<{
     success: boolean,
     slotStatus: any,
+    firstWALPoll?: any,
     error?: string
   }> {
     try {
@@ -100,15 +106,22 @@ export class ReplicationDO implements DurableObject {
         slotExists: slotStatus.exists
       }, MODULE_NAME);
       
-      // Start polling immediately - the polling manager will log its own status
-      await this.pollingManager.startPolling();
+      // Start polling immediately and capture the first poll results
+      const firstWALPoll = await this.pollingManager.startPollingWithFirstPollResults();
       
-      // Log successful initialization at debug level only
-      replicationLogger.debug('Initialization completed', {}, MODULE_NAME);
+              // Log successful initialization with first WAL poll results
+        replicationLogger.info('Initialization completed with first WAL poll', {
+          changesFound: firstWALPoll.changesFound,
+          changeCount: firstWALPoll.changeCount || 0,
+          walEntries: firstWALPoll.walEntries || 0,
+          filteredCount: firstWALPoll.filteredCount || 0,
+          success: firstWALPoll.success
+        }, MODULE_NAME);
       
       return {
         success: true,
-        slotStatus
+        slotStatus,
+        firstWALPoll
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -217,32 +230,14 @@ export class ReplicationDO implements DurableObject {
 
   /**
    * Initialize the replication system - HTTP endpoint handler
-   * First checks slot, then starts polling
+   * Always initializes and starts polling to ensure system is awake and running
    */
   private async handleInit(): Promise<Response> {
     try {
-      // Check if polling is already initialized and active first - this is a very fast check
-      // since it just checks memory state, no database calls needed
-      const isAlreadyPolling = this.pollingManager.hasCompletedFirstPoll;
+      replicationLogger.info('API: Replication init called - always initializing', {}, MODULE_NAME);
       
-      if (isAlreadyPolling) {
-        replicationLogger.debug('API: Replication already initialized', {}, MODULE_NAME);
-        
-        return new Response(JSON.stringify({
-          success: true,
-          pollingStarted: true,
-          alreadyInitialized: true
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      
-      // If not already polling, perform full initialization using the shared method
       try {
-        replicationLogger.info('API: Initializing replication', {}, MODULE_NAME);
-        
-        // Use the shared initialization method which returns slot status
+        // Always initialize and start polling - this is idempotent and ensures wake-up
         const initResult = await this.initializeAndStartPolling();
         
         if (!initResult.success) {
@@ -258,7 +253,8 @@ export class ReplicationDO implements DurableObject {
         return new Response(JSON.stringify({
           success: true,
           slotStatus: initResult.slotStatus,
-          pollingStarted: true
+          pollingStarted: true,
+          firstWALPoll: initResult.firstWALPoll
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
@@ -298,10 +294,11 @@ export class ReplicationDO implements DurableObject {
       const slotStatus = await this.stateManager.checkSlotStatus(c);
       const currentLSN = await this.stateManager.getLSN();
       
-      // Get polling status information
-      const pollingActive = this.pollingManager.hasCompletedFirstPoll;
+      // Get actual polling status information
+      const hasCompletedFirstPoll = this.pollingManager.hasCompletedFirstPoll;
+      const isPollingActive = this.pollingManager.isPollingActive();
       const pollCount = this.pollingManager.getPollCount ? this.pollingManager.getPollCount() : 0;
-      const pollingDuration = pollingActive && pollCount > 0 
+      const pollingDuration = hasCompletedFirstPoll && isPollingActive && pollCount > 0 
         ? `${Math.floor(pollCount / 60)} minutes (${pollCount} polls)` 
         : "inactive";
       
@@ -310,7 +307,8 @@ export class ReplicationDO implements DurableObject {
         slotStatus,
         currentLSN,
         polling: {
-          active: pollingActive,
+          active: isPollingActive, // Use actual interval state, not just flag
+          hasCompletedFirstPoll,   // Include both for debugging
           count: pollCount,
           duration: pollingDuration
         }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import OriginalSelect, {
   Props as SelectProps,
   StylesConfig,
@@ -49,54 +49,35 @@ const NewEditableMultiSelect: React.FC<NewEditableMultiSelectProps> = ({
   labelSrOnly,
   id,
 }) => {
-  const [currentSelectedOptions, setCurrentSelectedOptions] = useState<OptionType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Ref to store the value prop as it was when the component last settled (mounted or after a successful save)
-  const initialValuePropRef = useRef(value);
-
-  useEffect(() => {
-    const selectedOptions = value ? options.filter(opt => value.includes(opt.value as string | number)) : [];
-    setCurrentSelectedOptions(selectedOptions);
-    initialValuePropRef.current = value; // Update ref when 'value' prop changes externally
+  // Memoize selected options based on value prop only
+  const selectedOptions = useMemo(() => {
+    if (!value || !Array.isArray(value)) return [];
+    return options.filter(opt => value.includes(opt.value as string | number));
   }, [value, options]);
 
-  const handleChange = async (selectedOptions: readonly OptionType[] | null) => {
-    const newSelectedOptions = selectedOptions ? [...selectedOptions] : [];
-    setCurrentSelectedOptions(newSelectedOptions);
+  const handleChange = useCallback(async (selectedOptions: readonly OptionType[] | null) => {
+    const newValues = selectedOptions ? selectedOptions.map(opt => opt.value) : [];
     
-    // Save immediately when options are selected
-    const valuesToSave = newSelectedOptions.map(opt => opt.value);
-
-    // Compare arrays
-    const hasChanged = !initialValuePropRef.current || 
-      initialValuePropRef.current.length !== valuesToSave.length ||
-      !initialValuePropRef.current.every(val => valuesToSave.includes(val as any)) ||
-      !valuesToSave.every(val => initialValuePropRef.current!.includes(val as string | number));
+    // Only save if values actually changed
+    const currentValues = value || [];
+    const hasChanged = newValues.length !== currentValues.length ||
+      !newValues.every(val => currentValues.includes(val as string | number));
 
     if (hasChanged) {
       setIsLoading(true);
       setError(null);
       try {
-        await onSave(valuesToSave);
-        initialValuePropRef.current = valuesToSave; // Update ref to the new successfully saved value
+        await onSave(newValues);
       } catch (e: any) {
         setError(e.message || 'Failed to save. Please try again.');
-        // Revert to original options if save fails
-        const originalOptions = initialValuePropRef.current ? 
-          options.filter(opt => initialValuePropRef.current!.includes(opt.value as string | number)) : [];
-        setCurrentSelectedOptions(originalOptions);
       } finally {
         setIsLoading(false);
       }
     }
-  };
-
-  const handleBlur = async () => {
-    // Keep blur handler simple - just for cleanup if needed
-    // Main save logic now happens in handleChange
-  };
+  }, [value, onSave]);
   
   const componentId = id || selectProps?.id || React.useId();
 
@@ -232,9 +213,8 @@ const NewEditableMultiSelect: React.FC<NewEditableMultiSelectProps> = ({
         <Select
           inputId={componentId}
           options={options}
-          value={currentSelectedOptions}
+          value={selectedOptions}
           onChange={handleChange}
-          onBlur={handleBlur}
           placeholder={placeholder}
           styles={selectStyles}
           isDisabled={isLoading || selectProps.isDisabled}

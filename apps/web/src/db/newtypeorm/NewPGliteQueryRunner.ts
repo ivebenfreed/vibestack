@@ -105,8 +105,7 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
     constructor(driver: NewPGliteDriver, mode: ReplicationMode = "master") {
         super();
         this.driver = driver;
-        this.mode = mode; // Inherited mode property
-        // Assign connection from the driver (driver gets it assigned in DataSource factory)
+        this.mode = mode;
         this.connection = driver.connection; 
         // Use the safe broadcaster instead of the standard one
         this.broadcaster = new SafeBroadcaster(this); 
@@ -115,7 +114,8 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
             // This should ideally not happen if DataSource factory assigns it
             console.warn("QueryRunner created without a connection reference from the driver.");
         }
-        console.log(`NewPGliteQueryRunner initialized in mode: ${this.mode}`);
+        // Removed excessive logging - uncomment below for debugging if needed
+        // console.log(`NewPGliteQueryRunner initialized in mode: ${this.mode}`);
     }
 
     // -------------------------------------------------------------------------
@@ -126,36 +126,112 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
      * Executes a given SQL query.
      */
     async query(query: string, parameters?: any[], useStructuredResult = false): Promise<any> {
-        if (this.isReleased) {
-            throw new QueryRunnerAlreadyReleasedError();
-        }
-
-        const pglite = this.driver.pglite;
-        if (!pglite) {
+        if (!this.driver || !this.driver.connection) {
             throw new Error("PGlite connection is not available in the driver.");
         }
 
         const databaseConnection = await this.connect(); // Ensure connection from driver
 
-        // Using 'any' cast for logger temporarily
-        this.driver.connection.logger.logQuery(query, parameters, this as any);
-        // Comment out redundant manual query logging
-        // console.log(`[QueryRunner] Full SQL Query: ${query}`); 
+        // TypeORM logger (comment out the raw query logging in development)
+        // this.driver.connection.logger.logQuery(query, parameters, this as any);
+
+        // Concise query logging for debugging
+        const queryType = query.trim().split(' ')[0].toUpperCase();
+        const isSelect = queryType === 'SELECT';
+        const paramCount = parameters?.length || 0;
+        
+        // Only log non-SELECT queries and queries with errors in development
+        if (!isSelect || paramCount > 0) {
+            console.log(`[QueryRunner] ${queryType} query: ${paramCount} params`);
+        }
 
         try {
             const queryStartTime = +new Date();
 
-            const sanitizedParams = parameters;
-
-            // --- Log SQL Directly ---
-            console.log(">>> [QueryRunner EXEC] SQL:", query);
-            console.log(">>> [QueryRunner EXEC] Params:", JSON.stringify(sanitizedParams));
-            // --- End Log SQL Directly ---
-            const result = await databaseConnection.query(query, sanitizedParams);
-            // console.log('[QueryRunner] Raw result from PGLite:', JSON.stringify(result)); // REMOVED: Log the raw result
+            // Add retry logic for protocol errors with transaction handling
+            let result;
+            let attempts = 0;
+            const maxAttempts = 3;
+            let wasInTransaction = this.isTransactionActive;
+            
+            while (attempts < maxAttempts) {
+                try {
+                    // Pass parameters directly to PGLite, just like PostgreSQL QueryRunner does
+                    result = await databaseConnection.query(query, parameters);
+                    break; // Success, exit retry loop
+                } catch (error) {
+                    attempts++;
+                    
+                    // Enhanced error logging for protocol errors
+                    console.error(`[QueryRunner] ${queryType} failed (attempt ${attempts}/${maxAttempts}):`, {
+                        error: error instanceof Error ? error.message : String(error),
+                        paramCount,
+                        isTransactionActive: this.isTransactionActive,
+                        wasInTransaction
+                    });
+                    
+                    // Check if this is a recoverable protocol error
+                    if (this.isRecoverableProtocolError(error) && attempts < maxAttempts) {
+                        console.warn(`[QueryRunner] Protocol error attempt ${attempts}/${maxAttempts}, retrying...`);
+                        
+                        // If we're in a transaction and got a protocol error, we need to rollback and restart
+                        if (this.isTransactionActive) {
+                            try {
+                                console.warn(`[QueryRunner] Rolling back aborted transaction due to protocol error`);
+                                await this.rollbackTransaction();
+                                
+                                // If we were originally in a transaction, restart it
+                                if (wasInTransaction) {
+                                    console.warn(`[QueryRunner] Restarting transaction after protocol error recovery`);
+                                    await this.startTransaction();
+                                }
+                            } catch (rollbackError) {
+                                console.error(`[QueryRunner] Failed to rollback/restart transaction:`, rollbackError);
+                                // Continue with retry anyway - the connection might recover
+                            }
+                        }
+                        
+                        // Small delay before retry
+                        await new Promise(resolve => setTimeout(resolve, 50 * attempts));
+                        continue;
+                    }
+                    
+                    // Check if this is a transaction aborted error
+                    const errorMessage = (error as any)?.message || String(error);
+                    if (errorMessage.includes('current transaction is aborted') && this.isTransactionActive) {
+                        console.warn(`[QueryRunner] Transaction aborted, rolling back and retrying...`);
+                        try {
+                            await this.rollbackTransaction();
+                            
+                            // If we were originally in a transaction, restart it
+                            if (wasInTransaction && attempts < maxAttempts) {
+                                await this.startTransaction();
+                                // Retry the query in the new transaction
+                                await new Promise(resolve => setTimeout(resolve, 50 * attempts));
+                                continue;
+                            }
+                        } catch (rollbackError) {
+                            console.error(`[QueryRunner] Failed to rollback aborted transaction:`, rollbackError);
+                        }
+                    }
+                    
+                    // If not recoverable or max attempts reached, throw
+                    throw error;
+                }
+            }
 
             const queryEndTime = +new Date();
             const queryExecutionTime = queryEndTime - queryStartTime;
+
+            // Only log slow queries or non-SELECT operations
+            const isSlow = queryExecutionTime > 100; // 100ms threshold
+            if (!isSelect || isSlow) {
+                console.log(`[QueryRunner] ${queryType} completed:`, {
+                    executionTime: queryExecutionTime,
+                    affectedRows: result?.affectedRows,
+                    ...(isSlow && { performance: 'SLOW' })
+                });
+            }
 
             if (this.driver.connection.options?.maxQueryExecutionTime && queryExecutionTime > this.driver.connection.options.maxQueryExecutionTime) {
                  // Using 'any' cast for logger temporarily
@@ -173,20 +249,38 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
                 queryResult.raw = queryResult.records; 
             }
 
-            // Return based on useStructuredResult
-            if (useStructuredResult) {
-                // Return the standard QueryResult object
-                return queryResult; 
-            } else {
-                // Return just the raw rows array (which is also in queryResult.raw)
-                return queryResult.raw; 
+            return queryResult;
+        } catch (error) {
+            // Keep error logging
+            this.driver.connection.logger.logQueryError(error as Error, query, parameters, this as any);
+            
+            // Wrap in QueryFailedError for TypeORM compatibility
+            if (!(error instanceof QueryFailedError)) {
+                throw new QueryFailedError(query, parameters, error as Error);
             }
-        } catch (err: any) {
-             // Using 'any' cast for logger temporarily
-            this.driver.connection.logger.logQueryError(err, query, parameters, this as any);
-            const error = err instanceof Error ? err : new Error(String(err));
-            throw new QueryFailedError(query, parameters, error);
+            
+            throw error;
         }
+    }
+
+    /**
+     * Check if an error is a recoverable protocol error
+     */
+    private isRecoverableProtocolError(error: any): boolean {
+        const errorMessage = error?.message || String(error);
+        
+        // Known recoverable protocol errors
+        const recoverableErrors = [
+            'insufficient data left in message',
+            'protocol error',
+            'connection reset',
+            'connection lost',
+            'current transaction is aborted'
+        ];
+        
+        return recoverableErrors.some(recoverable => 
+            errorMessage.toLowerCase().includes(recoverable.toLowerCase())
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -235,6 +329,14 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
             await this.query("ROLLBACK");
             this.isTransactionActive = false;
         } catch (e) {
+            // If the transaction is already aborted, we can't execute ROLLBACK
+            // Just reset the transaction state
+            const errorMessage = (e as any)?.message || String(e);
+            if (errorMessage.includes('current transaction is aborted')) {
+                console.warn('[QueryRunner] Transaction already aborted, resetting state without ROLLBACK');
+                this.isTransactionActive = false;
+                return;
+            }
             throw e;
         }
     }

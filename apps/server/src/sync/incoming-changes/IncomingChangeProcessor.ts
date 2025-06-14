@@ -30,8 +30,8 @@ export class IncomingChangeProcessor {
     private env: { DATABASE_URL: string; NODE_ENV?: string },
     private config: SyncConfig = DEFAULT_SYNC_CONFIG
   ) {
-    this.entityOperations = new EntityOperations(client, env);
     this.conflictResolver = new ConflictResolver(config);
+    this.entityOperations = new EntityOperations(client, env, this.conflictResolver);
   }
 
   /**
@@ -215,41 +215,76 @@ export class IncomingChangeProcessor {
    * Log detailed information about received changes
    */
   private logReceivedChanges(clientId: string, message: ClientChangesMessage, changes: TableChange[]): void {
-    syncLogger.info(`🔍 [SERVER] Received ${changes.length} TableChange objects from client ${clientId}`, {
+    // Summary logging at info level
+    const summary = this.createChangesSummary(changes);
+    syncLogger.info(`Received ${changes.length} changes from client`, {
       clientId,
       messageId: message.messageId,
-      changesCount: changes.length
+      changesCount: changes.length,
+      summary
     }, MODULE_NAME);
     
-    // Log each TableChange object in detail
-    changes.forEach((change, index) => {
-      const data = change.data as any;
-      const hasRelationshipUpdates = !!(change.relationshipUpdates && change.relationshipUpdates.length > 0);
-      const hasEntityRelations = !!(change.entityRelations && change.entityRelations.length > 0);
+    // Detailed logging only at debug level
+    syncLogger.debug(`Detailed change breakdown for client ${clientId}`, {
+      clientId,
+      messageId: message.messageId,
+      changes: changes.map((change, index) => {
+        const data = change.data as any;
+        return {
+          index: index + 1,
+          table: change.table,
+          operation: change.operation,
+          entityId: data.id,
+          hasRelationshipUpdates: !!(change.relationshipUpdates && change.relationshipUpdates.length > 0),
+          relationshipUpdatesCount: change.relationshipUpdates?.length || 0,
+          hasEntityRelations: !!(change.entityRelations && change.entityRelations.length > 0),
+          updatedAt: change.updatedAt,
+          dataKeys: Object.keys(data)
+        };
+      })
+    }, MODULE_NAME);
+  }
+  
+  /**
+   * Create a concise summary of changes for logging
+   * Enhanced to distinguish between entity updates and relationship-only updates
+   */
+  private createChangesSummary(changes: TableChange[]): Record<string, Record<string, number>> {
+    const summary: Record<string, Record<string, number>> = {};
+    
+    for (const change of changes) {
+      if (!summary[change.table]) {
+        summary[change.table] = {};
+      }
       
-      syncLogger.info(`🔍 [SERVER] TableChange ${index + 1}/${changes.length} details:`, {
-        clientId,
-        index,
-        table: change.table,
-        operation: change.operation,
-        entityId: data.id,
-        hasClientId: !!data.client_id,
-        clientIdValue: data.client_id,
-        hasRelationshipUpdates,
-        relationshipUpdatesCount: change.relationshipUpdates?.length || 0,
-        relationshipUpdates: change.relationshipUpdates,
-        hasEntityRelations,
-        entityRelations: change.entityRelations,
-        updatedAt: change.updated_at,
-        topLevelClientId: change.client_id,
-        dataKeys: Object.keys(data),
-        // Check for snake_case versions in data
-        hasSnakeCaseEntityRelations: !!(data as any).entity_relations,
-        hasSnakeCaseRelationshipUpdates: !!(data as any).relationship_updates,
-        snakeCaseEntityRelations: (data as any).entity_relations,
-        snakeCaseRelationshipUpdates: (data as any).relationship_updates
-      }, MODULE_NAME);
-    });
+      // Determine the type of change more accurately
+      let changeType: string = change.operation;
+      
+      // For updates, check if this is a pure relationship update
+      if (change.operation === 'update' && change.relationshipUpdates && change.relationshipUpdates.length > 0) {
+        const data = change.data as any;
+        
+        // Check if there are actual entity fields to update (beyond id, clientId, updatedAt)
+        const entityFields = Object.keys(data).filter(key => 
+          key !== 'id' && key !== 'clientId' && key !== 'updatedAt'
+        );
+        
+        if (entityFields.length === 0) {
+          // This is a pure relationship update - the entity table itself won't be touched
+          changeType = 'relationship_update';
+        } else {
+          // This is a mixed update - both entity fields and relationships
+          changeType = 'update_with_relationships';
+        }
+      }
+      
+      if (!summary[change.table][changeType]) {
+        summary[change.table][changeType] = 0;
+      }
+      summary[change.table][changeType]++;
+    }
+    
+    return summary;
   }
   
   /**

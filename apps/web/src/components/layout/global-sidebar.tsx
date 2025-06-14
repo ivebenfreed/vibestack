@@ -1,39 +1,122 @@
 import * as React from 'react'
-import { Link, useMatchRoute } from '@tanstack/react-router'
+import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
-import { useGlobalSidebar } from '@/contexts/global-sidebar-context'
+import { useLayoutStore } from '@/stores/layoutStore'
 
 // Global sidebar width constant
 export const GLOBAL_SIDEBAR_WIDTH = 64
 // Mobile bottom navigation height constant  
 export const MOBILE_BOTTOM_NAV_HEIGHT = 64
 
-// V Logo component matching the main sidebar
-const VLogo = () => (
-  <svg
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-6 w-6"
-  >
-    <path
-      d="M6 4L12 18L18 4"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
 interface GlobalSidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
+interface NavItemProps {
+  sectionId: string
+  icon: React.ElementType
+  label: string
+  isActive: boolean
+  isMobile: boolean
+}
+
+function NavItem({ sectionId, icon: Icon, label, isActive, isMobile }: NavItemProps) {
+  const matchRoute = useMatchRoute()
+  const navigate = useNavigate()
+  
+  // Determine the route for this section
+  const getRouteForSection = (section: string) => {
+    switch (section) {
+      case 'home': return '/'
+      case 'projects': return '/projects'
+      case 'settings': return '/settings'
+      case 'debug': return '/debug'
+      default: return '/'
+    }
+  }
+  
+  const route = getRouteForSection(sectionId)
+  const isCurrentRoute = matchRoute({ to: route, fuzzy: true })
+  
+  const handleClick = () => {
+    // 🎯 DEBUG: Time the entire navigation process
+    const clickTime = performance.now()
+    console.log(`🔥 [GlobalSidebar] CLICK DETECTED for section: ${sectionId} to route: ${route}`)
+    if (import.meta.env.DEV) {
+      console.log(`[GlobalSidebar] Navigation click for section: ${sectionId} to route: ${route}`)
+    }
+    
+    // Defer navigation to next tick for instant click response
+    setTimeout(() => {
+      const navStartTime = performance.now()
+      console.log(`[GlobalSidebar] Starting navigation to ${route} at ${navStartTime - clickTime}ms after click`)
+      
+      navigate({ to: route })
+      
+      // Check when navigation completes
+      setTimeout(() => {
+        const navEndTime = performance.now()
+        console.log(`[GlobalSidebar] Navigation to ${route} took ${navEndTime - navStartTime}ms total`)
+      }, 0)
+    }, 0)
+  }
+  
+  if (isMobile) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col items-center justify-center p-2 rounded-md transition-colors text-xs cursor-pointer',
+          'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+          (isActive || isCurrentRoute) 
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
+            : 'text-sidebar-foreground'
+        )}
+        onClick={handleClick}
+      >
+        <Icon className="h-5 w-5 mb-1" />
+        <span className="text-xs">{label}</span>
+      </div>
+    )
+  }
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          to={route}
+          className={cn(
+            'flex items-center justify-center w-10 h-10 rounded-md transition-colors',
+            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            (isActive || isCurrentRoute) 
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
+              : 'text-sidebar-foreground'
+          )}
+          preload="intent"
+        >
+          <Icon className="h-5 w-5" />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function MobileNavItem({ sectionId, icon, label, isActive }: Omit<NavItemProps, 'isMobile'>) {
+  return <NavItem sectionId={sectionId} icon={icon} label={label} isActive={isActive} isMobile={true} />
+}
+
+function VLogo() {
+  return (
+    <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+      <span className="text-primary-foreground font-bold text-lg">V</span>
+    </div>
+  )
+}
+
 export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
-  const { activeSection, setActiveSection } = useGlobalSidebar()
+  const activeSection = useLayoutStore.activeSection()
 
   return (
     <>
@@ -52,7 +135,7 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
             to="/" 
             className="flex items-center justify-center p-2 rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             aria-label="Home"
-            onClick={() => setActiveSection('home')}
+            onClick={() => useLayoutStore.setActiveSection('home')}
           >
             <VLogo />
           </Link>
@@ -91,125 +174,5 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
         </div>
       </div>
     </>
-  )
-}
-
-interface NavItemProps {
-  sectionId: string
-  icon: React.ElementType
-  label: string
-  isActive: boolean
-  isMobile?: boolean
-}
-
-function NavItem({ sectionId, icon: Icon, label, isActive, isMobile = false }: NavItemProps) {
-  const { setActiveSection } = useGlobalSidebar()
-  
-  // Map section IDs to their main page routes
-  const getSectionRoute = (sectionId: string): string => {
-    switch (sectionId) {
-      case 'home':
-        return '/'
-      case 'projects':
-        return '/projects'
-      case 'settings':
-        return '/settings'
-      case 'debug':
-        return '/debug/database' // Default to database debug page
-      default:
-        return '/'
-    }
-  }
-  
-  const handleClick = () => {
-    setActiveSection(sectionId)
-  }
-  
-  const IconComponent = Icon as React.ComponentType<{ className?: string }>
-  const route = getSectionRoute(sectionId)
-  
-  if (isMobile) {
-    return (
-      <Link
-        to={route as any}
-        onClick={handleClick}
-        className={cn(
-          'flex flex-col items-center justify-center px-2 py-1 min-w-0 flex-1',
-          isActive
-            ? 'text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground'
-        )}
-        aria-label={label}
-      >
-        <IconComponent className="h-5 w-5 mb-1" />
-        <span className="text-xs truncate">{label}</span>
-      </Link>
-    )
-  }
-  
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          to={route as any}
-          onClick={handleClick}
-          className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-md transition-colors ring-sidebar-ring outline-hidden focus-visible:ring-2',
-            isActive
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-          )}
-          aria-label={label}
-        >
-          <IconComponent className="h-5 w-5" />
-        </Link>
-      </TooltipTrigger>
-      <TooltipContent side="right" align="center">{label}</TooltipContent>
-    </Tooltip>
-  )
-}
-
-// Mobile-specific nav item component
-function MobileNavItem({ sectionId, icon: Icon, label, isActive }: Omit<NavItemProps, 'isMobile'>) {
-  const { setActiveSection } = useGlobalSidebar()
-  
-  // Map section IDs to their main page routes
-  const getSectionRoute = (sectionId: string): string => {
-    switch (sectionId) {
-      case 'home':
-        return '/'
-      case 'projects':
-        return '/projects'
-      case 'settings':
-        return '/settings'
-      case 'debug':
-        return '/debug/database'
-      default:
-        return '/'
-    }
-  }
-  
-  const handleClick = () => {
-    setActiveSection(sectionId)
-  }
-  
-  const IconComponent = Icon as React.ComponentType<{ className?: string }>
-  const route = getSectionRoute(sectionId)
-  
-  return (
-    <Link
-      to={route as any}
-      onClick={handleClick}
-      className={cn(
-        'flex flex-col items-center justify-center p-2 min-w-0 flex-1 rounded-md transition-colors',
-        isActive
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-      )}
-      aria-label={label}
-    >
-      <IconComponent className="h-5 w-5 mb-1" />
-      <span className="text-xs truncate">{label}</span>
-    </Link>
   )
 }

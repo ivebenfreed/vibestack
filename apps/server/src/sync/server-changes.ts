@@ -14,9 +14,11 @@ import { syncLogger } from '../middleware/logger';
 import type { WebSocketHandler } from './types';
 import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
 import { getDBClient } from '../lib/db';
-import { compareLSN, deduplicateChanges, orderChangesByDomain as baseOrderChangesByDomain } from '../lib/sync-common';
+import { compareLSN, deduplicateChanges, orderChangesByDomain as baseOrderChangesByDomain, transformPostgreSQLFields } from '../lib/sync-common';
 import { sql } from '../lib/db';
 import type { SyncStateManager } from './state-manager';
+import { NeonService } from '../lib/neon-orm/neon-service';
+import { RepositoryContainer } from '../domains/RepositoryContainer';
 
 // Constants for chunking
 // 500 is a good balance between batch size and message size
@@ -28,6 +30,39 @@ const DEFAULT_CHUNK_SIZE = 500;
 type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 
 const MODULE_NAME = 'server-changes';
+
+/**
+ * Create a ChangeHistoryRepository instance from context
+ * Helper function to initialize repository for server-changes operations
+ */
+function createChangeHistoryRepository(context: MinimalContext): RepositoryContainer {
+  // Create a mock Hono context from MinimalContext (similar to EntityOperations pattern)
+  const stableRequestId = `sync-${context.env.DATABASE_URL?.slice(-10) || 'default'}`;
+  
+  const honoContext = {
+    req: { 
+      header: (name: string) => {
+        if (name === 'cf-request-id') {
+          return stableRequestId;
+        }
+        return undefined;
+      }
+    },
+    env: context.env,
+    finalized: false,
+    error: null,
+    get executionCtx() { return null; },
+    get event() { return null; },
+    var: {},
+    get: (key: string) => undefined,
+    set: (key: string, value: any) => {},
+    json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
+    text: (text: string) => Promise.resolve(new Response(text))
+  } as unknown as any;
+  
+  const neonService = new NeonService(honoContext);
+  return new RepositoryContainer(neonService);
+}
 
 /**
  * Helper function to process a raw batch of changes fetched from the database.
@@ -103,7 +138,7 @@ function processRawChangesBatch(
   const echoedChangesSummary: Array<{ table: string; operation: string; entityId?: string; }> = [];
   
   const filteredChanges = orderedChanges.filter(change => {
-    const originatingClientId = change.data?.client_id;
+    const originatingClientId = change.data?.clientId;
     const isEcho = originatingClientId === clientId;
     
     if (isEcho) {
@@ -120,7 +155,7 @@ function processRawChangesBatch(
         operation: change.operation,
         entityId: change.data?.id,
         originatingClientId,
-        changeUpdatedAt: change.updated_at
+        changeUpdatedAt: change.updatedAt
       }, MODULE_NAME);
       return false; // Filter out echoed change
     }
@@ -175,7 +210,7 @@ export async function sendCatchupChanges(
   }, MODULE_NAME);
 
   if (!changes.length) {
-    syncLogger.info('No changes to send for catchup', { clientId }, MODULE_NAME);
+    syncLogger.debug('No changes to send for catchup', { clientId }, MODULE_NAME);
     return false;
   }
 
@@ -183,7 +218,7 @@ export async function sendCatchupChanges(
   const chunks = Math.ceil(changes.length / DEFAULT_CHUNK_SIZE);
   const success: boolean[] = [];
 
-  syncLogger.info('Preparing to send catchup chunks', {
+  syncLogger.debug('Preparing to send catchup chunks', {
     clientId,
     totalChunks: chunks,
     changesPerChunk: DEFAULT_CHUNK_SIZE
@@ -288,7 +323,7 @@ export async function sendCatchupChanges(
 
   // Return true only if all chunks were sent successfully
   const allSuccess = success.every(s => s);
-  syncLogger.info('Catchup changes send completed', {
+  syncLogger.debug('Catchup changes send completed', {
     clientId,
     success: allSuccess,
     totalChunks: chunks,
@@ -304,7 +339,7 @@ export async function sendCatchupChanges(
 export function createCatchupSyncCompletion(
   clientId: string,
   startLSN: string,
-  finalLSN: string,
+  serverLSN: string,
   changeCount: number
 ): ServerCatchupCompletedMessage {
   return {
@@ -313,7 +348,7 @@ export function createCatchupSyncCompletion(
     timestamp: Date.now(),
     clientId,
     startLSN,
-    finalLSN,
+    serverLSN,
     changeCount,
     success: true
   };
@@ -333,7 +368,7 @@ export function createCatchupSyncError(
     timestamp: Date.now(),
     clientId,
     startLSN,
-    finalLSN: startLSN,
+    serverLSN: startLSN,
     changeCount: 0,
     success: false,
     error: error instanceof Error ? error.message : String(error)
@@ -388,39 +423,65 @@ export async function performCatchupSync(
       }, MODULE_NAME);
 
       let rawBatchChanges: TableChange[] = [];
-      syncLogger.debug(`[TIMING] Phase 1: Getting DB client for batch #${phase1Iteration}`, { clientId, timestamp: Date.now() });
-      const batchClient = getDBClient(context);
-      try { 
-        const connectStartTime = Date.now();
-        syncLogger.debug(`[TIMING] Phase 1: Connecting DB client for batch #${phase1Iteration}`, { clientId, timestamp: connectStartTime });
-        await batchClient.connect();
-        syncLogger.debug(`[TIMING] Phase 1: DB client connected for batch #${phase1Iteration} (took ${Date.now() - connectStartTime}ms)`, { clientId, timestamp: Date.now() });
-        
+      
+      try {
         const queryStartTime = Date.now();
-        syncLogger.debug(`[TIMING] Phase 1: Querying DB for batch #${phase1Iteration}`, { clientId, timestamp: queryStartTime });
-        const batchResult = await batchClient.query<TableChange>(`
-          SELECT lsn, table_name as "table", operation, data, timestamp 
-          FROM change_history 
-          WHERE 
-            lsn::pg_lsn > $1::pg_lsn -- Fetch all changes after client LSN
-            AND (data->>'client_id' IS NULL OR data->>'client_id' != $2) -- Adjusted parameter index
-          ORDER BY lsn::pg_lsn ASC
-          LIMIT $3 -- Adjusted parameter index
-        `, [currentLSN, clientId, BATCH_SIZE]); // Removed initialServerLSN, adjusted indices
-        syncLogger.debug(`[TIMING] Phase 1: DB query finished for batch #${phase1Iteration} (took ${Date.now() - queryStartTime}ms)`, { clientId, timestamp: Date.now(), rowCount: batchResult.rowCount });
+        syncLogger.debug(`[TIMING] Phase 1: Querying via repository for batch #${phase1Iteration}`, { clientId, timestamp: queryStartTime });
+        
+        const repositories = createChangeHistoryRepository(context);
+        rawBatchChanges = await repositories.changeHistory.findChangesAfterLSN(
+          currentLSN,
+          clientId,
+          BATCH_SIZE
+        );
+        
+        syncLogger.debug(`[TIMING] Phase 1: Repository query finished for batch #${phase1Iteration} (took ${Date.now() - queryStartTime}ms)`, { 
+          clientId, 
+          timestamp: Date.now(), 
+          rowCount: rawBatchChanges.length 
+        });
+      } catch (error) {
+        syncLogger.error(`Repository query failed for batch #${phase1Iteration}, falling back to direct query`, {
+          clientId,
+          currentLSN,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        
+        // Fallback to direct query if repository fails
+        syncLogger.debug(`[TIMING] Phase 1: Getting DB client for batch #${phase1Iteration} (fallback)`, { clientId, timestamp: Date.now() });
+        const batchClient = getDBClient(context);
+        try { 
+          const connectStartTime = Date.now();
+          syncLogger.debug(`[TIMING] Phase 1: Connecting DB client for batch #${phase1Iteration}`, { clientId, timestamp: connectStartTime });
+          await batchClient.connect();
+          syncLogger.debug(`[TIMING] Phase 1: DB client connected for batch #${phase1Iteration} (took ${Date.now() - connectStartTime}ms)`, { clientId, timestamp: Date.now() });
+          
+          const queryStartTime = Date.now();
+          syncLogger.debug(`[TIMING] Phase 1: Querying DB for batch #${phase1Iteration}`, { clientId, timestamp: queryStartTime });
+          const batchResult = await batchClient.query<TableChange>(`
+            SELECT lsn, table_name as "table", operation, data, timestamp 
+            FROM change_history 
+            WHERE 
+              lsn::pg_lsn > $1::pg_lsn -- Fetch all changes after client LSN
+              AND (data->>'clientId' IS NULL OR data->>'clientId' != $2) -- Changed from client_id to clientId
+            ORDER BY lsn::pg_lsn ASC
+            LIMIT $3 -- Adjusted parameter index
+          `, [currentLSN, clientId, BATCH_SIZE]); // Removed initialServerLSN, adjusted indices
+          syncLogger.debug(`[TIMING] Phase 1: DB query finished for batch #${phase1Iteration} (took ${Date.now() - queryStartTime}ms)`, { clientId, timestamp: Date.now(), rowCount: batchResult.rowCount });
 
-        rawBatchChanges = batchResult.rows.map((row: any) => ({
-          table: row.table || 'unknown',
-          operation: row.operation,
-          data: row.data,
-          lsn: row.lsn,
-          updated_at: row.timestamp || new Date().toISOString()
-        }));
-      } finally {
-        const endClientStartTime = Date.now();
-        syncLogger.debug(`[TIMING] Phase 1: Ending DB client connection for batch #${phase1Iteration}`, { clientId, timestamp: endClientStartTime });
-        await batchClient.end();
-        syncLogger.debug(`[TIMING] Phase 1: DB client ended for batch #${phase1Iteration} (took ${Date.now() - endClientStartTime}ms)`, { clientId, timestamp: Date.now() });
+          rawBatchChanges = batchResult.rows.map((row: any) => ({
+            table: row.table || 'unknown',
+            operation: row.operation,
+            data: transformPostgreSQLFields(row.data || {}, row.table || 'unknown'), // Transform PostgreSQL fields
+            lsn: row.lsn,
+            updatedAt: row.timestamp || new Date().toISOString()
+          }));
+        } finally {
+          const endClientStartTime = Date.now();
+          syncLogger.debug(`[TIMING] Phase 1: Ending DB client connection for batch #${phase1Iteration}`, { clientId, timestamp: endClientStartTime });
+          await batchClient.end();
+          syncLogger.debug(`[TIMING] Phase 1: DB client ended for batch #${phase1Iteration} (took ${Date.now() - endClientStartTime}ms)`, { clientId, timestamp: Date.now() });
+        }
       }
 
       if (rawBatchChanges.length === 0) {
@@ -690,8 +751,8 @@ export async function sendLiveChanges(
     // Filter out changes that originated from this client
     const originalCount = orderedChanges.length;
     orderedChanges = orderedChanges.filter(change => {
-      // Access client_id from change.data if it exists
-      return !change.data?.client_id || change.data.client_id !== clientId;
+      // Access clientId from change.data if it exists (changed from client_id to clientId)
+      return !change.data?.clientId || change.data.clientId !== clientId;
     });
     
     // Log filtered changes
@@ -911,8 +972,8 @@ export function createLiveSyncConfirmation(
     messageId: `srv_${Date.now()}_live_start`,
     timestamp: Date.now(),
     clientId,
-    startLSN: lsn,  // Current LSN as both start and final
-    finalLSN: lsn,
+    startLSN: lsn,  // Current LSN as both start and server
+    serverLSN: lsn,
     changeCount: 0, // No changes were sent
     success: true
   };
@@ -1002,30 +1063,56 @@ export async function processLiveUpdateNotification(
   let webSocketUnavailableError: Error | null = null;
 
   try {
-    // 1. Fetch raw delta changes
+    // 1. Fetch raw delta changes using repository
     let rawDeltaChanges: TableChange[] = [];
-    const deltaClient = getDBClient(context);
+    
     try {
-      await deltaClient.connect();
-      const deltaResult = await deltaClient.query<TableChange>(`
-        SELECT lsn, table_name as "table", operation, data, timestamp 
-        FROM change_history 
-        WHERE 
-          lsn::pg_lsn > $1::pg_lsn AND
-          lsn::pg_lsn <= $2::pg_lsn
-        ORDER BY lsn::pg_lsn ASC
-        LIMIT 1000 -- Reasonable limit for a live update delta
-      `, [clientLSN, serverLSN]);
+      const repositories = createChangeHistoryRepository(context);
+      rawDeltaChanges = await repositories.changeHistory.findChangesBetweenLSN(
+        clientLSN,
+        serverLSN,
+        clientId,
+        1000 // Reasonable limit for a live update delta
+      );
       
-      rawDeltaChanges = deltaResult.rows.map((row: any) => ({
-          table: row.table || 'unknown',
-          operation: row.operation,
-          data: row.data,
-          lsn: row.lsn,
-          updated_at: row.timestamp || new Date().toISOString()
-      }));
-    } finally {
-      await deltaClient.end();
+      syncLogger.debug('Repository fetch completed', {
+        clientId,
+        clientLSN,
+        serverLSN,
+        fetchedCount: rawDeltaChanges.length
+      }, MODULE_NAME);
+    } catch (error) {
+      syncLogger.error('Repository fetch failed, falling back to direct query', {
+        clientId,
+        clientLSN,
+        serverLSN,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
+      // Fallback to direct query if repository fails
+      const deltaClient = getDBClient(context);
+      try {
+        await deltaClient.connect();
+        const deltaResult = await deltaClient.query<TableChange>(`
+          SELECT lsn, table_name as "table", operation, data, timestamp 
+          FROM change_history 
+          WHERE 
+            lsn::pg_lsn > $1::pg_lsn AND
+            lsn::pg_lsn <= $2::pg_lsn
+          ORDER BY lsn::pg_lsn ASC
+          LIMIT 1000 -- Reasonable limit for a live update delta
+        `, [clientLSN, serverLSN]);
+        
+        rawDeltaChanges = deltaResult.rows.map((row: any) => ({
+            table: row.table || 'unknown',
+            operation: row.operation,
+            data: transformPostgreSQLFields(row.data || {}, row.table || 'unknown'), // Transform PostgreSQL fields
+            lsn: row.lsn,
+            updatedAt: row.timestamp || new Date().toISOString()
+        }));
+      } finally {
+        await deltaClient.end();
+      }
     }
 
     if (rawDeltaChanges.length === 0) {

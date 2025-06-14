@@ -47,6 +47,8 @@
     "@modelcontextprotocol/server-brave-search": "^0.6.2",
     "@modelcontextprotocol/server-postgres": "^0.6.2",
     "hono": "^4.7.8",
+    "jotai": "^2.12.5",
+    "position-observer": "^1.0.0",
     "rich-textarea": "^0.26.4",
     "tailwindcss": "^4.1.4"
   },

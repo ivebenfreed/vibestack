@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { useProjects as useProjectsHook } from '@/db/hooks';
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { usePGliteContext } from '@/db/pglite-provider';
 
@@ -41,80 +40,74 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
   const { services } = usePGliteContext();
   const projectService = services?.projects;
 
-  // Use the useProjects hook as a fallback if service isn't available
-  const hookMethods = useProjectsHook();
-
   // Create a new project
   const createProject = useCallback(async (projectData: { name: string; description?: string; status?: ProjectStatus }) => {
     console.log('Creating project with data:', projectData);
     
-    if (projectService) {
-      console.log('Using project service to create project');
-      const created = await projectService.createProject({
-        name: projectData.name,
-        description: projectData.description || '',
-        status: projectData.status || ProjectStatus.ACTIVE
-      });
-      
-      // Dispatch a custom event to notify that a project was created
-      const event = new CustomEvent('project-created', { 
-        detail: { project: created } 
-      });
-      window.dispatchEvent(event);
-      console.log('Dispatched project-created event');
-      
-      return created;
-    } else {
-      console.log('Using hook fallback to create project');
-      return hookMethods.createProject(projectData);
+    if (!projectService) {
+      throw new Error('Project service not available');
     }
-  }, [projectService, hookMethods]);
+    
+    console.log('Using project service to create project');
+    const created = await projectService.createProject({
+      name: projectData.name,
+      description: projectData.description || '',
+      status: projectData.status || ProjectStatus.ACTIVE
+    });
+    
+    // Dispatch a custom event to notify that a project was created
+    const event = new CustomEvent('project-created', { 
+      detail: { project: created } 
+    });
+    window.dispatchEvent(event);
+    console.log('Dispatched project-created event');
+    
+    return created;
+  }, [projectService]);
 
   // Update an existing project
   const updateProject = useCallback(async (id: string, changes: Partial<Project>) => {
     console.log('Updating project with id:', id, 'and changes:', changes);
     
-    if (projectService) {
-      console.log('Using project service to update project');
-      const updated = await projectService.updateProject(id, changes);
-      
-      // Dispatch a custom event to notify that a project was updated
-      const event = new CustomEvent('project-updated', { 
-        detail: { project: updated } 
-      });
-      window.dispatchEvent(event);
-      console.log('Dispatched project-updated event');
-      
-      return updated;
-    } else {
-      console.log('Using hook fallback to update project');
-      return hookMethods.updateProject(id, changes);
+    if (!projectService) {
+      throw new Error('Project service not available');
     }
-  }, [projectService, hookMethods]);
+    
+    console.log('Using project service to update project');
+    const updated = await projectService.updateProject(id, changes);
+    
+    // Dispatch a custom event to notify that a project was updated
+    const event = new CustomEvent('project-updated', { 
+      detail: { project: updated } 
+    });
+    window.dispatchEvent(event);
+    console.log('Dispatched project-updated event');
+    
+    return updated;
+  }, [projectService]);
 
   // Delete a project
   const deleteProject = useCallback(async (id: string) => {
     console.log('Deleting project with id:', id);
     
-    if (projectService) {
-      console.log('Using project service to delete project');
-      const success = await projectService.deleteProject(id);
-      
-      if (success) {
-        // Dispatch a custom event to notify that a project was deleted
-        const event = new CustomEvent('project-deleted', { 
-          detail: { projectId: id } 
-        });
-        window.dispatchEvent(event);
-        console.log('Dispatched project-deleted event');
-      }
-      
-      return success;
-    } else {
-      console.log('Using hook fallback to delete project');
-      return hookMethods.deleteProject(id);
+    if (!projectService) {
+      throw new Error('Project service not available');
     }
-  }, [projectService, hookMethods]);
+    
+    console.log('Using project service to delete project');
+    const success = await projectService.deleteProject(id);
+    
+    if (success) {
+      // Dispatch a custom event to notify that a project was deleted
+      const event = new CustomEvent('project-deleted', { 
+        detail: { projectId: id } 
+      });
+      window.dispatchEvent(event);
+      console.log('Dispatched project-deleted event');
+    }
+    
+    return success;
+  }, [projectService]);
 
   const value = {
     selectedProject,

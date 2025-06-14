@@ -98,9 +98,15 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     if (e.key === 'Enter' && fieldType === 'text') {
       e.preventDefault();
       handleSave();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && fieldType === 'textarea') {
-      e.preventDefault();
-      handleSave();
+    } else if (e.key === 'Enter' && fieldType === 'textarea') {
+      if (e.shiftKey) {
+        // Shift+Enter: Allow new line (default behavior)
+        return;
+      } else {
+        // Enter alone: Save
+        e.preventDefault();
+        handleSave();
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       handleCancel();

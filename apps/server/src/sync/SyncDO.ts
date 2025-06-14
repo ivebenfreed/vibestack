@@ -259,6 +259,182 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }
     });
 
+    // Add handler for client heartbeats
+    this.onMessage('clt_heartbeat', async (message: ClientMessage) => {
+      const heartbeatMessage = message as any;
+      
+      syncLogger.debug('Received client heartbeat', {
+        clientId: heartbeatMessage.clientId || this.clientId,
+        lsn: heartbeatMessage.lsn,
+        state: heartbeatMessage.state,
+        active: heartbeatMessage.active
+      }, MODULE_NAME);
+      
+      try {
+        // Get current server LSN for comparison using existing function
+        const context = this.getContext();
+        const serverLSN = (await getLatestChangeHistoryLSN(context)) || '0/0';
+        
+        // Send heartbeat response with current server state
+        await this.send({
+          type: 'srv_heartbeat',
+          clientId: heartbeatMessage.clientId || this.clientId,
+          messageId: `hb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now()
+        } as any); // Type assertion since ServerHeartbeatMessage doesn't exist yet
+        
+        // Check for LSN gap and handle accordingly
+        if (heartbeatMessage.lsn && heartbeatMessage.lsn !== serverLSN) {
+          // Special case: If client has LSN 0/0, always trigger initial sync
+          if (heartbeatMessage.lsn === '0/0') {
+            syncLogger.warn('Client LSN is 0/0 in heartbeat - triggering initial sync', {
+              clientId: heartbeatMessage.clientId || this.clientId,
+              clientLSN: heartbeatMessage.lsn,
+              serverLSN
+            }, MODULE_NAME);
+            
+            // Trigger initial sync for LSN 0/0 (integrity reset scenario)
+            this.state.waitUntil(this.triggerInitialSyncFromHeartbeat(
+              heartbeatMessage.clientId || this.clientId,
+              serverLSN
+            ));
+          } else {
+            // Normal LSN gap analysis for non-zero LSNs
+            const lsnGapResult = this.analyzeLSNGap(heartbeatMessage.lsn, serverLSN);
+            
+            if (lsnGapResult.shouldTriggerCatchup) {
+              syncLogger.warn('Large LSN gap detected in heartbeat - triggering catchup sync', {
+                clientId: heartbeatMessage.clientId || this.clientId,
+                clientLSN: heartbeatMessage.lsn,
+                serverLSN,
+                gapSize: lsnGapResult.gapSize,
+                threshold: lsnGapResult.threshold
+              }, MODULE_NAME);
+              
+              // Trigger catchup sync for large gaps
+              this.state.waitUntil(this.triggerCatchupFromHeartbeat(
+                heartbeatMessage.clientId || this.clientId,
+                heartbeatMessage.lsn,
+                serverLSN
+              ));
+            } else {
+              syncLogger.debug('Normal LSN gap in heartbeat - no action needed', {
+                clientId: heartbeatMessage.clientId || this.clientId,
+                clientLSN: heartbeatMessage.lsn,
+                serverLSN,
+                gapSize: lsnGapResult.gapSize,
+                threshold: lsnGapResult.threshold
+              }, MODULE_NAME);
+            }
+          }
+        }
+        
+        // Ensure replication is active - call replication init as part of heartbeat
+        // This helps maintain replication health and recover from any failures
+        this.state.waitUntil(this.ensureReplicationActive());
+        
+      } catch (error) {
+        syncLogger.error('Error processing heartbeat', {
+          clientId: heartbeatMessage.clientId || this.clientId,
+          error: error instanceof Error ? error.message : String(error)
+        }, MODULE_NAME);
+        
+        // Still try to send a basic heartbeat response even if LSN fetch fails
+        try {
+          await this.send({
+            type: 'srv_heartbeat',
+            clientId: heartbeatMessage.clientId || this.clientId,
+            messageId: `hb_err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: Date.now()
+          } as any);
+        } catch (sendError) {
+          // If we can't even send a response, the connection might be broken
+          syncLogger.error('Failed to send heartbeat response', {
+            clientId: heartbeatMessage.clientId || this.clientId,
+            error: sendError instanceof Error ? sendError.message : String(sendError)
+          }, MODULE_NAME);
+        }
+      }
+    });
+
+    // Add handler for integrity validation requests
+    this.onMessage('clt_integrity_validation', async (message: ClientMessage) => {
+      const validationMessage = message as any;
+      
+      syncLogger.info('Received integrity validation request', {
+        clientId: validationMessage.clientId || this.clientId,
+        currentLSN: validationMessage.currentLSN,
+        tableCount: Object.keys(validationMessage.tableFingerprints || {}).length
+      }, MODULE_NAME);
+      
+      try {
+        // Import IntegrityManager for validation
+        const { IntegrityManager } = await import('./integrity-manager');
+        const context = this.getContext();
+        const integrityManager = new IntegrityManager(context, this);
+        
+        // Perform validation
+        const result = await integrityManager.validateClientIntegrity({
+          clientId: validationMessage.clientId || this.clientId,
+          currentLSN: validationMessage.currentLSN,
+          tableFingerprints: validationMessage.tableFingerprints,
+          timestamp: validationMessage.timestamp
+        });
+        
+        // Send response back to client
+        await this.send({
+          type: 'srv_integrity_validation_response',
+          clientId: validationMessage.clientId || this.clientId,
+          messageId: `integrity_response_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          isValid: result.isValid,
+          issues: result.issues,
+          recommendedAction: result.recommendedAction,
+          serverFingerprints: result.serverFingerprints,
+          validationTimestamp: result.validationTimestamp
+        } as any);
+        
+        syncLogger.info('Integrity validation completed and response sent', {
+          clientId: validationMessage.clientId || this.clientId,
+          isValid: result.isValid,
+          issueCount: result.issues.length,
+          recommendedAction: result.recommendedAction
+        }, MODULE_NAME);
+        
+      } catch (error) {
+        syncLogger.error('Error processing integrity validation', {
+          clientId: validationMessage.clientId || this.clientId,
+          error: error instanceof Error ? error.message : String(error)
+        }, MODULE_NAME);
+        
+        // Send error response
+        try {
+          await this.send({
+            type: 'srv_integrity_validation_response',
+            clientId: validationMessage.clientId || this.clientId,
+            messageId: `integrity_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: Date.now(),
+            isValid: false,
+            issues: [{
+              type: 'data_corruption',
+              table: 'unknown',
+              severity: 'critical',
+              description: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
+              details: {}
+            }],
+            recommendedAction: 'none',
+            serverFingerprints: {},
+            validationTimestamp: Date.now()
+          } as any);
+        } catch (sendError) {
+          syncLogger.error('Failed to send integrity validation error response', {
+            clientId: validationMessage.clientId || this.clientId,
+            error: sendError instanceof Error ? sendError.message : String(sendError)
+          }, MODULE_NAME);
+        }
+      }
+    });
+
     this.isHandlerRegistered = true;
     syncLogger.info('Message handlers registered', {
       clientId: this.clientId,
@@ -366,8 +542,24 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // Start sync process AFTER connection is fully established
     this.state.waitUntil((async () => {
       try {
-        // Wait a moment to ensure WebSocket connection is established
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for WebSocket to be fully established
+        // Use a more reliable way to check connection status
+        let retries = 0;
+        const maxRetries = 10;
+        const retryDelay = 100;
+
+        while (retries < maxRetries) {
+          const webSockets = this.ctx.getWebSockets();
+          if (webSockets.length > 0 && webSockets[0].readyState === WS_READY_STATE.OPEN) {
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          retries++;
+        }
+
+        if (retries >= maxRetries) {
+          throw new Error('WebSocket connection failed to establish within timeout');
+        }
         
         // Determine sync strategy and perform sync
         const { strategy, serverLSN } = await this.determineSyncStrategy(finalClientId, finalClientLSN);
@@ -1015,12 +1207,44 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         throw new Error('WebSocketUnavailable: No active WebSocket connections for client ' + this.clientId);
       }
       
-      // Enhanced logging for acknowledgment messages (at INFO level)
+      // Add detailed logging for table changes messages to debug null/object conversion
+      if (message.type === 'srv_live_changes' || message.type === 'srv_catchup_changes') {
+        const changesMessage = message as any;
+        if (changesMessage.changes && Array.isArray(changesMessage.changes)) {
+          console.log('[SyncDO] Sending table changes:', {
+            messageType: message.type,
+            clientId: this.clientId,
+            changeCount: changesMessage.changes.length,
+            changes: changesMessage.changes.map((change: any, index: number) => ({
+              index,
+              table: change.table,
+              operation: change.operation,
+              dataKeys: Object.keys(change.data || {}),
+              estimatedDuration: {
+                value: change.data?.estimatedDuration,
+                type: typeof change.data?.estimatedDuration,
+                isNull: change.data?.estimatedDuration === null,
+                isUndefined: change.data?.estimatedDuration === undefined,
+                stringified: JSON.stringify(change.data?.estimatedDuration)
+              },
+              timeRange: {
+                value: change.data?.timeRange,
+                type: typeof change.data?.timeRange,
+                isNull: change.data?.timeRange === null,
+                isUndefined: change.data?.timeRange === undefined,
+                stringified: JSON.stringify(change.data?.timeRange)
+              }
+            }))
+          });
+        }
+      }
+      
+      // Enhanced logging for acknowledgment messages (at DEBUG level to reduce noise)
       const isAcknowledgment = message.type === 'srv_changes_received' || 
                              message.type === 'srv_changes_applied';
       
       if (isAcknowledgment) {
-        syncLogger.info('Sending acknowledgment message', {
+        syncLogger.debug('Sending acknowledgment message', {
           type: message.type,
           messageId: message.messageId,
           clientId: this.clientId,
@@ -1042,20 +1266,12 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         try {
           ws.send(JSON.stringify(message));
           
-          // Log success at different levels based on message type
-          if (isAcknowledgment) {
-            syncLogger.info('Acknowledgment message sent successfully', {
-              type: message.type,
-              messageId: message.messageId,
-              clientId: this.clientId
-            }, MODULE_NAME);
-          } else {
-            syncLogger.debug('Message sent successfully', {
-              type: message.type,
-              messageId: message.messageId,
-              clientId: this.clientId
-            }, MODULE_NAME);
-          }
+          // Log success at debug level for all messages to reduce noise
+          syncLogger.debug('Message sent successfully', {
+            type: message.type,
+            messageId: message.messageId,
+            clientId: this.clientId
+          }, MODULE_NAME);
         } catch (sendError) {
           syncLogger.error('Error sending message to WebSocket', {
             type: message.type,
@@ -1344,6 +1560,169 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       // Even if cleanup fails, reschedule the alarm
       const ONE_HOUR = 60 * 60 * 1000;
       this.state.storage.setAlarm(Date.now() + ONE_HOUR);
+    }
+  }
+
+  /**
+   * Ensure replication is active by calling the replication init endpoint
+   */
+  private async ensureReplicationActive(): Promise<void> {
+    try {
+      syncLogger.info('Ensuring replication is active', {
+        syncId: this.syncId
+      }, MODULE_NAME);
+      
+      // Get the ReplicationDO using the proper Durable Object pattern
+      const replicationId = this.env.REPLICATION.idFromName('replication');
+      const replicationStub = this.env.REPLICATION.get(replicationId);
+      
+      // Call the init endpoint directly on the ReplicationDO - using proper URL format
+      const response = await replicationStub.fetch('https://internal/api/replication/init');
+      
+      if (!response.ok) {
+        syncLogger.error('Failed to ensure replication is active', {
+          status: response.status,
+          statusText: response.statusText
+        }, MODULE_NAME);
+        return;
+      }
+      
+      const result = await response.json();
+      syncLogger.info('Replication active status confirmed', {
+        result,
+        syncId: this.syncId
+      }, MODULE_NAME);
+    } catch (error) {
+      syncLogger.error('Error ensuring replication is active', {
+        error: error instanceof Error ? error.message : String(error),
+        syncId: this.syncId
+      }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * Analyze the LSN gap between client and server to determine if catchup is needed
+   */
+  private analyzeLSNGap(clientLSN: string, serverLSN: string): {
+    gapSize: number;
+    shouldTriggerCatchup: boolean;
+    threshold: number;
+  } {
+    // Calculate the gap size by converting LSN hex values to decimal
+    const clientDecimal = this.lsnToDecimal(clientLSN);
+    const serverDecimal = this.lsnToDecimal(serverLSN);
+    const gapSize = serverDecimal - clientDecimal;
+    
+    // Threshold for triggering catchup sync
+    // ~16MB worth of WAL (typical for significant missed changes)
+    const CATCHUP_THRESHOLD = 16 * 1024 * 1024; // 16MB in bytes
+    
+    return {
+      gapSize,
+      shouldTriggerCatchup: gapSize > CATCHUP_THRESHOLD,
+      threshold: CATCHUP_THRESHOLD
+    };
+  }
+
+  /**
+   * Convert LSN string to decimal for gap calculation
+   */
+  private lsnToDecimal(lsn: string): number {
+    const [major, minor] = lsn.split('/');
+    // PostgreSQL LSN: major part * 16MB + minor part
+    return parseInt(major, 16) * 0x1000000 + parseInt(minor, 16);
+  }
+
+  /**
+   * Trigger initial sync from heartbeat when client LSN is 0/0 (integrity reset scenario)
+   */
+  private async triggerInitialSyncFromHeartbeat(
+    clientId: string, 
+    serverLSN: string
+  ): Promise<void> {
+    try {
+      syncLogger.info('Triggering initial sync from heartbeat for LSN 0/0', {
+        clientId,
+        serverLSN
+      }, MODULE_NAME);
+
+      // Send state change to initial to the client
+      await this.send({
+        type: 'srv_state_change',
+        clientId,
+        messageId: `initial_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
+        state: 'initial',
+        lsn: serverLSN
+      } as any);
+
+      // Perform initial sync (client LSN is 0/0)
+      await this.performSync(
+        { strategy: SyncStrategy.INITIAL, serverLSN },
+        clientId,
+        '0/0'
+      );
+
+      syncLogger.info('Heartbeat-triggered initial sync completed', {
+        clientId,
+        startLSN: '0/0',
+        endLSN: serverLSN
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Error in heartbeat-triggered initial sync', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * Trigger catchup sync from heartbeat when large LSN gap is detected
+   */
+  private async triggerCatchupFromHeartbeat(
+    clientId: string, 
+    clientLSN: string, 
+    serverLSN: string
+  ): Promise<void> {
+    try {
+      syncLogger.info('Triggering catchup sync from heartbeat', {
+        clientId,
+        clientLSN,
+        serverLSN
+      }, MODULE_NAME);
+
+      // Send state change to catchup to the client
+      await this.send({
+        type: 'srv_state_change',
+        clientId,
+        messageId: `catchup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
+        state: 'catchup',
+        lsn: serverLSN
+      } as any);
+
+             // Perform catchup sync
+       await performCatchupSync(
+         this.getContext(),
+         clientId,
+         clientLSN,
+         serverLSN,
+         this, // WebSocketHandler
+         this.stateManager
+       );
+
+      syncLogger.info('Heartbeat-triggered catchup sync completed', {
+        clientId,
+        startLSN: clientLSN,
+        endLSN: serverLSN
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Error in heartbeat-triggered catchup sync', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
     }
   }
 } 

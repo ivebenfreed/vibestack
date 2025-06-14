@@ -1,11 +1,12 @@
 import { useContext } from 'react';
-import { useSyncContext } from '@/sync/SyncContext'; // Context hook
+import { useOrchestrator } from '@/state-machines/orchestrator-hooks'; // Orchestrator hook
 // Removed unused imports: SyncState, Badge, icons, formatDateTime, getSyncStatusVisuals
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function Overview() {
-  // Keep useSyncContext hook for isLoading, but data is no longer used here
-  const { isLoading: isSyncLoading } = useSyncContext(); 
+  // Use orchestrator for sync loading state
+  const { isSyncLive, isDatabaseReady } = useOrchestrator();
+  const isSyncLoading = !isSyncLive || !isDatabaseReady; 
 
   if (isSyncLoading) {
     return (

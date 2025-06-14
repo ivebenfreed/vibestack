@@ -111,16 +111,12 @@ export function createNewPGliteDataSource(options: NewPGliteDataSourceOptions): 
             if (this.isInitialized) return this;
             try {
                 console.log("Initializing driver...");
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: Before driver.connect()`);
                 await this.driver.connect();
                 this.driver.connection = this as any; // Assign connection reference AFTER connect
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: After driver.connect()`);
                 await this.driver.afterConnect();
                 console.log("Driver connected.");
 
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: Before buildMetadatas()`);
                 console.log("Building metadata...");
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: After buildMetadatas()`);
                 await this.buildMetadatas(); // Call separate metadata build
                 console.log(`Metadata built. Found ${this.entityMetadatas.length} entities.`);
 
@@ -130,7 +126,6 @@ console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.
                 // console.log("Broadcaster created.");
 
                 console.log("Creating EntityManager...");
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.initialize: End`);
                 this.manager = new EntityManager(this as any); // Create manager AFTER metadata is ready
                 console.log("EntityManager created.");
 
@@ -282,45 +277,15 @@ console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - NewDataSource.ds.
 
 // --- Singleton --- 
 
+// DEPRECATED: This singleton is replaced by the global datasource manager
+// Keeping for backward compatibility but delegating to global implementation
 let dataSource: NewPGliteDataSource | null = null;
+let initializationPromise: Promise<NewPGliteDataSource> | null = null;
 
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - getNewPGliteDataSource: Start`);
 export async function getNewPGliteDataSource(
     config?: NewPGliteDataSourceOptions
 ): Promise<NewPGliteDataSource> {
-    if (dataSource && dataSource.isInitialized) {
-        return dataSource;
-    }
-    if (dataSource && !dataSource.isInitialized) {
-        await dataSource.destroy().catch(err => console.error("Error destroying previous uninitialized DataSource:", err));
-        dataSource = null;
-    }
-
-    try {
-        console.log("Creating new NewPGliteDataSource object...");
-        
-        // Merge provided config with the imported clientEntities
-        const effectiveConfig: NewPGliteDataSourceOptions = {
-            ...(config || {}), // Spread provided config first
-            database: config?.database || DB_NAME, // Use config.database if present, else default to DB_NAME
-            entities: clientEntities,
-        };
-        
-        const ds = createNewPGliteDataSource(effectiveConfig);
-        
-        console.log("Initializing NewPGliteDataSource object...");
-        await ds.initialize(); 
-        console.log("NewPGliteDataSource object initialized successfully.");
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - getNewPGliteDataSource: End`);
-        
-        dataSource = ds;
-        return dataSource;
-    } catch (error) {
-        console.error('Failed to initialize TypeORM DataSource (factory):', error);
-        if (dataSource) {
-            await dataSource.destroy().catch(err => console.error("Error destroying failed DataSource (factory):", err));
-            dataSource = null;
-        }
-        throw error;
-    }
+    // ✅ FIXED: Delegate to global datasource singleton to prevent race conditions
+    const { getGlobalDataSource } = await import('../global-datasource');
+    return getGlobalDataSource(config);
 } 

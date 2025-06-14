@@ -138,6 +138,10 @@ const worker = {
       try {
         const auth = initializeAuth(env); // Initialize auth using env
         
+        // Debug: Log all headers and cookies
+        console.log(`[${requestId}] [Sync Auth DEBUG] Request headers:`, Object.fromEntries(request.headers.entries()));
+        console.log(`[${requestId}] [Sync Auth DEBUG] Cookie header:`, request.headers.get('Cookie'));
+        
         // Check for auth token in query parameters (for WebSocket connections)
         const authToken = url.searchParams.get('auth');
         let sessionData = null;
@@ -148,7 +152,7 @@ const worker = {
           try {
             // Create a new request with the token in the Authorization header
             const modifiedHeaders = new Headers(request.headers);
-            modifiedHeaders.set('Cookie', `session_token=${authToken}`);
+            modifiedHeaders.set('Cookie', `better-auth.session_token=${authToken}`);
             
             // Try to get session using the modified headers
             sessionData = await auth.api.getSession({ headers: modifiedHeaders });
@@ -159,6 +163,7 @@ const worker = {
         
         // If no token or token validation failed, fall back to cookie-based auth
         if (!sessionData && auth.api && typeof auth.api.getSession === 'function') {
+          console.log(`[${requestId}] [Sync Auth] Attempting cookie-based auth`);
           sessionData = await auth.api.getSession({ headers: request.headers });
         }
         

@@ -16,7 +16,9 @@ export type SrvMessageType =
   | 'srv_sync_completed'   // Generic sync completion (for live sync)
   | 'srv_catchup_completed'
   | 'srv_live_start'      // Renamed: For confirming client is up-to-date and live sync starts
-  | 'srv_sync_stats';      // Server sends sync statistics
+  | 'srv_sync_stats'      // Server sends sync statistics
+  | 'srv_integrity_reset' // Server sends integrity reset command
+  | 'srv_integrity_validation_response'; // Server responds to integrity validation
 
 export type CltMessageType =
   | 'clt_sync_request'      // Client requests sync
@@ -27,7 +29,9 @@ export type CltMessageType =
   | 'clt_changes_applied'   // Client signals changes were applied
   | 'clt_init_received'    // Client acknowledges receipt of initial sync data
   | 'clt_init_processed'   // Client signals initial sync data was processed
-  | 'clt_catchup_received'; // Client acknowledges receipt of catchup sync chunk
+  | 'clt_catchup_received' // Client acknowledges receipt of catchup sync chunk
+  | 'clt_integrity_validation' // Client requests integrity validation
+  | 'clt_integrity_reset_ack'; // Client acknowledges integrity reset
 
 // Base message interface for all messages
 export interface BaseMessage {
@@ -105,10 +109,52 @@ export interface ServerAppliedMessage extends ServerMessage {
 export interface ServerSyncCompletedMessage extends ServerMessage {
   type: 'srv_sync_completed';
   startLSN: string;       // Starting LSN for the sync
-  finalLSN: string;       // Final LSN after sync
+  serverLSN: string;      // Server's current LSN after sync
   changeCount: number;    // Total number of changes sent
   success: boolean;       // Whether sync completed successfully
   error?: string;         // Error message if any
+}
+
+/**
+ * Server heartbeat response message
+ */
+export interface ServerHeartbeatMessage extends ServerMessage {
+  type: 'srv_heartbeat';
+  serverLSN?: string;     // Current server LSN for comparison
+  inReplyTo?: string;     // Message ID this is responding to
+  error?: string;         // Error message if heartbeat processing failed
+}
+
+/**
+ * Server integrity reset command message
+ */
+export interface ServerIntegrityResetMessage extends ServerMessage {
+  type: 'srv_integrity_reset';
+  resetCommand: {
+    type: 'full_reset' | 'table_reset';
+    reason: string;
+    affectedTables?: string[];
+    preserveUserData?: boolean;
+  };
+  reason: string;
+}
+
+/**
+ * Server integrity validation response message
+ */
+export interface ServerIntegrityValidationResponseMessage extends ServerMessage {
+  type: 'srv_integrity_validation_response';
+  isValid: boolean;
+  issues: Array<{
+    type: 'record_count_mismatch' | 'missing_records' | 'extra_records' | 'data_corruption' | 'lsn_regression';
+    table: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    description: string;
+    details: any;
+  }>;
+  recommendedAction: 'none' | 'catchup' | 'reset';
+  serverFingerprints: Record<string, any>;
+  validationTimestamp: number;
 }
 
 /**
@@ -117,8 +163,8 @@ export interface ServerSyncCompletedMessage extends ServerMessage {
  */
 export interface ServerLiveStartMessage extends ServerMessage {
   type: 'srv_live_start';
-  startLSN: string;       // Current LSN (same as finalLSN)
-  finalLSN: string;       // Current LSN (same as startLSN)
+  startLSN: string;       // Starting LSN for the live sync
+  serverLSN: string;      // Server's current LSN
   changeCount: number;    // Should be 0
   success: boolean;       // Should be true
 }
@@ -126,7 +172,7 @@ export interface ServerLiveStartMessage extends ServerMessage {
 export interface ServerCatchupCompletedMessage extends ServerMessage {
   type: 'srv_catchup_completed';
   startLSN: string;       // Starting LSN for the catchup sync
-  finalLSN: string;       // Final LSN after catchup sync
+  serverLSN: string;      // Server's current LSN after catchup sync
   changeCount: number;    // Total number of changes sent
   success: boolean;       // Whether catchup sync completed successfully
   error?: string;         // Error message if any
@@ -243,12 +289,47 @@ export interface ClientCatchupReceivedMessage extends ClientMessage {
   lsn: string;  // The last LSN processed in this chunk
 }
 
+/**
+ * Client integrity validation request message
+ */
+export interface ClientIntegrityValidationMessage extends ClientMessage {
+  type: 'clt_integrity_validation';
+  currentLSN: string;
+  tableFingerprints: Record<string, {
+    recordCount: number;
+    lastUpdated: number;
+    recordIdHash: string;
+    recentDataHash: string;
+  }>;
+}
+
+/**
+ * Client integrity reset acknowledgment message
+ */
+export interface ClientIntegrityResetAckMessage extends ClientMessage {
+  type: 'clt_integrity_reset_ack';
+  success: boolean;
+  result?: {
+    success: boolean;
+    tablesCleared: string[];
+    lsnReset: boolean;
+    error?: string;
+  };
+  error?: string;
+  inReplyTo?: string;
+}
+
 // Union types for all messages
 export type Message = 
   | ServerMessage 
   | ServerCatchupCompletedMessage
   | ServerLiveStartMessage
   | ServerSyncStatsMessage
-  | ClientMessage;
+  | ServerHeartbeatMessage
+  | ServerIntegrityResetMessage
+  | ServerIntegrityValidationResponseMessage
+  | ClientMessage
+  | ClientIntegrityValidationMessage
+  | ClientIntegrityResetAckMessage;
 
 // No need for named exports since these are already exported at declaration

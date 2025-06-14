@@ -45,18 +45,23 @@ export class PollingManager {
     return this.pollCounter;
   }
 
+  public isPollingActive(): boolean {
+    return this.pollingInterval !== null;
+  }
+
   public async startPolling(): Promise<void> {
     try {
       if (this.pollingInterval) {
-        replicationLogger.debug('Polling already active, no action needed', {}, MODULE_NAME);
-        return;
+        replicationLogger.debug('Polling interval exists - clearing and restarting to ensure proper state', {}, MODULE_NAME);
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
       }
       
       this.pollCounter = 0;
       replicationLogger.info('Starting polling process', {}, MODULE_NAME);
       
-      this.hasCompletedFirstPoll = true;
       this.startContinuousPolling();
+      this.hasCompletedFirstPoll = true; // Set flag after polling actually starts
     } catch (err) {
       replicationLogger.error('Start polling error', {
         error: err instanceof Error ? err.message : String(err)
@@ -65,14 +70,112 @@ export class PollingManager {
     }
   }
 
+  /**
+   * Start polling and return the results of the first poll
+   * This eliminates race conditions by doing everything in one sequence
+   */
+  public async startPollingWithFirstPollResults(): Promise<{
+    success: boolean;
+    changesFound: boolean;
+    changeCount?: number;
+    filteredCount?: number;
+    walEntries?: number;
+    error?: string;
+  }> {
+    try {
+      if (this.pollingInterval) {
+        replicationLogger.debug('Polling interval exists - clearing and restarting to ensure proper state', {}, MODULE_NAME);
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
+      }
+      
+      this.pollCounter = 0;
+      replicationLogger.info('Starting polling process with first poll results', {}, MODULE_NAME);
+      
+      // Perform the first poll immediately and capture results
+      const firstPollResults = await this.performFirstPollAndGetResults();
+      
+      // Now start continuous polling
+      this.startContinuousPolling();
+      this.hasCompletedFirstPoll = true;
+      
+      return firstPollResults;
+    } catch (err) {
+      replicationLogger.error('Start polling with first poll results error', {
+        error: err instanceof Error ? err.message : String(err)
+      }, MODULE_NAME);
+      
+      return {
+        success: false,
+        changesFound: false,
+        error: err instanceof Error ? err.message : String(err)
+      };
+    }
+  }
+
+  /**
+   * Perform the first poll and return detailed results
+   */
+  private async performFirstPollAndGetResults(): Promise<{
+    success: boolean;
+    changesFound: boolean;
+    changeCount?: number;
+    filteredCount?: number;
+    walEntries?: number;
+    error?: string;
+  }> {
+    try {
+      const changes = await this.pollForChanges();
+      
+      if (!changes || changes.length === 0) {
+        return {
+          success: true,
+          changesFound: false,
+          changeCount: 0,
+          filteredCount: 0,
+          walEntries: 0
+        };
+      }
+
+      // Process the changes and get the results
+      const result = await processChanges(
+        changes,
+        this.env,
+        this.c,
+        this.stateManager,
+        this.config.storeBatchSize
+      );
+
+      return {
+        success: result.success,
+        changesFound: true,
+        changeCount: result.changeCount || 0,
+        filteredCount: result.filteredCount || 0,
+        walEntries: changes.length
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      replicationLogger.error('First poll error', { error: errorMessage }, MODULE_NAME);
+      
+      return {
+        success: false,
+        changesFound: false,
+        error: errorMessage
+      };
+    }
+  }
+
   public stopPolling(): void {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
       this.pollCounter = 0;
+      this.hasCompletedFirstPoll = false;
       replicationLogger.info('Polling stopped', {}, MODULE_NAME);
     }
   }
+
+
 
   // ====== Private Polling Methods ======
   private startContinuousPolling(): void {

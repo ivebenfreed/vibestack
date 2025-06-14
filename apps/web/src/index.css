@@ -135,6 +135,18 @@
       font-size: 16px !important;
     }
   }
+
+  /* Layout system CSS - works with Shadcn sidebar */
+  .layout-container {
+    margin-left: var(--global-sidebar-width);
+  }
+
+  @media (max-width: 768px) {
+    .layout-container {
+      margin-left: 0;
+      padding-bottom: 64px; /* Mobile bottom nav */
+    }
+  }
 }
 
 @utility container {

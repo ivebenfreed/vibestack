@@ -83,7 +83,9 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
   async update(id: string, data: DeepPartial<T>): Promise<T | null> {
     console.log(`[BaseServerRepository] update() called for ${this.getTableName()}:${id}`, {
       updateData: Object.keys(data),
-      hasUpdatedAt: !!(data as any).updated_at
+      updateDataValues: Object.entries(data).map(([key, value]) => `${key}=${JSON.stringify(value)}`),
+      hasUpdatedAt: !!(data as any).updated_at,
+      fullDataStringified: JSON.stringify(data)
     });
     
     // Find existing entity first
@@ -227,9 +229,9 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
       // Incoming is newer, update
       return await this.update(data.id, data);
     } else if (incomingTimestamp.getTime() === existingTimestamp.getTime()) {
-      // Timestamps equal, use client_id tiebreaker if available
-      const incomingClientId = (data as any).client_id || '';
-      const existingClientId = (existing as any).client_id || '';
+      // Timestamps equal, use clientId tiebreaker if available
+      const incomingClientId = (data as any).clientId || '';
+      const existingClientId = (existing as any).clientId || '';
       
       if (incomingClientId > existingClientId) {
         return await this.update(data.id, data);
@@ -237,6 +239,13 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
     }
     
     // Existing is newer or equal, return null (conflict)
+    console.info(`[${this.getTableName()}] CRDT conflict - rejecting update (existing is newer)`, {
+      entityId: data.id,
+      incomingTimestamp: incomingTimestamp.toISOString(),
+      existingTimestamp: existingTimestamp.toISOString(),
+      incomingClientId: (data as any).clientId,
+      existingClientId: (existing as any).clientId
+    });
     return null;
   }
 
@@ -260,6 +269,11 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
     }
     
     // Existing is newer, reject delete
+    console.info(`[${this.getTableName()}] CRDT conflict - rejecting delete (existing is newer)`, {
+      entityId: id,
+      deleteTimestamp: deleteTimestamp.toISOString(),
+      existingTimestamp: existingTimestamp.toISOString()
+    });
     return false;
   }
 
@@ -269,6 +283,94 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
   async getEntityTimestamp(id: string): Promise<Date | null> {
     const entity = await this.findById(id);
     return entity?.updated_at ? new Date(entity.updated_at) : null;
+  }
+
+  // ========== PAGINATION OPERATIONS FOR INITIAL SYNC ==========
+
+  /**
+   * Find entities with cursor-based pagination
+   * Used for initial sync to efficiently stream large datasets
+   */
+  async findWithCursor(options: {
+    cursor?: string | null;
+    limit: number;
+    orderBy?: keyof T;
+    orderDirection?: 'ASC' | 'DESC';
+  }): Promise<{
+    items: T[];
+    nextCursor: string | null;
+    hasMore: boolean;
+  }> {
+    const { cursor, limit, orderBy = 'id' as keyof T, orderDirection = 'ASC' } = options;
+    
+    const queryBuilder = await this.createQueryBuilder('entity');
+    
+    // Add cursor condition if provided
+    if (cursor) {
+      const operator = orderDirection === 'ASC' ? '>' : '<';
+      queryBuilder.where(`entity.${String(orderBy)} ${operator} :cursor`, { cursor });
+    }
+    
+    // Order and limit (fetch one extra to check if there are more)
+    queryBuilder
+      .orderBy(`entity.${String(orderBy)}`, orderDirection)
+      .limit(limit + 1);
+    
+    const items = await queryBuilder.getMany();
+    
+    // Check if there are more records
+    const hasMore = items.length > limit;
+    const finalItems = hasMore ? items.slice(0, limit) : items;
+    
+    // Get next cursor
+    const nextCursor = finalItems.length > 0 ? 
+      String((finalItems[finalItems.length - 1] as any)[orderBy]) : 
+      null;
+    
+    return {
+      items: finalItems,
+      nextCursor,
+      hasMore
+    };
+  }
+
+  /**
+   * Get all records from this table in chunks (for initial sync)
+   * Efficiently streams all data using cursor-based pagination
+   */
+  async getAllInChunks(options: {
+    chunkSize: number;
+    onChunk: (chunk: T[], chunkNumber: number, totalProcessed: number) => Promise<void>;
+  }): Promise<number> {
+    const { chunkSize, onChunk } = options;
+    
+    let cursor: string | null = null;
+    let totalProcessed = 0;
+    let chunkNumber = 0;
+    
+    while (true) {
+      chunkNumber++;
+      
+      const result = await this.findWithCursor({
+        cursor,
+        limit: chunkSize
+      });
+      
+      if (result.items.length === 0) {
+        break;
+      }
+      
+      await onChunk(result.items, chunkNumber, totalProcessed + result.items.length);
+      totalProcessed += result.items.length;
+      
+      if (!result.hasMore) {
+        break;
+      }
+      
+      cursor = result.nextCursor;
+    }
+    
+    return totalProcessed;
   }
 
   // ========== ADVANCED FEATURES (via NeonService) ==========

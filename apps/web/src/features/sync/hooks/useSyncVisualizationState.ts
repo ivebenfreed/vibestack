@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSyncContext } from '@/sync/SyncContext';
+import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
 import { SyncManager, SyncState } from '@/sync/SyncManager';
 
 export type FlowStatus = 'idle' | 'sending' | 'receiving' | 'acknowledged' | 'processed' | 'error' | 'timeout';
@@ -10,10 +10,23 @@ export interface SyncVisualizationState {
   outgoingStatus: FlowStatus;
   incomingStatus: FlowStatus;
   currentConnectionState: 'disconnected' | 'connecting' | 'initial' | 'catchup' | 'live' | 'error';
+  isOnline: boolean;
+  syncPhase: string;
+  isSyncLive: boolean;
+  currentLSN: string;
+  isInitialSync: boolean;
+  isCatchupSync: boolean;
+  isLiveSync: boolean;
+  isConnecting: boolean;
+  machineState: string;
+  resetOutgoingStatus: () => void;
+  resetIncomingStatus: () => void;
 }
 
 export function useSyncVisualizationState(): SyncVisualizationState {
-  const { isConnected, syncState } = useSyncContext();
+  const { isOnline } = useOrchestrator();
+  const sync = useSyncMachine();
+  
   const [currentLsn, setCurrentLsn] = useState<string>('0/0');
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
   const [outgoingStatus, setOutgoingStatus] = useState<FlowStatus>('idle');
@@ -24,7 +37,23 @@ export function useSyncVisualizationState(): SyncVisualizationState {
     setTimeout(() => {
         setter('idle');
     }, 2000); 
-  }, []); 
+  }, []);
+
+  // Update LSN from orchestrator context when it changes
+  useEffect(() => {
+    if (sync.currentLSN && sync.currentLSN !== currentLsn) {
+      setCurrentLsn(sync.currentLSN);
+    }
+  }, [sync.currentLSN, currentLsn]);
+
+  // Update error info from sync machine state
+  useEffect(() => {
+    if (sync.error) {
+      setErrorInfo(sync.error);
+    } else {
+      setErrorInfo(null);
+    }
+  }, [sync.error]);
 
   // --- useEffect for listeners ---
   useEffect(() => {
@@ -123,7 +152,6 @@ export function useSyncVisualizationState(): SyncVisualizationState {
         }
     }
 
-
     // --- Cleanup --- (Using handlers defined above)
     return () => {
       manager.off('stateChange', handleStateChange);
@@ -140,29 +168,55 @@ export function useSyncVisualizationState(): SyncVisualizationState {
     };
   }, []); // Empty dependency array: Ensures effect runs only once on mount
 
-   // Determine the current animation state based on context and local state
+  // Determine the current animation state based on sync machine state
   let currentConnectionState: SyncVisualizationState['currentConnectionState'] = 'disconnected';
+  
   if (errorInfo && !(outgoingStatus === 'acknowledged' || incomingStatus === 'processed')) { 
     currentConnectionState = 'error';
-  } else if (isConnected) {
-    // Ensure syncState is a valid key for the connection state type
-    const validStates: SyncVisualizationState['currentConnectionState'][] = ['initial', 'catchup', 'live'];
-    if (validStates.includes(syncState as any)) {
-        currentConnectionState = syncState as SyncVisualizationState['currentConnectionState'];
-    } else if (syncState === 'connecting') {
-        // Handle connecting state explicitly if it's different from the SyncState type used
-        currentConnectionState = 'connecting'; 
+  } else if (!isOnline) {
+    currentConnectionState = 'disconnected';
+  } else {
+    // Map sync machine state to visualization states
+    if (sync.isError) {
+      currentConnectionState = 'error';
+    } else if (sync.isConnecting) {
+      currentConnectionState = 'connecting';
+    } else if (sync.isInitialSync) {
+      currentConnectionState = 'initial';
+    } else if (sync.isCatchupSync) {
+      currentConnectionState = 'catchup';
+    } else if (sync.isLiveSync) {
+      currentConnectionState = 'live';
+    } else if (sync.isIdle) {
+      currentConnectionState = 'disconnected';
+    } else {
+      // Default fallback
+      currentConnectionState = 'connecting';
     }
-    // else stays disconnected if syncState is unexpected while isConnected is true (shouldn't happen)
-  } else if (syncState === 'connecting') {
-     currentConnectionState = 'connecting';
   }
 
   return {
+    isOnline,
+    
+    // Use sync machine data
+    syncPhase: sync.syncPhase || 'idle',
+    isSyncLive: sync.isLiveSync,
+    currentLSN: sync.currentLSN,
+    isInitialSync: sync.isInitialSync,
+    isCatchupSync: sync.isCatchupSync,
+    isLiveSync: sync.isLiveSync,
+    isConnecting: sync.isConnecting,
+    machineState: sync.machineState,
+    
+    // Local state
     currentLsn,
     errorInfo,
     outgoingStatus,
     incomingStatus,
-    currentConnectionState
+    currentConnectionState,
+    
+    // Actions (if any)
+    resetOutgoingStatus: () => resetStatus(setOutgoingStatus),
+    resetIncomingStatus: () => resetStatus(setIncomingStatus),
   };
 } 

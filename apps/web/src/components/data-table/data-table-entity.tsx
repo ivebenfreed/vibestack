@@ -81,9 +81,9 @@ import {
 import { AlertCircle, RefreshCw, Loader2, Trash2 } from 'lucide-react' // For Error Component and loading states
 import { cn } from '@/lib/utils'
 import { useLiveEntity } from '../../db/hooks/useLiveEntity' // Assuming this path is correct relative to the new location
+import { useSuspenseEntity } from '../../db/hooks/useSuspenseEntity' // Add the new hook
 import { useDataTableUiStore } from '../../stores/dataTableUiStore' // Assuming this path is correct
 import { DataTableSkeleton } from '@/components/ui/table-skeleton' // Added import
-import { useContentWidth } from '@/hooks/use-content-width' // Add this import
 
 import { toast } from 'sonner' // For notifications
 
@@ -319,6 +319,7 @@ function DataTableFacetedFilter<TData, TValue>({
                 return (
                   <CommandItem
                     key={option.value}
+                    value={option.value}
                     onSelect={() => {
                       if (isSelected) {
                         selectedValues.delete(option.value)
@@ -359,6 +360,7 @@ function DataTableFacetedFilter<TData, TValue>({
                 <CommandSeparatorUI />
                 <CommandGroup>
                   <CommandItem
+                    value="clear-filters"
                     onSelect={() => column?.setFilterValue(undefined)}
                     className='justify-center text-center'
                   >
@@ -462,6 +464,7 @@ export interface EntityDataTableProps<T extends ObjectLiteral & { id: string; cr
   }
   relatedServices?: Record<string, any> // For relationship cell configs
   typeormOptions?: TypeORMColumnOptions // From data-table-logic
+  optimisticUpdates?: boolean // Enable optimistic updates for editable cells (default true)
   title?: string
   showCard?: boolean
   customColumns?: ColumnDef<T, any>[] // Allow passing fully custom columns
@@ -477,7 +480,8 @@ export interface EntityDataTableProps<T extends ObjectLiteral & { id: string; cr
   onEntityUpdated?: (entity: T) => void
   onEntityDeleted?: (id: string) => void
   onEntityCreated?: (entity: T) => void
-  liveQueryBuilder: SelectQueryBuilder<T>;
+  liveQueryBuilder?: SelectQueryBuilder<T> | null; // Made optional for Universal Reactive Data Pattern
+  loaderData?: T[] | null; // NEW: Pre-loaded data from router loaders for instant loading
   textFilterConfig?: { columnId: string; placeholder: string; }
   facetedFilterConfigs?: Array<{
     columnId: string;
@@ -540,6 +544,7 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
   onEntityUpdated,
   onEntityDeleted,
   liveQueryBuilder: propsLiveQueryBuilder,
+  loaderData,
   textFilterConfig,
   facetedFilterConfigs,
   emptyState,
@@ -555,84 +560,84 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
   onBulkDelete,
   customBulkActions = [],
   bulkEditFields = [],
+  optimisticUpdates = true,
 }: EntityDataTableProps<T>) {
   if (!tableId) {
-    throw new Error('EntityDataTable: tableId prop is required.');
+    throw new Error('EntityDataTable: tableId is required')
   }
 
-  // Add content width hook for responsive table sizing
-  const { contentWidth: availableContentWidth } = useContentWidth({ includePadding: true });
-
-  const { getUiState, setUiState } = useDataTableUiStore();
-  const persistedState = getUiState(tableId);
-
-  const initialSorting = persistedState?.sorting ?? propsDefaultSorting ?? internalDefaultConfig.defaultSorting;
-  const [currentSorting, setCurrentSorting] = useState<SortingState>(initialSorting)
-
-  const initialColumnVisibility = persistedState?.columnVisibility ?? {};
-  
-  // Hide ID columns by default unless showIdColumn is enabled
-  const defaultHiddenColumns = useMemo(() => {
-    const hidden: VisibilityState = {};
-    const showId = typeormOptions.showIdColumn ?? false;
-    
-    if (!showId && entityMetadata?.columns) {
-      entityMetadata.columns.forEach((column: any) => {
-        if (column.propertyName === 'id' || column.isPrimary === true) {
-          hidden[column.propertyName] = false;
-        }
-      });
-    }
-    
-    return hidden;
-  }, [typeormOptions.showIdColumn, entityMetadata]);
-  
-  const [currentColumnVisibility, setCurrentColumnVisibility] = useState<VisibilityState>({
-    ...defaultHiddenColumns,
-    ...initialColumnVisibility
-  })
-
-  const initialColumnFilters = persistedState?.columnFilters ?? [];
-  const [currentColumnFilters, setCurrentColumnFilters] = useState<ColumnFiltersState>(initialColumnFilters)
-
-  const initialColumnOrder = persistedState?.columnOrder ?? [];
-  const [currentColumnOrder, setCurrentColumnOrder] = useState<ColumnOrderState>(initialColumnOrder);
-
-  const initialColumnSizing = persistedState?.columnSizing ?? {};
-  const [currentColumnSizing, setCurrentColumnSizing] = useState<ColumnSizingState>(initialColumnSizing);
-  
+  // --- State Management ---
+  const [isAddingNewRecord, setIsAddingNewRecord] = useState(false)
+  const [newRecordData, setNewRecordData] = useState<Partial<T>>({})
+  const [newRecordErrors, setNewRecordErrors] = useState<Record<string, string>>({})
   const [rowSelection, setRowSelection] = useState({})
 
-  const initialPageSizeProp = tableConfig.pageSize ?? internalDefaultConfig.defaultTableConfig.pageSize;
-
-  const initialPaginationState = persistedState?.pagination ?? {
-    pageIndex: 0,
-    pageSize: initialPageSizeProp,
-  };
-  const [{ pageIndex, pageSize: currentPageSize }, setPagination] = useState<PaginationState>(initialPaginationState);
-
-  // State for inline new record creation
-  const [isAddingNewRecord, setIsAddingNewRecord] = useState(false);
-  const [newRecordData, setNewRecordData] = useState<Partial<T>>(propInitialNewRecordData || {});
-  const [newRecordValidationErrors, setNewRecordValidationErrors] = useState<Record<string, string>>({});
-  const [newRecordSubmissionStatus, setNewRecordSubmissionStatus] = useState<'idle' | 'validating' | 'submitting' | 'success' | 'error'>('idle');
-
   // Refs for focus management
-  const addRecordButtonRef = useRef<HTMLButtonElement>(null);
+  const addRecordButtonRef = useRef<HTMLButtonElement>(null)
 
-  // State for bulk actions
-  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  // Use the UI store for table state management
+  const {
+    getUiState,
+    setUiState,
+    resetUiState,
+  } = useDataTableUiStore()
 
+  const tableState = getUiState(tableId) || {}
+
+  // Extract state values with defaults
+  const currentSorting = tableState.sorting || propsDefaultSorting || []
+  const currentColumnVisibility = tableState.columnVisibility || {}
+  const currentColumnFilters = tableState.columnFilters || []
+  const currentColumnOrder = tableState.columnOrder || []
+  const currentColumnSizing = tableState.columnSizing || {}
+  const currentPageSize = tableState.pagination?.pageSize || tableConfig.pageSize || internalDefaultConfig.defaultTableConfig.pageSize
+  const pageIndex = tableState.pagination?.pageIndex || 0
+
+  // State setters that update the store
+  const setCurrentSorting = (sorting: SortingState | ((prev: SortingState) => SortingState)) => {
+    const newSorting = typeof sorting === 'function' ? sorting(currentSorting) : sorting
+    setUiState(tableId, { sorting: newSorting })
+  }
+
+  const setCurrentColumnVisibility = (visibility: VisibilityState | ((prev: VisibilityState) => VisibilityState)) => {
+    const newVisibility = typeof visibility === 'function' ? visibility(currentColumnVisibility) : visibility
+    setUiState(tableId, { columnVisibility: newVisibility })
+  }
+
+  const setCurrentColumnFilters = (filters: ColumnFiltersState | ((prev: ColumnFiltersState) => ColumnFiltersState)) => {
+    const newFilters = typeof filters === 'function' ? filters(currentColumnFilters) : filters
+    setUiState(tableId, { columnFilters: newFilters })
+  }
+
+  const setCurrentColumnOrder = (order: ColumnOrderState | ((prev: ColumnOrderState) => ColumnOrderState)) => {
+    const newOrder = typeof order === 'function' ? order(currentColumnOrder) : order
+    setUiState(tableId, { columnOrder: newOrder })
+  }
+
+  const setCurrentColumnSizing = (sizing: ColumnSizingState | ((prev: ColumnSizingState) => ColumnSizingState)) => {
+    const newSizing = typeof sizing === 'function' ? sizing(currentColumnSizing) : sizing
+    setUiState(tableId, { columnSizing: newSizing })
+  }
+
+  const setPagination = (pagination: PaginationState | ((prev: PaginationState) => PaginationState)) => {
+    const newPagination = typeof pagination === 'function' ? pagination({ pageIndex, pageSize: currentPageSize }) : pagination
+    setUiState(tableId, { 
+      pagination: {
+        pageIndex: newPagination.pageIndex,
+        pageSize: newPagination.pageSize 
+      }
+    })
+  }
+
+  // Add missing handler functions for inline record creation
   const validateNewRecord = (data: Partial<T>): Record<string, string> => {
-    console.log('[DataTable Debug] validateNewRecord called with data:', data);
-    const errors: Record<string, string> = {};
+    const errors: Record<string, string> = {}
     
     if (!entityMetadata || !entityMetadata.columns || !Array.isArray(entityMetadata.columns)) {
-      console.log('[DataTable Debug] No valid entityMetadata, returning empty errors');
-      return errors;
+      return errors
     }
 
-    // Filter out auto-generated columns early for performance
+    // Filter out auto-generated columns
     const requiredColumns = entityMetadata.columns.filter((column: any) => 
       !column.isNullable && 
       !column.isGenerated && 
@@ -642,164 +647,93 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
       column.propertyName !== 'createdAt' && 
       column.propertyName !== 'updatedAt' && 
       column.propertyName !== 'client_id'
-    );
+    )
 
-    console.log('[DataTable Debug] Checking', requiredColumns.length, 'required columns');
-
-    // Validate only required columns efficiently
+    // Validate required columns
     for (const column of requiredColumns) {
-      const value = data[column.propertyName as keyof T];
+      const value = data[column.propertyName as keyof T]
       if (value === undefined || value === null || value === '') {
-        console.log(`[DataTable Debug] Required field missing: ${column.propertyName}`);
-        errors[column.propertyName] = `${column.propertyName} is required.`;
+        errors[column.propertyName] = `${column.propertyName} is required.`
       }
     }
 
-    console.log('[DataTable Debug] Validation completed with', Object.keys(errors).length, 'errors');
-    return errors;
-  };
+    return errors
+  }
 
-  // --- Inline Create Handlers ---
   const handleAddRecord = () => {
-    setIsAddingNewRecord(true);
-    setNewRecordData(propInitialNewRecordData || {});
-    setNewRecordValidationErrors({});
-    setNewRecordSubmissionStatus('idle');
-    // Auto-focus will be handled by the autoFocus prop on the first editable field
-  };
+    setIsAddingNewRecord(true)
+    setNewRecordData(propInitialNewRecordData || {})
+    setNewRecordErrors({})
+  }
 
   const handleCancelNewRecord = () => {
-    setIsAddingNewRecord(false);
-    setNewRecordData({}); // Clear data
-    setNewRecordValidationErrors({});
-    setNewRecordSubmissionStatus('idle');
-    addRecordButtonRef.current?.focus();
-  };
+    setIsAddingNewRecord(false)
+    setNewRecordData({})
+    setNewRecordErrors({})
+  }
 
   const handleNewRecordFieldChange = (fieldName: keyof T, value: any) => {
-    console.log('[DataTable Debug] handleNewRecordFieldChange called:', { fieldName, value });
-    console.log('[DataTable Debug] Previous newRecordData:', newRecordData);
+    setNewRecordData(prev => ({ ...prev, [fieldName]: value }))
     
-    setNewRecordData(prev => {
-      const updated = { ...prev, [fieldName]: value };
-      console.log('[DataTable Debug] Updated newRecordData:', updated);
-      return updated;
-    });
-    
-    if (newRecordValidationErrors[fieldName as string]) {
-      setNewRecordValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[fieldName as string];
-        console.log('[DataTable Debug] Cleared validation error for:', fieldName);
-        return newErrors;
-      });
+    if (newRecordErrors[fieldName as string]) {
+      setNewRecordErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[fieldName as string]
+        return newErrors
+      })
     }
-  };
+  }
 
   const handleSaveNewRecord = async (triggerFieldName?: string, triggerFieldValue?: any) => {
-    console.log('[DataTable Debug] handleSaveNewRecord called');
-    if (triggerFieldName) {
-      console.log('[DataTable Debug] triggerField:', { triggerFieldName, triggerFieldValue });
-    }
-
     if (!service.create) {
-      console.error("Create service function not provided.");
-      setNewRecordValidationErrors({ _form: "Cannot create record: Service unavailable." });
-      setNewRecordSubmissionStatus('error');
-      return;
+      setNewRecordErrors({ _form: "Cannot create record: Service unavailable." })
+      return
     }
 
     // Get the latest data, including the trigger field value if provided
-    const currentData = { ...newRecordData };
+    const currentData = { ...newRecordData }
     if (triggerFieldName && triggerFieldValue !== undefined) {
-      currentData[triggerFieldName as keyof T] = triggerFieldValue;
+      currentData[triggerFieldName as keyof T] = triggerFieldValue
     }
 
-    // Validate the current data (including the trigger field)
-    const errors = validateNewRecord(currentData);
+    // Validate the current data
+    const errors = validateNewRecord(currentData)
     
     if (Object.keys(errors).length > 0) {
-      console.log('[DataTable Debug] Validation failed:', errors);
-      setNewRecordValidationErrors(errors);
-      setNewRecordSubmissionStatus('error');
-      return;
+      setNewRecordErrors(errors)
+      return
     }
 
-    // Clear any previous errors and start submission
-    setNewRecordValidationErrors({});
-    setNewRecordSubmissionStatus('submitting');
+    // Clear any previous errors
+    setNewRecordErrors({})
 
     try {
-      // Prepare data for submission using the current data
-      const dataToSave: Partial<T> = {};
+      // Prepare data for submission
+      const dataToSave: Partial<T> = {}
       entityMetadata.columns.forEach((col: any) => {
         if (currentData[col.propertyName as keyof T] !== undefined) {
-          (dataToSave as any)[col.propertyName] = currentData[col.propertyName as keyof T];
+          (dataToSave as any)[col.propertyName] = currentData[col.propertyName as keyof T]
         }
-      });
+      })
 
-      console.log('[DataTable Debug] Submitting to PGlite:', dataToSave);
-
-      // Submit to PGlite - this will be fast since it's local
-      const createdEntity = await service.create(dataToSave);
+      // Submit to service
+      const createdEntity = await service.create(dataToSave)
 
       // Notify parent component
-      onEntityCreated?.(createdEntity);
+      onEntityCreated?.(createdEntity)
 
       // Show success feedback
-      toast.success(`${entityType} created successfully!`);
+      toast.success(`${entityType} created successfully!`)
 
-      // Reset form for next entry - live query will update the table automatically
-      setNewRecordData(propInitialNewRecordData || {});
-      setNewRecordSubmissionStatus('idle');
-
-      console.log('[DataTable Debug] Record created successfully');
+      // Reset form for next entry
+      setNewRecordData(propInitialNewRecordData || {})
 
     } catch (error: any) {
-      console.error(`[DataTable Debug] PGlite error:`, error);
-      const errorMessage = error.message || "An unexpected error occurred.";
-      setNewRecordValidationErrors({ _form: errorMessage });
-      setNewRecordSubmissionStatus('error');
-      toast.error(`Error creating ${entityType}: ${errorMessage}`);
+      const errorMessage = error.message || "An unexpected error occurred."
+      setNewRecordErrors({ _form: errorMessage })
+      toast.error(`Error creating ${entityType}: ${errorMessage}`)
     }
-  };
-
-  const getColumnInputType = (column: any): string => {
-    const columnMeta = entityMetadata?.columns.find((c: any) => c.propertyName === column.id);
-    if (columnMeta) {
-      switch (columnMeta.type) {
-        case 'number':
-        case 'int':
-        case 'integer':
-        case 'float':
-        case 'double':
-        case 'decimal':
-          return 'number';
-        case 'date':
-          return 'date';
-        case 'datetime':
-        case 'timestamp':
-          return 'datetime-local'; // Or 'date' if time part is not needed
-        case 'boolean':
-          return 'boolean'; // Specific type for Checkbox
-        default:
-          // Check for enum type
-          if (columnMeta.enum) {
-            return 'enum';
-          }
-          return 'text';
-      }
-    }
-    return 'text';
-  };
-
-  const paginationHookState = useMemo(
-    () => ({
-      pageIndex,
-      pageSize: currentPageSize,
-    }),
-    [pageIndex, currentPageSize]
-  );
+  }
   
   const effectiveTypeormOptions = useMemo(() => {
     const options: TypeORMColumnOptions = { // Ensure TypeORMColumnOptions is used
@@ -807,6 +741,7 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
       entityName: entityType, // Pass entityType to be used as entityName in generateColumnsFromTypeORM
       enableEntityPlugins: true, // As per original logic
       enableRowSelection: enableBulkActions, // Enable row selection when bulk actions are enabled
+      optimisticUpdates: optimisticUpdates, // Pass through the optimistic updates flag
     };
     // Combine relationshipConfigs from props and relatedServices
     const combinedRelationshipConfigs = { ...(typeormOptions.relationshipConfigs || {}) };
@@ -822,12 +757,21 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
       ...options,
       relationshipConfigs: combinedRelationshipConfigs,
     };
-  }, [entityType, relatedServices, typeormOptions, enableBulkActions]);
+  }, [entityType, relatedServices, typeormOptions, enableBulkActions, optimisticUpdates]);
 
+  // Universal Reactive Data Pattern Support
+  // If loaderData is provided, use it immediately and let live queries update in the background
+  // If no loaderData, fall back to traditional live query loading
   const { data: liveData, loading: liveLoading, error: liveError } = useLiveEntity<T>(
-    propsLiveQueryBuilder,
-    { enabled: !!propsLiveQueryBuilder, transform: true } // Assuming transform is desired
+    propsLiveQueryBuilder || null, // Ensure we pass null instead of undefined
+    { enabled: !!propsLiveQueryBuilder, transform: true }
   );
+
+  // Smart data selection: Use loader data first, then live data
+  const data = loaderData || liveData || [];
+  
+  // Loading state: Only show loading if we have no data at all
+  const isDataLoading = !loaderData && liveLoading;
   
   // Check if related services are available - only wait for the ones we have in relatedServices
   const areRelatedServicesLoading = useMemo(() => {
@@ -840,8 +784,19 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
     return Object.values(relatedServices).some(service => !service);
   }, [relatedServices]);
   
-  // Overall loading state - wait for live data and related services
-  const isFullyLoading = liveLoading || areRelatedServicesLoading;
+  // Overall loading state - wait for data and related services
+  const isFullyLoading = isDataLoading || areRelatedServicesLoading;
+
+  // Error handling - show error if live query fails and we have no loader data
+  if (liveError && !loaderData) {
+    return (
+      <DataTableErrorDisplay
+        error={liveError}
+        title={`Error Loading ${title || entityType}`}
+        description={propsErrorMessage}
+      />
+    )
+  }
   
   const generatedColumns = useMemo(() => {
     let columns: ColumnDef<T, any>[];
@@ -896,7 +851,7 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
   const resolvedErrorMessage = propsErrorMessage ?? internalDefaultConfig.errorMessage;
 
   const table = useReactTable({
-    data: liveData || [],
+    data: data || [],
     columns: generatedColumns,
     state: {
       sorting: currentSorting,
@@ -905,12 +860,12 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
       columnOrder: currentColumnOrder,
       columnSizing: currentColumnSizing,
       rowSelection,
-      ...(enablePagination && { pagination: paginationHookState }),
+      ...(enablePagination && { pagination: { pageIndex, pageSize: currentPageSize } }),
     },
     meta: {
       onUpdate: (rowId: string, columnId: string, value: any) => handleUpdate(rowId, columnId, value),
       editableColumns: resolvedEditableColumns,
-      tableReady: !isFullyLoading && !!(liveData || []).length,
+      tableReady: !isFullyLoading && !!(data || []).length,
     },
     enableRowSelection: true,
     enableSorting,
@@ -927,8 +882,11 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
     getFilteredRowModel: getFilteredRowModel(),
     ...(enablePagination && { getPaginationRowModel: getPaginationRowModel() }),
     getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
+    // ✅ PERFORMANCE FIX: Only enable faceted operations when actually needed for advanced filters
+    // These are extremely expensive with 80+ rows and cause click handler violations
+    // TODO: Make conditional based on facetedFilterConfigs prop
+    // getFacetedRowModel: getFacetedRowModel(),
+    // getFacetedUniqueValues: getFacetedUniqueValues(),
     getRowId: (row: T) => row.id,
   });
   
@@ -992,51 +950,65 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
   }, [isAddingNewRecord, table, columnMetadataMap]);
 
   // Set the first editable column flag
-  useMemo(() => {
-    const firstEditableIndex = newRecordColumnConfigs.findIndex(config => !config.isAutoGenerated);
-    if (firstEditableIndex >= 0) {
-      newRecordColumnConfigs[firstEditableIndex].isFirstEditable = true;
+  if (newRecordColumnConfigs.length > 0 && firstEditableColumnId) {
+    const firstEditableConfig = newRecordColumnConfigs.find(config => config.column.id === firstEditableColumnId);
+    if (firstEditableConfig) {
+      firstEditableConfig.isFirstEditable = true;
     }
-  }, [newRecordColumnConfigs]);
+  }
   
+  // Track previous values to prevent infinite re-renders
+  const prevSortingRef = useRef<SortingState | undefined>(undefined);
+  const prevColumnVisibilityRef = useRef<any>(undefined);
+  const prevColumnOrderRef = useRef<any>(undefined);
+  const prevColumnSizingRef = useRef<any>(undefined);
+  const prevColumnFiltersRef = useRef<any>(undefined);
+  const prevPaginationRef = useRef<any>(undefined);
+
   useEffect(() => {
     const newSortingState = table.getState().sorting;
-    if (newSortingState !== undefined && JSON.stringify(newSortingState) !== JSON.stringify(persistedState?.sorting ?? [])) {
-      setUiState(tableId, { sorting: newSortingState });
+    if (newSortingState !== undefined && JSON.stringify(newSortingState) !== JSON.stringify(prevSortingRef.current) && JSON.stringify(newSortingState) !== JSON.stringify(tableState?.sorting ?? [])) {
+      prevSortingRef.current = newSortingState;
+      setCurrentSorting(newSortingState);
     }
-  }, [table.getState().sorting, tableId, setUiState, persistedState?.sorting]);
+  }, [table, tableId, setCurrentSorting, tableState?.sorting]);
 
   useEffect(() => {
     const newColumnVisibilityState = table.getState().columnVisibility;
-    if (newColumnVisibilityState !== undefined && JSON.stringify(newColumnVisibilityState) !== JSON.stringify(persistedState?.columnVisibility ?? {})) {
-      setUiState(tableId, { columnVisibility: newColumnVisibilityState });
+    if (newColumnVisibilityState !== undefined && JSON.stringify(newColumnVisibilityState) !== JSON.stringify(prevColumnVisibilityRef.current) && JSON.stringify(newColumnVisibilityState) !== JSON.stringify(tableState?.columnVisibility ?? {})) {
+      prevColumnVisibilityRef.current = newColumnVisibilityState;
+      setCurrentColumnVisibility(newColumnVisibilityState);
     }
-  }, [table.getState().columnVisibility, tableId, setUiState, persistedState?.columnVisibility]);
+  }, [table, tableId, setCurrentColumnVisibility, tableState?.columnVisibility]);
 
   useEffect(() => {
     const newColumnOrderState = table.getState().columnOrder;
-    if (newColumnOrderState !== undefined && JSON.stringify(newColumnOrderState) !== JSON.stringify(persistedState?.columnOrder ?? [])) {
-      setUiState(tableId, { columnOrder: newColumnOrderState });
+    if (newColumnOrderState !== undefined && JSON.stringify(newColumnOrderState) !== JSON.stringify(prevColumnOrderRef.current) && JSON.stringify(newColumnOrderState) !== JSON.stringify(tableState?.columnOrder ?? [])) {
+      prevColumnOrderRef.current = newColumnOrderState;
+      setCurrentColumnOrder(newColumnOrderState);
     }
-  }, [table.getState().columnOrder, tableId, setUiState, persistedState?.columnOrder]);
+  }, [table, tableId, setCurrentColumnOrder, tableState?.columnOrder]);
 
   useEffect(() => {
     const newColumnSizingState = table.getState().columnSizing;
     if (newColumnSizingState !== undefined) {
-        if (Object.keys(newColumnSizingState).length > 0 && JSON.stringify(newColumnSizingState) !== JSON.stringify(persistedState?.columnSizing ?? {})) {
-            setUiState(tableId, { columnSizing: newColumnSizingState });
-        } else if (Object.keys(newColumnSizingState).length === 0 && persistedState?.columnSizing && Object.keys(persistedState.columnSizing).length > 0) {
-            setUiState(tableId, { columnSizing: {} });
+        if (Object.keys(newColumnSizingState).length > 0 && JSON.stringify(newColumnSizingState) !== JSON.stringify(prevColumnSizingRef.current) && JSON.stringify(newColumnSizingState) !== JSON.stringify(tableState?.columnSizing ?? {})) {
+            prevColumnSizingRef.current = newColumnSizingState;
+            setCurrentColumnSizing(newColumnSizingState);
+        } else if (Object.keys(newColumnSizingState).length === 0 && tableState?.columnSizing && Object.keys(tableState.columnSizing).length > 0 && JSON.stringify(newColumnSizingState) !== JSON.stringify(prevColumnSizingRef.current)) {
+            prevColumnSizingRef.current = newColumnSizingState;
+            setCurrentColumnSizing({});
         }
     }
-  }, [table.getState().columnSizing, tableId, setUiState, persistedState?.columnSizing]);
+  }, [table, tableId, setCurrentColumnSizing, tableState?.columnSizing]);
   
   useEffect(() => {
     const newColumnFiltersState = table.getState().columnFilters;
-    if (newColumnFiltersState !== undefined && JSON.stringify(newColumnFiltersState) !== JSON.stringify(persistedState?.columnFilters ?? [])) {
-      setUiState(tableId, { columnFilters: newColumnFiltersState });
+    if (newColumnFiltersState !== undefined && JSON.stringify(newColumnFiltersState) !== JSON.stringify(prevColumnFiltersRef.current) && JSON.stringify(newColumnFiltersState) !== JSON.stringify(tableState?.columnFilters ?? [])) {
+      prevColumnFiltersRef.current = newColumnFiltersState;
+      setCurrentColumnFilters(newColumnFiltersState);
     }
-  }, [table.getState().columnFilters, tableId, setUiState, persistedState?.columnFilters]);
+  }, [table, tableId, setCurrentColumnFilters, tableState?.columnFilters]);
 
   // This useEffect now correctly depends on tableConfig.pageSize for its logic if needed,
   // and initialPageSize is correctly derived from tableConfig.pageSize.
@@ -1047,12 +1019,13 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
         pageIndex: newPaginationState.pageIndex ?? 0,
         pageSize: newPaginationState.pageSize ?? tableConfig.pageSize ?? internalDefaultConfig.defaultTableConfig.pageSize,
       };
-      const persistedPagination = persistedState?.pagination ?? { pageIndex: 0, pageSize: tableConfig.pageSize ?? internalDefaultConfig.defaultTableConfig.pageSize };
-      if (JSON.stringify(validNewPaginationState) !== JSON.stringify(persistedPagination)) {
-        setUiState(tableId, { pagination: validNewPaginationState });
+      const persistedPagination = tableState?.pagination ?? { pageIndex: 0, pageSize: tableConfig.pageSize ?? internalDefaultConfig.defaultTableConfig.pageSize };
+      if (JSON.stringify(validNewPaginationState) !== JSON.stringify(prevPaginationRef.current) && JSON.stringify(validNewPaginationState) !== JSON.stringify(persistedPagination)) {
+        prevPaginationRef.current = validNewPaginationState;
+        setPagination(validNewPaginationState);
       }
     }
-  }, [table.getState().pagination, tableId, setUiState, persistedState?.pagination, tableConfig.pageSize]); // Depend on tableConfig.pageSize
+  }, [table, tableId, setPagination, tableState?.pagination, tableConfig.pageSize]);
 
   // Keyboard navigation for new record row
   useEffect(() => {
@@ -1070,10 +1043,10 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
 
   // Effect to reset pagination when data changes if pagination is NOT enabled
   useEffect(() => {
-    if (!tableConfig.enablePagination && liveData) {
+    if (!tableConfig.enablePagination && data) {
       table.resetPageIndex(false);
     }
-  }, [liveData, tableConfig.enablePagination, table]);
+  }, [data, tableConfig.enablePagination, table]);
 
   // Effect to set table page size when tableConfig.pageSize changes
   useEffect(() => {
@@ -1122,14 +1095,11 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
     const selectedIds = table.getSelectedRowModel().rows.map(row => row.id);
     if (selectedIds.length === 0) return;
     
-    setBulkActionLoading('delete');
     try {
       await bulkHandlers.handleBulkDelete(selectedIds);
       table.resetRowSelection();
     } catch (error) {
       // Error already handled by the utility
-    } finally {
-      setBulkActionLoading(null);
     }
   };
 
@@ -1140,14 +1110,11 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
     
     if (selectedIds.length === 0) return;
     
-    setBulkActionLoading(action.label);
     try {
       await bulkHandlers.handleCustomBulkAction(action, selectedData, selectedIds);
       table.resetRowSelection();
     } catch (error) {
       // Error already handled by the utility
-    } finally {
-      setBulkActionLoading(null);
     }
   };
 
@@ -1164,15 +1131,8 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
     }
   };
   
-  if (liveError) {
-    return (
-      <DataTableErrorDisplay
-        error={liveError}
-        title={`Error Loading ${title || entityType}`}
-        description={resolvedErrorMessage}
-      />
-    )
-  }
+  // No need for error handling here - useSuspenseEntity throws errors for error boundaries
+  // The data is guaranteed to be available when we reach this point
 
   const constructedToolbar = (
     <div className="flex items-center space-x-2">
@@ -1210,7 +1170,7 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
               field={field}
               selectedCount={selectedRowCount}
               onBulkUpdate={handleBulkUpdate}
-              isLoading={bulkActionLoading !== null}
+              isLoading={false}
             />
           ))}
 
@@ -1220,15 +1180,10 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
               variant="destructive"
               size="sm"
               onClick={handleBulkDelete}
-              disabled={bulkActionLoading === 'delete'}
               className="h-8"
             >
-              {bulkActionLoading === 'delete' ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
                 <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              {bulkActionLoading === 'delete' ? 'Deleting...' : 'Delete'}
+              Delete
             </Button>
           )}
           
@@ -1239,15 +1194,10 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
               variant={action.variant || 'default'}
               size="sm"
               onClick={() => handleCustomBulkAction(action)}
-              disabled={bulkActionLoading === action.label}
               className="h-8"
             >
-              {bulkActionLoading === action.label ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                action.icon && <action.icon className="mr-2 h-4 w-4" />
-              )}
-              {bulkActionLoading === action.label ? 'Processing...' : action.label}
+              {action.icon && <action.icon className="mr-2 h-4 w-4" />}
+              {action.label}
             </Button>
           ))}
           
@@ -1372,15 +1322,12 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
       const size = (column as any).size || 150; // Default to 150px if no size specified
       return total + size;
     }, 0);
-    console.log('Calculated table width:', { 
-      totalTableWidth: width, 
-      tanstackSize: table.getCenterTotalSize(),
-      finalWidth: Math.max(width, table.getCenterTotalSize()),
-      columnCount: generatedColumns.length,
-      availableContentWidth: availableContentWidth // Add content width to debug info
-    });
     return width;
-  }, [generatedColumns, table, availableContentWidth]);
+  }, [generatedColumns, tableConfig.pageSize]);
+
+  // Get tanstack table's calculated width separately (not in useMemo to avoid infinite loop)
+  const tanstackTableWidth = table.getCenterTotalSize();
+  const finalTableWidth = Math.max(totalTableWidth, tanstackTableWidth);
 
   const tableRenderContent = (
     <div className='space-y-4'>
@@ -1394,13 +1341,13 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
           className='overflow-x-auto rounded-md border' 
           style={{ 
             width: '100%', 
-            maxWidth: `${Math.max(availableContentWidth, 300)}px`, // Use content width directly, with minimum
+            maxWidth: `${Math.max(tableConfig.pageSize ?? internalDefaultConfig.defaultTableConfig.pageSize, 300)}px`, // Use tableConfig.pageSize directly, with minimum
           }}
         >
           <Table 
             className="w-full"
             style={{ 
-              minWidth: `${Math.max(totalTableWidth, table.getCenterTotalSize())}px`
+              minWidth: `${finalTableWidth}px`
             }}
           >
             <TableHeader>
@@ -1546,20 +1493,16 @@ export function EntityDataTable<T extends ObjectLiteral & { id: string; createdA
                             size="sm"
                             className="h-8 px-3 text-sm"
                             onClick={() => handleSaveNewRecord()}
-                            disabled={newRecordSubmissionStatus === "submitting" || Object.keys(newRecordValidationErrors).length > 0}
+                            disabled={Object.keys(newRecordErrors).length > 0}
                             aria-label="Save new record"
                           >
-                            {newRecordSubmissionStatus === "submitting" && (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            )}
-                            {newRecordSubmissionStatus === "submitting" ? "Saving..." : "Save"}
+                            Save
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             className="h-8 px-3 text-sm"
                             onClick={handleCancelNewRecord}
-                            disabled={newRecordSubmissionStatus === "submitting"}
                             aria-label="Cancel new record creation"
                           >
                             Cancel

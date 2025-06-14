@@ -1,27 +1,35 @@
 import { SyncEventEmitter } from './SyncEventEmitter';
 
 // New Module Imports
-import { DatabaseInitializer } from './DatabaseInitializer';
 import { OutgoingChangeProcessor } from './OutgoingChangeProcessor';
 import { IncomingChangeProcessor } from './IncomingChangeProcessor';
-import { WebSocketConnector } from './WebSocketConnector'; // Remove IMessageSender import from here
-import { SyncStatePersister } from './SyncStatePersister';
+import { WebSocketConnector } from './WebSocketConnector';
+// Removed OrchestratorSyncInterface - accessing orchestrator directly
 import { SyncMessageHandler } from './SyncMessageHandler';
+import { IntegrityManager } from './IntegrityManager';
+import { LSNManager } from './LSNManager';
 import { 
   IOnlineStatusProvider,
   ISyncStateProvider,
   SyncStatus,
   ClientId,
   LSN,
-  IMessageSender // Add IMessageSender import here
+  IMessageSender
 } from './interfaces';
+import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
+import { TableChange, ClientMessage as SyncClientMessage } from '@repo/sync-types';
 
-// Define sync states - This type might be deprecated in favor of SyncStatus from interfaces.ts
-// For now, keep it if it's used internally or by older event listeners.
+// Constants
+export const WEBSOCKET_RECONNECT_INTERVAL = 3000;
+
+// Type aliases for better readability
+export type MessageId = string;
+export type Timestamp = number;
+
+// Legacy types for backward compatibility 
 export type SyncState = 'disconnected' | 'connecting' | 'initial' | 'catchup' | 'live';
 
-
-// Basic message types - Consider moving these to a shared types file or within interfaces.ts
+// Interfaces for better type safety and readability
 export interface BaseMessage {
   type: string;
   clientId: ClientId; 
@@ -62,44 +70,92 @@ export interface ServerLiveStartMessage extends ServerMessage {
   finalLSN: LSN;
 }
 
+interface GlobalSyncManager {
+  instance: SyncManager | null;
+}
+
+// Declare global scope for HMR-stable singleton
+declare global {
+  interface Window {
+    __syncManager?: GlobalSyncManager;
+  }
+}
+
 /**
  * SyncManager
  * 
- * Orchestrates the different components of the synchronization process.
+ * @deprecated This class is being phased out in favor of pure services and XState machines.
+ * 
+ * Legacy: Orchestrates the different components of the synchronization process.
  * Acts as a facade for UI components and other parts of the application
  * to interact with the sync system.
  * 
- * Implements a proper singleton pattern.
+ * NEW APPROACH: Use sync-machine with pure services (WebSocketService, IncomingChangeService, OutgoingChangeService)
+ * 
+ * Implements a HMR-stable singleton pattern.
  */
 export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
-  // Singleton instance
-  private static instance: SyncManager | null = null;
+  public static readonly VERSION = '1.0.0';
+  private static debugMode: boolean = process.env.NODE_ENV === 'development' && false;
   
-  // Add debug mode flag
-  private static debugMode: boolean = process.env.NODE_ENV === 'development' && false; 
+  // Use global window scope for HMR-stable singleton
+  private static getGlobalState(): GlobalSyncManager {
+    if (typeof window !== 'undefined') {
+      if (!window.__syncManager) {
+        window.__syncManager = { instance: null };
+      }
+      return window.__syncManager;
+    }
+    // Fallback for SSR/Node environments
+    return { instance: null };
+  }
+
+  private static get instance(): SyncManager | null {
+    return this.getGlobalState().instance;
+  }
+
+  private static set instance(value: SyncManager | null) {
+    this.getGlobalState().instance = value;
+  }
   
-  // Event emitter for component communication
   public readonly events = new SyncEventEmitter();
 
-  // New Sync Modules
-  private databaseInitializer!: DatabaseInitializer;
+  // Core sync modules
   private outgoingChangeProcessor!: OutgoingChangeProcessor;
   private incomingChangeProcessor!: IncomingChangeProcessor;
   private webSocketConnector!: WebSocketConnector;
-  private syncStatePersister!: SyncStatePersister;
+  // DEPRECATED: Temporarily keeping for compatibility during migration
+  private syncStatePersister: any = {
+    initialize: async () => {},
+    getClientId: () => {
+      // Avoid circular dependency - access orchestrator directly
+      try {
+        const snapshot = this.getOrchestratorSnapshot();
+        return snapshot.context.syncState.clientId;
+      } catch (error) {
+        return '';
+      }
+    },
+    getStatus: () => this.getStatus(),
+    getPendingChangesCount: () => this.getPendingChangesCount(),
+    resetSyncState: async () => {},
+    close: async () => {}
+  };
   private syncMessageHandler!: SyncMessageHandler;
+  private integrityManager!: IntegrityManager;
+  private lsnManager!: LSNManager;
+  
+  // Shared datasource from PGliteProvider (required)
+  private sharedDataSource: NewPGliteDataSource | null = null;
   
   // Initialization state
   private isInitialized: boolean = false;
   private isInitializing: boolean = false;
   private initPromise: Promise<void> | null = null;
   
-  // Auto-connect behavior
+  // Configuration
   private autoConnect: boolean = true;
 
-  /**
-   * Private constructor - use getInstance() instead
-   */
   private constructor() {
     if (SyncManager.debugMode) {
       console.log('[SyncManager] Constructor: Creating new SyncManager instance');
@@ -108,16 +164,72 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
     this.registerEventHandlers();
   }
 
+  // Helper methods to access orchestrator context directly
+  private getOrchestrator() {
+    const orchestrator = (window as any).orchestratorActor;
+    if (!orchestrator) {
+      throw new Error('Orchestrator actor not available');
+    }
+    return orchestrator;
+  }
+  
+  private getOrchestratorSnapshot() {
+    return this.getOrchestrator().getSnapshot();
+  }
+
+  private sendToOrchestrator(event: any) {
+    this.getOrchestrator().send(event);
+  }
+
+  // Helper methods to replace syncStatePersister functionality
+  private async initializeSyncState(): Promise<void> {
+    // No-op: orchestrator handles state initialization automatically
+  }
+
+  // getClientId is public (required by ISyncStateProvider interface) - implemented below
+
+  private getCurrentLSN(): string {
+    const snapshot = this.getOrchestratorSnapshot();
+    return snapshot.context.syncState.currentLSN;
+  }
+
+  private getSyncStatus(): SyncStatus {
+    const snapshot = this.getOrchestratorSnapshot();
+    const syncState = snapshot.context.syncState;
+    
+    // Map orchestrator sync machine state to SyncStatus
+    if (syncState.machineState === 'idle' && !syncState.phase) return 'disconnected';
+    if (syncState.machineState === 'connecting') return 'connecting';
+    if (syncState.phase === 'initial') return 'initial_sync';
+    if (syncState.phase === 'catchup') return 'catchup';
+    if (syncState.phase === 'live') return 'live';
+    if (syncState.error) return 'error';
+    return 'disconnected';
+  }
+
+  private getPendingChangesCountFromState(): number {
+    const snapshot = this.getOrchestratorSnapshot();
+    return snapshot.context.syncPendingChangesCount;
+  }
+
+  private async saveSyncState(data: { currentLsn?: string; syncState?: string }): Promise<void> {
+    // Only save what orchestrator needs via events
+    // LSN updates are handled via notifyXStateOfLSN
+    // Status changes are handled by sync machine
+  }
+
+  private async resetSyncState(): Promise<void> {
+    this.sendToOrchestrator({ type: 'SYNC_CLIENT_ID_RESET' });
+  }
+
   private setupModules(): void {
     if (SyncManager.debugMode) {
       console.log('[SyncManager] setupModules: Initializing core sync modules');
     }
 
-    this.databaseInitializer = new DatabaseInitializer();
-    this.syncStatePersister = new SyncStatePersister(); // Constructor takes no arguments
+    // Note: LSNManager will be updated to be a pure utility in next phase
+    this.lsnManager = new LSNManager(this.events, null as any); // Temporary until LSNManager refactor
     this.webSocketConnector = new WebSocketConnector(this.events);
-    // Dependent modules (IncomingChangeProcessor, OutgoingChangeProcessor, SyncMessageHandler)
-    // will be instantiated in initialize() after databaseInitializer is ready.
 
     if (SyncManager.debugMode) {
       console.log('[SyncManager] setupModules: Core sync modules initialized');
@@ -133,7 +245,10 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
       if (SyncManager.debugMode) {
         console.log(`[SyncManager] Event: websocket:status received: ${status}`);
       }
-      this.events.emit('sync:statusChanged', this.getStatus());
+      
+      const currentStatus = this.getStatus();
+            this.events.emit('sync:statusChanged', currentStatus);
+      this.events.emit('stateChange', currentStatus);
 
       if (status === 'disconnected' && this.autoConnect && this.isInitialized && !this.isInitializing) {
          if (SyncManager.debugMode) {
@@ -146,7 +261,7 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
         if (SyncManager.debugMode) {
             console.log(`[SyncManager] Event: outgoing:pendingCountChanged received: ${count}`);
         }
-        this.events.emit('sync:pendingChangesCount', count);
+        this.events.emit('pendingChangesUpdate', count);
     });
 
     this.events.on('sync:error', (errorData: { type: string, message: string, error?: any }) => {
@@ -158,88 +273,284 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
             console.log('[SyncManager] Event: syncStatePersister:stateUpdated', newState);
         }
     });
+
+    // Heartbeat event handlers
+    this.events.on('heartbeat:timeout', (data: { missedCount: number, lastPongReceived: number }) => {
+        console.warn('[SyncManager] Heartbeat timeout detected', data);
+        this.events.emit('sync:connection_degraded', {
+          reason: 'heartbeat_timeout',
+          missedHeartbeats: data.missedCount
+        });
+    });
+
+    this.events.on('heartbeat:connection_lost', (data: { missedCount: number, lastPongReceived: number }) => {
+        console.error('[SyncManager] Connection lost due to heartbeat failure', data);
+        this.events.emit('sync:connection_lost', {
+          reason: 'heartbeat_failure',
+          missedHeartbeats: data.missedCount
+        });
+    });
+
+    this.events.on('heartbeat:response', (data: { responseTime: number, wasRecovery: boolean }) => {
+        if (SyncManager.debugMode) {
+            console.log('[SyncManager] Heartbeat response received', data);
+        }
+        
+        if (data.wasRecovery) {
+            console.log('[SyncManager] Connection recovered after missed heartbeats');
+            this.events.emit('sync:connection_recovered');
+            
+            // Notify XState machine for potential integrity validation
+            this.notifyXStateOfConnectionRecovery(true);
+        }
+    });
+
+    this.events.on('heartbeat:lsn_drift_detected', (data: { clientLSN: string, serverLSN: string }) => {
+        console.warn('[SyncManager] LSN drift detected in heartbeat', data);
+        this.events.emit('sync:lsn_drift_detected', data);
+        
+        // Notify XState machine for integrity validation
+        this.notifyXStateOfLSNDrift(data.clientLSN, data.serverLSN);
+    });
+
+    this.events.on('heartbeat:error', () => {
+        console.error('[SyncManager] Heartbeat error detected');
+        this.events.emit('sync:error', {
+          type: 'heartbeat_error',
+          message: 'Failed to send or process heartbeat'
+        });
+    });
+
+    // Handle integrity reset reconnection requests
+    this.events.on('sync:reconnect_requested', async (data: { reason: string, newLSN: string }) => {
+        console.log(`[SyncManager] Reconnection requested: ${data.reason} (LSN: ${data.newLSN})`);
+        
+        if (this.autoConnect && this.isInitialized) {
+          try {
+            // Disconnect first if connected
+            if (this.isConnected()) {
+              console.log('[SyncManager] Disconnecting before reconnection...');
+              this.disconnect();
+              // Wait for clean disconnection and state cleanup
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            
+            // Ensure LSN is properly saved to state before reconnecting
+            await this.saveSyncState({
+              currentLsn: data.newLSN,
+              syncState: 'disconnected'
+            });
+            
+            // Update connection params with new LSN and reconnect
+            const clientId = this.getClientId();
+            this.webSocketConnector?.setConnectionParams(clientId, data.newLSN);
+            
+            console.log('[SyncManager] Attempting reconnection for automatic sync...');
+            await this.connect();
+            console.log('[SyncManager] ✅ Reconnection successful - automatic sync should begin');
+          } catch (error) {
+            console.error('[SyncManager] Failed to reconnect after integrity reset:', error);
+          }
+        } else {
+          console.warn('[SyncManager] Cannot reconnect - autoConnect disabled or not initialized');
+        }
+    });
+
+    // Forward sync status changes to XState machine
+    this.events.on('sync:statusChanged', (status: string) => {
+        if (SyncManager.debugMode) {
+            console.log(`[SyncManager] Forwarding sync status change to XState: ${status}`);
+        }
+        
+        // Notify XState machine about sync status changes
+        try {
+          const appActor = (window as any).appActor;
+          if (appActor) {
+            appActor.send({ 
+              type: 'SYNC_STATUS_CHANGED', 
+              status: status,
+              timestamp: Date.now()
+            });
+            console.log(`[SyncManager] ✅ Notified XState machine: SYNC_STATUS_CHANGED (${status})`);
+          } else if (SyncManager.debugMode) {
+            console.warn('[SyncManager] XState app machine actor not available');
+          }
+        } catch (error) {
+          console.error('[SyncManager] Error notifying XState machine:', error);
+        }
+    });
   }
   
   public static getInstance(): SyncManager {
-    if (SyncManager.debugMode) {
-      console.log('[SyncManager.getInstance] Getting instance');
-    }
     if (!SyncManager.instance) {
-      if (SyncManager.debugMode) { 
-        console.log('[SyncManager.getInstance] Creating new SyncManager instance');
-      }
+      if (SyncManager.debugMode) console.log('[SyncManager.getInstance] Creating new SyncManager instance.');
       SyncManager.instance = new SyncManager();
+    } else {
+      if (SyncManager.debugMode) console.log('[SyncManager.getInstance] Returning existing SyncManager instance.');
+      
+      // During HMR, check if the instance is in a valid state
+      if (import.meta.hot) {
+        const instance = SyncManager.instance;
+        
+        // If the instance is in an invalid state (e.g., datasource is null but should be set),
+        // we might need to reset some state
+        if (instance.isInitialized && !instance.sharedDataSource) {
+          console.warn('[SyncManager.getInstance] HMR detected: Instance is initialized but missing shared datasource');
+          // Don't reset the instance, but log the issue - the setSharedDataSource method will handle this
+        }
+        
+        // console.log('[SyncManager.getInstance] HMR: Reusing existing instance'); // DISABLED: Too noisy
+      }
     }
     return SyncManager.instance;
   }
   
+  /**
+   * Set the shared datasource from PGliteProvider
+   * Must be called before initialize() to use domain layer integration
+   * During HMR, allows updating the datasource even if already initialized
+   */
+  public setSharedDataSource(dataSource: NewPGliteDataSource): void {
+    // During HMR, we might need to update the datasource even if already initialized
+    if (this.isInitialized || this.isInitializing) {
+      if (import.meta.hot) {
+        console.log('[SyncManager] HMR detected: Updating shared datasource on already initialized SyncManager');
+        this.sharedDataSource = dataSource;
+        
+        // If we have an outgoing change processor, update its datasource reference
+        if (this.outgoingChangeProcessor && dataSource.isInitialized) {
+          console.log('[SyncManager] 🔥 HMR: Updating OutgoingChangeProcessor datasource reference');
+          try {
+            this.outgoingChangeProcessor.updateDataSource(dataSource);
+            console.log('[SyncManager] 🔥 HMR: Successfully updated OutgoingChangeProcessor datasource');
+          } catch (error) {
+            console.error('[SyncManager] 🔥 HMR: Failed to update OutgoingChangeProcessor datasource:', error);
+          }
+        }
+        return;
+      }
+      
+      throw new Error('Cannot set shared datasource after SyncManager initialization has started');
+    }
+    
+    this.sharedDataSource = dataSource;
+    console.log('[SyncManager] Shared datasource set from PGliteProvider context');
+  }
+
+  /**
+   * Initialize the SyncManager with improved HMR resilience
+   */
   public async initialize(): Promise<void> {
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Start`);
     if (this.isInitialized) {
       if (SyncManager.debugMode) console.log('[SyncManager.initialize] Already initialized.');
-      return;
+      
+      // During HMR, verify that our components are still valid
+      if (import.meta.hot && this.sharedDataSource) {
+        console.log('[SyncManager] HMR detected: Verifying initialization state');
+        
+        // Defer HMR state verification to avoid blocking React's message handler
+        await new Promise(resolve => setTimeout(resolve, 0));
+        
+        // Check if our datasource is still valid
+        if (!this.sharedDataSource.isInitialized) {
+          console.warn('[SyncManager] HMR: Shared datasource is no longer initialized, forcing re-initialization');
+          this.isInitialized = false;
+          this.isInitializing = false;
+          this.initPromise = null;
+          // Fall through to re-initialize
+        } else {
+          console.log('[SyncManager] HMR: Initialization state is valid, skipping re-initialization');
+          return;
+        }
+      } else {
+        return;
+      }
     }
     
     if (this.isInitializing) {
       if (SyncManager.debugMode) console.log('[SyncManager.initialize] Already initializing, waiting for completion.');
       return this.initPromise!; 
     }
+
+    if (!this.sharedDataSource) {
+      throw new Error('Shared datasource must be set before initializing SyncManager. Call setSharedDataSource() first.');
+    }
+    
+    // Additional check: ensure the shared datasource is actually initialized
+    if (!this.sharedDataSource.isInitialized) {
+      throw new Error('Shared datasource must be initialized before initializing SyncManager.');
+    }
     
     this.isInitializing = true;
-    if (SyncManager.debugMode) console.log('[SyncManager.initialize] Starting initialization sequence.');
+    if (SyncManager.debugMode) console.log('[SyncManager.initialize] Starting initialization sequence with shared datasource.');
 
     this.initPromise = (async () => {
       try {
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before syncStatePersister.initialize()`);
         await this.syncStatePersister.initialize();
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After syncStatePersister.initialize()`);
+        await this.lsnManager.initialize();
         const clientId = this.syncStatePersister.getClientId();
-        const lsn = this.syncStatePersister.getLSN();
-        if (SyncManager.debugMode) console.log(`[SyncManager.initialize] SyncStatePersister initialized. ClientID: ${clientId}, LSN: ${lsn}`);
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before databaseInitializer.initialize()`);
+        const lsn = this.lsnManager.getCurrentLSN();
+        if (SyncManager.debugMode) console.log(`[SyncManager.initialize] SyncStatePersister and LSNManager initialized. ClientID: ${clientId}, LSN: ${lsn}`);
 
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After databaseInitializer.initialize()`);
-await this.databaseInitializer.initialize(); 
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before new IncomingChangeProcessor()`);
-        if (SyncManager.debugMode) console.log('[SyncManager.initialize] DatabaseInitializer initialized.');
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After new IncomingChangeProcessor()`);
-
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before new OutgoingChangeProcessor()`);
-        // Now instantiate dependent modules
+        // Initialize sync modules using shared datasource
         this.incomingChangeProcessor = new IncomingChangeProcessor(this.events);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] IncomingChangeProcessor instantiated.');
 
         this.outgoingChangeProcessor = new OutgoingChangeProcessor(
-          this.databaseInitializer, // Now initialized
+          this.sharedDataSource!,
           this.events,
-          this.webSocketConnector // as IMessageSender
+          this.webSocketConnector
         );
-        if (SyncManager.debugMode) console.log('[SyncManager.initialize] OutgoingChangeProcessor instantiated.');
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After new OutgoingChangeProcessor()`);
+        if (SyncManager.debugMode) console.log('[SyncManager.initialize] OutgoingChangeProcessor instantiated with shared datasource.');
 
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: Before new SyncMessageHandler()`);
+        // Initialize IntegrityManager
+        this.integrityManager = new IntegrityManager(
+          this.events,
+          this.syncStatePersister
+        );
+        this.integrityManager.setMessageSender(this.webSocketConnector);
+        this.integrityManager.setLSNManager(this.lsnManager);
+        this.integrityManager.setSyncManager(this);
+        console.log('[SyncManager.initialize] ✅ IntegrityManager instantiated and configured.');
+
         this.syncMessageHandler = new SyncMessageHandler(
           this.events,
-          this.webSocketConnector, // as IMessageSender & for connection status
-          this.incomingChangeProcessor, // Now instantiated
-          this.syncStatePersister // Already initialized
+          this.webSocketConnector,
+          this.incomingChangeProcessor,
+          this.syncStatePersister,
+          this.integrityManager,
+          this.lsnManager
         );
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: After new SyncMessageHandler()`);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] SyncMessageHandler instantiated.');
         
         this.webSocketConnector.setConnectionParams(clientId, lsn);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] WebSocketConnector connection params set.');
 
-        // Pass the full state object to syncInitialState
+        // Register WebSocketConnector to listen for LSN changes
+        this.lsnManager.onLSNChange((newLsn: string) => {
+          console.log(`[SyncManager] 🔔 LSN change listener triggered: ${newLsn}`);
+          console.log(`[SyncManager] 🔄 Updating WebSocketConnector params with new LSN: ${newLsn}`);
+          this.webSocketConnector.setConnectionParams(this.getClientId(), newLsn);
+          
+          // Also notify XState machine about LSN changes
+          console.log(`[SyncManager] 📤 About to notify XState of LSN change: ${newLsn}`);
+          this.notifyXStateOfLSN(newLsn);
+        });
+
+        // 🔥 CRITICAL FIX: Send initial LSN to XState after initialization
+        // This ensures XState gets the stored LSN value, not just updates
+        const initialLSN = this.lsnManager.getCurrentLSN();
+        console.log(`[SyncManager] 🎯 Sending initial LSN to XState: ${initialLSN}`);
+        this.notifyXStateOfLSN(initialLSN);
+
         const initialStateData = {
             clientId,
             currentLsn: lsn,
-            syncState: this.syncStatePersister.getStatus(), // Get initial status from persister
+            syncState: this.syncStatePersister.getStatus(),
             pendingChangesCount: this.syncStatePersister.getPendingChangesCount(),
-            lastSyncTime: null // Or get from persister if available/needed
+            lastSyncTime: null
         };
         this.syncMessageHandler.syncInitialState(initialStateData);
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initialize: End`);
         if (SyncManager.debugMode) console.log('[SyncManager.initialize] SyncMessageHandler initial state synced.');
 
         this.isInitialized = true;
@@ -301,6 +612,10 @@ console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initi
     return this.webSocketConnector?.isConnected() ?? false;
   }
 
+  public getIsInitialized(): boolean {
+    return this.isInitialized;
+  }
+
   public send(messageData: Omit<ClientMessage, 'clientId' | 'messageId' | 'timestamp'>): void {
     if (!this.isInitialized) {
         console.warn('[SyncManager.send] SyncManager not initialized. Cannot send message.');
@@ -330,19 +645,23 @@ console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - SyncManager.initi
   }
 
   public getLSN(): LSN {
-    if (!this.syncStatePersister) {
-        if (SyncManager.debugMode) console.warn("[SyncManager.getLSN] SyncStatePersister not initialized.");
+    if (!this.lsnManager) {
+        if (SyncManager.debugMode) console.warn("[SyncManager.getLSN] LSNManager not initialized.");
         return '0/0'; 
     }
-    return this.syncStatePersister.getLSN();
+    return this.lsnManager.getCurrentLSN();
   }
 
   public getClientId(): ClientId {
-     if (!this.syncStatePersister) {
-        if (SyncManager.debugMode) console.warn("[SyncManager.getClientId] SyncStatePersister not initialized.");
-        return ''; 
+    try {
+      const snapshot = this.getOrchestratorSnapshot();
+      return snapshot.context.syncState.clientId;
+    } catch (error) {
+      if (SyncManager.debugMode) {
+        console.warn("[SyncManager.getClientId] Could not access orchestrator context:", error);
+      }
+      return '';
     }
-    return this.syncStatePersister.getClientId();
   }
 
   public getPendingChangesCount(): number {
@@ -371,6 +690,142 @@ public getOutgoingChangeProcessor(): OutgoingChangeProcessor {
     return this.incomingChangeProcessor;
   }
 
+  public getIntegrityManager(): IntegrityManager {
+    if (!this.integrityManager) {
+      throw new Error("IntegrityManager not initialized in SyncManager.");
+    }
+    return this.integrityManager;
+  }
+
+  public getLSNManager(): LSNManager {
+    if (!this.lsnManager) {
+      throw new Error("LSNManager not initialized in SyncManager.");
+    }
+    return this.lsnManager;
+  }
+
+  /**
+   * Notify XState machine of LSN changes
+   */
+  private notifyXStateOfLSN(lsn: string): void {
+    try {
+      // Try orchestrator first (new architecture)
+      const orchestratorActor = (window as any).orchestratorActor;
+      if (orchestratorActor) {
+        console.log(`[SyncManager] 📤 Sending LSN_UPDATE to Orchestrator: ${lsn}`);
+        orchestratorActor.send({ type: 'LSN_UPDATE', lsn: lsn });
+        return;
+      }
+      
+      // Fallback to app machine (legacy)
+      const appActor = (window as any).appActor;
+      if (appActor) {
+        console.log(`[SyncManager] 📤 Sending LSN_UPDATE to App Machine: ${lsn}`);
+        appActor.send({ type: 'LSN_UPDATE', lsn: lsn });
+        return;
+      }
+      
+      // If no actor available, retry after a short delay (for initialization timing)
+      console.warn('[SyncManager] ⚠️ Neither orchestratorActor nor appActor available for LSN update, retrying in 100ms');
+      setTimeout(() => {
+        this.notifyXStateOfLSNRetry(lsn, 1);
+      }, 100);
+      
+    } catch (error) {
+      console.warn('[SyncManager] Could not notify XState machine of LSN update:', error);
+    }
+  }
+  
+  /**
+   * Retry mechanism for LSN notification during initialization timing issues
+   */
+  private notifyXStateOfLSNRetry(lsn: string, attempt: number): void {
+    if (attempt > 5) {
+      console.error(`[SyncManager] ❌ Failed to send LSN_UPDATE after ${attempt} attempts, giving up`);
+      return;
+    }
+    
+    try {
+      // Try orchestrator first (new architecture)
+      const orchestratorActor = (window as any).orchestratorActor;
+      if (orchestratorActor) {
+        console.log(`[SyncManager] 📤 Sending LSN_UPDATE to Orchestrator (retry ${attempt}): ${lsn}`);
+        orchestratorActor.send({ type: 'LSN_UPDATE', lsn: lsn });
+        return;
+      }
+      
+      // Fallback to app machine (legacy)
+      const appActor = (window as any).appActor;
+      if (appActor) {
+        console.log(`[SyncManager] 📤 Sending LSN_UPDATE to App Machine (retry ${attempt}): ${lsn}`);
+        appActor.send({ type: 'LSN_UPDATE', lsn: lsn });
+        return;
+      }
+      
+      // Still not available, retry with exponential backoff
+      const delay = Math.min(100 * Math.pow(2, attempt - 1), 1000); // Max 1 second
+      console.warn(`[SyncManager] ⚠️ XState actor still not available (attempt ${attempt}), retrying in ${delay}ms`);
+      setTimeout(() => {
+        this.notifyXStateOfLSNRetry(lsn, attempt + 1);
+      }, delay);
+      
+    } catch (error) {
+      console.warn(`[SyncManager] Error on LSN update retry ${attempt}:`, error);
+    }
+  }
+
+  /**
+   * Notify XState machine of LSN drift detection
+   */
+  private notifyXStateOfLSNDrift(clientLSN: string, serverLSN: string): void {
+    try {
+      // Try orchestrator first (new architecture)
+      const orchestratorActor = (window as any).orchestratorActor;
+      if (orchestratorActor) {
+        console.log(`[SyncManager] 📤 Sending LSN_DRIFT_DETECTED to Orchestrator: client=${clientLSN}, server=${serverLSN}`);
+        orchestratorActor.send({ type: 'LSN_DRIFT_DETECTED', clientLSN, serverLSN });
+        return;
+      }
+      
+      // Fallback to app machine (legacy)
+      const appActor = (window as any).appActor;
+      if (appActor) {
+        console.log(`[SyncManager] 📤 Sending LSN_DRIFT_DETECTED to App Machine: client=${clientLSN}, server=${serverLSN}`);
+        appActor.send({ type: 'LSN_DRIFT_DETECTED', clientLSN, serverLSN });
+      } else {
+        console.warn('[SyncManager] ⚠️ Neither orchestratorActor nor appActor available for LSN drift notification');
+      }
+    } catch (error) {
+      console.warn('[SyncManager] Could not notify XState machine of LSN drift:', error);
+    }
+  }
+
+  /**
+   * Notify XState machine of connection recovery
+   */
+  private notifyXStateOfConnectionRecovery(wasOffline: boolean, durationMs?: number): void {
+    try {
+      // Try orchestrator first (new architecture)
+      const orchestratorActor = (window as any).orchestratorActor;
+      if (orchestratorActor) {
+        console.log(`[SyncManager] 📤 Sending CONNECTION_RECOVERED to Orchestrator: wasOffline=${wasOffline}`);
+        orchestratorActor.send({ type: 'CONNECTION_RECOVERED', disconnectedMs: durationMs || 0 });
+        return;
+      }
+      
+      // Fallback to app machine (legacy)
+      const appActor = (window as any).appActor;
+      if (appActor) {
+        console.log(`[SyncManager] 📤 Sending CONNECTION_RECOVERED to App Machine: wasOffline=${wasOffline}`);
+        appActor.send({ type: 'CONNECTION_RECOVERED', wasOffline, durationMs });
+      } else {
+        console.warn('[SyncManager] ⚠️ Neither orchestratorActor nor appActor available for connection recovery notification');
+      }
+    } catch (error) {
+      console.warn('[SyncManager] Could not notify XState machine of connection recovery:', error);
+    }
+  }
+
   /** @deprecated Pending changes are managed internally. */
   public updatePendingChangesCount(_count: number): void {
     if (SyncManager.debugMode) {
@@ -385,10 +840,14 @@ public getOutgoingChangeProcessor(): OutgoingChangeProcessor {
       this.webSocketConnector.disconnect(); 
     }
 
+    // Reset LSN through centralized manager
+    await this.lsnManager.resetLSN('manual_reset');
+    
+    // Reset other sync state
     await this.syncStatePersister.resetSyncState(); 
     
     const newClientId = this.syncStatePersister.getClientId();
-    const newLSN = this.syncStatePersister.getLSN();
+    const newLSN = this.lsnManager.getCurrentLSN();
 
     if (SyncManager.debugMode) console.log(`[SyncManager.resetLSN] State reset. New ClientID: ${newClientId}, New LSN: ${newLSN}`);
     
@@ -456,23 +915,24 @@ public getOutgoingChangeProcessor(): OutgoingChangeProcessor {
   }
 
   public async destroy(): Promise<void> {
-    if (SyncManager.debugMode) console.log('[SyncManager.destroy] Destroying SyncManager...');
+    if (SyncManager.debugMode) console.log('[SyncManager.destroy] Destroying SyncManager instance.');
     
+    this.disconnect();
+    
+    // Flush and close the IndexedDB sync store
+    await this.syncStatePersister?.close();
+    
+    // Clean up event listeners
+    this.events.removeAllListeners();
+    
+    // Reset state
     this.isInitialized = false;
     this.isInitializing = false;
     this.initPromise = null;
-
-    this.webSocketConnector?.destroy(); 
-    // OutgoingChangeProcessor, SyncMessageHandler, IncomingChangeProcessor might have destroy methods if needed.
-    // Example: await this.outgoingChangeProcessor?.destroy();
     
-    await this.syncStatePersister?.flush();
-    // Example: await this.syncStatePersister?.destroy();
-    // Example: await this.databaseInitializer?.destroy();
-
-    this.events.removeAllListeners();
+    // Reset singleton instance
+    SyncManager.instance = null;
     
-    SyncManager.instance = null; 
     if (SyncManager.debugMode) console.log('[SyncManager.destroy] SyncManager destroyed.');
   }
 
@@ -480,4 +940,42 @@ public getOutgoingChangeProcessor(): OutgoingChangeProcessor {
   public isOnline(): boolean {
     return this.webSocketConnector?.isOnline() ?? navigator.onLine;
   }
+  
+  /**
+   * Manually trigger LSN sync to XState (useful for ensuring orchestrator gets initial LSN)
+   */
+  public syncLSNToXState(): void {
+    if (!this.isInitialized) {
+      console.warn('[SyncManager.syncLSNToXState] SyncManager not initialized yet');
+      return;
+    }
+    
+    const currentLSN = this.lsnManager.getCurrentLSN();
+    console.log(`[SyncManager] 🔄 Manually syncing current LSN to XState: ${currentLSN}`);
+    this.notifyXStateOfLSN(currentLSN);
+  }
+}
+
+// HMR: Accept hot updates for this module
+if (import.meta.hot) {
+  import.meta.hot.accept();
+  
+  // During HMR dispose, we could optionally preserve the SyncManager instance
+  // For now, we'll let it persist naturally through the singleton pattern
+  import.meta.hot.dispose((data) => {
+    const instance = SyncManager.getInstance();
+    console.log("🔥 [SyncManager] HMR Dispose: SyncManager instance exists:", !!instance);
+    if (instance) {
+      try {
+        // Use public methods to check state
+        const clientId = instance.getClientId();
+        const isInitialized = !!clientId; // If we have a clientId, we're likely initialized
+        console.log("🔥 [SyncManager] HMR Dispose: Instance state - initialized:", isInitialized);
+      } catch (error) {
+        console.log("🔥 [SyncManager] HMR Dispose: Instance state - not initialized");
+      }
+    }
+    // Store reference for potential restoration (though we rely on singleton pattern)
+    data.timestamp = Date.now();
+  });
 }

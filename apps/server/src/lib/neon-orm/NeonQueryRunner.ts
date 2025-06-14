@@ -6,6 +6,9 @@ import { Client } from "@neondatabase/serverless"
 import { BroadcasterResult } from "typeorm/subscriber/BroadcasterResult.js"
 import { QueryFailedError } from "typeorm"
 import { NeonDataSourceOptions } from "./NeonDataSource"
+import { syncLogger, dbLogger } from '../../middleware/logger'
+
+const MODULE_NAME = 'neon-query-runner'
 
 // Copy SafeBroadcaster from NewPGliteQueryRunner
 class SafeBroadcaster extends Broadcaster {
@@ -18,24 +21,24 @@ class SafeBroadcaster extends Broadcaster {
         try {
             // Skip entirely in Cloudflare environment to avoid I/O issues
             if (typeof (globalThis as any).navigator !== 'undefined' && (globalThis as any).navigator.userAgent?.includes('Cloudflare-Workers')) {
-                console.warn("Running in Cloudflare Workers - skipping broadcastLoadEvent for compatibility");
-                return;
+                syncLogger.debug("Running in Cloudflare Workers - skipping broadcastLoadEvent for compatibility", {}, MODULE_NAME)
+                return
             }
             
             if (!this.safeQueryRunner?.connection?.subscribers) {
-                console.warn("Missing subscribers array on connection - skipping broadcastLoadEvent");
-                return;
+                dbLogger.warn("Missing subscribers array on connection - skipping broadcastLoadEvent", undefined, MODULE_NAME)
+                return
             }
             
             // Ensure subscribers is an array before calling filter
             if (!Array.isArray(this.safeQueryRunner.connection.subscribers)) {
-                console.warn("Connection subscribers is not an array - skipping broadcastLoadEvent");
-                return;
+                dbLogger.warn("Connection subscribers is not an array - skipping broadcastLoadEvent", undefined, MODULE_NAME)
+                return
             }
             
-            super.broadcastLoadEvent(result, metadata, entities);
+            super.broadcastLoadEvent(result, metadata, entities)
         } catch (err) {
-            console.error("Error in broadcastLoadEvent (safely caught):", err);
+            dbLogger.error("Error in broadcastLoadEvent (safely caught)", err, undefined, MODULE_NAME)
         }
     }
 }
@@ -96,7 +99,12 @@ export class NeonQueryRunner implements QueryRunner {
 
     async query(query: string, parameters?: any[], useStructuredResult: boolean = false): Promise<any> {
         const queryId = `query-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        console.log(`[${queryId}] NeonQueryRunner.query: START. Query: ${query}`, parameters);
+        
+        dbLogger.debug('Executing query', {
+            queryId,
+            queryPreview: query.substring(0, 100) + (query.length > 100 ? '...' : ''),
+            paramCount: parameters?.length || 0
+        }, MODULE_NAME);
 
         this.connection.logger.logQuery(query, parameters, this);
         
@@ -112,17 +120,21 @@ export class NeonQueryRunner implements QueryRunner {
 
         try {
             await client.connect();
-            console.log(`[${queryId}] NeonQueryRunner.query: Client connected, executing query...`);
+            dbLogger.debug('Client connected, executing query', { queryId }, MODULE_NAME);
             
             // Simply pass query and parameters directly, just like PostgresQueryRunner does
             // PostgreSQL natively handles the same positional parameter being used multiple times
             raw = await client.query(query, parameters);
             
-            console.log(`[${queryId}] NeonQueryRunner.query: Query executed. Command: ${raw?.command}, Rows: ${raw?.rows?.length}`);
-            
             const queryEndTime = +new Date();
             const queryExecutionTime = queryEndTime - queryStartTime;
-            console.log(`[${queryId}] NeonQueryRunner.query: Execution time: ${queryExecutionTime}ms`);
+            
+            dbLogger.debug('Query executed successfully', {
+                queryId,
+                command: raw?.command,
+                rowCount: raw?.rows?.length,
+                executionTime: queryExecutionTime
+            }, MODULE_NAME);
 
             if (this.connection.options?.maxQueryExecutionTime && queryExecutionTime > this.connection.options.maxQueryExecutionTime) {
                 this.connection.logger.logQuerySlow(queryExecutionTime, query, parameters, this);
@@ -154,20 +166,20 @@ export class NeonQueryRunner implements QueryRunner {
                 }
                 
                 // Return structured QueryResult - TypeORM handles column mapping
-                console.log(`[${queryId}] NeonQueryRunner.query: END (returning QueryResult)`);
+                dbLogger.debug('Returning QueryResult', { queryId }, MODULE_NAME);
                 return result;
             }
             
-            console.log(`[${queryId}] NeonQueryRunner.query: END (returning empty QueryResult)`);
+            dbLogger.debug('Returning empty QueryResult', { queryId }, MODULE_NAME);
             return result;
             
         } catch (err: any) {
-            console.error(`[${queryId}] NeonQueryRunner.query: CATCH block. Error:`, err);
+            dbLogger.error('Query execution failed', err, { queryId, query: query.substring(0, 200) }, MODULE_NAME);
             this.connection.logger.logQueryError(err, query, parameters, this);
             const error = err instanceof Error ? err : new Error(String(err));
             throw new QueryFailedError(query, parameters, error);
         } finally {
-            console.log(`[${queryId}] NeonQueryRunner.query: Closing client connection...`);
+            dbLogger.debug('Closing client connection', { queryId }, MODULE_NAME);
             await client.end();
         }
     }

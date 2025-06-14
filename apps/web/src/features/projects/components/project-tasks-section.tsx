@@ -1,315 +1,280 @@
 import React, { useMemo } from 'react'
-import { CellContext, ColumnDef } from '@tanstack/react-table'
-import {
-  EditableTextCell,
-  EditableSelectCell,
-  EditableDateCell,
-} from '@/components/data-table/data-table-editing'
-import {
-  createEditableEntityCell as createEditableEntityCellV2,
-  TaskEntityMetadata
-} from '@/components/data-table/data-table-logic'
-import { usePGliteContext } from '@/db/pglite-provider'
-import { Task, TaskStatus, TaskPriority, Project, User } from '@repo/dataforge/client-entities'
-import { format } from 'date-fns'
-import { EntityDataTable } from '@/components/data-table/data-table-entity'
-import { statuses, priorities } from '../../tasks/data/data'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DataTableSkeleton } from '@/components/ui/table-skeleton'
-
-// V2 Cell Factories for User (Project is not editable in this context since we're showing tasks for a specific project)
-const EditableUserCellV2 = createEditableEntityCellV2<User>({
-  serviceName: 'users',
-  getDisplayValue: (user) => user?.name || user?.email || 'N/A',
-  emptyLabel: 'Unassigned',
-});
+import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
+import { format } from 'date-fns'
+import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
+import { toast } from 'sonner'
+import { usePGliteContext } from '@/db/pglite-provider'
+import { useSelector } from '@xstate/store/react'
+import { tasksAtom } from '@/domain/task'
+import { shallowEqual } from '@xstate/store'
+import { Badge } from '@/components/ui/badge'
 
 interface ProjectTasksSectionProps {
   projectId: string
   projectName?: string
 }
 
-// Memoize the component to prevent re-renders when unrelated parent data changes
-const ProjectTasksSection = React.memo<ProjectTasksSectionProps>(({ projectId, projectName }) => {
-  const { services, isLoading: servicesLoading, repositories } = usePGliteContext()
-
-  const ormTaskRepository = useMemo(() => {
-    if (repositories?.tasks) {
-      if (typeof (repositories.tasks as any).getOrmRepository === 'function') {
-        return (repositories.tasks as any).getOrmRepository();
-      }
-      console.warn("[ProjectTasksSection] repositories.tasks.getOrmRepository is not a function");
-    }
-    return undefined;
-  }, [repositories]);
+// 🎯 XSTATE PATTERN: Simple hook to get tasks by project using XState selector
+function useTasksByProject(projectId: string) {
+  const projectTasks = useSelector(
+    tasksAtom,
+    (tasksRecord: Record<string, Task>) => {
+      const allTasks = Object.values(tasksRecord)
+      return allTasks.filter((task: Task) => task.projectId === projectId)
+    },
+    shallowEqual
+  )
   
-  // Create columns without projectId column since all tasks belong to this project
-  const columns = useMemo<ColumnDef<Task, any>[]>(() => [
-    {
-      accessorKey: 'id',
-      header: 'ID',
-      enableSorting: true,
-      enableHiding: true,
-      size: 120,
-      minSize: 80,
-      maxSize: 200,
-    },
-    {
-      accessorKey: 'title',
-      header: 'Title',
-      enableHiding: false,
-      size: 300,
-      minSize: 200,
-      cell: (props: CellContext<Task, string>) => (
-        <div className="max-w-[300px] truncate">
-          <EditableTextCell {...props} />
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'description',
-      header: 'Description',
-      enableHiding: true,
-      size: 400,
-      minSize: 200,
-      cell: (props: CellContext<Task, string>) => (
-        <div className="max-w-[400px] truncate">
-          <EditableTextCell {...props} />
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      enableHiding: true,
-      size: 150,
-      minSize: 120,
-      cell: (props: CellContext<Task, TaskStatus>) => (
-        <EditableSelectCell
-          {...props}
-          options={Object.values(TaskStatus).map(status => ({
-            label: status,
-            value: status
-          }))}
-        />
-      ),
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
-    },
-    {
-      accessorKey: 'priority',
-      header: 'Priority',
-      enableHiding: true,
-      size: 150,
-      minSize: 120,
-      cell: (props: CellContext<Task, TaskPriority>) => (
-        <EditableSelectCell
-          {...props}
-          options={Object.values(TaskPriority).map(priority => ({
-            label: priority,
-            value: priority
-          }))}
-        />
-      ),
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
-    },
-    {
-      accessorKey: 'dueDate',
-      header: 'Due Date',
-      enableHiding: true,
-      size: 180,
-      minSize: 150,
-      cell: (props: CellContext<Task, Date>) => <EditableDateCell {...props} />,
-    },
-    {
-      accessorKey: 'completedAt',
-      header: 'Completed At',
-      enableHiding: true,
-      size: 200,
-      minSize: 180,
-      cell: ({ getValue }: CellContext<Task, Date | null>) => {
-        const date = getValue()
-        return (
-          <div className="whitespace-nowrap">
-            {date ? format(date, 'PPP p') : '-'}
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: 'assigneeId',
-      header: 'Assignee',
-      enableHiding: true,
-      size: 200,
-      minSize: 150,
-      cell: (props: CellContext<Task, string>) => <EditableUserCellV2 {...props} />,
-    },
-    {
-      accessorKey: 'tags',
-      header: 'Tags',
-      enableHiding: true,
-      size: 250,
-      minSize: 150,
-      cell: ({ getValue }: CellContext<Task, string[]>) => {
-        const tags = getValue()
-        return (
-          <div className="max-w-[250px] truncate" title={tags && tags.length > 0 ? tags.join(', ') : undefined}>
-            {tags && tags.length > 0 ? tags.join(', ') : '-'}
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Created At',
-      enableHiding: true,
-      size: 200,
-      minSize: 180,
-      cell: ({ getValue }: CellContext<Task, Date>) => {
-        const date = getValue()
-        return (
-          <div className="whitespace-nowrap">
-            {date ? format(date, 'PPP p') : '-'}
-          </div>
-        )
-      },
-    },
-    {
-      accessorKey: 'updatedAt',
-      header: 'Updated At',
-      enableHiding: true,
-      size: 200,
-      minSize: 180,
-      cell: ({ getValue }: CellContext<Task, Date>) => {
-        const date = getValue()
-        return (
-          <div className="whitespace-nowrap">
-            {date ? format(date, 'PPP p') : '-'}
-          </div>
-        )
-      },
-    },
-  ], [])
+  return {
+    data: projectTasks,
+    isLoading: false, // XState stores are always synchronous
+    error: null as Error | null // Error handling via atoms if needed later
+  }
+}
 
-  // Memoize the live query builder to prevent recreation when unrelated props change
-  const liveQueryBuilder = useMemo(() => {
-    if (!services?.tasks?.getRepo()?.getOrmRepository) {
-      return null;
+// 🎯 UNIVERSAL REACTIVE DATA PATTERN: Simple, clean component using XState stores
+const ProjectTasksSection = React.memo<ProjectTasksSectionProps>(({ projectId, projectName }) => {
+  const { services } = usePGliteContext()
+
+  // 🎯 USE XSTATE STORES: Direct access via XState selector hook
+  const { 
+    data: projectTasks = [], 
+    isLoading, 
+    error 
+  } = useTasksByProject(projectId)
+
+  // 🎯 BUSINESS LOGIC: Simple handlers using domain services
+  const handleCreateTask = async () => {
+    if (!services?.tasks) {
+      toast.error('Task service not available')
+      return
     }
+
+    try {
+      const newTask = await services.tasks.createTask({
+        title: 'New Task',
+        description: '',
+        status: TaskStatus.OPEN,
+        priority: TaskPriority.MEDIUM,
+        projectId,
+      })
+      toast.success('Task created successfully')
+    } catch (error) {
+      console.error('Error creating task:', error)
+      toast.error('Failed to create task')
+    }
+  }
+
+  const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
+    if (!services?.tasks) {
+      toast.error('Task service not available')
+      return
+    }
+
+    try {
+      await services.tasks.updateTask(taskId, updates)
+      toast.success('Task updated successfully')
+    } catch (error) {
+      console.error('Error updating task:', error)
+      toast.error('Failed to update task')
+    }
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!services?.tasks) {
+      toast.error('Task service not available')
+      return
+    }
+
+    try {
+      await services.tasks.deleteTask(taskId)
+      toast.success('Task deleted successfully')
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      toast.error('Failed to delete task')
+    }
+  }
+
+  // 🎯 DERIVED DATA: Simple, pure transformations
+  const tasksByStatus = useMemo(() => {
+    const grouped = projectTasks.reduce((acc: Record<TaskStatus, Task[]>, task: Task) => {
+      const status = task.status || TaskStatus.OPEN
+      if (!acc[status]) acc[status] = []
+      acc[status].push(task)
+      return acc
+    }, {} as Record<TaskStatus, Task[]>)
     
-    return services.tasks.getRepo().getOrmRepository()
-      .createQueryBuilder('task')
-      .where('task.projectId = :projectId', { projectId })
-      .orderBy('task.createdAt', 'DESC');
-  }, [services?.tasks, projectId]); // Only depend on projectId, not the entire project object
+    return grouped
+  }, [projectTasks])
 
-  // Memoize the service configuration
-  const serviceConfig = useMemo(() => ({
-    getRepo: () => services.tasks.getRepo(),
-    create: (data: Partial<Task>) => services.tasks.createTask({ ...data, projectId }), // Ensure new tasks belong to this project
-    update: (id: string, data: Partial<Task>) => services.tasks.updateTask(id, data),
-    delete: (id: string) => services.tasks.deleteTask(id),
-    getById: (id: string) => services.tasks.get(id),
-  }), [services?.tasks, projectId]);
-
-  // Memoize related services
-  const relatedServices = useMemo(() => 
-    services?.users ? { user: services.users } : {}
-  , [services?.users]);
-
-  if (servicesLoading || !ormTaskRepository) {
+  // 🎯 LOADING STATES: Simple, no complex checking
+  if (isLoading) {
     return (
       <Card className="mt-6">
-        <CardContent className="p-6">
+        <CardHeader>
+          <CardTitle>{projectName ? `${projectName} Tasks` : 'Project Tasks'}</CardTitle>
+        </CardHeader>
+        <CardContent>
           <DataTableSkeleton />
         </CardContent>
       </Card>
-    );
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>{projectName ? `${projectName} Tasks` : 'Project Tasks'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Error loading tasks</p>
+            <p className="text-sm text-red-600">{error.message}</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="mt-6">
-      <EntityDataTable<Task>
-        tableId={`project-tasks-${projectId}`} // Stable ID based only on projectId
-        entityType="Task"
-        entityMetadata={TaskEntityMetadata}
-        liveQueryBuilder={liveQueryBuilder}
-        service={serviceConfig}
-        customColumns={columns}
-        title={projectName ? `${projectName} Tasks` : 'Project Tasks'}
-        showCard={true}
-        textFilterConfig={{ columnId: 'title', placeholder: 'Filter tasks by title...' }}
-        facetedFilterConfigs={[
-          {
-            columnId: 'status',
-            title: 'Status',
-            options: statuses,
-          },
-          {
-            columnId: 'priority',
-            title: 'Priority',
-            options: priorities,
-          },
-        ]}
-        retryOnError={true}
-        maxRetryAttempts={3}
-        tableConfig={{
-          enableSorting: true,
-          enablePagination: true,
-          pageSize: 10,
-          enableColumnResizing: true
-        }}
-        defaultSorting={[]} // Start with no sorting applied
-        customEditableColumns={['title', 'description', 'status', 'priority', 'dueDate', 'assigneeId']} // Note: projectId is not editable
-        relatedServices={relatedServices}
-        enableInlineCreate={true}
-        enableBulkActions={true}
-        bulkEditFields={[
-          {
-            key: 'status',
-            label: 'Status',
-            type: 'enum',
-            options: Object.values(TaskStatus).map(status => ({
-              label: status,
-              value: status
-            }))
-          },
-          {
-            key: 'priority',
-            label: 'Priority',
-            type: 'enum',
-            options: Object.values(TaskPriority).map(priority => ({
-              label: priority,
-              value: priority
-            }))
-          }
-        ]}
-        initialNewRecordData={{
-          projectId: projectId,
-          status: TaskStatus.OPEN,
-          priority: TaskPriority.MEDIUM
-        }}
-        onEntityCreated={(newTask) => {
-          console.log('New task created:', newTask);
-        }}
-        onEntityDeleted={(taskId) => {
-          console.log('Task deleted:', taskId);
-        }}
-        emptyState={
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-muted-foreground">No tasks found for this project.</p>
-            <p className="text-sm text-muted-foreground mt-1">Create your first task to get started.</p>
+    <Card className="mt-6">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>{projectName ? `${projectName} Tasks` : 'Project Tasks'}</CardTitle>
+        <Button onClick={handleCreateTask} size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Task
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {projectTasks.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No tasks yet</p>
+            <Button onClick={handleCreateTask} variant="outline" className="mt-4">
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Task
+            </Button>
           </div>
-        }
-      />
-    </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Task Status Columns */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.values(TaskStatus).map(status => {
+                // 🎯 THEME-AWARE: Status indicators that work with dark/light themes
+                const statusStyles = {
+                  [TaskStatus.COMPLETED]: 'bg-green-500 dark:bg-green-400',
+                  [TaskStatus.IN_PROGRESS]: 'bg-blue-500 dark:bg-blue-400', 
+                  [TaskStatus.OPEN]: 'bg-muted-foreground/60 dark:bg-muted-foreground/40'
+                }
+                
+                return (
+                  <div key={status} className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${statusStyles[status] || statusStyles[TaskStatus.OPEN]}`} />
+                      {status.replace('_', ' ').toLowerCase().replace(/^./, c => c.toUpperCase())}
+                      <span className="text-sm text-muted-foreground">
+                        ({tasksByStatus[status]?.length || 0})
+                      </span>
+                    </h4>
+                    <div className="space-y-2">
+                      {tasksByStatus[status]?.map((task: Task) => (
+                        <TaskCard 
+                          key={task.id} 
+                          task={task} 
+                          onUpdate={handleUpdateTask}
+                          onDelete={handleDeleteTask}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
-});
+})
 
-// Add display name for better debugging
-ProjectTasksSection.displayName = 'ProjectTasksSection';
+// Simple task card component
+interface TaskCardProps {
+  task: Task
+  onUpdate: (taskId: string, updates: Partial<Task>) => void
+  onDelete: (taskId: string) => void
+}
+
+const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdate, onDelete }) => {
+  // 🎯 THEME-AWARE: Use CSS custom properties and semantic color classes
+  const priorityStyles = {
+    [TaskPriority.HIGH]: {
+      card: 'border-destructive/20 bg-destructive/5 dark:border-destructive/30 dark:bg-destructive/10',
+      badge: 'bg-destructive/10 text-destructive border-destructive/20 dark:bg-destructive/20 dark:text-destructive-foreground'
+    },
+    [TaskPriority.MEDIUM]: {
+      card: 'border-yellow-200 bg-yellow-50 dark:border-yellow-600/30 dark:bg-yellow-600/10',
+      badge: 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-600/20 dark:text-yellow-300 dark:border-yellow-600/30'
+    },
+    [TaskPriority.LOW]: {
+      card: 'border-muted bg-muted/30 dark:border-muted/50 dark:bg-muted/20',
+      badge: 'bg-muted text-muted-foreground border-muted dark:bg-muted/30 dark:text-muted-foreground'
+    },
+  }
+
+  const currentPriority = task.priority || TaskPriority.LOW
+  const styles = priorityStyles[currentPriority]
+
+  return (
+    <Card className={`${styles.card} hover:shadow-sm transition-all duration-200 border-2`}>
+      <CardContent className="p-3">
+        <div className="space-y-2">
+          <div className="flex items-start justify-between">
+            <h5 className="font-medium text-sm truncate pr-2">{task.title}</h5>
+            <Badge variant="outline" className={`text-xs ${styles.badge} flex-shrink-0`}>
+              {task.priority}
+            </Badge>
+          </div>
+          
+          {task.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {task.description}
+            </p>
+          )}
+          
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <span>
+              {task.dueDate ? format(new Date(task.dueDate), 'MMM dd') : 'No due date'}
+            </span>
+            <div className="flex gap-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs hover:bg-background/80"
+                onClick={() => onUpdate(task.id, { 
+                  status: task.status === TaskStatus.COMPLETED ? TaskStatus.OPEN : TaskStatus.COMPLETED 
+                })}
+              >
+                {task.status === TaskStatus.COMPLETED ? 'Reopen' : 'Complete'}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => onDelete(task.id)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+ProjectTasksSection.displayName = 'ProjectTasksSection'
 
 export default ProjectTasksSection 

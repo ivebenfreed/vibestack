@@ -618,8 +618,8 @@ export const CLIENT_UTILITY_TABLES = [
 
 // Junction tables for client context
 export const CLIENT_JUNCTION_TABLES = [
-  "project_members",
-  "task_dependencies",
+  '"project_members"',
+  '"task_dependencies"',
 ];
 
 // Combined entity and junction tables for replication tracking
@@ -628,15 +628,15 @@ export const CLIENT_TRACKED_TABLES = [
   '"projects"',
   '"tasks"',
   '"users"',
-  "project_members",
-  "task_dependencies",
+  '"project_members"',
+  '"task_dependencies"',
 ];
 
 // Junction table mapping for relationship transformation
 export const CLIENT_JUNCTION_TABLE_MAPPING = {
   "project_members": {
     sourceEntity: 'Project',
-    sourceTable: "projects",
+    sourceTable: '"projects"',
     sourceColumn: 'project_id',
     targetEntity: 'User',
     targetColumn: 'user_id',
@@ -644,11 +644,133 @@ export const CLIENT_JUNCTION_TABLE_MAPPING = {
   },
   "task_dependencies": {
     sourceEntity: 'Task',
-    sourceTable: "tasks",
+    sourceTable: '"tasks"',
     sourceColumn: 'dependent_task_id',
     targetEntity: 'Task',
     targetColumn: 'dependency_task_id',
     relationName: 'dependencies'
   },
 } as const;
+
+// Auto-generated relationship configurations
+// This provides configuration-driven relationship handling for entities
+export interface RelationshipConfig {
+  requiredReferences?: Array<{
+    field: string;
+    targetEntity: string;
+    nullable?: boolean;
+  }>;
+  selfReferences?: Array<{
+    field: string;
+    allowCycles?: boolean;
+    maxDepth?: number;
+  }>;
+  junctionRelationships?: Array<{
+    junctionTable: string;
+    relationName: string;
+    sourceColumn: string;
+    targetColumn: string;
+    targetEntity: string;
+  }>;
+  customValidators?: Array<{
+    name: string;
+    validator: (data: Record<string, any>, operation: string) => void | Promise<void>;
+  }>;
+}
+
+export const CLIENT_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
+  'comments': {
+    requiredReferences: [
+      {
+        field: 'authorId',
+        targetEntity: 'users',
+        nullable: true,
+      },
+      {
+        field: 'taskId',
+        targetEntity: 'tasks',
+        nullable: true,
+      },
+      {
+        field: 'projectId',
+        targetEntity: 'projects',
+        nullable: true,
+      },
+    ],
+    selfReferences: [
+      {
+        field: 'parentId',
+        allowCycles: false,
+        maxDepth: 5,
+      },
+    ],
+    customValidators: [],
+  },
+  'projects': {
+    requiredReferences: [
+      {
+        field: 'ownerId',
+        targetEntity: 'users',
+        nullable: true,
+      },
+    ],
+    junctionRelationships: [
+      {
+        junctionTable: 'project_members',
+        relationName: 'members',
+        sourceColumn: 'project_id',
+        targetColumn: 'user_id',
+        targetEntity: 'users',
+      },
+    ],
+    customValidators: [],
+  },
+  'tasks': {
+    requiredReferences: [
+      {
+        field: 'projectId',
+        targetEntity: 'projects',
+        nullable: true,
+      },
+      {
+        field: 'assigneeId',
+        targetEntity: 'users',
+        nullable: true,
+      },
+    ],
+    junctionRelationships: [
+      {
+        junctionTable: 'task_dependencies',
+        relationName: 'dependencies',
+        sourceColumn: 'dependent_task_id',
+        targetColumn: 'dependency_task_id',
+        targetEntity: 'tasks',
+      },
+    ],
+    customValidators: [],
+  },
+  'users': {
+    customValidators: [],
+  },
+} as const;
+
+// Helper functions for relationship processing
+export function getEntityRelationships(entityName: string): RelationshipConfig | undefined {
+  return CLIENT_RELATIONSHIP_CONFIGS[entityName];
+}
+
+export function hasRelationshipConfig(entityName: string): boolean {
+  return entityName in CLIENT_RELATIONSHIP_CONFIGS;
+}
+
+export function getJunctionRelationships(entityName: string): Array<{
+  junctionTable: string;
+  relationName: string;
+  sourceColumn: string;
+  targetColumn: string;
+  targetEntity: string;
+}> {
+  const config = CLIENT_RELATIONSHIP_CONFIGS[entityName];
+  return config?.junctionRelationships || [];
+}
 

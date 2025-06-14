@@ -1,42 +1,34 @@
 // In apps/web/src/routes/_authenticated/debug/route.tsx
-import { createFileRoute, redirect, Outlet } from '@tanstack/react-router';
-// Adjust import paths for authStore and ability definitions
-import { useAuthStore } from '../../../stores/authStore';
-import { defineAbilityFor } from '../../../lib/ability';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { useUserRole } from '@/hooks/useSimpleAuth';
 
 export const Route = createFileRoute('/_authenticated/debug')({
-  beforeLoad: async ({ location }) => {
-    // Ensure auth state is initialized (important for initial load)
-    await useAuthStore.getState().ensureAuthInitialized();
-    const authState = useAuthStore.getState();
-
-    if (!authState.isAuthenticated) {
-      throw redirect({
-        to: '/sign-in', // Your sign-in route
-        search: {
-          // Pass the original intended location to redirect back after login
-          redirect: location.pathname + location.search,
-        },
-      });
-    }
-
-    const ability = defineAbilityFor(authState.user);
-    if (!ability.can('access', 'debug_features')) {
-      throw redirect({
-        to: '/403', // Your forbidden access route
-      });
-    }
-    // If checks pass, navigation proceeds. No explicit return needed here.
-  },
-  component: DebugLayoutComponent, // Replace with your actual layout component for this route if different
+  // Remove redundant auth check - _authenticated layout handles auth protection
+  component: DebugLayoutComponent,
 });
 
-// This is an example layout component. Use your actual layout component for the debug section.
-// It should render an <Outlet /> for child debug routes.
+// Debug layout component with permission check
 function DebugLayoutComponent() {
+  const { canAccess } = useUserRole();
+  
+  // Check debug permissions at component level
+  if (!canAccess('debug_features')) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 p-4 text-center">
+        <h2 className="text-xl font-semibold text-red-600 mb-2">Access Denied</h2>
+        <p className="text-muted-foreground">
+          You don't have permission to access debug features.
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Contact an administrator if you need access.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2>Debug Section</h2>
+      <h2 className="text-2xl font-bold mb-4">Debug Section</h2>
       <Outlet />
     </div>
   );

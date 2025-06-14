@@ -4,8 +4,43 @@ import { getDBClient, sql } from './db'; // Import necessary DB helpers
 import type { MinimalContext } from '../types/hono'; // Import context type
 import { syncLogger } from '../middleware/logger'; // Import logger
 import type { QueryResult } from '@neondatabase/serverless'; // Import QueryResult type
+import { NeonService } from './neon-orm/neon-service';
+import { RepositoryContainer } from '../domains/RepositoryContainer';
 
 const MODULE_NAME = 'sync-common';
+
+/**
+ * Create a ChangeHistoryRepository instance from context
+ * Helper function to initialize repository for sync-common operations
+ */
+function createChangeHistoryRepository(context: MinimalContext): RepositoryContainer {
+  // Create a mock Hono context from MinimalContext (similar to EntityOperations pattern)
+  const stableRequestId = `sync-${context.env.DATABASE_URL?.slice(-10) || 'default'}`;
+  
+  const honoContext = {
+    req: { 
+      header: (name: string) => {
+        if (name === 'cf-request-id') {
+          return stableRequestId;
+        }
+        return undefined;
+      }
+    },
+    env: context.env,
+    finalized: false,
+    error: null,
+    get executionCtx() { return null; },
+    get event() { return null; },
+    var: {},
+    get: (key: string) => undefined,
+    set: (key: string, value: any) => {},
+    json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
+    text: (text: string) => Promise.resolve(new Response(text))
+  } as unknown as any;
+  
+  const neonService = new NeonService(honoContext);
+  return new RepositoryContainer(neonService);
+}
 
 /**
  * Compare two LSNs
@@ -239,7 +274,7 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
 
   // Apply client ID filtering - filters out changes from the same client
   const filteredChanges = clientId
-    ? result.filter(change => change.data?.client_id !== clientId)
+    ? result.filter(change => change.data?.clientId !== clientId)
     : result;
 
   return {
@@ -309,20 +344,404 @@ export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
  */
 export async function getLatestChangeHistoryLSN(context: MinimalContext): Promise<string> {
   try {
-    // Use the sql helper function from db.ts to handle connection and query
+    // Try using repository first
+    const repositories = createChangeHistoryRepository(context);
+    const latestLSN = await repositories.changeHistory.getLatestLSN();
+    
+    if (latestLSN && latestLSN !== '0/0') {
+      return latestLSN;
+    }
+    
+    // Fallback to direct query if repository returns default value
     const result = await sql<{ latest_lsn: string | null }>(context,
       'SELECT MAX(lsn::pg_lsn)::text as latest_lsn FROM change_history;'
     );
     
-    const latestLSN = result[0]?.latest_lsn;
+    const fallbackLSN = result[0]?.latest_lsn;
     
-    if (latestLSN) {
-      return latestLSN;
+    if (fallbackLSN) {
+      return fallbackLSN;
     }
-    // No need for manual connection closing here, sql() handles it
-    return '0/0'; // Return default on error
+    
+    return '0/0'; // Return default if table is empty
   } catch (error) {
     console.error('Error getting latest change history LSN:', error);
-    return '0/0'; // Return default on error
+    
+    // Last resort fallback to direct query
+    try {
+      const result = await sql<{ latest_lsn: string | null }>(context,
+        'SELECT MAX(lsn::pg_lsn)::text as latest_lsn FROM change_history;'
+      );
+      
+      const fallbackLSN = result[0]?.latest_lsn;
+      return fallbackLSN || '0/0';
+    } catch (fallbackError) {
+      console.error('Fallback query also failed:', fallbackError);
+      return '0/0'; // Return default on error
+    }
   }
+}
+
+/**
+ * Field transformer system for PostgreSQL-specific data types
+ * Handles conversion of PostgreSQL objects to client-friendly formats
+ */
+
+interface FieldTransformer {
+  /** Check if this transformer should handle the field */
+  canTransform: (fieldName: string, value: any, tableName: string) => boolean;
+  /** Transform the field value */
+  transform: (fieldName: string, value: any, tableName: string) => any;
+  /** Description for debugging */
+  description: string;
+}
+
+/**
+ * Transformer for PostgreSQL tsrange objects to string representation
+ */
+const tsrangeTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    const isTsrangeField = fieldName === 'time_range' || fieldName === 'timeRange' || 
+                          fieldName.includes('range') || fieldName.includes('Range');
+    return isTsrangeField && typeof value === 'object' && value !== null && 
+           (value.from || value.to || value.start || value.end);
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    const range = value;
+    let start: string, end: string;
+    
+    // Handle different tsrange object formats
+    if (range.from && range.to) {
+      start = range.from instanceof Date ? range.from.toISOString() : String(range.from);
+      end = range.to instanceof Date ? range.to.toISOString() : String(range.to);
+    } else if (range.start && range.end) {
+      start = range.start instanceof Date ? range.start.toISOString() : String(range.start);
+      end = range.end instanceof Date ? range.end.toISOString() : String(range.end);
+    } else {
+      syncLogger.warn('Unknown tsrange object format', {
+        tableName,
+        fieldName,
+        value: range
+      }, MODULE_NAME);
+      return null;
+    }
+    
+    // Format as PostgreSQL tsrange: '[start, end)'
+    const result = `[${start}, ${end})`;
+    
+    syncLogger.debug('Transformed tsrange field', {
+      tableName,
+      fieldName,
+      original: range,
+      transformed: result
+    }, MODULE_NAME);
+    
+    return result;
+  },
+  
+  description: 'PostgreSQL tsrange object to string'
+};
+
+/**
+ * Transformer for PostgreSQL interval objects to string representation
+ */
+const intervalTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    // Check for field names that typically contain intervals
+    const isIntervalField = fieldName.includes('duration') || fieldName.includes('interval') ||
+                           fieldName === 'estimated_duration' || fieldName === 'estimatedDuration';
+    
+    // Check if value is an interval object like {"days": 3} or {"hours": 2, "minutes": 30}
+    return isIntervalField && typeof value === 'object' && value !== null &&
+           (value.days !== undefined || value.hours !== undefined || value.minutes !== undefined ||
+            value.seconds !== undefined || value.months !== undefined || value.years !== undefined);
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    const interval = value;
+    const parts: string[] = [];
+    
+    // Build PostgreSQL interval string
+    if (interval.years) parts.push(`${interval.years} years`);
+    if (interval.months) parts.push(`${interval.months} months`);
+    if (interval.days) parts.push(`${interval.days} days`);
+    if (interval.hours) parts.push(`${interval.hours} hours`);
+    if (interval.minutes) parts.push(`${interval.minutes} minutes`);
+    if (interval.seconds) parts.push(`${interval.seconds} seconds`);
+    
+    const result = parts.join(' ') || '0 seconds';
+    
+    syncLogger.debug('Transformed interval field', {
+      tableName,
+      fieldName,
+      original: interval,
+      transformed: result
+    }, MODULE_NAME);
+    
+    return result;
+  },
+  
+  description: 'PostgreSQL interval object to string'
+};
+
+/**
+ * Transformer for PostgreSQL array objects to proper array format
+ */
+const arrayTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    // Check if it's a PostgreSQL array object that needs transformation
+    return typeof value === 'object' && value !== null && 
+           Array.isArray(value) && 
+           (fieldName.includes('array') || fieldName.includes('list') || fieldName.endsWith('s'));
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    // Ensure all array elements are properly formatted
+    const result = value.map((item: any) => {
+      if (typeof item === 'string' && item.startsWith('"') && item.endsWith('"')) {
+        // Remove PostgreSQL string quotes
+        return item.slice(1, -1);
+      }
+      return item;
+    });
+    
+    syncLogger.debug('Transformed array field', {
+      tableName,
+      fieldName,
+      original: value,
+      transformed: result
+    }, MODULE_NAME);
+    
+    return result;
+  },
+  
+  description: 'PostgreSQL array formatting'
+};
+
+/**
+ * Transformer for PostgreSQL JSON strings to parsed objects
+ */
+const jsonTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    // Check for JSON-type fields that are still strings
+    const isJsonField = fieldName.includes('json') || fieldName.includes('data') ||
+                       fieldName === 'metadata' || fieldName === 'settings' ||
+                       fieldName === 'config' || fieldName === 'options';
+    
+    return isJsonField && typeof value === 'string' && 
+           (value.startsWith('{') || value.startsWith('['));
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    try {
+      const result = JSON.parse(value);
+      
+      syncLogger.debug('Transformed JSON field', {
+        tableName,
+        fieldName,
+        original: value,
+        transformed: typeof result
+      }, MODULE_NAME);
+      
+      return result;
+    } catch (error) {
+      syncLogger.warn('Failed to parse JSON field', {
+        tableName,
+        fieldName,
+        value,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, MODULE_NAME);
+      
+      return value; // Return original if parsing fails
+    }
+  },
+  
+  description: 'PostgreSQL JSON string to object'
+};
+
+/**
+ * Transformer for PostgreSQL boolean strings to actual booleans
+ */
+const booleanTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    // Check for boolean-type fields that are strings
+    const isBooleanField = fieldName.includes('is_') || fieldName.includes('has_') ||
+                          fieldName.includes('can_') || fieldName.includes('enabled') ||
+                          fieldName.includes('active') || fieldName.includes('visible');
+    
+    return isBooleanField && typeof value === 'string' && 
+           (value === 'true' || value === 'false' || value === 't' || value === 'f');
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    const result = value === 'true' || value === 't';
+    
+    syncLogger.debug('Transformed boolean field', {
+      tableName,
+      fieldName,
+      original: value,
+      transformed: result
+    }, MODULE_NAME);
+    
+    return result;
+  },
+  
+  description: 'PostgreSQL boolean string to boolean'
+};
+
+/**
+ * Transformer for PostgreSQL money values to numbers
+ */
+const moneyTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    // Check for money-type fields
+    const isMoneyField = fieldName.includes('price') || fieldName.includes('cost') ||
+                        fieldName.includes('amount') || fieldName.includes('fee') ||
+                        fieldName.includes('balance') || fieldName.includes('salary');
+    
+    return isMoneyField && typeof value === 'string' && 
+           (value.startsWith('$') || value.includes('$'));
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    // Remove currency symbols and convert to number
+    const cleanValue = value.replace(/[$,]/g, '');
+    const result = parseFloat(cleanValue);
+    
+    syncLogger.debug('Transformed money field', {
+      tableName,
+      fieldName,
+      original: value,
+      transformed: result
+    }, MODULE_NAME);
+    
+    return isNaN(result) ? 0 : result;
+  },
+  
+  description: 'PostgreSQL money string to number'
+};
+
+/**
+ * Transformer for PostgreSQL point objects
+ */
+const pointTransformer: FieldTransformer = {
+  canTransform: (fieldName: string, value: any, tableName: string) => {
+    // Check for point-type fields
+    const isPointField = fieldName.includes('point') || fieldName.includes('location') ||
+                        fieldName.includes('position') || fieldName.includes('coordinates');
+    
+    return isPointField && typeof value === 'string' && 
+           value.startsWith('(') && value.endsWith(')');
+  },
+  
+  transform: (fieldName: string, value: any, tableName: string) => {
+    // Parse PostgreSQL point format "(x,y)" to {x: number, y: number}
+    const coords = value.slice(1, -1).split(',');
+    const result = {
+      x: parseFloat(coords[0]),
+      y: parseFloat(coords[1])
+    };
+    
+    syncLogger.debug('Transformed point field', {
+      tableName,
+      fieldName,
+      original: value,
+      transformed: result
+    }, MODULE_NAME);
+    
+    return result;
+  },
+  
+  description: 'PostgreSQL point string to coordinates object'
+};
+
+/**
+ * Registry of all field transformers
+ * Order matters - more specific transformers should come first
+ */
+const fieldTransformers: FieldTransformer[] = [
+  intervalTransformer,     // Must be first to fix immediate error
+  jsonTransformer,         // JSON parsing
+  booleanTransformer,      // Boolean conversion
+  moneyTransformer,        // Money values
+  pointTransformer,        // Geographic points
+  arrayTransformer,        // Array formatting
+  tsrangeTransformer       // Time ranges (existing)
+  // Add more transformers here as needed
+];
+
+/**
+ * Transform a record's fields using registered transformers
+ * This ensures PostgreSQL objects are converted to client-friendly formats
+ */
+export function transformPostgreSQLFields(record: Record<string, any>, tableName: string = 'unknown'): Record<string, any> {
+  const transformed = { ...record };
+  let transformationCount = 0;
+  
+  for (const [fieldName, value] of Object.entries(transformed)) {
+    if (value === null || value === undefined) continue;
+    
+    // Try each transformer
+    for (const transformer of fieldTransformers) {
+      if (transformer.canTransform(fieldName, value, tableName)) {
+        const originalValue = value;
+        transformed[fieldName] = transformer.transform(fieldName, value, tableName);
+        transformationCount++;
+        
+        syncLogger.debug('Applied field transformation', {
+          tableName,
+          fieldName,
+          transformer: transformer.description,
+          original: typeof originalValue === 'object' ? JSON.stringify(originalValue) : originalValue,
+          transformed: transformed[fieldName]
+        }, MODULE_NAME);
+        
+        break; // Only apply the first matching transformer
+      }
+    }
+  }
+  
+  if (transformationCount > 0) {
+    syncLogger.debug('Completed field transformations', {
+      tableName,
+      transformationCount,
+      totalFields: Object.keys(record).length
+    }, MODULE_NAME);
+  }
+  
+  return transformed;
+}
+
+/**
+ * Transform an array of TableChange objects to ensure PostgreSQL fields are client-ready
+ * This should be called before sending changes to clients
+ */
+export function transformTableChanges(changes: TableChange[]): TableChange[] {
+  return changes.map(change => ({
+    ...change,
+    data: transformPostgreSQLFields(change.data, change.table)
+  }));
+}
+
+/**
+ * Register a new field transformer
+ * Allows extending the transformation system for new PostgreSQL types
+ */
+export function registerFieldTransformer(transformer: FieldTransformer): void {
+  fieldTransformers.push(transformer);
+  syncLogger.info('Registered new field transformer', {
+    description: transformer.description,
+    totalTransformers: fieldTransformers.length
+  }, MODULE_NAME);
+}
+
+/**
+ * Get information about registered transformers (for debugging)
+ */
+export function getTransformerInfo(): Array<{ description: string; index: number }> {
+  return fieldTransformers.map((transformer, index) => ({
+    description: transformer.description,
+    index
+  }));
 } 

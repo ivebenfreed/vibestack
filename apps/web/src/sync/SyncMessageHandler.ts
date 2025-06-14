@@ -1,58 +1,94 @@
+/**
+ * @deprecated This class is being phased out. Message handling logic will be integrated directly into sync-machine.
+ */
+
 import { SyncEventEmitter } from './SyncEventEmitter';
 import { WebSocketConnector } from './WebSocketConnector'; // Or IMessageSender if preferred
 import { IncomingChangeProcessor } from './IncomingChangeProcessor';
-import { SyncStatePersister, ISyncStateData } from './SyncStatePersister';
+import { IntegrityManager } from './IntegrityManager';
+import { LSNManager } from './LSNManager';
 // Remove SyncState import from SyncManager, import SyncStatus from interfaces
 import { ServerMessage, ClientMessage, ServerLiveStartMessage } from './SyncManager';
 import { SyncStatus } from './interfaces';
+
+// Temporary interface for initial state sync (compatibility)
+interface ISyncInitialState {
+  clientId: string;
+  currentLsn: string;
+  syncState: SyncStatus;
+}
 
 export class SyncMessageHandler {
   private events: SyncEventEmitter;
   private wsConnector: WebSocketConnector; // Use concrete class or IMessageSender
   private incomingProcessor: IncomingChangeProcessor;
-  private statePersister: SyncStatePersister;
+  private integrityManager: IntegrityManager | null = null; // Optional dependency
+  private lsnManager: LSNManager | null = null; // Centralized LSN management
 
   // Internal state needed for workflow management
   private currentSyncState: SyncStatus = 'disconnected'; // Ensure this uses the imported SyncStatus
-  private currentLsn: string = '0/0';
   private clientId: string = '';
 
   constructor(
     eventEmitter: SyncEventEmitter,
     wsConnector: WebSocketConnector, // Inject dependencies
     incomingProcessor: IncomingChangeProcessor,
-    statePersister: SyncStatePersister
+    _statePersister?: any, // DEPRECATED: No longer used, accessing orchestrator directly
+    integrityManager?: IntegrityManager, // Optional parameter
+    lsnManager?: LSNManager // Centralized LSN management
   ) {
     this.events = eventEmitter;
     this.wsConnector = wsConnector;
     this.incomingProcessor = incomingProcessor;
-    this.statePersister = statePersister;
+    // Note: statePersister parameter is ignored - using orchestrator state now
+    this.integrityManager = integrityManager || null;
+    this.lsnManager = lsnManager || null;
 
     // Listen for raw messages from the connector
     this.events.on('websocket:message', this.handleRawMessage.bind(this));
   }
 
-  // Called after SyncStatePersister is initialized
-  public syncInitialState(initialState: ISyncStateData): void {
+  /**
+   * Get orchestrator actor
+   */
+  private getOrchestrator() {
+    const orchestrator = (window as any).orchestratorActor;
+    if (!orchestrator) {
+      throw new Error('Orchestrator actor not available');
+    }
+    return orchestrator;
+  }
+
+  private getOrchestratorSnapshot() {
+    return this.getOrchestrator().getSnapshot();
+  }
+
+  // Called after initial state is loaded (compatibility method)
+  public syncInitialState(initialState: ISyncInitialState): void {
       this.clientId = initialState.clientId;
-      this.currentLsn = initialState.currentLsn;
+      // LSN is now managed by LSNManager, so we sync it there if available
+      if (this.lsnManager) {
+        this.lsnManager.updateLSN(initialState.currentLsn, 'sync_initial_state');
+      }
       this.currentSyncState = initialState.syncState; // Should be 'disconnected' initially
-      console.log(`SyncMessageHandler: Initial state synced - ClientID: ${this.clientId}, LSN: ${this.currentLsn}`);
+      console.log(`SyncMessageHandler: Initial state synced - ClientID: ${this.clientId}, LSN: ${initialState.currentLsn}`);
   }
 
   private handleRawMessage(rawData: string | Buffer | ArrayBuffer | Blob): void {
     try {
       let message: ServerMessage;
+
       if (typeof rawData === 'string') {
         message = JSON.parse(rawData);
       } else {
-        // Handle binary data if necessary, e.g., using TextDecoder
         console.warn("SyncMessageHandler: Received binary message data, decoding as UTF-8 string.");
         const decoder = new TextDecoder('utf-8');
         message = JSON.parse(decoder.decode(rawData as BufferSource)); // Assuming BufferSource
       }
 
-      console.log(`[SyncMessageHandler] Received message: ${message.type}`);
+      // Reduced logging - only log for debugging if needed
+      // console.log(`[SyncMessageHandler] Received message: ${message.type}`);
+      
       // Basic validation
       if (!message.type || !message.messageId) {
           console.error("[SyncMessageHandler] Invalid message received (missing type or messageId):", message);
@@ -68,7 +104,9 @@ export class SyncMessageHandler {
   }
 
   private processDecodedMessage(message: ServerMessage): void {
-    console.log(`[SyncMessageHandler] processDecodedMessage ENTERED for type: "${message.type}" (ID: ${message.messageId}).`);
+    // Reduced logging - only log for debugging if needed
+    // console.log(`[SyncMessageHandler] processDecodedMessage ENTERED for type: "${message.type}" (ID: ${message.messageId}).`);
+    
     // Logic from SyncManager.processMessage
     // Dispatch based on type
      switch (message.type) {
@@ -99,16 +137,25 @@ export class SyncMessageHandler {
        case 'srv_sync_stats':
          this.handleSyncStatsMessage(message);
          break;
+       case 'srv_heartbeat':
+         // Heartbeat responses are handled directly by WebSocketConnector
+         // But we can also emit an event for other components that might need it
+         this.events.emit('heartbeat:server_response', message);
+         break;
        case 'srv_changes_received':
          this.events.emit('server_message:srv_changes_received', message);
          break;
        case 'srv_changes_applied':
-         console.log(`[SyncMessageHandler] Matched CASE 'srv_changes_applied' for ID: ${message.messageId}`);
+         // Reduced logging - only log for debugging if needed
+         // console.log(`[SyncMessageHandler] Matched CASE 'srv_changes_applied' for ID: ${message.messageId}`);
          this.events.emit('server_message:srv_changes_applied', message);
-         console.log(`[SyncMessageHandler] AFTER EMIT 'server_message:srv_changes_applied' for ID: ${message.messageId}`);
+         // console.log(`[SyncMessageHandler] AFTER EMIT 'server_message:srv_changes_applied' for ID: ${message.messageId}`);
          break;
        case 'srv_error':
          this.events.emit('server_message:srv_error', message);
+         break;
+       case 'srv_integrity_validation_response':
+         this.handleIntegrityValidationResponse(message);
          break;
        // Messages like srv_changes_received, srv_changes_applied, srv_error are now emitted
        // for OutgoingChangeProcessor to handle.
@@ -122,32 +169,106 @@ export class SyncMessageHandler {
 
   private handleStateChangeMessage(message: ServerMessage): void {
     const state = message.state; // message.state is already SyncStatus | undefined
-    if (state && this.currentSyncState !== state) {
-        console.log(`[SyncMessageHandler] State changing from ${this.currentSyncState} to ${state}`);
-        this.currentSyncState = state; // Assign SyncStatus
-        this.events.emit('stateChange', state); // Emit SyncStatus
-        // Persist the state change (saveState expects Partial<ISyncStateData> where syncState is SyncStatus)
-        this.statePersister.saveState({ syncState: state }).catch(err => console.error("Error saving state:", err));
+    if (state) {
+        const previousState = this.currentSyncState;
+        console.log(`[SyncMessageHandler] State transition: ${previousState} → ${state}`);
+        
+        // 🔥 ALWAYS update state and emit event, even if "same"
+        // This ensures external listeners (like XState) get notified
+        this.currentSyncState = state;
+        this.events.emit('stateChange', state);
+        
+        // 🔥 FORCE emit sync:statusChanged for external coordination
+        this.events.emit('sync:statusChanged', state);
+        
+        console.log(`[SyncMessageHandler] ✅ Emitted stateChange and sync:statusChanged events for: ${state}`);
+        
+        // Persist the state change to orchestrator
+        try {
+          this.getOrchestrator().send({ type: 'SYNC_STATE_UPDATE', syncState: state });
+        } catch (error) {
+          console.warn('Error saving state to orchestrator:', error);
+        }
     }
   }
 
   private handleLSNUpdateMessage(message: ServerMessage): void {
     const lsn = message.lsn;
-    if (lsn && this.currentLsn !== lsn) {
-        console.log(`[SyncMessageHandler] LSN changing from ${this.currentLsn} to ${lsn}`);
-        this.currentLsn = lsn;
-        this.events.emit('lsnUpdate', lsn); // Emit for UI/SyncManager orchestrator
-        // Persist the LSN change immediately
-        this.statePersister.saveState({ currentLsn: lsn }).then(() => this.statePersister.flush());
+    if (lsn) {
+        const currentLsn = this.lsnManager?.getCurrentLSN() || '0/0';
+        if (currentLsn !== lsn) {
+            console.log(`[SyncMessageHandler] LSN changing from ${currentLsn} to ${lsn}`);
+            
+            // Update LSN through centralized manager
+            if (this.lsnManager) {
+                this.lsnManager.updateLSN(lsn, 'server_lsn_update');
+            } else {
+                // Fallback to orchestrator LSN update
+                try {
+                  this.getOrchestrator().send({ type: 'LSN_UPDATE', lsn });
+                } catch (error) {
+                  console.warn('Error updating LSN in orchestrator:', error);
+                }
+            }
+            
+            // 🔥 CRITICAL: Update WebSocketConnector's LSN for heartbeats
+            this.wsConnector.setConnectionParams(this.clientId, lsn);
+            console.log(`[SyncMessageHandler] ✅ Updated WebSocketConnector LSN to ${lsn} for heartbeats`);
+            
+            this.events.emit('lsnUpdate', lsn); // Emit for UI/SyncManager orchestrator
+        }
     }
   }
 
   private handleTableChangesMessage(message: ServerMessage): void {
     const changes = message.changes;
     if (changes && Array.isArray(changes)) {
+      // Add detailed logging for debugging null/object conversion issues
+      console.log('[SyncMessageHandler] Received table changes:', {
+        messageType: message.type,
+        changeCount: changes.length,
+        changes: changes.map((change, index) => ({
+          index,
+          table: change.table,
+          operation: change.operation,
+          dataKeys: Object.keys(change.data || {}),
+          estimatedDuration: {
+            value: change.data?.estimatedDuration,
+            type: typeof change.data?.estimatedDuration,
+            isNull: change.data?.estimatedDuration === null,
+            isUndefined: change.data?.estimatedDuration === undefined,
+            stringified: JSON.stringify(change.data?.estimatedDuration)
+          },
+          timeRange: {
+            value: change.data?.timeRange,
+            type: typeof change.data?.timeRange,
+            isNull: change.data?.timeRange === null,
+            isUndefined: change.data?.timeRange === undefined,
+            stringified: JSON.stringify(change.data?.timeRange)
+          }
+        }))
+      });
+
+      // 🔥 NEW: Emit granular sync events for app machine tracking
+      const syncEventData = {
+        messageType: message.type,
+        changes: changes,
+        sequence: message.sequence,
+        progress: {
+          changeCount: changes.length,
+          timestamp: Date.now()
+        }
+      };
+      
+      // Emit generic sync message event for app machine
+      this.events.emit('sync:message', syncEventData);
+      
       // Update LSN first if provided (common in catchup/live)
-      if (message.lastLSN && this.currentLsn !== message.lastLSN) {
-          this.handleLSNUpdateMessage({ ...message, lsn: message.lastLSN }); // Reuse LSN update logic
+      if (message.lastLSN) {
+          const currentLsn = this.lsnManager?.getCurrentLSN() || '0/0';
+          if (currentLsn !== message.lastLSN) {
+              this.handleLSNUpdateMessage({ ...message, lsn: message.lastLSN }); // Reuse LSN update logic
+          }
       }
 
       // Delegate processing to IncomingChangeProcessor
@@ -158,17 +279,14 @@ export class SyncMessageHandler {
             // Send appropriate acknowledgment
             this.sendMessageAcknowledgment(message);
           } else {
-            console.error(`[SyncMessageHandler] Incoming changes processing failed for ${message.type}. Not sending ACK.`);
-            // Handle failure? Trigger error state?
-            this.events.emit('sync_error', { error: `Failed to process incoming changes for ${message.type}`, phase: 'client_processing', messageId: message.messageId });
+            console.warn(`[SyncMessageHandler] Incoming changes processing failed for ${message.type}.`);
           }
         })
         .catch(error => {
-          console.error(`[SyncMessageHandler] Error delegating incoming changes processing (${message.type}):`, error);
-           this.events.emit('sync_error', { error: `Error processing incoming changes for ${message.type}`, phase: 'client_processing', messageId: message.messageId, originalError: error });
+          console.error(`[SyncMessageHandler] Error processing incoming changes for ${message.type}:`, error);
         });
     } else {
-      console.warn(`[SyncMessageHandler] Received ${message.type} with no valid changes array.`);
+      console.warn(`[SyncMessageHandler] Received ${message.type} message without valid changes array.`);
     }
   }
 
@@ -187,18 +305,28 @@ export class SyncMessageHandler {
          this.handleLSNUpdateMessage({ ...message, lsn: message.serverLSN });
      }
      this.sendInitProcessedAck(message.messageId);
-     // Transition state AFTER sending ACK
-     this.handleStateChangeMessage({ ...message, state: 'catchup' });
+     
+     // Don't automatically transition to 'catchup' state!
+     // The server will determine if catchup is needed and send either:
+     // - srv_catchup_changes (if catchup needed) 
+     // - srv_live_start (if client is up-to-date after initial sync)
+     console.log('[SyncMessageHandler] Initial sync acknowledged, waiting for server to determine next phase...');
   }
 
-  private handleCatchupCompletedMessage(message: ServerMessage): void {
+  private async handleCatchupCompletedMessage(message: ServerMessage): Promise<void> {
      console.log('[SyncMessageHandler] Catchup sync complete', { lastLSN: message.lastLSN });
      if (message.lastLSN) {
          this.handleLSNUpdateMessage({ ...message, lsn: message.lastLSN });
      }
+     
      this.handleStateChangeMessage({ ...message, state: 'live' });
-     // Persist last sync time
-     this.statePersister.saveState({ lastSyncTime: new Date() }).catch(err => console.error("Error saving last sync time:", err));
+     // Persist last sync time to orchestrator
+     try {
+       this.getOrchestrator().send({ type: 'SYNC_LAST_SYNC_TIME_UPDATE', lastSyncTime: new Date() });
+     } catch (error) {
+       console.warn('Error updating last sync time in orchestrator:', error);
+     }
+     
      // Trigger OutgoingChangeProcessor to send pending changes
      this.events.emit('process_all_outgoing_changes', { reason: 'catchup_complete' }); // New event for OutgoingProcessor
   }
@@ -209,15 +337,38 @@ export class SyncMessageHandler {
      if (liveStartMsg.finalLSN) {
          this.handleLSNUpdateMessage({ ...message, lsn: liveStartMsg.finalLSN });
      }
+     
+     // Only emit process_all_outgoing_changes if we're not already in live state
+     // This prevents duplicate emissions when transitioning from catchup_complete -> live_start
+     const wasAlreadyLive = this.currentSyncState === 'live';
+     console.log(`[SyncMessageHandler] Current state before transition: ${this.currentSyncState}, wasAlreadyLive: ${wasAlreadyLive}`);
+     
      this.handleStateChangeMessage({ ...message, state: 'live' });
-     this.statePersister.saveState({ lastSyncTime: new Date() }).catch(err => console.error("Error saving last sync time:", err));
-     // Trigger OutgoingChangeProcessor to send pending changes
-     this.events.emit('process_all_outgoing_changes', { reason: 'live_start' }); // New event for OutgoingProcessor
+     // Persist last sync time to orchestrator
+     try {
+       this.getOrchestrator().send({ type: 'SYNC_LAST_SYNC_TIME_UPDATE', lastSyncTime: new Date() });
+     } catch (error) {
+       console.warn('Error updating last sync time in orchestrator:', error);
+     }
+     
+     // Only trigger OutgoingChangeProcessor if we weren't already in live state
+     if (!wasAlreadyLive) {
+       console.log('[SyncMessageHandler] Transitioning to live state, triggering outgoing change processing');
+       this.events.emit('process_all_outgoing_changes', { reason: 'live_start' });
+     } else {
+       console.log('[SyncMessageHandler] Already in live state, skipping duplicate outgoing change processing');
+     }
   }
 
   private handleSyncStatsMessage(message: ServerMessage): void {
     console.log('[SyncMessageHandler] Received sync stats', message);
     this.events.emit('sync_stats', message); // Forward for UI
+  }
+
+  private handleIntegrityValidationResponse(message: ServerMessage): void {
+    console.log('[SyncMessageHandler] Received integrity validation response', message);
+    // Forward to IntegrityManager via the event expected in IntegrityManager.ts
+    this.events.emit('server_message:srv_integrity_validation_response', message);
   }
 
   // --- Acknowledgment Sending Methods (Adapted from SyncManager) ---
@@ -262,7 +413,7 @@ export class SyncMessageHandler {
   private sendCatchupAcknowledgment(message: ServerMessage): void {
     // Logic from SyncManager.sendCatchupAcknowledgment
      const sequence = message.sequence;
-     const lastLSN = message.lastLSN || this.currentLsn;
+     const lastLSN = message.lastLSN || this.lsnManager?.getCurrentLSN() || '0/0';
      const chunk = sequence?.chunk || 1;
      const ackMessage: ClientMessage = {
        type: 'clt_catchup_received', messageId: `catchup_ack_${Date.now()}`,
@@ -275,7 +426,7 @@ export class SyncMessageHandler {
   private sendLiveChangesAcknowledgment(message: ServerMessage): void {
     // Logic from SyncManager.sendLiveChangesAcknowledgment
      const changes = message.changes as Array<any> || [];
-     const lastLSN = message.lastLSN || this.currentLsn;
+     const lastLSN = message.lastLSN || this.lsnManager?.getCurrentLSN() || '0/0';
      const changeIds = changes.map(change => change.data?.id).filter(Boolean);
      const ackMessage: ClientMessage = {
        type: 'clt_changes_received', messageId: `live_ack_${Date.now()}`,

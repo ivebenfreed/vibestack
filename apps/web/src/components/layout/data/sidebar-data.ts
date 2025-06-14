@@ -60,8 +60,11 @@ export interface GlobalSidebarSection {
 /**
  * Generate dynamic project navigation items from actual project data
  * Projects will be organized into collapsible folders by status
+ * 🎯 PURE FUNCTION: Let Jotai atoms handle memoization for surgical rerendering
  */
 export function generateProjectNavItems(projects: Project[]): NavItem[] {
+  const startTime = performance.now()
+  
   // Separate projects by status using correct enum values
   const activeProjects = projects.filter(p => 
     p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.IN_PROGRESS
@@ -70,10 +73,11 @@ export function generateProjectNavItems(projects: Project[]): NavItem[] {
     p.status === ProjectStatus.ON_HOLD || p.status === ProjectStatus.COMPLETED
   )
   
-  // Create nav items for individual projects using dots
+  // Create nav items with project IDs for atomized rendering
   const createProjectItems = (projectList: Project[]) => 
     projectList.map(project => ({
-      title: project.name,
+      projectId: project.id, // 🎯 ATOMIZED: Store ID for surgical rendering
+      title: project.name,   // Keep for folder titles
       url: `/projects/${project.id}` as any,
       icon: Dot,
     }))
@@ -106,6 +110,8 @@ export function generateProjectNavItems(projects: Project[]): NavItem[] {
       items: createProjectItems(archivedProjects)
     })
   }
+  
+
 
   return navItems
 }
@@ -116,6 +122,17 @@ export function generateProjectNavItems(projects: Project[]): NavItem[] {
 export function generateProjectsSection(projects: Project[] = []): GlobalSidebarSection {
   const projectNavItems = generateProjectNavItems(projects)
   
+  const projectsGroupItems: NavItem[] = [
+    // Direct link to projects overview
+    {
+      title: 'All Projects',
+      url: '/projects',
+      icon: IconLayoutDashboard,
+    },
+    // Collapsible project folders
+    ...projectNavItems,
+  ]
+  
   return {
     id: 'projects',
     title: 'Projects',
@@ -124,16 +141,7 @@ export function generateProjectsSection(projects: Project[] = []): GlobalSidebar
     navGroups: [
       {
         title: 'Projects',
-        items: [
-          // Direct link to projects overview
-          {
-            title: 'All Projects',
-            url: '/projects',
-            icon: IconLayoutDashboard,
-          },
-          // Collapsible project folders
-          ...projectNavItems,
-        ],
+        items: projectsGroupItems,
       },
       {
         title: 'Project Tools',
@@ -288,6 +296,12 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             url: '/debug/data-table',
             icon: IconBug,
           },
+
+          {
+            title: 'Data Table Atom',
+            url: '/debug/data-table-atom',
+            icon: IconBug,
+          },
           {
             title: 'Sync',
             url: '/debug/sync',
@@ -296,6 +310,11 @@ export const globalSidebarData: GlobalSidebarSection[] = [
           {
             title: 'Sync Changes',
             url: '/debug/sync-changes',
+            icon: IconBug,
+          },
+          {
+            title: 'Sync Testing',
+            url: '/debug/sync-test',
             icon: IconBug,
           },
           {
@@ -317,6 +336,11 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             title: 'TypeORM Test',
             url: '/debug/typeorm-test',
             icon: IconBug,
+          },
+          {
+            title: 'Tasks New Pattern',
+            url: '/debug/tasks-new-pattern',
+            icon: IconChecklist,
           },
         ],
       },

@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: adding new ui components, shadcn, ui work
+globs: 
 alwaysApply: false
 ---
 # Shadcn UI CLI Usage

@@ -2,9 +2,10 @@ import { HTMLAttributes, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,29 +19,33 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { authClient } from '@/lib/auth'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuth } from '@/state-machines/orchestrator-hooks'
+import { Route } from '../../sign-in'
 
 type UserAuthFormProps = HTMLAttributes<HTMLFormElement>
 
 const formSchema = z.object({
-  email: z
-    .string()
-    .min(1, { message: 'Please enter your email' })
-    .email({ message: 'Invalid email address' }),
-  password: z
-    .string()
-    .min(1, {
-      message: 'Please enter your password',
-    })
-    .min(7, {
-      message: 'Password must be at least 7 characters long',
-    }),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(7, 'Password must be at least 7 characters long'),
 })
 
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const setAuthenticated = useAuthStore((state) => state.setAuthenticated)
-  const navigate = useNavigate({ from: '/sign-in' })
+  const navigate = useNavigate()
+  
+  // Safe auth hook usage - handle when orchestrator isn't ready yet
+  let authHook;
+  try {
+    authHook = useAuth();
+  } catch (error) {
+    console.warn('[UserAuthForm] Orchestrator not ready, using fallback auth');
+    authHook = { signIn: () => {} }; // Fallback
+  }
+  const { signIn } = authHook;
+  
+  const routerState = useRouterState()
+  const searchParams = routerState.location.search as { redirect?: string }
+  const redirectTo = searchParams.redirect || '/'
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,20 +59,24 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     setIsLoading(true)
     try {
       console.log("[AUTH] Attempting sign-in with:", data.email);
+      
+      // Use orchestrator sign-in if available
+      signIn(data.email, data.password);
+      
       const result = await authClient.signIn.email({
         email: data.email,
         password: data.password,
       });
 
-      console.log("[AUTH] Full API Result:", JSON.stringify(result, null, 2)); 
+      console.log("[AUTH] Sign In Result:", result); 
 
-      console.log("[AUTH] Sign In Result Object:", result); 
-
-      if ('data' in result && result.data?.user) {
-        setAuthenticated({ id: result.data.user.id, email: result.data.user.email, role: result.data.user.role });
+      if (result.data?.user) {
+        console.log("[AUTH] Sign-in successful, redirecting to:", redirectTo);
+        
         toast.success("Login successful!");
-        navigate({ to: '/', replace: true });
-      } else if ('error' in result) {
+        
+        navigate({ to: redirectTo, replace: true });
+      } else if (result.error) {
         console.error("[AUTH] Sign In Error:", result.error);
         const errorMessage = result.error?.message || "Sign in failed. Please check credentials.";
         toast.error(errorMessage);
@@ -124,6 +133,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
           )}
         />
         <Button className='mt-2' disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Login
         </Button>
 

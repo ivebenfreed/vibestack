@@ -1,23 +1,30 @@
 import { LocalChanges } from '@repo/dataforge/client-entities';
 import { In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+/**
+ * @deprecated This class is being replaced by OutgoingChangeService in the pure services architecture.
+ * Use OutgoingChangeService instead for new implementations.
+ */
+
 import { SyncEventEmitter } from './SyncEventEmitter';
-import { DatabaseInitializer } from './DatabaseInitializer';
 import { IMessageSender } from './interfaces';
-import { ClientMessage } from './SyncManager'; // Only ClientMessage needed here for sending
+import { ClientMessage } from './SyncManager';
+import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import type {
   TableChange,
   ServerMessage as BaseServerMessage,
   ServerAppliedMessage,
   ServerReceivedMessage,
-  // ServerErrorResponseMessage is not exported from sync-types, handle srv_error directly
-  SrvMessageType // To help with type guards
+  SrvMessageType
 } from '@repo/sync-types';
 
 // Constants for batch processing
 const BATCH_DELAY = 50; // ms
 const MAX_CHANGES_PER_BATCH = 50;
-const CHANGE_TIMEOUT = 300000; // 5 minutes
+const INITIAL_TIMEOUT = 30000; // 30 seconds - more reasonable for server processing
+const MAX_TIMEOUT = 300000; // 5 minutes - maximum timeout
+const TIMEOUT_MULTIPLIER = 2; // Exponential backoff multiplier
+const MAX_RETRY_ATTEMPTS = 3; // Maximum number of retries before giving up
 
 // A more specific type for server error messages if not covered by sync-types
 interface ServerErrorResponseMessage extends BaseServerMessage {
@@ -25,41 +32,66 @@ interface ServerErrorResponseMessage extends BaseServerMessage {
   errorCode?: string | number;
   errorMessage?: string;
   originalMessageId?: string;
-  // Add other expected error fields if any
 }
 
+// Enhanced interface for tracking sent changes with retry logic
+interface SentChangeInfo {
+  timestamp: number;
+  attempt: number;
+  timeout: number;
+}
 
 export class OutgoingChangeProcessor {
   private localChangesRepo: Repository<LocalChanges>;
   private events: SyncEventEmitter;
   private messageSender: IMessageSender;
-  private dbInitializer: DatabaseInitializer;
+  private dataSource: NewPGliteDataSource;
 
   private changeQueue: Set<string> = new Set(); // Stores LocalChanges.id
   private isProcessing: boolean = false;
-  private processTimer: NodeJS.Timeout | null = null; // Use NodeJS.Timeout type
-  private sentChanges: Map<string, number> = new Map(); // LocalChanges.id -> timestamp
+  private processTimer: NodeJS.Timeout | null = null;
+  private sentChanges: Map<string, SentChangeInfo> = new Map(); // Enhanced tracking with retry info
   private pendingChangesCount: number = 0;
 
   private debouncedUpdatePendingChangesCountTimer: NodeJS.Timeout | null = null;
   private lastPendingChangesCountUpdateTime = 0;
   private readonly MIN_PENDING_CHANGES_UPDATE_INTERVAL = 3000;
   private readonly PENDING_CHANGES_UPDATE_DEBOUNCE_DELAY = 1000;
+  
+  // Add tracking for recent changes to detect duplicates
+  private recentTracks = new Map<string, number>(); // key: `${table}:${entityId}:${operation}`, value: timestamp
 
   constructor(
-    dbInitializer: DatabaseInitializer,
+    dataSource: NewPGliteDataSource,
     eventEmitter: SyncEventEmitter,
     messageSender: IMessageSender
   ) {
-    this.dbInitializer = dbInitializer;
-    if (!this.dbInitializer.isInitialized()) {
-      throw new Error("DatabaseInitializer not initialized when OutgoingChangeProcessor is constructed.");
-    }
-    this.localChangesRepo = dbInitializer.getLocalChangesRepository();
     this.events = eventEmitter;
     this.messageSender = messageSender;
+    this.dataSource = dataSource;
+
+    if (!this.dataSource.isInitialized) {
+      throw new Error("DataSource not initialized when OutgoingChangeProcessor is constructed.");
+    }
+    
+    this.localChangesRepo = this.dataSource.getRepository(LocalChanges);
+    console.log('[OutgoingChangeProcessor] Using shared DataSource from PGliteProvider context');
 
     this.initializeEventListeners();
+  }
+
+  /**
+   * Update the datasource reference (for HMR compatibility)
+   */
+  public updateDataSource(dataSource: NewPGliteDataSource): void {
+    if (!dataSource.isInitialized) {
+      throw new Error("Cannot update to uninitialized DataSource");
+    }
+    
+    console.log('[OutgoingChangeProcessor] 🔥 HMR: Updating datasource reference');
+    this.dataSource = dataSource;
+    this.localChangesRepo = this.dataSource.getRepository(LocalChanges);
+    console.log('[OutgoingChangeProcessor] 🔥 HMR: DataSource and repository references updated');
   }
 
   private initializeEventListeners(): void {
@@ -76,6 +108,14 @@ export class OutgoingChangeProcessor {
     });
     this.events.on('process_all_outgoing_changes', () => {
       console.log('[OutgoingChangeProcessor] Received process_all_outgoing_changes event.');
+      
+      // Quick check: if we already know there are no pending changes and no queued changes,
+      // skip the expensive database query
+      if (this.pendingChangesCount === 0 && this.changeQueue.size === 0) {
+        console.log('[OutgoingChangeProcessor] No pending or queued changes, skipping database query.');
+        return;
+      }
+      
       this.loadUnprocessedChanges().then(() => {
         this.scheduleProcessing();
       }).catch(error => {
@@ -120,7 +160,12 @@ export class OutgoingChangeProcessor {
     // Access client ID through the IMessageSender interface
     try {
       const clientId = this.messageSender.getClientId() || '';
-      console.log(`[OutgoingChangeProcessor] getClientId() returning: "${clientId}"`);
+      // Add debugging for client ID tracking
+      if (!clientId) {
+        console.error('[OutgoingChangeProcessor] getClientId() returning empty string - this will break anti-echo!');
+      } else {
+        console.debug(`[OutgoingChangeProcessor] getClientId() returning: "${clientId}"`);
+      }
       return clientId;
     } catch (error) {
       console.warn('[OutgoingChangeProcessor] Failed to get client ID from message sender:', error);
@@ -142,69 +187,109 @@ export class OutgoingChangeProcessor {
       entityRelations?: string[];
     }
   ): Promise<string> {
-    const localChangeId = uuidv4(); // This is the ID for the LocalChanges record itself
-
-    if (!this.dbInitializer.isInitialized() || !this.localChangesRepo) {
-      console.error("[OutgoingChangeProcessor] Cannot track change, DatabaseInitializer not ready or repository not available.");
-      throw new Error("Database or repository not available for trackChange");
+    const trackCallId = `track_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const entityId = dataPayload.id || (originalData ? originalData.id : null) || '';
+    console.log(`[OutgoingChangeProcessor] 🔄 trackChange called: ${trackCallId} for ${tableName}:${entityId} operation:${operationType}`);
+    
+    // Check for rapid duplicate tracking attempts
+    const trackKey = `${tableName}:${entityId}:${operationType}`;
+    const now = Date.now();
+    const lastTrackTime = this.recentTracks.get(trackKey);
+    
+    if (lastTrackTime && (now - lastTrackTime) < 1000) { // Within 1 second
+      console.warn(`[OutgoingChangeProcessor] ⚠️ DUPLICATE TRACK DETECTED: ${trackCallId} - Same entity tracked ${now - lastTrackTime}ms ago!`);
+      console.warn(`[OutgoingChangeProcessor] ⚠️ Track key: ${trackKey}`);
+      console.trace(`[OutgoingChangeProcessor] ⚠️ Duplicate track call stack:`);
     }
-
+    
+    this.recentTracks.set(trackKey, now);
+    
+    // Clean up old entries (older than 10 seconds)
+    for (const [key, timestamp] of this.recentTracks.entries()) {
+      if (now - timestamp > 10000) {
+        this.recentTracks.delete(key);
+      }
+    }
+    
     try {
-      let processedData = { ...dataPayload };
-      // The entity's actual ID is expected to be in dataPayload.id
-      const entityId = dataPayload.id || originalData?.id;
+      if (!this.dataSource) {
+        throw new Error('Database not initialized');
+      }
 
-      console.log(`[OutgoingChangeProcessor] trackChange() called:`, {
-        localChangeId,
-        tableName,
-        operationType,
-        entityId,
-        originalDataPayload: dataPayload,
-        hasMetadata: !!metadata,
-        metadata
-      });
+      // Extract entity ID for tracking
+      
+      // Process different operation types with enhanced CRDT support
+      let processedData = { ...dataPayload };
+      let changedFieldsCount = 0;
+      let changedFields: string[] = [];
 
       if (operationType === 'update') {
+        // Enhanced update handling for better CRDT processing
+        // Instead of just sending changed fields, we now send:
+        // 1. Full entity state for proper upsert handling
+        // 2. Change metadata for conflict resolution
+        // 3. Both changed and unchanged fields for complete CRDT context
+        
         if (originalData) {
-          const modifiedFields: Record<string, any> = {};
+          // Calculate changed fields for metadata
+          const changedFieldsMap: Record<string, any> = {};
+          const unchangedFields: Record<string, any> = {};
           let hasChanges = false;
+          
           for (const [key, value] of Object.entries(dataPayload)) {
             if (JSON.stringify(value) !== JSON.stringify(originalData[key])) {
-              modifiedFields[key] = value;
+              changedFieldsMap[key] = value;
               hasChanges = true;
+            } else {
+              unchangedFields[key] = value;
             }
           }
-          if (dataPayload.id && !modifiedFields.id) { // Ensure entity ID is included
-            modifiedFields.id = dataPayload.id;
+          
+          // Ensure entity ID is always included
+          if (dataPayload.id && !changedFieldsMap.id) {
+            changedFieldsMap.id = dataPayload.id;
           }
+          
+          // Preserve clientId if it exists
+          if (dataPayload.clientId && !changedFieldsMap.clientId) {
+            changedFieldsMap.clientId = dataPayload.clientId;
+          }
+          
           if (!hasChanges && dataPayload.id) {
             console.log(`[OutgoingChangeProcessor] Skipping tracking update for ${tableName}:${dataPayload.id} as no data changed.`);
             return dataPayload.id; // Return entity id
           }
-          processedData = modifiedFields;
-          console.log(`[OutgoingChangeProcessor] Update operation processed data:`, processedData);
+          
+          changedFieldsCount = Object.keys(changedFieldsMap).length;
+          changedFields = Object.keys(changedFieldsMap).filter(k => k !== 'id' && k !== 'clientId');
+          
+          // Enhanced: Send FULL entity state with change metadata for better CRDT processing
+          processedData = {
+            ...dataPayload, // Full current entity state
+            __changeMetadata: {
+              changedFields: changedFields,
+              originalUpdatedAt: originalData.updatedAt,
+              changeTimestamp: new Date().toISOString(),
+              hasPartialUpdate: changedFieldsCount < Object.keys(dataPayload).length
+            }
+          };
         }
-        if (!processedData.id && dataPayload.id) { // Ensure entity ID is in the final data for update
+        
+        // Ensure entity ID is in the final data for update
+        if (!processedData.id && dataPayload.id) {
           processedData.id = dataPayload.id;
         } else if (!processedData.id) {
-          console.warn(`[OutgoingChangeProcessor] Update operation for table ${tableName} is missing an 'id' in the data. LocalChange ID: ${localChangeId}`);
+          console.warn(`[OutgoingChangeProcessor] Update operation for table ${tableName} is missing an 'id' in the data. LocalChange ID will be generated.`);
         }
       } else if (operationType === 'insert' && !dataPayload.id) {
-        console.warn(`[OutgoingChangeProcessor] Insert operation for table ${tableName} is missing an 'id' in dataPayload. LocalChange ID: ${localChangeId}`);
+        console.warn(`[OutgoingChangeProcessor] Insert operation for table ${tableName} is missing an 'id' in dataPayload.`);
       }
 
-      // Add client_id to the processed data for anti-echo functionality
+      // Add clientId to the processed data for anti-echo functionality
       const clientId = this.getClientId();
-      console.log(`[OutgoingChangeProcessor] Adding client_id for anti-echo:`, {
-        clientId,
-        hasClientId: !!clientId,
-        clientIdLength: clientId ? clientId.length : 0
-      });
       
       if (clientId) {
-        processedData.client_id = clientId;
-        console.log(`[OutgoingChangeProcessor] ✅ Successfully added client_id "${clientId}" to change data for anti-echo`);
-        console.log(`[OutgoingChangeProcessor] Final processedData:`, processedData);
+        processedData.clientId = clientId;
       } else {
         console.error(`[OutgoingChangeProcessor] ❌ NO CLIENT_ID AVAILABLE! Anti-echo will not work!`);
       }
@@ -217,6 +302,7 @@ export class OutgoingChangeProcessor {
         })
       };
 
+      const localChangeId = uuidv4(); // This is the ID for the LocalChanges record itself
       const now = new Date();
       const newChange = this.localChangesRepo.create({
         id: localChangeId, // Primary key for LocalChanges table
@@ -233,7 +319,10 @@ export class OutgoingChangeProcessor {
 
       await this.localChangesRepo.save(newChange);
       this.changeQueue.add(localChangeId);
-      console.log(`[OutgoingChangeProcessor] Tracked change ${localChangeId} (entity: ${entityId}) for ${operationType} on ${tableName} with client_id: ${processedData.client_id || 'MISSING'} and metadata: ${!!metadata}`);
+      
+      // Consolidated logging - all essential information in one log
+      console.log(`[OutgoingChangeProcessor] Tracked ${operationType} ${tableName}:${entityId} → ${localChangeId} | Fields: ${changedFieldsCount || Object.keys(dataPayload).length}${changedFields.length > 0 ? ` (changed: ${changedFields.join(',')})` : ''} | ClientId: ${clientId ? '✓' : '✗'} | Metadata: ${!!metadata || '__changeMetadata' in processedData ? '✓' : '✗'}`);
+      
       this.scheduleProcessing();
       this.events.emit('local_change_tracked', { changeId: localChangeId, table: tableName, operation: operationType, entityId });
       this.pendingChangesCount++;
@@ -266,7 +355,8 @@ export class OutgoingChangeProcessor {
       clearTimeout(this.debouncedUpdatePendingChangesCountTimer);
       this.debouncedUpdatePendingChangesCountTimer = null;
     }
-    console.log(`[OutgoingChangeProcessor] Pending changes count updated to: ${this.pendingChangesCount}`);
+    // Reduced logging - only log when count changes significantly or for debugging
+    // console.log(`[OutgoingChangeProcessor] Pending changes count updated to: ${this.pendingChangesCount}`);
     this.events.emit('pending_outgoing_changes_count_updated', this.pendingChangesCount);
   }
 
@@ -295,7 +385,7 @@ export class OutgoingChangeProcessor {
 
   private async processChanges(): Promise<void> {
     if (this.isProcessing || this.changeQueue.size === 0) return;
-    if (!this.dbInitializer.isInitialized() || !this.localChangesRepo) {
+    if (!this.dataSource) {
       console.error("[OutgoingChangeProcessor] Cannot process changes, DB not ready.");
       return;
     }
@@ -357,66 +447,51 @@ export class OutgoingChangeProcessor {
           }
         }
         
-        // Extract metadata if present
-        const metadata = (rowData as Record<string, any>)?.__metadata;
-        const { __metadata, ...actualRowData } = (rowData as Record<string, any>) || {};
+        // Extract metadata if present, but preserve the TypeORM entity structure
+        const { __metadata, __changeMetadata, ...entityData } = (rowData as Record<string, any>) || {};
+        const metadata = __metadata;
         
         console.log(`[OutgoingChangeProcessor] Processing change ${index + 1}/${optimizedChanges.length}:`, {
           localChangeId: change.id,
           table: change.table,
           operation: change.operation,
-          originalRowData: actualRowData,
-          hasClientIdInOriginal: !!actualRowData?.client_id,
-          originalClientId: actualRowData?.client_id,
-          hasMetadata: !!metadata,
-          metadata
+          originalKeys: Object.keys(entityData),
+          hasClientId: !!entityData?.clientId
         });
         
-        const entityId = actualRowData?.id;
+        const entityId = entityData?.id;
         if (!entityId && change.operation !== 'delete') {
             console.warn(`[OutgoingChangeProcessor] Entity ID missing in data for change ${change.id}, table ${change.table}, op ${change.operation}`);
         }
 
-        const changeDataForServer = this.convertKeysToSnakeCase(actualRowData || {});
-        
-        console.log(`[OutgoingChangeProcessor] After snake_case conversion:`, {
-          changeDataForServer,
-          hasClientIdAfterConversion: !!changeDataForServer.client_id,
-          clientIdAfterConversion: changeDataForServer.client_id
-        });
-        
-        // Ensure client_id is included in the data for anti-echo functionality
-        if (currentClientId && !changeDataForServer.client_id) {
-          changeDataForServer.client_id = currentClientId;
-          console.log(`[OutgoingChangeProcessor] ✅ Added missing client_id "${currentClientId}" to change data`);
-        } else if (currentClientId && changeDataForServer.client_id) {
-          console.log(`[OutgoingChangeProcessor] ✅ client_id already present: "${changeDataForServer.client_id}"`);
-        } else if (!currentClientId) {
-          console.error(`[OutgoingChangeProcessor] ❌ NO currentClientId available for change ${change.id}!`);
-        }
-        
-        const finalData = {
-          ...changeDataForServer,
+        // Preserve TypeORM entity structure - no conversions needed
+        // The data should already be in camelCase with proper types from the client
+        const finalData: Record<string, any> = {
+          ...entityData,
           id: entityId,
         };
         
-        console.log(`[OutgoingChangeProcessor] Final data being sent to server:`, {
-          localChangeId: change.id,
-          table: change.table,
-          operation: change.operation,
-          finalData,
-          hasClientIdInFinal: !!finalData.client_id,
-          finalClientId: finalData.client_id,
-          includingMetadata: !!metadata
+        // Ensure clientId is included for anti-echo functionality
+        if (currentClientId && !finalData.clientId) {
+          finalData.clientId = currentClientId;
+          console.log(`[OutgoingChangeProcessor] ✅ Added clientId "${currentClientId}" to entity data`);
+        }
+        
+        console.log(`[OutgoingChangeProcessor] Final entity data for ${change.table}:${entityId}:`, {
+          dataType: typeof finalData,
+          keys: Object.keys(finalData),
+          hasClientId: !!finalData.clientId,
+          hasUpdatedAt: !!finalData.updatedAt,
+          updatedAtType: typeof finalData.updatedAt
         });
         
-        // Construct TableChange object with metadata if present
+        // Construct TableChange with preserved TypeORM entity structure
         const tableChange: TableChange = {
           table: change.table,
           operation: change.operation as 'insert' | 'update' | 'delete',
-          data: finalData,
-          updated_at: change.updatedAt.toISOString(),
-          client_id: finalData.client_id,
+          data: finalData, // Preserve TypeORM entity structure with proper types
+          updatedAt: change.updatedAt.toISOString(), // TableChange.updatedAt is the sync timestamp
+          clientId: finalData.clientId || currentClientId,
           ...(metadata?.relationshipUpdates && { relationshipUpdates: metadata.relationshipUpdates }),
           ...(metadata?.entityRelations && { entityRelations: metadata.entityRelations })
         };
@@ -426,7 +501,21 @@ export class OutgoingChangeProcessor {
 
       console.log(`[OutgoingChangeProcessor] About to send ${tableChangesPayload.length} changes to server. Summary:`);
       tableChangesPayload.forEach((change, index) => {
-        console.log(`  Change ${index + 1}: ${change.table} ${change.operation} entity=${change.data.id} client_id=${change.data.client_id || 'MISSING'}`);
+        console.log(`  Change ${index + 1}: ${change.table} ${change.operation} entity=${change.data.id} dataClientId=${(change.data as any).clientId || 'MISSING'} tableChangeClientId=${change.clientId || 'MISSING'}`);
+      });
+
+      // Add detailed clientId debugging for anti-echo tracking
+      console.log(`[OutgoingChangeProcessor] 🔍 CLIENT ID VERIFICATION:`);
+      console.log(`  - Current client ID from messageSender: "${currentClientId}"`);
+      console.log(`  - Expected server to filter these as echoes when they come back`);
+      tableChangesPayload.forEach((change, index) => {
+        const dataClientId = (change.data as any).clientId;
+        const tableClientId = change.clientId;
+        console.log(`  - Change ${index + 1}: data.clientId="${dataClientId}" table.clientId="${tableClientId}" (server checks data.clientId)`);
+        
+        if (dataClientId !== currentClientId) {
+          console.error(`  ❌ Change ${index + 1}: data.clientId "${dataClientId}" doesn't match current "${currentClientId}" - ANTI-ECHO WILL FAIL!`);
+        }
       });
 
       // Construct the message payload *without* common fields, as per IMessageSender
@@ -445,8 +534,10 @@ export class OutgoingChangeProcessor {
         messageId: messagePayloadToSend.messageId,
         changesCount: messagePayloadToSend.changes.length,
         currentClientId: currentClientId,
-        changesWithClientId: messagePayloadToSend.changes.filter((c: TableChange) => c.data.client_id).length,
-        changesWithoutClientId: messagePayloadToSend.changes.filter((c: TableChange) => !c.data.client_id).length
+        changesWithDataClientId: messagePayloadToSend.changes.filter((c: TableChange) => (c.data as any).clientId).length,
+        changesWithoutDataClientId: messagePayloadToSend.changes.filter((c: TableChange) => !(c.data as any).clientId).length,
+        changesWithTableChangeClientId: messagePayloadToSend.changes.filter((c: TableChange) => c.clientId).length,
+        changesWithoutTableChangeClientId: messagePayloadToSend.changes.filter((c: TableChange) => !c.clientId).length
       });
 
       // Call send, which returns void. Assume success if no error is thrown by the sender.
@@ -454,7 +545,21 @@ export class OutgoingChangeProcessor {
 
       // Assume send was successful if no error was thrown. Track locally.
       const now = Date.now();
-      optimizedChanges.forEach(optChange => this.sentChanges.set(optChange.id, now));
+      optimizedChanges.forEach(optChange => {
+        const existingInfo = this.sentChanges.get(optChange.id);
+        const attempt = existingInfo ? existingInfo.attempt + 1 : 1;
+        const timeout = existingInfo ? 
+          Math.min(existingInfo.timeout * TIMEOUT_MULTIPLIER, MAX_TIMEOUT) : 
+          INITIAL_TIMEOUT;
+          
+        this.sentChanges.set(optChange.id, { 
+          timestamp: now, 
+          attempt: attempt, 
+          timeout: timeout 
+        });
+        
+        console.log(`[OutgoingChangeProcessor] Tracking change ${optChange.id} (attempt ${attempt}, timeout ${timeout}ms)`);
+      });
 
       // Emit event - messageId is not available here as it's added by the sender implementation.
       // The consumer (e.g., SyncManager) that adds the messageId might emit a more complete event.
@@ -510,7 +615,9 @@ export class OutgoingChangeProcessor {
         let firstOpType = entityChanges[0].operation;
         const firstLocalChangeId = entityChanges[0].id; // ID of the LocalChanges record
         const entityIdForOp = (entityChanges[0].data as Record<string, any>)?.id;
-
+        
+        // Extract clientId from the first change to ensure it's preserved
+        const clientId = (entityChanges[0].data as Record<string, any>)?.clientId;
 
         if (firstOpType === 'insert') {
             currentChangeData = { ...(entityChanges[0].data as Record<string, any>) };
@@ -537,7 +644,11 @@ export class OutgoingChangeProcessor {
                     if (!processedDueToOptimization.includes(firstLocalChangeId)) processedDueToOptimization.push(firstLocalChangeId);
                     break;
                 } else {
-                    currentChangeData = { id: entityIdForOp }; // For delete, only entity ID is needed in data
+                    // For delete, preserve both entity ID and clientId
+                    currentChangeData = { 
+                        id: entityIdForOp,
+                        clientId: clientId || (currentLocalChange.data as Record<string, any>)?.clientId
+                    };
                     firstOpType = 'delete';
                     for(let j=0; j < i; j++) {
                         if (!processedDueToOptimization.includes(entityChanges[j].id)) {
@@ -550,6 +661,12 @@ export class OutgoingChangeProcessor {
         }
 
         if (currentChangeData) {
+            // Ensure clientId is always present in the final optimized data
+            if (clientId && !currentChangeData.clientId) {
+                currentChangeData.clientId = clientId;
+                console.log(`[OutgoingChangeProcessor] ✅ Preserved clientId "${clientId}" during optimization for ${firstOpType} operation`);
+            }
+            
             const representativeChange = { ...entityChanges[0] }; // Base LocalChanges record
             representativeChange.id = firstLocalChangeId; // Use the ID of the first LocalChanges record
             representativeChange.operation = firstOpType as 'insert' | 'update' | 'delete';
@@ -568,21 +685,52 @@ export class OutgoingChangeProcessor {
 
   private checkSentChanges(): void {
     const now = Date.now();
-    this.sentChanges.forEach((timestamp, localChangeId) => {
-      if (now - timestamp > CHANGE_TIMEOUT) {
-        console.warn(`[OutgoingChangeProcessor] Change ${localChangeId} timed out. Re-queueing.`);
-        this.sentChanges.delete(localChangeId);
-        this.changeQueue.add(localChangeId);
-        this.scheduleProcessing();
+    const toRetry: string[] = [];
+    const permanentlyFailed: string[] = [];
+    
+    this.sentChanges.forEach((info, localChangeId) => {
+      if (now - info.timestamp > info.timeout) {
+        if (info.attempt >= MAX_RETRY_ATTEMPTS) {
+          // Permanently failed after max attempts
+          console.error(`[OutgoingChangeProcessor] Change ${localChangeId} permanently failed after ${info.attempt} attempts. Marking as failed.`);
+          this.sentChanges.delete(localChangeId);
+          permanentlyFailed.push(localChangeId);
+        } else {
+          // Retry with exponential backoff
+          const nextAttempt = info.attempt + 1;
+          const nextTimeout = Math.min(info.timeout * TIMEOUT_MULTIPLIER, MAX_TIMEOUT);
+          
+          console.warn(`[OutgoingChangeProcessor] Change ${localChangeId} timed out (attempt ${info.attempt}). Retrying with ${nextTimeout}ms timeout.`);
+          
+          this.sentChanges.delete(localChangeId);
+          toRetry.push(localChangeId);
+          
+          // Will be re-tracked when processChanges() runs again with updated attempt/timeout
+        }
       }
     });
+    
+    // Re-queue changes for retry
+    if (toRetry.length > 0) {
+      toRetry.forEach(id => this.changeQueue.add(id));
+      this.scheduleProcessing();
+    }
+    
+    // Mark permanently failed changes as processed with error
+    if (permanentlyFailed.length > 0) {
+      this.markLocalChangesAsProcessed(permanentlyFailed, false, `timeout_after_${MAX_RETRY_ATTEMPTS}_attempts`)
+        .catch(error => {
+          console.error('[OutgoingChangeProcessor] Error marking permanently failed changes:', error);
+        });
+    }
   }
 
   // Use specific message types from sync-types
   public handleChangesReceived(message: BaseServerMessage): void {
     if (message.type !== 'srv_changes_received') return;
     const receivedMessage = message as ServerReceivedMessage; // Narrow type
-    console.log(`[OutgoingChangeProcessor] Server acknowledged receipt of changes. Original Msg ID (from server): ${ (receivedMessage as any).originalMessageId || 'N/A'}. ChangeIDs from server: ${receivedMessage.changeIds?.join(', ')}`);
+    // Reduced logging - uncomment below for debugging if needed
+    // console.log(`[OutgoingChangeProcessor] Server acknowledged receipt of changes. Original Msg ID (from server): ${ (receivedMessage as any).originalMessageId || 'N/A'}. ChangeIDs from server: ${receivedMessage.changeIds?.join(', ')}`);
     // The `changeIds` in `ServerReceivedMessage` are the `LocalChanges.id`s that the server received.
     // This is a direct ACK for those specific changes.
     // However, the prompt's original SyncChangeManager used originalMessageId.
@@ -598,7 +746,8 @@ export class OutgoingChangeProcessor {
     // The ServerAppliedMessage in sync-types doesn't have failedChangeIds directly.
     // It has a single `success: boolean` and `error?: string` for the whole batch.
 
-    console.log(`[OutgoingChangeProcessor] Server applied changes. Success: ${appliedMessage.success}. Applied: ${appliedLocalChangeIds.length}. Error: ${appliedMessage.error || 'None'}`);
+    // Reduced logging - uncomment below for debugging if needed
+    // console.log(`[OutgoingChangeProcessor] Server applied changes. Success: ${appliedMessage.success}. Applied: ${appliedLocalChangeIds.length}. Error: ${appliedMessage.error || 'None'}`);
 
     const successfullyAppliedLocalChangeIds: string[] = [];
     const permanentlyFailedLocalChangeIds: string[] = [];
@@ -627,7 +776,7 @@ export class OutgoingChangeProcessor {
   }
   
 private async markChangesAsProcessed(entityIds: string[], success: boolean): Promise<void> {
-    const dataSource = this.dbInitializer.getDataSource();
+    const dataSource = this.dataSource;
     if (!dataSource) {
       console.error("[OutgoingChangeProcessor]: Cannot mark changes as processed, DataSource not available.");
       return;
@@ -667,7 +816,7 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
       });
 
       // After successful transaction, update the pending count
-      const currentLocalChangesRepo = this.dbInitializer.getLocalChangesRepository();
+      const currentLocalChangesRepo = this.localChangesRepo;
       this.pendingChangesCount = await currentLocalChangesRepo.count({ where: { processedSync: 0 } });
 
       entityIds.forEach(id => {
@@ -684,7 +833,7 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
   }
   private async markLocalChangesAsProcessed(entityIdsFromServer: string[], success: boolean, reason: string): Promise<void> {
     if (entityIdsFromServer.length === 0) return;
-    if (!this.dbInitializer.isInitialized() || !this.localChangesRepo) {
+    if (!this.dataSource) {
         console.error("[OutgoingChangeProcessor] Cannot mark changes, DB not ready.");
         return;
     }
@@ -701,7 +850,8 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
                 .getMany();
 
             if (changesToUpdate.length > 0) {
-                console.log(`[OutgoingChangeProcessor] Found ${changesToUpdate.length} LocalChanges record(s) for entity ID ${entityId} to mark as processedSync=${statusToSet}`);
+                // Reduced logging - uncomment below for debugging if needed
+                // console.log(`[OutgoingChangeProcessor] Found ${changesToUpdate.length} LocalChanges record(s) for entity ID ${entityId} to mark as processedSync=${statusToSet}`);
                 for (const change of changesToUpdate) {
                     change.processedSync = statusToSet;
                     await this.localChangesRepo.save(change); // Save each updated entity
@@ -709,11 +859,25 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
                     updatedCount++;
                 }
             } else {
-                console.warn(`[OutgoingChangeProcessor] No unprocessed LocalChanges found for entity ID ${entityId} to mark as processedSync=${statusToSet}. This might be okay if changes were optimized out or already processed by another means.`);
+                // Only warn if it seems unexpected - reduce noise for normal operations
+                if (reason !== 'applied_by_server') {
+                    console.warn(`[OutgoingChangeProcessor] No unprocessed LocalChanges found for entity ID ${entityId} to mark as processedSync=${statusToSet}. This might be okay if changes were optimized out or already processed by another means.`);
+                }
             }
         }
 
-        console.log(`[OutgoingChangeProcessor] Marked ${updatedCount} LocalChanges as processedSync=${statusToSet} due to: ${reason}, based on ${entityIdsFromServer.length} entity IDs from server.`);
+        // Reduced logging - only log summary
+        if (updatedCount > 0) {
+            console.log(`[OutgoingChangeProcessor] Marked ${updatedCount} LocalChanges as processed due to: ${reason}`);
+            
+            // 🐛 FIX: Clean up sentChanges Map to prevent timeout loops for processed changes
+            for (const localChangeId of successfullyProcessedLocalChangeIds) {
+                if (this.sentChanges.has(localChangeId)) {
+                    this.sentChanges.delete(localChangeId);
+                    console.debug(`[OutgoingChangeProcessor] 🧹 Cleaned up sentChanges tracking for processed change ${localChangeId}`);
+                }
+            }
+        }
         
         if (updatedCount > 0) {
             // Recalculate pendingChangesCount more accurately after updates
@@ -739,7 +903,7 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
   }
 
   private async loadUnprocessedChanges(): Promise<void> {
-    if (!this.dbInitializer.isInitialized() || !this.localChangesRepo) {
+    if (!this.dataSource) {
       console.warn('[OutgoingChangeProcessor] Cannot load unprocessed changes, DB not ready.');
       return;
     }
@@ -805,7 +969,7 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
   }
 
   public async getPendingChanges(): Promise<LocalChanges[]> {
-    if (!this.dbInitializer.isInitialized() || !this.localChangesRepo) {
+    if (!this.dataSource) {
         console.error("[OutgoingChangeProcessor] Cannot get pending changes, DB not ready.");
         return [];
     }
@@ -816,7 +980,7 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
   }
 
   public async clearUnprocessedChanges(): Promise<void> {
-    if (!this.dbInitializer.isInitialized() || !this.localChangesRepo) {
+    if (!this.dataSource) {
         console.error("[OutgoingChangeProcessor] Cannot clear unprocessed changes, DB not ready.");
         return;
     }
@@ -833,22 +997,7 @@ private async markChangesAsProcessed(entityIds: string[], success: boolean): Pro
     }
   }
 
-  private convertKeysToSnakeCase(obj: any): any {
-    if (typeof obj !== 'object' || obj === null) {
-      return obj;
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.convertKeysToSnakeCase(item));
-    }
-    const newObj: Record<string, any> = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const snakeKey = key.replace(/([A-Z]+)/g, "_$1").replace(/^_/, '').toLowerCase();
-        newObj[snakeKey] = this.convertKeysToSnakeCase(obj[key]);
-      }
-    }
-    return newObj;
-  }
+
 /**
    * Handles an LSN reset event.
    * Clears internal queues and state related to outgoing changes,

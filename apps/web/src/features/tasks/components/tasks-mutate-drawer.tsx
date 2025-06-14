@@ -10,6 +10,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Sheet,
@@ -26,7 +27,9 @@ import { useState, useEffect } from 'react'
 import { useTasks } from '../context/tasks-context'
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useProjects } from '@/db/hooks'
+import { useAtomValue } from 'jotai'
+import { ProjectService } from '@/domain/project'
+import { UserService } from '@/domain/user'
 
 interface Props {
   open: boolean
@@ -34,15 +37,23 @@ interface Props {
   currentRow?: Task
 }
 
+// Simplify the schema to avoid TypeScript instantiation depth issues
 const taskFormSchema = z.object({
   title: z.string().min(1, "Title cannot be empty").max(100, "Title cannot exceed 100 characters"),
   description: z.string().max(5000, "Description cannot exceed 5000 characters").optional(),
-  status: z.nativeEnum(TaskStatus),
-  priority: z.nativeEnum(TaskPriority),
+  status: z.enum([TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED]),
+  priority: z.enum([TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH]),
   projectId: z.string().uuid("Please select a valid project"),
 });
 
-type TasksFormValues = z.infer<typeof taskFormSchema>;
+// Explicit type annotation to prevent inference issues
+type TasksFormValues = {
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  projectId: string;
+};
 
 export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
   const isUpdate = !!currentRow
@@ -51,7 +62,8 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
   
   const { createTask, updateTask } = useTasks()
   
-  const { projects: availableProjects, isLoading: isLoadingProjects } = useProjects();
+  // Use the new domain-based hooks
+  const { data: availableProjects, isLoading: isLoadingProjects } = ProjectService.hooks.useAllProjects()
 
   const form = useForm<TasksFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -114,10 +126,10 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
     }
   }
 
-  const projectOptions = availableProjects?.map(project => ({ 
+  const projectOptions = (availableProjects || []).map((project: Project) => ({ 
     label: project.name,
     value: project.id 
-  })) || [];
+  }));
 
   return (
     <Sheet
@@ -172,6 +184,24 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
                     items={projectOptions}
                     disabled={isLoadingProjects}
                   />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='description'
+              render={({ field }) => (
+                <FormItem className='space-y-1'>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      {...field} 
+                      placeholder='Enter a description' 
+                      className="min-h-[100px]"
+                      value={field.value || ''}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

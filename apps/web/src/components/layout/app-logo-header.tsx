@@ -25,8 +25,8 @@ interface AppLogoHeaderProps {
 }
 
 export function AppLogoHeader({ isCollapsed }: AppLogoHeaderProps) {
-  // Log the state to validate our changes
-  console.log('AppLogoHeader isCollapsed:', isCollapsed)
+  // Removed excessive logging - uncomment below for debugging if needed
+  // console.log('AppLogoHeader isCollapsed:', isCollapsed)
   
   return (
     <div className="flex items-center p-2" style={{ width: 'min-content' }}>

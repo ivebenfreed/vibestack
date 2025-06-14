@@ -5,6 +5,54 @@
  */
 
 import { getDatabase, clearDatabaseStorage, Results } from './db';
+import { CLIENT_DOMAIN_TABLES, CLIENT_DOMAIN_TABLE_HIERARCHY, CLIENT_JUNCTION_TABLES } from '@repo/dataforge/client-entities';
+
+/**
+ * Entity configuration for database operations
+ * This centralizes entity definitions and can be easily extended
+ */
+const ENTITY_CONFIG = {
+  // Core entities from centralized dataforge configuration (without quotes)
+  get entities() {
+    return CLIENT_DOMAIN_TABLES.map(table => table.replace(/"/g, ''));
+  },
+  
+  // System tables that should be handled separately
+  systemTables: ['sync_metadata', 'schema_version', 'client_migration_status', 'local_changes'] as const,
+  
+  // Junction/relationship tables from centralized dataforge configuration (without quotes)
+  get junctionTables() {
+    return CLIENT_JUNCTION_TABLES.map(table => table.replace(/"/g, ''));
+  },
+  
+  // Known enum types
+  enumTypes: [
+    'client_migration_status_status_enum',
+    'tasks_status_enum', 
+    'tasks_priority_enum',
+    'users_role_enum',
+    'projects_status_enum'
+  ] as const,
+  
+  // Deletion order (reverse dependency order using centralized hierarchy)
+  get deletionOrder() {
+    // Sort entities by hierarchy level (highest level first for deletion)
+    const sortedEntities = this.entities.sort((a, b) => {
+      const levelA = CLIENT_DOMAIN_TABLE_HIERARCHY[`"${a}"` as keyof typeof CLIENT_DOMAIN_TABLE_HIERARCHY] || 0;
+      const levelB = CLIENT_DOMAIN_TABLE_HIERARCHY[`"${b}"` as keyof typeof CLIENT_DOMAIN_TABLE_HIERARCHY] || 0;
+      return levelB - levelA; // Sort descending (highest level first)
+    });
+    
+    return [...this.junctionTables, ...sortedEntities, ...this.systemTables];
+  },
+  
+  // All known tables
+  get allTables() {
+    return [...this.entities, ...this.systemTables, ...this.junctionTables];
+  }
+} as const;
+
+type EntityName = string;
 
 /**
  * Reset the database by clearing all data
@@ -27,34 +75,32 @@ export async function resetDatabase(): Promise<boolean> {
 export const resetDB = resetDatabase;
 
 /**
- * Get database statistics
+ * Get database statistics for all configured entities
  */
 export async function getDatabaseStats(): Promise<Record<string, number>> {
   try {
     const db = await getDatabase();
     
-    // Get table counts
-    const userCount = await getTableCount(db, 'users');
-    const projectCount = await getTableCount(db, 'projects');
-    const taskCount = await getTableCount(db, 'tasks');
-    const commentCount = await getTableCount(db, 'comments');
+    // Get table counts for all entities
+    const stats: Record<string, number> = {};
+    let total = 0;
     
-    return {
-      users: userCount,
-      projects: projectCount,
-      tasks: taskCount,
-      comments: commentCount,
-      total: userCount + projectCount + taskCount + commentCount
-    };
+    for (const entityName of ENTITY_CONFIG.entities) {
+      const count = await getTableCount(db, entityName);
+      stats[entityName] = count;
+      total += count;
+    }
+    
+    stats.total = total;
+    return stats;
   } catch (error) {
     console.error('Error getting database stats:', error);
-    return {
-      users: 0,
-      projects: 0,
-      tasks: 0,
-      comments: 0,
-      total: 0
-    };
+    // Return zero stats for all entities
+    const emptyStats: Record<string, number> = { total: 0 };
+    for (const entityName of ENTITY_CONFIG.entities) {
+      emptyStats[entityName] = 0;
+    }
+    return emptyStats;
   }
 }
 
@@ -109,20 +155,6 @@ export async function clearAllData(): Promise<boolean> {
     
     console.log('All data cleared successfully through complete storage reset');
     return success;
-    
-    /* Option 2: Keep table structures but delete all rows (moved to clearAllDataKeepSchema)
-    const db = await getDatabase();
-    
-    // Delete all data from tables in reverse order of relationships
-    await db.query('DELETE FROM comments');
-    await db.query('DELETE FROM tasks');
-    await db.query('DELETE FROM projects');
-    await db.query('DELETE FROM users');
-    await db.query('DELETE FROM sync_metadata');
-    
-    console.log('All data cleared successfully');
-    return true;
-    */
   } catch (error) {
     console.error('Error clearing data:', error);
     return false;
@@ -138,17 +170,18 @@ export async function clearAllDataKeepSchema(): Promise<boolean> {
     console.log('Clearing all data but keeping schema...');
     const db = await getDatabase();
     
-    // Delete all data from tables in reverse order of relationships
-    await db.query('DELETE FROM comments');
-    await db.query('DELETE FROM tasks');
-    await db.query('DELETE FROM projects');
-    await db.query('DELETE FROM users');
-    await db.query('DELETE FROM sync_metadata');
+    // Delete all data from tables in proper deletion order
+    for (const tableName of ENTITY_CONFIG.deletionOrder) {
+      try {
+        await db.query(`DELETE FROM ${tableName}`);
+        console.log(`Cleared data from ${tableName}`);
+      } catch (error) {
+        console.warn(`Warning: Could not clear ${tableName}:`, error);
+      }
+    }
     
     // Force commit changes to IndexedDB to avoid sleep-related issues
     try {
-      // This is an attempt to ensure changes are persisted, may not be
-      // fully effective but worth trying
       await db.query('COMMIT;');
     } catch (commitError) {
       console.warn('Explicit commit failed (this may be normal):', commitError);
@@ -163,6 +196,55 @@ export async function clearAllDataKeepSchema(): Promise<boolean> {
 }
 
 /**
+ * Clear only domain data tables, preserving system tables and sync metadata
+ * This is the preferred method for integrity resets to maintain sync state
+ */
+export async function clearDomainDataOnly(): Promise<boolean> {
+  try {
+    console.log('Clearing domain data only (preserving system tables)...');
+    const db = await getDatabase();
+    
+    // Get domain deletion order (entities + junction tables, but NOT system tables)
+    const domainTables = [...ENTITY_CONFIG.junctionTables, ...ENTITY_CONFIG.entities];
+    
+    // Sort domain entities by hierarchy for proper deletion order
+    const sortedDomainEntities = ENTITY_CONFIG.entities.sort((a, b) => {
+      const levelA = CLIENT_DOMAIN_TABLE_HIERARCHY[`"${a}"` as keyof typeof CLIENT_DOMAIN_TABLE_HIERARCHY] || 0;
+      const levelB = CLIENT_DOMAIN_TABLE_HIERARCHY[`"${b}"` as keyof typeof CLIENT_DOMAIN_TABLE_HIERARCHY] || 0;
+      return levelB - levelA; // Sort descending (highest level first)
+    });
+    
+    const domainDeletionOrder = [...ENTITY_CONFIG.junctionTables, ...sortedDomainEntities];
+    
+    console.log('Domain tables to clear:', domainDeletionOrder);
+    console.log('System tables preserved:', ENTITY_CONFIG.systemTables);
+    
+    // Delete data from domain tables only
+    for (const tableName of domainDeletionOrder) {
+      try {
+        await db.query(`DELETE FROM ${tableName}`);
+        console.log(`Cleared domain data from ${tableName}`);
+      } catch (error) {
+        console.warn(`Warning: Could not clear domain table ${tableName}:`, error);
+      }
+    }
+    
+    // Force commit changes to IndexedDB to avoid sleep-related issues
+    try {
+      await db.query('COMMIT;');
+    } catch (commitError) {
+      console.warn('Explicit commit failed (this may be normal):', commitError);
+    }
+    
+    console.log('Domain data cleared successfully while preserving system tables');
+    return true;
+  } catch (error) {
+    console.error('Error clearing domain data:', error);
+    return false;
+  }
+}
+
+/**
  * Drop all tables and types for a clean database state
  */
 export async function dropAllTables(): Promise<boolean> {
@@ -170,7 +252,7 @@ export async function dropAllTables(): Promise<boolean> {
     console.log('Dropping all tables and types with CASCADE...');
     const db = await getDatabase();
 
-    // First, try to get all tables from the database
+    // First, try to get all tables from the database dynamically
     try {
       console.log('Fetching all existing tables...');
       const tableResult = await db.query<{tablename: string}>(`
@@ -192,10 +274,10 @@ export async function dropAllTables(): Promise<boolean> {
         }
       }
     } catch (tableError) {
-      console.warn('Error fetching tables:', tableError);
+      console.warn('Error fetching tables dynamically:', tableError);
     }
 
-    // Then, try to get all custom types from the database
+    // Then, try to get all custom types from the database dynamically
     try {
       console.log('Fetching all existing enum types...');
       const typeResult = await db.query<{typname: string}>(`
@@ -218,26 +300,12 @@ export async function dropAllTables(): Promise<boolean> {
         }
       }
     } catch (typeError) {
-      console.warn('Error fetching enum types:', typeError);
+      console.warn('Error fetching enum types dynamically:', typeError);
     }
 
-    // As a fallback, manually drop known tables in reverse order of dependencies
-    const knownTables = [
-      'comments',
-      'task_dependencies',
-      'tasks',
-      'project_members',  // Added project_members table that was missing before
-      'projects',
-      'users',
-      'sync_metadata',
-      'schema_version',
-      'client_migration_status',
-      'local_changes',
-      'items'
-    ];
-
+    // As a fallback, manually drop known tables using configuration
     console.log('Dropping known tables as fallback...');
-    for (const table of knownTables) {
+    for (const table of ENTITY_CONFIG.allTables) {
       try {
         await db.query(`DROP TABLE IF EXISTS "${table}" CASCADE`);
       } catch (error) {
@@ -245,17 +313,9 @@ export async function dropAllTables(): Promise<boolean> {
       }
     }
 
-    // As a fallback, manually drop known types
-    const knownTypes = [
-      'client_migration_status_status_enum',
-      'tasks_status_enum',
-      'tasks_priority_enum',
-      'users_role_enum',
-      'projects_status_enum'
-    ];
-
+    // As a fallback, manually drop known types using configuration
     console.log('Dropping known enum types as fallback...');
-    for (const type of knownTypes) {
+    for (const type of ENTITY_CONFIG.enumTypes) {
       try {
         await db.query(`DROP TYPE IF EXISTS "public"."${type}" CASCADE`);
       } catch (error) {
@@ -301,4 +361,18 @@ export async function resetEntireDatabase(): Promise<boolean> {
     console.error('Error resetting entire database:', error);
     return false;
   }
+}
+
+/**
+ * Get the list of configured entity names
+ */
+export function getConfiguredEntities(): readonly EntityName[] {
+  return ENTITY_CONFIG.entities;
+}
+
+/**
+ * Check if a table name is a configured entity
+ */
+export function isConfiguredEntity(tableName: string): tableName is EntityName {
+  return ENTITY_CONFIG.entities.includes(tableName as EntityName);
 } 

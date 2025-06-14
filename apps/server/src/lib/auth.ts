@@ -5,6 +5,7 @@ import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
 import type { Dialect } from 'kysely';
 import { Kysely, PostgresDialect } from 'kysely';
+import { dbLogger } from '../middleware/logger';
 
 // Type for Hono context including Auth variables
 export type AuthType = {
@@ -62,18 +63,22 @@ export function initializeAuth(env: Env) {
     dialect: neonDialect as any,
     log: (event) => {
       if (event.level === 'query') {
-        console.log('[Kysely Query]:', event.query.sql, JSON.stringify(event.query.parameters));
-        console.log('[Kysely Query Duration]:', event.queryDurationMillis, 'ms');
+        dbLogger.debug('Kysely Query', {
+          sql: event.query.sql,
+          parameters: event.query.parameters,
+          duration: event.queryDurationMillis
+        }, 'kysely');
       } else if (event.level === 'error') {
-        console.error('[Kysely Error]:', event.error);
+        dbLogger.error('Kysely Error', event.error, undefined, 'kysely');
       }
     }
   });
 
-  console.log("[AUTH Runtime Init] Initializing Better Auth with:");
-  console.log(`  DATABASE_URL (type): ${typeof env.DATABASE_URL}`); 
-  console.log(`  BETTER_AUTH_SECRET (type): ${typeof env.BETTER_AUTH_SECRET}`);
-  console.log(`  TRUSTED_ORIGINS: ${['https://127.0.0.1:5173', 'http://127.0.0.1:5173', 'http://localhost:5173']}`);
+  dbLogger.debug("Initializing Better Auth", {
+    databaseUrlType: typeof env.DATABASE_URL,
+    secretType: typeof env.BETTER_AUTH_SECRET,
+    trustedOrigins: ['https://127.0.0.1:5173', 'http://127.0.0.1:5173', 'http://localhost:5173']
+  }, 'auth');
 
   const runtimeAuthConfig = {
     // Pass the pre-configured Kysely instance and type
@@ -97,8 +102,12 @@ export function initializeAuth(env: Env) {
       user: {
         create: {
           before: async (userData: any, hookContext: any) => {
-            console.log('[Auth Hook - user.create.before] Received userData:', JSON.stringify(userData, null, 2)); // Added log
-            console.log('User data in hook after type change:', JSON.stringify(userData));
+            dbLogger.debug('Auth Hook - user.create.before', {
+              userData: JSON.stringify(userData, null, 2)
+            }, 'auth');
+            dbLogger.debug('User data in hook after type change', {
+              userData: JSON.stringify(userData)
+            }, 'auth');
             // Simply pass through userData, respecting any role set by calling code
             // If userData.role is set, it will be used
             // If userData.role is not set, the DB default ('member') will apply
@@ -200,15 +209,13 @@ export function initializeAuth(env: Env) {
   };
 
   // Log the core model names being used
-  console.log('[AUTH Runtime Init] Using core model names:', 
-    JSON.stringify({ 
-      user: runtimeAuthConfig.user.modelName,
-      session: runtimeAuthConfig.session.modelName,
-      account: runtimeAuthConfig.account.modelName,
-      verification: runtimeAuthConfig.verification.modelName
-      // jwks: runtimeAuthConfig.jwks.modelName // Removed jwks from log
-    })
-  );
+  dbLogger.debug('Better Auth core model configuration', { 
+    user: runtimeAuthConfig.user.modelName,
+    session: runtimeAuthConfig.session.modelName,
+    account: runtimeAuthConfig.account.modelName,
+    verification: runtimeAuthConfig.verification.modelName
+    // jwks: runtimeAuthConfig.jwks.modelName // Removed jwks from log
+  }, 'auth');
 
   // Return a fully configured instance for runtime use
   return betterAuth(runtimeAuthConfig);

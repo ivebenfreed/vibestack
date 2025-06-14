@@ -12,20 +12,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LogOut, User } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
-import { useCurrentUser } from '@/hooks/use-current-user'
+import { useAuth } from '@/hooks/useSimpleAuth'
 import { useSignOut } from '@/hooks/use-sign-out'
 
 export function ProfileDropdown() {
-  const { user: authUser } = useAuthStore()
-  const { data: userProfile, loading } = useCurrentUser()
+  const { user, isLoading, displayName } = useAuth()
   const { signOut } = useSignOut()
 
-  // Combine user data from the database and auth store
-  const user = {
-    name: userProfile?.name || authUser?.email?.split('@')[0] || 'User',
-    email: userProfile?.email || authUser?.email || '',
-    image: userProfile?.image || null
+  // Use the auth user data directly - single source of truth
+  const userInfo = {
+    name: user?.name || displayName || 'User',
+    email: user?.email || '',
+    image: user?.image || null
   }
 
   return (
@@ -33,14 +31,14 @@ export function ProfileDropdown() {
       <DropdownMenuTrigger asChild>
         <Button variant='outline' size='icon' className='relative h-8 w-8 rounded-full'>
           <Avatar className='h-8 w-8'>
-            {user.image ? (
-              <AvatarImage src={user.image} alt={user.name} />
+            {userInfo.image ? (
+              <AvatarImage src={userInfo.image} alt={userInfo.name} />
             ) : (
               <AvatarFallback>
-                {loading ? (
+                {isLoading ? (
                   <span className="animate-pulse">...</span>
                 ) : (
-                  user.name?.charAt(0).toUpperCase() || <User className="h-4 w-4" />
+                  userInfo.name?.charAt(0).toUpperCase() || <User className="h-4 w-4" />
                 )}
               </AvatarFallback>
             )}
@@ -50,9 +48,9 @@ export function ProfileDropdown() {
       <DropdownMenuContent className='w-56' align='end' forceMount>
         <DropdownMenuLabel className='font-normal'>
           <div className='flex flex-col space-y-1'>
-            <p className='text-sm font-medium leading-none'>{loading ? '...' : user.name}</p>
+            <p className='text-sm font-medium leading-none'>{isLoading ? '...' : userInfo.name}</p>
             <p className='text-xs leading-none text-muted-foreground'>
-              {loading ? '...' : user.email}
+              {isLoading ? '...' : userInfo.email}
             </p>
           </div>
         </DropdownMenuLabel>

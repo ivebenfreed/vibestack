@@ -16,6 +16,62 @@ export const authClient = createAuthClient({
     'Content-Type': 'application/json',
   },
   mode: 'cors',
+  fetchOptions: {
+    // Add timeout for requests
+    timeout: 10000, // 10 seconds
+    
+    // Add retry logic for network failures and server errors
+    // Since we have persistent auth storage, we can be aggressive with retries
+    retry: {
+      type: "exponential",
+      attempts: import.meta.env.DEV ? 3 : 10, // More retries in production
+      baseDelay: 1000, // 1 second base delay
+      maxDelay: import.meta.env.DEV ? 5000 : 60000, // Longer max delay in production
+      shouldRetry: (response: Response | null) => {
+        // Always retry on network failures (response is null)
+        if (response === null) return true;
+        
+        // Retry on 5xx server errors
+        if (response.status >= 500) return true;
+        
+        // Don't retry on 4xx client errors (auth failures, validation errors, etc.)
+        return false;
+      }
+    },
+    
+    // Better error handling and logging
+    onError: (context) => {
+      const { error, response } = context;
+      
+      // Log the error details for debugging
+      console.log("[AUTH] Request failed:", { 
+        error: error?.message, 
+        status: response?.status,
+        url: context.request?.url 
+      });
+      
+      // Don't log expected auth errors as warnings in dev mode
+      if (import.meta.env.DEV && response?.status && [401, 403].includes(response.status)) {
+        return;
+      }
+      
+      // Log network failures and server errors for debugging
+      if (!response || response.status >= 500) {
+        console.warn("[AUTH] Network/server error - will retry:", error?.message || `HTTP ${response?.status}`);
+      }
+    },
+    
+    // Custom fetch implementation to handle network errors for retries
+    customFetchImpl: async (input: RequestInfo | URL, init?: RequestInit) => {
+      try {
+        return await fetch(input, init);
+      } catch (error) {
+        // Convert network errors to Response.error() so Better Fetch can retry them
+        console.log("[AUTH] Network error caught, converting for retry:", error);
+        return Response.error();
+      }
+    }
+  },
   fetch: (url: string, options: RequestInit) => {
     console.log(`[AUTH] Fetch request to: ${url}`);
     console.log('[AUTH] Request options:', JSON.stringify({

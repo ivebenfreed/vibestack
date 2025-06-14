@@ -4,6 +4,7 @@ import { NeonDataSource } from './NeonDataSource';
 import type { Context } from 'hono'; // Import Hono context
 import type { Env } from '../../types/env'; // Import Env type
 import type { AppBindings } from '../../types/hono'; // Import AppBindings
+import { dbLogger } from '../../middleware/logger';
 
 // Import the global DataSource getter
 // let dataSource: DataSource | null = null;
@@ -71,9 +72,8 @@ export class NeonService {
 
     // Ensure the dataSource and its manager are initialized
     if (!this.dataSourceInstance || !this.dataSourceInstance.isInitialized || !this.dataSourceInstance.manager) {
-      // This should ideally not happen if getDataSource handles initialization correctly
-      console.error("NeonService Error: DataSource or EntityManager not available after getDataSource call.");
-      throw new Error("DataSource is not properly initialized.");
+      dbLogger.error("NeonService Error: DataSource or EntityManager not available after getDataSource call", undefined, undefined, 'neon-service');
+      throw new Error("DataSource or EntityManager not available after getDataSource call.");
     }
 
     // Return the manager from the cached instance

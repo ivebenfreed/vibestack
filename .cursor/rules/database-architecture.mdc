@@ -1,0 +1,152 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Database & Services Architecture Guide
+
+## Core Architecture Components
+
+This project uses a sophisticated multi-layered database architecture combining:
+
+- **PGlite**: Client-side PostgreSQL with live query capabilities
+- **TypeORM**: Type-safe ORM with custom PGlite integration
+- **Jotai**: Atomic state management for granular reactivity
+- **Live Queries**: 3 different strategies for real-time data sync
+- **Domain Services**: Clean separation of business logic
+
+## Key Directories and Files
+
+### Database Core
+- [apps/web/src/db/README.md](mdc:apps/web/src/db/README.md) - Complete architecture documentation
+- [apps/web/src/db/db.ts](mdc:apps/web/src/db/db.ts) - Database initialization
+- [apps/web/src/db/pglite-provider.tsx](mdc:apps/web/src/db/pglite-provider.tsx) - React context for database access
+- [apps/web/src/db/index.ts](mdc:apps/web/src/db/index.ts) - Main exports
+
+### Domain Layer
+- [apps/web/src/domain/base.ts](mdc:apps/web/src/domain/base.ts) - Base repository and service classes
+- [apps/web/src/domain/task.ts](mdc:apps/web/src/domain/task.ts) - Task domain (repository + service)
+- [apps/web/src/domain/project.ts](mdc:apps/web/src/domain/project.ts) - Project domain
+- [apps/web/src/domain/user.ts](mdc:apps/web/src/domain/user.ts) - User domain
+- [apps/web/src/domain/index.ts](mdc:apps/web/src/domain/index.ts) - Domain factory and exports
+
+### Atomic State Management
+- [apps/web/src/db/atoms/index.ts](mdc:apps/web/src/db/atoms/index.ts) - Atom exports and composition
+- [apps/web/src/db/atoms/base/entityAtom.ts](mdc:apps/web/src/db/atoms/base/entityAtom.ts) - Base entity atom patterns
+- [apps/web/src/db/atoms/entities/taskAtoms.ts](mdc:apps/web/src/db/atoms/entities/taskAtoms.ts) - Task-specific atoms
+
+### Live Query Hooks
+- [apps/web/src/db/hooks/useLiveEntity.ts](mdc:apps/web/src/db/hooks/useLiveEntity.ts) - Traditional live queries
+- [apps/web/src/db/hooks/useLiveEntityIncremental.ts](mdc:apps/web/src/db/hooks/useLiveEntityIncremental.ts) - Incremental live queries
+- [apps/web/src/db/hooks/useLiveChanges.ts](mdc:apps/web/src/db/hooks/useLiveChanges.ts) - Live changes API
+- [apps/web/src/db/hooks/useAtomicLiveQuery.ts](mdc:apps/web/src/db/hooks/useAtomicLiveQuery.ts) - Bridge: live queries → atoms
+- [apps/web/src/db/hooks/useAtomicLiveChanges.ts](mdc:apps/web/src/db/hooks/useAtomicLiveChanges.ts) - Bridge: live changes → atoms
+
+## Live Query Strategy Decision Matrix
+
+### Choose Strategy Based on Dataset Size and Use Case:
+
+**Traditional Live Query** (`useLiveEntity`)
+- **Best for**: Small datasets (<100 records), complex client operations
+- **Use when**: Rich relationship data needed, complex computations, dashboard with heavy processing
+- **Example**: Reference data, user lists, project dropdowns
+
+**Incremental Live Query** (`useLiveEntityIncremental`) 
+- **Best for**: Medium datasets (100-1000 records), balanced performance
+- **Use when**: Main data tables with complex relationships, moderate real-time needs
+- **Example**: Standard task lists, data tables with JOINs
+
+**Live Changes API** (`useLiveChanges`)
+- **Best for**: Large datasets (1000+ records), maximum efficiency
+- **Use when**: High-frequency updates, bandwidth constraints, simple CRUD operations
+- **Example**: Large task lists (5000+ records), real-time collaboration
+
+## Atoms vs Direct Database Queries
+
+### Use Atoms When:
+- Real-time collaboration (multiple users editing)
+- Frequent updates (CRUD operations)
+- Component reactivity (UI needs to react to changes)
+- Shared state (multiple components need same data)
+- Optimistic updates (immediate UI feedback)
+
+### Query Database Directly When:
+- Analytics & reporting (complex aggregations)
+- One-time data fetches (modals, forms)
+- Large data exports (streaming required)
+- Search operations (full-text, complex filters)
+- Dashboard metrics (heavy computations)
+
+## Performance Guidelines
+
+### Database Optimization
+- Use single query updates (avoid SELECT then UPDATE)
+- Implement batch operations for bulk changes
+- Leverage database engines for complex aggregations
+- Use streaming for large exports
+
+### Application Optimization
+- Choose appropriate live query strategy for dataset size
+- Use atoms for shared, frequently-updated state
+- Use direct queries for one-time operations
+- Implement proper error boundaries
+- Monitor performance metrics
+
+## Code Patterns
+
+### Domain Service Pattern
+```typescript
+// Follow pattern in apps/web/src/domain/task.ts
+export class TaskService extends BaseService<Task> {
+  async createTask(data: CreateTaskData): Promise<Task> {
+    // Business logic + automatic sync tracking
+  }
+}
+```
+
+### Atomic State Pattern
+```typescript
+// Follow pattern in apps/web/src/db/atoms/entities/taskAtoms.ts
+const allTasksDataAtom = atom<Task[]>([]);
+const taskStatsAtom = atom((get) => {
+  const tasks = get(allTasksDataAtom);
+  return calculateTaskStats(tasks);
+});
+```
+
+### Live Query Bridge Pattern
+```typescript
+// Use atomic bridges for optimal performance
+const { performance } = useAtomicLiveChanges(); // For large datasets
+const { atoms } = useAtomicLiveQuery(); // For medium datasets
+```
+
+## Common Implementation Examples
+
+### Basic Task Management (Recommended Pattern)
+See [apps/web/src/features/tasks/components/atomic-tasks-data-table.tsx](mdc:apps/web/src/features/tasks/components/atomic-tasks-data-table.tsx)
+
+### Large Dataset Optimization  
+See [apps/web/src/features/tasks/components/atomic-live-changes-data-table.tsx](mdc:apps/web/src/features/tasks/components/atomic-live-changes-data-table.tsx)
+
+### Analytics Dashboard Pattern
+Use direct database queries for heavy analytics, atoms for live updates
+
+### Search Implementation
+Use database-optimized full-text search with React Query caching
+
+## Troubleshooting
+
+- Check console logs for performance metrics
+- Monitor WebSocket connection status in sync system
+- Verify anti-echo protection is working
+- Use database query logs for optimization
+- Test with large datasets early in development
+
+## Migration Path
+
+1. **Start**: Traditional approach for prototyping
+2. **Production**: Migrate to incremental for balanced performance
+3. **Scale**: Use live changes for large dataset optimization
+4. **Complex UIs**: Add atomic state for granular reactivity
+5. **Analytics**: Implement with direct database queries

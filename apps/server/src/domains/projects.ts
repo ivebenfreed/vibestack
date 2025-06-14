@@ -67,44 +67,79 @@ export class ProjectRepository extends BaseServerRepository<Project> {
   }
 
   /**
-   * Update project members using TypeORM query builders
+   * Update project members using differential updates (only change what's different)
+   * Much more efficient than DELETE ALL + INSERT ALL
    */
-  async updateMembers(projectId: string, userIds: string[]): Promise<User[]> {
-    // Check if project exists
-    const project = await this.findById(projectId);
-    if (!project) {
-      throw new Error(`Project with ID ${projectId} not found`);
+  async updateMembers(projectId: string, newUserIds: string[], skipValidation = false): Promise<User[]> {
+    // Skip project existence check if already validated upstream
+    if (!skipValidation) {
+      const project = await this.findById(projectId);
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
     }
 
-    // Validate that all users exist
-    if (userIds.length > 0) {
+    // Validate that all new users exist (always needed for data integrity)
+    if (newUserIds.length > 0) {
       const existingUsers = await this.neonService.find(User, {
-        id: In(userIds)
+        id: In(newUserIds)
       } as FindOptionsWhere<User>);
       
-      if (existingUsers.length !== userIds.length) {
+      if (existingUsers.length !== newUserIds.length) {
         throw new Error('One or more user IDs are invalid');
       }
     }
 
-    // Remove all existing members using TypeORM query builder
-    const deleteBuilder = await this.neonService.createQueryBuilder(User, 'pm');
-    await deleteBuilder
-      .delete()
-      .from('project_members')
-      .where('project_id = :projectId', { projectId })
-      .execute();
+    // Get current members to calculate differences
+    const currentMembers = await this.getMembers(projectId);
+    const currentUserIds = new Set(currentMembers.map(m => m.id));
+    const newUserIdSet = new Set(newUserIds);
     
-    // Add new members using TypeORM query builder
-    if (userIds.length > 0) {
-      const insertBuilder = await this.neonService.createQueryBuilder(User, 'pm');
-      const memberValues = userIds.map(userId => ({ project_id: projectId, user_id: userId }));
+    // Calculate what needs to be added and removed
+    const toAdd = newUserIds.filter(id => !currentUserIds.has(id));
+    const toRemove = Array.from(currentUserIds).filter(id => !newUserIdSet.has(id));
+    
+    // Early return if no changes needed
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      console.log(`[ProjectRepository] No member changes needed for project ${projectId}`);
+      return currentMembers;
+    }
+
+    console.log(`[ProjectRepository] Updating members for project ${projectId}:`, {
+      currentCount: currentMembers.length,
+      newCount: newUserIds.length,
+      toAdd: toAdd.length,
+      toRemove: toRemove.length,
+      skipValidation
+    });
+    
+    // Apply only the differences
+    if (toRemove.length > 0) {
+      // Use proper array parameter syntax for Neon driver
+      const placeholders = toRemove.map((_, index) => `$${index + 2}`).join(', ');
+      const deleteQuery = `DELETE FROM project_members WHERE project_id = $1 AND user_id IN (${placeholders})`;
       
-      await insertBuilder
-        .insert()
-        .into('project_members')
-        .values(memberValues)
-        .execute();
+      await this.neonService.query(deleteQuery, [projectId, ...toRemove]);
+    }
+    
+    if (toAdd.length > 0) {
+      // Use bulk insert with proper parameter handling
+      if (toAdd.length === 1) {
+        const insertQuery = `INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`;
+        await this.neonService.query(insertQuery, [projectId, toAdd[0]]);
+      } else {
+        // Multiple inserts - each row needs (project_id, user_id)
+        const valuesClauses = toAdd.map((_, index) => {
+          const offset = index * 2;
+          return `($${offset + 1}, $${offset + 2})`;
+        }).join(', ');
+        
+        const insertQuery = `INSERT INTO project_members (project_id, user_id) VALUES ${valuesClauses} ON CONFLICT DO NOTHING`;
+        const params: string[] = [];
+        toAdd.forEach(userId => params.push(projectId, userId));
+        
+        await this.neonService.query(insertQuery, params);
+      }
     }
 
     // Return the updated members

@@ -6,10 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  useSyncVisualizationState,
-  type SyncVisualizationState,
-} from '@/features/sync/hooks/useSyncVisualizationState';
+import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -18,105 +15,65 @@ interface SyncStatusIconProps {
 }
 
 const SyncStatusIcon: React.FC<SyncStatusIconProps> = ({ className }) => {
+  const { isOnline } = useOrchestrator();
+  const syncMachineState = useSyncMachine();
+  
+  // Destructure from the sync machine state
   const {
-    currentConnectionState,
-    errorInfo,
-    outgoingStatus,
-    incomingStatus,
-    currentLsn,
-  } = useSyncVisualizationState();
+    syncPhase,
+    syncProgress,
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    currentLSN,
+    statusText
+  } = syncMachineState;
+
+  // Debug: Log sync state (remove in production)
+  console.log('[SyncStatusIcon] State:', {
+    isOnline,
+    syncPhase,
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    statusText
+  });
 
   const [pulseKey, setPulseKey] = useState(0);
 
+  // Pulse when sync phase changes
   useEffect(() => {
-    if (outgoingStatus === 'sending' || incomingStatus === 'receiving') {
+    if (isInitialSync || isCatchupSync) {
       setPulseKey((prevKey) => prevKey + 1);
     }
-  }, [outgoingStatus, incomingStatus]);
+  }, [isInitialSync, isCatchupSync]);
 
   const getIconColor = (): string => {
-    switch (currentConnectionState) {
-      case 'live':
-        return 'text-green-500';
-      case 'disconnected':
-        return 'text-red-500';
-      case 'connecting':
-      case 'initial':
-      case 'catchup':
-        return 'text-yellow-400';
-      case 'error':
-        return 'text-orange-500';
-      default:
-        return 'text-gray-500';
-    }
+    if (!isOnline) return 'text-red-500';
+    if (isError) return 'text-orange-500';
+    if (isLiveSync) return 'text-green-500';
+    if (isInitialSync || isCatchupSync) return 'text-yellow-400';
+    return 'text-gray-500';
   };
 
   const getTooltipText = (): string => {
-    if (errorInfo) {
-      return `Error: ${errorInfo}`;
-    }
-
-    if (currentConnectionState === 'live') {
-      let liveStatus = `Status: Connected (Live) | LSN: ${currentLsn ?? 'N/A'}`;
-      const activeSyncs: string[] = [];
-      if (outgoingStatus === 'sending') activeSyncs.push("Sending changes");
-      if (incomingStatus === 'receiving') activeSyncs.push("Receiving changes");
-
-      if (activeSyncs.length > 0) {
-        liveStatus += ` | Syncing: ${activeSyncs.join(' & ')}`;
-      }
-      return liveStatus;
-    }
-
-    if (currentConnectionState === 'connecting') {
-      return 'Status: Connecting...';
-    }
-    if (currentConnectionState === 'initial') {
-      return 'Status: Initializing sync...';
-    }
-    if (currentConnectionState === 'catchup') {
-      return 'Status: Catching up...';
-    }
-
-    if (outgoingStatus === 'sending' && incomingStatus === 'receiving') {
-      return 'Syncing: Sending & Receiving changes...';
-    }
-    if (outgoingStatus === 'sending') {
-      return 'Syncing: Sending changes...';
-    }
-    if (incomingStatus === 'receiving') {
-      return 'Syncing: Receiving changes...';
-    }
-
-    if (currentConnectionState === 'disconnected') {
-      return 'Status: Disconnected';
-    }
-
-    if (currentConnectionState) {
-        return `Status: ${currentConnectionState}`;
-    }
-
-    return 'Status: Unknown';
+    const baseStatus = !isOnline ? 'Status: Disconnected' :
+                      isError ? 'Status: Error' :
+                      statusText ? `Status: ${statusText}` :
+                      'Status: Connecting...';
+    
+    return `${baseStatus}\nLSN: ${currentLSN || '0/0'}`;
   };
 
   const getAriaLabel = (): string => {
-    if (errorInfo) {
-      return 'Sync status: Error';
-    }
-    switch (currentConnectionState) {
-      case 'live':
-        return 'Sync status: Connected (Live)';
-      case 'connecting':
-        return 'Sync status: Connecting';
-      case 'initial':
-        return 'Sync status: Initializing';
-      case 'catchup':
-        return 'Sync status: Catching up';
-      case 'disconnected':
-        return 'Sync status: Disconnected';
-      default:
-        return `Sync status: ${currentConnectionState || 'Unknown'}`;
-    }
+    if (!isOnline) return 'Sync status: Disconnected';
+    if (isError) return 'Sync status: Error';
+    if (isLiveSync) return 'Sync status: Connected (Live)';
+    if (isInitialSync) return 'Sync status: Initial sync';
+    if (isCatchupSync) return 'Sync status: Catchup sync';
+    return 'Sync status: Connecting';
   };
 
   return (

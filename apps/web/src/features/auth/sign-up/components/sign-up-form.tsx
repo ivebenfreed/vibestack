@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,7 +19,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { authClient } from '@/lib/auth'
-import { useAuthStore } from '@/stores/authStore'
 
 type SignUpFormProps = HTMLAttributes<HTMLFormElement>
 
@@ -46,8 +46,11 @@ const formSchema = z
 
 export function SignUpForm({ className, ...props }: SignUpFormProps) {
   const [isLoading, setIsLoading] = useState(false)
-  const setAuthenticated = useAuthStore((state) => state.setAuthenticated)
   const navigate = useNavigate({ from: '/sign-up' })
+  
+  // Get redirect search param from route
+  const searchParams = new URLSearchParams(window.location.search)
+  const redirectTo = searchParams.get('redirect') || '/'
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -72,11 +75,13 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
       console.log("[AUTH] Sign Up Result:", result);
 
       if ('data' in result && result.data?.user) {
-        setAuthenticated({ id: result.data.user.id, email: result.data.user.email, role: result.data.user.role });
+        console.log("[AUTH] Sign-up successful, redirecting to:", redirectTo);
         toast.success("Account created successfully!");
-        navigate({ to: '/', replace: true });
+        
+        // Smart redirect back to where user wanted to go
+        navigate({ to: redirectTo, replace: true });
       } else if ('error' in result) {
-        console.error("[AUTH] Sign Up Auth Error:", result.error);
+        console.error("[AUTH] Sign Up Error:", result.error);
         const errorMessage = result.error?.message || "Sign up failed. Please try again.";
         toast.error(errorMessage);
       } else {
@@ -152,6 +157,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
           )}
         />
         <Button className='mt-2' disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Create Account
         </Button>
 

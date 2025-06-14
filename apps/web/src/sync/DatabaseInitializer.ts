@@ -1,3 +1,18 @@
+/**
+ * @deprecated This DatabaseInitializer is deprecated in favor of shared datasource approach.
+ * 
+ * ❌ OLD: SyncManager uses DatabaseInitializer to create its own datasource
+ * ✅ NEW: SyncManager receives shared datasource from PGliteProvider context
+ * 
+ * The new approach provides:
+ * - Single datasource instance shared across sync and domain layers
+ * - Better integration with domain services and repositories
+ * - Consistent transaction handling and connection pooling
+ * - Elimination of race conditions between multiple datasource instances
+ * 
+ * This file will be removed in a future version.
+ */
+
 import { getNewPGliteDataSource, NewPGliteDataSource, NewPGliteDataSourceOptions } from '../db/newtypeorm/NewDataSource';
 import { LocalChanges } from '@repo/dataforge/client-entities';
 import { Repository } from 'typeorm';

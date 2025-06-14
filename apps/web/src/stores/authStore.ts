@@ -1,129 +1,115 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-// No longer need js-cookie
-// import Cookies from 'js-cookie';
-
-// Define a simpler state focused on auth status and user data
+// Enhanced UserInfo interface for the simplified system
 export interface UserInfo {
   id: string;
-  email?: string;
-  role?: string; // <--- ADD THIS
-  // Add other relevant fields from your User model
+  email: string;
+  name?: string;
+  role: 'admin' | 'member' | 'viewer' | 'super_admin';
+  emailVerified: boolean;
+  image?: string | null;
 }
 
-interface AuthState {
-  isAuthenticated: boolean;
-  user: UserInfo | null;
-  isLoading: boolean; // Tracks initial auth status check
-  sessionExpiresAt: string | null; // Stores session expiration date
-  lastOnlineCheck: string | null; // Stores when we last successfully checked with the server
+// Minimal auth store - only app preferences and offline support
+interface AuthStoreState {
+  // App preferences (persistent)
+  preferences: {
+    theme: 'light' | 'dark';
+    language: string;
+    sidebarCollapsed: boolean;
+  };
+  
+  // User caching for offline support
+  lastKnownUser: UserInfo | null;
+  isOfflineMode: boolean;
+  
+  // Simple actions
+  updatePreferences: (prefs: Partial<AuthStoreState['preferences']>) => void;
+  cacheUser: (user: UserInfo) => void;
+  setOfflineMode: (offline: boolean) => void;
+  clearCache: () => void;
+  
+  // Computed getters
+  getDisplayName: () => string;
+  getUserInitials: () => string;
 }
 
-interface AuthActions {
-  setAuthenticated: (user: UserInfo, expiresAt?: string | null) => void;
-  setUnauthenticated: () => void;
-  setLoading: (loading: boolean) => void;
-  ensureAuthInitialized: () => Promise<void>;
-  updateSessionExpiry: (expiresAt: string) => void;
-  isSessionExpired: () => boolean;
-}
-
-export const useAuthStore = create<AuthState & AuthActions>()(
+export const useAuthStore = create<AuthStoreState>()(
   persist(
     (set, get) => ({
-      // Initial state assumes we need to check with the backend
-      isAuthenticated: false,
-      user: null,
-      isLoading: true, // Start loading until initial check completes
-      sessionExpiresAt: null,
-      lastOnlineCheck: null,
-
-      setAuthenticated: (user, expiresAt = null) => {
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - authStore.setAuthenticated: User: ${JSON.stringify(user)}, expiresAt: ${expiresAt}`);
-        console.log("[AUTH] Setting state to AUTHENTICATED. User:", user);
+      // Default app preferences
+      preferences: {
+        theme: 'light',
+        language: 'en',
+        sidebarCollapsed: false,
+      },
+      
+      // User caching
+      lastKnownUser: null,
+      isOfflineMode: false,
+      
+      // Actions
+      updatePreferences: (prefs) => {
+        set((state) => ({
+          preferences: { ...state.preferences, ...prefs }
+        }));
+      },
+      
+      cacheUser: (user) => {
+        console.log('[AUTH_STORE] Caching user for offline access:', user.id);
         set({ 
-          isAuthenticated: true, 
-          user: user, 
-          isLoading: false,
-          sessionExpiresAt: expiresAt,
-          lastOnlineCheck: new Date().toISOString()
+          lastKnownUser: user,
+          isOfflineMode: false // Clear offline mode when we have fresh user data
         });
       },
-
-      setUnauthenticated: () => {
-        console.log("[AUTH] Setting state to UNAUTHENTICATED.");
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - authStore.setUnauthenticated: Called`);
-console.log(`[LAG_INVESTIGATION] ${new Date().toISOString()} - authStore.setUnauthenticated: Called`);
-        set({ 
-          isAuthenticated: false, 
-          user: null, 
-          isLoading: false,
-          sessionExpiresAt: null 
-        });
-      },
-
-      setLoading: (loading) => {
-        // console.log(`[AUTH] Setting loading state: ${loading}`);
-        set({ isLoading: loading });
-      },
-
-      updateSessionExpiry: (expiresAt) => {
-        console.log(`[AUTH] Updating session expiry to: ${expiresAt}`);
-        set({ 
-          sessionExpiresAt: expiresAt,
-          lastOnlineCheck: new Date().toISOString()
-        });
-      },
-
-      isSessionExpired: () => {
-        const { sessionExpiresAt } = get();
-        
-        if (!sessionExpiresAt) {
-          return true; // If no expiry date is set, consider it expired
-        }
-        
-        try {
-          const expiryDate = new Date(sessionExpiresAt);
-          const now = new Date();
-          return now >= expiryDate;
-        } catch (error) {
-          console.error("[AUTH] Error checking session expiry:", error);
-          return true; // On error, consider session expired
+      
+      setOfflineMode: (offline) => {
+        if (offline !== get().isOfflineMode) {
+          console.log('[AUTH_STORE] Setting offline mode:', offline);
+          set({ isOfflineMode: offline });
         }
       },
-
-      // New function to ensure authentication check has completed
-      ensureAuthInitialized: () => {
-        return new Promise((resolve) => {
-          const state = get(); // Get current state
-          if (!state.isLoading) {
-            // If not loading, resolve immediately
-            resolve();
-          } else {
-            // If loading, subscribe to changes and wait for isLoading to become false
-            const unsubscribe = useAuthStore.subscribe((currentState) => {
-              if (!currentState.isLoading) {
-                resolve();
-                unsubscribe(); // Clean up the subscription
-              }
-            });
-          }
+      
+      clearCache: () => {
+        console.log('[AUTH_STORE] Clearing user cache');
+        set({ 
+          lastKnownUser: null,
+          isOfflineMode: false 
         });
+      },
+      
+      // Computed getters
+      getDisplayName: () => {
+        const { lastKnownUser } = get();
+        if (!lastKnownUser) return 'User';
+        
+        return lastKnownUser.name || 
+               lastKnownUser.email?.split('@')[0] || 
+               'User';
+      },
+      
+      getUserInitials: () => {
+        const displayName = get().getDisplayName();
+        return displayName.slice(0, 2).toUpperCase();
       },
     }),
     {
-      name: 'auth-storage', // Name for localStorage key
+      name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist these fields
+      // Persist everything except computed functions
       partialize: (state) => ({
-        isAuthenticated: state.isAuthenticated,
-        user: state.user,
-        sessionExpiresAt: state.sessionExpiresAt,
-        lastOnlineCheck: state.lastOnlineCheck,
+        preferences: state.preferences,
+        lastKnownUser: state.lastKnownUser,
+        isOfflineMode: state.isOfflineMode,
       }),
     }
   )
 );
 
-console.log("[AUTH] Zustand auth store initialized. Initial state:", useAuthStore.getState());
+// console.log("[AUTH] Zustand auth store initialized. Initial state:", useAuthStore.getState());
+
+// HMR: Accept hot updates for this module to preserve auth state
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}

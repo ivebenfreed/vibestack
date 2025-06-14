@@ -88,18 +88,27 @@ let initPromise: Promise<PGliteWorker> | null = null;
 // Store instances during HMR dispose
 if (import.meta.hot) {
   import.meta.hot.dispose(async (data) => {
-    console.log("🔥 HMR Dispose: Storing DB worker instances");
+    console.log("🔥 [DB] HMR Dispose: Storing DB worker instances");
+    console.log("🔥 [DB] pgliteWorkerInstance exists:", !!pgliteWorkerInstance);
+    console.log("🔥 [DB] workerInstance exists:", !!workerInstance);
+    console.log("🔥 [DB] isInitializing:", isInitializing);
     // We might not need to explicitly terminate if we're reusing,
     // but ensure clean state if needed. Consider if termination is better.
     // For now, just store the references.
     data.pgliteWorkerInstance = pgliteWorkerInstance;
     data.workerInstance = workerInstance;
+    data.isInitializing = isInitializing;
+    data.initPromise = initPromise;
+    data.timestamp = Date.now();
     // Reset module state for next load if instances aren't reused
     // pgliteWorkerInstance = null; 
     // workerInstance = null;
     // isInitializing = false;
     // initPromise = null;
   });
+
+  // Accept hot updates for this module
+  import.meta.hot.accept();
 }
 
 /**
@@ -130,7 +139,8 @@ export const db = pgliteWorkerInstance;
 export async function initializeDatabase(): Promise<PGliteWorker> {
   // HMR Restore: Check if instances were preserved
   if (import.meta.hot?.data.pgliteWorkerInstance) {
-    console.log("🔥 HMR Restore: Reusing existing DB worker instances");
+    console.log("🔥 [DB] HMR Restore: Reusing existing DB worker instances");
+    console.log("🔥 [DB] Restored from timestamp:", import.meta.hot.data.timestamp);
     pgliteWorkerInstance = import.meta.hot.data.pgliteWorkerInstance;
     workerInstance = import.meta.hot.data.workerInstance;
     isInitializing = false; // Ensure state is reset
@@ -179,7 +189,17 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
       });
 
       // Wait for the worker to signal readiness and verify live queries
-      await pgliteWorker.query('SELECT 1');
+      console.log('🔍 [DB] Testing worker connection...');
+      try {
+        await Promise.race([
+          pgliteWorker.query('SELECT 1'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Query timeout')), 5000))
+        ]);
+        console.log('✅ [DB] Worker connection test successful');
+      } catch (error) {
+        console.warn('⚠️ [DB] Worker connection test failed, but continuing:', error);
+        // Continue anyway - the worker might be ready but the query interface has issues
+      }
       
       // Verify live query support
       if (!pgliteWorker.live?.query) {
@@ -199,7 +219,9 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
       // await validateDatabaseSchema(pgliteWorkerInstance);
       
       // Check and apply migrations
+      console.log('🔍 [DB] Starting migration check...');
       await checkAndApplyMigrations();
+      console.log('✅ [DB] Migration check complete');
       
       console.log('✅ PGliteWorker initialized successfully');
       dbMessageBus.publish('initialized', { success: true });

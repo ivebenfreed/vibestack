@@ -13,6 +13,8 @@ export interface ConflictDecision {
   shouldApply: boolean;
   reason: string;
   conflictingFields?: string[];
+  mergeableFields?: string[];
+  requiresMerge?: boolean;
 }
 
 /**
@@ -48,13 +50,13 @@ export class ConflictResolver {
         errors.push('Missing required field: id');
       }
       
-      if (!data.updated_at) {
-        errors.push('Missing required field: updated_at');
+      if (!data.updatedAt) {
+        errors.push('Missing required field: updatedAt');
       }
       
       // Validate timestamp format
-      if (data.updated_at && isNaN(Date.parse(data.updated_at))) {
-        errors.push('Invalid timestamp format for updated_at');
+      if (data.updatedAt && isNaN(Date.parse(data.updatedAt))) {
+        errors.push('Invalid timestamp format for updatedAt');
       }
     }
     
@@ -69,8 +71,7 @@ export class ConflictResolver {
 
   /**
    * Determine if a change should be applied based on CRDT rules
-   * Current: Simple timestamp-based last-write-wins
-   * Future: Field-level conflict resolution
+   * Enhanced: Supports field-level conflict resolution for non-conflicting updates
    */
   shouldApplyChange(
     incoming: TableChange,
@@ -84,10 +85,78 @@ export class ConflictResolver {
       };
     }
 
-    const incomingTimestamp = new Date(incoming.updated_at);
-    const existingTimestamp = new Date(existing.updated_at);
+    const incomingData = incoming.data as any;
+    
+    // Enhanced: Check if this is a relationship-only update
+    // Relationship-only updates contain only system metadata fields (id, clientId, updatedAt)
+    // and should not be subject to CRDT conflict resolution since they don't modify entity content
+    const dataKeys = Object.keys(incomingData).filter(key => key !== 'id');
+    const isRelationshipOnlyUpdate = dataKeys.length <= 2 && 
+      dataKeys.every(key => ['clientId', 'updatedAt', 'updated_at'].includes(key)) &&
+      incoming.relationshipUpdates && incoming.relationshipUpdates.length > 0;
+    
+    if (isRelationshipOnlyUpdate) {
+      syncLogger.info(`Detected relationship-only update - skipping CRDT conflict resolution`, {
+        table: incoming.table,
+        entityId: incomingData.id,
+        hasEntityFields: dataKeys.length > 0,
+        hasRelationshipUpdates: (incoming.relationshipUpdates?.length ?? 0) > 0,
+        fieldCount: Object.keys(incomingData).length
+      }, MODULE_NAME);
+      
+      return {
+        shouldApply: true,
+        reason: 'Relationship-only update (no entity content changes)'
+      };
+    }
 
-    // Simple timestamp-based CRDT (last-write-wins)
+    const incomingTimestamp = new Date(incoming.updatedAt);
+    const existingTimestamp = new Date(existing.updatedAt || 0);
+
+    syncLogger.debug(`CRDT timestamp comparison`, {
+      table: incoming.table,
+      entityId: incomingData.id,
+      incomingTimestamp: incoming.updatedAt,
+      incomingTimestampParsed: incomingTimestamp.toISOString(),
+      existingTimestamp: existing.updatedAt,
+      existingTimestampParsed: existing.updatedAt ? existingTimestamp.toISOString() : 'INVALID',
+      incomingMs: incomingTimestamp.getTime(),
+      existingMs: existing.updatedAt ? existingTimestamp.getTime() : 'INVALID',
+      timeDiffMs: existing.updatedAt ? (incomingTimestamp.getTime() - existingTimestamp.getTime()) : 'N/A',
+      incomingIsNewer: incomingTimestamp > existingTimestamp,
+      incomingIsOlder: incomingTimestamp < existingTimestamp,
+      timestampsEqual: incomingTimestamp.getTime() === existingTimestamp.getTime(),
+      existingUpdatedAtRaw: existing.updatedAt,
+      existingUpdatedAtType: typeof existing.updatedAt
+    }, MODULE_NAME);
+
+    // Enhanced: Try field-level conflict resolution first
+    const fieldAnalysis = this.analyzeFieldLevelConflicts(incoming, existing);
+    
+    if (fieldAnalysis.resolutionStrategy === 'merge' && fieldAnalysis.mergeableFields.length > 0) {
+      // Some fields can be merged even if incoming is older
+      const hasConflicts = fieldAnalysis.conflictingFields.length > 0;
+      
+      if (hasConflicts) {
+        return {
+          shouldApply: true, // Apply with partial merge
+          reason: `Partial merge: ${fieldAnalysis.mergeableFields.length} non-conflicting fields, ${fieldAnalysis.conflictingFields.length} conflicts`,
+          conflictingFields: fieldAnalysis.conflictingFields,
+          mergeableFields: fieldAnalysis.mergeableFields,
+          requiresMerge: true
+        };
+      } else {
+        return {
+          shouldApply: true,
+          reason: `Field-level merge: ${fieldAnalysis.mergeableFields.length} non-conflicting fields`,
+          conflictingFields: [],
+          mergeableFields: fieldAnalysis.mergeableFields,
+          requiresMerge: true
+        };
+      }
+    }
+
+    // Fall back to simple timestamp-based CRDT (last-write-wins)
     if (incomingTimestamp > existingTimestamp) {
       return {
         shouldApply: true,
@@ -99,19 +168,28 @@ export class ConflictResolver {
         reason: 'Existing record is newer'
       };
     } else {
-      // Timestamps are equal - use client_id as tiebreaker
-      const incomingClientId = (incoming.data as any).client_id || '';
-      const existingClientId = existing.client_id || '';
+      // Timestamps are equal - use clientId as tiebreaker
+      const incomingClientId = (incoming.data as any).clientId || '';
+      const existingClientId = existing.clientId || '';
+      
+      syncLogger.debug(`CRDT clientId tiebreaker`, {
+        table: incoming.table,
+        entityId: incomingData.id,
+        incomingClientId,
+        existingClientId,
+        incomingClientIdWins: incomingClientId > existingClientId,
+        existingClientIdWins: existingClientId >= incomingClientId
+      }, MODULE_NAME);
       
       if (incomingClientId > existingClientId) {
         return {
           shouldApply: true,
-          reason: 'Timestamp tie broken by client_id'
+          reason: 'Timestamp tie broken by clientId'
         };
       } else {
         return {
           shouldApply: false,
-          reason: 'Timestamp tie, existing client_id wins'
+          reason: 'Timestamp tie, existing clientId wins'
         };
       }
     }
@@ -181,8 +259,8 @@ export class ConflictResolver {
         operation: change.operation,
         entityId: (change.data as any).id,
         reason: decision.reason,
-        incomingTimestamp: change.updated_at,
-        existingTimestamp: existing?.updated_at,
+        incomingTimestamp: change.updatedAt,
+                  existingTimestamp: existing?.updatedAt,
         conflictingFields: decision.conflictingFields
       }, MODULE_NAME);
     } else {
@@ -270,9 +348,8 @@ export class ConflictResolver {
   }
 
   /**
-   * Future: Field-level conflict resolution
-   * This is a placeholder for enhanced CRDT resolution that can handle
-   * partial updates and field-specific conflict strategies
+   * Enhanced: Field-level conflict resolution
+   * Allows non-conflicting updates to succeed even if they're older
    */
   private analyzeFieldLevelConflicts(
     incoming: TableChange,
@@ -282,31 +359,220 @@ export class ConflictResolver {
     mergeableFields: string[];
     resolutionStrategy: 'timestamp' | 'merge' | 'custom';
   } {
-    // TODO: Implement field-level analysis
-    // Different fields might have different conflict resolution strategies:
-    // - Timestamps: last-write-wins
-    // - Arrays: merge or set operations
-    // - Numbers: could use CRDTs like counters
-    // - Strings: last-write-wins or operational transforms
+    const incomingData = incoming.data as any;
+    const changeMetadata = incomingData.__changeMetadata;
     
+    // If no change metadata, fall back to timestamp-based resolution
+    if (!changeMetadata || !changeMetadata.changedFields) {
+      return {
+        conflictingFields: [],
+        mergeableFields: [],
+        resolutionStrategy: 'timestamp'
+      };
+    }
+    
+    const changedFields = changeMetadata.changedFields as string[];
+    const conflictingFields: string[] = [];
+    const mergeableFields: string[] = [];
+    
+    // Compare timestamps to see if incoming is older
+    const incomingTimestamp = new Date(incoming.updatedAt);
+    const existingTimestamp = new Date(existing.updatedAt || 0);
+    const isIncomingOlder = incomingTimestamp < existingTimestamp;
+    
+    // If incoming is newer or equal, all fields are mergeable (no conflicts)
+    if (!isIncomingOlder) {
+      return {
+        conflictingFields: [],
+        mergeableFields: changedFields,
+        resolutionStrategy: 'merge'
+      };
+    }
+    
+    // Incoming is older - check for field-level conflicts
+    for (const fieldName of changedFields) {
+      // Skip system fields that shouldn't cause conflicts
+      if (['id', 'createdAt', 'clientId'].includes(fieldName)) {
+        continue;
+      }
+      
+      // Check if this field was modified since the incoming change's original timestamp
+      const fieldConflictStrategy = this.getFieldConflictStrategy(incoming.table, fieldName);
+      
+      switch (fieldConflictStrategy) {
+        case 'always_merge':
+          // Fields like tags, arrays that can be merged
+          mergeableFields.push(fieldName);
+          break;
+          
+        case 'last_write_wins':
+          // Fields where newer value should always win
+          if (this.wasFieldModifiedSince(existing, fieldName, changeMetadata.originalUpdatedAt)) {
+            conflictingFields.push(fieldName);
+          } else {
+            mergeableFields.push(fieldName);
+          }
+          break;
+          
+        case 'timestamp_wins':
+        default:
+          // Standard behavior - newer timestamp wins
+          if (this.wasFieldModifiedSince(existing, fieldName, changeMetadata.originalUpdatedAt)) {
+            conflictingFields.push(fieldName);
+          } else {
+            mergeableFields.push(fieldName);
+          }
+          break;
+      }
+    }
+    
+    // If any fields can be merged, use merge strategy
+    if (mergeableFields.length > 0) {
+      return {
+        conflictingFields,
+        mergeableFields,
+        resolutionStrategy: 'merge'
+      };
+    }
+    
+    // All fields conflict, use timestamp resolution
     return {
-      conflictingFields: [],
+      conflictingFields,
       mergeableFields: [],
       resolutionStrategy: 'timestamp'
     };
   }
 
   /**
-   * Future: Generate merged entity from conflicting changes
-   * This would support partial non-conflicting updates
+   * Enhanced: Generate merged entity from conflicting changes
+   * Supports partial non-conflicting updates even from older changes
    */
-  private generateMergedEntity(
+  public generateMergedEntity(
     incoming: TableChange,
     existing: any,
-    resolutionStrategy: any
+    analysis: {
+      conflictingFields: string[];
+      mergeableFields: string[];
+      resolutionStrategy: 'timestamp' | 'merge' | 'custom';
+    }
   ): any {
-    // TODO: Implement smart merging based on field-level strategies
-    // For now, we use simple last-write-wins at the entity level
-    return null;
+    if (analysis.resolutionStrategy !== 'merge' || analysis.mergeableFields.length === 0) {
+      return null; // Can't merge
+    }
+    
+    const incomingData = incoming.data as any;
+    const mergedEntity = { ...existing }; // Start with existing entity
+    
+    // Apply only non-conflicting fields from incoming change
+    for (const fieldName of analysis.mergeableFields) {
+      if (fieldName in incomingData) {
+        const fieldStrategy = this.getFieldConflictStrategy(incoming.table, fieldName);
+        
+        switch (fieldStrategy) {
+          case 'always_merge':
+            mergedEntity[fieldName] = this.mergeFieldValues(
+              existing[fieldName],
+              incomingData[fieldName],
+              fieldName,
+              incoming.table
+            );
+            break;
+            
+          default:
+            // Direct assignment for non-conflicting fields
+            mergedEntity[fieldName] = incomingData[fieldName];
+            break;
+        }
+      }
+    }
+    
+    // Update metadata to reflect the merge
+    mergedEntity.updated_at = new Date().toISOString(); // Set new timestamp for merge
+    mergedEntity.clientId = incomingData.clientId || existing.clientId;
+    
+    return mergedEntity;
+  }
+  
+  /**
+   * Determine conflict resolution strategy for specific field
+   */
+  private getFieldConflictStrategy(tableName: string, fieldName: string): 'always_merge' | 'last_write_wins' | 'timestamp_wins' {
+    // Table-specific field strategies
+    switch (tableName) {
+      case 'tasks':
+        switch (fieldName) {
+          case 'tags':
+            return 'always_merge'; // Arrays can often be merged
+          case 'title':
+          case 'description':
+            return 'last_write_wins'; // Content should prefer newer
+          case 'status':
+          case 'priority':
+            return 'last_write_wins'; // Status changes should prefer newer
+          case 'dueDate':
+          case 'startDate':
+            return 'timestamp_wins'; // Dates can be overridden if no conflict
+          default:
+            return 'timestamp_wins';
+        }
+        
+      case 'projects':
+        switch (fieldName) {
+          case 'name':
+          case 'description':
+            return 'last_write_wins';
+          default:
+            return 'timestamp_wins';
+        }
+        
+      case 'users':
+        switch (fieldName) {
+          case 'name':
+          case 'email':
+            return 'last_write_wins';
+          default:
+            return 'timestamp_wins';
+        }
+        
+      default:
+        return 'timestamp_wins';
+    }
+  }
+  
+  /**
+   * Check if a field was modified since a given timestamp
+   * This is a simplified version - in practice, you might want per-field timestamps
+   */
+  private wasFieldModifiedSince(existing: any, fieldName: string, sinceTimestamp: string): boolean {
+    // For now, we assume if the entity was updated since the original timestamp,
+    // then the field might have been modified
+    const existingTimestamp = new Date(existing.updatedAt || 0);
+    const sinceTime = new Date(sinceTimestamp);
+    
+    return existingTimestamp > sinceTime;
+  }
+  
+  /**
+   * Merge two field values using field-specific logic
+   */
+  private mergeFieldValues(existingValue: any, incomingValue: any, fieldName: string, tableName: string): any {
+    // Handle array merging (e.g., tags)
+    if (Array.isArray(existingValue) && Array.isArray(incomingValue)) {
+      // Merge arrays, removing duplicates
+      const mergedArray = [...existingValue];
+      for (const item of incomingValue) {
+        if (!mergedArray.includes(item)) {
+          mergedArray.push(item);
+        }
+      }
+      return mergedArray;
+    }
+    
+    // For non-array fields, prefer the incoming value if it's different
+    if (JSON.stringify(existingValue) !== JSON.stringify(incomingValue)) {
+      return incomingValue;
+    }
+    
+    return existingValue;
   }
 } 

@@ -213,11 +213,12 @@ export function EditableFilterableRelationshipCell<TData, TEntity>({
                 </CommandItem>
                 {filteredEntities.map((entity) => {
                   const entityId = getEntityId(entity)
+                  const displayValue = relationshipConfig.getDisplayValue(entity)
                   const isSelected = localEntityId === entityId
                   return (
                     <CommandItem
                       key={entityId}
-                      value={relationshipConfig.getDisplayValue(entity)}
+                      value={`${displayValue}-${entityId}`}
                       onSelect={() => onSave(entityId)}
                     >
                       <CheckIcon
@@ -226,7 +227,7 @@ export function EditableFilterableRelationshipCell<TData, TEntity>({
                           isSelected ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      {relationshipConfig.getDisplayValue(entity)}
+                      {displayValue}
                     </CommandItem>
                   )
                 })}
@@ -445,11 +446,12 @@ export function EditableMultiSelectRelationshipCell<TData, TEntity>({
                 <CommandGroup>
                   {filteredEntities.map((entity) => {
                     const entityId = getEntityId(entity)
+                    const displayValue = relationshipConfig.getDisplayValue(entity)
                     const isSelected = localEntityIds.includes(entityId)
                     return (
                       <CommandItem
                         key={entityId}
-                        value={relationshipConfig.getDisplayValue(entity)}
+                        value={`${displayValue}-${entityId}`}
                         onSelect={() => onToggleEntity(entityId)}
                       >
                         <CheckIcon
@@ -458,7 +460,7 @@ export function EditableMultiSelectRelationshipCell<TData, TEntity>({
                             isSelected ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        {relationshipConfig.getDisplayValue(entity)}
+                        {displayValue}
                       </CommandItem>
                     )
                   })}

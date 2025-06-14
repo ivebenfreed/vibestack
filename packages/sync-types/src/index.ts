@@ -15,6 +15,9 @@ import type {
   ServerLiveStartMessage,
   ServerCatchupCompletedMessage,
   ServerSyncStatsMessage,
+  ServerHeartbeatMessage,
+  ServerIntegrityResetMessage,
+  ServerIntegrityValidationResponseMessage,
   ClientMessage,
   ClientChangesMessage,
   ClientHeartbeatMessage,
@@ -22,6 +25,8 @@ import type {
   ClientAppliedMessage,
   ClientInitReceivedMessage,
   ClientInitProcessedMessage,
+  ClientIntegrityValidationMessage,
+  ClientIntegrityResetAckMessage,
   Message
 } from './messages';
 
@@ -35,8 +40,8 @@ import type { TableChange } from './table-changes';
  */
 export interface RecordData {
   id: string;
-  client_id: string;
-  updated_at: string;
+  clientId: string;
+  updatedAt: string;
   [key: string]: unknown;  // Additional fields specific to each record type
 }
 
@@ -73,6 +78,9 @@ export type {
   ServerLiveStartMessage,
   ServerCatchupCompletedMessage,
   ServerSyncStatsMessage,
+  ServerHeartbeatMessage,
+  ServerIntegrityResetMessage,
+  ServerIntegrityValidationResponseMessage,
   ClientMessage,
   ClientChangesMessage,
   ClientHeartbeatMessage,
@@ -80,6 +88,8 @@ export type {
   ClientAppliedMessage,
   ClientInitReceivedMessage,
   ClientInitProcessedMessage,
+  ClientIntegrityValidationMessage,
+  ClientIntegrityResetAckMessage,
   Message
 } from './messages';
 
@@ -104,7 +114,7 @@ export function isTableChange(payload: unknown): payload is TableChange {
     && typeof p.data === 'object'
     && p.data !== null
     && (!p.lsn || typeof p.lsn === 'string')  // LSN is optional
-    && typeof p.updated_at === 'string';
+    && typeof p.updatedAt === 'string';
 }
 
 export function isClientMessageType(type: string): type is CltMessageType {

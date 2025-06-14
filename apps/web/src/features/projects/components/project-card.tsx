@@ -2,35 +2,51 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction, CardFooter } from '@/components/ui/card'; // Added CardFooter
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+// Removed Tooltip imports for performance - using native title attributes
 import { CheckSquare, Edit2, Trash2, ExternalLink } from 'lucide-react';
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { useProjects } from '../context/projects-context';
 import { Link } from '@tanstack/react-router';
+import { useSelector } from '@xstate/store/react';
+import { projectsAtom } from '@/domain/project';
+import { shallowEqual } from '@xstate/store';
 
 interface ProjectCardProps {
-  project: Project;
+  // 🎯 PERFORMANCE: Receive only projectId for granular atomic binding
+  projectId: string;
+  // 🎯 PERFORMANCE: Pass handlers as props to avoid 34 context calls
+  onEdit?: (project: Project) => void;
+  onDelete?: (project: Project) => void;
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
-  const { 
-    setSelectedProject,
-    setIsUpdateDrawerOpen,
-    setIsDeleteDialogOpen 
-  } = useProjects();
+// 🎯 PERFORMANCE: Memoized component that only re-renders when its specific project changes via XState selector
+export const ProjectCard = React.memo(function ProjectCard({ projectId, onEdit, onDelete }: ProjectCardProps) {
+  // 🎯 PERFORMANCE: Removed useProjects context call to avoid 34 expensive context reads
+
+  // 🎯 XSTATE SURGICAL: Read from XState store - only re-renders when THIS specific project changes
+  const project = useSelector(projectsAtom, (projectsRecord) => projectsRecord[projectId] || null);
+
+  // Handle missing project (deleted or not loaded)
+  if (!project) {
+    return (
+      <Card className="overflow-hidden shadow-md opacity-50">
+        <CardHeader className="p-4">
+          <CardTitle className="text-muted-foreground">Project not found</CardTitle>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   const handleEditClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedProject(project);
-    setIsUpdateDrawerOpen(true);
+    onEdit?.(project);
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedProject(project);
-    setIsDeleteDialogOpen(true);
+    onDelete?.(project);
   };
 
   // Format status for display
@@ -50,49 +66,43 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const titleMinHeight = "h-14"; // For 2 lines of text-xl
 
   return (
-    <Link to="/projects/$projectId" params={{ projectId: project.id }}>
-      <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow flex flex-col cursor-pointer">
+    <Link 
+      to="/projects/$projectId" 
+      params={{ projectId: project.id }}
+      preload={false}
+      className="block"
+    >
+      <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow flex flex-col cursor-pointer h-full">
         <CardHeader className="p-4 relative"> {/* Changed padding to p-4, removed pb-2 */}
           {/* Actions positioned absolutely */}
           <CardAction className="absolute top-4 right-4 flex space-x-1"> {/* Adjusted top/right to match new padding */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handleEditClick}
-                >
-                  <Edit2 className="h-4 w-4" />
-                  <span className="sr-only">Edit Project</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>Edit</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="icon" 
-                  onClick={handleDeleteClick}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Delete Project</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>Delete</p></TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="sr-only">View Project Details</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>View Details</p></TooltipContent>
-            </Tooltip>
+            {/* 🎯 OPTIMIZED: Use native title tooltips instead of Tooltip components for better performance */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleEditClick}
+              title="Edit Project"
+            >
+              <Edit2 className="h-4 w-4" />
+              <span className="sr-only">Edit Project</span>
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="icon" 
+              onClick={handleDeleteClick}
+              title="Delete Project"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">Delete Project</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon"
+              title="View Project Details"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="sr-only">View Project Details</span>
+            </Button>
           </CardAction>
         
         {/* Title - fixed height for 2 lines, with padding to avoid actions */}
@@ -121,4 +131,4 @@ export function ProjectCard({ project }: ProjectCardProps) {
     </Card>
     </Link>
   );
-}
+});

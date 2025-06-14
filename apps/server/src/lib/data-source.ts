@@ -12,6 +12,9 @@ import type { Context } from 'hono'; // Import Hono context
 import type { Env } from '../types/env'; // Import Env type
 import type { AppBindings } from '../types/hono'; // Import AppBindings
 import { addConnectTimeout } from './db'; // Import helper from db.ts
+import { dbLogger } from '../middleware/logger';
+
+const MODULE_NAME = 'data-source';
 
 // Change the singleton instance type
 let appDataSource: NeonDataSource | null = null;
@@ -22,23 +25,23 @@ let initPromise: Promise<NeonDataSource> | null = null; // Promise to track ongo
  */
 export const getDataSource = async (c: Context<AppBindings>): Promise<NeonDataSource> => { // Update context type
     const requestId = c.req.header('cf-request-id') || `local-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    console.log(`[${requestId}] getDataSource: Called.`);
+    dbLogger.debug('getDataSource called', { requestId }, MODULE_NAME);
 
     // Return existing instance if already initialized
     if (appDataSource && appDataSource.isInitialized) {
-        console.log(`[${requestId}] getDataSource: Returning existing initialized instance.`);
+        dbLogger.debug('Returning existing initialized instance', { requestId }, MODULE_NAME);
         return appDataSource;
     }
 
     // If initialization is in progress, wait for it
     if (initPromise) {
-        console.log(`[${requestId}] getDataSource: Initialization in progress, awaiting...`);
+        dbLogger.debug('Initialization in progress, awaiting', { requestId }, MODULE_NAME);
         try {
             const ds = await initPromise;
-            console.log(`[${requestId}] getDataSource: Initialization completed via await, returning instance.`);
+            dbLogger.debug('Initialization completed via await', { requestId }, MODULE_NAME);
             return ds;
         } catch (error) {
-            console.error(`[${requestId}] getDataSource: Awaited initialization failed.`, error);
+            dbLogger.error('Awaited initialization failed', error, { requestId }, MODULE_NAME);
             // Reset promise if initialization failed
             initPromise = null;
             appDataSource = null; // Ensure appDataSource is also cleared
@@ -47,11 +50,11 @@ export const getDataSource = async (c: Context<AppBindings>): Promise<NeonDataSo
     }
 
     // Start new initialization
-    console.log(`[${requestId}] getDataSource: No instance or ongoing initialization. Starting new initialization.`);
+    dbLogger.debug('Starting new initialization', { requestId }, MODULE_NAME);
 
     // Create a promise to track this initialization attempt
     initPromise = (async () => {
-        console.log(`[${requestId}] getDataSource: Creating new NeonDataSource instance from context...`);
+        dbLogger.debug('Creating new NeonDataSource instance', { requestId }, MODULE_NAME);
 
         // --- Configuration ---
         const dbUrl = c.env.DATABASE_URL;
@@ -68,8 +71,8 @@ export const getDataSource = async (c: Context<AppBindings>): Promise<NeonDataSo
                 entity => typeof entity === 'object' && entity !== null && (entity as any).options?.name
             ) as EntitySchema<any>[], // Cast the result
             synchronize: c.env.NODE_ENV !== 'production',
-            // Explicitly enable ALL logging for debugging
-            logging: "all",
+            // Reduce logging to only errors and warnings to minimize noise
+            logging: ["error", "warn"],
             // Pass other options like namingStrategy if needed
         };
 
@@ -79,12 +82,12 @@ export const getDataSource = async (c: Context<AppBindings>): Promise<NeonDataSo
         appDataSource = ds;
 
         try {
-            console.log(`[${requestId}] getDataSource: Calling ds.initialize()...`);
+            dbLogger.debug('Calling ds.initialize()', { requestId }, MODULE_NAME);
             await ds.initialize();
-            console.log(`[${requestId}] getDataSource: ds.initialize() successful.`);
+            dbLogger.debug('ds.initialize() successful', { requestId }, MODULE_NAME);
             return ds;
         } catch (error) {
-            console.error(`[${requestId}] getDataSource: Error during ds.initialize():`, error);
+            dbLogger.error('Error during ds.initialize()', error, { requestId }, MODULE_NAME);
             appDataSource = null; // Clear the instance if initialization fails
             initPromise = null;  // Clear the promise if initialization fails
             throw error; // Rethrow to reject the initPromise
@@ -94,10 +97,10 @@ export const getDataSource = async (c: Context<AppBindings>): Promise<NeonDataSo
     try {
         // Await the promise we just created
         const ds = await initPromise;
-        console.log(`[${requestId}] getDataSource: Initial initialization successful, returning instance.`);
+        dbLogger.debug('Initial initialization successful', { requestId }, MODULE_NAME);
         return ds;
     } catch (error) {
-         console.error(`[${requestId}] getDataSource: Initial initialization failed (error caught after awaiting initPromise).`, error);
+         dbLogger.error('Initial initialization failed', error, { requestId }, MODULE_NAME);
          // Ensure promise is cleared on failure
          initPromise = null;
          appDataSource = null; // Ensure appDataSource is also cleared
@@ -113,6 +116,6 @@ export const getDataSource = async (c: Context<AppBindings>): Promise<NeonDataSo
          // If the initialization was successful, future calls will hit the "already initialized" path.
          // If it failed, this allows a retry.
          // initPromise = null; // Temporarily removing this to see if it causes issues. Let the success path handle keeping it.
-         console.log(`[${requestId}] getDataSource: Exiting.`);
+         dbLogger.debug('getDataSource exiting', { requestId }, MODULE_NAME);
     }
 };

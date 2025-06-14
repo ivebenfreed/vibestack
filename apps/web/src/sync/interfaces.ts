@@ -14,6 +14,26 @@ export type SyncStatus =
   | 'error'
   | 'paused'; // Added paused state
 
+// Interface for sync metadata storage operations
+export interface ISyncMetadataStore {
+  // Initialization
+  initialize(): Promise<{ clientId: ClientId; currentLsn: LSN; syncState: SyncStatus; pendingChangesCount: number; lastSyncTime: Date | null }>;
+  
+  // State management
+  saveState(stateData: Partial<{ clientId: ClientId; currentLsn: LSN; syncState: SyncStatus; pendingChangesCount: number; lastSyncTime: Date | null }>): Promise<void>;
+  resetSyncState(): Promise<void>;
+  
+  // Accessors
+  getClientId(): ClientId;
+  getLSN(): LSN;
+  getStatus(): SyncStatus;
+  getPendingChangesCount(): number;
+  
+  // Cleanup
+  flush(): Promise<void>;
+  close(): Promise<void>;
+}
+
 export interface IMessageSender {
   send(message: Omit<ClientMessage, 'clientId' | 'messageId' | 'timestamp'>): void; // SyncManager will add common fields
   // getClientId(): ClientId; // ClientId is now managed by SyncStatePersister, not directly by sender

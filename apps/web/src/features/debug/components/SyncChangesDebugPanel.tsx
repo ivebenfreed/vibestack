@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { usePGliteContext } from '@/db/pglite-provider';
 import { TaskStatus, TaskPriority, ProjectStatus } from '@repo/dataforge/client-entities';
+import { LocalChanges } from '@repo/dataforge/client-entities';
+import { useLiveEntity } from '@/db/hooks/useLiveEntity';
 
 // History event types
 interface ChangeHistoryEvent {
@@ -40,10 +42,51 @@ export function SyncChangesDebugPanel() {
   } = useSyncContext();
   
   // Get services from PGlite context
-  const { services, isLoading: dbLoading } = usePGliteContext();
+  const { services, isLoading: dbLoading, createQueryBuilder, isDataSourceReady } = usePGliteContext();
+  
+  // Create live query builder for LocalChanges
+  const localChangesQueryBuilder = useMemo(() => {
+    if (!isDataSourceReady || !createQueryBuilder) {
+      console.log('[SyncChangesDebugPanel] DataSource not ready for LocalChanges query builder creation');
+      return null;
+    }
+    
+    try {
+      return createQueryBuilder(LocalChanges, 'localChanges')
+        .where('localChanges.processedSync = :processedSync', { processedSync: 0 })
+        .orderBy('localChanges.createdAt', 'ASC');
+    } catch (error) {
+      console.error('[SyncChangesDebugPanel] Error creating LocalChanges query builder:', error);
+      return null;
+    }
+  }, [isDataSourceReady, createQueryBuilder]);
+
+  // Use live query for outgoing changes
+  const { 
+    data: liveLocalChanges, 
+    loading: liveChangesLoading, 
+    error: liveChangesError 
+  } = useLiveEntity<LocalChanges>(
+    localChangesQueryBuilder,
+    { 
+      enabled: !!localChangesQueryBuilder,
+      transform: true 
+    }
+  );
+
+  // Transform LocalChanges to TableChange format
+  const outgoingChanges = useMemo(() => {
+    if (!liveLocalChanges) return [];
+    
+    return liveLocalChanges.map(lc => ({
+      table: lc.table,
+      operation: lc.operation as 'insert' | 'update' | 'delete',
+      data: lc.data,
+      updatedAt: lc.updatedAt instanceof Date ? lc.updatedAt.toISOString() : new Date().toISOString(),
+    }));
+  }, [liveLocalChanges]);
   
   // State for tracking changes
-  const [outgoingChanges, setOutgoingChanges] = useState<TableChange[]>([]);
   const [incomingChanges, setIncomingChanges] = useState<TableChange[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -93,28 +136,6 @@ export function SyncChangesDebugPanel() {
   // Reference to SyncManager for event listening and processors
   const syncManager = SyncManager.getInstance();
 
-  // Helper function to get pending changes (temporary until implemented in SyncChangeManager)
-  const fetchPendingChanges = async (): Promise<TableChange[]> => {
-    try {
-      // Get OutgoingChangeProcessor instance
-      const outgoingProcessor = syncManager.getOutgoingChangeProcessor();
-      // Use the implemented getPendingChanges method
-      const localChanges = await outgoingProcessor.getPendingChanges();
-      // Map LocalChanges[] to TableChange[]
-      return localChanges.map(lc => ({
-        table: lc.table,
-        operation: lc.operation as 'insert' | 'update' | 'delete', // Cast operation
-        data: lc.data, // Assuming lc.data is already in the correct format or handled by consumer
-        updated_at: lc.updatedAt instanceof Date ? lc.updatedAt.toISOString() : new Date().toISOString(), // Ensure updatedAt is a string
-        // Add other TableChange fields if necessary, e.g., id, client_id, lsn
-        // For now, assuming these are the core fields needed by the debug panel
-      }));
-    } catch (error) {
-      console.error('Error fetching pending changes:', error);
-      return [];
-    }
-  };
-
   // Helper function to add a history event
   const addHistoryEvent = (
     type: 'create' | 'prepare' | 'send' | 'receive' | 'process' | 'apply' | 'acknowledge' | 'error',
@@ -153,61 +174,34 @@ export function SyncChangesDebugPanel() {
     return event;
   };
 
-  // Load initial data
+  // Update loading and error states based on live query
   useEffect(() => {
-    // Track previous count to avoid redundant history entries
-    let previousPendingCount = -1;
-    
-    const loadInitialData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Get pending outgoing changes using the implemented method
-        const pending = await fetchPendingChanges();
-        setOutgoingChanges(pending || []);
-        
-        // Only log history if the count has changed
-        if (previousPendingCount !== pending.length) {
-          addHistoryEvent(
-            'create',
-            'success',
-            `Loaded ${pending.length} pending outgoing changes`,
-            undefined
-          );
-          // Update previous count
-          previousPendingCount = pending.length;
-        }
-        
-        setIsLoading(false);
-      } catch (err) {
-        console.error('Error loading sync changes data:', err);
-        setError(err instanceof Error ? err : new Error('Failed to load sync changes data'));
-        
-        // Log error in history
+    if (liveChangesError) {
+      setError(liveChangesError);
+      setIsLoading(false);
+      addHistoryEvent(
+        'error',
+        'error',
+        'Failed to load sync changes data',
+        undefined,
+        liveChangesError
+      );
+    } else {
+      setError(null);
+      setIsLoading(liveChangesLoading || dbLoading);
+      
+      // Only log history if we have outgoing changes data AND there are actually changes
+      if (outgoingChanges && !liveChangesLoading && outgoingChanges.length > 0) {
         addHistoryEvent(
-          'error',
-          'error',
-          'Failed to load sync changes data',
-          undefined,
-          err
+          'create',
+          'success',
+          `Loaded ${outgoingChanges.length} pending outgoing changes via live query`,
+          undefined
         );
-        
-        setIsLoading(false);
       }
-    };
-    
-    loadInitialData();
-    
-    // Set up a refresh interval
-    const intervalId = setInterval(() => {
-      loadInitialData();
-    }, 5000); // Refresh every 5 seconds
-    
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, []);
-  
+    }
+  }, [liveChangesError, liveChangesLoading, dbLoading, outgoingChanges]);
+
   // Process a test change
   const processTestChange = async () => {
     try {
@@ -235,9 +229,7 @@ export function SyncChangesDebugPanel() {
         changeData.data
       );
       
-      // Refresh outgoing changes
-      const pending = await fetchPendingChanges();
-      setOutgoingChanges(pending || []);
+      // Live query will automatically update outgoingChanges
       
       // Update history event to success
       addHistoryEvent(
@@ -299,12 +291,10 @@ export function SyncChangesDebugPanel() {
       // Actual processing
       await processQueuedChanges();
       
-      // Refresh outgoing changes after processing
-      const pending = await fetchPendingChanges();
-      setOutgoingChanges(pending || []);
+      // Live query will automatically update outgoingChanges
       
-      // Calculate how many were sent
-      const changesSent = changes.length - pending.length;
+      // Calculate how many were sent (will be updated when live query refreshes)
+      const changesSent = changes.length;
       
       // Log server received
       if (changesSent > 0) {
@@ -336,7 +326,7 @@ export function SyncChangesDebugPanel() {
       addHistoryEvent(
         'process',
         'success',
-        `Sync complete. ${changesSent} sent, ${pending.length} still pending`,
+        `Sync complete. ${changesSent} sent, live query will show remaining pending`,
         undefined
       );
       
@@ -370,15 +360,13 @@ export function SyncChangesDebugPanel() {
       // Clear unprocessed changes using the implemented method
       await outgoingProcessor.clearUnprocessedChanges();
       
-      // Refresh outgoing changes
-      const pending = await fetchPendingChanges();
-      setOutgoingChanges(pending || []);
+      // Live query will automatically update outgoingChanges
       
       // Update history
       addHistoryEvent(
         'process',
         'success',
-        `Cleared unprocessed changes. Now have ${pending.length} pending changes`
+        `Cleared unprocessed changes. Live query will show updated count`
       );
       
     } catch (error) {
@@ -464,7 +452,7 @@ export function SyncChangesDebugPanel() {
         table: 'tasks',
         operation: 'insert',
         data: task,
-        updated_at: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
 
       // Add to incoming changes list - these are changes from the server via sync
@@ -500,10 +488,8 @@ export function SyncChangesDebugPanel() {
         tableChange
       );
 
-      // Refresh outgoing changes
-      const pending = await fetchPendingChanges();
-      setOutgoingChanges(pending || []);
-
+      // Live query will automatically update outgoingChanges
+      
       // Update result
       setTestResult(`Success: Task created with ID ${task.id}`);
     } catch (error) {
@@ -553,7 +539,7 @@ export function SyncChangesDebugPanel() {
         table: 'projects',
         operation: 'insert',
         data: project,
-        updated_at: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
 
       // Add to incoming changes list - these are changes from the server via sync
@@ -589,10 +575,8 @@ export function SyncChangesDebugPanel() {
         tableChange
       );
 
-      // Refresh outgoing changes
-      const pending = await fetchPendingChanges();
-      setOutgoingChanges(pending || []);
-
+      // Live query will automatically update outgoingChanges
+      
       // Update result
       setTestResult(`Success: Project created with ID ${project.id}`);
     } catch (error) {
@@ -645,12 +629,12 @@ export function SyncChangesDebugPanel() {
       // If it's a task, ensure we include status
       if (existingChange.table === 'tasks') {
         updatePayload.status = existingData.status || 'open';
-        updatePayload.updated_at = new Date().toISOString();
+        updatePayload.updatedAt = new Date().toISOString();
       } 
       // If it's a project, ensure we include status
       else if (existingChange.table === 'projects') {
         updatePayload.status = existingData.status || 'active';
-        updatePayload.updated_at = new Date().toISOString();
+        updatePayload.updatedAt = new Date().toISOString();
       }
       
       setTestChangeJson(`{
@@ -815,7 +799,7 @@ export function SyncChangesDebugPanel() {
               table: tableName,
               operation: operation,
               data: entityData,
-              updated_at: new Date().toISOString()
+              updatedAt: new Date().toISOString()
             };
             
             // Add to incoming changes list
@@ -872,7 +856,7 @@ export function SyncChangesDebugPanel() {
               table: apiEndpoint.split('/').pop() || 'unknown',
               operation: (apiMethod === 'POST' ? 'insert' : apiMethod === 'PATCH' ? 'update' : apiMethod === 'DELETE' ? 'delete' : 'insert') as 'insert' | 'update' | 'delete',
               data: responseData,
-              updated_at: new Date().toISOString()
+              updatedAt: new Date().toISOString()
             } as TableChange
           );
         }
@@ -1045,9 +1029,93 @@ export function SyncChangesDebugPanel() {
     </div>
   );
   
+  // Effect to listen for sync events from OutgoingChangeProcessor
+  useEffect(() => {
+    if (!syncManager) return;
+
+    const outgoingProcessor = syncManager.getOutgoingChangeProcessor();
+    if (!outgoingProcessor) {
+      console.warn('[SyncChangesDebugPanel] OutgoingChangeProcessor not available for event listening');
+      return;
+    }
+
+    // Listen to sync events
+    const eventEmitter = (syncManager as any).events || (outgoingProcessor as any).events;
+    if (!eventEmitter) {
+      console.warn('[SyncChangesDebugPanel] No event emitter available');
+      return;
+    }
+
+    // Handler for when changes are sent to server
+    const handleChangesSent = (data: any) => {
+      console.log('[SyncChangesDebugPanel] Changes sent event:', data);
+      addHistoryEvent(
+        'send',
+        'success',
+        `Sent ${data.changesCount || 'unknown'} changes to server`,
+        undefined
+      );
+    };
+
+    // Handler for when server acknowledges receipt
+    const handleChangesReceived = (data: any) => {
+      console.log('[SyncChangesDebugPanel] Changes received event:', data);
+      addHistoryEvent(
+        'receive',
+        'success',
+        `Server acknowledged receipt of changes`,
+        undefined
+      );
+    };
+
+    // Handler for when server applies changes
+    const handleChangesApplied = (data: any) => {
+      console.log('[SyncChangesDebugPanel] Changes applied event:', data);
+      addHistoryEvent(
+        'apply',
+        'success',
+        `Server applied ${data.appliedCount || data.successfullyProcessedLocalChangeIds?.length || 'unknown'} changes`,
+        undefined
+      );
+    };
+
+    // Handler for when local changes are processed/marked as done
+    const handleOutgoingChangesProcessed = (data: any) => {
+      console.log('[SyncChangesDebugPanel] Outgoing changes processed event:', data);
+      addHistoryEvent(
+        'acknowledge',
+        'success',
+        `Marked ${data.changeIds?.length || 'unknown'} local changes as processed (${data.reason || 'completed'})`,
+        undefined
+      );
+    };
+
+    // Register event listeners
+    eventEmitter.on?.('changes_sent', handleChangesSent);
+    eventEmitter.on?.('server_message:srv_changes_received', handleChangesReceived);
+    eventEmitter.on?.('server_message:srv_changes_applied', handleChangesApplied);
+    eventEmitter.on?.('outgoing_changes_processed_locally', handleOutgoingChangesProcessed);
+
+    // Also listen for direct sync manager events if available
+    eventEmitter.on?.('sync:changes_sent', handleChangesSent);
+    eventEmitter.on?.('sync:changes_received', handleChangesReceived);
+    eventEmitter.on?.('sync:changes_applied', handleChangesApplied);
+
+    return () => {
+      // Cleanup event listeners
+      eventEmitter.off?.('changes_sent', handleChangesSent);
+      eventEmitter.off?.('server_message:srv_changes_received', handleChangesReceived);
+      eventEmitter.off?.('server_message:srv_changes_applied', handleChangesApplied);
+      eventEmitter.off?.('outgoing_changes_processed_locally', handleOutgoingChangesProcessed);
+      eventEmitter.off?.('sync:changes_sent', handleChangesSent);
+      eventEmitter.off?.('sync:changes_received', handleChangesReceived);
+      eventEmitter.off?.('sync:changes_applied', handleChangesApplied);
+    };
+  }, [syncManager]);
+
   // Effect to listen for incoming changes from the server
   useEffect(() => {
-    if (!syncManager) return; // Use syncManager
+    if (!syncManager) return;
 
     const incomingProcessor = syncManager.getIncomingChangeProcessor();
     if (!incomingProcessor) {
@@ -1252,7 +1320,7 @@ export function SyncChangesDebugPanel() {
                     </thead>
                     <tbody>
                       {outgoingChanges.map((change, index) => {
-                        const id = change.data.id || 'unknown';
+                        const id = change.data?.id || 'unknown';
                         return (
                           <tr key={`${change.table}-${id}-${index}`} className="border-b">
                             <td className="p-2">{change.table}</td>

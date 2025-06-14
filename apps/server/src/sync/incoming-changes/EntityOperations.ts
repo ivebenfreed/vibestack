@@ -4,13 +4,23 @@ import { syncLogger } from '../../middleware/logger';
 import { RepositoryContainer } from '../../domains/RepositoryContainer';
 import { NeonService } from '../../lib/neon-orm/neon-service';
 import { DatabaseError, ValidationError } from './errors';
+import { ConflictResolver } from './ConflictResolver';
+import { 
+  SERVER_RELATIONSHIP_CONFIGS,
+  SERVER_JUNCTION_TABLES,
+  SERVER_JUNCTION_TABLE_MAPPING,
+  getEntityRelationships,
+  hasRelationshipConfig,
+  getJunctionRelationships,
+  type RelationshipConfig
+} from '@repo/dataforge/server-entities';
 
 const MODULE_NAME = 'entity-operations';
 
 interface RecordData {
   id: string;
-  client_id?: string;
-  updated_at: string;
+  clientId?: string;
+  updatedAt: string;
   [key: string]: any;
 }
 
@@ -21,16 +31,21 @@ interface RecordData {
 export class EntityOperations {
   private neonService: NeonService;
   private repositories: RepositoryContainer;
+  private conflictResolver: ConflictResolver;
   
   constructor(
     private client: Client,
-    private env: { DATABASE_URL: string; NODE_ENV?: string }
+    private env: { DATABASE_URL: string; NODE_ENV?: string },
+    conflictResolver: ConflictResolver
   ) {
     // Create NeonService instance using the real DATABASE_URL from the environment
     this.neonService = this.createNeonServiceFromEnvironment();
     
     // Initialize repository container for centralized access
     this.repositories = new RepositoryContainer(this.neonService);
+    
+    // Store conflict resolver for field-level conflict resolution
+    this.conflictResolver = conflictResolver;
   }
 
   /**
@@ -95,7 +110,7 @@ export class EntityOperations {
           return this.executeBatch(
             table, 
             changes, 
-            (table, data) => this.executeDelete(table, data.id, data.updated_at)
+            (table, data) => this.executeDelete(table, data.id, data.updatedAt)
           );
         default:
           throw new Error(`Unsupported operation: ${operation}`);
@@ -171,7 +186,7 @@ export class EntityOperations {
           }, MODULE_NAME);
           results.push(result);
         } else {
-          syncLogger.debug(`Operation skipped on ${table} for id ${data.id} (CRDT conflict)`, {
+          syncLogger.info(`Operation skipped on ${table} for id ${data.id} (CRDT conflict)`, {
             table,
             operation: change.operation,
             id: data.id,
@@ -223,16 +238,8 @@ export class EntityOperations {
         ...insertData 
       } = data as any;
       
-      // Transform snake_case property names to camelCase for TypeORM compatibility
-      const transformedData = this.transformPropertyNames(insertData);
-      
-      // Ensure updatedAt is a Date object
-      if (transformedData.updatedAt) {
-        transformedData.updatedAt = new Date(transformedData.updatedAt);
-      }
-      if (transformedData.createdAt) {
-        transformedData.createdAt = new Date(transformedData.createdAt);
-      }
+      // Data is already in camelCase from client - just ensure date fields are Date objects
+      const transformedData = this.ensureDateObjects(insertData);
 
       // Use CRDT-aware insert that handles conflicts
       const result = await repository.insertOrUpdateIfNewer(transformedData);
@@ -247,31 +254,45 @@ export class EntityOperations {
   }
 
   /**
-   * Convert snake_case property names to camelCase for TypeORM entity compatibility
-   * e.g., 'owner_id' -> 'ownerId', 'created_at' -> 'createdAt'
+   * Ensure date fields are converted from strings to Date objects
+   * Handles common date fields across all entities and entity-specific ones
    */
-  private transformPropertyNames(data: any): any {
-    const transformed: any = {};
+  private ensureDateObjects(obj: Record<string, any>): Record<string, any> {
+    const transformed = { ...obj };
     
-    for (const [key, value] of Object.entries(data)) {
-      // Convert snake_case to camelCase
-      const camelCaseKey = this.snakeToCamelCase(key);
-      transformed[camelCaseKey] = value;
+    // Common date fields across all entities
+    const commonDateFields = ['createdAt', 'updatedAt'];
+    
+    // Entity-specific date fields
+    const entityDateFields = {
+      tasks: ['dueDate', 'startDate', 'completedAt'],
+      projects: [],
+      users: [],
+      comments: []
+    };
+    
+    // Convert common date fields
+    for (const field of commonDateFields) {
+      if (transformed[field] && typeof transformed[field] === 'string') {
+        transformed[field] = new Date(transformed[field]);
+      }
+    }
+    
+    // Convert entity-specific date fields for all known entities
+    for (const fields of Object.values(entityDateFields)) {
+      for (const field of fields) {
+        if (transformed[field] && typeof transformed[field] === 'string') {
+          transformed[field] = new Date(transformed[field]);
+        }
+      }
     }
     
     return transformed;
   }
-  
-  /**
-   * Convert snake_case to camelCase
-   * e.g., 'owner_id' -> 'ownerId', 'created_at' -> 'createdAt'
-   */
-  private snakeToCamelCase(str: string): string {
-    return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
-  }
 
   /**
    * Execute an update operation using repositories
+   * Enhanced with upsert fallback and field-level conflict resolution
    */
   private async executeUpdate(table: string, data: RecordData): Promise<any> {
     // Junction tables don't support update operations
@@ -287,17 +308,17 @@ export class EntityOperations {
     try {
       // Get repository for this table
       const repository = this.repositories.getRepository(table);
-      console.log(`[EntityOperations] executeUpdate - repository lookup:`, {
+      syncLogger.debug('Repository lookup for update operation', {
         table,
         repositoryFound: !!repository,
         repositoryType: repository?.constructor?.name
-      });
+      }, MODULE_NAME);
       
       if (!repository) {
         throw new ValidationError(`No repository found for table: ${table}`);
       }
 
-      // Clean the data - remove metadata and relationship fields
+      // Clean the data - remove metadata and relationship fields, and snake_case duplicates
       const { 
         metadata, 
         id, 
@@ -305,54 +326,197 @@ export class EntityOperations {
         relationshipUpdates, 
         entity_relations,
         relationship_updates,
+        __changeMetadata,  // Enhanced: Remove client-side change metadata
+        __metadata,        // Remove sync metadata
         ...updateData 
       } = data as any;
       
-      // Transform snake_case property names to camelCase for TypeORM compatibility
-      const transformedData = this.transformPropertyNames(updateData);
-      
-      // Ensure client_id becomes clientId and convert updated_at to Date
-      if (transformedData.updatedAt) {
-        transformedData.updatedAt = new Date(transformedData.updatedAt);
-      }
+      // Clean snake_case duplicates first, then ensure date objects
+      const cleanedData = this.ensureDateObjects(updateData);
 
-      console.log(`[EntityOperations] executeUpdate - about to call repository.update():`, {
+      syncLogger.debug('Data processing for update operation', {
         table,
         id,
         originalDataKeys: Object.keys(updateData),
-        transformedDataKeys: Object.keys(transformedData),
-        hasClientId: !!transformedData.clientId,
-        hasUpdatedAt: !!transformedData.updatedAt
-      });
+        cleanedDataKeys: Object.keys(cleanedData),
+        hasClientId: !!cleanedData.clientId,
+        hasUpdatedAt: !!cleanedData.updatedAt,
+        hasChangeMetadata: !!__changeMetadata,
+        isRelationshipOnlyUpdate: Object.keys(cleanedData).filter(k => k !== 'id').every(k => ['clientId', 'updatedAt'].includes(k)) && 
+          Object.keys(cleanedData).filter(k => k !== 'id').length <= 2
+      }, MODULE_NAME);
 
-      // Use direct update method for explicit update operations
-      // This prevents trying to INSERT when we know it should be an UPDATE
-      const result = await repository.update(id, transformedData);
+      // Enhanced: Log change metadata for debugging
+      if (__changeMetadata) {
+        syncLogger.debug('Change metadata from client', {
+          changedFields: __changeMetadata.changedFields,
+          originalUpdatedAt: __changeMetadata.originalUpdatedAt,
+          changeTimestamp: __changeMetadata.changeTimestamp,
+          hasPartialUpdate: __changeMetadata.hasPartialUpdate
+        }, MODULE_NAME);
+      }
+
+      // Enhanced: Check for field-level conflicts before applying
+      const existing = await repository.findById(id);
       
-      console.log(`[EntityOperations] executeUpdate - repository.update() result:`, {
+      if (existing) {
+        // Use ConflictResolver to determine if we should apply this change
+        const tableChange = {
+          table,
+          operation: 'update' as const,
+          data: { ...data }, // Include original data with metadata
+          updatedAt: cleanedData.updatedAt || new Date().toISOString(),
+          clientId: cleanedData.clientId
+        };
+        
+        const decision = this.conflictResolver.shouldApplyChange(tableChange, existing);
+        
+        syncLogger.info(`Conflict resolution decision`, {
+          table,
+          id,
+          shouldApply: decision.shouldApply,
+          reason: decision.reason,
+          requiresMerge: decision.requiresMerge,
+          mergeableFields: decision.mergeableFields?.length || 0,
+          conflictingFields: decision.conflictingFields?.length || 0
+        }, MODULE_NAME);
+        
+        if (!decision.shouldApply) {
+          syncLogger.info(`Update rejected by conflict resolver: ${table}:${id}`, {
+            table,
+            id,
+            operation: 'update',
+            reason: decision.reason
+          }, MODULE_NAME);
+          
+          return null; // Conflict - don't apply
+        }
+        
+        // Enhanced: Handle field-level merging
+        if (decision.requiresMerge && decision.mergeableFields) {
+          const fieldAnalysis = {
+            conflictingFields: decision.conflictingFields || [],
+            mergeableFields: decision.mergeableFields,
+            resolutionStrategy: 'merge' as const
+          };
+          
+          const mergedEntity = this.conflictResolver.generateMergedEntity(tableChange, existing, fieldAnalysis);
+          
+          if (mergedEntity) {
+            syncLogger.debug(`Applying field-level merge`, {
+              table,
+              id,
+              mergedFields: decision.mergeableFields,
+              conflictedFields: decision.conflictingFields || []
+            }, MODULE_NAME);
+            
+            // Apply the merged entity
+            const result = await repository.update(id, mergedEntity);
+            
+            if (result) {
+              syncLogger.info(`Update applied with field-level merge: ${table}:${id}`, {
+                table,
+                id,
+                operation: 'field_merge_update',
+                mergedFields: decision.mergeableFields.length,
+                conflictedFields: (decision.conflictingFields || []).length
+              }, MODULE_NAME);
+              
+              return result;
+            }
+          }
+        }
+      }
+
+      // Try direct update first (preferred for explicit update operations)
+      const result = await repository.update(id, cleanedData);
+      
+      syncLogger.debug(`Repository.update() result`, {
         table,
         id,
         resultExists: !!result,
         resultType: typeof result
-      });
+      }, MODULE_NAME);
       
-      // If entity doesn't exist, this is likely a sync ordering issue
+      // Enhanced: If entity doesn't exist, fall back to upsert for better CRDT handling
       if (!result) {
-        syncLogger.warn(`Update operation failed - entity not found: ${table}:${id}`, {
+        syncLogger.warn(`Update operation failed - entity not found: ${table}:${id}. Attempting upsert fallback.`, {
           table,
           id,
-          operation: 'update'
+          operation: 'update',
+          fallbackAttempt: true
         }, MODULE_NAME);
+        
+        // Try upsert fallback using insertOrUpdateIfNewer
+        try {
+          // Ensure we have the required fields for insertOrUpdateIfNewer
+          const upsertData = {
+            ...cleanedData,
+            id, // Ensure ID is included
+            updatedAt: cleanedData.updatedAt || new Date() // Use camelCase property, TypeORM will map to updated_at column
+          };
+          
+          syncLogger.debug(`Attempting upsert fallback`, {
+            table,
+            id,
+            upsertDataKeys: Object.keys(upsertData),
+            hasRequiredFields: {
+              id: !!upsertData.id,
+              updatedAt: !!upsertData.updatedAt,
+              clientId: !!(upsertData as any).clientId
+            }
+          }, MODULE_NAME);
+          
+          const upsertResult = await repository.insertOrUpdateIfNewer(upsertData);
+          
+          if (upsertResult) {
+            syncLogger.info(`Update operation succeeded via upsert fallback: ${table}:${id}`, {
+              table,
+              id,
+              operation: 'update_via_upsert',
+              success: true
+            }, MODULE_NAME);
+            
+            syncLogger.debug(`Upsert fallback succeeded`, {
+              table,
+              id,
+              resultType: typeof upsertResult
+            }, MODULE_NAME);
+            
+            return upsertResult;
+          } else {
+            // Upsert returned null - this means the incoming data was older (CRDT conflict)
+            syncLogger.info(`Update operation via upsert rejected due to CRDT conflict: ${table}:${id}`, {
+              table,
+              id,
+              operation: 'update_via_upsert',
+              conflict: true
+            }, MODULE_NAME);
+            
+            return null; // Return null to indicate CRDT conflict
+          }
+        } catch (upsertError) {
+          syncLogger.error(`Update operation upsert fallback failed: ${table}:${id}`, {
+            table,
+            id,
+            operation: 'update_via_upsert',
+            error: upsertError instanceof Error ? upsertError.message : String(upsertError)
+          }, MODULE_NAME);
+          
+          // If upsert also fails, return null rather than throwing
+          // This allows the sync process to continue with other changes
+          return null;
+        }
       }
       
-      return result; // null means entity not found or CRDT conflict
+      return result; // Return successful direct update result
     } catch (error) {
-      console.error(`[EntityOperations] executeUpdate - ERROR:`, {
+      syncLogger.error(`Error executing update operation`, {
         table,
         id: data.id,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
-      });
+      }, MODULE_NAME);
       
       throw new DatabaseError(
         error instanceof Error ? error.message : String(error),
@@ -363,6 +527,7 @@ export class EntityOperations {
 
   /**
    * Execute a delete operation using repositories
+   * Modified: Delete operations are always applied regardless of timestamp conflicts
    */
   private async executeDelete(table: string, id: string, timestamp: string): Promise<any> {
     // Handle junction tables specially
@@ -380,14 +545,43 @@ export class EntityOperations {
       // Get current record before delete for return value
       const existing = await repository.findById(id);
       if (!existing) {
+        syncLogger.debug(`Delete operation - entity not found: ${table}:${id}`, {
+          table,
+          id,
+          operation: 'delete'
+        }, MODULE_NAME);
         return null; // Entity doesn't exist
       }
 
-      // Use CRDT-aware delete that checks timestamps
-      const deleted = await repository.deleteIfNewer(id, new Date(timestamp));
+      // ✅ FIXED: Always delete regardless of timestamp conflicts
+      // Delete operations take precedence over CRDT timestamp resolution
+      const deleted = await repository.delete(id);
       
-      return deleted ? existing : null; // Return the deleted entity or null if conflict
+      if (deleted) {
+        syncLogger.debug(`Delete operation succeeded: ${table}:${id}`, {
+          table,
+          id,
+          operation: 'delete',
+          existingUpdatedAt: existing.updated_at,
+          deleteTimestamp: timestamp
+        }, MODULE_NAME);
+        return existing; // Return the deleted entity
+      } else {
+        syncLogger.warn(`Delete operation failed (repository.delete returned false): ${table}:${id}`, {
+          table,
+          id,
+          operation: 'delete'
+        }, MODULE_NAME);
+        return null;
+      }
     } catch (error) {
+      syncLogger.error(`Delete operation error: ${table}:${id}`, {
+        table,
+        id,
+        operation: 'delete',
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
       throw new DatabaseError(
         error instanceof Error ? error.message : String(error),
         { table, operation: 'delete', id }
@@ -397,140 +591,105 @@ export class EntityOperations {
 
   /**
    * Check if a table is a junction table (many-to-many relationship table)
+   * Now uses auto-generated configuration instead of hardcoded list
    */
   private isJunctionTable(table: string): boolean {
-    const junctionTables = ['project_members', 'task_dependencies'];
-    return junctionTables.includes(table);
+    return SERVER_JUNCTION_TABLES.includes(table as any);
   }
 
   /**
-   * Execute an insert operation on a junction table using repositories
+   * Execute an insert operation on a junction table using auto-generated configurations
+   * This replaces the hardcoded switch statement with configuration-driven processing
    */
   private async executeJunctionInsert(table: string, data: RecordData): Promise<any> {
-    if (table === 'project_members') {
-      const projectId = (data as any).project_id;
-      const userId = (data as any).user_id;
-      
-      if (!projectId || !userId) {
-        throw new ValidationError('Missing project_id or user_id in project_members insert');
-      }
-      
-      try {
-        // Use repository method instead of raw SQL
-        await this.repositories.projects.addMember(projectId, userId);
-        
-        // Return synthetic record for consistency
-        return {
-          id: `${projectId}_${userId}`,
-          project_id: projectId,
-          user_id: userId
-        };
-      } catch (error) {
-        // Check if this is a conflict (member already exists)
-        if (error instanceof Error && error.message.includes('already exists')) {
-          return null; // Conflict - member already exists
-        }
-        
-        throw new DatabaseError(
-          error instanceof Error ? error.message : String(error),
-          { table: 'project_members', operation: 'insert', project_id: projectId, user_id: userId }
-        );
-      }
+    // Get junction table configuration
+    const junctionConfig = SERVER_JUNCTION_TABLE_MAPPING[table as keyof typeof SERVER_JUNCTION_TABLE_MAPPING];
+    if (!junctionConfig) {
+      throw new ValidationError(`No junction table configuration found for: ${table}`);
+    }
+
+    const { sourceColumn, targetColumn, sourceEntity, targetEntity, relationName } = junctionConfig;
+    
+    // Extract IDs from data using the configured column names
+    const sourceId = (data as any)[sourceColumn];
+    const targetId = (data as any)[targetColumn];
+    
+    if (!sourceId || !targetId) {
+      throw new ValidationError(`Missing ${sourceColumn} or ${targetColumn} in ${table} insert`);
     }
     
-    if (table === 'task_dependencies') {
-      const dependentTaskId = (data as any).dependent_task_id;
-      const dependencyTaskId = (data as any).dependency_task_id;
+    try {
+      // Get the source repository to perform the relationship operation
+      const sourceRepo = this.getRepositoryForEntity(sourceEntity.toLowerCase() + 's');
+      if (!sourceRepo) {
+        throw new ValidationError(`No repository found for source entity: ${sourceEntity}`);
+      }
+
+      // Use the universal relationship adder
+      await this.addUniversalRelationship(sourceRepo, sourceId, relationName, targetId);
       
-      if (!dependentTaskId || !dependencyTaskId) {
-        throw new ValidationError('Missing dependent_task_id or dependency_task_id in task_dependencies insert');
+      // Return synthetic record for consistency
+      return {
+        id: `${sourceId}_${targetId}`,
+        [sourceColumn]: sourceId,
+        [targetColumn]: targetId
+      };
+    } catch (error) {
+      // Check if this is a conflict (relationship already exists)
+      if (error instanceof Error && error.message.includes('already exists')) {
+        return null; // Conflict - relationship already exists
       }
       
-      try {
-        // Use repository method instead of raw SQL
-        await this.repositories.tasks.addDependency(dependentTaskId, dependencyTaskId);
-        
-        // Return synthetic record for consistency
-        return {
-          id: `${dependentTaskId}_${dependencyTaskId}`,
-          dependent_task_id: dependentTaskId,
-          dependency_task_id: dependencyTaskId
-        };
-      } catch (error) {
-        // Check if this is a conflict (dependency already exists)
-        if (error instanceof Error && error.message.includes('already exists')) {
-          return null; // Conflict - dependency already exists
-        }
-        
-        throw new DatabaseError(
-          error instanceof Error ? error.message : String(error),
-          { table: 'task_dependencies', operation: 'insert', dependent_task_id: dependentTaskId, dependency_task_id: dependencyTaskId }
-        );
-      }
+      throw new DatabaseError(
+        error instanceof Error ? error.message : String(error),
+        { table, operation: 'insert', [sourceColumn]: sourceId, [targetColumn]: targetId }
+      );
     }
-    
-    throw new ValidationError(`Unsupported junction table: ${table}`);
   }
 
   /**
-   * Execute a delete operation on a junction table using repositories
+   * Execute a delete operation on a junction table using auto-generated configurations
+   * This replaces the hardcoded switch statement with configuration-driven processing
    */
   private async executeJunctionDelete(table: string, syntheticId: string): Promise<any> {
-    if (table === 'project_members') {
-      // Parse synthetic ID: "projectId_userId"
-      const parts = syntheticId.split('_');
-      if (parts.length !== 2) {
-        throw new ValidationError(`Invalid synthetic ID format for project_members: ${syntheticId}`);
-      }
-      
-      const [projectId, userId] = parts;
-      
-      try {
-        // Use repository method instead of raw SQL
-        await this.repositories.projects.removeMember(projectId, userId);
-        
-        // Return synthetic record for consistency
-        return {
-          id: syntheticId,
-          project_id: projectId,
-          user_id: userId
-        };
-      } catch (error) {
-        throw new DatabaseError(
-          error instanceof Error ? error.message : String(error),
-          { table: 'project_members', operation: 'delete', synthetic_id: syntheticId }
-        );
-      }
+    // Get junction table configuration
+    const junctionConfig = SERVER_JUNCTION_TABLE_MAPPING[table as keyof typeof SERVER_JUNCTION_TABLE_MAPPING];
+    if (!junctionConfig) {
+      throw new ValidationError(`No junction table configuration found for: ${table}`);
+    }
+
+    const { sourceColumn, targetColumn, sourceEntity, relationName } = junctionConfig;
+    
+    // Parse synthetic ID: "sourceId_targetId"
+    const parts = syntheticId.split('_');
+    if (parts.length !== 2) {
+      throw new ValidationError(`Invalid synthetic ID format for ${table}: ${syntheticId}`);
     }
     
-    if (table === 'task_dependencies') {
-      // Parse synthetic ID: "dependentTaskId_dependencyTaskId"
-      const parts = syntheticId.split('_');
-      if (parts.length !== 2) {
-        throw new ValidationError(`Invalid synthetic ID format for task_dependencies: ${syntheticId}`);
-      }
-      
-      const [dependentTaskId, dependencyTaskId] = parts;
-      
-      try {
-        // Use repository method instead of raw SQL
-        await this.repositories.tasks.removeDependency(dependentTaskId, dependencyTaskId);
-        
-        // Return synthetic record for consistency
-        return {
-          id: syntheticId,
-          dependent_task_id: dependentTaskId,
-          dependency_task_id: dependencyTaskId
-        };
-      } catch (error) {
-        throw new DatabaseError(
-          error instanceof Error ? error.message : String(error),
-          { table: 'task_dependencies', operation: 'delete', synthetic_id: syntheticId }
-        );
-      }
-    }
+    const [sourceId, targetId] = parts;
     
-    throw new ValidationError(`Unsupported junction table: ${table}`);
+    try {
+      // Get the source repository to perform the relationship operation
+      const sourceRepo = this.getRepositoryForEntity(sourceEntity.toLowerCase() + 's');
+      if (!sourceRepo) {
+        throw new ValidationError(`No repository found for source entity: ${sourceEntity}`);
+      }
+
+      // Use the universal relationship remover
+      await this.removeUniversalRelationship(sourceRepo, sourceId, relationName, targetId);
+      
+      // Return synthetic record for consistency
+      return {
+        id: syntheticId,
+        [sourceColumn]: sourceId,
+        [targetColumn]: targetId
+      };
+    } catch (error) {
+      throw new DatabaseError(
+        error instanceof Error ? error.message : String(error),
+        { table, operation: 'delete', synthetic_id: syntheticId }
+      );
+    }
   }
 
   /**
@@ -564,16 +723,8 @@ export class EntityOperations {
           ...entityData 
         } = data as any;
         
-        // Transform snake_case property names to camelCase for TypeORM compatibility
-        const transformedData = this.transformPropertyNames(entityData);
-        
-        // Ensure date fields are Date objects
-        if (transformedData.updatedAt) {
-          transformedData.updatedAt = new Date(transformedData.updatedAt);
-        }
-        if (transformedData.createdAt) {
-          transformedData.createdAt = new Date(transformedData.createdAt);
-        }
+        // Data is already in camelCase from client - just ensure date fields are Date objects
+        const transformedData = this.ensureDateObjects(entityData);
         
         return transformedData;
       });
@@ -625,34 +776,41 @@ export class EntityOperations {
       try {
         const data = change.data as RecordData;
         
-        // First, handle any regular entity data updates (if there are fields other than just 'id')
-        const entityFields = Object.keys(data).filter(key => key !== 'id');
+        // Check if there are actual entity fields to update (beyond id, clientId, updatedAt)
+        const entityFields = Object.keys(data).filter(key => 
+          key !== 'id' && key !== 'clientId' && key !== 'updatedAt'
+        );
+        
+        let entityResult = null;
+        
         if (entityFields.length > 0) {
-          const entityResult = await this.executeUpdate(table, data);
+          // There are actual entity fields to update
+          entityResult = await this.executeUpdate(table, data);
           if (entityResult) {
             results.push(entityResult);
           }
+        } else {
+          // Pure relationship update - skip entity update, just fetch current record
+          entityResult = await this.fetchCurrentRecord(table, data.id);
+          syncLogger.debug(`Skipping entity update for pure relationship change: ${table}:${data.id}`);
         }
         
-        // Then, handle relationship updates
+        // Handle relationship updates with validation optimization
         if (change.relationshipUpdates && change.relationshipUpdates.length > 0) {
-          await this.processEntityRelationshipUpdates(table, data.id, change.relationshipUpdates);
+          await this.processEntityRelationshipUpdates(table, data.id, change.relationshipUpdates, true); // skipValidation = true
           
-          // For relationship updates, we still need to return a result to mark as processed
-          // Use the existing entity data or fetch it if we didn't update entity fields
-          const relationshipResult = entityFields.length > 0 ? 
-            results[results.length - 1] : 
-            await this.fetchCurrentRecord(table, data.id);
-            
-          if (relationshipResult && !entityFields.length) {
-            results.push(relationshipResult);
+          // If we didn't update entity fields, add the relationship result
+          if (entityFields.length === 0 && entityResult) {
+            results.push(entityResult);
           }
         }
         
         syncLogger.debug(`Processed relationship change for ${table}:${data.id}`, {
           table,
           entityId: data.id,
-          relationshipCount: change.relationshipUpdates?.length || 0
+          relationshipCount: change.relationshipUpdates?.length || 0,
+          hadEntityFields: entityFields.length > 0,
+          entityFields
         }, MODULE_NAME);
         
       } catch (error) {
@@ -672,6 +830,7 @@ export class EntityOperations {
 
   /**
    * Process relationship updates for a specific entity
+   * Now uses auto-generated configurations instead of hardcoded switch statements
    */
   private async processEntityRelationshipUpdates(
     table: string, 
@@ -680,123 +839,154 @@ export class EntityOperations {
       relationName: string;
       operation: 'set' | 'add' | 'remove';
       targetIds: string[];
-    }>
+    }>,
+    skipValidation = false
   ): Promise<void> {
-    for (const relUpdate of relationshipUpdates) {
-      switch (table) {
-        case 'projects':
-          await this.processProjectRelationshipUpdate(entityId, relUpdate);
-          break;
-        case 'tasks':
-          await this.processTaskRelationshipUpdate(entityId, relUpdate);
-          break;
-        default:
-          syncLogger.warn(`Unknown entity table for relationship updates: ${table}`, {
-            table,
-            entityId,
-            relationName: relUpdate.relationName
-          }, MODULE_NAME);
-      }
+    // Check if entity has relationship configuration
+    if (!hasRelationshipConfig(table)) {
+      syncLogger.warn(`No relationship configuration found for entity table: ${table}`, {
+        table,
+        entityId,
+        availableEntities: Object.keys(SERVER_RELATIONSHIP_CONFIGS)
+      }, MODULE_NAME);
+      return;
     }
-  }
 
-  /**
-   * Process project relationship updates
-   */
-  private async processProjectRelationshipUpdate(
-    projectId: string, 
-    relUpdate: {
-      relationName: string;
-      operation: 'set' | 'add' | 'remove';
-      targetIds: string[];
-    }
-  ): Promise<void> {
-    switch (relUpdate.relationName) {
-      case 'members':
-        await this.updateProjectMembers(projectId, relUpdate);
-        break;
-      default:
-        syncLogger.warn(`Unknown project relationship: ${relUpdate.relationName}`, {
-          projectId,
+    const junctionRelationships = getJunctionRelationships(table);
+    const validRelationNames = new Set(junctionRelationships.map(rel => rel.relationName));
+
+    for (const relUpdate of relationshipUpdates) {
+      // Validate relationship exists for this entity
+      if (!validRelationNames.has(relUpdate.relationName)) {
+        syncLogger.warn(`Unknown relationship '${relUpdate.relationName}' for entity '${table}'`, {
+          table,
+          entityId,
+          relationName: relUpdate.relationName,
+          availableRelations: Array.from(validRelationNames)
+        }, MODULE_NAME);
+        continue;
+      }
+
+      // Find the relationship configuration
+      const relationshipConfig = junctionRelationships.find(rel => rel.relationName === relUpdate.relationName);
+      if (!relationshipConfig) {
+        syncLogger.error(`Could not find relationship config for '${relUpdate.relationName}' on entity '${table}'`, {
+          table,
+          entityId,
           relationName: relUpdate.relationName
         }, MODULE_NAME);
-    }
-  }
+        continue;
+      }
 
-  /**
-   * Process task relationship updates
-   */
-  private async processTaskRelationshipUpdate(
-    taskId: string, 
-    relUpdate: {
-      relationName: string;
-      operation: 'set' | 'add' | 'remove';
-      targetIds: string[];
-    }
-  ): Promise<void> {
-    switch (relUpdate.relationName) {
-      case 'dependencies':
-        await this.updateTaskDependencies(taskId, relUpdate);
-        break;
-      case 'assignees':
-        syncLogger.warn(`Task assignee relationship updates not yet implemented`, {
-          taskId,
+      try {
+        await this.processUniversalRelationshipUpdate(table, entityId, relUpdate, relationshipConfig, skipValidation);
+        
+        syncLogger.debug(`Successfully processed relationship update using auto-generated config`, {
+          table,
+          entityId,
           relationName: relUpdate.relationName,
           operation: relUpdate.operation,
-          targetCount: relUpdate.targetIds.length
+          targetCount: relUpdate.targetIds.length,
+          junctionTable: relationshipConfig.junctionTable,
+          skipValidation
         }, MODULE_NAME);
-        break;
-      default:
-        syncLogger.warn(`Unknown task relationship: ${relUpdate.relationName}`, {
-          taskId,
-          relationName: relUpdate.relationName
+        
+      } catch (error) {
+        syncLogger.error(`Failed to process relationship update using auto-generated config`, {
+          table,
+          entityId,
+          relationName: relUpdate.relationName,
+          operation: relUpdate.operation,
+          targetCount: relUpdate.targetIds.length,
+          junctionTable: relationshipConfig.junctionTable,
+          error: error instanceof Error ? error.message : String(error)
         }, MODULE_NAME);
+        throw error;
+      }
     }
   }
 
   /**
-   * Update project members based on relationship operation using repositories
+   * Universal relationship update processor using auto-generated configurations
+   * This replaces the entity-specific methods (processProjectRelationshipUpdate, processTaskRelationshipUpdate)
    */
-  private async updateProjectMembers(
-    projectId: string,
+  private async processUniversalRelationshipUpdate(
+    table: string,
+    entityId: string,
     relUpdate: {
+      relationName: string;
       operation: 'set' | 'add' | 'remove';
       targetIds: string[];
-    }
+    },
+    relationshipConfig: {
+      junctionTable: string;
+      relationName: string;
+      sourceColumn: string;
+      targetColumn: string;
+      targetEntity: string;
+    },
+    skipValidation = false
   ): Promise<void> {
+    const { junctionTable, sourceColumn, targetColumn, targetEntity, relationName } = relationshipConfig;
+    
+    syncLogger.debug(`Processing universal relationship update`, {
+      table,
+      entityId,
+      relationName,
+      operation: relUpdate.operation,
+      targetCount: relUpdate.targetIds.length,
+      junctionTable,
+      sourceColumn,
+      targetColumn,
+      targetEntity,
+      skipValidation
+    }, MODULE_NAME);
+
+    // Get the appropriate repository based on the target entity
+    const targetRepo = this.getRepositoryForEntity(targetEntity);
+    const sourceRepo = this.getRepositoryForEntity(table);
+
+    if (!targetRepo || !sourceRepo) {
+      throw new Error(`Repository not found for relationship processing: source=${table}, target=${targetEntity}`);
+    }
+
     try {
       switch (relUpdate.operation) {
         case 'set':
-          // Replace entire member list using repository method
-          await this.repositories.projects.updateMembers(projectId, relUpdate.targetIds);
+          // Replace entire relationship list
+          await this.setUniversalRelationship(sourceRepo, entityId, relationName, relUpdate.targetIds, skipValidation);
           break;
           
         case 'add':
-          // Add specific members using repository method
-          for (const userId of relUpdate.targetIds) {
-            await this.repositories.projects.addMember(projectId, userId);
+          // Add specific relationships
+          for (const targetId of relUpdate.targetIds) {
+            await this.addUniversalRelationship(sourceRepo, entityId, relationName, targetId);
           }
           break;
           
         case 'remove':
-          // Remove specific members using repository method
-          for (const userId of relUpdate.targetIds) {
-            await this.repositories.projects.removeMember(projectId, userId);
+          // Remove specific relationships
+          for (const targetId of relUpdate.targetIds) {
+            await this.removeUniversalRelationship(sourceRepo, entityId, relationName, targetId);
           }
           break;
       }
       
-      syncLogger.debug(`Updated project members via repository`, {
-        projectId,
+      syncLogger.debug(`Universal relationship update completed successfully`, {
+        table,
+        entityId,
+        relationName,
         operation: relUpdate.operation,
-        memberCount: relUpdate.targetIds.length
+        targetCount: relUpdate.targetIds.length
       }, MODULE_NAME);
       
     } catch (error) {
-      syncLogger.error(`Failed to update project members via repository`, {
-        projectId,
+      syncLogger.error(`Universal relationship update failed`, {
+        table,
+        entityId,
+        relationName,
         operation: relUpdate.operation,
-        memberCount: relUpdate.targetIds.length,
+        targetCount: relUpdate.targetIds.length,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
       throw error;
@@ -804,64 +994,122 @@ export class EntityOperations {
   }
 
   /**
-   * Update task dependencies based on relationship operation using repositories consistently
+   * Get repository for an entity table name
    */
-  private async updateTaskDependencies(
-    taskId: string,
-    relUpdate: {
-      operation: 'set' | 'add' | 'remove';
-      targetIds: string[];
-    }
+  private getRepositoryForEntity(entityTableOrName: string): any {
+    // Handle both plural table names and entity names
+    const entityMap: Record<string, string> = {
+      'users': 'users',
+      'projects': 'projects', 
+      'tasks': 'tasks',
+      'comments': 'comments',
+      // Add more mappings as needed
+    };
+
+    const repoKey = entityMap[entityTableOrName] || entityTableOrName;
+    return this.repositories.getRepository(repoKey);
+  }
+
+  /**
+   * Universal relationship setter using repository methods
+   */
+  private async setUniversalRelationship(
+    sourceRepo: any,
+    entityId: string,
+    relationName: string,
+    targetIds: string[],
+    skipValidation = false
   ): Promise<void> {
-    try {
-      switch (relUpdate.operation) {
-        case 'set':
-          // Replace entire dependency list using repository method
-          // TODO: Add setDependencies method to TaskRepository for batch updates
-          // For now, use individual remove/add operations
-          
-          // Remove all existing dependencies first
-          // Note: We should fetch existing dependencies from repository to know what to remove
-          // This is a temporary implementation until we add setDependencies to TaskRepository
-          for (const depTaskId of relUpdate.targetIds) {
-            await this.repositories.tasks.addDependency(taskId, depTaskId);
-          }
-          
-          syncLogger.warn(`Task dependency 'set' operation using individual adds - consider adding setDependencies to TaskRepository`, {
-            taskId,
-            dependencyCount: relUpdate.targetIds.length
-          }, MODULE_NAME);
-          break;
-          
-        case 'add':
-          // Add specific dependencies using repository method
-          for (const depTaskId of relUpdate.targetIds) {
-            await this.repositories.tasks.addDependency(taskId, depTaskId);
-          }
-          break;
-          
-        case 'remove':
-          // Remove specific dependencies using repository method
-          for (const depTaskId of relUpdate.targetIds) {
-            await this.repositories.tasks.removeDependency(taskId, depTaskId);
-          }
-          break;
+    // Try to find a repository method for this relationship
+    const setMethodName = `set${relationName.charAt(0).toUpperCase() + relationName.slice(1)}`;
+    const updateMethodName = `update${relationName.charAt(0).toUpperCase() + relationName.slice(1)}`;
+    
+    if (typeof sourceRepo[setMethodName] === 'function') {
+      await sourceRepo[setMethodName](entityId, targetIds, skipValidation);
+    } else if (typeof sourceRepo[updateMethodName] === 'function') {
+      await sourceRepo[updateMethodName](entityId, targetIds, skipValidation);
+    } else {
+      syncLogger.warn(`No set/update method found for relationship '${relationName}' on repository`, {
+        entityId,
+        relationName,
+        skipValidation,
+        availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(sourceRepo)).filter(name => 
+          typeof sourceRepo[name] === 'function' && name !== 'constructor'
+        )
+      }, MODULE_NAME);
+      
+      // Fallback: log warning but don't fail
+      throw new Error(`Repository method not found for setting relationship '${relationName}'`);
+    }
+  }
+
+  /**
+   * Universal relationship adder using repository methods
+   */
+  private async addUniversalRelationship(
+    sourceRepo: any,
+    entityId: string,
+    relationName: string,
+    targetId: string
+  ): Promise<void> {
+    // Try to find a repository method for this relationship
+    const addMethodName = `add${relationName.charAt(0).toUpperCase() + relationName.slice(1).replace(/s$/, '')}`;
+    
+    if (typeof sourceRepo[addMethodName] === 'function') {
+      await sourceRepo[addMethodName](entityId, targetId);
+    } else {
+      // For some relationships like 'dependencies', we need to handle differently
+      if (relationName === 'dependencies' && typeof sourceRepo.addDependency === 'function') {
+        await sourceRepo.addDependency(entityId, targetId);
+      } else if (relationName === 'members' && typeof sourceRepo.addMember === 'function') {
+        await sourceRepo.addMember(entityId, targetId);
+      } else {
+        syncLogger.warn(`No add method found for relationship '${relationName}' on repository`, {
+          entityId,
+          targetId,
+          relationName,
+          availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(sourceRepo)).filter(name => 
+            typeof sourceRepo[name] === 'function' && name !== 'constructor'
+          )
+        }, MODULE_NAME);
+        
+        throw new Error(`Repository method not found for adding relationship '${relationName}'`);
       }
-      
-      syncLogger.debug(`Updated task dependencies via repository methods`, {
-        taskId,
-        operation: relUpdate.operation,
-        dependencyCount: relUpdate.targetIds.length
-      }, MODULE_NAME);
-      
-    } catch (error) {
-      syncLogger.error(`Failed to update task dependencies via repository methods`, {
-        taskId,
-        operation: relUpdate.operation,
-        dependencyCount: relUpdate.targetIds.length,
-        error: error instanceof Error ? error.message : String(error)
-      }, MODULE_NAME);
-      throw error;
+    }
+  }
+
+  /**
+   * Universal relationship remover using repository methods
+   */
+  private async removeUniversalRelationship(
+    sourceRepo: any,
+    entityId: string,
+    relationName: string,
+    targetId: string
+  ): Promise<void> {
+    // Try to find a repository method for this relationship
+    const removeMethodName = `remove${relationName.charAt(0).toUpperCase() + relationName.slice(1).replace(/s$/, '')}`;
+    
+    if (typeof sourceRepo[removeMethodName] === 'function') {
+      await sourceRepo[removeMethodName](entityId, targetId);
+    } else {
+      // For some relationships like 'dependencies', we need to handle differently
+      if (relationName === 'dependencies' && typeof sourceRepo.removeDependency === 'function') {
+        await sourceRepo.removeDependency(entityId, targetId);
+      } else if (relationName === 'members' && typeof sourceRepo.removeMember === 'function') {
+        await sourceRepo.removeMember(entityId, targetId);
+      } else {
+        syncLogger.warn(`No remove method found for relationship '${relationName}' on repository`, {
+          entityId,
+          targetId,
+          relationName,
+          availableMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(sourceRepo)).filter(name => 
+            typeof sourceRepo[name] === 'function' && name !== 'constructor'
+          )
+        }, MODULE_NAME);
+        
+        throw new Error(`Repository method not found for removing relationship '${relationName}'`);
+      }
     }
   }
 

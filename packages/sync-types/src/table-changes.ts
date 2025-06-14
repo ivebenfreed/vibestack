@@ -10,16 +10,33 @@ export interface RelationshipUpdate {
 /**
  * Core change type for replication
  * Represents a change to a table that needs to be replicated
+ * 
+ * IMPORTANT: The `data` field should contain TypeORM entity data in camelCase format
+ * with proper types (Date objects for dates, not strings). This preserves TypeORM
+ * entity structure throughout the sync pipeline and reduces unnecessary conversions.
  */
 export interface TableChange {
   table: string;
   operation: 'insert' | 'update' | 'delete';
-  data: Record<string, unknown>;
-  updated_at: string;  // ISO timestamp of when the record was updated
-  lsn?: string;        // WAL LSN for ordering
-  client_id?: string;  // Client ID for conflict resolution
   
-  // ✨ NEW: TypeORM-native relationship support
+  /**
+   * Entity data in TypeORM format (camelCase properties, proper types)
+   * - Date fields should be Date objects, not ISO strings
+   * - Property names should match TypeORM entity properties (camelCase)
+   * - This preserves the entity structure from client to server
+   */
+  data: Record<string, unknown>;
+  
+  /**
+   * ISO timestamp string of when the record was last updated
+   * This is separate from data.updatedAt to avoid confusion
+   */
+  updatedAt: string;
+  
+  lsn?: string;        // WAL LSN for ordering
+  clientId?: string;  // Client ID for conflict resolution
+  
+  // ✨ TypeORM-native relationship support
   relationshipUpdates?: RelationshipUpdate[];
   entityRelations?: string[]; // Which relations to load/save
 }
@@ -32,7 +49,7 @@ export function isTableChange(payload: unknown): payload is TableChange {
     && ['insert', 'update', 'delete'].includes(p.operation)
     && typeof p.data === 'object'
     && p.data !== null
-    && typeof p.updated_at === 'string';
+    && typeof p.updatedAt === 'string';
 }
 
 export function isRelationshipUpdate(payload: unknown): payload is RelationshipUpdate {

@@ -11,7 +11,8 @@
     "_start_servers_for_pwa_test": "vite preview",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
-    "knip": "knip"
+    "knip": "knip",
+    "test:sync-isolation": "tsx src/sync/testing/run-sync-isolation-test.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",
@@ -46,6 +47,8 @@
     "@tanstack/react-query": "^5.74.3",
     "@tanstack/react-router": "^1.116.0",
     "@tanstack/react-table": "^8.21.3",
+    "@xstate/react": "^5.0.5",
+    "@xstate/store": "^3.6.2",
     "axios": "^1.8.4",
     "better-auth": "^1.2.7",
     "class-variance-authority": "^0.7.1",
@@ -53,7 +56,9 @@
     "cmdk": "1.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.7.4",
+    "immer": "^10.1.1",
     "input-otp": "^1.4.2",
+    "jotai": "^2.12.5",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.488.0",
     "react": "^19.1.0",
@@ -71,6 +76,7 @@
     "typeorm": "^0.3.20",
     "typeorm-pglite": "^0.3.2",
     "uuid": "^9.0.1",
+    "xstate": "^5.19.4",
     "zod": "^3.24.2",
     "zustand": "^5.0.3"
   },
@@ -99,6 +105,7 @@
     "knip": "^5.50.4",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
+    "tsx": "^4.19.2",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^6.2.6",

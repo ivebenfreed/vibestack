@@ -10,32 +10,48 @@ interface QueryState<T> {
 }
 
 /**
- * Helper function to transform snake_case database fields to camelCase TypeScript objects.
- * This handles both direct fields and prefixed fields (like task_id -> id).
+ * Optimized helper function to transform snake_case database fields to camelCase TypeScript objects.
+ * Uses memoization and optimized string operations for better performance.
  */
+const transformCache = new Map<string, string>();
+
+// Pre-compile regex for better performance
+const UNDERSCORE_REGEX = /_([a-z])/g;
+
 function transformDatabaseResultToEntity<T extends ObjectLiteral>(
   row: Record<string, any>,
   entityName: string
 ): T {
   const result: Record<string, any> = {};
   const entityPrefix = entityName.toLowerCase() + '_';
+  const entityPrefixLength = entityPrefix.length;
   
-  // Process each field in the row
-  for (const key in row) {
-    if (Object.prototype.hasOwnProperty.call(row, key)) {
-      const value = row[key];
-      
-      // Handle prefixed fields (e.g., task_id -> id)
-      if (key.startsWith(entityPrefix)) {
-        // Convert snake_case to camelCase and remove prefix
-        const unprefixedKey = key.substring(entityPrefix.length);
-        const camelCaseKey = unprefixedKey.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-        result[camelCaseKey] = value;
-      } else {
-        // Handle non-prefixed fields (direct snake_case to camelCase)
-        const camelCaseKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-        result[camelCaseKey] = value;
+  // Get all keys once to avoid repeated Object.keys() calls
+  const keys = Object.keys(row);
+  
+  // Process each field in the row with optimized operations
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const value = row[key];
+    
+    // Handle prefixed fields (e.g., task_id -> id) - optimized string operations
+    if (key.startsWith(entityPrefix)) {
+      // Convert snake_case to camelCase and remove prefix - avoid substring allocation
+      const unprefixedKey = key.slice(entityPrefixLength);
+      let camelCaseKey = transformCache.get(unprefixedKey);
+      if (!camelCaseKey) {
+        camelCaseKey = unprefixedKey.replace(UNDERSCORE_REGEX, (_, letter) => letter.toUpperCase());
+        transformCache.set(unprefixedKey, camelCaseKey);
       }
+      result[camelCaseKey] = value;
+    } else {
+      // Handle non-prefixed fields (direct snake_case to camelCase) - use cached transformation
+      let camelCaseKey = transformCache.get(key);
+      if (!camelCaseKey) {
+        camelCaseKey = key.replace(UNDERSCORE_REGEX, (_, letter) => letter.toUpperCase());
+        transformCache.set(key, camelCaseKey);
+      }
+      result[camelCaseKey] = value;
     }
   }
   
@@ -52,7 +68,7 @@ function transformDatabaseResultToEntity<T extends ObjectLiteral>(
  */
 export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string; updatedAt?: Date | string; createdAt?: Date | string }>(
   queryBuilder: SelectQueryBuilder<T> | null,
-  keyColumn: string = 'id', // The column to key the diff algorithm on (usually primary key)
+  keyColumn: string = 'id', // ⚠️ IMPORTANT: Use SQL result column name (e.g., 'task_id' from TypeORM alias), NOT database column name
   options?: {
     enabled?: boolean;
     transform?: boolean; // Add option to control transformation
@@ -73,20 +89,24 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
 
   // Effect to set up the incremental live query
   useEffect(() => {
-    console.log('[useLiveEntityIncremental] useEffect triggered', { enabled, queryBuilder: !!queryBuilder });
+    // Reduced logging - uncomment below for debugging if needed
+    // console.log('[useLiveEntityIncremental] useEffect triggered', { enabled, queryBuilder: !!queryBuilder });
     
     if (!enabled || !queryBuilder) {
-      console.log('[useLiveEntityIncremental] Early return - enabled:', enabled, 'queryBuilder:', !!queryBuilder);
+      // Reduced logging - uncomment below for debugging if needed
+      // console.log('[useLiveEntityIncremental] Early return - enabled:', enabled, 'queryBuilder:', !!queryBuilder);
       setState({ data: null, loading: false, error: null });
       return;
     }
 
     let isMounted = true;
-    console.log('[useLiveEntityIncremental] Setting up incremental live query with PGlite...');
+    // Reduced logging - uncomment below for debugging if needed
+    // console.log('[useLiveEntityIncremental] Setting up incremental live query with PGlite...');
 
     const setupIncrementalLiveQuery = async () => {
       try {
-        console.log('[useLiveEntityIncremental] Starting setup...');
+        // Reduced logging - uncomment below for debugging if needed
+        // console.log('[useLiveEntityIncremental] Starting setup...');
         
         // First set loading state
         if (isMounted) {
@@ -94,11 +114,13 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
         }
 
         const db = await getDatabase();
-        console.log('[useLiveEntityIncremental] Database obtained, checking live extension...', { hasLive: !!db.live, hasIncrementalQuery: !!(db.live && db.live.incrementalQuery) });
+        // Reduced logging - uncomment below for debugging if needed
+        // console.log('[useLiveEntityIncremental] Database obtained, checking live extension...', { hasLive: !!db.live, hasIncrementalQuery: !!(db.live && db.live.incrementalQuery) });
         
         // Get the SQL and parameters from the query builder first
         const [sql, params] = queryBuilder.getQueryAndParameters();
-        console.log('[useLiveEntityIncremental] Watching SQL:', sql, 'with params:', params, 'key column:', keyColumn);
+        // Reduced logging - uncomment below for debugging if needed
+        // console.log('[useLiveEntityIncremental] Watching SQL:', sql, 'with params:', params, 'key column:', keyColumn);
         
         // Check if the live extension and incremental query are available
         if (!db.live || !db.live.incrementalQuery) {
@@ -106,7 +128,8 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
           
           // Fallback to regular live query
           const liveQueryResult = await db.live.query(sql, params, (results: Results<any>) => {
-            console.log('[useLiveEntityIncremental] Regular live query fallback update received:', results);
+            // Reduced logging - uncomment below for debugging if needed
+            // console.log('[useLiveEntityIncremental] Regular live query fallback update received:', results);
             
             if (isMounted) {
               // Format and transform the results
@@ -114,13 +137,22 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
               
               // Apply transformation if enabled
               if (shouldTransform && entityName) {
-                console.log('[useLiveEntityIncremental] Transforming snake_case to camelCase entities (fallback)');
+                // Reduced logging - uncomment below for debugging if needed
+                // console.log('[useLiveEntityIncremental] Transforming snake_case to camelCase entities (fallback)');
+                const transformStartTime = performance.now();
                 formattedResults = formattedResults.map((row: Record<string, any>) => 
                   transformDatabaseResultToEntity<T>(row, entityName)
                 );
+                const transformEndTime = performance.now();
+                const transformTime = transformEndTime - transformStartTime;
+                // Only log if transformation is slow
+                if (transformTime > 10) {
+                  console.warn(`[useLiveEntityIncremental] Slow fallback transformation: ${transformTime}ms for ${formattedResults.length} rows`);
+                }
               }
               
-              console.log('[useLiveEntityIncremental] Processed fallback results:', formattedResults.length, 'rows');
+              // Reduced logging - uncomment below for debugging if needed
+              // console.log('[useLiveEntityIncremental] Processed fallback results:', formattedResults.length, 'rows');
               
               setState({
                 data: formattedResults,
@@ -135,16 +167,25 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
           
           // Set the initial results if we have them
           if (isMounted && liveQueryResult.initialResults?.rows) {
-            console.log('[useLiveEntityIncremental] Setting initial fallback results:', liveQueryResult.initialResults.rows.length, 'rows');
+            // Reduced logging - uncomment below for debugging if needed
+            // console.log('[useLiveEntityIncremental] Setting initial fallback results:', liveQueryResult.initialResults.rows.length, 'rows');
             
             // Apply transformation to initial results if enabled
             let initialResults = liveQueryResult.initialResults.rows;
             
             if (shouldTransform && entityName) {
-              console.log('[useLiveEntityIncremental] Transforming initial fallback results from snake_case to camelCase');
+              // Reduced logging - uncomment below for debugging if needed
+              // console.log('[useLiveEntityIncremental] Transforming initial fallback results from snake_case to camelCase');
+              const transformStartTime = performance.now();
               initialResults = initialResults.map((row: Record<string, any>) => 
                 transformDatabaseResultToEntity<T>(row, entityName)
               );
+              const transformEndTime = performance.now();
+              const transformTime = transformEndTime - transformStartTime;
+              // Only log if transformation is slow
+              if (transformTime > 10) {
+                console.warn(`[useLiveEntityIncremental] Slow initial fallback transformation: ${transformTime}ms for ${initialResults.length} rows`);
+              }
             }
             
             setState({ 
@@ -154,11 +195,13 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
             });
           }
           
-          console.log('[useLiveEntityIncremental] Regular live query fallback setup complete');
+          // Reduced logging - uncomment below for debugging if needed
+          // console.log('[useLiveEntityIncremental] Regular live query fallback setup complete');
           return;
         }
 
-        console.log('[useLiveEntityIncremental] Database instance obtained with incremental live query support');
+        // Reduced logging - uncomment below for debugging if needed
+        // console.log('[useLiveEntityIncremental] Database instance obtained with incremental live query support');
         
         // Set up the incremental live query
         const liveQueryResult = await db.live.incrementalQuery(
@@ -166,7 +209,10 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
           params, 
           keyColumn, // The key column for diffing
           (results: Results<any>) => {
-            console.log('[useLiveEntityIncremental] Incremental live query update received:', results);
+            // Reduced logging - uncomment below for debugging if needed
+            // console.log(`[useLiveEntityIncremental] Incremental live query update received: {rows: Array(${results.rows?.length || 0})}`);
+            // console.log(`[useLiveEntityIncremental] SQL was: ${sql}`);
+            // console.log(`[useLiveEntityIncremental] Key column: ${keyColumn}`);
             
             if (isMounted) {
               // Format and transform the results
@@ -174,27 +220,33 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
               
               // Apply transformation if enabled
               if (shouldTransform && entityName) {
-                console.log('[useLiveEntityIncremental] Transforming snake_case to camelCase entities');
+                // Reduced logging - uncomment below for debugging if needed
+                // console.log('[useLiveEntityIncremental] Transforming snake_case to camelCase entities');
+                const transformStartTime = performance.now();
                 formattedResults = formattedResults.map((row: Record<string, any>) => 
                   transformDatabaseResultToEntity<T>(row, entityName)
                 );
+                const transformEndTime = performance.now();
+                const transformTime = transformEndTime - transformStartTime;
+                // Only log if transformation is slow
+                if (transformTime > 10) {
+                  console.warn(`[useLiveEntityIncremental] Slow incremental transformation: ${transformTime}ms for ${formattedResults.length} rows`);
+                }
               }
               
-              console.log('[useLiveEntityIncremental] Processed incremental results:', formattedResults.length, 'rows');
+              // Reduced logging - uncomment below for debugging if needed
+              // console.log('[useLiveEntityIncremental] Processed incremental results:', formattedResults.length, 'rows');
               
-              setState(prev => {
-                // Check if data actually changed using JSON comparison
-                const prevDataJson = JSON.stringify(prev.data);
-                const newDataJson = JSON.stringify(formattedResults);
-                
-                if (prevDataJson === newDataJson) {
-                  console.log('[useLiveEntityIncremental] No changes in incremental data');
-                  return prev; // Don't update state if data is the same
-                }
-                
-                console.log('[useLiveEntityIncremental] Incremental data changed, updating state');
-                return { data: formattedResults, loading: false, error: null };
+              // FIXED: incrementalQuery returns the FULL result set, not incremental changes
+              // PGlite handles the incremental part internally - we just get the complete materialized view
+              setState({
+                data: formattedResults,
+                loading: false,
+                error: null
               });
+              
+              // Reduced logging - uncomment below for debugging if needed
+              // console.log(`[useLiveEntityIncremental] Updated state with complete result set: ${formattedResults.length} rows`);
             }
           }
         );
@@ -204,16 +256,25 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
         
         // Set the initial results if we have them
         if (isMounted && liveQueryResult.initialResults?.rows) {
-          console.log('[useLiveEntityIncremental] Setting initial incremental results:', liveQueryResult.initialResults.rows.length, 'rows');
+          // Reduced logging - uncomment below for debugging if needed
+          // console.log('[useLiveEntityIncremental] Setting initial incremental results:', liveQueryResult.initialResults.rows.length, 'rows');
           
           // Apply transformation to initial results if enabled
           let initialResults = liveQueryResult.initialResults.rows;
           
           if (shouldTransform && entityName) {
-            console.log('[useLiveEntityIncremental] Transforming initial results from snake_case to camelCase');
+            // Reduced logging - uncomment below for debugging if needed
+            // console.log('[useLiveEntityIncremental] Transforming initial results from snake_case to camelCase');
+            const transformStartTime = performance.now();
             initialResults = initialResults.map((row: Record<string, any>) => 
               transformDatabaseResultToEntity<T>(row, entityName)
             );
+            const transformEndTime = performance.now();
+            const transformTime = transformEndTime - transformStartTime;
+            // Only log if transformation is slow
+            if (transformTime > 10) {
+              console.warn(`[useLiveEntityIncremental] Slow initial transformation: ${transformTime}ms for ${initialResults.length} rows`);
+            }
           }
           
           setState({ 
@@ -223,7 +284,8 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
           });
         }
         
-        console.log('[useLiveEntityIncremental] Incremental live query setup complete');
+        // Reduced logging - uncomment below for debugging if needed
+        // console.log('[useLiveEntityIncremental] Incremental live query setup complete');
       } catch (error) {
         console.error('[useLiveEntityIncremental] Error setting up incremental live query:', error);
         
@@ -265,7 +327,8 @@ export function useLiveEntityIncremental<T extends ObjectLiteral & { id: string;
       isMounted = false;
       
       if (unsubscribeRef.current) {
-        console.log('[useLiveEntityIncremental] Unsubscribing from incremental live query');
+        // Reduced logging - uncomment below for debugging if needed
+        // console.log('[useLiveEntityIncremental] Unsubscribing from incremental live query');
         unsubscribeRef.current().catch(err => {
           console.error('[useLiveEntityIncremental] Error unsubscribing from incremental live query:', err);
         });

@@ -1,0 +1,106 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Layout System Architecture Guide
+
+## Core Architecture
+
+```
+/_authenticated (Route)
+├── GlobalSidebar (64px fixed)
+└── SidebarLayout (Unified)
+    ├── SidebarProvider (Shadcn context)
+    ├── AppSidebar (Dynamic content)
+    └── SidebarInset
+        ├── Header (Context-aware)
+        └── Main Content (Outlet)
+            └── ContentContainer (REQUIRED for all pages)
+```
+
+## Required Page Pattern
+```typescript
+import { ContentContainer } from '@/components/layout/content-container'
+
+function MyPage() {
+  return (
+    <ContentContainer>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Page Title</h1>
+          <p className="text-muted-foreground">Page description</p>
+        </div>
+        {/* Page content */}
+      </div>
+    </ContentContainer>
+  )
+}
+```
+
+## Section Configuration
+- **layoutStore.ts**: Add section to `sectionConfig` + route detection in `updateSectionFromRoute`
+- **sidebar-data.ts**: Add section to `globalSidebarData` array
+
+## Anti-Patterns (NEVER)
+```typescript
+// ❌ Manual layout components
+<div className="max-w-7xl mx-auto px-4"> // Use ContentContainer instead
+
+// ❌ Multiple state systems
+const [sidebarOpen, setSidebarOpen] = useState(false) // Use SidebarProvider
+
+// ❌ Manual width calculations
+const contentWidth = `calc(100vw - ${sidebarWidth}px)` // Use LayoutStore
+
+// ❌ Content based on pending section
+const navGroups = getSidebarDataForSection(pendingSection || activeSection) // Use activeSection only
+```
+
+## Adding New Pages
+
+### Existing Section
+1. Create route file with ContentContainer
+2. Add to sidebar-data.ts navigation
+
+### New Section
+1. Add to `sectionConfig` in layoutStore.ts
+2. Add route detection logic in `updateSectionFromRoute`
+3. Add to `globalSidebarData` in sidebar-data.ts
+4. Create routes with ContentContainer
+
+### No-Sidebar Pages
+1. Set `showSidebar: false` in section config
+2. Set `showMainSidebar: false` in global sidebar data
+3. Still use ContentContainer
+
+## Route Template
+```typescript
+import { createFileRoute } from '@tanstack/react-router'
+import { ContentContainer } from '@/components/layout/content-container'
+
+export const Route = createFileRoute('/_authenticated/my-page')({
+  component: MyPage,
+})
+
+function MyPage() {
+  return (
+    <ContentContainer>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Title</h1>
+          <p className="text-muted-foreground">Description</p>
+        </div>
+        {/* Content */}
+      </div>
+    </ContentContainer>
+  )
+}
+```
+
+## Essential Rules
+- **ALWAYS** use ContentContainer for page layouts
+- **NEVER** create manual width/padding constraints
+- Use `activeSection` not `pendingSection` for content
+- Memoize derived values with `useMemo`
+- Icons from `lucide-react`

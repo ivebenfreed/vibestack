@@ -3,6 +3,7 @@ import { Comment } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
 import { FindOptionsWhere, DeepPartial } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
+import { BaseServerRepository } from './BaseServerRepository';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 
@@ -14,27 +15,13 @@ export type CommentCreateInput = Partial<Omit<CommentInstance, 'id' | 'created_a
 export type CommentUpdateInput = Partial<CommentCreateInput>;
 
 /**
- * CommentRepository class that uses TypeORM
+ * CommentRepository class that extends BaseServerRepository
+ * Provides both base repository functionality and comment-specific methods
  */
-export class CommentRepository {
-  private neonService: NeonService;
+export class CommentRepository extends BaseServerRepository<Comment> {
   
   constructor(neonService: NeonService) {
-    this.neonService = neonService;
-  }
-
-  /**
-   * Find all comments
-   */
-  async findAll(): Promise<Comment[]> {
-    return await this.neonService.find(Comment);
-  }
-
-  /**
-   * Find comment by ID
-   */
-  async findById(id: string): Promise<Comment | null> {
-    return await this.neonService.findOne(Comment, { id } as FindOptionsWhere<Comment>);
+    super(neonService, Comment);
   }
 
   /**
@@ -83,9 +70,9 @@ export class CommentRepository {
   }
 
   /**
-   * Create a new comment
+   * Create a new comment with validation
    */
-  async create(data: CommentCreateInput): Promise<Comment> {
+  async createComment(data: CommentCreateInput): Promise<Comment> {
     // Validate that either taskId or projectId is provided
     if (!data.taskId && !data.projectId) {
       throw new Error('Validation failed: Either taskId or projectId must be provided');
@@ -106,9 +93,9 @@ export class CommentRepository {
   }
 
   /**
-   * Update a comment
+   * Update a comment with validation
    */
-  async update(id: string, data: CommentUpdateInput): Promise<Comment | null> {
+  async updateComment(id: string, data: CommentUpdateInput): Promise<Comment | null> {
     // Create comment for validation
     const comment = new Comment();
     Object.assign(comment, { id, ...data });
@@ -129,7 +116,7 @@ export class CommentRepository {
   /**
    * Delete comment
    */
-  async delete(id: string): Promise<boolean> {
+  async deleteComment(id: string): Promise<boolean> {
     const result = await this.neonService.delete(Comment, { id } as FindOptionsWhere<Comment>);
     return (result.affected !== null && result.affected !== undefined && result.affected > 0);
   }
@@ -147,7 +134,7 @@ const createServiceFromClient = (client: Client): NeonService => {
     error: null,
     get executionCtx() { return null; },
     get event() { return null; }
-  } as unknown as Context<{ Bindings: Env }>;
+  } as unknown as any;
   
   return new NeonService(context);
 };
@@ -187,18 +174,18 @@ export const commentQueries = {
   create: async (client: Client, data: CommentCreateInput): Promise<CommentInstance> => {
     const neonService = createServiceFromClient(client);
     const repo = new CommentRepository(neonService);
-    return await repo.create(data);
+    return await repo.createComment(data);
   },
 
   update: async (client: Client, id: string, data: CommentUpdateInput): Promise<CommentInstance | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new CommentRepository(neonService);
-    return await repo.update(id, data);
+    return await repo.updateComment(id, data);
   },
 
   delete: async (client: Client, id: string): Promise<boolean> => {
     const neonService = createServiceFromClient(client);
     const repo = new CommentRepository(neonService);
-    return await repo.delete(id);
+    return await repo.deleteComment(id);
   }
 }; 

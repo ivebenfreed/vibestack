@@ -30,6 +30,7 @@ interface ExtendedCellContext<TData, TValue> extends CellContext<TData, TValue> 
   required?: boolean
   onEnterSave?: (fieldName: string, currentValue: TValue) => void
   autoFocus?: boolean
+  optimisticUpdates?: boolean
 }
 
 // Re-export existing editable cell components with create mode support
@@ -44,6 +45,7 @@ export function EditableTextCell<TData, TValue>({
   required = false,
   onEnterSave,
   autoFocus = false,
+  optimisticUpdates = false,
 }: ExtendedCellContext<TData, TValue>) {
   const initialValue = createMode ? (createValue as string) : (getValue() as string)
   const [value, setValue] = React.useState(initialValue)
@@ -71,21 +73,36 @@ export function EditableTextCell<TData, TValue>({
       return
     }
 
-    // Handle PGlite + live query optimistic update
-    setIsUpdating(true)
-    try {
-      console.log('[EditableTextCell] Updating:', { rowId: row.id, columnId: column.id, value })
-      await meta?.onUpdate?.(row.id, column.id, value)
-      console.log('[EditableTextCell] Update successful, live query will refresh')
+    if (optimisticUpdates) {
+      // Optimistic update pattern - update UI immediately
       setIsEditing(false)
-      // Live query will automatically update the displayed value
-    } catch (error) {
-      console.error('[EditableTextCell] Update failed:', error)
-      // Revert to original value on error
-      setValue(initialValue)
-      setIsEditing(false)
-    } finally {
-      setIsUpdating(false)
+      
+      // Fire and forget the async update
+      if (meta?.onUpdate) {
+        console.log('[EditableTextCell] Optimistic update:', { rowId: row.id, columnId: column.id, value })
+        meta.onUpdate(row.id, column.id, value).then(() => {
+          console.log('[EditableTextCell] Update successful, live query will refresh')
+        }).catch((error) => {
+          console.error('[EditableTextCell] Update failed:', error)
+          // Revert to original value on error
+          setValue(initialValue)
+        })
+      }
+    } else {
+      // Original behavior with loading state
+      setIsUpdating(true)
+      try {
+        console.log('[EditableTextCell] Updating:', { rowId: row.id, columnId: column.id, value })
+        await meta?.onUpdate?.(row.id, column.id, value)
+        console.log('[EditableTextCell] Update successful, live query will refresh')
+        setIsEditing(false)
+      } catch (error) {
+        console.error('[EditableTextCell] Update failed:', error)
+        setValue(initialValue)
+        setIsEditing(false)
+      } finally {
+        setIsUpdating(false)
+      }
     }
   }
 
@@ -170,6 +187,7 @@ export function EditableSelectCell<TData, TValue>({
   createValue,
   onCreateValueChange,
   required = false,
+  optimisticUpdates = false,
 }: ExtendedCellContext<TData, TValue> & { options: { label: string; value: string }[] }) {
   const initialValue = createMode ? (createValue as string) : (getValue() as string)
   const [value, setValue] = React.useState(initialValue)
@@ -194,20 +212,35 @@ export function EditableSelectCell<TData, TValue>({
     
     if (newValue === initialValue) return
 
-    // Handle PGlite + live query optimistic update
-    setIsUpdating(true)
-    try {
-      console.log('[EditableSelectCell] Updating:', { rowId: row.id, columnId: column.id, value: newValue })
-      await meta?.onUpdate?.(row.id, column.id, newValue)
-      console.log('[EditableSelectCell] Update successful, live query will refresh')
+    if (optimisticUpdates) {
+      // Optimistic update pattern - update UI immediately
       setValue(newValue as any)
-      // Live query will automatically update the displayed value
-    } catch (error) {
-      console.error('[EditableSelectCell] Update failed:', error)
-      // Revert to original value on error
-      setValue(initialValue as any)
-    } finally {
-      setIsUpdating(false)
+      
+      // Fire and forget the async update
+      if (meta?.onUpdate) {
+        console.log('[EditableSelectCell] Optimistic update:', { rowId: row.id, columnId: column.id, value: newValue })
+        meta.onUpdate(row.id, column.id, newValue).then(() => {
+          console.log('[EditableSelectCell] Update successful, live query will refresh')
+        }).catch((error) => {
+          console.error('[EditableSelectCell] Update failed:', error)
+          // Revert to original value on error
+          setValue(initialValue as any)
+        })
+      }
+    } else {
+      // Original behavior with loading state
+      setIsUpdating(true)
+      try {
+        console.log('[EditableSelectCell] Updating:', { rowId: row.id, columnId: column.id, value: newValue })
+        await meta?.onUpdate?.(row.id, column.id, newValue)
+        console.log('[EditableSelectCell] Update successful, live query will refresh')
+        setValue(newValue as any)
+      } catch (error) {
+        console.error('[EditableSelectCell] Update failed:', error)
+        setValue(initialValue as any)
+      } finally {
+        setIsUpdating(false)
+      }
     }
   }
 
@@ -269,6 +302,7 @@ export function EditableCheckboxCell<TData, TValue>({
   createValue,
   onCreateValueChange,
   required = false,
+  optimisticUpdates = false,
 }: ExtendedCellContext<TData, TValue>) {
   const initialValue = createMode ? (createValue as boolean) : (getValue() as boolean)
   const meta = table.options.meta
@@ -279,12 +313,24 @@ export function EditableCheckboxCell<TData, TValue>({
       onCreateValueChange?.(checked as TValue)
       return
     }
-    
-    if (checked === initialValue) return
-    try {
-      await meta?.onUpdate?.(row.id, column.id, checked)
-    } catch (error) {
-      console.error('Failed to update cell:', error)
+
+    if (optimisticUpdates) {
+      // Optimistic update pattern - no loading state needed
+      if (meta?.onUpdate) {
+        console.log('[EditableCheckboxCell] Optimistic update:', { rowId: row.id, columnId: column.id, value: checked })
+        meta.onUpdate(row.id, column.id, checked).then(() => {
+          console.log('[EditableCheckboxCell] Update successful, live query will refresh')
+        }).catch((error) => {
+          console.error('[EditableCheckboxCell] Update failed:', error)
+        })
+      }
+    } else {
+      // Original behavior
+      try {
+        await meta?.onUpdate?.(row.id, column.id, checked)
+      } catch (error) {
+        console.error('Failed to update cell:', error)
+      }
     }
   }
 
@@ -323,6 +369,7 @@ export function EditableDateCell<TData, TValue>({
   createValue,
   onCreateValueChange,
   required = false,
+  optimisticUpdates = false,
 }: ExtendedCellContext<TData, TValue>) {
   const initialValue = createMode ? (createValue as Date | null) : (getValue() as Date | null)
   const [date, setDate] = React.useState<Date | undefined>(initialValue || undefined)
@@ -350,14 +397,34 @@ export function EditableDateCell<TData, TValue>({
       setIsPopoverOpen(false)
       return
     }
-    try {
-      await meta?.onUpdate?.(row.id, column.id, newDate || null)
+
+    if (optimisticUpdates) {
+      // Optimistic update pattern - update UI immediately
       setDate(newDate)
       setIsPopoverOpen(false)
-    } catch (error) {
-      console.error('Failed to update cell:', error)
-      setDate(initialValue || undefined)
-      setIsPopoverOpen(false)
+      
+      // Fire and forget the async update
+      if (meta?.onUpdate) {
+        console.log('[EditableDateCell] Optimistic update:', { rowId: row.id, columnId: column.id, value: newDate || null })
+        meta.onUpdate(row.id, column.id, newDate || null).then(() => {
+          console.log('[EditableDateCell] Update successful, live query will refresh')
+        }).catch((error) => {
+          console.error('[EditableDateCell] Update failed:', error)
+          // Revert on error
+          setDate(initialValue || undefined)
+        })
+      }
+    } else {
+      // Original behavior
+      try {
+        await meta?.onUpdate?.(row.id, column.id, newDate || null)
+        setDate(newDate)
+        setIsPopoverOpen(false)
+      } catch (error) {
+        console.error('Failed to update cell:', error)
+        setDate(initialValue || undefined)
+        setIsPopoverOpen(false)
+      }
     }
   }
 
@@ -415,6 +482,7 @@ export function EditableNumberCell<TData, TValue>({
   required = false,
   onEnterSave,
   autoFocus = false,
+  optimisticUpdates = false,
 }: ExtendedCellContext<TData, TValue>) {
   const initialValue = createMode ? (createValue as number) : (getValue() as number)
   const [value, setValue] = React.useState(initialValue)
@@ -442,21 +510,36 @@ export function EditableNumberCell<TData, TValue>({
       return
     }
 
-    // Handle PGlite + live query optimistic update
-    setIsUpdating(true)
-    try {
-      console.log('[EditableNumberCell] Updating:', { rowId: row.id, columnId: column.id, value })
-      await meta?.onUpdate?.(row.id, column.id, value)
-      console.log('[EditableNumberCell] Update successful, live query will refresh')
+    if (optimisticUpdates) {
+      // Optimistic update pattern - update UI immediately
       setIsEditing(false)
-      // Live query will automatically update the displayed value
-    } catch (error) {
-      console.error('[EditableNumberCell] Update failed:', error)
-      // Revert to original value on error
-      setValue(initialValue)
-      setIsEditing(false)
-    } finally {
-      setIsUpdating(false)
+      
+      // Fire and forget the async update
+      if (meta?.onUpdate) {
+        console.log('[EditableNumberCell] Optimistic update:', { rowId: row.id, columnId: column.id, value })
+        meta.onUpdate(row.id, column.id, value).then(() => {
+          console.log('[EditableNumberCell] Update successful, live query will refresh')
+        }).catch((error) => {
+          console.error('[EditableNumberCell] Update failed:', error)
+          // Revert to original value on error
+          setValue(initialValue)
+        })
+      }
+    } else {
+      // Original behavior with loading state
+      setIsUpdating(true)
+      try {
+        console.log('[EditableNumberCell] Updating:', { rowId: row.id, columnId: column.id, value })
+        await meta?.onUpdate?.(row.id, column.id, value)
+        console.log('[EditableNumberCell] Update successful, live query will refresh')
+        setIsEditing(false)
+      } catch (error) {
+        console.error('[EditableNumberCell] Update failed:', error)
+        setValue(initialValue)
+        setIsEditing(false)
+      } finally {
+        setIsUpdating(false)
+      }
     }
   }
 

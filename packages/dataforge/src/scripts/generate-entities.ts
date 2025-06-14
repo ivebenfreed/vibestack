@@ -800,7 +800,7 @@ function generateContextOutput(
     footerOutput += `export const ${contextUpper}_JUNCTION_TABLES = [\n`;
     if (junctionTables.length > 0) {
         junctionTables.forEach(tableName => {
-            footerOutput += `  ${tableName},\n`;
+            footerOutput += `  '"${tableName.replace(/"/g, '')}"',\n`;
         });
     }
     footerOutput += `];\n\n`;
@@ -820,7 +820,7 @@ function generateContextOutput(
     
     // Add all junction tables
     junctionTables.forEach(tableName => {
-        footerOutput += `  ${tableName},\n`;
+        footerOutput += `  '"${tableName.replace(/"/g, '')}"',\n`;
     });
     
     footerOutput += `];\n\n`;
@@ -839,6 +839,10 @@ function generateContextOutput(
         footerOutput += `  },\n`;
     }
     footerOutput += `} as const;\n\n`;
+
+    // ✨ NEW: Generate relationship configurations
+    const relationshipConfigOutput = generateRelationshipConfigs(validEntities, filter, context);
+    footerOutput += relationshipConfigOutput;
 
     // Combine all parts (include enumExportOutput)
     return headerOutput + enumImportOutput + enumExportOutput + classOutput + bodyOutput + footerOutput;
@@ -922,7 +926,7 @@ function extractJunctionTableInfo(entities: Function[], filter: MetadataFilter):
                 if (!junctionMapping[`"${junctionTableName}"`]) {
                     junctionMapping[`"${junctionTableName}"`] = {
                         sourceEntity: entityName,
-                        sourceTable: `"${tableName}"`,
+                        sourceTable: `'"${tableName}"'`,
                         sourceColumn,
                         targetEntity: targetEntityName,
                         targetColumn,
@@ -937,6 +941,248 @@ function extractJunctionTableInfo(entities: Function[], filter: MetadataFilter):
         junctionTables: Array.from(junctionTables).sort(),
         junctionMapping
     };
+}
+
+/**
+ * Generate relationship configurations from entity metadata
+ * This creates auto-extensible relationship configs for both client and server
+ */
+function generateRelationshipConfigs(entities: Function[], filter: MetadataFilter, context: 'server' | 'client'): string {
+    const storage = getMetadataArgsStorage();
+    const { junctionMapping } = extractJunctionTableInfo(entities, filter);
+    
+    let output = `// Auto-generated relationship configurations\n`;
+    output += `// This provides configuration-driven relationship handling for entities\n`;
+    output += `export interface RelationshipConfig {\n`;
+    output += `  requiredReferences?: Array<{\n`;
+    output += `    field: string;\n`;
+    output += `    targetEntity: string;\n`;
+    output += `    nullable?: boolean;\n`;
+    output += `  }>;\n`;
+    output += `  selfReferences?: Array<{\n`;
+    output += `    field: string;\n`;
+    output += `    allowCycles?: boolean;\n`;
+    output += `    maxDepth?: number;\n`;
+    output += `  }>;\n`;
+    output += `  junctionRelationships?: Array<{\n`;
+    output += `    junctionTable: string;\n`;
+    output += `    relationName: string;\n`;
+    output += `    sourceColumn: string;\n`;
+    output += `    targetColumn: string;\n`;
+    output += `    targetEntity: string;\n`;
+    output += `  }>;\n`;
+    output += `  customValidators?: Array<{\n`;
+    output += `    name: string;\n`;
+    output += `    validator: (data: Record<string, any>, operation: string) => void | Promise<void>;\n`;
+    output += `  }>;\n`;
+    output += `}\n\n`;
+    
+    output += `export const ${context.toUpperCase()}_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {\n`;
+    
+    // Extract foreign key relationships from @ManyToOne relations
+    const foreignKeyConfigs = extractForeignKeyRelationships(entities, filter);
+    
+    // Extract self-referential relationships
+    const selfReferenceConfigs = extractSelfReferences(entities, filter);
+    
+    // Group junction relationships by source entity
+    const junctionConfigs: Record<string, any[]> = {};
+    for (const [junctionTable, mapping] of Object.entries(junctionMapping)) {
+        const sourceEntity = mapping.sourceEntity.toLowerCase() + 's'; // e.g., 'projects'
+        
+        if (!junctionConfigs[sourceEntity]) {
+            junctionConfigs[sourceEntity] = [];
+        }
+        
+        junctionConfigs[sourceEntity].push({
+            junctionTable: junctionTable.replace(/"/g, ''),
+            relationName: mapping.relationName,
+            sourceColumn: mapping.sourceColumn,
+            targetColumn: mapping.targetColumn,
+            targetEntity: mapping.targetEntity.toLowerCase() + 's'
+        });
+    }
+    
+    // Get all unique entity names from various sources
+    const allEntityNames = new Set<string>();
+    
+    // Add entities that have foreign key relationships
+    Object.keys(foreignKeyConfigs).forEach(name => allEntityNames.add(name));
+    
+    // Add entities that have self references
+    Object.keys(selfReferenceConfigs).forEach(name => allEntityNames.add(name));
+    
+    // Add entities that have junction relationships
+    Object.keys(junctionConfigs).forEach(name => allEntityNames.add(name));
+    
+    // Add all domain entities (even those without explicit relationships)
+    entities.forEach(entity => {
+        const category = getTableCategory(entity);
+        if (category === 'domain') {
+            const entityName = entity.name.toLowerCase() + 's';
+            allEntityNames.add(entityName);
+        }
+    });
+    
+    // Generate config for each entity
+    Array.from(allEntityNames).sort().forEach(entityName => {
+        output += `  '${entityName}': {\n`;
+        
+        // Add foreign key relationships
+        if (foreignKeyConfigs[entityName]?.length > 0) {
+            output += `    requiredReferences: [\n`;
+            foreignKeyConfigs[entityName].forEach((ref: any) => {
+                output += `      {\n`;
+                output += `        field: '${ref.field}',\n`;
+                output += `        targetEntity: '${ref.targetEntity}',\n`;
+                if (ref.nullable) {
+                    output += `        nullable: ${ref.nullable},\n`;
+                }
+                output += `      },\n`;
+            });
+            output += `    ],\n`;
+        }
+        
+        // Add self-referential relationships
+        if (selfReferenceConfigs[entityName]?.length > 0) {
+            output += `    selfReferences: [\n`;
+            selfReferenceConfigs[entityName].forEach((selfRef: any) => {
+                output += `      {\n`;
+                output += `        field: '${selfRef.field}',\n`;
+                output += `        allowCycles: ${selfRef.allowCycles},\n`;
+                output += `        maxDepth: ${selfRef.maxDepth},\n`;
+                output += `      },\n`;
+            });
+            output += `    ],\n`;
+        }
+        
+        // Add junction relationships
+        if (junctionConfigs[entityName]?.length > 0) {
+            output += `    junctionRelationships: [\n`;
+            junctionConfigs[entityName].forEach((junction: any) => {
+                output += `      {\n`;
+                output += `        junctionTable: '${junction.junctionTable}',\n`;
+                output += `        relationName: '${junction.relationName}',\n`;
+                output += `        sourceColumn: '${junction.sourceColumn}',\n`;
+                output += `        targetColumn: '${junction.targetColumn}',\n`;
+                output += `        targetEntity: '${junction.targetEntity}',\n`;
+                output += `      },\n`;
+            });
+            output += `    ],\n`;
+        }
+        
+        // Add common validation patterns (can be extended later)
+        output += `    customValidators: [],\n`;
+        
+        output += `  },\n`;
+    });
+    
+    output += `} as const;\n\n`;
+    
+    // Generate helper functions
+    output += `// Helper functions for relationship processing\n`;
+    output += `export function getEntityRelationships(entityName: string): RelationshipConfig | undefined {\n`;
+    output += `  return ${context.toUpperCase()}_RELATIONSHIP_CONFIGS[entityName];\n`;
+    output += `}\n\n`;
+    
+    output += `export function hasRelationshipConfig(entityName: string): boolean {\n`;
+    output += `  return entityName in ${context.toUpperCase()}_RELATIONSHIP_CONFIGS;\n`;
+    output += `}\n\n`;
+    
+    output += `export function getJunctionRelationships(entityName: string): Array<{\n`;
+    output += `  junctionTable: string;\n`;
+    output += `  relationName: string;\n`;
+    output += `  sourceColumn: string;\n`;
+    output += `  targetColumn: string;\n`;
+    output += `  targetEntity: string;\n`;
+    output += `}> {\n`;
+    output += `  const config = ${context.toUpperCase()}_RELATIONSHIP_CONFIGS[entityName];\n`;
+    output += `  return config?.junctionRelationships || [];\n`;
+    output += `}\n\n`;
+    
+    return output;
+}
+
+/**
+ * Extract foreign key relationships from @ManyToOne relations
+ */
+function extractForeignKeyRelationships(entities: Function[], filter: MetadataFilter): Record<string, any[]> {
+    const configs: Record<string, any[]> = {};
+    
+    entities.forEach(entity => {
+        const { relations } = filter.filterEntityMetadata(entity, 'server');
+        const entityName = entity.name.toLowerCase() + 's';
+        
+        relations.forEach(relation => {
+            if (relation.relationType === 'many-to-one') {
+                const targetEntity = (relation.type as () => Function)();
+                if (!targetEntity) return;
+                
+                const targetEntityName = targetEntity.name.toLowerCase() + 's';
+                
+                // Skip self-references (handled separately)
+                if (targetEntityName === entityName) return;
+                
+                if (!configs[entityName]) {
+                    configs[entityName] = [];
+                }
+                
+                // Determine field name (usually propertyName + 'Id')
+                let fieldName = relation.propertyName;
+                if (!fieldName.endsWith('Id')) {
+                    fieldName += 'Id';
+                }
+                
+                configs[entityName].push({
+                    field: fieldName,
+                    targetEntity: targetEntityName,
+                    nullable: relation.options?.nullable || false
+                });
+            }
+        });
+    });
+    
+    return configs;
+}
+
+/**
+ * Extract self-referential relationships (like comment.parentId)
+ */
+function extractSelfReferences(entities: Function[], filter: MetadataFilter): Record<string, any[]> {
+    const configs: Record<string, any[]> = {};
+    
+    entities.forEach(entity => {
+        const { relations } = filter.filterEntityMetadata(entity, 'server');
+        const entityName = entity.name.toLowerCase() + 's';
+        
+        relations.forEach(relation => {
+            if (relation.relationType === 'many-to-one') {
+                const targetEntity = (relation.type as () => Function)();
+                if (!targetEntity) return;
+                
+                // Self-referential if target is same as source
+                if (targetEntity.name === entity.name) {
+                    if (!configs[entityName]) {
+                        configs[entityName] = [];
+                    }
+                    
+                    // Determine field name
+                    let fieldName = relation.propertyName;
+                    if (!fieldName.endsWith('Id')) {
+                        fieldName += 'Id';
+                    }
+                    
+                    configs[entityName].push({
+                        field: fieldName,
+                        allowCycles: false, // Safe default
+                        maxDepth: 5 // Reasonable default depth
+                    });
+                }
+            }
+        });
+    });
+    
+    return configs;
 }
 
 // Run the generator

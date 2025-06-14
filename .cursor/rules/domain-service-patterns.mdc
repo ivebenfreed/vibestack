@@ -1,0 +1,397 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Domain Service Architecture Patterns
+
+## Domain Architecture Overview
+
+This project uses domain-driven design with each entity having its own domain module containing both repository and service layers.
+
+### Domain Structure
+- [apps/web/src/domain/base.ts](mdc:apps/web/src/domain/base.ts) - Base repository and service classes with performance optimizations
+- [apps/web/src/domain/user.ts](mdc:apps/web/src/domain/user.ts) - User domain (repository + service)
+- [apps/web/src/domain/project.ts](mdc:apps/web/src/domain/project.ts) - Project domain with relationship management
+- [apps/web/src/domain/task.ts](mdc:apps/web/src/domain/task.ts) - Task domain with status management
+- [apps/web/src/domain/comment.ts](mdc:apps/web/src/domain/comment.ts) - Comment domain
+- [apps/web/src/domain/index.ts](mdc:apps/web/src/domain/index.ts) - Domain factory and centralized creation
+
+### Domain Refactoring Plan
+- [apps/web/src/db/DOMAIN_REFACTORING_PLAN.md](mdc:apps/web/src/db/DOMAIN_REFACTORING_PLAN.md) - Complete migration strategy and performance optimizations
+
+## Base Classes Pattern
+
+### BaseRepository Pattern
+```typescript
+// Follow pattern in apps/web/src/domain/base.ts
+export abstract class BaseRepository<T extends ObjectLiteral> {
+  constructor(
+    protected repository: Repository<T>,
+    protected entityName: string,
+    protected dataSource: NewPGliteDataSource // Race condition prevention
+  ) {}
+
+  // Optimized update: Single query instead of update + findById
+  async update(id: string, data: DeepPartial<T>): Promise<T> {
+    const existingEntity = await this.repository.findOne({ where: { id } as any });
+    if (!existingEntity) {
+      throw new Error(`${this.entityName} with ID ${id} not found`);
+    }
+    
+    const mergedEntity = this.repository.merge(existingEntity, data);
+    return await this.repository.save(mergedEntity);
+  }
+
+  // Safe query method for race condition prevention
+  protected async safeQuery(sql: string, params?: any[]): Promise<any> {
+    if (!this.dataSource.isInitialized) {
+      throw new Error(`DataSource not ready for ${this.entityName} query`);
+    }
+    return this.dataSource.query(sql, params);
+  }
+}
+```
+
+### BaseService Pattern
+```typescript
+export abstract class BaseService<T extends object> {
+  constructor(
+    protected repository: any,
+    protected tableName: string,
+    protected syncChangeManager: OutgoingChangeProcessor
+  ) {}
+
+  // Centralized event dispatching
+  protected emitEvent(eventType: string, detail: any): void {
+    EventDispatcher.emit(eventType, detail);
+  }
+
+  // Non-blocking sync tracking
+  protected async trackChange(operation: string, data: Record<string, unknown>): Promise<void> {
+    this.syncChangeManager.trackChange(this.tableName, operation, data)
+      .catch(error => {
+        console.error(`[${this.tableName.toUpperCase()}_SERVICE] Sync tracking failed (non-blocking):`, error);
+      });
+  }
+}
+```
+
+## Domain Implementation Patterns
+
+### 1. Simple Entity Domain (User)
+```typescript
+// Follow pattern in apps/web/src/domain/user.ts
+export class UserRepository extends BaseRepository<User> {
+  constructor(dataSource: NewPGliteDataSource) {
+    if (!dataSource.isInitialized) {
+      throw new Error('DataSource must be initialized before creating UserRepository');
+    }
+    super(dataSource.getRepository(User), 'user', dataSource);
+  }
+
+  // User-specific repository methods
+  async findByEmail(email: string): Promise<User | null> {
+    return this.repository.findOne({ where: { email } });
+  }
+}
+
+export class UserService extends BaseService<User> {
+  async createUser(userData: { name: string; email: string }): Promise<User> {
+    const userId = uuidv4();
+    const now = new Date();
+    
+    const newUser = {
+      id: userId,
+      name: userData.name,
+      email: userData.email,
+      createdAt: now,
+      updatedAt: now
+    } as User;
+
+    const createdUser = await this.repository.create(newUser);
+    
+    // Track change for sync (non-blocking)
+    await this.trackChange('insert', createdUser as unknown as Record<string, unknown>);
+    
+    // Emit event
+    this.emitEvent('user:created', { user: createdUser });
+    
+    return createdUser;
+  }
+}
+```
+
+### 2. Complex Entity with Relationships (Project)
+```typescript
+// Follow pattern in apps/web/src/domain/project.ts
+export class ProjectRepository extends BaseRepository<Project> {
+  // Optimized relationship query with JOINs
+  async getProjectWithMembers(projectId: string): Promise<Project | null> {
+    return await this.repository
+      .createQueryBuilder('project')
+      .leftJoinAndSelect('project.members', 'member')
+      .where('project.id = :id', { id: projectId })
+      .getOne();
+  }
+
+  // Batch operations for performance
+  async updateMembers(projectId: string, memberIds: string[]): Promise<void> {
+    await this.repository.manager.transaction(async manager => {
+      // Remove existing members
+      await manager.query(
+        'DELETE FROM project_members WHERE project_id = $1',
+        [projectId]
+      );
+      
+      // Add new members in batch
+      if (memberIds.length > 0) {
+        const values = memberIds.map((_, index) => 
+          `($1, $${index + 2})`
+        ).join(', ');
+        
+        await manager.query(
+          `INSERT INTO project_members (project_id, user_id) VALUES ${values}`,
+          [projectId, ...memberIds]
+        );
+      }
+    });
+  }
+}
+
+export class ProjectService extends BaseService<Project> {
+  async addProjectMember(projectId: string, userId: string): Promise<void> {
+    // Validate entities exist first
+    const project = await this.repository.findById(projectId);
+    if (!project) throw new Error(`Project with ID ${projectId} not found`);
+
+    const userRepository = this.repository.dataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new Error(`User with ID ${userId} not found`);
+
+    // Add relationship
+    await this.repository.addMember(projectId, userId);
+    
+    // Track change and emit event
+    await this.trackChange('insert', { projectId, userId });
+    this.emitEvent('project:member:added', { projectId, userId });
+  }
+}
+```
+
+### 3. Entity with Enums and Status (Task)
+```typescript
+// Follow pattern in apps/web/src/domain/task.ts
+export class TaskService extends BaseService<Task> {
+  async updateTaskStatus(id: string, status: TaskStatus): Promise<Task> {
+    // Validate status transition
+    const task = await this.repository.findById(id);
+    if (!task) throw new Error(`Task with ID ${id} not found`);
+    
+    if (!this.isValidStatusTransition(task.status, status)) {
+      throw new Error(`Invalid status transition from ${task.status} to ${status}`);
+    }
+
+    // Update with timestamp tracking
+    const updateData: Partial<Task> = {
+      status,
+      updatedAt: new Date()
+    };
+
+    // Add completion timestamp for completed tasks
+    if (status === TaskStatus.COMPLETED && task.status !== TaskStatus.COMPLETED) {
+      updateData.completedAt = new Date();
+    }
+
+    const updatedTask = await this.repository.update(id, updateData);
+    
+    // Track change and emit event
+    await this.trackChange('update', updatedTask as unknown as Record<string, unknown>);
+    this.emitEvent('task:status:updated', { task: updatedTask, oldStatus: task.status });
+    
+    return updatedTask;
+  }
+
+  private isValidStatusTransition(from: TaskStatus, to: TaskStatus): boolean {
+    // Business rules for status transitions
+    const allowedTransitions: Record<TaskStatus, TaskStatus[]> = {
+      [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS, TaskStatus.CANCELLED],
+      [TaskStatus.IN_PROGRESS]: [TaskStatus.COMPLETED, TaskStatus.TODO, TaskStatus.CANCELLED],
+      [TaskStatus.COMPLETED]: [TaskStatus.IN_PROGRESS], // Can reopen
+      [TaskStatus.CANCELLED]: [TaskStatus.TODO] // Can restore
+    };
+    
+    return allowedTransitions[from]?.includes(to) ?? false;
+  }
+}
+```
+
+## Domain Factory Pattern
+
+### Centralized Domain Creation
+```typescript
+// Follow pattern in apps/web/src/domain/index.ts
+export function createAllDomains(
+  dataSource: NewPGliteDataSource, 
+  syncManager: OutgoingChangeProcessor
+) {
+  if (!dataSource.isInitialized) {
+    throw new Error('DataSource must be initialized before creating domains');
+  }
+
+  return {
+    user: createUserDomain(dataSource, syncManager),
+    project: createProjectDomain(dataSource, syncManager),
+    task: createTaskDomain(dataSource, syncManager),
+    comment: createCommentDomain(dataSource, syncManager)
+  };
+}
+
+// Individual domain factory
+export function createTaskDomain(
+  dataSource: NewPGliteDataSource, 
+  syncManager: OutgoingChangeProcessor
+) {
+  const repository = new TaskRepository(dataSource);
+  const service = new TaskService(repository, syncManager);
+  
+  return { repository, service };
+}
+```
+
+## Performance Optimization Patterns
+
+### 1. Database Round-trip Reduction
+```typescript
+// ❌ Before: 2 database calls
+await this.repository.update(criteria, data);  // Query 1
+const updatedEntity = await this.findById(id); // Query 2
+
+// ✅ After: 1 database call (implemented in BaseRepository)
+const existingEntity = await this.repository.findOne({ where: { id } });
+const mergedEntity = this.repository.merge(existingEntity, data);
+return await this.repository.save(mergedEntity);
+```
+
+### 2. Batch Operations
+```typescript
+// Batch relationship operations for better performance
+async addProjectMembers(projectId: string, userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+  
+  const values = userIds.map((userId, index) => 
+    `($${index * 2 + 1}, $${index * 2 + 2})`
+  ).join(', ');
+  
+  const params = userIds.flatMap(userId => [projectId, userId]);
+  
+  await this.repository.manager.query(
+    `INSERT INTO project_members (project_id, user_id) VALUES ${values} ON CONFLICT DO NOTHING`,
+    params
+  );
+}
+```
+
+### 3. Conditional Logging
+```typescript
+// Environment-aware logging in BaseRepository
+private log(message: string, data?: any): void {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[${this.entityName.toUpperCase()}_REPOSITORY] ${message}`, data);
+  }
+}
+```
+
+## Best Practices
+
+### 1. Domain Organization
+- One file per entity containing both repository and service
+- Use factory functions for domain creation
+- Implement centralized error handling
+- Follow consistent naming conventions
+
+### 2. Performance Guidelines
+- Use single-query updates in repositories
+- Implement batch operations for bulk changes
+- Add conditional logging for development
+- Use transactions for multi-step operations
+
+### 3. Business Logic
+- Keep business rules in service layer
+- Validate state transitions in services
+- Emit events for important domain changes
+- Use proper error types for different scenarios
+
+### 4. Integration Patterns
+- Use non-blocking sync tracking
+- Implement proper race condition prevention
+- Handle datasource initialization correctly
+- Provide proper TypeScript types
+
+## Error Handling Patterns
+
+### Custom Error Types
+```typescript
+export class DatabaseServiceError extends Error {
+  constructor(
+    message: string, 
+    public operation: string, 
+    public originalError?: unknown
+  ) {
+    super(message);
+    this.name = 'DatabaseServiceError';
+  }
+}
+
+// Usage in services
+throw new DatabaseServiceError(
+  `Failed to create ${this.tableName}`,
+  'create',
+  error
+);
+```
+
+### Transaction Safety
+```typescript
+async complexOperation(data: ComplexData): Promise<Result> {
+  return await this.repository.manager.transaction(async manager => {
+    try {
+      // Multiple operations within transaction
+      const step1 = await manager.save(Entity1, data.entity1);
+      const step2 = await manager.save(Entity2, data.entity2);
+      
+      return { step1, step2 };
+    } catch (error) {
+      // Transaction automatically rolls back
+      throw new DatabaseServiceError('Complex operation failed', 'complexOperation', error);
+    }
+  });
+}
+```
+
+## Testing Patterns
+
+### Domain Unit Testing
+```typescript
+// Test services in isolation
+describe('TaskService', () => {
+  let service: TaskService;
+  let mockRepository: jest.Mocked<TaskRepository>;
+  let mockSyncManager: jest.Mocked<OutgoingChangeProcessor>;
+
+  beforeEach(() => {
+    mockRepository = createMockRepository();
+    mockSyncManager = createMockSyncManager();
+    service = new TaskService(mockRepository, mockSyncManager);
+  });
+
+  test('should create task with proper defaults', async () => {
+    const taskData = { title: 'Test Task', description: 'Test Description' };
+    const result = await service.createTask(taskData);
+    
+    expect(result.id).toBeDefined();
+    expect(result.status).toBe(TaskStatus.TODO);
+    expect(mockSyncManager.trackChange).toHaveBeenCalledWith('tasks', 'insert', result);
+  });
+});
+```

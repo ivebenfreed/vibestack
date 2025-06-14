@@ -16,6 +16,7 @@ interface BaseNavItem {
   title: string
   badge?: string
   icon?: React.ElementType
+  projectId?: string // 🎯 ATOMIZED: For project nav items that use individual atoms
 }
 
 type NavLink = BaseNavItem & {
@@ -24,7 +25,7 @@ type NavLink = BaseNavItem & {
 }
 
 type NavCollapsible = BaseNavItem & {
-  items: (BaseNavItem & { url: LinkProps['to'] })[]
+  items: (BaseNavItem & { url: LinkProps['to']; projectId?: string })[]
   url?: never
 }
 

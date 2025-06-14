@@ -16,7 +16,7 @@ interface TasksContextType {
   // Task operations - using service methods only for clean interface
   createTask: (taskData: {
     title: string;
-    projectId: string;
+    projectId?: string;
     description?: string;
     status?: TaskStatus;
     priority?: TaskPriority;
@@ -49,7 +49,7 @@ export default function TasksProvider({ children }: Props) {
   // Create a new task
   const createTask = useCallback(async (taskData: {
     title: string;
-    projectId: string;
+    projectId?: string;
     description?: string;
     status?: TaskStatus;
     priority?: TaskPriority;

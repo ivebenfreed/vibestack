@@ -176,9 +176,15 @@ const RichEditableText: React.FC<RichEditableTextProps> = ({
       if (fieldType === 'text') {
         e.preventDefault()
         handleSave()
-      } else if (fieldType === 'textarea' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault()
-        handleSave()
+      } else if (fieldType === 'textarea') {
+        if (e.shiftKey) {
+          // Shift+Enter: Allow new line (default behavior)
+          return
+        } else {
+          // Enter alone: Save
+          e.preventDefault()
+          handleSave()
+        }
       }
     }
   }, [fieldType, handleSave, handleCancel])

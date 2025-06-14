@@ -1,6 +1,6 @@
 import { AbilityBuilder, createMongoAbility, MongoAbility } from '@casl/ability';
-// Adjust the import path if your authStore is located differently relative to 'lib'
-import { UserInfo } from '../stores/authStore';
+// 🔥 NEW: Use XState types instead of Zustand authStore
+import { UserInfo } from '../state-machines/types';
 
 // Define actions and subjects relevant to your application
 type AppActions = 'access';
