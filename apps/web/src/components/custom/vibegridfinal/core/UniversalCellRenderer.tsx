@@ -506,52 +506,52 @@ const CellDisplay = ({ value, cellType, config, relationshipData = {}, columnId 
 
     case 'uuid':
       return (
-        <span className="vibe-grid-uuid">
+        <span className="display-text">
           {value ? String(value).slice(-8) : '-'}
         </span>
       )
 
     case 'json':
-      if (!value) return <span className="vibe-grid-empty">-</span>
+      if (!value) return <span className="display-text">-</span>
       return (
-        <span className="vibe-grid-json">
+        <span className="display-text">
           {JSON.stringify(value)}
         </span>
       )
 
     case 'number':
-      if (value === null || value === undefined) return <span className="vibe-grid-empty">-</span>
-      return <span className="vibe-grid-number">{value}</span>
+      if (value === null || value === undefined) return <span className="display-text">-</span>
+      return <span className="display-text">{value}</span>
 
     case 'relationship-single':
-      if (!value) return <span className="vibe-grid-empty">- None -</span>
+      if (!value) return <span className="display-text">- None -</span>
       const displayField = relationshipData[columnId]?.displayField || 'name'
       const relationshipDisplayValue = value[displayField] || value.name || value.id
       return (
-        <div className="vibe-grid-relationship">
-          <span className="vibe-grid-relationship__text">{relationshipDisplayValue}</span>
-          <span className="vibe-grid-relationship__icon">🔗</span>
-        </div>
+        <>
+          <span className="relationship-text">{relationshipDisplayValue}</span>
+          <span className="relationship-icon">🔗</span>
+        </>
       )
 
     case 'relationship-multi':
       if (!value || !Array.isArray(value) || value.length === 0) {
-        return <span className="vibe-grid-empty">- None -</span>
+        return <span className="display-text">- None -</span>
       }
       const multiDisplayField = relationshipData[columnId]?.displayField || 'name'
       return (
-        <div className="vibe-grid-relationship">
-          <span className="vibe-grid-relationship__text">
+        <>
+          <span className="relationship-text">
             {value.map(item => item[multiDisplayField] || item.name || item.id).join(', ')}
           </span>
-          <span className="vibe-grid-relationship__icon">🔗×{value.length}</span>
-        </div>
+          <span className="relationship-icon">🔗×{value.length}</span>
+        </>
       )
 
     case 'text':
     default:
-      if (!value && value !== 0) return <span className="vibe-grid-empty">-</span>
-      return <span className="vibe-grid-text">{String(value)}</span>
+      if (!value && value !== 0) return <span className="display-text">-</span>
+      return <span className="display-text">{String(value)}</span>
   }
 }
 
@@ -573,22 +573,9 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   const isSystemField = meta?.systemField || false
   const columnId = column.columnDef.id as string
   
-  // Determine cell behavior class based on type - CLEAN, TRACEABLE
-  const getCellBehaviorClass = (type: string) => {
-    switch (type) {
-      case 'enum':
-      case 'boolean':
-        return 'vibe-grid-cell--content-fill' // Badges want to fill entire cell
-      case 'text':
-      case 'number':
-      case 'date':
-      case 'uuid':
-      case 'json':
-      case 'relationship-single':
-      case 'relationship-multi':
-      default:
-        return 'vibe-grid-cell--content-padded' // Text content needs breathing room
-    }
+  // Generate the simple cell class name based on type
+  const getCellClassName = (type: string) => {
+    return `vibe-cell vibe-cell--${type}`
   }
   
   // Consolidated state management
@@ -668,14 +655,13 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   
   const displayText = getDisplayText(optimistic.value, cellType)
   
-  // Determine which cell types should use the preferred overlay pattern (show content + overlay)
-  // ✅ FIXED: Include text inputs in overlay pattern to prevent layout shifts
-  const useOverlayPattern = ['enum', 'relationship-single', 'boolean', 'text', 'number', 'date', 'uuid', 'json'].includes(cellType)
+  // Determine which cell types need overlays vs content replacement
+  const needsOverlay = ['enum', 'relationship-single', 'relationship-multi', 'boolean', 'date'].includes(cellType)
   
-  // Render editing UI for text types only (replaces content entirely)
-  if (editing.isEditing && config.editable !== false && !isSystemField && !useOverlayPattern) {
+  // For text-like types: replace content entirely when editing  
+  if (editing.isEditing && config.editable !== false && !isSystemField && !needsOverlay) {
     return (
-      <div className="vibe-grid-cell__edit-overlay">
+      <div className={getCellClassName(cellType)}>
         <UniversalInput
           cellType={cellType}
           config={config}
@@ -693,12 +679,7 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   // Render display UI (always visible)
   return (
     <div 
-      className={cn(
-        "vibe-grid-cell",
-        getCellBehaviorClass(cellType), // CLEAN: Opt-in behavior based on cell type
-        (config.editable !== false && !isSystemField) && "vibe-grid-cell--editable",
-        isSystemField && "vibe-grid-cell--system"
-      )}
+      className={getCellClassName(cellType)}
       onClick={handleStartEdit}
       title={
         displayText
@@ -710,7 +691,7 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
               : "Read-only field"
       }
     >
-      {/* Always show display content - keep original value visible during overlay editing */}
+      {/* Always show display content */}
       <CellDisplay
         value={optimistic.value}
         cellType={cellType}
@@ -719,18 +700,29 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
         columnId={columnId}
       />
       
-      {/* For overlay pattern cell types (enum, relationship, boolean), show dropdown WITHOUT replacing content */}
-      {editing.isEditing && config.editable !== false && !isSystemField && useOverlayPattern && (
-        <UniversalInput
-          cellType={cellType}
-          config={config}
-          value={editing.editValue}
-          onChange={editing.setEditValue}
-          onSave={handleSave}
-          onCancel={handleCancel}
-          relationshipData={relationshipData}
-          columnId={columnId}
-        />
+      {/* For overlay types: show edit component over display content */}
+      {editing.isEditing && config.editable !== false && !isSystemField && needsOverlay && (
+        <div style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0,
+          zIndex: 10,
+          background: 'transparent', /* Keep transparent to show display content */
+          pointerEvents: 'auto' /* Ensure interactions work */
+        }}>
+          <UniversalInput
+            cellType={cellType}
+            config={config}
+            value={editing.editValue}
+            onChange={editing.setEditValue}
+            onSave={handleSave}
+            onCancel={handleCancel}
+            relationshipData={relationshipData}
+            columnId={columnId}
+          />
+        </div>
       )}
     </div>
   )

@@ -7,14 +7,6 @@
  */
 
 import React from 'react'
-import { Input } from '@/components/ui/input'
-
-// Force consistent font size to match display text
-// Note: Inline styles needed to override shadcn Input component's responsive text sizing
-const EDITOR_TEXT_STYLE = {
-  fontSize: '16px',
-  lineHeight: 'normal'
-} as const
 
 export interface TextInputEditorProps {
   cellType: string
@@ -73,22 +65,24 @@ export const TextInputEditor: React.FC<TextInputEditorProps> = ({
   }
 
   return (
-    <div className="absolute inset-0 z-50 bg-background/95 backdrop-blur-sm">
-      <Input
-        ref={inputRef}
-        type={inputType}
-        value={value || ''}
-        placeholder={placeholder || config.placeholder}
-        min={config.numberMin}
-        max={config.numberMax}
-        step={config.step}
-        maxLength={config.maxLength}
-        readOnly={config.readOnly !== false && cellType === 'uuid'}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={handleBlur}
-        className="h-full border border-input shadow-sm focus-visible:ring-1 focus-visible:ring-ring rounded-sm bg-background px-2"
-        style={EDITOR_TEXT_STYLE}
-      />
-    </div>
+    <input
+      ref={inputRef}
+      type={inputType}
+      value={value || ''}
+      placeholder={placeholder || config.placeholder}
+      min={config.numberMin}
+      max={config.numberMax}
+      step={config.step}
+      maxLength={config.maxLength}
+      readOnly={config.readOnly !== false && cellType === 'uuid'}
+      onChange={(e) => onChange(e.target.value)}
+      className="edit-input"
+      onFocus={(e) => {
+        console.log('Input focused')
+      }}
+      onBlur={(e) => {
+        handleBlur(e)
+      }}
+    />
   )
 } 

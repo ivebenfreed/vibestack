@@ -43,8 +43,8 @@ import { UniversalCellRenderer } from './UniversalCellRenderer'
 
 // ✅ PERFORMANCE: Removed getColumnSizing import (no longer needed)
 
-// Import existing styles (preserved) - CSS now in index.css
-// import '../../vibegridnative/styles/VibeGridNative.css' // Moved to index.css
+// Import component-specific styles (prevents style loss during cleanup)
+import './VibeGridFinal.css'
 
 // ============================================================================
 // Persistence Types Extension
@@ -821,9 +821,9 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
         </div>
       )}
       
-      {/* 🔥 CORE TABLE (PERFORMANCE CRITICAL - KEEP INLINE) */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className={enableHorizontalScrolling ? "vibe-grid-table-wrapper" : "overflow-auto"}>
+      {/* 🔥 CORE TABLE (PERFORMANCE CRITICAL - 3-LAYER SIMPLIFIED) */}
+      <div className="vibegrid-outer-combined">
+        <div className={enableHorizontalScrolling ? "vibegrid-scroll-container" : "vibegrid-scroll-container--no-scroll"}>
           <table 
             className={cn("vibe-grid-table", tableClassName)}
             style={{ tableLayout: 'fixed' }}
@@ -867,7 +867,7 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
                   {row.getVisibleCells().map(cell => (
                     <td
                       key={cell.id}
-                      className="px-0 py-0 border-r last:border-r-0 relative"
+                      className="border-r last:border-r-0 relative"
                       style={{ width: cell.column.getSize() }}
                     >
                       {/* 🔥 CRITICAL: Keep cell rendering inline for performance */}
