@@ -171,8 +171,6 @@ function AuthenticatedContent() {
   // ⚡ PERFORMANCE: No layout store updates - using pure route-based highlighting
   // The sidebar uses matchRoute for highlighting, which is much lighter than layout store updates
   
-  console.log('[AuthenticatedLayout] ✅ Rendering layout with SystemReadyGuard')
-  
   return (
     <div className="layout-container">
       <GlobalSidebar />

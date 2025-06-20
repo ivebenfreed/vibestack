@@ -1,6 +1,5 @@
 import { setup, assign, sendTo, fromPromise } from 'xstate';
 import { connectionMachine } from './machines/connection-machine';
-import { syncMachine } from './machines/sync-machine'; // Legacy - will be replaced
 import { syncMachineV2 } from './machines/sync-machine-v2'; // New pure services implementation
 import { liveChangesMachine } from './machines/live-changes-machine';
 // Integrity functionality now integrated into sync-machine-v2
@@ -135,7 +134,6 @@ export const orchestrator = setup({
   actors: {
     // Child machines
     connectionMachine,
-    syncMachine, // Legacy - deprecated
     syncMachineV2, // New pure services implementation - includes integrity functionality
     liveChangesMachine,
     

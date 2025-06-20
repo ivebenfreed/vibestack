@@ -414,6 +414,10 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
   tableId = 'default',
   enablePersistence = true,
   enableCrossTabSync = true,
+  // 🔍 NEW: Ellipsis debugging props
+  debugEllipsis = false,
+  debugBorders = false,
+  debugForceConstraints = false,
 }: VibeGridFinalProps<TEntity>) {
   
   // ============================================================================
@@ -704,6 +708,10 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
     
+    // 🔥 FIX: Prevent automatic resets on data changes (preserve user state)
+    autoResetPageIndex: false,
+    autoResetAll: false,
+    
     // Global search filter function
     globalFilterFn: 'includesString',
     
@@ -796,6 +804,8 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
     <div className={cn(
       "space-y-4", 
       enableHorizontalScrolling && "vibegrid-container",
+      debugBorders && "vibegrid-debug-borders",
+      debugForceConstraints && "vibegrid-force-cell-constraints",
       className
     )}>
       
@@ -826,7 +836,10 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
         <div className={enableHorizontalScrolling ? "vibegrid-scroll-container" : "vibegrid-scroll-container--no-scroll"}>
           <table 
             className={cn("vibe-grid-table", tableClassName)}
-            style={{ tableLayout: 'fixed' }}
+            style={{ 
+              tableLayout: 'fixed',
+              width: table.getTotalSize()
+            }}
           >
             <thead className="bg-muted/50">
               {table.getHeaderGroups().map(headerGroup => (
@@ -976,6 +989,34 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
               >
                 <ChevronsRight className="h-4 w-4" />
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 🔍 DEBUG: Ellipsis Testing Overlay */}
+      {debugEllipsis && (
+        <div className="vibegrid-debug-info">
+          <div className="text-white font-bold mb-2">🔍 Ellipsis Debug Mode</div>
+          <div className="space-y-1 text-xs">
+            <div>Table Layout: {enableHorizontalScrolling ? 'Fixed' : 'Auto'}</div>
+            <div>Debug Borders: {debugBorders ? 'ON' : 'OFF'}</div>
+            <div>Force Constraints: {debugForceConstraints ? 'ON' : 'OFF'}</div>
+            <div>Total Rows: {table.getRowModel().rows.length}</div>
+            <div>Visible Columns: {table.getVisibleLeafColumns().length}</div>
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="text-white font-semibold">Column Sizes:</div>
+            {table.getVisibleLeafColumns().slice(0, 3).map((col: any) => (
+              <div key={col.id} className="text-xs">
+                {col.id}: {col.getSize()}px
+              </div>
+            ))}
+          </div>
+          <div className="mt-3">
+            <div className="text-white font-semibold mb-1">Test Ellipsis:</div>
+            <div className="vibegrid-test-ellipsis text-black">
+              This is a very long text that should be truncated with ellipsis when it overflows
             </div>
           </div>
         </div>

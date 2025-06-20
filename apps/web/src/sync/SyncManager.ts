@@ -382,27 +382,35 @@ export class SyncManager implements IOnlineStatusProvider, ISyncStateProvider {
   }
   
   public static getInstance(): SyncManager {
-    if (!SyncManager.instance) {
-      if (SyncManager.debugMode) console.log('[SyncManager.getInstance] Creating new SyncManager instance.');
-      SyncManager.instance = new SyncManager();
-    } else {
-      if (SyncManager.debugMode) console.log('[SyncManager.getInstance] Returning existing SyncManager instance.');
-      
-      // During HMR, check if the instance is in a valid state
-      if (import.meta.hot) {
-        const instance = SyncManager.instance;
-        
-        // If the instance is in an invalid state (e.g., datasource is null but should be set),
-        // we might need to reset some state
-        if (instance.isInitialized && !instance.sharedDataSource) {
-          console.warn('[SyncManager.getInstance] HMR detected: Instance is initialized but missing shared datasource');
-          // Don't reset the instance, but log the issue - the setSharedDataSource method will handle this
-        }
-        
-        // console.log('[SyncManager.getInstance] HMR: Reusing existing instance'); // DISABLED: Too noisy
-      }
-    }
-    return SyncManager.instance;
+    // 🚨 LEGACY SYNC DISABLED: This system has been replaced by sync-machine-v2.ts + Pure Services
+    console.warn('[SyncManager] 🚨 LEGACY SYNC DISABLED - This system has been replaced by sync-machine-v2.ts');
+    console.warn('[SyncManager] ↪️  Use useAppState() or orchestrator hooks instead');
+    
+    // Return a stub that prevents any legacy sync operations
+    return {
+      // Stub methods that do nothing
+      initialize: async () => {},
+      connect: async () => false,
+      disconnect: () => {},
+      isConnected: () => false,
+      getStatus: () => 'disconnected' as const,
+      getLSN: () => '0/0',
+      getClientId: () => '',
+      getPendingChangesCount: () => 0,
+      autoConnectToServer: async () => {},
+      resetLSN: async () => {},
+      setAutoConnect: () => {},
+      getAutoConnect: () => false,
+      setSharedDataSource: () => {},
+      getIsInitialized: () => false,
+      on: () => {},
+      off: () => {},
+      destroy: async () => {},
+      getOutgoingChangeProcessor: () => ({ processQueuedChanges: async () => {} }),
+      getIntegrityManager: () => ({ requestIntegrityValidation: async () => ({ isValid: true }) }),
+      send: () => {},
+      events: { on: () => {}, off: () => {}, emit: () => {} }
+    } as any;
   }
   
   /**

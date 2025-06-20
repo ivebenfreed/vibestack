@@ -60,9 +60,6 @@ const AuthenticatedDebugTypeormTestLazyImport = createFileRoute(
 const AuthenticatedDebugTasksNewPatternLazyImport = createFileRoute(
   '/_authenticated/debug/tasks-new-pattern',
 )()
-const AuthenticatedDebugSyncTestLazyImport = createFileRoute(
-  '/_authenticated/debug/sync-test',
-)()
 const AuthenticatedDebugSyncChangesLazyImport = createFileRoute(
   '/_authenticated/debug/sync-changes',
 )()
@@ -284,15 +281,6 @@ const AuthenticatedDebugTasksNewPatternLazyRoute =
     import('./routes/_authenticated/debug/tasks-new-pattern.lazy').then(
       (d) => d.Route,
     ),
-  )
-
-const AuthenticatedDebugSyncTestLazyRoute =
-  AuthenticatedDebugSyncTestLazyImport.update({
-    id: '/sync-test',
-    path: '/sync-test',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/sync-test.lazy').then((d) => d.Route),
   )
 
 const AuthenticatedDebugSyncChangesLazyRoute =
@@ -652,13 +640,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugSyncChangesLazyImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
-    '/_authenticated/debug/sync-test': {
-      id: '/_authenticated/debug/sync-test'
-      path: '/sync-test'
-      fullPath: '/debug/sync-test'
-      preLoaderRoute: typeof AuthenticatedDebugSyncTestLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
     '/_authenticated/debug/tasks-new-pattern': {
       id: '/_authenticated/debug/tasks-new-pattern'
       path: '/tasks-new-pattern'
@@ -767,7 +748,6 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugPerformanceLazyRoute: typeof AuthenticatedDebugPerformanceLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
   AuthenticatedDebugSyncChangesLazyRoute: typeof AuthenticatedDebugSyncChangesLazyRoute
-  AuthenticatedDebugSyncTestLazyRoute: typeof AuthenticatedDebugSyncTestLazyRoute
   AuthenticatedDebugTasksNewPatternLazyRoute: typeof AuthenticatedDebugTasksNewPatternLazyRoute
   AuthenticatedDebugTypeormTestLazyRoute: typeof AuthenticatedDebugTypeormTestLazyRoute
   AuthenticatedDebugVibegridGeneratedLazyRoute: typeof AuthenticatedDebugVibegridGeneratedLazyRoute
@@ -794,7 +774,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
     AuthenticatedDebugSyncChangesLazyRoute:
       AuthenticatedDebugSyncChangesLazyRoute,
-    AuthenticatedDebugSyncTestLazyRoute: AuthenticatedDebugSyncTestLazyRoute,
     AuthenticatedDebugTasksNewPatternLazyRoute:
       AuthenticatedDebugTasksNewPatternLazyRoute,
     AuthenticatedDebugTypeormTestLazyRoute:
@@ -896,7 +875,6 @@ export interface FileRoutesByFullPath {
   '/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesLazyRoute
-  '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
   '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
   '/debug/vibegrid-generated': typeof AuthenticatedDebugVibegridGeneratedLazyRoute
@@ -940,7 +918,6 @@ export interface FileRoutesByTo {
   '/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/debug/sync-changes': typeof AuthenticatedDebugSyncChangesLazyRoute
-  '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
   '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
   '/debug/vibegrid-generated': typeof AuthenticatedDebugVibegridGeneratedLazyRoute
@@ -988,7 +965,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/_authenticated/debug/sync-changes': typeof AuthenticatedDebugSyncChangesLazyRoute
-  '/_authenticated/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/_authenticated/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
   '/_authenticated/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
   '/_authenticated/debug/vibegrid-generated': typeof AuthenticatedDebugVibegridGeneratedLazyRoute
@@ -1037,7 +1013,6 @@ export interface FileRouteTypes {
     | '/debug/performance'
     | '/debug/sync'
     | '/debug/sync-changes'
-    | '/debug/sync-test'
     | '/debug/tasks-new-pattern'
     | '/debug/typeorm-test'
     | '/debug/vibegrid-generated'
@@ -1080,7 +1055,6 @@ export interface FileRouteTypes {
     | '/debug/performance'
     | '/debug/sync'
     | '/debug/sync-changes'
-    | '/debug/sync-test'
     | '/debug/tasks-new-pattern'
     | '/debug/typeorm-test'
     | '/debug/vibegrid-generated'
@@ -1126,7 +1100,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/performance'
     | '/_authenticated/debug/sync'
     | '/_authenticated/debug/sync-changes'
-    | '/_authenticated/debug/sync-test'
     | '/_authenticated/debug/tasks-new-pattern'
     | '/_authenticated/debug/typeorm-test'
     | '/_authenticated/debug/vibegrid-generated'
@@ -1224,7 +1197,6 @@ export const routeTree = rootRoute
         "/_authenticated/debug/performance",
         "/_authenticated/debug/sync",
         "/_authenticated/debug/sync-changes",
-        "/_authenticated/debug/sync-test",
         "/_authenticated/debug/tasks-new-pattern",
         "/_authenticated/debug/typeorm-test",
         "/_authenticated/debug/vibegrid-generated",
@@ -1340,10 +1312,6 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/sync-changes": {
       "filePath": "_authenticated/debug/sync-changes.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/sync-test": {
-      "filePath": "_authenticated/debug/sync-test.lazy.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/debug/tasks-new-pattern": {

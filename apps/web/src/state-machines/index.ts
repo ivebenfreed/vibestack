@@ -1,5 +1,4 @@
 // Main exports for XState universal state management
-export { appMachine } from './app-machine';
 export { orchestrator } from './orchestrator';
 
 // 🔥 NEW: Orchestrator hooks (preferred)
@@ -16,29 +15,7 @@ export {
   useSimpleReadiness as useOrchestratorSimpleReadiness // Renamed to avoid conflict
 } from './orchestrator-hooks';
 
-// 🔴 LEGACY: Old app-machine hooks (deprecated)
-export * from './hooks';
+// 🔴 LEGACY: Old app-machine hooks (DELETED - replaced by orchestrator-hooks)
 export * from './types';
 
-// Export selectors for existing code that needs them
-export { 
-  isConnectionOnline, 
-  isAuthenticated, 
-  isDatabaseReady, 
-  isSyncLive, 
-  areLiveChangesActive,
-  isAppReady,
-  getAppReadinessInfo,
-  canLoadRoutes,
-  getRouteLoadingInfo,
-  getSyncProgress,
-  getDebugInfo,
-  getUserDisplayInfo,
-  getCurrentUser,
-  getLastKnownUser,
-  isOfflineMode,
-  hasUserCache,
-  isIntegrityResetInProgress,
-  isIntegrityValidationInProgress,
-  getIntegrityResetInfo
-} from './selectors'; 
+// 🔴 LEGACY: Selectors from deleted app-machine (use orchestrator hooks instead) 

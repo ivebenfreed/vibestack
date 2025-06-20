@@ -528,10 +528,10 @@ const CellDisplay = ({ value, cellType, config, relationshipData = {}, columnId 
       const displayField = relationshipData[columnId]?.displayField || 'name'
       const relationshipDisplayValue = value[displayField] || value.name || value.id
       return (
-        <>
+        <div className="relationship-content">
           <span className="relationship-text">{relationshipDisplayValue}</span>
           <span className="relationship-icon">🔗</span>
-        </>
+        </div>
       )
 
     case 'relationship-multi':
@@ -540,12 +540,12 @@ const CellDisplay = ({ value, cellType, config, relationshipData = {}, columnId 
       }
       const multiDisplayField = relationshipData[columnId]?.displayField || 'name'
       return (
-        <>
+        <div className="relationship-content">
           <span className="relationship-text">
             {value.map(item => item[multiDisplayField] || item.name || item.id).join(', ')}
           </span>
           <span className="relationship-icon">🔗×{value.length}</span>
-        </>
+        </div>
       )
 
     case 'text':
@@ -573,6 +573,17 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   const isSystemField = meta?.systemField || false
   const columnId = column.columnDef.id as string
   
+  // 🔍 DEBUG: Log cell type detection for relationship columns
+  if (false && (columnId === 'project' || columnId === 'assignee')) {
+    console.log(`🔍 Cell Debug [${columnId}]:`, {
+      columnId,
+      cellType,
+      meta,
+      atomValue,
+      valueType: typeof atomValue
+    })
+  }
+  
   // Generate the simple cell class name based on type
   const getCellClassName = (type: string) => {
     return `vibe-cell vibe-cell--${type}`
@@ -581,6 +592,101 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   // Consolidated state management
   const optimistic = useOptimisticValue(atomValue)
   const editing = useEditingState(optimistic.value, cellType)
+
+  // 🔍 DEBUG: DOM INSPECTION - Let's see what's actually in the DOM
+  React.useEffect(() => {
+    if (false && (columnId === 'project' || columnId === 'assignee') && cellType === 'relationship-single') {
+      const timer = setTimeout(() => {
+        // Find the cell in the DOM
+        const cells = document.querySelectorAll(`.vibe-cell--${cellType}`)
+        cells.forEach((cell, index) => {
+          if (cell.textContent?.includes('Test User') || cell.textContent?.includes('Test Project')) {
+            console.log(`🔍 DOM INSPECTION [${columnId}] Cell ${index}:`)
+            console.log('📍 Cell element:', cell)
+            console.log('📍 Cell innerHTML:', cell.innerHTML)
+            console.log('📍 Cell classes:', cell.className)
+            
+            // 📏 WIDTH MEASUREMENTS
+            const cellRect = cell.getBoundingClientRect()
+            const tableCellParent = cell.closest('td')
+            const tableCellRect = tableCellParent?.getBoundingClientRect()
+            console.log('📏 WIDTH MEASUREMENTS:', {
+              cellWidth: cellRect.width,
+              cellHeight: cellRect.height,
+              tableCellWidth: tableCellRect?.width,
+              tableCellHeight: tableCellRect?.height,
+              screenWidth: window.innerWidth,
+              availableSpace: tableCellRect?.width || 0
+            })
+            
+            // Check for relationship content
+            const relationshipContent = cell.querySelector('.relationship-content')
+            if (relationshipContent) {
+              console.log('📍 Relationship content:', relationshipContent)
+              console.log('📍 Relationship content classes:', relationshipContent.className)
+              
+              // 📏 RELATIONSHIP CONTENT WIDTH MEASUREMENTS
+              const contentRect = relationshipContent.getBoundingClientRect()
+              console.log('📏 RELATIONSHIP CONTENT WIDTH:', {
+                actualWidth: contentRect.width,
+                actualHeight: contentRect.height,
+                computedWidth: getComputedStyle(relationshipContent).width,
+                computedMinWidth: getComputedStyle(relationshipContent).minWidth,
+                computedMaxWidth: getComputedStyle(relationshipContent).maxWidth
+              })
+              
+              console.log('📍 Relationship content computed styles:', {
+                display: getComputedStyle(relationshipContent).display,
+                flexDirection: getComputedStyle(relationshipContent).flexDirection,
+                alignItems: getComputedStyle(relationshipContent).alignItems,
+                gap: getComputedStyle(relationshipContent).gap,
+                width: getComputedStyle(relationshipContent).width,
+                minWidth: getComputedStyle(relationshipContent).minWidth,
+                overflow: getComputedStyle(relationshipContent).overflow
+              })
+              
+              // Check relationship text
+              const relationshipText = relationshipContent.querySelector('.relationship-text')
+              if (relationshipText) {
+                console.log('📍 Relationship text:', relationshipText)
+                console.log('📍 Relationship text classes:', relationshipText.className)
+                
+                // 📏 RELATIONSHIP TEXT WIDTH MEASUREMENTS
+                const textRect = relationshipText.getBoundingClientRect()
+                const textContent = relationshipText.textContent || ''
+                console.log('📏 RELATIONSHIP TEXT WIDTH:', {
+                  actualWidth: textRect.width,
+                  actualHeight: textRect.height,
+                  textLength: textContent.length,
+                  textContent: textContent,
+                  computedWidth: getComputedStyle(relationshipText).width,
+                  computedMinWidth: getComputedStyle(relationshipText).minWidth,
+                  computedMaxWidth: getComputedStyle(relationshipText).maxWidth,
+                  isOverflowing: textRect.width < relationshipText.scrollWidth,
+                  scrollWidth: relationshipText.scrollWidth,
+                  clientWidth: relationshipText.clientWidth
+                })
+                
+                console.log('📍 Relationship text computed styles:', {
+                  flex: getComputedStyle(relationshipText).flex,
+                  minWidth: getComputedStyle(relationshipText).minWidth,
+                  overflow: getComputedStyle(relationshipText).overflow,
+                  textOverflow: getComputedStyle(relationshipText).textOverflow,
+                  whiteSpace: getComputedStyle(relationshipText).whiteSpace,
+                  wordBreak: getComputedStyle(relationshipText).wordBreak,
+                  wordWrap: getComputedStyle(relationshipText).wordWrap,
+                  width: getComputedStyle(relationshipText).width,
+                  maxWidth: getComputedStyle(relationshipText).maxWidth
+                })
+              }
+            }
+          }
+        })
+      }, 100) // Small delay to ensure DOM is updated
+      
+      return () => clearTimeout(timer)
+    }
+  }, [columnId, cellType, optimistic.value])
   
   // Unified save handler - works with atoms automatically
   const handleSave = React.useCallback(async (newValue: any) => {

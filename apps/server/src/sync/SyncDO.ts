@@ -109,49 +109,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // We no longer register handlers in the constructor
     // to prevent duplicate registrations when DO wakes from hibernation
     
-    // Initialize replication when SyncDO starts up
-    this.state.waitUntil(this.initializeReplication());
-    
     // Schedule cleanup alarm if not already set
     this.checkAndSetCleanupAlarm();
-  }
-
-  /**
-   * Initialize replication by calling the replication init endpoint
-   * This ensures the replication system is ready before handling client connections
-   */
-  private async initializeReplication(): Promise<void> {
-    try {
-      syncLogger.info('Initializing replication from SyncDO startup', {
-        syncId: this.syncId
-      }, MODULE_NAME);
-      
-      // Get the ReplicationDO using the proper Durable Object pattern
-      const replicationId = this.env.REPLICATION.idFromName('replication');
-      const replicationStub = this.env.REPLICATION.get(replicationId);
-      
-      // Call the init endpoint directly on the ReplicationDO - using proper URL format
-      const response = await replicationStub.fetch('https://internal/api/replication/init');
-      
-      if (!response.ok) {
-        syncLogger.error('Failed to initialize replication', {
-          status: response.status,
-          statusText: response.statusText
-        }, MODULE_NAME);
-        return;
-      }
-      
-      const result = await response.json();
-      syncLogger.info('Replication initialization successful', {
-        result,
-        syncId: this.syncId
-      }, MODULE_NAME);
-    } catch (error) {
-      syncLogger.error('Error initializing replication', {
-        error: error instanceof Error ? error.message : String(error),
-        syncId: this.syncId
-      }, MODULE_NAME);
-    }
   }
 
   /**
@@ -329,9 +288,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           }
         }
         
-        // Ensure replication is active - call replication init as part of heartbeat
-        // This helps maintain replication health and recover from any failures
-        this.state.waitUntil(this.ensureReplicationActive());
+        // REMOVED: Don't call replication init from heartbeat
+        // The cron-tester is the single source of replication heartbeat
         
       } catch (error) {
         syncLogger.error('Error processing heartbeat', {

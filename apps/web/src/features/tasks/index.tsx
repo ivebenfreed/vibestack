@@ -236,6 +236,8 @@ const Tasks: React.FC = () => {
               pageSize={10}
               className="border border-border rounded-lg"
               debugMode={true}
+                      debugEllipsis={false}
+        debugBorders={false}
               tableId="tasks-grid"
               enablePersistence={true}
               enableCrossTabSync={false}

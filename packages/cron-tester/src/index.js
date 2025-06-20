@@ -3,6 +3,9 @@
  * 
  * This script sends periodic requests to the replication initialization endpoint
  * to keep the replication DO active during local development.
+ * 
+ * SINGLE SOURCE OF TRUTH: This is the only process that should initialize replication
+ * to prevent PostgreSQL replication slot race conditions.
  */
 const http = require('http');
 
@@ -13,7 +16,7 @@ const SERVER_PORT = 8787;       // Default Cloudflare Workers port for wrangler 
 
 /**
  * Triggers the replication initialization endpoint directly
- * This is more reliable than using the scheduled handler in local development
+ * This is the single source of replication heartbeat (mimics production alarms)
  */
 function triggerCron() {
   const options = {
@@ -72,9 +75,10 @@ function triggerCron() {
 }
 
 // Print startup message
-console.log('[CRON-TESTER] Starting cron trigger service');
+console.log('[CRON-TESTER] Starting replication heartbeat service (SINGLE SOURCE)');
 console.log(`[CRON-TESTER] Will trigger every ${POLL_INTERVAL_MS/1000} seconds`);
 console.log(`[CRON-TESTER] First trigger in ${INITIAL_DELAY_MS/1000} seconds`);
+console.log('[CRON-TESTER] This prevents PostgreSQL replication slot race conditions');
 
 // Only start once server has likely started
 setTimeout(() => {
@@ -87,6 +91,6 @@ setTimeout(() => {
 
 // Keep process running
 process.on('SIGINT', () => {
-  console.log('[CRON-TESTER] Shutting down cron trigger service');
+  console.log('[CRON-TESTER] Shutting down replication heartbeat service');
   process.exit(0);
 }); 

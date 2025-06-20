@@ -56,112 +56,206 @@ Cell content is not properly ellipsing in VibeGridFinal component. Long text ove
 3. **Table layout constraints unclear** - Uncertain if TanStack table sizing is working correctly
 4. **Multiple CSS approaches attempted without systematic testing**
 
-## 📋 **Recommended Debug Process**
+## ✅ **IMPLEMENTED: Systematic Debug Solution**
 
-### **Step 1: Browser Inspector Analysis**
-```bash
-# Open browser dev tools and inspect a long text cell
-# Look for:
-# 1. Actual DOM structure (not just the React components)
-# 2. Computed CSS styles on each element  
-# 3. Box model constraints (width, overflow, display)
-# 4. Which element is actually supposed to be constrained
+### **🔧 New Debug Features Available**
+
+#### **1. Debug Props in VibeGridFinal**
+```tsx
+<VibeGridFinal
+  // ... other props
+  debugEllipsis={true}      // Shows debug overlay with table info
+  debugBorders={true}       // Adds colored borders to visualize layout
+  debugForceConstraints={true} // Forces table cell max-width constraints
+/>
 ```
 
-### **Step 2: Verify Table Column Constraints**
+#### **2. Debug CSS Classes Added**
 ```css
-/* Add temporary debug borders */
-.vibe-grid-table td { border: 2px solid red !important; }
-.vibe-cell { border: 2px solid blue !important; }
-.display-text { border: 2px solid green !important; }
+/* Visual debugging */
+.vibegrid-debug-borders .vibe-grid-table td { border: 2px solid red !important; }
+.vibegrid-debug-borders .vibe-cell { border: 2px solid blue !important; }
+.vibegrid-debug-borders .display-text { border: 2px solid green !important; }
+
+/* Test ellipsis in isolation */
+.vibegrid-test-ellipsis {
+  width: 200px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Force table constraints */
+.vibegrid-force-cell-constraints .vibe-grid-table td {
+  max-width: 0 !important;
+  overflow: hidden !important;
+}
 ```
 
-### **Step 3: Test Minimal Ellipsis Example**
+#### **3. Enhanced Ellipsis Implementation**
 ```css
-/* Create isolated test case */
-.test-ellipsis {
-  width: 200px; /* Fixed width for testing */
+/* Applied to table cells for proper constraint */
+.vibe-grid-table td {
+  max-width: 0;  /* Force cells to respect column width */
+  width: 1%;     /* Minimal width for flex calculations */
+}
+
+/* Applied to cell containers */
+.vibe-cell {
+  overflow: hidden;
+  min-width: 0;  /* Allow flex shrinking */
+}
+
+/* Applied to text content */
+.vibe-cell--text .display-text {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border: 1px solid red;
+  max-width: 100%;
+}
+
+/* Applied to relationship cell text */
+.vibe-cell--relationship .relationship-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Applied to UUID, JSON, and number cells */
+.vibe-cell--uuid, .vibe-cell--json, .vibe-cell--number .display-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 ```
 
-### **Step 4: Check TanStack Table Column Sizing**
+### **📋 How to Use the Debug System**
+
+#### **Step 1: Enable Debug Mode**
+```tsx
+// In your page component
+<VibeGridFinal
+  data={taskData}
+  columns={taskColumns}
+  debugEllipsis={true}
+  debugBorders={true}
+  // ... other props
+/>
+```
+
+#### **Step 2: Visual Inspection**
+1. **Red borders** = Table cells (td elements)
+2. **Blue borders** = Cell containers (.vibe-cell)
+3. **Green borders** = Display text elements (.display-text)
+4. **Yellow test box** = Isolated ellipsis test (should show "...")
+
+#### **Step 3: Debug Overlay Information**
+- Table layout type (Fixed/Auto)
+- Debug flags status
+- Row and column counts
+- Column size information
+- Working ellipsis test example
+
+#### **Step 4: Systematic Testing**
+```tsx
+// Test 1: Basic debug visualization
+<VibeGridFinal debugBorders={true} />
+
+// Test 2: Force table constraints
+<VibeGridFinal debugForceConstraints={true} />
+
+// Test 3: Full debug mode
+<VibeGridFinal 
+  debugEllipsis={true} 
+  debugBorders={true} 
+  debugForceConstraints={true} 
+/>
+```
+
+## 🎯 **Browser Debug Workflow**
+
+### **1. Open Browser Dev Tools**
+- Right-click on a long text cell → "Inspect"
+- Look for the colored borders from debug mode
+- Check the computed styles tab
+
+### **2. Verify Table Layout**
 ```javascript
-// In browser console, inspect table instance:
-table.getVisibleLeafColumns().map(col => ({ 
-  id: col.id, 
-  size: col.getSize(),
-  actualWidth: col.columnDef.size 
+// In browser console:
+// Check if table-layout: fixed is applied
+getComputedStyle(document.querySelector('.vibe-grid-table')).tableLayout
+
+// Check column sizes
+Array.from(document.querySelectorAll('.vibe-grid-table th')).map(th => ({
+  text: th.textContent,
+  width: getComputedStyle(th).width
 }))
 ```
 
-## 🚀 **Recommendations for Further Work**
-
-### **1. Browser-First Debugging**
-- **Use browser dev tools FIRST** before writing CSS
-- Inspect actual rendered DOM, not React component structure
-- Test ellipsis on isolated elements before complex integration
-
-### **2. Verify Table Layout Fundamentals**
-- Confirm `table-layout: fixed` is working correctly
-- Ensure column widths are actually being constrained by TanStack
-- Check if inline `style={{ width: header.getSize() }}` is applied correctly
-
-### **3. Alternative Approaches to Consider**
-
-#### **Option A: Force Table Cell Constraints**
-```css
-.vibe-grid-table td {
-  max-width: 0; /* Force cell to respect column width */
-  overflow: hidden;
-}
-```
-
-#### **Option B: CSS Grid Alternative**
-```css
-.vibe-grid-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-}
-```
-
-#### **Option C: JavaScript-Based Truncation**
+### **3. Test Ellipsis Elements**
 ```javascript
-// Measure text width and truncate programmatically
-const truncateText = (text, maxWidth) => {
-  // Implementation using canvas measureText or similar
-}
+// Check if ellipsis is working on display text
+Array.from(document.querySelectorAll('.display-text')).forEach(el => {
+  const styles = getComputedStyle(el);
+  console.log({
+    element: el,
+    overflow: styles.overflow,
+    textOverflow: styles.textOverflow,
+    whiteSpace: styles.whiteSpace,
+    width: styles.width,
+    maxWidth: styles.maxWidth
+  });
+});
 ```
 
-### **4. Systematic Testing Strategy**
-1. **Test with single column table first**
-2. **Add fixed pixel widths** to eliminate variables
-3. **Test with plain HTML/CSS** (no React components)
-4. **Gradually add complexity** back layer by layer
+### **4. Debug Cell Constraints**
+```javascript
+// Check table cell constraints
+Array.from(document.querySelectorAll('.vibe-grid-table td')).forEach(td => {
+  const styles = getComputedStyle(td);
+  console.log({
+    element: td,
+    width: styles.width,
+    maxWidth: styles.maxWidth,
+    overflow: styles.overflow
+  });
+});
+```
 
-### **5. Component Architecture Questions**
-- Should ellipsis be handled in CSS or JavaScript?
-- Should the UniversalCellRenderer handle truncation?
-- Is the current flex-based cell layout optimal for text display?
-- Would a tooltip on hover be better UX than ellipsis?
+## 🚀 **Expected Results**
 
-## 🎯 **Next Action Items**
+### **✅ What Should Work Now**
+1. **Table cells** should have `max-width: 0` and `width: 1%`
+2. **Cell containers** should have `overflow: hidden` and `min-width: 0`
+3. **Text content** should have ellipsis properties applied
+4. **Relationship cell text** should truncate with ellipsis (✅ NEWLY ADDED)
+5. **UUID cells** should truncate long identifiers (✅ NEWLY ADDED)
+6. **JSON cells** should truncate long JSON strings (✅ NEWLY ADDED)
+7. **Number cells** should truncate long numbers
+8. **Debug borders** should clearly show layout hierarchy
+9. **Test ellipsis box** should demonstrate working truncation
 
-1. **Open browser dev tools** on the actual VibeGrid
-2. **Inspect a problematic long text cell** 
-3. **Document the real DOM structure** (not assumptions)
-4. **Test ellipsis on the actual constrained element**
-5. **Build solution based on real constraints, not guesses**
+### **🔍 If Still Not Working**
+1. Check browser console for CSS conflicts
+2. Verify column widths are actually being set by TanStack
+3. Check if any parent elements are interfering
+4. Look for competing CSS rules in dev tools
+5. Try the force constraints mode
 
 ## 📁 **Related Files**
-- `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.css`
-- `apps/web/src/components/custom/vibegridfinal/core/UniversalCellRenderer.tsx`
-- `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.tsx`
+- `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.css` - Updated with debug classes and ellipsis fixes
+- `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.tsx` - Added debug props and overlay
+- `apps/web/src/components/custom/vibegridfinal/types/index.ts` - Added debug prop types
 
 ---
 **Created:** $(date)  
 **Issue:** Cell content overflow in VibeGridFinal  
-**Status:** Investigation ongoing - requires browser-based debugging 
+**Status:** ✅ Debug system implemented - Ready for browser testing 

@@ -129,16 +129,6 @@ export class ReplicationDO implements DurableObject {
         error: errorMessage 
       }, MODULE_NAME);
       
-      // Even on error, attempt to start polling
-      // This provides resilience - polling will skip problematic slots
-      try {
-        await this.pollingManager.startPolling();
-      } catch (pollErr) {
-        replicationLogger.error('Failed to start polling after initialization error', {
-          error: pollErr instanceof Error ? pollErr.message : String(pollErr)
-        }, MODULE_NAME);
-      }
-      
       return {
         success: false,
         slotStatus: null,

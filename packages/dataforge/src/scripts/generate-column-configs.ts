@@ -220,8 +220,8 @@ export type ${entityName}ColumnDef = (typeof ${entityName}ColumnConfig)[${entity
         output += `    accessorKey: '${propertyName}' as keyof ${entityName},\n`;
         output += `    header: '${formatFieldLabel(propertyName)}',\n`;
         output += `    size: ${getColumnSize(config.cellType, config.validation?.maxLength)},\n`;
-        output += `    minSize: 50,\n`;
-        output += `    maxSize: 500,\n`;
+        output += `    minSize: ${getMinColumnSize(config.cellType)},\n`;
+        output += `    maxSize: ${config.cellType === 'text' ? 600 : 500},\n`;
         // System fields are always sortable and hideable
         // Only restrict hiding for non-nullable business fields that are truly required
         const isSystemField = config.systemField;
@@ -285,7 +285,7 @@ export type ${entityName}ColumnDef = (typeof ${entityName}ColumnConfig)[${entity
             output += `    accessorKey: '${propertyName}' as keyof ${entityName},\n`;
             output += `    header: '${formatFieldLabel(propertyName)}',\n`;
             output += `    size: ${getColumnSize(cellType)},\n`;
-            output += `    minSize: 100,\n`;
+            output += `    minSize: ${getMinColumnSize(cellType)},\n`;
             output += `    maxSize: 400,\n`;
             output += `    enableSorting: false,\n`;
             output += `    enableColumnFilter: true,\n`;
@@ -547,7 +547,7 @@ function getColumnSize(cellType: string, maxLength?: number): number {
         case 'uuid':
             return 120;
         case 'date':
-            return 160;
+            return 120;
         case 'number':
             return 100;
         case 'boolean':
@@ -556,12 +556,12 @@ function getColumnSize(cellType: string, maxLength?: number): number {
             return 120;
         case 'text':
             if (maxLength) {
-                if (maxLength <= 50) return 150;
-                if (maxLength <= 100) return 200;
-                if (maxLength <= 255) return 250;
-                return 300;
+                if (maxLength <= 50) return 200;
+                if (maxLength <= 100) return 250;
+                if (maxLength <= 255) return 300;
+                return 350;
             }
-            return 200;
+            return 250;
         case 'relationship-single':
         case 'relationship-multi':
         case 'relationship-collection':
@@ -570,6 +570,35 @@ function getColumnSize(cellType: string, maxLength?: number): number {
             return 220;
         default:
             return 150;
+    }
+}
+
+/**
+ * Get minimum column size based on cell type - prevents wrapping on small screens
+ */
+function getMinColumnSize(cellType: string): number {
+    switch (cellType) {
+        case 'uuid':
+            return 100; // UUIDs need space to show truncated value
+        case 'date':
+            return 100; // Dates are compact: "Jan 15, 2024" fits in ~100px
+        case 'number':
+            return 80;  // Numbers are usually short
+        case 'boolean':
+            return 70;  // Booleans are compact
+        case 'enum':
+            return 100; // Enums need space for labels
+        case 'text':
+            return 120; // Text needs room for ellipsis to be useful
+        case 'relationship-single':
+        case 'relationship-multi':
+            return 140; // Relationships need room for names + icon
+        case 'relationship-collection':
+            return 160; // Collections need more space
+        case 'json':
+            return 140; // JSON needs space for meaningful preview
+        default:
+            return 100;
     }
 }
 

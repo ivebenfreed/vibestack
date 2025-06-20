@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppState } from '@/state-machines/hooks'
+import { useOrchestrator, useConnection, useDatabase, useSync } from '@/state-machines/orchestrator-hooks'
 
 export type SystemMode = 'online' | 'offline' | 'degraded'
 
@@ -16,11 +16,18 @@ interface SystemStatus {
  * Combines network status, sync status, and database status
  */
 export function useSystemStatus(): SystemStatus {
-  const { isConnectionOnline, isSyncLive, isDatabaseReady, snapshot } = useAppState()
+  const connection = useConnection()
+  const database = useDatabase()
+  const sync = useSync()
+  const orchestrator = useOrchestrator()
+  
+  const isConnectionOnline = connection.isOnline
+  const isDatabaseReady = database.isReady
+  const isSyncLive = sync.isSyncLive
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   
-  // Get sync state from snapshot
-  const syncState = snapshot.sync
+  // Get sync state from orchestrator
+  const syncState = sync.isSyncing ? 'syncing' : (sync.isSyncLive ? 'live' : 'idle')
 
   // Monitor network status changes
   useEffect(() => {

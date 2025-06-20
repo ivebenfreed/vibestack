@@ -460,17 +460,28 @@ export const syncMachineV2 = setup({
           try {
             const snapshot = self.getSnapshot();
             if (snapshot?.status === 'stopped') {
-              console.log(`[SyncMachineV2] 🚫 safeActorSend failed: actor stopped (status: ${snapshot.status})`);
+              // Only log stopped actor warnings for non-heartbeat messages to reduce noise
+              if (event.type !== 'WS_MESSAGE' || event.message?.type !== 'srv_heartbeat') {
+                console.log(`[SyncMachineV2] 🚫 safeActorSend failed: actor stopped (status: ${snapshot.status})`);
+              }
               return false;
             }
-            console.log(`[SyncMachineV2] 🟢 Actor status: ${snapshot?.status}, state: ${snapshot?.value}`);
+            // Actor status check passed - only log for non-heartbeat events
           } catch (snapshotError) {
             console.log(`[SyncMachineV2] 🚫 safeActorSend failed: snapshot error:`, snapshotError);
             return false;
           }
           
           self.send(event);
-          console.log(`[SyncMachineV2] ✅ Successfully sent ${event.type}`);
+          
+          // Clean, informative logging for heartbeats
+          if (event.type === 'WS_MESSAGE' && event.message?.type === 'srv_heartbeat') {
+            const hasLSN = !!event.message?.serverLSN;
+            const lsnInfo = hasLSN ? ` (LSN: ${event.message.serverLSN})` : '';
+            console.log(`[SyncMachineV2] 💓 Heartbeat processed${lsnInfo}`);
+          } else {
+            console.log(`[SyncMachineV2] ✅ Successfully sent ${event.type}`);
+          }
           return true;
         } catch (error: any) {
           // Handle various stopped actor error patterns
@@ -482,7 +493,10 @@ export const syncMachineV2 = setup({
                                 error?.name === 'Error';
           
           if (isStoppedError) {
-            console.log(`[SyncMachineV2] 🚫 safeActorSend failed: stopped actor error:`, errorMessage);
+            // Only log stopped actor errors for non-heartbeat messages to reduce noise
+            if (event.type !== 'WS_MESSAGE' || event.message?.type !== 'srv_heartbeat') {
+              console.log(`[SyncMachineV2] 🚫 safeActorSend failed: stopped actor error:`, errorMessage);
+            }
             return false;
           } else {
             console.warn(`[SyncMachineV2] Failed to send ${event.type}:`, error);

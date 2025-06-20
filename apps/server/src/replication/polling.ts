@@ -124,6 +124,20 @@ export class PollingManager {
     walEntries?: number;
     error?: string;
   }> {
+    // Use the same polling lock as continuous polling to prevent conflicts
+    if (this.isPolling) {
+      replicationLogger.debug('First poll skipped - polling already in progress', {}, MODULE_NAME);
+      return {
+        success: true,
+        changesFound: false,
+        changeCount: 0,
+        filteredCount: 0,
+        walEntries: 0
+      };
+    }
+    
+    this.isPolling = true;
+    
     try {
       const changes = await this.pollForChanges();
       
@@ -162,6 +176,8 @@ export class PollingManager {
         changesFound: false,
         error: errorMessage
       };
+    } finally {
+      this.isPolling = false;
     }
   }
 

@@ -244,6 +244,11 @@ export interface VibeGridFinalProps<TEntity extends BaseEntity> {
   // Performance/Debug
   debugMode?: boolean
   
+  // 🔍 NEW: Ellipsis debugging props
+  debugEllipsis?: boolean
+  debugBorders?: boolean
+  debugForceConstraints?: boolean
+  
   // 🔥 ENFORCED: Persistence props (required for proper usage)
   tableId: string // Made required
   enablePersistence?: boolean
