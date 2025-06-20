@@ -112,6 +112,8 @@ async function loadProjectsForSidebar() {
     }
   }
   
+
+  
   // ✅ CHECK ATOMS FIRST: Route loaders likely already populated them
   const { projectsAtom } = await import('@/domain/project')
   const { tasksAtom } = await import('@/domain/task')

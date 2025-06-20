@@ -1,5 +1,5 @@
 import { DeepPartial, EntityTarget, ObjectLiteral, Repository, FindOptionsWhere } from 'typeorm';
-import { OutgoingChangeProcessor } from '../sync/OutgoingChangeProcessor';
+import { OutgoingChangeService } from '../sync/OutgoingChangeService';
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { RelationshipProcessor } from './lib';
 
@@ -169,7 +169,7 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
   constructor(
     protected repository: any,
     protected tableName: string,
-    protected syncChangeManager: OutgoingChangeProcessor
+    protected outgoingChangeService: OutgoingChangeService
   ) {
     // Initialize with a basic repositories object - in practice this would be injected
     this.relationshipProcessor = new RelationshipProcessor({
@@ -579,10 +579,10 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
   async createWithProcessing(data: Record<string, any>): Promise<T> {
     console.log(`[${this.tableName}] Creating entity with enhanced processing and sync tracking`);
     
-    // Check if syncChangeManager is available
-    if (!this.syncChangeManager) {
-      console.error(`[${this.tableName}] syncChangeManager is null - cannot track changes for sync. This indicates the service was not properly initialized.`);
-      throw new Error(`SyncChangeManager not available for ${this.tableName}. Service may not be properly initialized.`);
+    // Check if outgoingChangeService is available
+    if (!this.outgoingChangeService) {
+      console.error(`[${this.tableName}] outgoingChangeService is null - cannot track changes for sync. This indicates the service was not properly initialized.`);
+      throw new Error(`OutgoingChangeService not available for ${this.tableName}. Service may not be properly initialized.`);
     }
     
     // Process data through the entity's sync data processor
@@ -599,7 +599,7 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
     const entity = await this.repository.create(processedData);
     
     // Record outgoing change for sync (this is for user operations, not incoming sync)
-    await this.syncChangeManager.trackChange(this.tableName, 'insert', entity);
+    await this.outgoingChangeService.trackEntityChange(this.tableName, 'insert', entity);
     
     return entity;
   }
@@ -607,10 +607,10 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
   async updateWithProcessing(id: string, data: Record<string, any>): Promise<T> {
     console.log(`[${this.tableName}] Updating entity ${id} with enhanced processing and sync tracking`);
     
-    // Check if syncChangeManager is available
-    if (!this.syncChangeManager) {
-      console.error(`[${this.tableName}] syncChangeManager is null - cannot track changes for sync. This indicates the service was not properly initialized.`);
-      throw new Error(`SyncChangeManager not available for ${this.tableName}. Service may not be properly initialized.`);
+    // Check if outgoingChangeService is available
+    if (!this.outgoingChangeService) {
+      console.error(`[${this.tableName}] outgoingChangeService is null - cannot track changes for sync. This indicates the service was not properly initialized.`);
+      throw new Error(`OutgoingChangeService not available for ${this.tableName}. Service may not be properly initialized.`);
     }
     
     // Process data through the entity's sync data processor
@@ -627,20 +627,16 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
     const updatedEntity = await this.repository.update(id, processedData);
     
     // Record outgoing change for sync (this is for user operations, not incoming sync)
-    console.log(`[${this.tableName}] 🔍 DEBUG: About to call trackChange for UPDATE of ${id}`);
-    console.log(`[${this.tableName}] 🔍 DEBUG: syncChangeManager available:`, !!this.syncChangeManager);
-    console.log(`[${this.tableName}] 🔍 DEBUG: syncChangeManager type:`, typeof this.syncChangeManager);
-    console.log(`[${this.tableName}] 🔍 DEBUG: syncChangeManager constructor:`, this.syncChangeManager.constructor.name);
-    console.log(`[${this.tableName}] 🔍 DEBUG: syncChangeManager === OutgoingChangeProcessor?`, this.syncChangeManager.constructor.name === 'OutgoingChangeProcessor');
-    console.log(`[${this.tableName}] 🔍 DEBUG: typeof trackChange:`, typeof this.syncChangeManager.trackChange);
-    console.log(`[${this.tableName}] 🔍 DEBUG: trackChange method:`, this.syncChangeManager.trackChange);
-    console.log(`[${this.tableName}] 🔍 DEBUG: calling trackChange now...`);
+    console.log(`[${this.tableName}] 🔍 DEBUG: About to call trackEntityChange for UPDATE of ${id}`);
+    console.log(`[${this.tableName}] 🔍 DEBUG: outgoingChangeService available:`, !!this.outgoingChangeService);
+    console.log(`[${this.tableName}] 🔍 DEBUG: outgoingChangeService type:`, typeof this.outgoingChangeService);
+    console.log(`[${this.tableName}] 🔍 DEBUG: calling trackEntityChange now...`);
     
     try {
-      await this.syncChangeManager.trackChange(this.tableName, 'update', updatedEntity);
-      console.log(`[${this.tableName}] ✅ DEBUG: trackChange call completed successfully for UPDATE of ${id}`);
+      await this.outgoingChangeService.trackEntityChange(this.tableName, 'update', updatedEntity);
+      console.log(`[${this.tableName}] ✅ DEBUG: trackEntityChange call completed successfully for UPDATE of ${id}`);
     } catch (trackError) {
-      console.error(`[${this.tableName}] ❌ ERROR: trackChange failed for UPDATE of ${id}:`, trackError);
+      console.error(`[${this.tableName}] ❌ ERROR: trackEntityChange failed for UPDATE of ${id}:`, trackError);
       console.error(`[${this.tableName}] ❌ ERROR: trackError details:`, {
         name: (trackError as any)?.name,
         message: (trackError as any)?.message,
@@ -655,10 +651,10 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
   async deleteWithProcessing(id: string): Promise<boolean> {
     console.log(`[${this.tableName}] Deleting entity ${id} with enhanced processing and sync tracking`);
     
-    // Check if syncChangeManager is available
-    if (!this.syncChangeManager) {
-      console.error(`[${this.tableName}] syncChangeManager is null - cannot track changes for sync. This indicates the service was not properly initialized.`);
-      throw new Error(`SyncChangeManager not available for ${this.tableName}. Service may not be properly initialized.`);
+    // Check if outgoingChangeService is available
+    if (!this.outgoingChangeService) {
+      console.error(`[${this.tableName}] outgoingChangeService is null - cannot track changes for sync. This indicates the service was not properly initialized.`);
+      throw new Error(`OutgoingChangeService not available for ${this.tableName}. Service may not be properly initialized.`);
     }
     
     // Delete the entity
@@ -666,7 +662,7 @@ export abstract class BaseService<T extends object> implements SyncDataProcessor
     
     if (success) {
       // Record outgoing change for sync (this is for user operations, not incoming sync)
-      await this.syncChangeManager.trackChange(this.tableName, 'delete', { id });
+      await this.outgoingChangeService.trackEntityChange(this.tableName, 'delete', { id });
     }
     
     return success;

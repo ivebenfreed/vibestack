@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import url('./components/ui/global.css');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @custom-variant dark (&:is(.dark *));
 
@@ -196,3 +200,121 @@
     height: 0;
   }
 }
+
+/* ============================================================================
+   VibeGrid CSS - Pure CSS Responsive Solution
+   Following tanstack-table-horz-scrolling rule exactly
+   ============================================================================ */
+
+/* 
+   THE HOLY GRAIL: CSS sizing strategy handles expand-vs-scroll automatically
+   ✅ No JavaScript width calculations needed
+   ✅ No ResizeObserver complexity
+   ✅ No magic number hacks
+   ✅ Works perfectly with existing layout system
+*/
+
+/* ============================================================================
+   CRITICAL: Force Container Width Constraints - The Table Scrolling Solution
+   ============================================================================ */
+
+.vibegrid-container {
+  /* 🎯 CRITICAL: width: 0 prevents content from affecting parent container sizing */
+  width: 0;
+  /* 📏 Fill parent's actual available space (adapts to sidebar state) */
+  min-width: 100%;
+  max-width: 100%;
+  
+  /* Use flexbox to control child sizing predictably */
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  
+  /* Prevent any expansion beyond available layout space */
+  overflow: hidden;
+}
+
+/* Table container - the border/background wrapper */
+.vibegrid-container > div {
+  /* 🎯 INHERIT: Same sizing technique as parent */
+  width: 0;           /* Don't affect parent sizing */
+  min-width: 100%;    /* Fill parent's available space */
+  max-width: 100%;    /* Never exceed parent */
+  
+  /* Flex item that adapts to parent constraints */
+  flex-shrink: 1;
+  
+  /* Prevent overflow - let child handle scrolling */
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ============================================================================
+   Table Wrapper - The Horizontal Scrolling Container
+   ============================================================================ */
+
+.vibe-grid-table-wrapper {
+  /* 🎯 FINAL CONTAINER: Constrained to actual layout space, not table content */
+  width: 0;           /* Table width won't affect this container */
+  min-width: 100%;    /* Use all available space from parent */
+  max-width: 100%;    /* Never exceed available space */
+  
+  /* 📜 ENABLE SCROLLING: Now that container is properly constrained */
+  overflow-x: auto;
+  overflow-y: visible;
+  
+  /* Flex behavior */
+  flex-shrink: 1;     /* Can shrink if needed */
+  
+  /* Ensure proper box model */
+  box-sizing: border-box;
+  
+  /* Try to eliminate scroll lock - remove any potential conflicts */
+  position: relative;
+}
+
+/* ============================================================================
+   Main Table - Calculated Width for Horizontal Scrolling
+   ============================================================================ */
+
+.vibe-grid-table {
+  /* 🎯 CRITICAL FIX: Calculate width from column sizes, allow overflow */
+  width: auto;
+  
+  /* Essential for fixed column widths */
+  table-layout: fixed;
+  border-collapse: collapse;
+  
+  /* Ensure smooth scrolling without lock */
+  will-change: auto;
+}
+
+/* When table has fixed column widths, ensure it sizes properly */
+.vibe-grid-table th,
+.vibe-grid-table td {
+  /* Let column widths be controlled by inline styles */
+  box-sizing: border-box;
+}
+
+/* Alternative approach for better browser support */
+@supports not (width: fit-content) {
+  .vibe-grid-table {
+    /* Fallback: Set specific width based on column sizes */
+    width: auto;
+  }
+}
+
+/* ============================================================================
+   HOW IT WORKS:
+   1. Parent layout (sidebar + main area) determines available space
+   2. vibegrid-container: width: 0 + min-width: 100% = fills available space
+   3. Border wrapper: inherits constraints from parent
+   4. Scroll wrapper: constrained to available space, NOT table content
+   5. Table: calculated width can now overflow the constrained wrapper
+   6. Result: Horizontal scrollbar appears!
+
+   RESPONSIVE BEHAVIOR:
+   - Sidebar collapsed (more space): containers expand, less scrolling needed
+   - Sidebar expanded (less space): containers shrink, more scrolling needed
+   - Works with any sidebar width without hardcoded values
+   ============================================================================ */

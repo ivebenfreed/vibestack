@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DeepPartial } from 'typeorm';
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
 import { BaseRepository, BaseService, DatabaseServiceError, EventDispatcher } from './base';
-import { OutgoingChangeProcessor } from '../sync/OutgoingChangeProcessor';
+import { OutgoingChangeService } from '../sync/OutgoingChangeService';
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
@@ -151,26 +151,58 @@ export const taskActions = {
     console.log(`[TaskAtoms] Bulk loaded ${tasks.length} tasks`);
   },
 
-  // ✅ SYNC-INTEGRATED UPDATE: Calls service layer for proper sync tracking
+  // ✅ PURE FUNCTION UPDATE: Direct database + sync tracking (no optimistic update)
   updateTask: async (taskId: string, updates: Partial<Task>) => {
     try {
-      // Get the service instance for sync integration
-      const { getTaskService } = await import('./task-service-instance');
-      const taskService = await getTaskService();
+      console.log(`[TaskAtoms] Background update for task ${taskId.slice(-8)}: ${Object.keys(updates).join(', ')}`);
       
-      if (taskService) {
-        // Call through service layer for proper sync tracking
-        await taskService.updateTask(taskId, updates);
-        console.log(`[TaskAtoms] Updated task ${taskId} via service (with sync tracking)`);
-      } else {
-        // Fallback to atom-only update if service not available
-        console.warn(`[TaskAtoms] Service not available, updating atom only (no sync tracking)`);
-        taskActions.updateTaskAtomOnly(taskId, updates);
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(Task);
+      
+      // Get current task
+      const task = await repository.findOne({ where: { id: taskId } });
+      if (!task) {
+        throw new Error(`Task with ID ${taskId} not found`);
       }
+      
+      // Apply business logic
+      const updatedData = {
+        ...updates,
+        updatedAt: new Date(),
+        // Handle completedAt logic
+        ...(updates.status === TaskStatus.COMPLETED && !task.completedAt 
+            ? { completedAt: new Date() } 
+            : updates.status !== TaskStatus.COMPLETED && updates.status !== undefined
+            ? { completedAt: undefined } 
+            : {})
+      };
+      
+      // Update database
+      await repository.update(taskId, updatedData);
+      const updated = await repository.findOne({ where: { id: taskId } });
+      
+      if (!updated) {
+        throw new Error(`Failed to retrieve updated task ${taskId}`);
+      }
+      
+             // Get OutgoingChangeService from sync machine
+       try {
+         const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+         const outgoingChangeService = getGlobalOutgoingChangeService();
+         
+         if (outgoingChangeService) {
+           await outgoingChangeService.trackEntityChange('tasks', 'update', updated);
+         } else {
+           console.warn('[TaskAtoms] No OutgoingChangeService available - sync tracking skipped');
+         }
+       } catch (error) {
+         console.warn('[TaskAtoms] Failed to get OutgoingChangeService:', error);
+       }
+       
+       console.log(`[TaskAtoms] Successfully updated task ${taskId.slice(-8)} - live sync will update atoms`);
     } catch (error) {
       console.error(`[TaskAtoms] Failed to update task ${taskId}:`, error);
-      // Fallback to atom-only update
-      taskActions.updateTaskAtomOnly(taskId, updates);
+      throw error; // Let VibeGrid handle the error
     }
   },
 
@@ -201,22 +233,42 @@ export const taskActions = {
     console.log(`[TaskAtoms] Updated task atom ${taskId}`);
   },
 
-  // ✅ SYNC-INTEGRATED DELETE: Calls service layer for proper sync tracking
+  // ✅ PURE FUNCTION DELETE: Direct database + sync tracking (no service overhead)
   deleteTask: async (taskId: string) => {
     try {
-      // Get the service instance for sync integration
-      const { getTaskService } = await import('./task-service-instance');
-      const taskService = await getTaskService();
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(Task);
       
-      if (taskService) {
-        // Call through service layer for proper sync tracking
-        await taskService.deleteTask(taskId);
-        console.log(`[TaskAtoms] Deleted task ${taskId} via service (with sync tracking)`);
-      } else {
-        // Fallback to atom-only delete if service not available
-        console.warn(`[TaskAtoms] Service not available, deleting from atom only (no sync tracking)`);
+      // Check if task exists
+      const task = await repository.findOne({ where: { id: taskId } });
+      if (!task) {
+        throw new Error(`Task with ID ${taskId} not found`);
+      }
+      
+      // Delete from database
+      const result = await repository.delete(taskId);
+      const success = (result.affected ?? 0) > 0;
+      
+      if (success) {
+        // Get OutgoingChangeService from sync machine
+        try {
+          const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+          const outgoingChangeService = getGlobalOutgoingChangeService();
+          
+          if (outgoingChangeService) {
+            await outgoingChangeService.trackEntityChange('tasks', 'delete', { id: taskId });
+          } else {
+            console.warn('[TaskAtoms] No OutgoingChangeService available - sync tracking skipped');
+          }
+        } catch (error) {
+          console.warn('[TaskAtoms] Failed to get OutgoingChangeService:', error);
+        }
+        
+        // Remove from atom
         taskActions.deleteTaskAtomOnly(taskId);
       }
+      
+      console.log(`[TaskAtoms] Deleted task ${taskId} via pure function (with sync tracking)`);
     } catch (error) {
       console.error(`[TaskAtoms] Failed to delete task ${taskId}:`, error);
       // Fallback to atom-only delete
@@ -312,17 +364,17 @@ export class TaskService extends BaseService<Task> {
 
   constructor(
     protected taskRepository: TaskRepository,
-    protected syncChangeManager: OutgoingChangeProcessor
+    protected outgoingChangeService: OutgoingChangeService
   ) {
-    super(taskRepository, 'tasks', syncChangeManager);
+    super(taskRepository, 'tasks', outgoingChangeService);
     
-    // Add debugging for sync manager initialization
-    if (!syncChangeManager) {
-      console.error('[TaskService] CRITICAL: TaskService created with null syncChangeManager!');
+    // Add debugging for outgoing change service initialization
+    if (!outgoingChangeService) {
+      console.error('[TaskService] CRITICAL: TaskService created with null outgoingChangeService!');
       console.error('[TaskService] This will cause crashes when trying to track changes for sync.');
       console.trace('[TaskService] Constructor call stack:');
     } else {
-      console.log('[TaskService] Successfully initialized with syncChangeManager');
+      console.log('[TaskService] Successfully initialized with outgoingChangeService');
     }
     
     // Set up entity-specific sync processing methods
@@ -537,14 +589,14 @@ export class TaskService extends BaseService<Task> {
           // ✅ REVERT: If save fails, revert atom to original state
           console.error(`[TaskService] Update failed for ${updateCallId}, reverting optimistic change:`, updateError)
           
-          // Check if it's a sync manager initialization issue
-          if (updateError instanceof Error && updateError.message.includes('SyncChangeManager not available')) {
-            console.error('[TaskService] SyncChangeManager not initialized - this indicates a service initialization problem');
-            console.error('[TaskService] Current syncChangeManager:', this.syncChangeManager);
+          // Check if it's an outgoing change service initialization issue
+          if (updateError instanceof Error && updateError.message.includes('OutgoingChangeService not available')) {
+            console.error('[TaskService] OutgoingChangeService not initialized - this indicates a service initialization problem');
+            console.error('[TaskService] Current outgoingChangeService:', this.outgoingChangeService);
             console.error('[TaskService] Service constructor was called with:', {
               repository: !!this.repository,
               tableName: this.tableName,
-              syncChangeManager: !!this.syncChangeManager
+              outgoingChangeService: !!this.outgoingChangeService
             });
           }
           
@@ -743,19 +795,50 @@ export { taskAtoms };
 // Factory function for this domain
 export function createTaskDomain(
   dataSource: NewPGliteDataSource, 
-  syncManager: OutgoingChangeProcessor
+  outgoingChangeService: OutgoingChangeService
 ) {
   if (!dataSource.isInitialized) {
     throw new Error('DataSource must be initialized before creating Task domain');
   }
   
   const repository = new TaskRepository(dataSource);
-  const service = new TaskService(repository, syncManager);
+  const service = new TaskService(repository, outgoingChangeService);
   
-  // Register service instance for atomic actions
-  import('./task-service-instance').then(({ setTaskService }) => {
-    setTaskService(service);
-  });
+  // Register service instance for VibeGrid integration
+  setTaskService(service);
   
   return { repository, service };
+}
+
+// ============================================================================
+// SINGLETON SERVICE INSTANCE - For VibeGrid Integration
+// ============================================================================
+
+let taskServiceInstance: TaskService | null = null;
+
+export function setTaskService(service: TaskService): void {
+  taskServiceInstance = service;
+}
+
+export async function getTaskService(): Promise<TaskService | null> {
+  return taskServiceInstance;
+}
+
+export function hasTaskService(): boolean {
+  return taskServiceInstance !== null;
+}
+
+/**
+ * Update the TaskService's OutgoingChangeService after sync machine initialization
+ * This allows the service to be created with a no-op service initially, then upgraded
+ * to use the real OutgoingChangeService from the sync machine.
+ */
+export function updateTaskServiceOutgoingChangeService(outgoingChangeService: OutgoingChangeService): void {
+  if (taskServiceInstance) {
+    console.log('[TaskService] 🔄 Updating OutgoingChangeService from no-op to real service');
+    (taskServiceInstance as any).outgoingChangeService = outgoingChangeService;
+    console.log('[TaskService] ✅ OutgoingChangeService updated successfully');
+  } else {
+    console.warn('[TaskService] Cannot update OutgoingChangeService - TaskService not initialized');
+  }
 } 

@@ -71,8 +71,7 @@ const NavBadge = ({ children }: { children: ReactNode }) => (
 const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
   const { setOpenMobile } = useSidebar()
   
-  // Use intent-based preloading for project detail links (hover to preload)
-  const isProjectDetailLink = item.url?.includes('/projects/') && item.url.split('/').length > 2
+  // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
   
   return (
     <SidebarMenuItem>
@@ -84,7 +83,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
         <Link 
           to={item.url} 
           onClick={() => setOpenMobile(false)}
-          preload={isProjectDetailLink ? "intent" : undefined}
+          preload={false}
         >
           {item.icon && <item.icon />}
           <span>{item.title}</span>
@@ -132,8 +131,7 @@ const SidebarMenuCollapsible = ({
                 )
               }
               
-              // Regular nav items (non-project)
-              const isProjectDetailLink = subItem.url?.includes('/projects/') && subItem.url.split('/').length > 2
+              // Regular nav items (non-project) - disable preloading for performance
               
               return (
                 <SidebarMenuSubItem key={`${subItem.title}-${subItem.url}`}>
@@ -144,7 +142,7 @@ const SidebarMenuCollapsible = ({
                     <Link 
                       to={subItem.url} 
                       onClick={() => setOpenMobile(false)}
-                      preload={isProjectDetailLink ? "intent" : undefined}
+                      preload={false}
                     >
                       {subItem.icon && <subItem.icon />}
                       <span>{subItem.title}</span>
@@ -188,15 +186,14 @@ const SidebarMenuCollapsedDropdown = ({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {item.items.map((sub) => {
-            // Use intent-based preloading for project detail links (hover to preload)
-            const isProjectDetailLink = sub.url?.includes('/projects/') && sub.url.split('/').length > 2
+            // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
             
             return (
               <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
                 <Link
                   to={sub.url}
                   className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
-                  preload={isProjectDetailLink ? "intent" : undefined}
+                  preload={false}
                 >
                   {sub.icon && <sub.icon />}
                   <span className='max-w-52 text-wrap'>{sub.title}</span>

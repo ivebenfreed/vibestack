@@ -6,7 +6,7 @@ import { Search } from '@/components/search'
 import SyncStatusIcon from '../../features/sync/components/SyncStatusIcon'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
-import { useLayoutStore, shouldShowSidebarForSection } from '@/stores/layoutStore'
+import { useLocation } from '@tanstack/react-router'
 import { GLOBAL_SIDEBAR_WIDTH } from './global-sidebar'
 
 export const HEADER_HEIGHT = 64 // pixels
@@ -23,24 +23,23 @@ export const Header = ({
   ...props
 }: HeaderProps) => {
   const [offset, setOffset] = React.useState(0)
-  const activeSection = useLayoutStore.activeSection()
-  const pendingSection = useLayoutStore.pendingSection()
+  const location = useLocation()
   
-  // Memoize effective section calculation
-  const effectiveSection = React.useMemo(() => 
-    pendingSection || activeSection, 
-    [pendingSection, activeSection]
-  )
+  // ⚡ PERFORMANCE: Direct route-based sidebar trigger detection
+  const shouldShowSidebarTrigger = React.useMemo(() => {
+    // Show trigger for routes that have sidebars (projects/settings/debug)
+    return location.pathname.startsWith('/projects') || 
+           location.pathname === '/tasks' || 
+           location.pathname.startsWith('/settings') ||
+           location.pathname.startsWith('/debug')
+  }, [location.pathname])
   
   // Check if we're within a SidebarProvider context
   const sidebarContext = React.useContext(SidebarContext)
   const hasSidebarContext = !!sidebarContext
   
-  // Memoize sidebar trigger visibility calculation
-  const showSidebarTrigger = React.useMemo(() => 
-    shouldShowSidebarForSection(effectiveSection) && hasSidebarContext,
-    [effectiveSection, hasSidebarContext]
-  )
+  // Final trigger visibility
+  const showSidebarTrigger = shouldShowSidebarTrigger && hasSidebarContext
 
   React.useEffect(() => {
     const onScroll = () => {

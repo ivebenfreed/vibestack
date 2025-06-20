@@ -1,0 +1,37 @@
+
+
+> server@0.1.0 build /home/benfreed/dev/tinytest/vibestack/apps/server
+> tsc --noEmit && wrangler deploy --outdir=dist
+
+[96msrc/api/sync.ts[0m:[93m32[0m:[93m32[0m - [91merror[0m[90m TS2339: [0mProperty 'id' does not exist on type '{}'.
+
+[7m32[0m       userId: sessionData.user.id
+[7m  [0m [91m                               ~~[0m
+
+[96msrc/middleware/auth.ts[0m:[93m16[0m:[93m9[0m - [91merror[0m[90m TS2769: [0mNo overload matches this call.
+  Overload 1 of 2, '(key: "user", value: { id: string; name: string; email: string; emailVerified: boolean; createdAt: Date; updatedAt: Date; image?: string | null | undefined; } | null): void', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{ id: string; name: string; email: string; emailVerified: boolean; createdAt: Date; updatedAt: Date; image?: string | null | undefined; } | null'.
+  Overload 2 of 2, '(key: never, value: never): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'never'.
+
+[7m16[0m       c.set('user', sessionData.user);
+[7m  [0m [91m        ~~~[0m
+
+
+[96msrc/middleware/auth.ts[0m:[93m17[0m:[93m9[0m - [91merror[0m[90m TS2769: [0mNo overload matches this call.
+  Overload 1 of 2, '(key: "session", value: { id: string; createdAt: Date; updatedAt: Date; userId: string; expiresAt: Date; token: string; ipAddress?: string | null | undefined; userAgent?: string | null | undefined; } | null): void', gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{ id: string; createdAt: Date; updatedAt: Date; userId: string; expiresAt: Date; token: string; ipAddress?: string | null | undefined; userAgent?: string | null | undefined; } | null'.
+  Overload 2 of 2, '(key: never, value: never): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'never'.
+
+[7m17[0m       c.set('session', sessionData.session);
+[7m  [0m [91m        ~~~[0m
+
+
+
+Found 3 errors in 2 files.
+
+Errors  Files
+     1  src/api/sync.ts[90m:32[0m
+     2  src/middleware/auth.ts[90m:16[0m
+[41m[30m ELIFECYCLE [39m[49m [31mCommand failed with exit code 2.[39m

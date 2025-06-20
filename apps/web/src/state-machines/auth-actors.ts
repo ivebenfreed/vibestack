@@ -15,7 +15,7 @@ export const checkAuthActor = fromPromise(async () => {
         id: session.data.user.id,
         email: session.data.user.email,
         name: session.data.user.name || session.data.user.email?.split('@')[0] || 'User',
-        role: 'member', // Default role, adjust based on user's user model
+        role: (session.data.user as any).role || 'member', // Extract role from session data or default to 'member'
         emailVerified: session.data.user.emailVerified || false,
         image: session.data.user.image,
       };
@@ -28,6 +28,7 @@ export const checkAuthActor = fromPromise(async () => {
       console.log('[checkAuthActor] Session data:', {
         hasUser: !!session.data.user,
         hasSession: !!session.data.session,
+        userRole: user.role,
         sessionExpiry,
         tokenPresent: !!session.data.session?.token
       });
@@ -64,9 +65,15 @@ export const signInActor = fromPromise(async ({ input }: {
     // Dispatch auth event for any listeners
     window.dispatchEvent(new CustomEvent('auth:signin'));
     
+    // Extract user with role information
+    const user = result.data?.user ? {
+      ...result.data.user,
+      role: (result.data.user as any).role || 'member'
+    } : undefined;
+    
     return {
       success: true,
-      user: result.data?.user,
+      user,
       token: result.data?.token,
     };
   } catch (error) {

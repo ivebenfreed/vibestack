@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DeepPartial } from 'typeorm';
 import { Project, User, ProjectStatus } from '@repo/dataforge/client-entities';
 import { BaseRepository, BaseService, DatabaseServiceError, EventDispatcher } from './base';
-import { OutgoingChangeProcessor } from '../sync/OutgoingChangeProcessor';
+import { OutgoingChangeService } from '../sync/OutgoingChangeService';
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { RelationshipChangeEncoder } from '../db/relationship-change-encoder';
 import { createAtom, shallowEqual } from '@xstate/store';
@@ -120,7 +120,7 @@ export const projectActions = {
     
     // Update atom
     projectsAtom.set(projectsRecord);
-    console.log(`[ProjectAtoms] Bulk loaded ${projects.length} projects`);
+    console.log(`[ProjectAtoms] Bulk loaded ${projects.length} projects - atom now contains ${Object.keys(projectsRecord).length} projects`);
   },
 
   // Update individual project
@@ -351,9 +351,9 @@ export class ProjectService extends BaseService<Project> {
 
   constructor(
     protected projectRepository: ProjectRepository,
-    protected syncChangeManager: OutgoingChangeProcessor
+    protected outgoingChangeService: OutgoingChangeService
   ) {
-    super(projectRepository, 'projects', syncChangeManager);
+    super(projectRepository, 'projects', outgoingChangeService);
     
     // Set up entity-specific sync processing methods
     this.validateSyncData = this.validateProjectSyncData.bind(this);
@@ -526,20 +526,20 @@ export class ProjectService extends BaseService<Project> {
       );
 
       // Track change for sync - NON-BLOCKING (fire and forget)
-      this.syncChangeManager.trackChange(
-        relationshipChange.table,
-        relationshipChange.operation as 'insert' | 'update' | 'delete',
+      this.outgoingChangeService.trackEntityChange(
+        'projects',
+        'update',
         {
           id: projectId,
           updatedAt: relationshipChange.updatedAt,
-          clientId: relationshipChange.clientId
-        },
-        undefined, // originalData
-        {
-          relationshipUpdates: relationshipChange.relationshipUpdates,
-          entityRelations: relationshipChange.entityRelations
+          clientId: relationshipChange.clientId,
+          // TODO: Add relationship metadata support to OutgoingChangeService
+          _relationshipUpdate: {
+            relationshipUpdates: relationshipChange.relationshipUpdates,
+            entityRelations: relationshipChange.entityRelations
+          }
         }
-      ).catch(error => {
+      ).catch((error: any) => {
         console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
       });
 
@@ -580,20 +580,20 @@ export class ProjectService extends BaseService<Project> {
       );
 
       // Track change for sync - NON-BLOCKING (fire and forget)
-      this.syncChangeManager.trackChange(
-        relationshipChange.table,
-        relationshipChange.operation as 'insert' | 'update' | 'delete',
+      this.outgoingChangeService.trackEntityChange(
+        'projects',
+        'update',
         {
           id: projectId,
           updatedAt: relationshipChange.updatedAt,
-          clientId: relationshipChange.clientId
-        },
-        undefined, // originalData
-        {
-          relationshipUpdates: relationshipChange.relationshipUpdates,
-          entityRelations: relationshipChange.entityRelations
+          clientId: relationshipChange.clientId,
+          // TODO: Add relationship metadata support to OutgoingChangeService
+          _relationshipUpdate: {
+            relationshipUpdates: relationshipChange.relationshipUpdates,
+            entityRelations: relationshipChange.entityRelations
+          }
         }
-      ).catch(error => {
+      ).catch((error: any) => {
         console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
       });
 
@@ -601,7 +601,7 @@ export class ProjectService extends BaseService<Project> {
       EventDispatcher.emit('project:members-updated', { projectId, members: updatedMembers });
 
       return updatedMembers;
-    } catch (error) {
+    } catch (error: any) {
       throw new DatabaseServiceError(
         `Failed to add member to project with ID ${projectId}`,
         'addProjectMember',
@@ -634,20 +634,20 @@ export class ProjectService extends BaseService<Project> {
       );
 
       // Track change for sync - NON-BLOCKING (fire and forget)
-      this.syncChangeManager.trackChange(
-        relationshipChange.table,
-        relationshipChange.operation as 'insert' | 'update' | 'delete',
+      this.outgoingChangeService.trackEntityChange(
+        'projects',
+        'update',
         {
           id: projectId,
           updatedAt: relationshipChange.updatedAt,
-          clientId: relationshipChange.clientId
-        },
-        undefined, // originalData
-        {
-          relationshipUpdates: relationshipChange.relationshipUpdates,
-          entityRelations: relationshipChange.entityRelations
+          clientId: relationshipChange.clientId,
+          // TODO: Add relationship metadata support to OutgoingChangeService
+          _relationshipUpdate: {
+            relationshipUpdates: relationshipChange.relationshipUpdates,
+            entityRelations: relationshipChange.entityRelations
+          }
         }
-      ).catch(error => {
+      ).catch((error: any) => {
         console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
       });
 
@@ -655,7 +655,7 @@ export class ProjectService extends BaseService<Project> {
       EventDispatcher.emit('project:members-updated', { projectId, members: updatedMembers });
 
       return updatedMembers;
-    } catch (error) {
+    } catch (error: any) {
       throw new DatabaseServiceError(
         `Failed to remove member from project with ID ${projectId}`,
         'removeProjectMember',
@@ -719,14 +719,32 @@ export { projectAtoms };
 // Factory function for this domain
 export function createProjectDomain(
   dataSource: NewPGliteDataSource, 
-  syncManager: OutgoingChangeProcessor
+  outgoingChangeService: OutgoingChangeService
 ) {
   if (!dataSource.isInitialized) {
     throw new Error('DataSource must be initialized before creating Project domain');
   }
   
   const repository = new ProjectRepository(dataSource);
-  const service = new ProjectService(repository, syncManager);
+  const service = new ProjectService(repository, outgoingChangeService);
   
   return { repository, service };
+}
+
+// ============================================================================
+// SINGLETON SERVICE INSTANCE - For VibeGrid Integration
+// ============================================================================
+
+let projectServiceInstance: ProjectService | null = null;
+
+export function setProjectService(service: ProjectService): void {
+  projectServiceInstance = service;
+}
+
+export async function getProjectService(): Promise<ProjectService | null> {
+  return projectServiceInstance;
+}
+
+export function hasProjectService(): boolean {
+  return projectServiceInstance !== null;
 } 

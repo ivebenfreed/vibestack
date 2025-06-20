@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
-import { SyncManager } from '@/sync/SyncManager';
 import { getGlobalDataSourceSync } from '@/db/global-datasource';
 import { User, Project, Task, Comment, UserRole, ProjectStatus, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
 
@@ -18,7 +17,7 @@ interface IntegrityTestResult {
 
 interface ResetResult {
   success: boolean;
-  tablesCleared: string[];
+  tablesCleared?: string[];
   lsnReset: boolean;
   error?: string;
 }
@@ -36,7 +35,6 @@ interface CorruptionResult {
 }
 
 export default function IntegrityDebugPage() {
-  const [syncManager, setSyncManager] = useState<SyncManager | null>(null);
   const [currentLSN, setCurrentLSN] = useState<string>('');
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [isConnected, setIsConnected] = useState(false);
@@ -51,39 +49,22 @@ export default function IntegrityDebugPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [fingerprints, setFingerprints] = useState<any>(null);
 
-  // Initialize SyncManager reference
+  // Initialize state from IntegrityService
   useEffect(() => {
-    const sm = SyncManager.getInstance();
-    setSyncManager(sm);
+    // Add some delay to let services initialize
+    const timer = setTimeout(() => {
+      refreshState();
+    }, 2000); // Wait 2 seconds for services to be ready
     
-    if (sm && sm.getIsInitialized()) {
-      setCurrentLSN(sm.getLSN());
-      setSyncStatus(sm.getStatus());
-      setIsConnected(sm.isConnected());
-    }
-
-    // Listen for sync updates
-    const handleStatusChange = (status: string) => {
-      setSyncStatus(status);
-      addLog(`Sync status: ${status}`);
-    };
-
-    const handleLSNUpdate = (lsn: string) => {
-      setCurrentLSN(lsn);
-      addLog(`LSN updated: ${lsn}`);
-    };
-
-    if (sm) {
-      sm.on('sync:statusChanged', handleStatusChange);
-      sm.on('lsnUpdate', handleLSNUpdate);
-    }
-
-    return () => {
-      if (sm) {
-        sm.off('sync:statusChanged', handleStatusChange);
-        sm.off('lsnUpdate', handleLSNUpdate);
-      }
-    };
+    addLog('🎯 IntegrityDebugPage loaded - using new IntegrityService');
+    addLog('💡 Use browser console for advanced debugging:');
+    addLog('   • window.debugReset() - State machine reset');
+    addLog('   • window.debugResetDirect() - Direct service reset');
+    addLog('   • window.debugValidate() - State machine validation');
+    addLog('   • window.debugValidateDirect() - Direct service validation');
+    addLog('   • window.debugIntegrityStatus() - Current status');
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const addLog = (message: string) => {
@@ -93,121 +74,185 @@ export default function IntegrityDebugPage() {
 
   const clearLogs = () => setLogs([]);
 
-  // Step 1: Generate local fingerprints
+  // Step 1: Generate local fingerprints - using new IntegrityService
   const generateFingerprints = async () => {
-    if (!syncManager) return;
-    
     try {
-      addLog('Generating local fingerprints...');
-      const integrityManager = syncManager.getIntegrityManager();
-      const fps = await integrityManager.generateLocalFingerprints();
-      setFingerprints(fps);
-      addLog(`Generated fingerprints for ${Object.keys(fps).length} tables`);
+      addLog('Generating local fingerprints via new IntegrityService...');
+      
+      // Use our new global debug function
+      const fps = await (window as any).debugFingerprints?.();
+      
+      if (fps) {
+        setFingerprints(fps);
+        addLog(`✅ Generated fingerprints for ${Object.keys(fps).length} tables`);
+      } else {
+        addLog('❌ Failed to generate fingerprints - IntegrityService not available');
+      }
     } catch (error) {
-      addLog(`Error generating fingerprints: ${error}`);
+      addLog(`❌ Error generating fingerprints: ${error}`);
     }
   };
 
-  // Step 2: Request integrity validation from server
+  // Step 2: Request integrity validation from server - using new IntegrityService
   const requestValidation = async () => {
-    if (!syncManager || !syncManager.isConnected()) {
-      addLog('Error: Not connected to server');
-      return;
-    }
-
     setIsValidating(true);
     setValidationResult(null);
     
     try {
-      addLog('Requesting integrity validation from server...');
-      const integrityManager = syncManager.getIntegrityManager();
+      addLog('🔍 Requesting integrity validation via new IntegrityService...');
       
-      // Temporary workaround - access the debug method directly
-      const result = await (integrityManager as any).requestIntegrityValidationDebug?.() 
-        || await integrityManager.requestIntegrityValidation();
+      // Use our new global debug function (prefer direct for more control)
+      const result = await (window as any).debugValidateDirect?.('Manual debug validation');
       
-      setValidationResult({
-        ...result,
-        timestamp: Date.now()
-      });
-      
-      addLog(`Validation complete: ${result.isValid ? 'VALID' : 'INVALID'}`);
-      if (result.issues.length > 0) {
-        addLog(`Found ${result.issues.length} issues`);
+      if (result) {
+        setValidationResult({
+          ...result,
+          timestamp: Date.now()
+        });
+        
+        addLog(`✅ Validation complete: ${result.isValid ? 'VALID' : 'INVALID'}`);
+        if (result.issues && result.issues.length > 0) {
+          addLog(`⚠️ Found ${result.issues.length} issues`);
+        }
+        addLog(`📋 Recommended action: ${result.recommendedAction}`);
+      } else {
+        addLog('❌ Failed to validate - IntegrityService not available');
       }
-      addLog(`Recommended action: ${result.recommendedAction}`);
       
     } catch (error) {
-      addLog(`Validation error: ${error}`);
+      addLog(`❌ Validation error: ${error}`);
     } finally {
       setIsValidating(false);
     }
   };
 
-  // Step 3: Execute integrity reset
+  // Step 3: Execute integrity reset - using new IntegrityService
   const executeReset = async (preserveUserData = false) => {
-    if (!syncManager) return;
-
     setIsResetting(true);
     setResetResult(null);
     
     try {
-      addLog(`Executing integrity reset (preserve user data: ${preserveUserData})...`);
-      const integrityManager = syncManager.getIntegrityManager();
+      const resetType = preserveUserData ? 'table_reset' : 'full_reset';
+      addLog(`🔄 Executing integrity reset (${resetType}) via new IntegrityService...`);
       
-      // Temporary workaround - access the debug method directly
-      const result = await (integrityManager as any).executeFullResetDebug?.(
-        'Manual debug reset',
-        preserveUserData
-      ) || await integrityManager.executeFullReset(
-        'Manual debug reset',
-        preserveUserData
-      );
+      // Enhanced debugging - check if function exists
+      const debugResetProper = (window as any).debugResetProper;
+      const debugResetDirect = (window as any).debugResetDirect;
       
-      setResetResult(result);
-      addLog(`Reset ${result.success ? 'SUCCESS' : 'FAILED'}`);
-      if (result.tablesCleared.length > 0) {
-        addLog(`Cleared tables: ${result.tablesCleared.join(', ')}`);
-      }
-      if (result.error) {
-        addLog(`Reset error: ${result.error}`);
+      if (!debugResetProper && !debugResetDirect) {
+        addLog('❌ Debug reset functions not available on window - debug functions not loaded');
+        addLog('💡 Try refreshing the page or check console for debug initialization');
+        return;
       }
       
-      // Update current state
-      if (result.success) {
-        setCurrentLSN('0/0');
-        setSyncStatus('disconnected');
+      // Check if IntegrityService is available first
+      const integrityService = await (window as any).debugGetIntegrityService?.();
+      if (!integrityService) {
+        addLog('❌ IntegrityService not available - system may not be initialized');
+        addLog('💡 Wait for sync machine to initialize or check orchestrator status');
+        return;
+      }
+      
+      addLog('✅ IntegrityService found, proceeding with reset...');
+      
+      // Prefer proper state-machine reset for better disconnect/reconnect behavior
+      let result;
+      if (debugResetProper) {
+        addLog('🔄 Using state-machine-aware reset (proper disconnect/reconnect)...');
+        result = await debugResetProper(
+          'Manual debug reset',
+          resetType
+        );
+      } else {
+        addLog('🔄 Using direct reset (bypasses state machine)...');
+        addLog('⚠️ Note: Direct reset may not properly disconnect sync machine');
+        result = await debugResetDirect(
+          'Manual debug reset',
+          resetType
+        );
+      }
+      
+      if (result) {
+        setResetResult(result);
+        addLog(`✅ Reset ${result.success ? 'SUCCESS' : 'FAILED'}`);
+        if (result.tablesCleared && result.tablesCleared.length > 0) {
+          addLog(`🗑️ Cleared tables: ${result.tablesCleared.join(', ')}`);
+        }
+        if (result.lsnReset) {
+          addLog('🔄 LSN reset to 0/0 - will trigger full initial sync');
+        }
+        if (result.error) {
+          addLog(`❌ Reset error: ${result.error}`);
+        }
+        
+        // Update current state - check status from IntegrityService
+        if (result.success) {
+          addLog('📊 Checking post-reset status...');
+          setTimeout(async () => {
+            const status = await (window as any).debugIntegrityStatus?.();
+            if (status) {
+              addLog(`📊 Post-reset status: ${status.syncManagerState}, connected: ${status.isConnected}, LSN: ${status.lsn}`);
+            }
+          }, 1000); // Give time for state to update
+        }
+      } else {
+        addLog('❌ Reset returned null result - check console for errors');
       }
       
     } catch (error) {
-      addLog(`Reset error: ${error}`);
+      addLog(`❌ Reset error: ${error}`);
+      console.error('[DEBUG PAGE] Reset error details:', error);
     } finally {
       setIsResetting(false);
     }
   };
 
-  // Step 4: Trigger reconnection
+  // Step 4: Trigger reconnection - updated for new IntegrityService
   const triggerReconnect = async () => {
-    if (!syncManager) return;
-
     try {
-      addLog('Triggering reconnection...');
-      await syncManager.connect();
-      addLog('Reconnection initiated');
+      addLog('🔌 Triggering reconnection via new IntegrityService...');
+      
+      // Use the global debug function to get current status and trigger reconnect
+      const integrityService = await (window as any).debugGetIntegrityService?.();
+      if (integrityService) {
+        // Trigger auto-reconnection through the integrity service
+        await integrityService.triggerAutoReconnection();
+        addLog('✅ Reconnection initiated via IntegrityService');
+        
+        // Update status after reconnection attempt
+        setTimeout(refreshState, 1000);
+      } else {
+        addLog('❌ IntegrityService not available for reconnection');
+      }
     } catch (error) {
-      addLog(`Reconnection error: ${error}`);
+      addLog(`❌ Reconnection error: ${error}`);
     }
   };
 
-  // Step 5: Check current state
-  const refreshState = () => {
-    if (!syncManager) return;
-
-    if (syncManager.getIsInitialized()) {
-      setCurrentLSN(syncManager.getLSN());
-      setSyncStatus(syncManager.getStatus());
-      setIsConnected(syncManager.isConnected());
-      addLog('State refreshed');
+  // Step 5: Check current state - updated for new IntegrityService
+  const refreshState = async () => {
+    try {
+      addLog('🔄 Refreshing state via new IntegrityService...');
+      
+      // Check if debug functions are available
+      if (!(window as any).debugIntegrityStatus) {
+        addLog('⚠️ Debug functions not available yet - debug script may still be loading');
+        return;
+      }
+      
+      const status = await (window as any).debugIntegrityStatus?.();
+      if (status) {
+        // Update state from IntegrityService status
+        setCurrentLSN(status.lsn || 'Unknown');
+        setSyncStatus(status.syncManagerState || 'Unknown');
+        setIsConnected(status.isConnected || false);
+        
+        addLog(`📊 State refreshed - Status: ${status.syncManagerState}, Connected: ${status.isConnected}, LSN: ${status.lsn}`);
+      } else {
+        addLog('❌ Failed to get status - IntegrityService not available');
+      }
+    } catch (error) {
+      addLog(`❌ State refresh error: ${error}`);
     }
   };
 
@@ -332,6 +377,57 @@ export default function IntegrityDebugPage() {
         </Button>
       </div>
 
+      {/* New IntegrityService Console Functions */}
+      <Card className="border-blue-200 bg-blue-50/50">
+        <CardHeader>
+          <CardTitle className="text-blue-800">🚀 Enhanced Console Debug Functions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert>
+            <AlertDescription>
+              <div className="space-y-3">
+                <p className="font-medium text-blue-800">
+                  New IntegrityService provides powerful console debugging commands:
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-blue-700">State Machine Functions:</h4>
+                    <div className="space-y-1 font-mono text-xs bg-blue-100 p-2 rounded">
+                      <div>• <code>window.debugReset()</code> - Trigger reset via state machine</div>
+                      <div>• <code>window.debugValidate()</code> - Trigger validation via state machine</div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-blue-700">Direct Service Functions:</h4>
+                    <div className="space-y-1 font-mono text-xs bg-blue-100 p-2 rounded">
+                      <div>• <code>window.debugResetDirect(reason?, type?)</code> - Direct reset</div>
+                      <div>• <code>window.debugValidateDirect(reason?)</code> - Direct validation</div>
+                      <div>• <code>window.debugFingerprints()</code> - Generate fingerprints</div>
+                      <div>• <code>window.debugIntegrityStatus()</code> - Show current status</div>
+                      <div>• <code>window.debugResetBaseline(reason?)</code> - Reset baseline for full validation</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-blue-700">Utility Functions:</h4>
+                  <div className="space-y-1 font-mono text-xs bg-blue-100 p-2 rounded">
+                    <div>• <code>window.debugClearData()</code> - Clear all local data</div>
+                    <div>• <code>window.debugGetIntegrityService()</code> - Get service instance</div>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-blue-600 border-l-2 border-blue-300 pl-2">
+                  💡 <strong>Tip:</strong> Open browser DevTools console and try these commands for advanced debugging!
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+
       {/* Current State Display */}
       <Card>
         <CardHeader>
@@ -375,6 +471,40 @@ export default function IntegrityDebugPage() {
               </pre>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Step 1.5: Reset Baseline */}
+      <Card className="border-purple-200 bg-purple-50/50">
+        <CardHeader>
+          <CardTitle className="text-purple-800">Step 1.5: Reset Integrity Baseline</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Reset the integrity baseline to force a full validation comparison instead of incremental changes since last baseline. 
+              This is useful when you want to validate all data, not just recent changes.
+            </p>
+            <Button 
+              onClick={async () => {
+                try {
+                  addLog('🔄 Resetting integrity baseline...');
+                  const result = await (window as any).debugResetBaseline?.('Debug page reset');
+                  if (result?.success) {
+                    addLog('✅ Baseline reset complete - next validation will be full comparison');
+                  } else {
+                    addLog(`❌ Baseline reset failed: ${result?.error || 'Unknown error'}`);
+                  }
+                } catch (error) {
+                  addLog(`❌ Baseline reset error: ${error}`);
+                }
+              }}
+              variant="outline"
+              className="border-purple-200 text-purple-600 hover:bg-purple-50"
+            >
+              🔄 Reset Baseline (Force Full Validation)
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -549,13 +679,13 @@ export default function IntegrityDebugPage() {
           <CardTitle>Step 3: Execute Integrity Reset</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button 
               onClick={() => executeReset(false)} 
               disabled={isResetting}
               variant="destructive"
             >
-              {isResetting ? 'Resetting...' : 'Full Reset'}
+              {isResetting ? 'Resetting...' : 'Full Reset (Smart)'}
             </Button>
             <Button 
               onClick={() => executeReset(true)} 
@@ -563,6 +693,74 @@ export default function IntegrityDebugPage() {
               variant="outline"
             >
               Reset (Preserve Users)
+            </Button>
+            <Button
+              onClick={async () => {
+                setIsResetting(true);
+                addLog('🔄 Testing direct reset (bypasses sync machine)...');
+                try {
+                  const debugResetDirect = (window as any).debugResetDirect;
+                  if (debugResetDirect) {
+                    const result = await debugResetDirect('Direct reset test', 'full_reset');
+                    addLog(`✅ Direct reset result: ${JSON.stringify(result)}`);
+                  } else {
+                    addLog('❌ debugResetDirect not available');
+                  }
+                } catch (error) {
+                  addLog(`❌ Direct reset error: ${error}`);
+                } finally {
+                  setIsResetting(false);
+                }
+              }}
+              disabled={isResetting}
+              variant="secondary"
+              size="sm"
+            >
+              Direct Reset
+            </Button>
+            <Button
+              onClick={async () => {
+                setIsResetting(true);
+                addLog('🔄 Testing state machine reset (proper disconnect/reconnect)...');
+                try {
+                  const debugResetProper = (window as any).debugResetProper;
+                  if (debugResetProper) {
+                    const result = await debugResetProper('State machine reset test', 'full_reset');
+                    addLog(`✅ State machine reset result: ${JSON.stringify(result)}`);
+                  } else {
+                    addLog('❌ debugResetProper not available');
+                  }
+                } catch (error) {
+                  addLog(`❌ State machine reset error: ${error}`);
+                } finally {
+                  setIsResetting(false);
+                }
+              }}
+              disabled={isResetting}
+              variant="secondary"
+              size="sm"
+            >
+              State Machine Reset
+            </Button>
+            <Button
+              onClick={async () => {
+                addLog('🔧 Testing debug functions availability...');
+                addLog(`debugResetDirect available: ${!!(window as any).debugResetDirect}`);
+                addLog(`debugGetIntegrityService available: ${!!(window as any).debugGetIntegrityService}`);
+                addLog(`debugIntegrityStatus available: ${!!(window as any).debugIntegrityStatus}`);
+                
+                if ((window as any).debugGetIntegrityService) {
+                  const service = await (window as any).debugGetIntegrityService();
+                  addLog(`IntegrityService available: ${!!service}`);
+                  if (service) {
+                    addLog(`IntegrityService ready: ${service.isReady?.() || 'unknown'}`);
+                  }
+                }
+              }}
+              variant="secondary"
+              size="sm"
+            >
+              Test Debug Functions
             </Button>
           </div>
           
@@ -580,7 +778,7 @@ export default function IntegrityDebugPage() {
                     </Badge>
                   </div>
                   <div><strong>LSN Reset:</strong> {resetResult.lsnReset ? 'Yes' : 'No'}</div>
-                  <div><strong>Tables Cleared:</strong> {resetResult.tablesCleared.join(', ') || 'None'}</div>
+                  <div><strong>Tables Cleared:</strong> {resetResult.tablesCleared?.join(', ') || 'None'}</div>
                   {resetResult.error && (
                     <div className="text-destructive">
                       <strong>Error:</strong> {resetResult.error}

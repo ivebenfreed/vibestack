@@ -1,23 +1,27 @@
 import Cookies from 'js-cookie'
-import { Outlet } from '@tanstack/react-router'
+import { Outlet, useLocation } from '@tanstack/react-router'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { Header, HEADER_HEIGHT } from '@/components/layout/header'
-import { useLayoutStore, shouldShowSidebarForSection } from '@/stores/layoutStore'
 import { useState, useEffect, useMemo } from 'react'
 
 export function SidebarLayout() {
-  const activeSection = useLayoutStore.activeSection()
-  const pendingSection = useLayoutStore.pendingSection()
+  const location = useLocation()
   
-  // Use effective section (pending takes priority for immediate animations)
-  const effectiveSection = pendingSection || activeSection
-  
-  // Memoize shouldShowSidebar to prevent unnecessary useEffect runs
-  const shouldShowSidebar = useMemo(() => 
-    shouldShowSidebarForSection(effectiveSection), 
-    [effectiveSection]
-  )
+  // ⚡ PERFORMANCE: Direct route-based sidebar visibility (no layout store)
+  const shouldShowSidebar = useMemo(() => {
+    // Determine if sidebar should be shown based on current route
+    if (location.pathname.startsWith('/projects') || location.pathname === '/tasks') {
+      return true // projects section - show sidebar
+    } else if (location.pathname.startsWith('/settings')) {
+      return true // settings section - show sidebar
+    } else if (location.pathname.startsWith('/debug')) {
+      return true // debug section - show sidebar
+    } else if (location.pathname === '/') {
+      return false // home section - hide sidebar
+    }
+    return false // default to hidden
+  }, [location.pathname])
   
   // Read sidebar state from cookie for manual toggle state
   const sidebarState = Cookies.get('sidebar_state')
@@ -41,7 +45,7 @@ export function SidebarLayout() {
       setManualToggleState(savedState)
     }
   }, [shouldShowSidebar])
-  
+
   const handleOpenChange = (open: boolean) => {
     // Only allow manual toggle when sidebar should be visible for this section
     if (shouldShowSidebar) {

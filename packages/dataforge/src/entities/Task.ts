@@ -54,7 +54,7 @@ export class Task extends BaseDomainEntity {
   @MaxLength(5000, { message: "Description cannot exceed 5000 characters" })
   description?: string;
   
-  @Column({ type: "enum", enum: TaskStatus })
+  @Column({ type: "enum", enum: TaskStatus, default: TaskStatus.OPEN })
   @IsEnum(TaskStatus)
   @EnumTypeName({ name: 'TaskStatus', sourcePath: './Task' })
   status!: TaskStatus;

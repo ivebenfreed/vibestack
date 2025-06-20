@@ -14,7 +14,7 @@ interface SyncStatusIconProps {
   className?: string;
 }
 
-const SyncStatusIcon: React.FC<SyncStatusIconProps> = ({ className }) => {
+const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className }) => {
   const { isOnline } = useOrchestrator();
   const syncMachineState = useSyncMachine();
   
@@ -30,16 +30,16 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = ({ className }) => {
     statusText
   } = syncMachineState;
 
-  // Debug: Log sync state (remove in production)
-  console.log('[SyncStatusIcon] State:', {
-    isOnline,
-    syncPhase,
-    isInitialSync,
-    isCatchupSync,
-    isLiveSync,
-    isError,
-    statusText
-  });
+  // Remove excessive logging that was causing performance issues during scroll
+  // console.log('[SyncStatusIcon] State:', {
+  //   isOnline,
+  //   syncPhase,
+  //   isInitialSync,
+  //   isCatchupSync,
+  //   isLiveSync,
+  //   isError,
+  //   statusText
+  // });
 
   const [pulseKey, setPulseKey] = useState(0);
 
@@ -102,6 +102,8 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = ({ className }) => {
       </Tooltip>
     </TooltipProvider>
   );
-};
+});
+
+SyncStatusIcon.displayName = 'SyncStatusIcon';
 
 export default SyncStatusIcon;

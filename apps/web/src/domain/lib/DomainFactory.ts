@@ -1,5 +1,5 @@
 import { NewPGliteDataSource } from '../../db/newtypeorm/NewDataSource';
-import { OutgoingChangeProcessor } from '../../sync/OutgoingChangeProcessor';
+import { OutgoingChangeService } from '../../sync/OutgoingChangeService';
 
 // Import domain modules
 import { createUserDomain } from '../user';
@@ -9,38 +9,38 @@ import { createProjectDomain } from '../project';
 
 /**
  * Creates all domain modules using centralized datasource
- * Prevents race conditions by using single datasource instance
+ * Integrates with pure services architecture using OutgoingChangeService
  */
 export function createAllDomains(
   dataSource: NewPGliteDataSource, 
-  syncManager: OutgoingChangeProcessor | null
+  outgoingChangeService: OutgoingChangeService | null
 ) {
   if (!dataSource.isInitialized) {
     throw new Error('DataSource must be initialized before creating domains');
   }
 
-  // If syncManager is null (e.g., for incoming sync processing), create a no-op version
-  let effectiveSyncManager: OutgoingChangeProcessor;
+  // If outgoingChangeService is null (e.g., for incoming sync processing), create a no-op version
+  let effectiveOutgoingChangeService: OutgoingChangeService;
   
-  if (!syncManager) {
-    console.log('[DomainFactory] Creating domains with no-op syncManager (incoming sync mode)');
-    // Create a no-op sync manager for incoming sync processing
-    effectiveSyncManager = {
-      trackChange: async (table: string, operation: string, entity: any) => {
+  if (!outgoingChangeService) {
+    console.log('[DomainFactory] Creating domains with no-op outgoing change service (incoming sync mode)');
+    // Create a no-op outgoing change service for incoming sync processing
+    effectiveOutgoingChangeService = {
+      trackEntityChange: async (table: string, operation: string, entity: any) => {
         // No-op: incoming sync changes should not track outgoing changes
-        console.debug(`[DomainFactory] No-op trackChange called: ${table}:${operation} (incoming sync mode)`);
+        console.debug(`[DomainFactory] No-op trackEntityChange called: ${table}:${operation} (incoming sync mode)`);
       }
     } as any;
   } else {
-    console.log('[DomainFactory] Creating domains with real syncManager (outgoing sync mode)');
-    effectiveSyncManager = syncManager;
+    console.log('[DomainFactory] Creating domains with real outgoing change service (outgoing sync mode)');
+    effectiveOutgoingChangeService = outgoingChangeService;
   }
 
   return {
-    user: createUserDomain(dataSource, effectiveSyncManager),
-    comment: createCommentDomain(dataSource, effectiveSyncManager),
-    task: createTaskDomain(dataSource, effectiveSyncManager),
-    project: createProjectDomain(dataSource, effectiveSyncManager),
+    user: createUserDomain(dataSource, effectiveOutgoingChangeService),
+    comment: createCommentDomain(dataSource, effectiveOutgoingChangeService),
+    task: createTaskDomain(dataSource, effectiveOutgoingChangeService),
+    project: createProjectDomain(dataSource, effectiveOutgoingChangeService),
   };
 }
 
@@ -176,11 +176,11 @@ export function createRepositories(dataSource: NewPGliteDataSource) {
  * Creates domain-based services for sync adapters
  * This replaces the deprecated createServices from db/services.ts
  */
-export function createServices(dataSource: NewPGliteDataSource, syncManager: OutgoingChangeProcessor) {
+export function createServices(dataSource: NewPGliteDataSource, outgoingChangeService: OutgoingChangeService) {
   console.log('[DomainFactory] Creating domain-based services for sync adapters');
   
   // Create all domain modules
-  const domains = createAllDomains(dataSource, syncManager);
+  const domains = createAllDomains(dataSource, outgoingChangeService);
   
   // Create sync-compatible service adapters
   const syncServices = createSyncServiceAdapters(domains);

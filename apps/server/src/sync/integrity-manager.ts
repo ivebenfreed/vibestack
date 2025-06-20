@@ -22,6 +22,11 @@ export interface IntegrityValidationRequest {
   currentLSN: string;
   tableFingerprints: Record<string, TableFingerprint>;
   timestamp: number;
+  
+  // NEW: Baseline validation support
+  validationType?: 'baseline_incremental' | 'full';
+  baselineTimestamp?: number;
+  recordCount?: number;
 }
 
 export interface TableFingerprint {
@@ -86,20 +91,28 @@ export class IntegrityManager {
       clientId: request.clientId,
       clientLSN: request.currentLSN,
       tableCount: Object.keys(request.tableFingerprints).length,
-      validationType: (request as any).validationType,
-      baselineTimestamp: (request as any).baselineTimestamp
+      validationType: request.validationType,
+      baselineTimestamp: request.baselineTimestamp
     }, MODULE_NAME);
 
     try {
       // Check if this is a baseline validation request
-      const isBaselineValidation = (request as any).validationType === 'baseline_incremental';
-      const baselineTimestamp = (request as any).baselineTimestamp;
+      const isBaselineValidation = request.validationType === 'baseline_incremental';
+      const baselineTimestamp = request.baselineTimestamp;
       
-      if (isBaselineValidation && baselineTimestamp) {
+      if (isBaselineValidation && baselineTimestamp && request.recordCount !== undefined) {
         console.log(`[IntegrityManager] Processing baseline validation since ${new Date(baselineTimestamp).toISOString()}`);
-        return await this.validateBaselineChanges(request as any);
+        return await this.validateBaselineChanges({
+          clientId: request.clientId,
+          currentLSN: request.currentLSN,
+          tableFingerprints: request.tableFingerprints,
+          baselineTimestamp,
+          recordCount: request.recordCount,
+          timestamp: request.timestamp
+        });
       } else {
         // Standard full validation
+        console.log(`[IntegrityManager] Processing FULL validation (validationType: ${request.validationType})`);
         return await this.validateFullIntegrity(request);
       }
 

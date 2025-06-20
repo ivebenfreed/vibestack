@@ -14,6 +14,11 @@ export function DebugNavigation() {
     { path: '/debug/data-table', label: 'Data Table' },
     { path: '/debug/data-table-v2', label: 'Data Table V2' },
     { path: '/debug/data-table-atom', label: 'Data Table Atom' },
+    { path: '/debug/vibegrid-tasks', label: 'VibeGrid Tasks' },
+    { path: '/debug/vibegrid-native', label: 'VibeGrid Native' },
+    { path: '/debug/vibegrid-generated', label: 'VibeGrid Generated' },
+    { path: '/debug/vibegrid-registry', label: 'VibeGrid Registry' },
+    { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal Tasks' },
     { path: '/debug/typeorm-test', label: 'TypeORM Test' },
     { path: '/debug/tasks-new-pattern', label: 'Tasks New Pattern' },
   ];

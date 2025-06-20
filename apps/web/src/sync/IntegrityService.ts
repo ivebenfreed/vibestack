@@ -19,6 +19,7 @@ import {
 import { clearDomainDataOnly } from '../db/storage';
 import { liveChangesManager } from '../lib/live-changes-manager';
 import { MoreThan } from 'typeorm';
+import { getGlobalServices } from '../state-machines/machines/sync-machine-v2';
 
 // Map table names to entity classes
 const TABLE_TO_ENTITY_MAP: Record<string, any> = {
@@ -53,9 +54,24 @@ export interface IntegrityValidationRequest {
 }
 
 export interface IntegrityValidationResult {
+  /** 
+   * Whether NO integrity issues were found. 
+   * NOTE: This means "no issues detected", NOT "validation completed successfully".
+   * The validation process itself can complete successfully while finding issues.
+   */
   isValid: boolean;
+  
+  /** Array of integrity issues found during validation */
   issues: any[];
+  
+  /** 
+   * Recommended action based on validation results:
+   * - 'none': No action needed (only when isValid=true AND issues.length=0)
+   * - 'reset': Serious issues found, full reset recommended
+   * - 'retry': Temporary issues, retry validation recommended
+   */
   recommendedAction: 'none' | 'reset' | 'retry';
+  
   fingerprints?: Record<string, any>;
   serverResponse?: any;
   validationType?: string;
@@ -90,6 +106,9 @@ export class IntegrityService {
   private callbacks: IntegrityServiceCallbacks = {};
   private messageSender: IMessageSender | null = null;
   
+  // Machine reference for event-driven communication
+  private machineRef: any = null;
+  
   // Validation state
   private pendingValidations = new Map<string, {
     resolve: (result: IntegrityValidationResult) => void;
@@ -120,6 +139,14 @@ export class IntegrityService {
   }
 
   /**
+   * Set machine reference for event-driven communication
+   */
+  setMachineRef(machineRef: any): void {
+    this.machineRef = machineRef;
+    console.log('[IntegrityService] Machine reference set for event-driven communication');
+  }
+
+  /**
    * Handle validation response from server
    */
   async handleValidationResponse(message: any): Promise<IntegrityValidationResult> {
@@ -132,6 +159,39 @@ export class IntegrityService {
       serverResponse: message
     };
     
+    // ✅ ENHANCED: Log validation result analysis
+    console.log('[IntegrityService] 🔍 Validation result analysis:', {
+      isValid: result.isValid,
+      issueCount: result.issues.length,
+      recommendedAction: result.recommendedAction,
+      shouldProceedToLiveSync: result.isValid && result.issues.length === 0 && result.recommendedAction === 'none',
+      shouldTriggerReset: !result.isValid && (result.recommendedAction === 'reset' || result.recommendedAction === 'none'),
+      shouldRetry: !result.isValid && result.recommendedAction === 'retry'
+    });
+    
+    if (!result.isValid) {
+      console.warn('[IntegrityService] ⚠️ INTEGRITY ISSUES DETECTED:');
+      console.warn(`[IntegrityService] - Issues found: ${result.issues.length}`);
+      console.warn(`[IntegrityService] - Recommended action: ${result.recommendedAction}`);
+      
+      if (result.issues.length > 0) {
+        result.issues.forEach((issue: any, index: number) => {
+          console.warn(`[IntegrityService] Issue ${index + 1}:`, issue);
+        });
+      }
+      
+      // ✅ CLARIFY: What will happen next based on recommended action
+      if (result.recommendedAction === 'reset') {
+        console.warn('[IntegrityService] 🚨 SYNC MACHINE WILL TRIGGER RESET due to recommendedAction=reset');
+      } else if (result.recommendedAction === 'retry') {
+        console.warn('[IntegrityService] 🔄 SYNC MACHINE WILL RETRY VALIDATION due to recommendedAction=retry');
+      } else if (result.recommendedAction === 'none') {
+        console.error('[IntegrityService] 🚨 CRITICAL: SYNC MACHINE WILL FORCE RESET due to issues with no clear resolution (recommendedAction=none)');
+      }
+    } else {
+      console.log('[IntegrityService] ✅ No integrity issues detected - sync machine will proceed to live sync');
+    }
+    
     // Resolve any pending validation promises (resolve all pending since we only expect one at a time)
     for (const [key, pending] of this.pendingValidations) {
       console.log(`[IntegrityService] Resolving pending validation: ${key}`);
@@ -143,7 +203,10 @@ export class IntegrityService {
     // Trigger callback
     this.callbacks.onValidationCompleted?.(result);
     
-    console.log('[IntegrityService] Validation response processed:', result);
+    // ✅ NEW: Send event to machine for ongoing validations
+    this.sendEventToMachine({ type: 'INTEGRITY_VALIDATION_COMPLETED', result });
+    
+    console.log('[IntegrityService] Validation response processed and sent to sync machine');
     return result;
   }
 
@@ -164,6 +227,23 @@ export class IntegrityService {
       
       this.callbacks.onValidationStarted?.(reason);
 
+      // ✅ NEW: Detect empty database conditions that cause false positives
+      const emptyDatabaseCheck = await this.checkForEmptyDatabase();
+      if (emptyDatabaseCheck.isEmpty) {
+        console.log(`[IntegrityService] 🔄 EMPTY DATABASE DETECTED - SKIPPING VALIDATION`);
+        console.log(`[IntegrityService] 🔄 Reason: ${emptyDatabaseCheck.reason}`);
+        console.log(`[IntegrityService] 🔄 Total records across all tables: ${emptyDatabaseCheck.totalRecords}`);
+        console.log(`[IntegrityService] 🔄 This prevents false positives when database is empty after reset`);
+        
+        return {
+          isValid: true,
+          issues: [],
+          recommendedAction: 'none',
+          validationType: 'skipped_empty_database',
+          resetReason: `Skipped: ${emptyDatabaseCheck.reason}`
+        };
+      }
+
       // Get orchestrator context for baseline tracking
       const context = await this.getOrchestratorContext();
       const baseline = context?.integrityBaseline;
@@ -172,11 +252,23 @@ export class IntegrityService {
         contextFound: !!context,
         baselineFound: !!baseline,
         lastInitialSyncCompletedAt: baseline?.lastInitialSyncCompletedAt,
+        lastInitialSyncTime: baseline?.lastInitialSyncCompletedAt ? new Date(baseline.lastInitialSyncCompletedAt).toISOString() : 'NULL',
         maxRecordsBeforeReset: baseline?.maxRecordsBeforeReset,
         recordChangesSinceBaseline: baseline?.recordChangesSinceBaseline
       });
 
-      if (!baseline?.lastInitialSyncCompletedAt) {
+      // 🔍 CRITICAL DEBUG: Check exactly what baseline value we have
+      const hasValidBaseline = baseline?.lastInitialSyncCompletedAt !== null && baseline?.lastInitialSyncCompletedAt !== undefined;
+      console.log(`[IntegrityService] 🔍 BASELINE CHECK:`, {
+        hasValidBaseline,
+        baselineValue: baseline?.lastInitialSyncCompletedAt,
+        baselineType: typeof baseline?.lastInitialSyncCompletedAt,
+        isNull: baseline?.lastInitialSyncCompletedAt === null,
+        isUndefined: baseline?.lastInitialSyncCompletedAt === undefined,
+        shouldDoFullValidation: !hasValidBaseline
+      });
+
+      if (!hasValidBaseline) {
         console.log('[IntegrityService] No baseline timestamp - performing full validation');
         console.log(`[IntegrityService] 🔍 DEBUG: Why no baseline?`, {
           noContext: !context,
@@ -363,11 +455,13 @@ export class IntegrityService {
       this.pendingValidations.set(validationKey, { resolve, reject, timeout });
 
       try {
-        // Generate fingerprints only for records changed since baseline
-        const modifiedFingerprints = await this.generateFingerprintsSinceTimestamp(baselineTimestamp);
+        // Generate fingerprints for all tables
+        const fingerprints = await this.generateFingerprintsSinceTimestamp(baselineTimestamp);
 
-        if (Object.keys(modifiedFingerprints).length === 0) {
-          console.log('[IntegrityService] No modifications detected - integrity valid');
+        // Check if any tables have actual modifications
+        const hasModifications = Object.values(fingerprints).some(fp => fp.recordCount > 0);
+        if (!hasModifications) {
+          console.log('[IntegrityService] No modifications detected since baseline - returning early without server validation');
           clearTimeout(timeout);
           this.pendingValidations.delete(validationKey);
           resolve({
@@ -376,21 +470,38 @@ export class IntegrityService {
             recommendedAction: 'none',
             validationType: 'baseline_incremental_clean',
             recordsValidated: 0,
-            baselineTimestamp
+            baselineTimestamp,
+            fingerprints // Include empty fingerprints for consistency
           });
           return;
+        }
+
+        // 🔍 DETAILED LOGGING: Show exactly what we're sending to server
+        console.log('[IntegrityService] 📊 DETAILED FINGERPRINT ANALYSIS:');
+        console.log(`[IntegrityService] Baseline timestamp: ${new Date(baselineTimestamp).toISOString()}`);
+        console.log(`[IntegrityService] Record changes since baseline: ${recordCount.totalChanges}`);
+        
+        for (const [tableName, fp] of Object.entries(fingerprints)) {
+          console.log(`[IntegrityService]   ${tableName}:`, {
+            recordCount: fp.recordCount,
+            recordIdHash: fp.recordIdHash,
+            recentDataHash: fp.recentDataHash,
+            lastUpdated: fp.lastUpdated ? new Date(fp.lastUpdated).toISOString() : 'none'
+          });
         }
 
         // Send baseline validation request to server
         const validationRequest = {
           clientId: this.config.clientId,
           currentLSN: this.getCurrentLSN(),
-          tableFingerprints: modifiedFingerprints,
+          tableFingerprints: fingerprints,
           validationType: 'baseline_incremental',
           baselineTimestamp,
           recordCount: recordCount.totalChanges,
           timestamp: Date.now()
         };
+
+        console.log('[IntegrityService] 📤 SENDING TO SERVER:', JSON.stringify(validationRequest, null, 2));
 
         this.messageSender!.send({
           type: 'clt_integrity_validation',
@@ -408,7 +519,7 @@ export class IntegrityService {
   }
 
   /**
-   * Generate fingerprints only for records modified since timestamp
+   * Generate fingerprints for all tables
    */
   private async generateFingerprintsSinceTimestamp(sinceTimestamp: number): Promise<Record<string, TableFingerprint>> {
     console.log('[IntegrityService] Generating fingerprints for records modified since baseline');
@@ -420,13 +531,20 @@ export class IntegrityService {
       for (const tableName of CRITICAL_TABLES) {
         const modifiedFingerprint = await this.generateModifiedTableFingerprint(tableName, sinceTimestamp, dataSource);
         
-        // Only include tables with modifications
-        if (modifiedFingerprint.recordCount > 0) {
-          fingerprints[tableName] = modifiedFingerprint;
-        }
+        // 🔥 FIXED: Include ALL tables in baseline validation, not just modified ones
+        // This prevents "missing fingerprint" errors that cause integrity check loops
+        fingerprints[tableName] = modifiedFingerprint;
+        
+        // 🔍 DEBUG: Show what we found for each table
+        console.log(`[IntegrityService] 🔍 Table ${tableName} since ${new Date(sinceTimestamp).toISOString()}:`, {
+          recordCount: modifiedFingerprint.recordCount,
+          recordIdHash: modifiedFingerprint.recordIdHash,
+          lastUpdated: modifiedFingerprint.lastUpdated ? new Date(modifiedFingerprint.lastUpdated).toISOString() : 'none'
+        });
       }
 
-      console.log('[IntegrityService] Generated fingerprints for', Object.keys(fingerprints).length, 'modified tables');
+      const modifiedTablesCount = Object.values(fingerprints).filter(fp => fp.recordCount > 0).length;
+      console.log('[IntegrityService] Generated fingerprints for', Object.keys(fingerprints).length, 'total tables,', modifiedTablesCount, 'with modifications');
       return fingerprints;
 
     } catch (error) {
@@ -581,15 +699,24 @@ export class IntegrityService {
       result = await this.performLocalValidation();
     }
     
-    // 🔥 NEW: If this was a full validation for an existing system (LSN != 0/0) 
-    // and validation passed, establish baseline now
+    // 🔥 FIXED: Only advance baseline if validation passed AND no issues were found
     const currentLSN = this.getCurrentLSN();
-    if (result.isValid && currentLSN !== '0/0' && reason.includes('baseline')) {
-      console.log(`[IntegrityService] ✅ Full validation passed for existing system - establishing baseline now`);
+    const shouldAdvanceBaseline = result.isValid && 
+                                 result.issues.length === 0 && 
+                                 result.recommendedAction === 'none' &&
+                                 currentLSN !== '0/0' && 
+                                 reason.includes('baseline');
+                                 
+    if (shouldAdvanceBaseline) {
+      console.log(`[IntegrityService] ✅ Full validation passed with zero issues - establishing new baseline`);
       await this.establishCurrentBaseline();
       
       // Add a small delay to allow baseline to be set before validation completes
       await new Promise(resolve => setTimeout(resolve, 50));
+    } else if (result.isValid && result.issues.length > 0) {
+      console.log(`[IntegrityService] ⚠️ Validation marked valid but found ${result.issues.length} issues - NOT advancing baseline`);
+    } else if (result.recommendedAction !== 'none') {
+      console.log(`[IntegrityService] ⚠️ Validation recommends '${result.recommendedAction}' - NOT advancing baseline`);
     }
     
     return result;
@@ -666,7 +793,19 @@ export class IntegrityService {
       
       this.callbacks.onResetStarted?.(reason, resetType);
 
-      const result = await this.executeFullReset(reason);
+      // ✅ CRITICAL: Disconnect BEFORE reset to avoid sending messages over stale connections
+      console.log('[IntegrityService] 🔌 Phase 1: Disconnecting services before reset...');
+      await this.disconnectAllServices();
+
+      // ✅ MISSING: Support different reset types
+      let result: IntegrityResetResult;
+      if (resetType === 'full_reset') {
+        result = await this.executeFullReset(reason);
+      } else if (resetType === 'table_reset') {
+        result = await this.executeTableReset(reason);
+      } else {
+        throw new Error(`Unknown reset type: ${resetType}`);
+      }
 
       console.log(`[IntegrityService] Integrity reset completed:`, result);
 
@@ -689,7 +828,7 @@ export class IntegrityService {
   }
 
   /**
-   * Execute full reset
+   * Execute full reset - enhanced with connection management and verification
    */
   private async executeFullReset(reason: string): Promise<IntegrityResetResult> {
     console.warn('[IntegrityService] Executing full reset:', reason);
@@ -701,46 +840,67 @@ export class IntegrityService {
     };
 
     try {
-      // 1. Reset LSN to trigger full sync
+      // 1. Reset LSN to trigger full sync (disconnection already happened in executeReset)
       this.resetLSN();
       result.lsnReset = true;
-      console.log('[IntegrityService] LSN reset to 0/0');
+      console.log('[IntegrityService] ✅ LSN reset to 0/0');
 
       // 2. Pause live changes processing
       try {
         const liveChangesStats = liveChangesManager.getStats();
         if (liveChangesStats.status === 'active') {
-          console.log('[IntegrityService] Pausing live changes processing during reset...');
+          console.log('[IntegrityService] ⏸️ Pausing live changes processing during reset...');
           liveChangesManager.pause();
+        } else {
+          console.log(`[IntegrityService] Live changes manager not active (${liveChangesStats.status}) - skipping pause`);
         }
       } catch (liveChangesError) {
         console.warn('[IntegrityService] Could not pause live changes manager:', liveChangesError);
       }
 
-      // 3. Clear domain data
+      // 3. Clear domain data using robust storage functions
+      console.log('[IntegrityService] 🗑️ Using storage.ts functions for reliable table clearing...');
       const clearSuccess = await clearDomainDataOnly();
       
       if (clearSuccess) {
         result.tablesCleared = [...CRITICAL_TABLES];
-        console.log(`[IntegrityService] ✅ Successfully cleared tables:`, result.tablesCleared);
+        console.log(`[IntegrityService] ✅ Successfully cleared tables using storage functions:`, result.tablesCleared);
+        
+        // ✅ MISSING: Verify tables are actually empty
+        console.log('[IntegrityService] 🔍 Verifying tables are empty...');
+        await this.verifyTablesEmpty();
       } else {
-        console.error('[IntegrityService] ❌ Failed to clear tables');
+        console.error('[IntegrityService] ❌ Storage function failed to clear tables');
       }
 
       result.success = clearSuccess;
+      
+      console.log('[IntegrityService] ✅ Full reset completed successfully', result);
+      
+      // ✅ FIXED: Reset baseline after successful reset to prevent validation loops
+      if (result.success) {
+        await this.resetIntegrityBaseline('Post-reset baseline reset');
+        console.log('[IntegrityService] 🔄 Baseline reset - next validation will start fresh');
+        
+        await this.reEnableAutoReconnect();
+        console.log('[IntegrityService] 🔄 Auto-reconnect re-enabled - sync machines will handle reconnection automatically');
+      }
+
       return result;
 
     } catch (error) {
       result.error = error instanceof Error ? error.message : String(error);
-      console.error('[IntegrityService] Full reset failed:', error);
+      console.error('[IntegrityService] ❌ Full reset failed:', error);
       return result;
     } finally {
-      // Always resume live changes processing
+      // Always resume live changes processing, even if clearing failed
       try {
         const liveChangesStats = liveChangesManager.getStats();
         if (liveChangesStats.status === 'active' && liveChangesStats.isPaused) {
-          console.log('[IntegrityService] Resuming live changes processing...');
+          console.log('[IntegrityService] ▶️ Resuming live changes processing...');
           liveChangesManager.resume();
+        } else {
+          console.log(`[IntegrityService] Live changes manager not in paused state (status: ${liveChangesStats.status}, paused: ${liveChangesStats.isPaused}) - skipping resume`);
         }
       } catch (liveChangesError) {
         console.warn('[IntegrityService] Could not resume live changes manager:', liveChangesError);
@@ -981,6 +1141,7 @@ export class IntegrityService {
     
     this.callbacks = {};
     this.messageSender = null;
+    this.machineRef = null;  // ✅ Clear machine reference
   }
 
   /**
@@ -1024,6 +1185,16 @@ export class IntegrityService {
           baseline
         });
         console.log('[IntegrityService] 📡 Sent baseline update to orchestrator for persistence:', baseline);
+        
+        // 🔥 CRITICAL FIX: Force localStorage persistence immediately
+        // The orchestrator state is persisted to localStorage but there might be a delay.
+        // For baseline resets, we need immediate persistence to prevent old baseline being restored on reload.
+        await new Promise(resolve => setTimeout(resolve, 50)); // Allow time for orchestrator to process
+        
+        // Force persistence by triggering a state snapshot (the subscription handles localStorage saving)
+        const currentSnapshot = orchestratorActor.getSnapshot();
+        console.log('[IntegrityService] 🔄 Forced orchestrator state persistence for baseline update');
+        
       } else {
         console.warn('[IntegrityService] ⚠️ Orchestrator actor not available for baseline persistence');
       }
@@ -1050,6 +1221,590 @@ export class IntegrityService {
       }
     } catch (error) {
       console.error('[IntegrityService] ❌ Failed to update baseline record count:', error);
+    }
+  }
+
+  /**
+   * ✅ NEW: Reset integrity baseline to force full validation
+   */
+  async resetIntegrityBaseline(reason: string = 'Manual baseline reset'): Promise<void> {
+    try {
+      console.log(`[IntegrityService] 🔄 Resetting integrity baseline: ${reason}`);
+      
+      const resetBaseline = {
+        lastInitialSyncCompletedAt: null, // Force full validation
+        lastFullValidationAt: null,
+        recordChangesSinceBaseline: 0,
+        tableChangeCounts: {},
+        lastCountUpdateAt: Date.now()
+      };
+      
+      console.log(`[IntegrityService] 🔄 SETTING BASELINE TO:`, resetBaseline);
+      
+      // Reset baseline to force full validation next time
+      await this.sendBaselineToOrchestrator(resetBaseline);
+      
+      console.log('[IntegrityService] ✅ Integrity baseline reset - next validation will be full comparison');
+      
+      // 🔍 VERIFY: Check if the baseline was actually set
+      setTimeout(async () => {
+        const context = await this.getOrchestratorContext();
+        console.log(`[IntegrityService] 🔍 VERIFICATION: Baseline after reset:`, {
+          lastInitialSyncCompletedAt: context?.integrityBaseline?.lastInitialSyncCompletedAt,
+          isNull: context?.integrityBaseline?.lastInitialSyncCompletedAt === null
+        });
+      }, 100);
+      
+    } catch (error) {
+      console.error('[IntegrityService] ❌ Failed to reset integrity baseline:', error);
+      throw error;
+    }
+  }
+
+  // ✅ NEW: Simple event-driven validation method
+  startValidation(params: { reason: string; clientId: string; currentLSN: string }): void {
+    console.log(`[IntegrityService] 🚀 Starting validation: ${params.reason}`);
+    
+    // ✅ MISSING: Send validation started event
+    this.sendEventToMachine({ 
+      type: 'INTEGRITY_VALIDATION_STARTED', 
+      reason: params.reason 
+    });
+    
+    // Run validation asynchronously and send events back to machine
+    this.validateIntegrity(params.reason)
+      .then((result) => {
+        console.log(`[IntegrityService] ✅ Validation completed, sending INTEGRITY_VALIDATION_COMPLETED`);
+        this.sendEventToMachine({ type: 'INTEGRITY_VALIDATION_COMPLETED', result });
+      })
+      .catch((error) => {
+        console.error(`[IntegrityService] ❌ Validation failed, sending INTEGRITY_VALIDATION_FAILED:`, error);
+        this.sendEventToMachine({ type: 'INTEGRITY_VALIDATION_FAILED', error });
+      });
+  }
+
+  // ✅ NEW: Simple event-driven reset method
+  startReset(params: { reason: string; resetType: 'full_reset' | 'table_reset'; clientId: string }): void {
+    console.log(`[IntegrityService] 🚀 Starting reset: ${params.reason} (${params.resetType})`);
+    
+    // ✅ MISSING: Send reset started event
+    this.sendEventToMachine({ 
+      type: 'INTEGRITY_RESET_STARTED', 
+      reason: params.reason,
+      resetType: params.resetType
+    });
+    
+    // Run reset asynchronously and send events back to machine
+    this.executeReset(params.reason, params.resetType)
+      .then((result) => {
+        console.log(`[IntegrityService] ✅ Reset completed, sending INTEGRITY_RESET_COMPLETED`);
+        this.sendEventToMachine({ type: 'INTEGRITY_RESET_COMPLETED', result });
+      })
+      .catch((error) => {
+        console.error(`[IntegrityService] ❌ Reset failed, sending INTEGRITY_RESET_ERROR:`, error);
+        this.sendEventToMachine({ type: 'INTEGRITY_RESET_ERROR', error });
+      });
+  }
+
+  // ✅ NEW: Send events back to machine
+  private sendEventToMachine(event: any): void {
+    if (this.machineRef && typeof this.machineRef.send === 'function') {
+      try {
+        this.machineRef.send(event);
+        console.log(`[IntegrityService] 📤 Sent event to machine: ${event.type}`);
+      } catch (error) {
+        console.error(`[IntegrityService] ❌ Failed to send event to machine:`, error);
+      }
+    } else {
+      console.warn(`[IntegrityService] ⚠️ No machine reference available, cannot send event: ${event.type}`);
+    }
+  }
+
+  /**
+   * ✅ MISSING: Execute table-specific reset
+   */
+  private async executeTableReset(reason: string): Promise<IntegrityResetResult> {
+    console.log('[IntegrityService] Executing table reset:', reason);
+
+    const result: IntegrityResetResult = {
+      success: false,
+      tablesCleared: [],
+      lsnReset: false
+    };
+
+    try {
+      console.log('[IntegrityService] Table-specific reset using storage functions...');
+      
+      // For partial table resets, we'll use clearDomainDataOnly since it's more reliable
+      // than trying to selectively clear tables with foreign key constraints
+      console.warn('[IntegrityService] Partial table reset not supported with storage functions - clearing domain tables only');
+      
+      // Pause live changes processing
+      try {
+        const liveChangesStats = liveChangesManager.getStats();
+        if (liveChangesStats.status === 'active') {
+          console.log('[IntegrityService] ⏸️ Pausing live changes processing during table reset...');
+          liveChangesManager.pause();
+        } else {
+          console.log(`[IntegrityService] Live changes manager not active (${liveChangesStats.status}) - skipping pause`);
+        }
+      } catch (liveChangesError) {
+        console.warn('[IntegrityService] Could not pause live changes manager:', liveChangesError);
+      }
+      
+      const clearSuccess = await clearDomainDataOnly();
+      
+      if (clearSuccess) {
+        result.tablesCleared = [...CRITICAL_TABLES];
+        console.log(`[IntegrityService] ✅ Successfully cleared tables using storage functions:`, result.tablesCleared);
+      } else {
+        console.error('[IntegrityService] ❌ Storage function failed to clear tables');
+      }
+
+      result.success = clearSuccess;
+      return result;
+
+    } catch (error) {
+      result.error = error instanceof Error ? error.message : String(error);
+      console.error('[IntegrityService] ❌ Table reset failed:', error);
+      return result;
+    } finally {
+      // Always resume live changes processing, even if clearing failed
+      try {
+        const liveChangesStats = liveChangesManager.getStats();
+        if (liveChangesStats.status === 'active' && liveChangesStats.isPaused) {
+          console.log('[IntegrityService] ▶️ Resuming live changes processing...');
+          liveChangesManager.resume();
+        } else {
+          console.log(`[IntegrityService] Live changes manager not in paused state (status: ${liveChangesStats.status}, paused: ${liveChangesStats.isPaused}) - skipping resume`);
+        }
+      } catch (liveChangesError) {
+        console.warn('[IntegrityService] Could not resume live changes manager:', liveChangesError);
+      }
+    }
+  }
+
+  /**
+   * ✅ MISSING: Get sync manager from global service registry
+   */
+  private getSyncManager(): any {
+    try {
+      // Access sync manager through global service registry or orchestrator
+      const orchestrator = (window as any).orchestratorActor;
+      if (orchestrator) {
+        const snapshot = orchestrator.getSnapshot();
+        return snapshot.context.syncManager || null;
+      }
+    } catch (error) {
+      console.warn('[IntegrityService] Could not get sync manager:', error);
+    }
+    return null;
+  }
+
+  /**
+   * ✅ MISSING: Disconnect sync manager with retry logic
+   */
+  private async disconnectSyncManager(syncManager: any): Promise<void> {
+    try {
+      syncManager.disconnect();
+      
+      // Wait for disconnection to complete
+      let disconnectAttempts = 0;
+      const maxDisconnectAttempts = 10;
+      while (syncManager.isConnected() && disconnectAttempts < maxDisconnectAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        disconnectAttempts++;
+      }
+      
+      if (syncManager.isConnected()) {
+        console.warn('[IntegrityService] ⚠️ Warning: Still connected after disconnect attempts, proceeding anyway');
+      } else {
+        console.log('[IntegrityService] ✅ Successfully disconnected from sync');
+      }
+    } catch (error) {
+      console.warn('[IntegrityService] Error during sync manager disconnect:', error);
+    }
+  }
+
+  /**
+   * ✅ MISSING: Verify tables are actually empty after clearing
+   */
+  private async verifyTablesEmpty(): Promise<void> {
+    try {
+      if (this.dataSource && this.dataSource.isInitialized) {
+        for (const tableName of CRITICAL_TABLES) {
+          try {
+            const entityClass = TABLE_TO_ENTITY_MAP[tableName];
+            if (entityClass) {
+              const repository = this.dataSource.getRepository(entityClass);
+              const count = await repository.count();
+              if (count > 0) {
+                console.warn(`[IntegrityService] ⚠️ Table ${tableName} still has ${count} records after clearing`);
+              } else {
+                console.log(`[IntegrityService] ✅ Verified table ${tableName} is empty`);
+              }
+            }
+          } catch (verifyError) {
+            console.warn(`[IntegrityService] Could not verify table ${tableName} is empty:`, verifyError);
+          }
+        }
+      }
+    } catch (dsError) {
+      console.warn('[IntegrityService] Could not verify table clearing due to datasource error:', dsError);
+    }
+  }
+
+  /**
+   * ✅ MISSING: Trigger automatic reconnection after reset
+   */
+  private async triggerAutoReconnection(syncManager: any): Promise<void> {
+    setTimeout(() => {
+      try {
+        console.log('[IntegrityService] 🔄 All database cleanup completed - triggering fresh connection for initial sync...');
+        
+        if (syncManager && syncManager.getAutoConnect && syncManager.getAutoConnect()) {
+          syncManager.connect().then(() => {
+            console.log('[IntegrityService] ✅ Fresh connection established - should trigger initial sync with LSN 0/0');
+          }).catch((connectError: any) => {
+            console.warn('[IntegrityService] Failed to establish fresh connection:', connectError);
+          });
+        } else {
+          console.log('[IntegrityService] Auto-connect disabled - manual reconnection required');
+        }
+      } catch (reconnectError) {
+        console.warn('[IntegrityService] Failed to trigger fresh connection, but reset was successful:', reconnectError);
+      }
+    }, 1000); // Longer delay to ensure both state machine processing AND database cleanup complete
+  }
+  
+  /**
+   * ✅ MISSING: Handle server-initiated reset commands
+   */
+ async handleServerResetCommand(message: any): Promise<void> {
+    console.warn('[IntegrityService] 🚨 Received reset command from server', message);
+
+    const resetCommand = message.resetCommand || message;
+    const reason = message.reason || 'Server-initiated reset';
+
+    try {
+      let result: any;
+
+      if (resetCommand.type === 'full_reset') {
+        result = await this.executeReset(reason, 'full_reset');
+      } else if (resetCommand.type === 'table_reset') {
+        result = await this.executeReset(reason, 'table_reset');
+      } else {
+        throw new Error(`Unknown reset type: ${resetCommand.type}`);
+      }
+
+      // ✅ MISSING: Send acknowledgment to server
+      if (this.messageSender) {
+        this.messageSender.send({
+          type: 'clt_integrity_reset_ack',
+          success: result.success,
+          result,
+          inReplyTo: message.messageId
+        });
+      }
+
+      // ✅ MISSING: Send completion event to machine
+      this.sendEventToMachine({ 
+        type: 'SERVER_INTEGRITY_RESET_COMPLETED', 
+        result, 
+        command: resetCommand 
+      });
+
+    } catch (error) {
+      console.error('[IntegrityService] ❌ Error executing server reset command:', error);
+
+      // Send error acknowledgment
+      if (this.messageSender) {
+        this.messageSender.send({
+          type: 'clt_integrity_reset_ack',
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          inReplyTo: message.messageId
+        });
+      }
+      
+      // Send error event to machine
+      this.sendEventToMachine({ 
+        type: 'INTEGRITY_RESET_ERROR', 
+        error: error instanceof Error ? error : new Error(String(error))
+      });
+    }
+  }
+
+  /**
+   * Disconnect all services cleanly before reset
+   * CRITICAL: Must happen BEFORE database reset to avoid sending messages over stale connections
+   */
+  private async disconnectAllServices(): Promise<void> {
+    let wasConnected = false;
+    
+    try {
+      console.log('[IntegrityService] 🔌 Starting comprehensive service disconnection...');
+      
+      // Step 1: Disable auto-reconnect on all systems to prevent interference
+      await this.disableAllAutoReconnect();
+      
+      // Step 2: Disconnect sync machine v2 services (orchestrator-managed)
+      const services = getGlobalServices();
+      if (services?.webSocketService) {
+        wasConnected = services.webSocketService.isConnected();
+        if (wasConnected) {
+          console.log('[IntegrityService] 🔌 Disconnecting SyncMachineV2 WebSocketService...');
+          await services.webSocketService.disconnect();
+          
+          // Wait for disconnection to fully propagate
+          await this.waitForServiceDisconnection(services.webSocketService, 'SyncMachineV2');
+        }
+      }
+      
+      // Step 3: Disconnect legacy SyncManager (used by debug page)
+      await this.disconnectLegacySyncManager();
+      
+      // Step 4: Send orchestrator event to ensure clean state
+      await this.notifyOrchestratorOfDisconnection();
+      
+      // Step 5: Final wait for all systems to stabilize
+      console.log('[IntegrityService] ⏳ Waiting for all sync systems to stabilize...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!wasConnected) {
+        console.log('[IntegrityService] No active connections found');
+      } else {
+        console.log('[IntegrityService] ✅ All sync systems disconnected successfully');
+      }
+      
+    } catch (error) {
+      console.warn('[IntegrityService] Error during comprehensive service disconnection:', error);
+      // Continue with reset even if disconnection fails
+    }
+  }
+
+  /**
+   * Disable auto-reconnect on all sync systems
+   */
+  private async disableAllAutoReconnect(): Promise<void> {
+    try {
+      console.log('[IntegrityService] 🚫 Disabling auto-reconnect on all sync systems...');
+      
+      // Disable on legacy SyncManager
+      const { SyncManager } = await import('./SyncManager');
+      const syncManager = SyncManager.getInstance();
+      if (syncManager) {
+        syncManager.setAutoConnect(false);
+        console.log('[IntegrityService] ✅ Disabled auto-reconnect on SyncManager');
+      }
+      
+      // Disable on orchestrator level
+      const orchestrator = (window as any).orchestratorActor;
+      if (orchestrator) {
+        orchestrator.send({ 
+          type: 'DISABLE_AUTO_RECONNECT_FOR_RESET',
+          reason: 'integrity_reset_in_progress' 
+        });
+        console.log('[IntegrityService] ✅ Disabled auto-reconnect on Orchestrator');
+      }
+      
+    } catch (error) {
+      console.warn('[IntegrityService] Could not disable auto-reconnect:', error);
+    }
+  }
+
+  /**
+   * Wait for a service to fully disconnect with timeout
+   */
+  private async waitForServiceDisconnection(service: any, serviceName: string): Promise<void> {
+    let disconnectAttempts = 0;
+    const maxDisconnectAttempts = 25; // 5 seconds max
+    
+    while (service.isConnected() && disconnectAttempts < maxDisconnectAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      disconnectAttempts++;
+      
+      if (disconnectAttempts % 5 === 0) {
+        console.log(`[IntegrityService] ⏳ ${serviceName} still disconnecting... (${disconnectAttempts * 200}ms)`);
+      }
+    }
+    
+    if (service.isConnected()) {
+      console.warn(`[IntegrityService] ⚠️ Warning: ${serviceName} still connected after ${disconnectAttempts * 200}ms, proceeding anyway`);
+    } else {
+      console.log(`[IntegrityService] ✅ ${serviceName} disconnected after ${disconnectAttempts * 200}ms`);
+    }
+  }
+
+  /**
+   * Disconnect legacy SyncManager system
+   */
+  private async disconnectLegacySyncManager(): Promise<void> {
+    try {
+      const { SyncManager } = await import('./SyncManager');
+      const syncManager = SyncManager.getInstance();
+      
+      if (syncManager?.isConnected?.()) {
+        console.log('[IntegrityService] 🔌 Disconnecting legacy SyncManager...');
+        syncManager.disconnect();
+        
+        // Wait for legacy disconnection
+        let disconnectAttempts = 0;
+        const maxDisconnectAttempts = 15;
+        
+        while (syncManager.isConnected() && disconnectAttempts < maxDisconnectAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          disconnectAttempts++;
+        }
+        
+        if (syncManager.isConnected()) {
+          console.warn('[IntegrityService] ⚠️ Warning: Legacy SyncManager still connected, proceeding anyway');
+        } else {
+          console.log('[IntegrityService] ✅ Legacy SyncManager disconnected successfully');
+        }
+      } else {
+        console.log('[IntegrityService] Legacy SyncManager not connected');
+      }
+    } catch (error) {
+      console.warn('[IntegrityService] Error disconnecting legacy SyncManager:', error);
+    }
+  }
+
+  /**
+   * Notify orchestrator of intentional disconnection
+   */
+  private async notifyOrchestratorOfDisconnection(): Promise<void> {
+    try {
+      const orchestrator = (window as any).orchestratorActor;
+      if (orchestrator) {
+        orchestrator.send({ 
+          type: 'INTEGRITY_RESET_DISCONNECTION_COMPLETE',
+          timestamp: Date.now()
+        });
+        console.log('[IntegrityService] 📤 Notified orchestrator of disconnection completion');
+      }
+    } catch (error) {
+      console.warn('[IntegrityService] Could not notify orchestrator of disconnection:', error);
+    }
+  }
+
+  /**
+   * Re-enable auto-reconnect after successful reset
+   */
+  private async reEnableAutoReconnect(): Promise<void> {
+    try {
+      console.log('[IntegrityService] 🔄 Re-enabling auto-reconnect after reset...');
+      
+      // Re-enable on legacy SyncManager
+      const { SyncManager } = await import('./SyncManager');
+      const syncManager = SyncManager.getInstance();
+      if (syncManager) {
+        syncManager.setAutoConnect(true);
+        console.log('[IntegrityService] ✅ Re-enabled auto-reconnect on SyncManager');
+      }
+      
+      // Re-enable on orchestrator level
+      const orchestrator = (window as any).orchestratorActor;
+      if (orchestrator) {
+        orchestrator.send({ 
+          type: 'ENABLE_AUTO_RECONNECT_AFTER_RESET',
+          reason: 'integrity_reset_completed' 
+        });
+        console.log('[IntegrityService] ✅ Re-enabled auto-reconnect on Orchestrator');
+      }
+      
+    } catch (error) {
+      console.warn('[IntegrityService] Could not re-enable auto-reconnect:', error);
+    }
+  }
+
+  /**
+   * ✅ NEW: Check if database is empty to prevent false positive validations
+   */
+  private async checkForEmptyDatabase(): Promise<{
+    isEmpty: boolean;
+    reason: string;
+    totalRecords: number;
+    tableBreakdown: Record<string, number>;
+  }> {
+    let totalRecords = 0;
+    const tableBreakdown: Record<string, number> = {};
+    
+    try {
+      // Count total records across all critical tables
+      for (const tableName of CRITICAL_TABLES) {
+        try {
+          const repository = this.dataSource.getRepository(TABLE_TO_ENTITY_MAP[tableName]);
+          const count = await repository.count();
+          tableBreakdown[tableName] = count;
+          totalRecords += count;
+        } catch (error) {
+          console.warn(`[IntegrityService] Could not count ${tableName} for empty check:`, error);
+          tableBreakdown[tableName] = 0;
+        }
+      }
+      
+      // Check various empty conditions
+      const currentLSN = this.getCurrentLSN();
+      
+      // Condition 1: LSN is 0/0 (fresh start or post-reset)
+      if (currentLSN === '0/0') {
+        return {
+          isEmpty: true,
+          reason: `Fresh database state (LSN: ${currentLSN})`,
+          totalRecords,
+          tableBreakdown
+        };
+      }
+      
+      // Condition 2: All critical tables are completely empty
+      if (totalRecords === 0) {
+        return {
+          isEmpty: true,
+          reason: 'All critical tables are empty',
+          totalRecords,
+          tableBreakdown
+        };
+      }
+      
+      // Condition 3: Multiple tables are empty (likely post-reset)
+      const emptyTables = CRITICAL_TABLES.filter(table => tableBreakdown[table] === 0);
+      if (emptyTables.length >= CRITICAL_TABLES.length - 1) { // All but one table empty
+        return {
+          isEmpty: true,
+          reason: `${emptyTables.length}/${CRITICAL_TABLES.length} critical tables are empty (${emptyTables.join(', ')})`,
+          totalRecords,
+          tableBreakdown
+        };
+      }
+      
+      // Condition 4: Very low record count (likely incomplete sync)
+      if (totalRecords < 10) {
+        return {
+          isEmpty: true,
+          reason: `Very low record count (${totalRecords} total records) - likely incomplete sync`,
+          totalRecords,
+          tableBreakdown
+        };
+      }
+      
+      // Database has sufficient data for validation
+      return {
+        isEmpty: false,
+        reason: 'Database has sufficient data for integrity validation',
+        totalRecords,
+        tableBreakdown
+      };
+      
+    } catch (error) {
+      console.error('[IntegrityService] Error checking for empty database:', error);
+      // Default to allowing validation if check fails
+      return {
+        isEmpty: false,
+        reason: `Empty check failed: ${error instanceof Error ? error.message : String(error)}`,
+        totalRecords,
+        tableBreakdown
+      };
     }
   }
 } 

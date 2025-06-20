@@ -9,11 +9,25 @@ interface RelationshipUpdate {
 /**
  * Core change type for replication
  * Represents a change to a table that needs to be replicated
+ *
+ * IMPORTANT: The `data` field should contain TypeORM entity data in camelCase format
+ * with proper types (Date objects for dates, not strings). This preserves TypeORM
+ * entity structure throughout the sync pipeline and reduces unnecessary conversions.
  */
 interface TableChange {
     table: string;
     operation: 'insert' | 'update' | 'delete';
+    /**
+     * Entity data in TypeORM format (camelCase properties, proper types)
+     * - Date fields should be Date objects, not ISO strings
+     * - Property names should match TypeORM entity properties (camelCase)
+     * - This preserves the entity structure from client to server
+     */
     data: Record<string, unknown>;
+    /**
+     * ISO timestamp string of when the record was last updated
+     * This is separate from data.updatedAt to avoid confusion
+     */
     updatedAt: string;
     lsn?: string;
     clientId?: string;
@@ -21,8 +35,8 @@ interface TableChange {
     entityRelations?: string[];
 }
 
-type SrvMessageType = 'srv_send_changes' | 'srv_catchup_changes' | 'srv_live_changes' | 'srv_init_start' | 'srv_init_changes' | 'srv_init_complete' | 'srv_heartbeat' | 'srv_error' | 'srv_state_change' | 'srv_lsn_update' | 'srv_changes_received' | 'srv_changes_applied' | 'srv_sync_completed' | 'srv_catchup_completed' | 'srv_live_start' | 'srv_sync_stats';
-type CltMessageType = 'clt_sync_request' | 'clt_send_changes' | 'clt_heartbeat' | 'clt_error' | 'clt_changes_received' | 'clt_changes_applied' | 'clt_init_received' | 'clt_init_processed' | 'clt_catchup_received';
+type SrvMessageType = 'srv_send_changes' | 'srv_catchup_changes' | 'srv_live_changes' | 'srv_init_start' | 'srv_init_changes' | 'srv_init_complete' | 'srv_heartbeat' | 'srv_error' | 'srv_state_change' | 'srv_lsn_update' | 'srv_changes_received' | 'srv_changes_applied' | 'srv_sync_completed' | 'srv_catchup_completed' | 'srv_live_start' | 'srv_sync_stats' | 'srv_integrity_reset' | 'srv_integrity_validation_response';
+type CltMessageType = 'clt_sync_request' | 'clt_send_changes' | 'clt_heartbeat' | 'clt_error' | 'clt_changes_received' | 'clt_changes_applied' | 'clt_init_received' | 'clt_init_processed' | 'clt_catchup_received' | 'clt_integrity_validation' | 'clt_integrity_reset_ack';
 interface BaseMessage {
     messageId: string;
     timestamp: number;
@@ -79,10 +93,49 @@ interface ServerAppliedMessage extends ServerMessage {
 interface ServerSyncCompletedMessage extends ServerMessage {
     type: 'srv_sync_completed';
     startLSN: string;
-    finalLSN: string;
+    serverLSN: string;
     changeCount: number;
     success: boolean;
     error?: string;
+}
+/**
+ * Server heartbeat response message
+ */
+interface ServerHeartbeatMessage extends ServerMessage {
+    type: 'srv_heartbeat';
+    serverLSN?: string;
+    inReplyTo?: string;
+    error?: string;
+}
+/**
+ * Server integrity reset command message
+ */
+interface ServerIntegrityResetMessage extends ServerMessage {
+    type: 'srv_integrity_reset';
+    resetCommand: {
+        type: 'full_reset' | 'table_reset';
+        reason: string;
+        affectedTables?: string[];
+        preserveUserData?: boolean;
+    };
+    reason: string;
+}
+/**
+ * Server integrity validation response message
+ */
+interface ServerIntegrityValidationResponseMessage extends ServerMessage {
+    type: 'srv_integrity_validation_response';
+    isValid: boolean;
+    issues: Array<{
+        type: 'record_count_mismatch' | 'missing_records' | 'extra_records' | 'data_corruption' | 'lsn_regression';
+        table: string;
+        severity: 'low' | 'medium' | 'high' | 'critical';
+        description: string;
+        details: any;
+    }>;
+    recommendedAction: 'none' | 'catchup' | 'reset';
+    serverFingerprints: Record<string, any>;
+    validationTimestamp: number;
 }
 /**
  * Message sent when a client connects and is already up-to-date,
@@ -91,14 +144,14 @@ interface ServerSyncCompletedMessage extends ServerMessage {
 interface ServerLiveStartMessage extends ServerMessage {
     type: 'srv_live_start';
     startLSN: string;
-    finalLSN: string;
+    serverLSN: string;
     changeCount: number;
     success: boolean;
 }
 interface ServerCatchupCompletedMessage extends ServerMessage {
     type: 'srv_catchup_completed';
     startLSN: string;
-    finalLSN: string;
+    serverLSN: string;
     changeCount: number;
     success: boolean;
     error?: string;
@@ -176,7 +229,35 @@ interface ClientInitReceivedMessage extends ClientMessage {
 interface ClientInitProcessedMessage extends ClientMessage {
     type: 'clt_init_processed';
 }
-type Message = ServerMessage | ServerCatchupCompletedMessage | ServerLiveStartMessage | ServerSyncStatsMessage | ClientMessage;
+/**
+ * Client integrity validation request message
+ */
+interface ClientIntegrityValidationMessage extends ClientMessage {
+    type: 'clt_integrity_validation';
+    currentLSN: string;
+    tableFingerprints: Record<string, {
+        recordCount: number;
+        lastUpdated: number;
+        recordIdHash: string;
+        recentDataHash: string;
+    }>;
+}
+/**
+ * Client integrity reset acknowledgment message
+ */
+interface ClientIntegrityResetAckMessage extends ClientMessage {
+    type: 'clt_integrity_reset_ack';
+    success: boolean;
+    result?: {
+        success: boolean;
+        tablesCleared: string[];
+        lsnReset: boolean;
+        error?: string;
+    };
+    error?: string;
+    inReplyTo?: string;
+}
+type Message = ServerMessage | ServerCatchupCompletedMessage | ServerLiveStartMessage | ServerSyncStatsMessage | ServerHeartbeatMessage | ServerIntegrityResetMessage | ServerIntegrityValidationResponseMessage | ClientMessage | ClientIntegrityValidationMessage | ClientIntegrityResetAckMessage;
 
 /**
  * Strongly typed record data for sync operations
@@ -216,4 +297,4 @@ interface ClientDeregistration {
 declare function isTableChange(payload: unknown): payload is TableChange;
 declare function isClientMessageType(type: string): type is CltMessageType;
 
-export { type BaseMessage, type ClientAppliedMessage, type ClientChangesMessage, type ClientDeregistration, type ClientHeartbeatMessage, type ClientInitProcessedMessage, type ClientInitReceivedMessage, type ClientMessage, type ClientReceivedMessage, type ClientRegistration, type CltMessageType, type ExecutionResult, type Message, type RecordData, type RelationshipUpdate, type ServerAppliedMessage, type ServerCatchupCompletedMessage, type ServerChangesMessage, type ServerInitChangesMessage, type ServerInitCompleteMessage, type ServerInitStartMessage, type ServerLSNUpdateMessage, type ServerLiveStartMessage, type ServerMessage, type ServerReceivedMessage, type ServerStateChangeMessage, type ServerSyncCompletedMessage, type ServerSyncStatsMessage, type SrvMessageType, type TableChange, isClientMessageType, isTableChange };
+export { type BaseMessage, type ClientAppliedMessage, type ClientChangesMessage, type ClientDeregistration, type ClientHeartbeatMessage, type ClientInitProcessedMessage, type ClientInitReceivedMessage, type ClientIntegrityResetAckMessage, type ClientIntegrityValidationMessage, type ClientMessage, type ClientReceivedMessage, type ClientRegistration, type CltMessageType, type ExecutionResult, type Message, type RecordData, type RelationshipUpdate, type ServerAppliedMessage, type ServerCatchupCompletedMessage, type ServerChangesMessage, type ServerHeartbeatMessage, type ServerInitChangesMessage, type ServerInitCompleteMessage, type ServerInitStartMessage, type ServerIntegrityResetMessage, type ServerIntegrityValidationResponseMessage, type ServerLSNUpdateMessage, type ServerLiveStartMessage, type ServerMessage, type ServerReceivedMessage, type ServerStateChangeMessage, type ServerSyncCompletedMessage, type ServerSyncStatsMessage, type SrvMessageType, type TableChange, isClientMessageType, isTableChange };

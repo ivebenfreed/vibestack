@@ -1185,6 +1185,8 @@ function extractSelfReferences(entities: Function[], filter: MetadataFilter): Re
     return configs;
 }
 
+
+
 // Run the generator
 generateContextEntities().catch(error => {
     console.error('Error generating context entities:', error);

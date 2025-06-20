@@ -1,17 +1,17 @@
 // In apps/web/src/routes/_authenticated/debug/route.tsx
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { useUserRole } from '@/hooks/useSimpleAuth';
+import { useUserRole } from '@/state-machines/orchestrator-hooks';
 
 export const Route = createFileRoute('/_authenticated/debug')({
   // Remove redundant auth check - _authenticated layout handles auth protection
   component: DebugLayoutComponent,
 });
 
-// Debug layout component with permission check
+// Debug layout component with permission check using orchestrator state
 function DebugLayoutComponent() {
   const { canAccess } = useUserRole();
   
-  // Check debug permissions at component level
+  // Check debug permissions using orchestrator state
   if (!canAccess('debug_features')) {
     return (
       <div className="flex flex-col items-center justify-center h-64 p-4 text-center">

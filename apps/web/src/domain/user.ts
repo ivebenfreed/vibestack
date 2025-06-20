@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DeepPartial } from 'typeorm';
 import { User } from '@repo/dataforge/client-entities';
 import { BaseRepository, BaseService, DatabaseServiceError, EventDispatcher } from './base';
-import { OutgoingChangeProcessor } from '../sync/OutgoingChangeProcessor';
+import { OutgoingChangeService } from '../sync/OutgoingChangeService';
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
@@ -221,9 +221,9 @@ export class UserRepository extends BaseRepository<User> {
 export class UserService extends BaseService<User> {
   constructor(
     protected userRepository: UserRepository,
-    protected syncChangeManager: OutgoingChangeProcessor
+    protected outgoingChangeService: OutgoingChangeService
   ) {
-    super(userRepository, 'users', syncChangeManager);
+    super(userRepository, 'users', outgoingChangeService);
     
     // Set up entity-specific sync processing methods
     this.validateSyncData = this.validateUserSyncData.bind(this);
@@ -415,14 +415,45 @@ export { userAtoms };
 // Factory function for this domain
 export function createUserDomain(
   dataSource: NewPGliteDataSource, 
-  syncManager: OutgoingChangeProcessor
+  outgoingChangeService: OutgoingChangeService
 ) {
   if (!dataSource.isInitialized) {
     throw new Error('DataSource must be initialized before creating User domain');
   }
   
   const repository = new UserRepository(dataSource);
-  const service = new UserService(repository, syncManager);
+  const service = new UserService(repository, outgoingChangeService);
   
   return { repository, service };
+}
+
+// ============================================================================
+// SINGLETON SERVICE INSTANCE - For VibeGrid Integration
+// ============================================================================
+
+let userServiceInstance: UserService | null = null;
+
+export function setUserService(service: UserService): void {
+  userServiceInstance = service;
+}
+
+export async function getUserService(): Promise<UserService | null> {
+  return userServiceInstance;
+}
+
+export function hasUserService(): boolean {
+  return userServiceInstance !== null;
+}
+
+/**
+ * Update the UserService's OutgoingChangeService after sync machine initialization
+ */
+export function updateUserServiceOutgoingChangeService(outgoingChangeService: OutgoingChangeService): void {
+  if (userServiceInstance) {
+    console.log('[UserService] 🔄 Updating OutgoingChangeService from no-op to real service');
+    (userServiceInstance as any).outgoingChangeService = outgoingChangeService;
+    console.log('[UserService] ✅ OutgoingChangeService updated successfully');
+  } else {
+    console.warn('[UserService] Cannot update OutgoingChangeService - UserService not initialized');
+  }
 } 

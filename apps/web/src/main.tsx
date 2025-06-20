@@ -66,8 +66,7 @@ import { ThemeProvider } from './context/theme-context'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
-// Import atom setters - Jotai atomic stores
-import { useSetAtom } from 'jotai'
+// Import domain services for atomic store access
 import { TaskService } from '@/domain/task'
 import { ProjectService } from '@/domain/project'
 import { UserService } from '@/domain/user'
@@ -108,14 +107,14 @@ function getRouter() {
         setProjectAtoms: undefined!,
         setUserAtoms: undefined!,
       },
-      // ✅ PERFORMANCE: Optimized settings for snappy navigation
-      defaultPreload: 'intent',  // Preload on hover/focus
+      // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
+      defaultPreload: false,  // Disabled to prevent performance issues
       defaultPreloadStaleTime: 10_000, // Cache preloaded routes for 10 seconds
       defaultPendingMs: 100, // Show pending UI after 100ms
       defaultPendingMinMs: 150, // ⚡ OPTIMIZED: Reduced from 500ms to 150ms for snappier feel
       
-      // ⚡ PERFORMANCE: Add optimized preload timing
-      defaultPreloadDelay: 25, // ⚡ OPTIMIZED: Reduced from 50ms to 25ms for faster preloading
+      // ⚡ PERFORMANCE: Reduced aggressiveness to prevent excessive multiple route loading
+      defaultPreloadDelay: 150, // ⚡ LESS AGGRESSIVE: Increased from 25ms to 150ms to reduce accidental preloads
       defaultPreloadGcTime: 30_000, // Keep preloaded routes in memory for 30 seconds
     })
     
@@ -123,18 +122,18 @@ function getRouter() {
     console.log("✅ [ROUTER] Router instance created", {
       createTime: `${createTime.toFixed(2)}ms`,
       preloadEnabled: true,
-      preloadDelay: 25,
+      preloadDelay: 150,
       pendingMs: 100,
       pendingMinMs: 150,
       staleTime: 10_000,
       lazyRoutesEnabled: true
     })
     
-    // Simple route tracking - just log when routes change
-    if (typeof window !== 'undefined') {
-      console.log("🔍 [ROUTER] Setting up route change tracking...")
+    // ⚡ PERFORMANCE: Disable custom tracking during development to prevent HMR issues
+    if (typeof window !== 'undefined' && !import.meta.env.DEV) {
+      console.log("🔍 [ROUTER] Setting up route change tracking for production...")
       
-      // Track history changes to detect navigation
+      // Only in production - avoid HMR conflicts in development
       const originalPushState = window.history.pushState
       window.history.pushState = function(state, title, url) {
         const navStart = performance.now()
@@ -145,7 +144,6 @@ function getRouter() {
         
         const result = originalPushState.call(this, state, title, url)
         
-        // Simple timer to check when route is loaded
         requestAnimationFrame(() => {
           const navTime = performance.now() - navStart
           console.log("🎯 [ROUTER] Route change completed:", {
@@ -157,13 +155,6 @@ function getRouter() {
         
         return result
       }
-      
-      // Track page visibility for debugging
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          console.log("👁️ [ROUTER] Page became visible, current route:", window.location.pathname)
-        }
-      })
     }
   }
   return router;
@@ -179,17 +170,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
-// HMR: Store instances to preserve state during hot reloads
+// ⚡ PERFORMANCE: Simplified HMR - just preserve router instance
 if (import.meta.hot) {
   import.meta.hot.dispose((data) => {
-    console.log("🔥 [MAIN] HMR Dispose: Storing Router instance");
+    console.log("🔥 [MAIN] HMR Dispose: Storing router instance");
     data.router = router;
     data.timestamp = Date.now();
   });
 
   // Restore instances on hot reload
   if (import.meta.hot.data.router) {
-    console.log("🔥 [MAIN] HMR Restore: Reusing existing Router instance");
+    console.log("🔥 [MAIN] HMR Restore: Reusing existing router instance");
     router = import.meta.hot.data.router;
   }
 }
@@ -204,9 +195,10 @@ async function initializeApp() {
 
 // Wrapper component to provide atom setters via router context - Phase 4: Atomic Integration
 function AppWithRouterContext() {
-  const setTaskAtoms = useSetAtom(TaskService.atoms.syncBulkLoad)
-  const setProjectAtoms = useSetAtom(ProjectService.atoms.syncBulkLoad)
-  const setUserAtoms = useSetAtom(UserService.atoms.syncBulkLoad)
+  // Direct access to the set methods from the atomic stores
+  const setTaskAtoms = TaskService.atoms.syncBulkLoad.set
+  const setProjectAtoms = ProjectService.atoms.syncBulkLoad.set
+  const setUserAtoms = UserService.atoms.syncBulkLoad.set
 
   return (
     <RouterProvider 

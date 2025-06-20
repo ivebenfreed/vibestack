@@ -135,6 +135,12 @@ export function useAuth() {
       authToken: snapshot.context.authToken,
       authError: snapshot.context.authError,
       
+      // User role info
+      userRole: snapshot.context.user?.role || null,
+      isAdmin: snapshot.context.user?.role === 'admin' || snapshot.context.user?.role === 'super_admin',
+      isSuperAdmin: snapshot.context.user?.role === 'super_admin',
+      canAccessDebugFeatures: snapshot.context.user?.role === 'admin' || snapshot.context.user?.role === 'super_admin',
+      
       // User display info
       displayName: (() => {
         const user = snapshot.context.user;
@@ -203,11 +209,12 @@ export function useSyncMachine() {
   
   return useSelector(actor, (snapshot) => {
     const syncState = snapshot.context.syncState;
-    console.log(`[useSyncMachine] 🔍 Reading syncState from orchestrator context:`, {
-      phase: syncState.phase,
-      currentLSN: syncState.currentLSN,
-      machineState: syncState.machineState
-    });
+    // Remove excessive logging that was causing performance issues during scroll
+    // console.log(`[useSyncMachine] 🔍 Reading syncState from orchestrator context:`, {
+    //   phase: syncState.phase,
+    //   currentLSN: syncState.currentLSN,
+    //   machineState: syncState.machineState
+    // });
     
     return {
       // Sync phase information
@@ -319,4 +326,40 @@ export function useIntegrity() {
     requestReset: (reason: string) => 
       actor.send({ type: 'INTEGRITY_RESET_REQUIRED', reason }),
   }));
+}
+
+// ===== ROLE-BASED ACCESS CONTROL HOOK =====
+
+export function useUserRole() {
+  const actor = useOrchestratorActor();
+  
+  return useSelector(actor, (snapshot) => {
+    const userRole = snapshot.context.user?.role || null;
+    
+    return {
+      role: userRole || 'member',
+      isAdmin: userRole === 'admin' || userRole === 'super_admin',
+      isSuperAdmin: userRole === 'super_admin', 
+      isMember: userRole === 'member',
+      isViewer: userRole === 'viewer',
+      
+      // Permission helpers
+      canAccess: (feature: string): boolean => {
+        if (!snapshot.context.user) return false;
+        
+        switch (feature) {
+          case 'debug_features':
+            return userRole === 'admin' || userRole === 'super_admin';
+          case 'user_management':
+            return userRole === 'admin' || userRole === 'super_admin';
+          case 'project_create':
+            return userRole !== 'viewer';
+          case 'admin_panel':
+            return userRole === 'admin' || userRole === 'super_admin';
+          default:
+            return true;
+        }
+      }
+    };
+  });
 } 

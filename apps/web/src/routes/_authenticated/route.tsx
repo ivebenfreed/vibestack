@@ -16,100 +16,133 @@ import { EnhancedLoadingSkeleton } from '@/components/loading/enhanced-loading-s
 import { SystemReadyGuard } from '@/components/guards/SystemReadyGuard'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 
+// Global debouncer to prevent multiple auth checks during rapid preloading
+let lastAuthCheck: {
+  timestamp: number
+  result: 'authenticated' | 'unauthenticated'
+  executionId: string
+  url: string
+} | null = null
+
+// ⚡ PERFORMANCE: Moderate debounce time now that route loaders are removed
+const AUTH_DEBOUNCE_MS = 500 // Prevent duplicate auth checks within 500ms
+
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    // Pure XState auth protection - check global orchestrator
-    const orchestratorActor = (window as any).orchestratorActor
+    const now = Date.now()
+    const executionId = Math.random().toString(36).substr(2, 9)
+    const currentUrl = location.href
     
-    if (orchestratorActor) {
-      const snapshot = orchestratorActor.getSnapshot()
-      
-      // Debug: Log the actual orchestrator state to understand what's happening
-      console.log('[AuthenticatedRoute] Orchestrator state check:', {
-        hasUser: !!snapshot.context.user,
-        hasAuthToken: !!snapshot.context.authToken,
-        isSystemReady: snapshot.context.isSystemReady,
-        machineState: snapshot.value,
-        userEmail: snapshot.context.user?.email
-      })
-      
-      // If XState says we're authenticated, check system readiness
-      if (snapshot.context.user && snapshot.context.authToken) {
-        console.log('[AuthenticatedRoute] User authenticated - proceeding with route')
-        
-        // If system is ready, proceed immediately
-        if (snapshot.context.isSystemReady) {
-          console.log('[AuthenticatedRoute] System is ready - allowing route access')
-          return
-        }
-        
-        // If system is not ready, wait for it to become ready
-        console.log('[AuthenticatedRoute] System not ready - waiting for system readiness...')
-        
-        await new Promise<void>((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('System readiness timeout after 30 seconds'))
-          }, 30000)
-          
-          const unsubscribe = orchestratorActor.subscribe((state: any) => {
-            if (state.context.isSystemReady) {
-              console.log('[AuthenticatedRoute] System became ready - allowing route access')
-              clearTimeout(timeout)
-              unsubscribe.unsubscribe()
-              resolve()
-            }
-          })
-        })
-        return
-      }
-      
-      // If XState says we're clearly unauthenticated, redirect
-      if (snapshot.value === 'initializing.auth.unauthenticated') {
-        console.log('[AuthenticatedRoute] Orchestrator shows unauthenticated state - redirecting')
+    // Debug: Track debouncer state
+    console.log(`[AuthenticatedRoute] BeforeLoad execution ${executionId}:`, {
+      url: currentUrl,
+      timestamp: now,
+      lastCheck: lastAuthCheck ? {
+        timestamp: lastAuthCheck.timestamp,
+        timeDiff: now - lastAuthCheck.timestamp,
+        withinDebounce: (now - lastAuthCheck.timestamp) < AUTH_DEBOUNCE_MS,
+        executionId: lastAuthCheck.executionId,
+        sameUrl: lastAuthCheck.url === currentUrl
+      } : null
+    })
+    
+    // ⚡ PERFORMANCE: More aggressive debouncing - also check if same URL to skip redundant checks
+    if (lastAuthCheck && 
+        (now - lastAuthCheck.timestamp) < AUTH_DEBOUNCE_MS &&
+        lastAuthCheck.url === currentUrl) {
+      console.log(`[AuthenticatedRoute] DEBOUNCED execution ${executionId} - returning cached result (same URL)`)
+      // Return cached result silently (no logging during rapid preload calls)
+      if (lastAuthCheck.result === 'unauthenticated') {
         throw redirect({
           to: '/sign-in',
           search: { redirect: location.href },
           replace: true
         })
       }
-      
-      // If we get here, we're in an intermediate state - wait a moment for orchestrator to settle
-      console.log('[AuthenticatedRoute] Orchestrator in intermediate state - waiting for auth to settle...')
-      
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          console.log('[AuthenticatedRoute] Auth settlement timeout - redirecting to sign-in')
-          reject(new Error('Auth settlement timeout'))
-        }, 5000) // Shorter timeout for auth settlement
-        
-        const unsubscribe = orchestratorActor.subscribe((state: any) => {
-          // Once we have a clear auth state (either authenticated or unauthenticated)
-          if ((state.context.user && state.context.authToken) || 
-              state.value === 'initializing.auth.unauthenticated') {
-            clearTimeout(timeout)
-            unsubscribe.unsubscribe()
-            resolve()
-          }
-        })
-      })
-      
-      // Re-check after waiting
-      const newSnapshot = orchestratorActor.getSnapshot()
-      if (newSnapshot.context.user && newSnapshot.context.authToken) {
-        console.log('[AuthenticatedRoute] Auth settled - user authenticated')
-        return
-      } else {
-        console.log('[AuthenticatedRoute] Auth settled - user not authenticated')
-        throw redirect({
-          to: '/sign-in',
-          search: { redirect: location.href },
-          replace: true
-        })
-      }
+      return // authenticated - proceed silently
     }
     
-    // Fallback: if XState isn't ready yet, redirect to sign-in to be safe
-    console.log('[AuthenticatedRoute] No orchestrator actor found - redirecting to sign-in')
+    console.log(`[AuthenticatedRoute] EXECUTING auth check ${executionId}`)
+    
+    // XState-based auth guard - simple state checks only
+    const orchestratorActor = (window as any).orchestratorActor
+    
+    // Fallback: if XState isn't ready yet, redirect to sign-in
+    if (!orchestratorActor) {
+      console.log('[AuthenticatedRoute] No orchestrator actor found - redirecting to sign-in')
+      lastAuthCheck = { timestamp: now, result: 'unauthenticated', executionId, url: currentUrl }
+      throw redirect({
+        to: '/sign-in',
+        search: { redirect: location.href },
+        replace: true
+      })
+    }
+    
+    const snapshot = orchestratorActor.getSnapshot()
+    
+    // Debug: Log the actual orchestrator state (only for non-debounced checks)
+    console.log('[AuthenticatedRoute] Orchestrator state check:', {
+      hasUser: !!snapshot.context.user,
+      hasAuthToken: !!snapshot.context.authToken,
+      isSystemReady: snapshot.context.isSystemReady,
+      canLoadRoutes: snapshot.context.isSystemReady, // Use system ready as route loading flag
+      machineState: snapshot.value,
+      userEmail: snapshot.context.user?.email
+    })
+    
+    // Simple XState guards - no complex logic or subscriptions
+    
+    // If clearly unauthenticated, redirect immediately
+    if (snapshot.value === 'initializing.auth.unauthenticated') {
+      console.log('[AuthenticatedRoute] Unauthenticated state - redirecting')
+      lastAuthCheck = { timestamp: now, result: 'unauthenticated', executionId, url: currentUrl }
+      throw redirect({
+        to: '/sign-in',
+        search: { redirect: location.href },
+        replace: true
+      })
+    }
+    
+    // 🔥 CRITICAL FIX: Check both authentication AND system readiness
+    if (snapshot.context.user && snapshot.context.authToken) {
+      // User is authenticated, but check if system is ready for route loading
+      if (!snapshot.context.isSystemReady) {
+        console.log('[AuthenticatedRoute] User authenticated but system not ready - waiting for initialization...')
+        
+        // Return a promise that resolves when system becomes ready
+        return new Promise((resolve, reject) => {
+          const checkSystemReady = () => {
+            const currentSnapshot = orchestratorActor.getSnapshot()
+            if (currentSnapshot.context.isSystemReady) {
+              console.log('[AuthenticatedRoute] System ready - proceeding with route')
+              lastAuthCheck = { timestamp: Date.now(), result: 'authenticated', executionId, url: currentUrl }
+              resolve(undefined)
+            } else if (currentSnapshot.value === 'initializing.auth.unauthenticated') {
+              // User became unauthenticated while waiting
+              console.log('[AuthenticatedRoute] User became unauthenticated while waiting - redirecting')
+              reject(redirect({
+                to: '/sign-in',
+                search: { redirect: location.href },
+                replace: true
+              }))
+            } else {
+              // Still not ready, check again in a bit
+              setTimeout(checkSystemReady, 100)
+            }
+          }
+          
+          checkSystemReady()
+        })
+      }
+      
+      console.log('[AuthenticatedRoute] User authenticated and system ready - proceeding with route')
+      lastAuthCheck = { timestamp: now, result: 'authenticated', executionId, url: currentUrl }
+      return
+    }
+    
+    // For any intermediate/unknown states, redirect to sign-in to be safe
+    console.log('[AuthenticatedRoute] Intermediate/unknown state - redirecting to sign-in')
+    lastAuthCheck = { timestamp: now, result: 'unauthenticated', executionId, url: currentUrl }
     throw redirect({
       to: '/sign-in',
       search: { redirect: location.href },
@@ -133,26 +166,10 @@ function RouteComponent() {
 
 function AuthenticatedContent() {
   const { isSystemReady } = useSystemReadiness()
-  const activeSection = useLayoutStore.activeSection()
   const location = useLocation()
   
-  // Layout store route updates for sidebar functionality
-  useEffect(() => {
-    // Only run when system is ready to avoid unnecessary work
-    if (!isSystemReady) return
-    
-    const getExpectedSection = (pathname: string) => {
-      if (pathname.startsWith('/projects') || pathname === '/tasks') return 'projects'
-      if (pathname.startsWith('/settings') || pathname.startsWith('/help-center')) return 'settings'
-      if (pathname.startsWith('/debug') || pathname.startsWith('/sign-') || pathname.startsWith('/forgot-') || pathname.startsWith('/otp') || pathname.match(/^\/(401|403|404|500|503)$/)) return 'debug'
-      return 'home'
-    }
-    
-    const expectedSection = getExpectedSection(location.pathname)
-    if (activeSection !== expectedSection) {
-      useLayoutStore.updateSectionFromRoute(location.pathname)
-    }
-  }, [isSystemReady, location.pathname, activeSection])
+  // ⚡ PERFORMANCE: No layout store updates - using pure route-based highlighting
+  // The sidebar uses matchRoute for highlighting, which is much lighter than layout store updates
   
   console.log('[AuthenticatedLayout] ✅ Rendering layout with SystemReadyGuard')
   

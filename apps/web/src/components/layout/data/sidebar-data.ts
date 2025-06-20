@@ -342,6 +342,31 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             url: '/debug/tasks-new-pattern',
             icon: IconChecklist,
           },
+          {
+            title: 'VibeGrid Tasks',
+            url: '/debug/vibegrid-tasks',
+            icon: IconChecklist,
+          },
+          {
+            title: 'VibeGrid Native',
+            url: '/debug/vibegrid-native',
+            icon: IconChecklist,
+          },
+          {
+            title: 'VibeGrid Generated',
+            url: '/debug/vibegrid-generated',
+            icon: IconChecklist,
+          },
+          {
+            title: 'VibeGrid Registry',
+            url: '/debug/vibegrid-registry',
+            icon: IconChecklist,
+          },
+          {
+            title: 'VibeGridFinal Tasks',
+            url: '/debug/vibegridfinal-tasks',
+            icon: IconChecklist,
+          },
         ],
       },
       {

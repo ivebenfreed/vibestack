@@ -88,23 +88,46 @@ let initPromise: Promise<PGliteWorker> | null = null;
 // Store instances during HMR dispose
 if (import.meta.hot) {
   import.meta.hot.dispose(async (data) => {
-    console.log("🔥 [DB] HMR Dispose: Storing DB worker instances");
+    console.log("🔥 [DB] HMR Dispose: Cleaning up database connections");
     console.log("🔥 [DB] pgliteWorkerInstance exists:", !!pgliteWorkerInstance);
     console.log("🔥 [DB] workerInstance exists:", !!workerInstance);
     console.log("🔥 [DB] isInitializing:", isInitializing);
-    // We might not need to explicitly terminate if we're reusing,
-    // but ensure clean state if needed. Consider if termination is better.
-    // For now, just store the references.
-    data.pgliteWorkerInstance = pgliteWorkerInstance;
-    data.workerInstance = workerInstance;
-    data.isInitializing = isInitializing;
-    data.initPromise = initPromise;
+    
+    // 🔥 HMR FIX: Properly terminate worker to prevent IndexedDB conflicts
+    if (workerInstance) {
+      try {
+        console.log("🔥 [DB] HMR: Terminating worker instance...");
+        workerInstance.terminate();
+        console.log("🔥 [DB] HMR: Worker terminated successfully");
+      } catch (error) {
+        console.warn("🔥 [DB] HMR: Error terminating worker:", error);
+      }
+    }
+    
+    if (pgliteWorkerInstance) {
+      try {
+        console.log("🔥 [DB] HMR: Closing PGlite worker connection...");
+        // Close any open connections
+        if (typeof pgliteWorkerInstance.close === 'function') {
+          await pgliteWorkerInstance.close();
+        }
+        console.log("🔥 [DB] HMR: PGlite worker closed successfully");
+      } catch (error) {
+        console.warn("🔥 [DB] HMR: Error closing PGlite worker:", error);
+      }
+    }
+    
+    // Reset module state for clean restart
+    pgliteWorkerInstance = null;
+    workerInstance = null;
+    isInitializing = false;
+    initPromise = null;
+    
+    // Store cleanup timestamp
     data.timestamp = Date.now();
-    // Reset module state for next load if instances aren't reused
-    // pgliteWorkerInstance = null; 
-    // workerInstance = null;
-    // isInitializing = false;
-    // initPromise = null;
+    data.cleanedUp = true;
+    
+    console.log("🔥 [DB] HMR: Database cleanup completed");
   });
 
   // Accept hot updates for this module
@@ -137,17 +160,9 @@ export const db = pgliteWorkerInstance;
  * Initialize the database using PGliteWorker
  */
 export async function initializeDatabase(): Promise<PGliteWorker> {
-  // HMR Restore: Check if instances were preserved
-  if (import.meta.hot?.data.pgliteWorkerInstance) {
-    console.log("🔥 [DB] HMR Restore: Reusing existing DB worker instances");
-    console.log("🔥 [DB] Restored from timestamp:", import.meta.hot.data.timestamp);
-    pgliteWorkerInstance = import.meta.hot.data.pgliteWorkerInstance;
-    workerInstance = import.meta.hot.data.workerInstance;
-    isInitializing = false; // Ensure state is reset
-    initPromise = null;     // Ensure state is reset
-    // Optional: Verify connection is still alive (e.g., ping)
-    // try { await pgliteWorkerInstance.query('SELECT 1'); } catch { ... reinit? }
-    return pgliteWorkerInstance;
+  // 🔥 HMR CHANGE: No longer restore instances - always create fresh after cleanup
+  if (import.meta.hot?.data.cleanedUp) {
+    console.log("🔥 [DB] HMR: Previous instance was properly cleaned up, creating fresh instance");
   }
 
   if (pgliteWorkerInstance) {

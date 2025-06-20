@@ -9,22 +9,68 @@ interface UnifiedLoadingScreenProps {
 export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
   const orchestrator = useOrchestrator();
   const { canLoadRoutes, isSystemReady, readinessChecks, isLoading } = useSystemReadiness();
-  const shouldShow = !canLoadRoutes || isLoading;
+  const systemShouldShow = !canLoadRoutes || isLoading;
 
-  // Debug logging in development
-  if (import.meta.env.MODE === 'development') {
-    console.log('[UnifiedLoadingScreen] State check:', {
-      currentPhase: orchestrator.currentPhase,
-      canLoadRoutes,
-      isSystemReady,
-      isLoading,
-      shouldShow,
-      contextReady: orchestrator.context.isSystemReady,
-      isDatabaseReady: orchestrator.context.isDatabaseInitialized,
-      isSyncLive: orchestrator.context.isSyncLive,
-      liveChangesActive: orchestrator.context.liveChangesActive,
-    });
-  }
+  // Add 200ms delay before hiding the screen for smooth transition
+  const [shouldShow, setShouldShow] = React.useState(systemShouldShow);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    if (systemShouldShow) {
+      // System needs loading screen - show immediately
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      setShouldShow(true);
+    } else {
+      // System is ready - delay hiding by 200ms for smooth transition
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setShouldShow(false);
+        timeoutRef.current = null;
+      }, 400);
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [systemShouldShow]);
+
+  // Debug logging in development - only log when state actually changes
+  const prevStateRef = React.useRef<string>('');
+  React.useEffect(() => {
+    if (import.meta.env.MODE === 'development') {
+      const currentState = JSON.stringify({
+        currentPhase: orchestrator.currentPhase,
+        canLoadRoutes,
+        isSystemReady,
+        isLoading,
+        shouldShow
+      });
+      
+      // Only log if state actually changed
+      if (currentState !== prevStateRef.current) {
+        console.log('[UnifiedLoadingScreen] State changed:', {
+          currentPhase: orchestrator.currentPhase,
+          canLoadRoutes,
+          isSystemReady,
+          isLoading,
+          shouldShow,
+          contextReady: orchestrator.context.isSystemReady,
+          isDatabaseReady: orchestrator.context.isDatabaseInitialized,
+          isSyncLive: orchestrator.context.isSyncLive,
+          liveChangesActive: orchestrator.context.liveChangesActive,
+        });
+        prevStateRef.current = currentState;
+      }
+    }
+  }, [orchestrator.currentPhase, canLoadRoutes, isSystemReady, isLoading, shouldShow]);
 
   // Determine the current phase based on orchestrator state machine
   const getLoadingState = () => {

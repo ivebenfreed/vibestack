@@ -1,4 +1,4 @@
-import { HTMLAttributes, useState } from 'react'
+import { HTMLAttributes, useState, useEffect } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { authClient } from '@/lib/auth'
 import { useAuth } from '@/state-machines/orchestrator-hooks'
 import { Route } from '../../sign-in'
 
@@ -33,15 +32,8 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   
-  // Safe auth hook usage - handle when orchestrator isn't ready yet
-  let authHook;
-  try {
-    authHook = useAuth();
-  } catch (error) {
-    console.warn('[UserAuthForm] Orchestrator not ready, using fallback auth');
-    authHook = { signIn: () => {} }; // Fallback
-  }
-  const { signIn } = authHook;
+  // Use orchestrator auth hook
+  const { signIn, isAuthenticated, isSigningIn, authError } = useAuth();
   
   const routerState = useRouterState()
   const searchParams = routerState.location.search as { redirect?: string }
@@ -55,41 +47,51 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     },
   })
 
+  // Handle successful authentication with proper orchestrator coordination
+  useEffect(() => {
+    if (isAuthenticated && isLoading) {
+      console.log("[AUTH] Authentication successful via orchestrator, redirecting to:", redirectTo);
+      toast.success("Login successful!");
+      navigate({ to: redirectTo, replace: true });
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, isLoading, redirectTo, navigate]);
+
+  // Handle auth errors
+  useEffect(() => {
+    if (authError && isLoading) {
+      console.error("[AUTH] Authentication failed:", authError);
+      toast.error(authError);
+      setIsLoading(false);
+    }
+  }, [authError, isLoading]);
+
+  // Handle when signing in state changes
+  useEffect(() => {
+    if (!isSigningIn && isLoading && !isAuthenticated && !authError) {
+      // Sign-in completed but no success or error - possible unexpected state
+      console.warn("[AUTH] Sign-in completed but no clear result");
+      toast.error("Sign-in failed. Please try again.");
+      setIsLoading(false);
+    }
+  }, [isSigningIn, isLoading, isAuthenticated, authError]);
+
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      console.log("[AUTH] Attempting sign-in with:", data.email);
+      console.log("[AUTH] Attempting sign-in with orchestrator:", data.email);
       
-      // Use orchestrator sign-in if available
+      // Use ONLY the orchestrator sign-in - remove dual system
       signIn(data.email, data.password);
       
-      const result = await authClient.signIn.email({
-        email: data.email,
-        password: data.password,
-      });
-
-      console.log("[AUTH] Sign In Result:", result); 
-
-      if (result.data?.user) {
-        console.log("[AUTH] Sign-in successful, redirecting to:", redirectTo);
-        
-        toast.success("Login successful!");
-        
-        navigate({ to: redirectTo, replace: true });
-      } else if (result.error) {
-        console.error("[AUTH] Sign In Error:", result.error);
-        const errorMessage = result.error?.message || "Sign in failed. Please check credentials.";
-        toast.error(errorMessage);
-      } else {
-        console.error("[AUTH] Unexpected Sign In response structure:", result);
-        toast.error("An unexpected error occurred during login.");
-      }
+      // Don't manually navigate - let the useEffect handle it when isAuthenticated becomes true
+      // The orchestrator will update isAuthenticated state when sign-in is successful
+      
     } catch (error: any) {
-      console.error("[AUTH] Sign In Network/Fetch Error:", error);
+      console.error("[AUTH] Sign In Error:", error);
       const errorMessage = error?.message || "A network error occurred. Please try again.";
       toast.error(errorMessage);
-    } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -132,8 +134,8 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             </FormItem>
           )}
         />
-        <Button className='mt-2' disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Button className='mt-2' disabled={isLoading || isSigningIn}>
+          {(isLoading || isSigningIn) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Login
         </Button>
 

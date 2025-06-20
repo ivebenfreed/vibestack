@@ -373,12 +373,15 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         const context = this.getContext();
         const integrityManager = new IntegrityManager(context, this);
         
-        // Perform validation
+        // Perform validation with baseline validation support
         const result = await integrityManager.validateClientIntegrity({
           clientId: validationMessage.clientId || this.clientId,
           currentLSN: validationMessage.currentLSN,
           tableFingerprints: validationMessage.tableFingerprints,
-          timestamp: validationMessage.timestamp
+          timestamp: validationMessage.timestamp,
+          validationType: validationMessage.validationType,
+          baselineTimestamp: validationMessage.baselineTimestamp,
+          recordCount: validationMessage.recordCount
         });
         
         // Send response back to client

@@ -1,0 +1,211 @@
+---
+description: tanstack table horizontal scrolling 
+globs: 
+alwaysApply: false
+---
+/**
+ * VibeGrid CSS - Pure CSS Responsive Solution
+ * 
+ * 🎯 THE HOLY GRAIL: CSS max() function handles expand-vs-scroll automatically
+ * ✅ No JavaScript width calculations needed
+ * ✅ No ResizeObserver complexity
+ * ✅ No magic number hacks
+ * ✅ Works perfectly with your existing layout system
+ */
+
+/* ============================================================================
+   CRITICAL: Force Container Width Constraints - The Table Scrolling Solution
+   ============================================================================ */
+
+/* 
+   THE PROBLEM:
+   - Tables have extremely strong intrinsic sizing behavior
+   - When a table has fixed column widths (table-layout: fixed), it calculates
+     its natural width and forces ALL parent containers to expand to fit
+   - This breaks horizontal scrolling because containers grow instead of
+     allowing the table to overflow
+   - Normal CSS approaches (max-width: 100%, contain: layout, etc.) don't work
+     because table sizing behavior overrides them
+
+   THE SOLUTION: width: 0 + min-width: 100% trick
+   - width: 0 tells the browser "don't let my content affect parent sizing"
+   - min-width: 100% says "but fill my parent's available space"  
+   - This breaks the connection between table width and container width
+   - Containers are sized by their PARENT'S available space, not their content
+   - Works with any sidebar state because it adapts to actual available space
+*/
+
+.vibegrid-container {
+  /* 🎯 CRITICAL: width: 0 prevents content from affecting parent container sizing */
+  width: 0;
+  /* 📏 Fill parent's actual available space (adapts to sidebar state) */
+  min-width: 100%;
+  max-width: 100%;
+  
+  /* Use flexbox to control child sizing predictably */
+  display: flex;
+  flex-direction: column;
+  
+  /* Prevent any expansion beyond available layout space */
+  overflow: hidden;
+}
+
+/* Table container - the border/background wrapper */
+.vibegrid-container > div {
+  /* 🎯 INHERIT: Same sizing technique as parent */
+  width: 0;           /* Don't affect parent sizing */
+  min-width: 100%;    /* Fill parent's available space */
+  max-width: 100%;    /* Never exceed parent */
+  
+  /* Flex item that adapts to parent constraints */
+  flex-shrink: 1;
+  
+  /* Prevent overflow - let child handle scrolling */
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ============================================================================
+   Table Wrapper - The Horizontal Scrolling Container
+   ============================================================================ */
+
+.vibe-grid-table-wrapper {
+  /* 🎯 FINAL CONTAINER: Constrained to actual layout space, not table content */
+  width: 0;           /* Table width won't affect this container */
+  min-width: 100%;    /* Use all available space from parent */
+  max-width: 100%;    /* Never exceed available space */
+  
+  /* 📜 ENABLE SCROLLING: Now that container is properly constrained */
+  overflow-x: auto;
+  overflow-y: visible;
+  
+  /* Flex behavior */
+  flex-shrink: 1;     /* Can shrink if needed */
+  
+  /* Enhanced scrolling experience */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  
+  /* Allow cell editing overlays to extend beyond wrapper */
+  position: relative;
+  z-index: 1;
+  
+  /* Ensure proper box model */
+  box-sizing: border-box;
+}
+
+/* 
+   HOW IT WORKS:
+   1. Parent layout (sidebar + main area) determines available space
+   2. vibegrid-container: width: 0 + min-width: 100% = fills available space
+   3. Border wrapper: inherits constraints from parent
+   4. Scroll wrapper: constrained to available space, NOT table content
+   5. Table: 1308px width can now overflow the constrained wrapper
+   6. Result: Horizontal scrollbar appears!
+
+   RESPONSIVE BEHAVIOR:
+   - Sidebar collapsed (more space): containers expand, less scrolling needed
+   - Sidebar expanded (less space): containers shrink, more scrolling needed
+   - Works with any sidebar width without hardcoded values
+*/
+
+/* ============================================================================
+   Main Table - Calculated Width for Horizontal Scrolling
+   ============================================================================ */
+
+.vibe-grid-table {
+  /* 🎯 CRITICAL FIX: Calculate width from column sizes, allow overflow */
+  width: auto;
+  
+  /* Essential for fixed column widths */
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+/* When table has fixed column widths, ensure it sizes properly */
+.vibe-grid-table th,
+.vibe-grid-table td {
+  /* Let column widths be controlled by inline styles */
+  box-sizing: border-box;
+}
+
+/* Alternative approach for better browser support */
+@supports not (width: fit-content) {
+  .vibe-grid-table {
+    /* Fallback: Set specific width based on column sizes */
+    width: auto;
+  }
+}
+
+/* ============================================================================
+   Virtual Scrolling Containers
+   ============================================================================ */
+
+.vibe-grid-virtual-container {
+  /* Enable horizontal scrolling for virtual tables */
+  overflow-x: auto;
+  width: 100%;
+  
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vibe-grid-header-row {
+  /* Header row uses the same magic width calculation */
+  width: max(100%, min-content);
+  display: flex;
+  
+  /* Ensure header doesn't shrink */
+  flex-shrink: 0;
+}
+
+.vibe-grid-virtual-body {
+  /* Virtual body container */
+  position: relative;
+  
+  /* Each virtual row will use the same width calculation */
+  width: max(100%, min-content);
+}
+
+/* ============================================================================
+   Pure CSS max() Solution - No JavaScript needed
+   ============================================================================ */
+
+/* The max() function automatically handles all responsive behavior:
+ * - Expands to fill container when space is available
+ * - Enables horizontal scrolling when content exceeds container
+ * - No ResizeObserver, timeouts, or JavaScript measurements needed
+ */
+
+/* ============================================================================
+   Responsive Behavior Explanation
+   ============================================================================ */
+
+/*
+  How the max() function works:
+
+  1. When container is WIDER than table content:
+     - 100% (e.g., 2000px) > min-content (e.g., 1300px)
+     - max() resolves to 100% (2000px)
+     - Table expands to fill container
+     - No horizontal scrolling
+
+  2. When container is NARROWER than table content:
+     - 100% (e.g., 800px) < min-content (1300px)
+     - max() resolves to min-content (1300px)
+     - Table maintains its natural width
+     - overflow-x: auto activates horizontal scrolling
+
+  3. During sidebar transitions:
+     - CSS recalculates max() automatically on every frame
+     - No JavaScript coordination needed
+     - Smooth transitions without stepping effects
+     - No timing issues or magic number corrections
+
+  PROBLEM: If this isn't working, it means:
+  - The wrapper isn't constraining the table properly
+  - The table's min-content isn't being calculated correctly
+  - There are conflicting CSS rules
+  - Browser doesn't support max() with min-content properly
+*/

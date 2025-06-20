@@ -9,7 +9,7 @@ import {
 import AuthLayout from '../auth-layout'
 import { UserAuthForm } from './components/user-auth-form'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { useAuth } from '@/hooks/useSimpleAuth'
+import { useAuth } from '@/state-machines/orchestrator-hooks'
 import { useEffect } from 'react'
 
 export default function SignIn() {
@@ -17,10 +17,10 @@ export default function SignIn() {
   const navigate = useNavigate()
   const search = useSearch({ from: '/(auth)/sign-in' })
   
-  // Auto-redirect if already authenticated
+  // Auto-redirect if already authenticated (only using orchestrator state)
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('[SignIn] User already authenticated - auto-redirecting')
+      console.log('[SignIn] User already authenticated via orchestrator - auto-redirecting')
       const redirectTo = search.redirect || '/tasks' // Default to tasks page
       navigate({ 
         to: redirectTo as any,

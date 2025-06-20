@@ -40,9 +40,20 @@ import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_authenticated/debug/vibegridfinal-tasks'
+import { Route as AuthenticatedDebugVibegridTasksImport } from './routes/_authenticated/debug/vibegrid-tasks'
 
 // Create Virtual Routes
 
+const AuthenticatedDebugVibegridRegistryLazyImport = createFileRoute(
+  '/_authenticated/debug/vibegrid-registry',
+)()
+const AuthenticatedDebugVibegridNativeLazyImport = createFileRoute(
+  '/_authenticated/debug/vibegrid-native',
+)()
+const AuthenticatedDebugVibegridGeneratedLazyImport = createFileRoute(
+  '/_authenticated/debug/vibegrid-generated',
+)()
 const AuthenticatedDebugTypeormTestLazyImport = createFileRoute(
   '/_authenticated/debug/typeorm-test',
 )()
@@ -220,6 +231,39 @@ const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexImport.update({
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
+const AuthenticatedDebugVibegridRegistryLazyRoute =
+  AuthenticatedDebugVibegridRegistryLazyImport.update({
+    id: '/vibegrid-registry',
+    path: '/vibegrid-registry',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/vibegrid-registry.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugVibegridNativeLazyRoute =
+  AuthenticatedDebugVibegridNativeLazyImport.update({
+    id: '/vibegrid-native',
+    path: '/vibegrid-native',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/vibegrid-native.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedDebugVibegridGeneratedLazyRoute =
+  AuthenticatedDebugVibegridGeneratedLazyImport.update({
+    id: '/vibegrid-generated',
+    path: '/vibegrid-generated',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/vibegrid-generated.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
 const AuthenticatedDebugTypeormTestLazyRoute =
   AuthenticatedDebugTypeormTestLazyImport.update({
     id: '/typeorm-test',
@@ -380,6 +424,20 @@ const AuthenticatedProjectsProjectIdRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
+const AuthenticatedDebugVibegridfinalTasksRoute =
+  AuthenticatedDebugVibegridfinalTasksImport.update({
+    id: '/vibegridfinal-tasks',
+    path: '/vibegridfinal-tasks',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
+const AuthenticatedDebugVibegridTasksRoute =
+  AuthenticatedDebugVibegridTasksImport.update({
+    id: '/vibegrid-tasks',
+    path: '/vibegrid-tasks',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -481,6 +539,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/debug/vibegrid-tasks': {
+      id: '/_authenticated/debug/vibegrid-tasks'
+      path: '/vibegrid-tasks'
+      fullPath: '/debug/vibegrid-tasks'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridTasksImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/vibegridfinal-tasks': {
+      id: '/_authenticated/debug/vibegridfinal-tasks'
+      path: '/vibegridfinal-tasks'
+      fullPath: '/debug/vibegridfinal-tasks'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridfinalTasksImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/projects/$projectId': {
       id: '/_authenticated/projects/$projectId'
@@ -601,6 +673,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugTypeormTestLazyImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/vibegrid-generated': {
+      id: '/_authenticated/debug/vibegrid-generated'
+      path: '/vibegrid-generated'
+      fullPath: '/debug/vibegrid-generated'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridGeneratedLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/vibegrid-native': {
+      id: '/_authenticated/debug/vibegrid-native'
+      path: '/vibegrid-native'
+      fullPath: '/debug/vibegrid-native'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridNativeLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/vibegrid-registry': {
+      id: '/_authenticated/debug/vibegrid-registry'
+      path: '/vibegrid-registry'
+      fullPath: '/debug/vibegrid-registry'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridRegistryLazyImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
@@ -663,6 +756,8 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugVibegridTasksRoute: typeof AuthenticatedDebugVibegridTasksRoute
+  AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
   AuthenticatedDebugDataTableLazyRoute: typeof AuthenticatedDebugDataTableLazyRoute
   AuthenticatedDebugDataTableAtomLazyRoute: typeof AuthenticatedDebugDataTableAtomLazyRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
@@ -675,11 +770,17 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugSyncTestLazyRoute: typeof AuthenticatedDebugSyncTestLazyRoute
   AuthenticatedDebugTasksNewPatternLazyRoute: typeof AuthenticatedDebugTasksNewPatternLazyRoute
   AuthenticatedDebugTypeormTestLazyRoute: typeof AuthenticatedDebugTypeormTestLazyRoute
+  AuthenticatedDebugVibegridGeneratedLazyRoute: typeof AuthenticatedDebugVibegridGeneratedLazyRoute
+  AuthenticatedDebugVibegridNativeLazyRoute: typeof AuthenticatedDebugVibegridNativeLazyRoute
+  AuthenticatedDebugVibegridRegistryLazyRoute: typeof AuthenticatedDebugVibegridRegistryLazyRoute
   AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
 }
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
+    AuthenticatedDebugVibegridTasksRoute: AuthenticatedDebugVibegridTasksRoute,
+    AuthenticatedDebugVibegridfinalTasksRoute:
+      AuthenticatedDebugVibegridfinalTasksRoute,
     AuthenticatedDebugDataTableLazyRoute: AuthenticatedDebugDataTableLazyRoute,
     AuthenticatedDebugDataTableAtomLazyRoute:
       AuthenticatedDebugDataTableAtomLazyRoute,
@@ -698,6 +799,12 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugTasksNewPatternLazyRoute,
     AuthenticatedDebugTypeormTestLazyRoute:
       AuthenticatedDebugTypeormTestLazyRoute,
+    AuthenticatedDebugVibegridGeneratedLazyRoute:
+      AuthenticatedDebugVibegridGeneratedLazyRoute,
+    AuthenticatedDebugVibegridNativeLazyRoute:
+      AuthenticatedDebugVibegridNativeLazyRoute,
+    AuthenticatedDebugVibegridRegistryLazyRoute:
+      AuthenticatedDebugVibegridRegistryLazyRoute,
     AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
   }
 
@@ -773,6 +880,8 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/debug/vibegrid-tasks': typeof AuthenticatedDebugVibegridTasksRoute
+  '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -790,6 +899,9 @@ export interface FileRoutesByFullPath {
   '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
   '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
+  '/debug/vibegrid-generated': typeof AuthenticatedDebugVibegridGeneratedLazyRoute
+  '/debug/vibegrid-native': typeof AuthenticatedDebugVibegridNativeLazyRoute
+  '/debug/vibegrid-registry': typeof AuthenticatedDebugVibegridRegistryLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug/': typeof AuthenticatedDebugIndexRoute
@@ -812,6 +924,8 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/debug/vibegrid-tasks': typeof AuthenticatedDebugVibegridTasksRoute
+  '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -829,6 +943,9 @@ export interface FileRoutesByTo {
   '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
   '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
+  '/debug/vibegrid-generated': typeof AuthenticatedDebugVibegridGeneratedLazyRoute
+  '/debug/vibegrid-native': typeof AuthenticatedDebugVibegridNativeLazyRoute
+  '/debug/vibegrid-registry': typeof AuthenticatedDebugVibegridRegistryLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug': typeof AuthenticatedDebugIndexRoute
@@ -855,6 +972,8 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/debug/vibegrid-tasks': typeof AuthenticatedDebugVibegridTasksRoute
+  '/_authenticated/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -872,6 +991,9 @@ export interface FileRoutesById {
   '/_authenticated/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/_authenticated/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
   '/_authenticated/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
+  '/_authenticated/debug/vibegrid-generated': typeof AuthenticatedDebugVibegridGeneratedLazyRoute
+  '/_authenticated/debug/vibegrid-native': typeof AuthenticatedDebugVibegridNativeLazyRoute
+  '/_authenticated/debug/vibegrid-registry': typeof AuthenticatedDebugVibegridRegistryLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
@@ -899,6 +1021,8 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/debug/vibegrid-tasks'
+    | '/debug/vibegridfinal-tasks'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -916,6 +1040,9 @@ export interface FileRouteTypes {
     | '/debug/sync-test'
     | '/debug/tasks-new-pattern'
     | '/debug/typeorm-test'
+    | '/debug/vibegrid-generated'
+    | '/debug/vibegrid-native'
+    | '/debug/vibegrid-registry'
     | '/apps'
     | '/chats'
     | '/debug/'
@@ -937,6 +1064,8 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/debug/vibegrid-tasks'
+    | '/debug/vibegridfinal-tasks'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -954,6 +1083,9 @@ export interface FileRouteTypes {
     | '/debug/sync-test'
     | '/debug/tasks-new-pattern'
     | '/debug/typeorm-test'
+    | '/debug/vibegrid-generated'
+    | '/debug/vibegrid-native'
+    | '/debug/vibegrid-registry'
     | '/apps'
     | '/chats'
     | '/debug'
@@ -978,6 +1110,8 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
+    | '/_authenticated/debug/vibegrid-tasks'
+    | '/_authenticated/debug/vibegridfinal-tasks'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -995,6 +1129,9 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/sync-test'
     | '/_authenticated/debug/tasks-new-pattern'
     | '/_authenticated/debug/typeorm-test'
+    | '/_authenticated/debug/vibegrid-generated'
+    | '/_authenticated/debug/vibegrid-native'
+    | '/_authenticated/debug/vibegrid-registry'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/debug/'
@@ -1076,6 +1213,8 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/route.tsx",
       "parent": "/_authenticated",
       "children": [
+        "/_authenticated/debug/vibegrid-tasks",
+        "/_authenticated/debug/vibegridfinal-tasks",
         "/_authenticated/debug/data-table",
         "/_authenticated/debug/data-table-atom",
         "/_authenticated/debug/database",
@@ -1088,6 +1227,9 @@ export const routeTree = rootRoute
         "/_authenticated/debug/sync-test",
         "/_authenticated/debug/tasks-new-pattern",
         "/_authenticated/debug/typeorm-test",
+        "/_authenticated/debug/vibegrid-generated",
+        "/_authenticated/debug/vibegrid-native",
+        "/_authenticated/debug/vibegrid-registry",
         "/_authenticated/debug/"
       ]
     },
@@ -1135,6 +1277,14 @@ export const routeTree = rootRoute
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",
       "parent": "/_authenticated"
+    },
+    "/_authenticated/debug/vibegrid-tasks": {
+      "filePath": "_authenticated/debug/vibegrid-tasks.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegridfinal-tasks": {
+      "filePath": "_authenticated/debug/vibegridfinal-tasks.tsx",
+      "parent": "/_authenticated/debug"
     },
     "/_authenticated/projects/$projectId": {
       "filePath": "_authenticated/projects/$projectId.tsx",
@@ -1202,6 +1352,18 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/typeorm-test": {
       "filePath": "_authenticated/debug/typeorm-test.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegrid-generated": {
+      "filePath": "_authenticated/debug/vibegrid-generated.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegrid-native": {
+      "filePath": "_authenticated/debug/vibegrid-native.lazy.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegrid-registry": {
+      "filePath": "_authenticated/debug/vibegrid-registry.lazy.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/apps/": {

@@ -91,78 +91,46 @@ const loadPersistedOrchestratorState = () => {
 
 const saveOrchestratorState = async (snapshot: any) => {
   try {
-    // Only persist if we have a complete, valid snapshot
-    if (!snapshot || !snapshot.context || !snapshot.value) {
-      console.warn('[XSTATE] Skipping save - incomplete snapshot')
-      return
-    }
+    // Check if user is authenticated before persisting
+    const user = snapshot.context.user
+    const authToken = snapshot.context.authToken
+    const sessionExpiry = snapshot.context.sessionExpiry
     
-    const ctx = snapshot.context
-    
-    // Only persist meaningful states with complete context (only what we actually persist)
-    const hasValidContext = typeof ctx.syncClientId === 'string' &&
-                           ctx.syncState &&
-                           typeof ctx.syncState.currentLSN === 'string'
-    
-    if (!hasValidContext) {
-      console.warn('[XSTATE] Skipping save - incomplete context')
-      return
-    }
-    
-    // Only persist stable states (not transient loading states)
-    const isPersistableState = ctx.user || 
-                              snapshot.value === 'initializing.auth.unauthenticated' ||
-                              ctx.isDatabaseInitialized
-
-    if (isPersistableState) {
-      // Use session expiry from orchestrator context instead of making additional HTTP requests
-      // The orchestrator already captured this from the checkAuth actor
-      const sessionExpiry = ctx.sessionExpiry
-      
-      // Persist complete, validated state with session expiry
+    if (user && authToken) {
       const stateToPersist = {
-        value: 'initializing', // 🔥 ALWAYS START WITH INITIALIZATION - don't persist machine state
+        value: snapshot.value,
         context: {
-          // 🔥 PERSIST: Auth state (needed for route guards)
-          user: ctx.user || null,
-          authToken: ctx.authToken || null,
-          authError: ctx.authError || null,
-          sessionExpiry: ctx.sessionExpiry || null,
-          
-          // 🚫 DON'T PERSIST: System state flags (these should reset on each app start)
-          // isDatabaseInitialized: false, // Always reset
-          // isSystemReady: false, // Always reset  
-          // isOnline: navigator.onLine, // Always use current status
-          // isSyncLive: false, // Always reset
-          // liveChangesActive: false, // Always reset
-          
-          lastActivity: Date.now(), // Update to current time
-          
-          // 🔥 PERSIST: Sync client metadata (needed for continuity)
-          syncClientId: ctx.syncClientId,
-          syncPendingChangesCount: ctx.syncPendingChangesCount || 0,
-          syncLastSyncTime: ctx.syncLastSyncTime,
-          
-          // 🔥 PERSIST: Only the LSN from sync state (the critical piece for avoiding re-sync)
-          syncState: {
-            phase: null, // Reset - will be determined fresh
-            progress: 0, // Reset
-            currentLSN: ctx.syncState?.currentLSN || '0/0', // 🔥 PRESERVE LSN!
-            error: null, // Reset
-            machineState: 'idle', // Reset
-            phaseProgress: {
-              initial: { completedTables: 0, totalTables: 0, currentTable: null, tablesRemaining: [] },
-              catchup: { batchesProcessed: 0, changesProcessed: 0, estimatedRemaining: 0 },
-              live: { messagesProcessed: 0, lastActivity: null, throughputPerSec: 0 }
-            }
-          }
-        },
-        sessionExpiry, // Include session expiry for TTL management
+          user,
+          authToken,
+          sessionExpiry,
+          isDatabaseInitialized: snapshot.context.isDatabaseInitialized,
+          syncClientId: snapshot.context.syncClientId,
+          syncState: snapshot.context.syncState,
+          integrityBaseline: snapshot.context.integrityBaseline
+        }
       }
+      
+      // Get previous LSN to avoid logging redundant saves
+      const previousState = localStorage.getItem(ORCHESTRATOR_STORAGE_KEY);
+      let previousLSN = '0/0';
+      if (previousState) {
+        try {
+          const parsed = JSON.parse(previousState);
+          previousLSN = parsed.context?.syncState?.currentLSN || '0/0';
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
       localStorage.setItem(ORCHESTRATOR_STORAGE_KEY, JSON.stringify(stateToPersist))
       const ttlInfo = sessionExpiry ? `expires with session at ${sessionExpiry}` : 'no session expiry'
-      console.log(`[XSTATE] Persisted complete orchestrator state: ${stateToPersist.value} (${ttlInfo})`)
-      console.log(`[XSTATE] 💾 Persisted LSN: ${stateToPersist.context.syncState.currentLSN}, ClientID: ${stateToPersist.context.syncClientId}`)
+      
+      // Only log when state value changes or LSN actually changes
+      const currentLSN = stateToPersist.context.syncState.currentLSN;
+      if (previousLSN !== currentLSN || !previousState) {
+        console.log(`[XSTATE] Persisted complete orchestrator state: ${stateToPersist.value} (${ttlInfo})`)
+        console.log(`[XSTATE] 💾 Persisted LSN: ${currentLSN}, ClientID: ${stateToPersist.context.syncClientId}`)
+      }
     }
   } catch (error) {
     console.warn('[XSTATE] Failed to persist orchestrator state:', error)
@@ -173,6 +141,24 @@ const saveOrchestratorState = async (snapshot: any) => {
 const persistedSnapshot = loadPersistedOrchestratorState()
 
 console.log('[XSTATE] Creating orchestrator actor with persistence support...')
+
+// 🔥 HMR FIX: Clean up existing orchestrator before creating new one
+if (import.meta.hot && (window as any).orchestratorActor) {
+  console.log('[XSTATE] 🔥 HMR: Cleaning up existing orchestrator actor...')
+  const existingActor = (window as any).orchestratorActor
+  
+  try {
+    // Stop the existing actor and its child machines
+    existingActor.stop()
+    console.log('[XSTATE] 🔥 HMR: Existing orchestrator stopped')
+  } catch (error) {
+    console.warn('[XSTATE] 🔥 HMR: Error stopping existing orchestrator:', error)
+  }
+  
+  // Clear the global reference
+  (window as any).orchestratorActor = null
+}
+
 const orchestratorActor = createActor(orchestrator, {
   input: { snapshot: persistedSnapshot }
 })
@@ -187,6 +173,26 @@ orchestratorActor.subscribe((snapshot) => {
 
 // Make orchestrator globally accessible for auth guards
 ;(window as any).orchestratorActor = orchestratorActor
+
+// 🔥 HMR FIX: Add HMR disposal handler
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    console.log('[XSTATE] 🔥 HMR Dispose: Cleaning up orchestrator...')
+    
+    if ((window as any).orchestratorActor) {
+      try {
+        const actor = (window as any).orchestratorActor
+        actor.stop()
+        console.log('[XSTATE] 🔥 HMR: Orchestrator stopped for HMR')
+      } catch (error) {
+        console.warn('[XSTATE] 🔥 HMR: Error stopping orchestrator during dispose:', error)
+      }
+    }
+    
+    // Clear global reference
+    (window as any).orchestratorActor = null
+  })
+}
 
 // Clear persisted state on sign-out events
 window.addEventListener('auth:signout', () => {

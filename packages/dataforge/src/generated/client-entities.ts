@@ -430,6 +430,7 @@ export const TaskSchema = new EntitySchema<Task>({
         'status': {
             name: 'status', // Explicit DB Name
             type: 'enum', // Use helper
+            default: "open",
             enum: TaskStatus, // Use name from decorator
         },
         'priority': {

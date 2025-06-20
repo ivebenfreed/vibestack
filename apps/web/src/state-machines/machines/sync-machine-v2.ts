@@ -49,6 +49,24 @@ export const destroyGlobalSyncServices = () => {
   console.log('[SyncMachineV2] Global services destroyed');
 };
 
+// 🔥 HMR FIX: Clean up global services on HMR
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    console.log('[SyncMachineV2] 🔥 HMR: Cleaning up global sync services...');
+    destroyGlobalSyncServices();
+  });
+}
+
+// Function to access global OutgoingChangeService for domain functions
+export const getGlobalOutgoingChangeService = (): OutgoingChangeService | null => {
+  return globalServices?.outgoingChangeService || null;
+};
+
+// Function to access all global services for debugging
+export const getGlobalServices = () => {
+  return globalServices;
+};
+
 export interface SyncMachineContext {
   // Service registry key instead of direct service instances
   serviceRegistryKey: string | null;
@@ -67,6 +85,10 @@ export interface SyncMachineContext {
   lastError: any;
   reconnectAttempts: number;
   integrityRetryAttempts: number;
+  
+  // Connection management
+  shouldReconnectAfterDisconnect: boolean;
+  autoReconnectDisabled: boolean;
   
   // Stats (minimal - services handle their own detailed metrics)
   lastSyncTime: number | null;
@@ -149,11 +171,27 @@ export type SyncMachineEvent =
   | { type: 'INTEGRITY_VALIDATE'; reason?: string }
   | { type: 'INTEGRITY_VALIDATION_SUCCESS'; result: any }
   | { type: 'INTEGRITY_VALIDATION_ERROR'; error: Error; reason?: string }
+  | { type: 'INTEGRITY_VALIDATION_COMPLETED'; result: any }  // ✅ NEW: Event-driven response from service
+  | { type: 'INTEGRITY_VALIDATION_FAILED'; error: Error }   // ✅ NEW: Event-driven error from service
   | { type: 'INTEGRITY_RESET_REQUIRED'; reason: string }
   | { type: 'INTEGRITY_RESET_START'; reason: string; resetType?: 'full_reset' | 'table_reset' }
   | { type: 'INTEGRITY_RESET_COMPLETE'; result: any }
+  | { type: 'INTEGRITY_RESET_COMPLETED'; result: any }      // ✅ NEW: Event-driven response from service
   | { type: 'INTEGRITY_RESET_ERROR'; error: Error }
   | { type: 'RESET_INTEGRITY_BASELINE' }
+  
+  // ✅ MISSING: Server-initiated integrity events
+  | { type: 'SERVER_INTEGRITY_RESET_COMMAND'; command: any; reason: string }
+  | { type: 'SERVER_INTEGRITY_RESET_COMPLETED'; result: any; command: any }
+  
+  // ✅ MISSING: Validation progress/lifecycle events  
+  | { type: 'INTEGRITY_VALIDATION_STARTED'; reason: string }
+  | { type: 'INTEGRITY_RESET_STARTED'; reason: string; resetType: string }
+  
+  // ✅ NEW: Auto-reconnect control events from IntegrityService
+  | { type: 'DISABLE_AUTO_RECONNECT_FOR_RESET'; reason: string }
+  | { type: 'ENABLE_AUTO_RECONNECT_AFTER_RESET'; reason: string }
+  | { type: 'INTEGRITY_RESET_DISCONNECTION_COMPLETE'; timestamp: number }
   
   // Error events
   | { type: 'SERVICE_ERROR'; service: string; error: Error; context?: string }
@@ -327,11 +365,7 @@ export const syncMachineV2 = setup({
     }): Promise<{ changesSent: number }> => {
       console.log('[SyncMachineV2] Detecting and sending outgoing changes...');
       
-      // Set the message sender for the outgoing service
-      input.outgoingChangeService.setMessageSender({
-        send: (message) => input.webSocketService.send(message)
-      });
-      
+      // Message sender is already set up in setupServiceCallbacks
       const changesQueued = await input.outgoingChangeService.detectAndQueueChanges();
       
       if (changesQueued > 0) {
@@ -343,23 +377,7 @@ export const syncMachineV2 = setup({
       return { changesSent: changesQueued };
     }),
 
-    // Integrity validation actor
-    validateIntegrity: fromPromise(async ({ input }: {
-      input: { integrityService: IntegrityService; reason: string }
-    }) => {
-      console.log('[SyncMachineV2] Running integrity validation...');
-      const result = await input.integrityService.validateIntegrity(input.reason);
-      return result;
-    }),
-
-    // Integrity reset actor
-    executeIntegrityReset: fromPromise(async ({ input }: {
-      input: { integrityService: IntegrityService; reason: string; resetType: 'full_reset' | 'table_reset' }
-    }) => {
-      console.log('[SyncMachineV2] Executing integrity reset...');
-      const result = await input.integrityService.executeReset(input.reason, input.resetType);
-      return result;
-    })
+    // Removed complex invoke actors - using simple event-driven communication instead
   },
   
   guards: {
@@ -372,6 +390,13 @@ export const syncMachineV2 = setup({
     servicesReady: ({ context }) => {
       const services = getServices(context);
       return !!(services?.webSocketService && services?.incomingChangeService && services?.outgoingChangeService);
+    },
+    canAutoReconnect: ({ context }) => {
+      const canReconnect = !context.autoReconnectDisabled && context.reconnectAttempts < 5;
+      if (!canReconnect && context.autoReconnectDisabled) {
+        console.log('[SyncMachineV2] 🚫 Auto-reconnect disabled - not attempting reconnection');
+      }
+      return canReconnect;
     }
   },
   
@@ -415,27 +440,37 @@ export const syncMachineV2 = setup({
       
       console.log('[SyncMachineV2] Setting up service callbacks for actor:', self.id);
       
+      // 🔥 CRITICAL FIX: Clear any existing callbacks to prevent stale actor references
+      console.log('[SyncMachineV2] 🧹 Clearing any existing service callbacks...');
+      services.webSocketService.setCallbacks({});
+      services.incomingChangeService.setCallbacks({});
+      services.outgoingChangeService.setCallbacks({});
+      services.integrityService.setCallbacks({});
+      
       // 🔥 FIX: Add actor state checking to prevent sending to stopped actors
       const safeActorSend = (event: any) => {
         try {
           // More robust check - just try to send and catch if failed
           if (!self || typeof self.send !== 'function') {
-            // Silently ignore - this is normal during actor lifecycle
+            console.log(`[SyncMachineV2] 🚫 safeActorSend failed: self=${!!self}, send=${typeof self?.send}`);
             return false;
           }
           
           // Check if actor is stopped before sending
           try {
-            if (self.getSnapshot && self.getSnapshot().status === 'stopped') {
-              // Silently ignore - this is normal when actor is stopped
+            const snapshot = self.getSnapshot();
+            if (snapshot?.status === 'stopped') {
+              console.log(`[SyncMachineV2] 🚫 safeActorSend failed: actor stopped (status: ${snapshot.status})`);
               return false;
             }
+            console.log(`[SyncMachineV2] 🟢 Actor status: ${snapshot?.status}, state: ${snapshot?.value}`);
           } catch (snapshotError) {
-            // If we can't get snapshot, actor is probably stopped
+            console.log(`[SyncMachineV2] 🚫 safeActorSend failed: snapshot error:`, snapshotError);
             return false;
           }
           
           self.send(event);
+          console.log(`[SyncMachineV2] ✅ Successfully sent ${event.type}`);
           return true;
         } catch (error: any) {
           // Handle various stopped actor error patterns
@@ -447,7 +482,7 @@ export const syncMachineV2 = setup({
                                 error?.name === 'Error';
           
           if (isStoppedError) {
-            // Silently ignore stopped actor errors - this is normal during cleanup
+            console.log(`[SyncMachineV2] 🚫 safeActorSend failed: stopped actor error:`, errorMessage);
             return false;
           } else {
             console.warn(`[SyncMachineV2] Failed to send ${event.type}:`, error);
@@ -459,8 +494,15 @@ export const syncMachineV2 = setup({
       // WebSocket service callbacks
       services.webSocketService.setCallbacks({
         onMessage: (message: any) => {
-          console.log('[SyncMachineV2] WebSocket message received:', message.type);
-          safeActorSend({ type: 'WS_MESSAGE', message });
+          // Silent heartbeat processing - no logging for routine heartbeats
+          if (message.type === 'srv_heartbeat') {
+            const sendResult = safeActorSend({ type: 'WS_MESSAGE', message });
+            // Skip verbose logging for heartbeats
+          } else {
+            console.log('[SyncMachineV2] WebSocket message received:', message.type);
+            const sendResult = safeActorSend({ type: 'WS_MESSAGE', message });
+            console.log('[SyncMachineV2] 🎯 safeActorSend result:', sendResult);
+          }
         },
         onStatusChange: (status: any) => {
           console.log('[SyncMachineV2] WebSocket status change:', status);
@@ -540,23 +582,35 @@ export const syncMachineV2 = setup({
         }
       });
 
-      // Set up integrity service with WebSocket connection for server validation
-      // Create a simple adapter to make WebSocketService work with IntegrityManager
-      if (services.webSocketService && services.integrityService) {
-        const wsAdapter = {
-          send: (message: any) => services.webSocketService!.send(message),
-          isConnected: () => services.webSocketService!.isConnected(),
-          getStatus: () => services.webSocketService!.getStatus(),
-          on: () => {}, // Not used by IntegrityManager
-          off: () => {}, // Not used by IntegrityManager
-          setConnectionParams: () => {}, // Not used by IntegrityManager
-          setAutoReconnect: () => {}, // Not used by IntegrityManager
-          isOnline: () => navigator.onLine,
-          getClientId: () => context.clientId || ''
-        };
+      // Set up outgoing change service with WebSocket connection for immediate sending
+      if (services.webSocketService && services.outgoingChangeService) {
+        console.log('[SyncMachineV2] Setting up outgoing change service with WebSocket sender');
+        services.outgoingChangeService.setMessageSender({
+          send: (message: any) => services.webSocketService!.send(message)
+        });
+      }
+
+      // ✅ SIMPLE: Set up integrity service with machine reference for event-driven communication
+      if (services.integrityService) {
+        console.log('[SyncMachineV2] Setting up integrity service with machine reference');
+        services.integrityService.setMachineRef(self);
         
-        console.log('[SyncMachineV2] Setting up integrity service with WebSocket adapter');
-        services.integrityService.setMessageSender(wsAdapter as any);
+        // Still set up WebSocket for server validation
+        if (services.webSocketService) {
+          const wsAdapter = {
+            send: (message: any) => services.webSocketService!.send(message),
+            isConnected: () => services.webSocketService!.isConnected(),
+            getStatus: () => services.webSocketService!.getStatus(),
+            on: () => {}, // Not used by IntegrityService
+            off: () => {}, // Not used by IntegrityService
+            setConnectionParams: () => {}, // Not used by IntegrityService
+            setAutoReconnect: () => {}, // Not used by IntegrityService
+            isOnline: () => navigator.onLine,
+            getClientId: () => context.clientId || ''
+          };
+          
+          services.integrityService.setMessageSender(wsAdapter as any);
+        }
       }
     },
     
@@ -591,7 +645,10 @@ export const syncMachineV2 = setup({
     
     // Handle WebSocket messages by sending appropriate events instead of calling services directly
     handleWebSocketMessage: ({ context, event, self }) => {
-      console.log(`[SyncMachineV2] 🔍 handleWebSocketMessage called with event:`, event.type);
+      // Only log non-heartbeat messages to reduce noise
+      if (event.type === 'WS_MESSAGE' && event.message?.type !== 'srv_heartbeat') {
+        console.log(`[SyncMachineV2] 🔍 handleWebSocketMessage called with event:`, event.type);
+      }
       
       if (event.type !== 'WS_MESSAGE') {
         console.log(`[SyncMachineV2] ⚠️ Not a WS_MESSAGE event:`, event.type);
@@ -612,7 +669,10 @@ export const syncMachineV2 = setup({
       const message = event.message;
       const messageType = message.type || 'unknown';
       
-      console.log(`[SyncMachineV2] 📨 Handling message type: ${messageType}`);
+      // Only log non-heartbeat message types to reduce noise
+      if (messageType !== 'srv_heartbeat') {
+        console.log(`[SyncMachineV2] 📨 Handling message type: ${messageType}`);
+      }
       
       // 🔍 DEBUG: Check if this message should be routed to SyncMessageHandler
       if (messageType === 'srv_integrity_validation_response') {
@@ -637,43 +697,104 @@ export const syncMachineV2 = setup({
         }
       }
       
-            // Handle integrity validation responses - route to IntegrityService
+      // ✅ SIMPLE: Handle integrity validation responses - route to IntegrityService
       if (messageType === 'srv_integrity_validation_response') {
         console.log(`[SyncMachineV2] 🔍 Processing integrity validation response`);
-        console.log(`[SyncMachineV2] Services available:`, !!services);
-        console.log(`[SyncMachineV2] IntegrityService available:`, !!services?.integrityService);
         
         if (services?.integrityService) {
           console.log(`[SyncMachineV2] ✅ Routing integrity validation response to IntegrityService`);
           try {
-            services.integrityService.handleValidationResponse(message)
-              .then((result: any) => {
-                console.log('[SyncMachineV2] ✅ Integrity validation response processed successfully:', result);
-                self.send({ type: 'INTEGRITY_VALIDATION_SUCCESS', result });
-              })
-              .catch((error: any) => {
-                console.error('[SyncMachineV2] ❌ Error processing integrity validation response:', error);
-                self.send({ type: 'INTEGRITY_VALIDATION_ERROR', error, reason: 'response_processing_error' });
-              });
+            // Simple delegation to service - service will send events back to machine
+            services.integrityService.handleValidationResponse(message);
           } catch (error) {
             console.error('[SyncMachineV2] ❌ Error routing integrity validation response:', error);
-            self.send({ type: 'INTEGRITY_VALIDATION_ERROR', error: error instanceof Error ? error : new Error(String(error)), reason: 'routing_error' });
           }
         } else {
           console.error('[SyncMachineV2] ❌ IntegrityService not available for routing validation response');
         }
       }
       
-      // Handle acknowledgments for outgoing changes
-      if ((messageType === 'srv_changes_received' || messageType === 'srv_changes_applied') && 
-          services.outgoingChangeService) {
-        const changeIds = message.changeIds || message.appliedChanges || [];
-        console.log(`[SyncMachineV2] Acknowledging ${changeIds.length} outgoing changes`);
-        services.outgoingChangeService.acknowledgeChanges(changeIds, message)
-          .catch((error: any) => {
-            console.error('[SyncMachineV2] Error acknowledging changes:', error);
-            self.send({ type: 'SERVICE_ERROR', service: 'outgoing', error, context: 'acknowledge_changes' });
-          });
+      // ✅ MISSING: Handle server-initiated integrity reset commands
+      if (messageType === 'srv_integrity_reset') {
+        console.log(`[SyncMachineV2] 🚨 Received server-initiated integrity reset command`);
+        
+        // Route to IntegrityService for handling AND send event to machine
+        if (services?.integrityService) {
+          console.log(`[SyncMachineV2] ✅ Routing server reset command to IntegrityService`);
+          try {
+            services.integrityService.handleServerResetCommand(message);
+          } catch (error) {
+            console.error('[SyncMachineV2] ❌ Error routing server reset command:', error);
+          }
+        }
+        
+        self.send({ 
+          type: 'SERVER_INTEGRITY_RESET_COMMAND', 
+          command: message.resetCommand || message,
+          reason: message.reason || 'Server-initiated reset'
+        });
+      }
+      
+      // Handle server responses for outgoing changes using specific message handlers
+      // Only log non-heartbeat messages to reduce noise
+      if (messageType !== 'srv_heartbeat') {
+        console.log(`[SyncMachineV2] 🔍 Checking outgoing handlers for messageType: ${messageType}`);
+        console.log(`[SyncMachineV2] 🔍 OutgoingChangeService available:`, !!services.outgoingChangeService);
+      }
+      
+      if (services.outgoingChangeService) {
+        if (messageType === 'srv_changes_received') {
+          console.log(`[SyncMachineV2] 📥 Server acknowledged receipt of changes - calling handler`);
+          try {
+            services.outgoingChangeService.handleChangesReceived(message);
+          } catch (error: any) {
+            console.error('[SyncMachineV2] Error processing changes received message:', error);
+            self.send({ type: 'SERVICE_ERROR', service: 'outgoing', error, context: 'handle_changes_received' });
+          }
+        } else if (messageType === 'srv_changes_applied') {
+          console.log(`[SyncMachineV2] ✅ Server confirmed changes were applied - calling handler`);
+          services.outgoingChangeService.handleChangesApplied(message)
+            .catch((error: any) => {
+              console.error('[SyncMachineV2] Error processing changes applied message:', error);
+              self.send({ type: 'SERVICE_ERROR', service: 'outgoing', error, context: 'handle_changes_applied' });
+            });
+        } else if (messageType === 'srv_error' && message.context === 'outgoing_changes') {
+          console.log(`[SyncMachineV2] ❌ Server reported error for outgoing changes`);
+          try {
+            services.outgoingChangeService.handleServerError(message);
+          } catch (error: any) {
+            console.error('[SyncMachineV2] Error processing server error message:', error);
+            self.send({ type: 'SERVICE_ERROR', service: 'outgoing', error, context: 'handle_server_error' });
+          }
+        } else if (messageType !== 'srv_heartbeat' && 
+                   messageType !== 'srv_integrity_validation_response' && 
+                   messageType !== 'srv_integrity_reset' &&
+                   messageType !== 'srv_init_start' &&
+                   messageType !== 'srv_init_changes' &&
+                   messageType !== 'srv_init_complete' &&
+                   messageType !== 'srv_catchup_changes' &&
+                   messageType !== 'srv_catchup_completed' &&
+                   messageType !== 'srv_live_changes' &&
+                   messageType !== 'srv_live_start' &&
+                   messageType !== 'srv_lsn_update' &&
+                   messageType !== 'srv_sync_completed') {
+          // Only log unhandled messages that aren't heartbeats, handled by other services, or incoming sync messages
+          console.log(`[SyncMachineV2] 🤷 Unhandled messageType for outgoing service: ${messageType}`);
+        }
+      } else if (messageType !== 'srv_heartbeat' && 
+                 messageType !== 'srv_integrity_validation_response' && 
+                 messageType !== 'srv_integrity_reset' &&
+                 messageType !== 'srv_init_start' &&
+                 messageType !== 'srv_init_changes' &&
+                 messageType !== 'srv_init_complete' &&
+                 messageType !== 'srv_catchup_changes' &&
+                 messageType !== 'srv_catchup_completed' &&
+                 messageType !== 'srv_live_changes' &&
+                 messageType !== 'srv_live_start' &&
+                 messageType !== 'srv_lsn_update' &&
+                 messageType !== 'srv_sync_completed') {
+        // Only log missing service errors for non-heartbeat messages, messages handled by other services, and incoming sync messages
+        console.error(`[SyncMachineV2] ❌ OutgoingChangeService not available for message: ${messageType}`);
       }
       
       // Update LSN from server messages that contain LSN information
@@ -694,6 +815,13 @@ export const syncMachineV2 = setup({
         lsnToUpdate = message.lsn;
       } else if (messageType === 'srv_heartbeat' && message.serverLSN) {
         lsnToUpdate = message.serverLSN;
+        // Only log heartbeats with LSN drift (important for debugging)
+        if (message.serverLSN !== context.currentLSN) {
+          console.log(`[SyncMachineV2] 💓 Heartbeat LSN drift - Server: ${message.serverLSN}, Client: ${context.currentLSN}`);
+        }
+      } else if (messageType === 'srv_heartbeat') {
+        // Silent heartbeat - no action needed for routine heartbeats
+        // FIXED: Removed recursive self.send that was causing infinite loops
       } else if (messageType === 'srv_sync_completed' && message.serverLSN) {
         lsnToUpdate = message.serverLSN;
       }
@@ -763,21 +891,21 @@ export const syncMachineV2 = setup({
           
           // Send acknowledgment for the completion message
           ackMessage = {
-            type: 'clt_init_complete_ack',
+            type: 'clt_init_processed',
             messageId: `init_complete_ack_${Date.now()}`,
             timestamp: Date.now(),
             clientId: context.clientId,
             serverLSN: message.serverLSN || context.currentLSN
           };
-        } else if (messageType === 'srv_catchup_complete') {
-          console.log('[SyncMachineV2] Catchup sync complete message received');
+        } else if (messageType === 'srv_catchup_completed') {
+          console.log('[SyncMachineV2] Catchup sync completed message received');
           
           // Send the CATCHUP_SYNC_COMPLETE event to trigger state transition
           self.send({ type: 'CATCHUP_SYNC_COMPLETE' });
           
           // Send acknowledgment for the completion message
           ackMessage = {
-            type: 'clt_catchup_complete_ack',
+            type: 'clt_catchup_received',
             messageId: `catchup_complete_ack_${Date.now()}`,
             timestamp: Date.now(),
             clientId: context.clientId,
@@ -852,12 +980,55 @@ export const syncMachineV2 = setup({
     
          updateStats: assign(({ context, event }) => {
        const updates: Partial<SyncMachineContext> = {};
+       
        if (event.type === 'WS_MESSAGE') {
+         const messageType = event.message?.type || 'unknown';
+         
+         // Skip state updates for routine heartbeats (no meaningful changes)
+         if (messageType === 'srv_heartbeat' && !event.message?.serverLSN) {
+           // Routine heartbeat with no LSN - no state update needed
+           return {};
+         }
+         
          updates.messagesProcessed = context.messagesProcessed + 1;
+         
+         // Silent heartbeat processing - only log every 10,000th heartbeat to reduce noise
+         if (messageType === 'srv_heartbeat') {
+           const heartbeatCount = context.messagesProcessed + 1;
+           if (heartbeatCount % 10000 === 0) {
+             console.log(`[SyncMachineV2] 💓 Heartbeat milestone: ${heartbeatCount} processed`);
+           }
+         }
+         
+         // Update live sync activity
+         if (context.syncPhase === 'live') {
+           updates.phaseProgress = {
+             ...context.phaseProgress,
+             live: {
+               ...context.phaseProgress.live,
+               messagesProcessed: context.messagesProcessed + 1,
+               lastActivity: Date.now(),
+               throughputPerSec: 0 // Calculate if needed
+             }
+           };
+         }
        }
+       
        if (event.type === 'INCOMING_CHANGES_PROCESSED' || event.type === 'LSN_UPDATE') {
          updates.lastSyncTime = Date.now();
        }
+       
+       // Log outgoing activity
+       if (event.type === 'OUTGOING_CHANGES_QUEUED') {
+         console.log(`[SyncMachineV2] 📤 Outgoing changes queued: ${event.count || 'unknown'}`);
+       }
+       if (event.type === 'OUTGOING_CHANGES_SENT') {
+         console.log(`[SyncMachineV2] 📤 Outgoing changes sent: ${event.count || 'unknown'}, messageId: ${event.messageId || 'unknown'}`);
+       }
+       if (event.type === 'OUTGOING_CHANGES_ACKNOWLEDGED') {
+         console.log(`[SyncMachineV2] ✅ Outgoing changes acknowledged: ${event.changeIds?.length || 'unknown'} changes`);
+       }
+       
        return updates;
      }),
     
@@ -889,10 +1060,98 @@ export const syncMachineV2 = setup({
     },
     
     logActorStop: () => {
-      console.log('[SyncMachineV2] 🛑 Actor stopping - cleaning up callbacks');
+      console.log('[SyncMachineV2] 🛑 Actor stopping - machine will be inactive');
     },
     
-    logEvent: log(({ event }) => `[SyncMachineV2] Event: ${event.type}`)
+    // 🔥 NEW: Detailed lifecycle logging for debugging
+    logStateEntry: ({ context }) => ({ state }: { state: string }) => {
+      console.log(`[SyncMachineV2] ➡️ ENTERING state: ${state}`, {
+        phase: context.syncPhase,
+        lsn: context.currentLSN,
+        servicesActive: context.serviceRegistryKey ? 'yes' : 'no',
+        error: context.error || 'none'
+      });
+    },
+    
+    logStateExit: ({ context }) => ({ state }: { state: string }) => {
+      console.log(`[SyncMachineV2] ⬅️ EXITING state: ${state}`, {
+        phase: context.syncPhase,
+        lsn: context.currentLSN,
+        nextReason: 'transition pending'
+      });
+    },
+    
+    // 🔥 NEW: Log when actor receives events
+    logEventReceived: ({ event }) => {
+      if (event.type !== 'WS_MESSAGE') {
+        console.log(`[SyncMachineV2] 📨 Event received: ${event.type}`, {
+          timestamp: Date.now(),
+          eventData: event.type === 'LSN_UPDATE' ? { lsn: event.lsn } : 'other'
+        });
+      }
+    },
+    
+    // 🔥 NEW: Log actor lifecycle events
+    logActorLifecycle: () => {
+      console.log('[SyncMachineV2] 🔍 Actor lifecycle checkpoint:', {
+        timestamp: Date.now(),
+        status: 'active',
+        checkpoint: 'lifecycle_log'
+      });
+    },
+    
+    logEvent: log(({ event }) => `[SyncMachineV2] Event: ${event.type}`),
+    
+    // ✅ SIMPLE: Event-driven integrity actions
+    requestIntegrityValidation: ({ context, event }) => {
+      const services = getServices(context);
+      if (services?.integrityService) {
+        const reason = event.type === 'INTEGRITY_VALIDATE' ? (event as any).reason || 'routine_check' : 'unknown';
+        console.log(`[SyncMachineV2] 📤 Requesting integrity validation: ${reason}`);
+        
+        // Simple command to service - service will send events back
+        services.integrityService.startValidation({
+          reason,
+          clientId: context.clientId!,
+          currentLSN: context.currentLSN
+        });
+      } else {
+        console.error('[SyncMachineV2] ❌ IntegrityService not available for validation request');
+      }
+    },
+    
+    requestIntegrityReset: ({ context, event }) => {
+      const services = getServices(context);
+      if (services?.integrityService) {
+        const reason = event.type === 'INTEGRITY_RESET_START' ? (event as any).reason : 'Integrity issues detected';
+        const resetType = event.type === 'INTEGRITY_RESET_START' ? (event as any).resetType || 'full_reset' : 'full_reset';
+        console.log(`[SyncMachineV2] 📤 Requesting integrity reset: ${reason} (${resetType})`);
+        
+        // Simple command to service - service will send events back
+        services.integrityService.startReset({
+          reason,
+          resetType,
+          clientId: context.clientId!
+        });
+      } else {
+        console.error('[SyncMachineV2] ❌ IntegrityService not available for reset request');
+      }
+    },
+    
+    // ✅ NEW: Auto-reconnect control actions
+    disableAutoReconnect: assign(({ event }) => {
+      console.log(`[SyncMachineV2] 🚫 Disabling auto-reconnect: ${(event as any).reason}`);
+      return { autoReconnectDisabled: true };
+    }),
+    
+    enableAutoReconnect: assign(({ event }) => {
+      console.log(`[SyncMachineV2] ✅ Enabling auto-reconnect: ${(event as any).reason}`);
+      return { autoReconnectDisabled: false };
+    }),
+    
+    logDisconnectionComplete: ({ event }) => {
+      console.log(`[SyncMachineV2] 🔌 Integrity reset disconnection completed at ${new Date((event as any).timestamp).toISOString()}`);
+    }
   }
 }).createMachine({
   id: 'syncV2',
@@ -901,6 +1160,25 @@ export const syncMachineV2 = setup({
   // 🔥 NEW: Add entry/exit logging for the entire machine
   entry: ['logActorStart'],
   exit: ['logActorStop'],
+  
+  // 🔥 NEW: Global event handlers for debugging and auto-reconnect control
+  on: {
+    '*': {
+      actions: [
+        'logEventReceived',
+        'logActorLifecycle'
+      ]
+    },
+    DISABLE_AUTO_RECONNECT_FOR_RESET: {
+      actions: ['disableAutoReconnect']
+    },
+    ENABLE_AUTO_RECONNECT_AFTER_RESET: {
+      actions: ['enableAutoReconnect']
+    },
+    INTEGRITY_RESET_DISCONNECTION_COMPLETE: {
+      actions: ['logDisconnectionComplete']
+    }
+  },
   
   context: {
     serviceRegistryKey: null,
@@ -913,6 +1191,8 @@ export const syncMachineV2 = setup({
     lastError: null,
     reconnectAttempts: 0,
     integrityRetryAttempts: 0,
+    shouldReconnectAfterDisconnect: false,
+    autoReconnectDisabled: false,
     lastSyncTime: null,
     messagesProcessed: 0,
     phaseProgress: {
@@ -937,8 +1217,20 @@ export const syncMachineV2 = setup({
   
   states: {
     idle: {
-      entry: () => console.log('[SyncMachineV2] 💤 Entered idle state'),
-      exit: () => console.log('[SyncMachineV2] 🔄 Exiting idle state'),
+      entry: [
+        () => console.log('[SyncMachineV2] 💤 Entered idle state'),
+        ({ context }) => console.log('[SyncMachineV2] 🔍 Idle state context:', {
+          phase: context.syncPhase,
+          lsn: context.currentLSN,
+          serviceKey: context.serviceRegistryKey,
+          error: context.error
+        }),
+        'logActorLifecycle'
+      ],
+      exit: [
+        () => console.log('[SyncMachineV2] 🔄 Exiting idle state'),
+        'logActorLifecycle'
+      ],
       on: {
         CONNECT: {
           target: 'initializing',
@@ -948,8 +1240,14 @@ export const syncMachineV2 = setup({
     },
     
     initializing: {
-      entry: () => console.log('[SyncMachineV2] 🔧 Entered initializing state'),
-      exit: () => console.log('[SyncMachineV2] 🔄 Exiting initializing state'),
+      entry: [
+        () => console.log('[SyncMachineV2] 🔧 Entered initializing state'),
+        'logActorLifecycle'
+      ],
+      exit: [
+        () => console.log('[SyncMachineV2] 🔄 Exiting initializing state'),
+        'logActorLifecycle'
+      ],
       invoke: {
         id: 'initializeServices',
         src: 'initializeServices',
@@ -1145,42 +1443,153 @@ export const syncMachineV2 = setup({
     },
     
     live_sync: {
-      entry: () => console.log('[SyncMachineV2] 🟢 Entered live_sync state'),
-      exit: () => console.log('[SyncMachineV2] 🔄 Exiting live_sync state'),
+      entry: [
+        () => console.log('[SyncMachineV2] 🟢 Entered live_sync state'),
+        ({ context }) => {
+          // Log operational status when entering live sync
+          console.log('[SyncMachineV2] 📊 Live sync operational status:', {
+            phase: context.syncPhase,
+            lsn: context.currentLSN,
+            messagesProcessed: context.messagesProcessed,
+            lastSyncTime: context.lastSyncTime ? new Date(context.lastSyncTime).toISOString() : 'none',
+            serviceKey: context.serviceRegistryKey ? 'active' : 'none'
+          });
+        }
+      ],
+      exit: [
+        () => console.log('[SyncMachineV2] 🔄 Exiting live_sync state'),
+        ({ context, event }) => {
+          console.log('[SyncMachineV2] 🚨 CRITICAL: Live sync state exiting!', {
+            triggerEvent: event.type,
+            currentPhase: context.syncPhase,
+            currentLSN: context.currentLSN,
+            error: context.error,
+            servicesActive: context.serviceRegistryKey ? 'yes' : 'no',
+            timestamp: Date.now()
+          });
+        },
+        'logActorLifecycle'
+      ],
+      
+      // 🔄 ADD: Periodic status reporting every 60 seconds
+      after: {
+        60000: {
+          target: 'live_sync', // Stay in same state
+          actions: [
+            ({ context }) => {
+              const uptime = context.lastSyncTime ? Date.now() - context.lastSyncTime : 0;
+              const services = getServices(context);
+              console.log('[SyncMachineV2] 📊 Periodic operational status:', {
+                state: 'live_sync',
+                phase: context.syncPhase,
+                lsn: context.currentLSN,
+                messagesProcessed: context.messagesProcessed,
+                uptimeMinutes: Math.floor(uptime / 60000),
+                servicesHealthy: !!(services?.webSocketService && services?.outgoingChangeService),
+                reconnectAttempts: context.reconnectAttempts,
+                lastError: context.error || 'none'
+              });
+            }
+          ]
+        }
+      },
       
       on: {
         WS_MESSAGE: {
-          actions: ['handleWebSocketMessage', 'updateStats']
+          actions: [
+            ({ event, context }) => {
+              // Only log non-heartbeat WS_MESSAGE processing to reduce noise
+              const messageType = event.message?.type || 'unknown';
+              if (messageType !== 'srv_heartbeat') {
+                console.log('[SyncMachineV2] 🔄 Processing WS_MESSAGE in live_sync:', {
+                  messageType,
+                  currentState: 'live_sync',
+                  timestamp: Date.now(),
+                  actorStatus: 'processing'
+                });
+              }
+            },
+            'handleWebSocketMessage', 
+            'updateStats'
+          ]
         },
         INCOMING_CHANGES: {
-          actions: 'processIncomingChanges'
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 📥 Processing INCOMING_CHANGES in live_sync:', event.changes?.length || 0),
+            'processIncomingChanges'
+          ]
         },
         INCOMING_CHANGES_PROCESSED: {
-          actions: ['updateStats']
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] ✅ INCOMING_CHANGES_PROCESSED in live_sync'),
+            'updateStats'
+          ]
         },
         INCOMING_CHANGES_ERROR: {
-          actions: 'recordError'
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] ❌ INCOMING_CHANGES_ERROR in live_sync:', event.error),
+            'recordError'
+          ]
         },
         OUTGOING_CHANGES_QUEUED: {
-          actions: 'updateStats'
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 📤 OUTGOING_CHANGES_QUEUED in live_sync:', event.count),
+            'updateStats'
+          ]
         },
         OUTGOING_CHANGES_SENT: {
-          actions: 'updateStats'
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 🚀 OUTGOING_CHANGES_SENT in live_sync:', event.count),
+            'updateStats'
+          ]
         },
         OUTGOING_CHANGES_ACKNOWLEDGED: {
-          actions: 'updateStats'
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] ✅ OUTGOING_CHANGES_ACKNOWLEDGED in live_sync:', event.changeIds?.length),
+            'updateStats'
+          ]
         },
         LSN_UPDATE: {
-          actions: ['updateLSN']
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 📍 LSN_UPDATE in live_sync:', { from: 'unknown', to: event.lsn }),
+            'updateLSN'
+          ]
         },
         // Integrity validation events
         INTEGRITY_VALIDATE: {
           target: 'validating_integrity',
-          actions: ['logState']
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 🔍 INTEGRITY_VALIDATE - transitioning to validating_integrity:', (event as any).reason),
+            'logState'
+          ]
         },
         INTEGRITY_RESET_REQUIRED: {
           target: 'resetting_integrity',
           actions: ['logState']
+        },
+        // ✅ CRITICAL: Handle orchestrator-initiated integrity reset
+        INTEGRITY_RESET_START: {
+          target: 'resetting_integrity',
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 🚨 INTEGRITY_RESET_START - transitioning to resetting_integrity:', (event as any).reason),
+            'logState'
+          ]
+        },
+        
+        // ✅ MISSING: Handle server-initiated reset commands
+        SERVER_INTEGRITY_RESET_COMMAND: {
+          target: 'resetting_integrity',
+          actions: [
+            ({ event }) => {
+              console.warn('[SyncMachineV2] 🚨 Server-initiated integrity reset:', (event as any).command);
+              // Store command details for reset execution
+            },
+            ({ event }) => sendParent({ 
+              type: 'SERVER_INTEGRITY_RESET_REQUIRED', 
+              command: (event as any).command, 
+              reason: (event as any).reason 
+            })
+          ]
         },
 
         WS_DISCONNECTED: {
@@ -1195,27 +1604,112 @@ export const syncMachineV2 = setup({
     },
 
     validating_integrity: {
-      entry: () => console.log('[SyncMachineV2] 🔍 Entered validating_integrity state'),
+      entry: [
+        () => console.log('[SyncMachineV2] 🔍 Entered validating_integrity state'),
+        'requestIntegrityValidation'  // ✅ Simple action call
+      ],
       exit: () => console.log('[SyncMachineV2] 🔄 Exiting validating_integrity state'),
       
       on: {
         WS_MESSAGE: {
           actions: ['handleWebSocketMessage', 'updateStats']
         },
-        INTEGRITY_VALIDATION_SUCCESS: {
-          target: 'live_sync',
+        
+        // ✅ MISSING: Handle validation started event
+        INTEGRITY_VALIDATION_STARTED: {
           actions: [
-            ({ event }) => {
-              console.log('[SyncMachineV2] ✅ Integrity validation successful:', event.result);
-            },
-            sendParent({ type: 'INTEGRITY_VALIDATION_SUCCESS' }),
-            'logState'
+            ({ event }) => console.log('[SyncMachineV2] 🚀 Integrity validation started:', (event as any).reason)
           ]
         },
-        INTEGRITY_VALIDATION_ERROR: {
-          target: 'error',
-          actions: ['recordError', 'logState']
+        
+        // ✅ SIMPLE: Event-driven responses from service
+        INTEGRITY_VALIDATION_COMPLETED: [
+          {
+            target: 'resetting_integrity',
+            guard: ({ event }) => !event.result.isValid && event.result.recommendedAction === 'reset',
+            actions: [
+              ({ event }) => {
+                console.error('[SyncMachineV2] 🚨 Integrity validation failed - triggering reset:', event.result);
+                if (event.result.issues && event.result.issues.length > 0) {
+                  console.error('[SyncMachineV2] 🚨 Integrity issues that triggered reset:');
+                  event.result.issues.forEach((issue: any, index: number) => {
+                    console.error(`[SyncMachineV2] Reset Issue ${index + 1}:`, issue);
+                  });
+                }
+              },
+              sendParent({ type: 'INTEGRITY_RESET_REQUIRED', reason: 'Integrity validation failed' })
+            ]
+          },
+          {
+            target: 'validating_integrity',
+            guard: ({ event }) => !event.result.isValid && event.result.recommendedAction === 'retry',
+            actions: [
+              ({ event }) => {
+                console.warn('[SyncMachineV2] ⚠️ Integrity validation failed - retrying:', event.result);
+                if (event.result.issues && event.result.issues.length > 0) {
+                  console.warn('[SyncMachineV2] ⚠️ Integrity issues that triggered retry:');
+                  event.result.issues.forEach((issue: any, index: number) => {
+                    console.warn(`[SyncMachineV2] Retry Issue ${index + 1}:`, issue);
+                  });
+                }
+              },
+              'requestIntegrityValidation'  // Retry validation
+            ]
+          },
+          {
+            target: 'resetting_integrity',
+            guard: ({ event }) => !event.result.isValid && event.result.recommendedAction === 'none',
+            actions: [
+              ({ event }) => {
+                console.error('[SyncMachineV2] 🚨 CRITICAL: Integrity validation failed with no recommended action - forcing reset:', event.result);
+                console.error('[SyncMachineV2] 🚨 This indicates a serious integrity issue that requires manual intervention');
+                if (event.result.issues && event.result.issues.length > 0) {
+                  console.error('[SyncMachineV2] 🚨 Critical integrity issues found:');
+                  event.result.issues.forEach((issue: any, index: number) => {
+                    console.error(`[SyncMachineV2] Critical Issue ${index + 1}:`, issue);
+                  });
+                }
+              },
+              sendParent({ type: 'INTEGRITY_RESET_REQUIRED', reason: 'Critical integrity issues found with no clear resolution path' })
+            ]
+          },
+          {
+            target: 'live_sync',
+            guard: ({ event }) => event.result.isValid === true,
+            actions: [
+              ({ event }) => {
+                console.log('[SyncMachineV2] ✅ Integrity validation passed:', event.result);
+                if (event.result.issues && event.result.issues.length > 0) {
+                  console.log('[SyncMachineV2] ℹ️ Non-critical issues found but validation passed:');
+                  event.result.issues.forEach((issue: any, index: number) => {
+                    console.log(`[SyncMachineV2] Info Issue ${index + 1}:`, issue);
+                  });
+                }
+              },
+              sendParent({ type: 'INTEGRITY_VALIDATION_SUCCESS' })
+            ]
+          },
+          {
+            // Fallback case for completely unknown validation results - trigger reset for safety
+            target: 'resetting_integrity',
+            actions: [
+              ({ event }) => {
+                console.error('[SyncMachineV2] 🚨 UNKNOWN integrity validation result - forcing reset for safety:', event.result);
+                console.error('[SyncMachineV2] 🚨 This may indicate a bug in the validation logic');
+              },
+              sendParent({ type: 'INTEGRITY_RESET_REQUIRED', reason: 'Unknown integrity validation result - safety reset' })
+            ]
+          }
+        ],
+        
+        INTEGRITY_VALIDATION_FAILED: {
+          target: 'live_sync',
+          actions: [
+            ({ event }) => console.error('[SyncMachineV2] Integrity validation error:', event.error),
+            'recordError'
+          ]
         },
+        
         WS_DISCONNECTED: {
           target: 'reconnecting',
           actions: ['logState']
@@ -1237,120 +1731,86 @@ export const syncMachineV2 = setup({
         }
       },
       
-      invoke: {
-        src: 'validateIntegrity',
-        input: ({ context, event }) => {
-          const services = getServices(context);
-          const reason = event.type === 'INTEGRITY_VALIDATE' ? event.reason || 'routine check' : 'unknown';
-          return {
-            integrityService: services?.integrityService!,
-            reason
-          };
-        },
-        onDone: [
-          {
-            target: 'resetting_integrity',
-            guard: ({ event }) => {
-              const result = event.output;
-              return !result.isValid && result.recommendedAction === 'reset';
-            },
-            actions: [
-              ({ event }) => {
-                console.error('[SyncMachineV2] 🚨 Integrity validation failed - triggering reset:', event.output);
-                if (event.output.issues && event.output.issues.length > 0) {
-                  console.error('[SyncMachineV2] 🚨 Integrity issues that triggered reset:');
-                  event.output.issues.forEach((issue: any, index: number) => {
-                    console.error(`[SyncMachineV2] Reset Issue ${index + 1}:`, issue);
-                  });
-                }
-              },
-              sendParent({ type: 'INTEGRITY_RESET_REQUIRED', reason: 'Integrity validation failed' })
-            ]
-          },
-          {
-            target: 'validating_integrity',
-            guard: ({ event }) => {
-              const result = event.output;
-              return !result.isValid && result.recommendedAction === 'retry';
-            },
-            actions: [
-              ({ event }) => {
-                console.warn('[SyncMachineV2] ⚠️ Integrity validation failed - retrying:', event.output);
-                if (event.output.issues && event.output.issues.length > 0) {
-                  console.warn('[SyncMachineV2] ⚠️ Integrity issues that triggered retry:');
-                  event.output.issues.forEach((issue: any, index: number) => {
-                    console.warn(`[SyncMachineV2] Retry Issue ${index + 1}:`, issue);
-                  });
-                }
-              }
-            ]
-          },
-          {
-            target: 'live_sync',
-            guard: ({ event }) => {
-              const result = event.output;
-              return result.isValid === true;
-            },
-            actions: [
-              ({ event }) => {
-                console.log('[SyncMachineV2] ✅ Integrity validation passed:', event.output);
-                if (event.output.issues && event.output.issues.length > 0) {
-                  console.log('[SyncMachineV2] ℹ️ Non-critical issues found but validation passed:');
-                  event.output.issues.forEach((issue: any, index: number) => {
-                    console.log(`[SyncMachineV2] Info Issue ${index + 1}:`, issue);
-                  });
-                }
-              },
-              sendParent({ type: 'INTEGRITY_VALIDATION_SUCCESS' })
-            ]
-          },
-          {
-            // Fallback case for unknown integrity states - proceed with warning
-            target: 'live_sync',
-            actions: [
-              ({ event }) => console.warn('[SyncMachineV2] ⚠️ Unknown integrity validation result - proceeding anyway:', event.output),
-              sendParent({ type: 'INTEGRITY_VALIDATION_SUCCESS' })
-            ]
-          }
-        ],
-        onError: {
-          target: 'live_sync',
-          actions: [
-            ({ event }) => console.error('[SyncMachineV2] Integrity validation error:', event.error),
-            'recordError'
-          ]
-        }
-      }
+      // ✅ REMOVED: Complex invoke pattern replaced with simple event-driven approach
     },
 
     resetting_integrity: {
-      entry: () => console.log('[SyncMachineV2] 🚨 Entered resetting_integrity state'),
+      entry: [
+        () => console.log('[SyncMachineV2] 🚨 Entered resetting_integrity state'),
+        'requestIntegrityReset'  // ✅ Simple action call
+      ],
       exit: () => console.log('[SyncMachineV2] 🔄 Exiting resetting_integrity state'),
       
-      invoke: {
-        src: 'executeIntegrityReset',
-        input: ({ context, event }) => {
-          const services = getServices(context);
-          const reason = event.type === 'INTEGRITY_RESET_START' ? event.reason : 'Integrity issues detected';
-          const resetType = (event.type === 'INTEGRITY_RESET_START' && event.resetType) ? event.resetType : 'full_reset';
-          return {
-            integrityService: services?.integrityService!,
-            reason,
-            resetType
-          };
-        },
-        onDone: {
-          target: 'idle', // Reset to idle - orchestrator will restart sync
+      on: {
+        // ✅ MISSING: Handle reset started event
+        INTEGRITY_RESET_STARTED: {
           actions: [
-            ({ event }) => console.log('[SyncMachineV2] Integrity reset completed:', event.output),
+            ({ event }) => console.log('[SyncMachineV2] 🚀 Integrity reset started:', (event as any).reason, (event as any).resetType)
+          ]
+        },
+        
+        // ✅ FIXED: After integrity reset, database is empty - need full initial sync
+        INTEGRITY_RESET_COMPLETED: {
+          target: 'initializing', // Database is empty - need to start fresh with services & initial sync
+          actions: [
+            ({ event }) => console.log('[SyncMachineV2] 🔄 Integrity reset completed! Database cleared, starting fresh with initial sync:', (event as any).result),
+            assign({ 
+              reconnectAttempts: 0,         // Reset reconnect counter
+              currentLSN: '0/0',           // Reset LSN context after DB reset
+              serverLSN: null,             // Clear server LSN for fresh sync
+              autoReconnectDisabled: false, // Re-enable auto-reconnect after reset completion
+              syncPhase: null,             // Clear sync phase - will be set to 'initial' in initial_sync
+              // Reset phase progress for fresh start
+              phaseProgress: {
+                initial: {
+                  completedTables: 0,
+                  totalTables: 0,
+                  currentTable: null,
+                  tablesRemaining: []
+                },
+                catchup: {
+                  batchesProcessed: 0,
+                  changesProcessed: 0,
+                  estimatedRemaining: 0
+                },
+                live: {
+                  messagesProcessed: 0,
+                  lastActivity: null,
+                  throughputPerSec: 0
+                }
+              }
+            }),
+            // ✅ CRITICAL: Send LSN reset to orchestrator so it updates its context
+            sendParent({ type: 'LSN_UPDATE', lsn: '0/0' }),
             sendParent({ type: 'INTEGRITY_RESET_COMPLETED' })
           ]
         },
-        onError: {
+        
+        INTEGRITY_RESET_ERROR: {
           target: 'error',
           actions: [
-            ({ event }) => console.error('[SyncMachineV2] Integrity reset failed:', event.error),
+            ({ event }) => console.error('[SyncMachineV2] Integrity reset failed:', (event as any).error),
             'recordError'
+          ]
+        },
+        
+        WS_DISCONNECTED: {
+          target: 'reconnecting',
+          actions: ['logState']
+        },
+        SERVICE_ERROR: {
+          target: 'error',
+          actions: ['recordError', 'logState']
+        }
+      },
+      
+      // Simple timeout for reset operations
+      after: {
+        60000: {
+          target: 'error',
+          actions: [
+            () => console.error('[SyncMachineV2] ⚠️ Integrity reset timeout'),
+            assign({ error: 'Integrity reset timeout' })
           ]
         }
       }
@@ -1364,13 +1824,22 @@ export const syncMachineV2 = setup({
         2000: [
           {
             target: 'connecting',
-            guard: 'hasReconnectAttempts',
-            actions: 'logState'
+            guard: 'canAutoReconnect',
+            actions: [
+              ({ context }) => console.log(`[SyncMachineV2] 🔄 Auto-reconnecting (attempt ${context.reconnectAttempts + 1}/5)`),
+              'logState'
+            ]
           },
           {
             target: 'error',
             actions: [
-              assign({ error: 'Max reconnection attempts reached' }),
+              ({ context }) => {
+                const reason = context.autoReconnectDisabled 
+                  ? 'Auto-reconnect disabled for integrity reset'
+                  : 'Max reconnection attempts reached';
+                console.log(`[SyncMachineV2] 🚫 Cannot reconnect: ${reason}`);
+                return assign({ error: reason });
+              },
               'logState'
             ]
           }
@@ -1385,6 +1854,9 @@ export const syncMachineV2 = setup({
         DISCONNECT: {
           target: 'disconnecting',
           actions: ['logState']
+        },
+        ENABLE_AUTO_RECONNECT_AFTER_RESET: {
+          actions: ['enableAutoReconnect']
         }
       }
     },
@@ -1395,10 +1867,21 @@ export const syncMachineV2 = setup({
         'cleanupServices'
       ],
       exit: () => console.log('[SyncMachineV2] 🔄 Exiting disconnecting state'),
-      always: {
-        target: 'idle',
-        actions: ['logState']
-      }
+      always: [
+        {
+          target: 'connecting',
+          guard: ({ context }) => context.shouldReconnectAfterDisconnect,
+          actions: [
+            ({ context }) => console.log('[SyncMachineV2] 🔄 Auto-reconnecting after integrity reset with fresh LSN:', context.currentLSN),
+            assign({ shouldReconnectAfterDisconnect: false }), // Clear the flag
+            'logState'
+          ]
+        },
+        {
+          target: 'idle',
+          actions: ['logState']
+        }
+      ]
     },
     
     error: {

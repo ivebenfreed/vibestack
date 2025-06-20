@@ -44,7 +44,7 @@ export const SidebarProjectItem = React.memo<SidebarProjectItemProps>(({ project
         <Link 
           to={`/projects/${project.id}`} 
           onClick={() => setOpenMobile(false)}
-          preload="intent" // Intent-based preloading for project detail links
+          preload={false} // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
         >
           <Dot />
           <span>{project.name}</span>

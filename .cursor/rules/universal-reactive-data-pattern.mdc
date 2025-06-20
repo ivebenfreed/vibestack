@@ -1,274 +1,202 @@
 ---
-description: data loading, data fetching, data display, all queries, tanstak query
+description: 
 globs: 
 alwaysApply: false
 ---
-# Universal Reactive Data Pattern (Atomic Edition)
+# Universal Reactive Data Pattern (XState Edition)
 
 ## Core Concept
 
-The Universal Reactive Data Pattern (Atomic Edition) uses Jotai atomic stores for **surgical precision** updates. Each entity gets its own atom, enabling only specific components to re-render when that entity changes.
+The Universal Reactive Data Pattern (XState Edition) uses **XState stores** with `createAtom` for normalized entity storage and `useSelector` with `shallowEqual` for **surgical precision** updates. Only specific components re-render when their selected data changes.
+# Universal Reactive Data Pattern (XState Edition)
+
+## Core Concept
+
+The Universal Reactive Data Pattern uses **XState atomic stores** for surgical precision updates. Normalized entity stores enable only specific components to re-render when individual entities change.
 
 ## Key Principles
 
 ### 1. Surgical Updates
-- Individual entity atoms update independently
-- Only components reading specific entities re-render
-- Collections derive from individual atoms automatically
+- **Normalized XState atoms** (Record<id, Entity>) for stable references
+- **useSelector with shallowEqual** for precise subscriptions  
+- Only components reading changed data re-render
+- Live changes update individual entities surgically
 
 ### 2. Instant Loading
-- Router loaders pre-populate atomic stores during navigation
+- Router loaders use `ensureLoaded` pattern
+- Atoms act as persistent cache across navigation
 - Users see content immediately when pages load
 
-### 3. Co-located Atomic Stores
-- Atomic stores live with domain services
+### 3. Co-located Domain Actions
+- Domain actions live with XState atoms
 - Direct integration with business logic
+- Centralized CRUD operations
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│  Router Loaders │───▶│ Individual Atoms │───▶│   Live Queries  │
-│  (Bulk Loading) │    │ (Surgical Store) │    │ (Surgical Updt) │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌──────────────────────┐    ┌─────────────────┐
+│  Router Loaders │───▶│ XState Atoms         │───▶│   useSelector   │
+│  (ensureLoaded) │    │ (Normalized Store)   │    │ (shallowEqual)  │
+└─────────────────┘    └──────────────────────┘    └─────────────────┘
 ```
 
-## ✅ DO: Individual Entity Atoms
+## ✅ CRITICAL: Surgical Selector Pattern
+
+**ALWAYS use this pattern to prevent recursion and maintain stable references:**
 
 ```typescript
-// ✅ Each entity gets its own atom
-const TaskAtomStore = {
-  getTaskAtom: (id: string) => {
-    if (!globalTaskAtoms.has(id)) {
-      globalTaskAtoms.set(id, atom<Task | null>(null))
-    }
-    return globalTaskAtoms.get(id)!
+// ✅ CORRECT: ID-based selector with shallowEqual
+const entityIds = useSelector(entityAtom, (entityRecord) => {
+  if (!entityRecord || typeof entityRecord !== 'object') return []
+  return Object.keys(entityRecord).sort()
+}, shallowEqual) // CRITICAL: Prevents infinite loops
+
+// ✅ CORRECT: Stable entity array via useMemo
+const entities = React.useMemo(() => {
+  const currentEntities = entityAtom.get()
+  if (!currentEntities || typeof currentEntities !== 'object') return []
+  return entityIds.map(id => currentEntities[id]).filter(Boolean)
+}, [entityIds]) // Only changes when entities added/removed
+```
+
+## ✅ DO: Normalized XState Atoms
+
+```typescript
+import { createAtom } from '@xstate/store'
+import { useSelector } from '@xstate/store/react'
+import { shallowEqual } from '@xstate/store'
+
+// ✅ Normalized entity store
+export const entitiesAtom = createAtom<Record<string, Entity>>({})
+
+export const entityHooks = {
+  // All entities (surgical pattern)
+  allEntities: () => {
+    const entityIds = useSelector(entitiesAtom, (record) => {
+      return Object.keys(record).sort()
+    }, shallowEqual)
+    
+    return React.useMemo(() => {
+      const current = entitiesAtom.get()
+      return entityIds.map(id => current[id]).filter(Boolean)
+    }, [entityIds])
   },
-  
-  // ✅ Derived collection from individual atoms
-  allTasksAtom: atom<Task[]>((get) => {
-    const atomValues = Array.from(globalTaskAtoms.values())
-    return atomValues
-      .map(taskAtom => get(taskAtom))
-      .filter(task => task !== null)
-  })
-}
-```
 
-## ✅ DO: Co-locate with Domain Services
-
-```typescript
-// ✅ Atomic store lives with domain service
-export class TaskService extends BaseService<Task> {
-  static atoms: TaskAtomStore;
-  
-  async updateTask(id: string, changes: Partial<Task>): Promise<Task> {
-    const updatedTask = await this.repository.update(id, changes)
-    
-    // ✅ Surgical update: only this task's atom changes
-    const taskAtom = TaskService.atoms.getTaskAtom(id)
-    const store = getDefaultStore()
-    store.set(taskAtom, updatedTask)
-    
-    return updatedTask
+  // Individual entity
+  entity: (entityId: string) => {
+    return useSelector(entitiesAtom, (record) => record[entityId] || null)
   }
 }
 ```
 
-## ✅ DO: Router Loaders Bulk Populate
+## ✅ DO: Domain Actions
 
 ```typescript
-// ✅ Router loaders populate individual atoms efficiently
-export const Route = createFileRoute('/_authenticated/tasks/')({
-  loader: async () => {
-    const store = getDefaultStore()
-    const existingTasks = store.get(TaskService.atoms.allTasksAtom)
+export const entityActions = {
+  // Ensure loaded pattern
+  ensureLoaded: async () => {
+    const current = entitiesAtom.get()
+    if (Object.keys(current).length > 0) return // Already loaded
     
-    if (existingTasks.length > 0) return null // Already populated
-    
-    const dataSource = await getNewPGliteDataSource()
-    const tasks = await dataSource.getRepository(Task).find()
-    
-    // ✅ Bulk load into individual atoms
-    store.set(TaskService.atoms.syncBulkLoad, tasks)
-    return null
+    const entities = await fetchEntitiesFromDatabase()
+    const entityRecord: Record<string, Entity> = {}
+    entities.forEach(entity => { entityRecord[entity.id] = entity })
+    entitiesAtom.set(entityRecord)
   },
-  component: Tasks,
-})
-```
 
-## ✅ DO: Surgical Component Updates
-
-```typescript
-// ✅ Pass IDs, not entire objects - enables surgical updates
-const TaskList = () => {
-  const tasks = useAtomValue(TaskService.atoms.allTasksAtom)
-  return (
-    <div>
-      {tasks.map(task => (
-        <TaskCard key={task.id} taskId={task.id} />
-      ))}
-    </div>
-  )
-}
-
-// ✅ Component reads individual atom - only re-renders when THIS task changes
-const TaskCard = ({ taskId }: { taskId: string }) => {
-  const task = useAtomValue(TaskService.atoms.getTaskAtom(taskId))
-  if (!task) return null
-  return <Card>{task.title}</Card>
-}
-```
-
-## ✅ DO: CRUD with Surgical Updates
-
-```typescript
-// ✅ Create - adds new individual atom
-const useCreateTask = () => {
-  return useMutation({
-    mutationFn: async (taskData: CreateTaskData) => {
-      const newTask = await services.tasks.createTask(taskData)
-      
-      // ✅ Only new atom is created
-      const store = getDefaultStore()
-      const taskAtom = TaskService.atoms.getTaskAtom(newTask.id)
-      store.set(taskAtom, newTask)
-      
-      return newTask
-    }
-  })
-}
-
-// ✅ Update - updates specific individual atom
-const useUpdateTask = () => {
-  return useMutation({
-    mutationFn: async ({ id, changes }) => {
-      const updatedTask = await services.tasks.updateTask(id, changes)
-      
-      // ✅ Only this task's atom updates
-      const store = getDefaultStore()
-      const taskAtom = TaskService.atoms.getTaskAtom(id)
-      store.set(taskAtom, updatedTask)
-      
-      return updatedTask
-    }
-  })
-}
-
-// ✅ Delete - nullifies specific individual atom
-const useDeleteTask = () => {
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await services.tasks.deleteTask(id)
-      
-      // ✅ Only this task's atom is nullified
-      const store = getDefaultStore()
-      const taskAtom = TaskService.atoms.getTaskAtom(id)
-      store.set(taskAtom, null)
-      
-      return id
-    }
-  })
-}
-```
-
-## ❌ DON'T: Bulk State Updates
-
-```typescript
-// ❌ DON'T do this - causes bulk re-renders
-const [tasks, setTasks] = useState([])
-const updateTask = (updatedTask) => {
-  setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t))
-  // All TaskCard components re-render unnecessarily
-}
-
-// ❌ DON'T invalidate entire cache
-queryClient.invalidateQueries(['tasks']) // Refetches all data
-
-// ❌ DON'T pass entire objects as props
-<TaskCard task={task} /> // Prevents surgical updates
-
-// ❌ DON'T use manual state management
-const [loading, setLoading] = useState(true)
-const [data, setData] = useState([])
-```
-
-## Live Query Integration
-
-```typescript
-// ✅ Live queries update individual atoms surgically
-class TaskAtomStore {
-  private processLiveChanges(changes: TaskChange[]) {
-    const store = getDefaultStore()
+  // Surgical update
+  updateEntity: (entityId: string, updates: Partial<Entity>) => {
+    const current = entitiesAtom.get()
+    const entity = current[entityId]
+    if (!entity) return
     
-    changes.forEach(change => {
-      const task = this.transformDatabaseResult(change)
-      const taskAtom = this.getTaskAtom(task.id)
-      
-      switch (change.__op__) {
-        case 'INSERT':
-        case 'UPDATE':
-          store.set(taskAtom, task) // ✅ Only this atom updates
-          break
-        case 'DELETE':
-          store.set(taskAtom, null) // ✅ Only this atom nullifies
-          break
-      }
+    entitiesAtom.set({
+      ...current,
+      [entityId]: { ...entity, ...updates }
     })
   }
 }
 ```
 
-## Jotai Setup
+## ✅ DO: Router Loader Pattern
 
 ```typescript
-// main.tsx
-import { Provider, getDefaultStore } from 'jotai'
+export const Route = createFileRoute('/entities/')({
+  loader: async () => {
+    // ensureLoaded only loads if atoms are empty
+    await entityActions.ensureLoaded()
+    return null // Components use selectors
+  },
+  component: EntityPage
+})
+```
 
-function App() {
-  return (
-    <Provider store={getDefaultStore()}>
-      <RouterProvider router={router} />
-    </Provider>
-  )
+## ❌ DON'T: Common Anti-Patterns
+
+```typescript
+// ❌ NEVER: Object.values() directly in selectors (causes recursion)
+const entities = useSelector(entitiesAtom, (record) => Object.values(record))
+
+// ❌ NEVER: Missing shallowEqual (causes infinite loops) 
+const entityIds = useSelector(entitiesAtom, (record) => Object.keys(record))
+
+// ❌ NEVER: Bulk state updates
+setEntities(prev => prev.map(e => e.id === id ? updated : e))
+
+// ❌ NEVER: Cache invalidation
+queryClient.invalidateQueries(['entities'])
+```
+
+## Live Query Integration
+
+```typescript
+// ✅ Live changes update individual entities surgically
+const processLiveChanges = (changes: EntityChange[]) => {
+  const current = entitiesAtom.get()
+  const updated = { ...current }
+  
+  changes.forEach(change => {
+    switch (change.__op__) {
+      case 'INSERT':
+      case 'UPDATE':
+        updated[change.id] = transformEntity(change)
+        break
+      case 'DELETE':
+        delete updated[change.id]
+        break
+    }
+  })
+  
+  entitiesAtom.set(updated)
 }
 ```
 
 ## Key Benefits
 
 1. **Surgical Updates**: Only changed entities trigger re-renders
-2. **Instant Loading**: Router loaders pre-populate atomic stores
-3. **Real-time Sync**: Live queries update individual atoms
-4. **Performance**: Minimal re-renders and efficient memory usage
+2. **Stable References**: Prevents table pagination resets  
+3. **Instant Loading**: Router loaders pre-populate stores
+4. **Real-time Sync**: Live queries update individual entities
+5. **Performance**: Minimal re-renders, efficient memory usage
 
-## Common Patterns
+## Essential Patterns
 
-### Filtered Collections
+### Always Use shallowEqual
 ```typescript
-// ✅ Efficient filtering from atomic store
-function useTasksByProject(projectId: string) {
-  const allTasks = useAtomValue(TaskService.atoms.allTasksAtom)
-  
-  const projectTasks = useMemo(() => {
-    return allTasks.filter(task => task.projectId === projectId)
-  }, [allTasks, projectId])
-  
-  return { data: projectTasks, isLoading: false, error: null }
-}
+// ✅ Required for all selectors
+const data = useSelector(atom, selector, shallowEqual)
 ```
 
-### Relationship Loading
+### Always Use ID + useMemo Pattern
 ```typescript
-// ✅ Individual atoms for relationships
-const ProjectDetail = ({ projectId }: { projectId: string }) => {
-  const project = useAtomValue(ProjectService.atoms.getProjectAtom(projectId))
-  const projectTasks = useTasksByProject(projectId)
-  
-  return (
-    <div>
-      <h1>{project?.name}</h1>
-      <TaskList tasks={projectTasks.data} />
-    </div>
-  )
-}
+// ✅ Prevents recursion and maintains stability
+const ids = useSelector(atom, (record) => Object.keys(record).sort(), shallowEqual)
+const entities = useMemo(() => ids.map(id => atom.get()[id]).filter(Boolean), [ids])
+```
+
+### Always Use ensureLoaded in Loaders
+```typescript
+// ✅ Only loads if atoms are empty
+await entityActions.ensureLoaded()
 ```

@@ -9,6 +9,7 @@
 
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { TableChange } from '@repo/sync-types';
+import { createAllDomains } from '../domain/lib';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -38,6 +39,7 @@ export class IncomingChangeService {
   private dataSource: NewPGliteDataSource;
   private callbacks: IncomingChangeServiceCallbacks = {};
   private isProcessing = false;
+  private domainServices: Awaited<ReturnType<typeof createAllDomains>> | null = null;
   
   // Internal queue for handling concurrent requests
   private processingQueue: Array<{
@@ -55,6 +57,21 @@ export class IncomingChangeService {
     this.config = config;
     this.dataSource = dataSource;
     console.log('[IncomingChangeService] Initialized with config:', config);
+  }
+
+  /**
+   * Initialize domain services
+   */
+  private async initializeDomainServices(): Promise<void> {
+    if (!this.domainServices) {
+      console.log('[IncomingChangeService] Initializing domain services...');
+      
+      // For incoming sync processing, we can pass null since we don't want to track outgoing changes
+      const syncManager = null as any; // Domain services won't track outgoing changes for incoming sync
+      
+      this.domainServices = createAllDomains(this.dataSource, syncManager);
+      console.log('[IncomingChangeService] Domain services initialized');
+    }
   }
 
   /**
@@ -123,6 +140,9 @@ export class IncomingChangeService {
 
     try {
       console.log(`[IncomingChangeService] Processing ${changes.length} incoming changes (${messageType})`);
+
+      // Initialize domain services if needed
+      await this.initializeDomainServices();
 
       const batchSize = this.config.batchSize || 50;
       
@@ -240,28 +260,173 @@ export class IncomingChangeService {
     this.callbacks = {};
   }
 
+  /**
+   * Get domain service for a table
+   */
+  private getDomainService(table: string): any {
+    if (!this.domainServices) {
+      throw new Error('Domain services not initialized');
+    }
+
+    switch (table) {
+      case 'tasks':
+        return this.domainServices.task.service;
+      case 'projects':
+        return this.domainServices.project.service;
+      case 'users':
+        return this.domainServices.user.service;
+      case 'comments':
+        return this.domainServices.comment.service;
+      default:
+        throw new Error(`No domain service found for table: ${table}`);
+    }
+  }
+
   // Private methods
 
   private async processBatch(batch: TableChange[]): Promise<ProcessingResult[]> {
     const results: ProcessingResult[] = [];
 
-    // Use database transaction for batch consistency
-    await this.dataSource.manager.transaction(async (transactionalEntityManager: any) => {
-      for (const change of batch) {
+    try {
+      // Group changes by table and operation for bulk optimization
+      const grouped = this.groupChangesByTableAndOperation(batch);
+      
+      // Process each group
+      for (const [key, changes] of grouped.entries()) {
+        const [table, operation] = key.split(':');
+        
         try {
-          const result = await this.applyChangeInTransaction(change, transactionalEntityManager);
-          results.push(result);
+          if (operation === 'insert' && changes.length > 1) {
+            // Use bulk insert for multiple inserts of same entity type
+            console.log(`[IncomingChangeService] Processing ${changes.length} bulk inserts for ${table}`);
+            const bulkResults = await this.processBulkInserts(table, changes);
+            results.push(...bulkResults);
+          } else {
+            // Process individually for other operations or single changes
+            for (const change of changes) {
+              try {
+                const result = await this.applyChangeInTransaction(change, null);
+                results.push(result);
+              } catch (error) {
+                console.error(`[IncomingChangeService] Error processing individual change for ${change.table}:`, error);
+                results.push({
+                  change,
+                  success: false,
+                  error: error instanceof Error ? error.message : String(error)
+                });
+              }
+            }
+          }
         } catch (error) {
-          console.error(`[IncomingChangeService] Error in batch processing for ${change.table}:`, error);
-          results.push({
-            change,
-            success: false,
-            error: error instanceof Error ? error.message : String(error)
-          });
+          console.error(`[IncomingChangeService] Error processing group ${key}:`, error);
+          // Add error results for all changes in this group
+          for (const change of changes) {
+            results.push({
+              change,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
         }
       }
-    });
+    } catch (error) {
+      console.error('[IncomingChangeService] Error in batch processing:', error);
+      // Fallback: add error results for all changes
+      for (const change of batch) {
+        results.push({
+          change,
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
 
+    return results;
+  }
+
+  /**
+   * Group changes by table and operation for bulk optimization
+   */
+  private groupChangesByTableAndOperation(changes: TableChange[]): Map<string, TableChange[]> {
+    const grouped = new Map<string, TableChange[]>();
+    
+    for (const change of changes) {
+      const key = `${change.table}:${change.operation}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(change);
+    }
+    
+    console.log(`[IncomingChangeService] Grouped ${changes.length} changes into ${grouped.size} operation groups`);
+    return grouped;
+  }
+
+  /**
+   * Process bulk inserts using domain service bulk operations
+   */
+  private async processBulkInserts(table: string, changes: TableChange[]): Promise<ProcessingResult[]> {
+    const results: ProcessingResult[] = [];
+    
+    try {
+      const domainService = this.getDomainService(table);
+      
+      // Check if domain service supports bulk operations
+      if (typeof domainService.bulkCreateFromSync === 'function') {
+        console.log(`[IncomingChangeService] Using bulkCreateFromSync for ${changes.length} ${table} entities`);
+        
+        // Extract data for bulk insert
+        const entities = changes.map(change => change.data);
+        const startTime = Date.now();
+        
+        // Perform bulk insert
+        await domainService.bulkCreateFromSync(entities);
+        
+        const processingTime = Date.now() - startTime;
+        const throughput = changes.length / (processingTime / 1000);
+        console.log(`[IncomingChangeService] Successfully bulk inserted ${changes.length} ${table} entities in ${processingTime}ms (${throughput.toFixed(0)} entities/sec)`);
+        
+        // Create success results for all changes
+        for (const change of changes) {
+          results.push({
+            change,
+            success: true
+          });
+        }
+      } else {
+        console.warn(`[IncomingChangeService] Domain service for ${table} doesn't support bulkCreateFromSync, falling back to individual processing`);
+        
+        // Fallback to individual processing
+        for (const change of changes) {
+          try {
+            await domainService.createFromSync(change.data);
+            results.push({
+              change,
+              success: true
+            });
+          } catch (error) {
+            console.error(`[IncomingChangeService] Individual insert failed for ${table}:${change.data.id}:`, error);
+            results.push({
+              change,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[IncomingChangeService] Bulk insert failed for ${table}:`, error);
+      
+      // Create error results for all changes
+      for (const change of changes) {
+        results.push({
+          change,
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    
     return results;
   }
 
@@ -283,21 +448,34 @@ export class IncomingChangeService {
         };
       }
 
-      const repository = entityManager.getRepository(change.table);
+      // Use domain services instead of direct repository access
+      const domainService = this.getDomainService(change.table);
+      
+      console.log(`[IncomingChangeService] Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
       switch (change.operation) {
         case 'insert':
-          return await this.handleInsert(change, repository);
+          await domainService.createFromSync(change.data);
+          break;
         
         case 'update':
-          return await this.handleUpdate(change, repository);
+          await domainService.updateFromSync(change.data.id, change.data);
+          break;
         
         case 'delete':
-          return await this.handleDelete(change, repository);
+          await domainService.deleteFromSync(change.data.id);
+          break;
         
         default:
           throw new Error(`Unknown operation: ${change.operation}`);
       }
+
+      console.log(`[IncomingChangeService] Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
+      
+      return {
+        change,
+        success: true
+      };
 
     } catch (error) {
       console.error(`[IncomingChangeService] Error applying ${change.operation} to ${change.table}:`, error);
@@ -309,188 +487,4 @@ export class IncomingChangeService {
     }
   }
 
-  private async handleInsert(change: TableChange, repository: any): Promise<ProcessingResult> {
-    try {
-      // Check if record already exists (potential conflict)
-      const existing = await repository.findOne({ where: { id: change.data.id } });
-      
-      if (existing) {
-        // Handle conflict based on configuration
-        const resolution = await this.resolveConflict(change, existing);
-        
-        if (resolution === 'server-wins') {
-          // Server data wins, update the existing record
-          await repository.update(change.data.id, change.data);
-          this.callbacks.onConflictDetected?.(change, existing, 'server-wins');
-          
-          return {
-            change,
-            success: true,
-            conflictResolved: true
-          };
-        } else {
-          // Client data wins, skip the change
-          this.callbacks.onConflictDetected?.(change, existing, 'client-wins');
-          
-          return {
-            change,
-            success: true,
-            skipped: true,
-            reason: 'conflict_client_wins'
-          };
-        }
-      }
-
-      // No conflict, insert the record
-      await repository.insert(change.data);
-      
-      return {
-        change,
-        success: true
-      };
-
-    } catch (error) {
-      return {
-        change,
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-
-  private async handleUpdate(change: TableChange, repository: any): Promise<ProcessingResult> {
-    try {
-      // Check if record exists
-      const existing = await repository.findOne({ where: { id: change.data.id } });
-      
-      if (!existing) {
-        // Record doesn't exist, treat as insert
-        await repository.insert(change.data);
-        
-        return {
-          change,
-          success: true,
-          reason: 'update_as_insert'
-        };
-      }
-
-      // Check for conflicts based on timestamp
-      const resolution = await this.resolveConflict(change, existing);
-      
-      if (resolution === 'server-wins') {
-        await repository.update(change.data.id, change.data);
-        
-        return {
-          change,
-          success: true,
-          conflictResolved: true
-        };
-      } else if (resolution === 'no-conflict') {
-        // No conflict, just update
-        await repository.update(change.data.id, change.data);
-        
-        return {
-          change,
-          success: true,
-          conflictResolved: false
-        };
-      } else {
-        // Client data wins, skip the update
-        this.callbacks.onConflictDetected?.(change, existing, 'client-wins');
-        
-        return {
-          change,
-          success: true,
-          skipped: true,
-          reason: 'conflict_client_wins'
-        };
-      }
-
-    } catch (error) {
-      return {
-        change,
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-
-  private async handleDelete(change: TableChange, repository: any): Promise<ProcessingResult> {
-    try {
-      // Check if record exists
-      const existing = await repository.findOne({ where: { id: change.data.id } });
-      
-      if (!existing) {
-        // Record doesn't exist, consider it already deleted
-        return {
-          change,
-          success: true,
-          skipped: true,
-          reason: 'already_deleted'
-        };
-      }
-
-      // Check for conflicts
-      const resolution = await this.resolveConflict(change, existing);
-      
-      if (resolution === 'server-wins') {
-        await repository.delete(change.data.id);
-        
-        return {
-          change,
-          success: true,
-          conflictResolved: true
-        };
-      } else if (resolution === 'no-conflict') {
-        // No conflict, just delete
-        await repository.delete(change.data.id);
-        
-        return {
-          change,
-          success: true,
-          conflictResolved: false
-        };
-      } else {
-        // Client data wins, keep the record
-        this.callbacks.onConflictDetected?.(change, existing, 'client-wins');
-        
-        return {
-          change,
-          success: true,
-          skipped: true,
-          reason: 'conflict_client_wins'
-        };
-      }
-
-    } catch (error) {
-      return {
-        change,
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-
-  private async resolveConflict(change: TableChange, existingData: any): Promise<'client-wins' | 'server-wins' | 'no-conflict'> {
-    // Simple timestamp-based conflict resolution
-    if (this.config.conflictResolution === 'server-wins') {
-      return 'server-wins';
-    }
-    
-    if (this.config.conflictResolution === 'client-wins') {
-      return 'client-wins';
-    }
-
-    // Timestamp-based resolution (default)
-    const changeTime = new Date(change.updatedAt);
-    const existingTime = new Date(existingData.updatedAt || existingData.updated_at);
-    
-    if (changeTime > existingTime) {
-      return 'server-wins'; // Server change is newer
-    } else if (changeTime < existingTime) {
-      return 'client-wins'; // Client data is newer
-    } else {
-      return 'no-conflict'; // Same timestamp, no conflict
-    }
-  }
 } 

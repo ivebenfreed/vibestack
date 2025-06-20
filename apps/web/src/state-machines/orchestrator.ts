@@ -122,7 +122,9 @@ export type OrchestratorEvent =
       recordChangesSinceBaseline: number;
       tableChangeCounts: Record<string, number>;
       lastCountUpdateAt: number | null;
-    }};
+    }}
+  
+  // 🚫 REMOVED: Manual sync machine restart events - these caused race conditions
 
 export const orchestrator = setup({
   types: {
@@ -182,6 +184,17 @@ export const orchestrator = setup({
       // Always validate integrity during app initialization to ensure system health
       // Even fresh installs should verify database schema and basic integrity
       return true;
+    },
+    
+    // Role-based guards
+    hasAdminRole: ({ context }) => {
+      const userRole = context.user?.role;
+      return userRole === 'admin' || userRole === 'super_admin';
+    },
+    
+    canAccessDebugFeatures: ({ context }) => {
+      const userRole = context.user?.role;
+      return userRole === 'admin' || userRole === 'super_admin';
     },
   },
   
@@ -256,7 +269,7 @@ export const orchestrator = setup({
             id: authUser.id,
             email: authUser.email,
             name: authUser.name || authUser.email?.split('@')[0] || 'User',
-            role: 'member',
+            role: authUser.role || 'member', // Use role from auth user or default to 'member'
             emailVerified: authUser.emailVerified || false,
             image: authUser.image,
           };
@@ -321,10 +334,10 @@ export const orchestrator = setup({
       window.dispatchEvent(new CustomEvent('app:ready'));
     },
     
-    // Child machine coordination
+    // Child machine coordination - FIXED: Send to syncMachineV2 instead of legacy syncMachine
     startSync: sendTo('syncMachine', ({ context }) => {
       const currentLSN = context.syncState.currentLSN || '0/0';
-      console.log(`[Orchestrator] 🚀 Starting sync with LSN: ${currentLSN}`);
+      console.log(`[Orchestrator] 🚀 Starting sync with LSN: ${currentLSN} (sending to syncMachineV2)`);
       return {
         type: 'CONNECT',
         serverUrl: 'ws://127.0.0.1:8787/ws', // Default server URL
@@ -338,13 +351,13 @@ export const orchestrator = setup({
       entities: ['Task', 'Project', 'User', 'Comment']
     }),
     
-    resetSystem: sendTo('syncMachine', ({ event }) => ({
+        resetSystem: sendTo('syncMachine', ({ event }) => ({
       type: 'INTEGRITY_RESET_START',
       reason: event.type === 'INTEGRITY_RESET_REQUIRED' ? event.reason : 'System reset',
       resetType: 'full_reset'
     })),
-    
-    // Forward LSN updates to sync machine
+
+    // Forward LSN updates to sync machine - FIXED: Now sends to syncMachineV2
     forwardLSNUpdate: sendTo('syncMachine', ({ event }) => ({
       type: 'LSN_UPDATE',
       lsn: event.type === 'LSN_UPDATE' ? event.lsn : '0/0'
@@ -380,7 +393,7 @@ export const orchestrator = setup({
       syncLastSyncTime: null
     }),
     
-    // Send validation request to sync machine using sendTo
+    // Send validation request to sync machine using sendTo - FIXED: Now sends to syncMachineV2
     triggerIntegrityValidation: sendTo('syncMachine', ({ context }) => ({
       type: 'INTEGRITY_VALIDATE',
       reason: 'post-sync validation'
@@ -620,6 +633,103 @@ export const orchestrator = setup({
   
   initial: 'initializing', // Always start with initialization, even when restoring from persisted state
   
+  // 🔥 CRITICAL FIX: Move sync machine to root level so it persists across all orchestrator states
+  invoke: [
+    {
+      id: 'connectionMachine',
+      src: 'connectionMachine',
+      onSnapshot: {
+        actions: assign({
+          isOnline: ({ event }) => event.snapshot.value === 'online'
+        })
+      }
+    },
+    {
+      id: 'liveChangesMachine',
+      src: 'liveChangesMachine',
+      onSnapshot: {
+        actions: ({ event }) => {
+          // Log live changes machine state for debugging
+          console.log('[Orchestrator] 📸 Live changes machine snapshot:', event.snapshot.value);
+        }
+      }
+    },
+    {
+      id: 'syncMachine',
+      src: 'syncMachineV2',
+      onSnapshot: {
+        actions: assign({
+          syncState: ({ event, context, self }) => {
+            const syncContext = event.snapshot.context;
+            const state = event.snapshot.value as string;
+            const status = event.snapshot.status;
+            
+            // Only log snapshot if it's not just a routine heartbeat update
+            const isHeartbeatUpdate = state === 'live_sync' && 
+              syncContext.syncPhase === 'live' && 
+              status === 'active' &&
+              syncContext.error === null;
+            
+            if (!isHeartbeatUpdate) {
+              // 🔥 ENHANCED LOGGING: Track sync machine lifecycle (non-routine updates only)
+              console.log(`[Orchestrator] 📸 onSnapshot from sync machine v2 - Status: ${status}, State: ${state}, LSN: ${syncContext.currentLSN}, phase: ${syncContext.syncPhase}`);
+              
+              // 🔥 DEBUG: Track orchestrator state during sync machine snapshot
+              const orchestratorState = self.getSnapshot().value;
+              console.log(`[Orchestrator] 📸 Orchestrator state during sync snapshot: ${JSON.stringify(orchestratorState)}`);
+            }
+            
+            // 🔥 CRITICAL: If sync machine stops, log orchestrator context to identify cause
+            if (status === 'stopped' || status === 'done') {
+              console.error(`[Orchestrator] 🚨 CONTEXT: Orchestrator state when sync machine stopped:`, {
+                orchestratorState: JSON.stringify(self.getSnapshot().value),
+                timestamp: Date.now(),
+                syncMachineState: state,
+                syncMachinePhase: syncContext.syncPhase
+              });
+            }
+            
+            // 🚨 MONITOR: Log unexpected stops (should rarely happen now)
+            if (status === 'stopped' || status === 'done') {
+              console.error(`[Orchestrator] 🚨 CRITICAL: Sync machine stopped! Status: ${status}, State: ${state}`);
+              console.error('[Orchestrator] 🚨 ALERT: This indicates a serious issue!');
+              
+              // Log context for debugging but don't auto-restart aggressively
+              console.warn('[Orchestrator] ⚠️ Sync machine context when stopped:', {
+                serviceRegistryKey: syncContext.serviceRegistryKey,
+                error: syncContext.error,
+                reconnectAttempts: syncContext.reconnectAttempts,
+                syncPhase: syncContext.syncPhase
+              });
+              
+              // 🔥 CRITICAL FIX: Disable aggressive auto-restart to prevent race conditions
+              // The sync machine should manage its own lifecycle - orchestrator restarts create broken acknowledgment flows
+              console.log('[Orchestrator] 🔍 Auto-restart disabled - sync machine should self-manage lifecycle');
+            }
+            
+            // CRITICAL FIX: Don't override orchestrator's restored LSN with sync machine's default 0/0
+            // Only update LSN if sync machine has been properly initialized (not idle with 0/0)
+            const shouldUpdateLSN = state !== 'idle' || syncContext.currentLSN !== '0/0';
+            const newLSN = shouldUpdateLSN ? syncContext.currentLSN : context.syncState.currentLSN;
+            
+            if (!shouldUpdateLSN && context.syncState.currentLSN !== '0/0') {
+              console.log(`[Orchestrator] 🔒 Preserving orchestrator LSN (${context.syncState.currentLSN}) - sync machine not ready (${state}, ${syncContext.currentLSN})`);
+            }
+            
+            return {
+              phase: syncContext.syncPhase,
+              progress: 0, // Removed from sync machine context - calculate from phaseProgress if needed
+              currentLSN: newLSN,
+              error: syncContext.error,
+              machineState: state,
+              phaseProgress: syncContext.phaseProgress
+            };
+          }
+        })
+      }
+    }
+  ],
+  
   states: {
     // Sequential initialization flow
     initializing: {
@@ -637,75 +747,7 @@ export const orchestrator = setup({
         }
       },
       
-      invoke: [
-        {
-          id: 'connectionMachine',
-          src: 'connectionMachine',
-          onSnapshot: {
-            actions: assign({
-              isOnline: ({ event }) => event.snapshot.value === 'online'
-            })
-          }
-        },
-        {
-          id: 'liveChangesMachine',
-          src: 'liveChangesMachine',
-          onSnapshot: {
-            actions: ({ event }) => {
-              // Log live changes machine state for debugging
-              console.log('[Orchestrator] 📸 Live changes machine snapshot:', event.snapshot.value);
-            }
-          }
-        },
-        {
-          id: 'syncMachine',
-          src: 'syncMachineV2',
-          onSnapshot: {
-            actions: assign({
-              syncState: ({ event, context }) => {
-                const syncContext = event.snapshot.context;
-                const state = event.snapshot.value as string;
-                const status = event.snapshot.status;
-                
-                // 🔥 ENHANCED LOGGING: Track sync machine lifecycle
-                console.log(`[Orchestrator] 📸 onSnapshot from sync machine v2 - Status: ${status}, State: ${state}, LSN: ${syncContext.currentLSN}, phase: ${syncContext.syncPhase}`);
-                
-                // 🚨 CRITICAL: Log if sync machine is stopping/stopped
-                if (status === 'stopped' || status === 'done') {
-                  console.error(`[Orchestrator] 🛑 SYNC MACHINE STOPPED! Status: ${status}, Final state: ${state}`);
-                  console.error('[Orchestrator] 🛑 This explains why heartbeat messages are failing!');
-                  
-                  // Also log the context for debugging
-                  console.error('[Orchestrator] 🛑 Sync machine context when stopped:', {
-                    serviceRegistryKey: syncContext.serviceRegistryKey,
-                    error: syncContext.error,
-                    reconnectAttempts: syncContext.reconnectAttempts,
-                    syncPhase: syncContext.syncPhase
-                  });
-                }
-                
-                // CRITICAL FIX: Don't override orchestrator's restored LSN with sync machine's default 0/0
-                // Only update LSN if sync machine has been properly initialized (not idle with 0/0)
-                const shouldUpdateLSN = state !== 'idle' || syncContext.currentLSN !== '0/0';
-                const newLSN = shouldUpdateLSN ? syncContext.currentLSN : context.syncState.currentLSN;
-                
-                if (!shouldUpdateLSN && context.syncState.currentLSN !== '0/0') {
-                  console.log(`[Orchestrator] 🔒 Preserving orchestrator LSN (${context.syncState.currentLSN}) - sync machine not ready (${state}, ${syncContext.currentLSN})`);
-                }
-                
-                return {
-                  phase: syncContext.syncPhase,
-                  progress: 0, // Removed from sync machine context - calculate from phaseProgress if needed
-                  currentLSN: newLSN,
-                  error: syncContext.error,
-                  machineState: state,
-                  phaseProgress: syncContext.phaseProgress
-                };
-              }
-            })
-          }
-        }
-      ],
+      // 🔥 REMOVED: Moved invoke machines to root level to persist across state transitions
       
       states: {
         auth: {
@@ -984,7 +1026,13 @@ export const orchestrator = setup({
             'logIntegrityBaseline',
             () => console.log('[Orchestrator] 📡 Baseline updated and persisted')
           ]
-        }
+        },
+        
+        // 🚫 REMOVED: Manual sync machine restart logic 
+        // This was causing race conditions where orchestrator would stop actors that were processing acknowledgments
+        // Sync machine should manage its own lifecycle
+        
+        // 🚫 REMOVED: Internal restart connect logic - no longer needed
       }
     },
     
@@ -1008,11 +1056,58 @@ export const orchestrator = setup({
       },
       
       on: {
+        // ✅ CRITICAL: Handle LSN updates during reset
+        LSN_UPDATE: {
+          actions: ['updateOrchestratorLSN']
+        },
+        
+        // 🔥 CRITICAL FIX: Handle baseline updates during reset
+        INTEGRITY_BASELINE_UPDATE: {
+          actions: [
+            'updateIntegrityBaseline',
+            'logIntegrityBaseline',
+            () => console.log('[Orchestrator] 📡 Baseline updated during reset - will be persisted')
+          ]
+        },
+        
         INTEGRITY_RESET_COMPLETED: {
           target: 'initializing.sync',
-          actions: () => {
-            console.log('[Orchestrator] ✅ Reset completed - restarting sync');
-          }
+          actions: [
+            // ✅ LSN update now comes from sync machine via sendParent(LSN_UPDATE)
+            // ✅ Still reset other sync state for completely fresh start
+            assign({ 
+              syncState: ({ context }) => ({
+                ...context.syncState,
+                // currentLSN will be updated by preceding LSN_UPDATE event from sync machine
+                phase: null,           // Clear sync phase for fresh start
+                progress: 0,           // Reset progress
+                error: null,           // Clear any sync errors
+                machineState: 'initializing', // Reset machine state
+                // Reset phase progress for completely fresh start
+                phaseProgress: {
+                  initial: {
+                    completedTables: 0,
+                    totalTables: 0,
+                    currentTable: null,
+                    tablesRemaining: []
+                  },
+                  catchup: {
+                    batchesProcessed: 0,
+                    changesProcessed: 0,
+                    estimatedRemaining: 0
+                  },
+                  live: {
+                    messagesProcessed: 0,
+                    lastActivity: null,
+                    throughputPerSec: 0
+                  }
+                }
+              })
+            }),
+            () => {
+              console.log('[Orchestrator] 🔄 Reset completed - restarting sync (LSN updated by sync machine)');
+            }
+          ]
         }
       }
     }

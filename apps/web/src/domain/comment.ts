@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DeepPartial } from 'typeorm';
 import { Comment } from '@repo/dataforge/client-entities';
 import { BaseRepository, BaseService, DatabaseServiceError, EventDispatcher } from './base';
-import { OutgoingChangeProcessor } from '../sync/OutgoingChangeProcessor';
+import { OutgoingChangeService } from '../sync/OutgoingChangeService';
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
@@ -243,9 +243,9 @@ export class CommentRepository extends BaseRepository<Comment> {
 export class CommentService extends BaseService<Comment> {
   constructor(
     protected commentRepository: CommentRepository,
-    protected syncChangeManager: OutgoingChangeProcessor
+    protected outgoingChangeService: OutgoingChangeService
   ) {
-    super(commentRepository, 'comments', syncChangeManager);
+    super(commentRepository, 'comments', outgoingChangeService);
     
     // Set up entity-specific sync processing methods
     this.resolveDependencies = this.resolveCommentDependencies.bind(this);
@@ -528,14 +528,32 @@ export { commentAtoms };
 // Factory function for this domain
 export function createCommentDomain(
   dataSource: NewPGliteDataSource, 
-  syncManager: OutgoingChangeProcessor
+  outgoingChangeService: OutgoingChangeService
 ) {
   if (!dataSource.isInitialized) {
     throw new Error('DataSource must be initialized before creating Comment domain');
   }
   
   const repository = new CommentRepository(dataSource);
-  const service = new CommentService(repository, syncManager);
+  const service = new CommentService(repository, outgoingChangeService);
   
   return { repository, service };
+}
+
+// ============================================================================
+// SINGLETON SERVICE INSTANCE - For VibeGrid Integration
+// ============================================================================
+
+let commentServiceInstance: CommentService | null = null;
+
+export function setCommentService(service: CommentService): void {
+  commentServiceInstance = service;
+}
+
+export async function getCommentService(): Promise<CommentService | null> {
+  return commentServiceInstance;
+}
+
+export function hasCommentService(): boolean {
+  return commentServiceInstance !== null;
 } 

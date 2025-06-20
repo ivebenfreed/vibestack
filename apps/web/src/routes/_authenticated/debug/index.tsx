@@ -57,6 +57,41 @@ function DebugIndexPage() {
       description: 'Data table component testing',
       path: '/debug/data-table',
       color: 'border-gray-200 hover:border-gray-300'
+    },
+    {
+      title: '🔥 VibeGrid Native (Clean Break)',
+      description: 'NEWEST: Pure TanStack Table implementation with native meta property configuration. Zero XState complexity, instant performance, ~150 lines vs 950+ old lines.',
+      path: '/debug/vibegrid-native',
+      color: 'border-emerald-200 hover:border-emerald-300 bg-emerald-50',
+      badge: 'CLEAN BREAK'
+    },
+    {
+      title: '🔥 VibeGrid Generated (Fully Generated)',
+      description: 'NEWEST: Fully generated columns using TaskColumns from generated config. Universal cell renderer with all metadata, business logic, and relationships automatically included.',
+      path: '/debug/vibegrid-generated',
+      color: 'border-red-200 hover:border-red-300 bg-red-50',
+      badge: 'FULLY GENERATED'
+    },
+    {
+      title: '🔥 VibeGrid Registry (Scalable)',
+      description: 'SCALABLE: Uses existing native cell components with registry pattern. Supports 20+ cell types with component isolation and tree shaking. No universal renderer complexity.',
+      path: '/debug/vibegrid-registry',
+      color: 'border-purple-200 hover:border-purple-300 bg-purple-50',
+      badge: 'SCALABLE REGISTRY'
+    },
+    {
+      title: '🎯 VibeGrid Tasks Example',
+      description: 'Complete VibeGrid architecture demonstration with Tasks entity. Shows Domain Store → XState Machine → TanStack Table → React Aria UI integration.',
+      path: '/debug/vibegrid-tasks',
+      color: 'border-purple-200 hover:border-purple-300 bg-purple-50',
+      badge: 'LEGACY ARCHITECTURE'
+    },
+    {
+      title: '🧩 VibeGridFinal Tasks (Modular)',
+      description: 'MODULAR: Demonstrates the new modularized VibeGridFinal architecture. Clean separation of concerns with preserved 42.54ms performance and 100% feature parity.',
+      path: '/debug/vibegridfinal-tasks',
+      color: 'border-indigo-200 hover:border-indigo-300 bg-indigo-50',
+      badge: 'MODULAR ARCHITECTURE'
     }
   ]
 
@@ -81,8 +116,18 @@ function DebugIndexPage() {
           <Card key={page.path} className={`transition-colors ${page.color} relative`}>
             {page.badge && (
               <div className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full ${
-                page.badge === 'NEW ARCHITECTURE' 
+                page.badge === 'CLEAN BREAK' 
+                  ? 'bg-emerald-100 text-emerald-800' 
+                  : page.badge === 'NEW ARCHITECTURE' 
                   ? 'bg-green-100 text-green-800' 
+                  : page.badge === 'FULLY GENERATED'
+                  ? 'bg-red-100 text-red-800'
+                  : page.badge === 'SCALABLE REGISTRY'
+                  ? 'bg-purple-100 text-purple-800'
+                  : page.badge === 'LEGACY ARCHITECTURE'
+                  ? 'bg-orange-100 text-orange-800'
+                  : page.badge === 'MODULAR ARCHITECTURE'
+                  ? 'bg-indigo-100 text-indigo-800'
                   : 'bg-gray-100 text-gray-600'
               }`}>
                 {page.badge}
@@ -97,7 +142,12 @@ function DebugIndexPage() {
               </p>
               <Link to={page.path}>
                 <Button variant="outline" className="w-full">
-                  {page.badge === 'NEW ARCHITECTURE' ? '🚀 Open New Debug Panel' : 'Open Tool'}
+                  {page.badge === 'CLEAN BREAK' ? '🔥 Open Native Implementation' 
+                   : page.badge === 'NEW ARCHITECTURE' ? '🚀 Open New Debug Panel' 
+                   : page.badge === 'FULLY GENERATED' ? '🔥 Open Generated Implementation'
+                   : page.badge === 'SCALABLE REGISTRY' ? '🔥 Open Registry Implementation'
+                   : page.badge === 'MODULAR ARCHITECTURE' ? '🧩 Open Modular Implementation'
+                   : 'Open Tool'}
                 </Button>
               </Link>
             </CardContent>

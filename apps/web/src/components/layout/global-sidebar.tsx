@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
@@ -20,62 +20,35 @@ interface NavItemProps {
   isMobile: boolean
 }
 
+// ⚡ PERFORMANCE: Simple memoized NavItem to prevent re-renders during hover
 function NavItem({ sectionId, icon: Icon, label, isActive, isMobile }: NavItemProps) {
-  const matchRoute = useMatchRoute()
-  const navigate = useNavigate()
-  
-  // Determine the route for this section
-  const getRouteForSection = (section: string) => {
-    switch (section) {
+  // ⚡ PERFORMANCE: Memoize route calculation to prevent recalculation on every render
+  const route = React.useMemo(() => {
+    switch (sectionId) {
       case 'home': return '/'
       case 'projects': return '/projects'
       case 'settings': return '/settings'
       case 'debug': return '/debug'
       default: return '/'
     }
-  }
-  
-  const route = getRouteForSection(sectionId)
-  const isCurrentRoute = matchRoute({ to: route, fuzzy: true })
-  
-  const handleClick = () => {
-    // 🎯 DEBUG: Time the entire navigation process
-    const clickTime = performance.now()
-    console.log(`🔥 [GlobalSidebar] CLICK DETECTED for section: ${sectionId} to route: ${route}`)
-    if (import.meta.env.DEV) {
-      console.log(`[GlobalSidebar] Navigation click for section: ${sectionId} to route: ${route}`)
-    }
-    
-    // Defer navigation to next tick for instant click response
-    setTimeout(() => {
-      const navStartTime = performance.now()
-      console.log(`[GlobalSidebar] Starting navigation to ${route} at ${navStartTime - clickTime}ms after click`)
-      
-      navigate({ to: route })
-      
-      // Check when navigation completes
-      setTimeout(() => {
-        const navEndTime = performance.now()
-        console.log(`[GlobalSidebar] Navigation to ${route} took ${navEndTime - navStartTime}ms total`)
-      }, 0)
-    }, 0)
-  }
+  }, [sectionId])
   
   if (isMobile) {
     return (
-      <div
+      <Link
+        to={route}
         className={cn(
-          'flex flex-col items-center justify-center p-2 rounded-md transition-colors text-xs cursor-pointer',
+          'flex flex-col items-center justify-center p-2 rounded-md text-xs',
           'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          (isActive || isCurrentRoute) 
+          isActive 
             ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
             : 'text-sidebar-foreground'
         )}
-        onClick={handleClick}
+        preload={false}
       >
         <Icon className="h-5 w-5 mb-1" />
         <span className="text-xs">{label}</span>
-      </div>
+      </Link>
     )
   }
   
@@ -85,13 +58,13 @@ function NavItem({ sectionId, icon: Icon, label, isActive, isMobile }: NavItemPr
         <Link
           to={route}
           className={cn(
-            'flex items-center justify-center w-10 h-10 rounded-md transition-colors',
+            'flex items-center justify-center w-10 h-10 rounded-md',
             'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-            (isActive || isCurrentRoute) 
+            isActive 
               ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
               : 'text-sidebar-foreground'
           )}
-          preload="intent"
+          preload={false}
         >
           <Icon className="h-5 w-5" />
         </Link>
@@ -135,13 +108,14 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
             to="/" 
             className="flex items-center justify-center p-2 rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             aria-label="Home"
-            onClick={() => useLayoutStore.setActiveSection('home')}
+            preload={false}
           >
             <VLogo />
           </Link>
         </div>
         <div className="flex flex-1 flex-col items-center gap-1 p-2">
-          <TooltipProvider delayDuration={200}>
+          {/* ⚡ PERFORMANCE: Increased delay to 800ms to prevent premature tooltip calculations */}
+          <TooltipProvider delayDuration={800} skipDelayDuration={200}>
             {globalSidebarData.map((section) => (
               <NavItem 
                 key={section.id}
