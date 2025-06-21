@@ -104,6 +104,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         
+      - name: Build Dataforge Package
+        working-directory: packages/dataforge
+        run: pnpm run forge:build
+        
       - name: Deploy Backend to Staging
         uses: cloudflare/wrangler-action@v3
         with:
@@ -161,6 +165,10 @@ jobs:
         
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        
+      - name: Build Dataforge Package
+        working-directory: packages/dataforge
+        run: pnpm run forge:build
         
       - name: Deploy Backend to Production
         uses: cloudflare/wrangler-action@v3
