@@ -1,7 +1,7 @@
 name = "vibestack-web"
 compatibility_date = "2025-04-03"
 compatibility_flags = ["nodejs_compat"]
-main = "./dist/vibestack_web/index.js"
+main = "./worker/index.ts"
 
 # Assets configuration for serving static files
 [assets]
