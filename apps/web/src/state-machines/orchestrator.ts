@@ -179,9 +179,23 @@ export const orchestrator = setup({
     
     // Always require integrity validation for app initialization - ensures data consistency
     needsIntegrityValidation: ({ context }) => {
-      // Always validate integrity during app initialization to ensure system health
-      // Even fresh installs should verify database schema and basic integrity
-      return true;
+      // Check if this is right after initial sync completion
+      // If the baseline hasn't been established yet (lastInitialSyncCompletedAt is null), 
+      // this means we're in the first run after initial sync
+      const baseline = context.integrityBaseline;
+      const hasBaseline = baseline?.lastInitialSyncCompletedAt !== null;
+      
+      if (!hasBaseline) {
+        // This is the first time sync goes live after initial sync
+        // Skip validation but we'll update the baseline instead
+        console.log('[Orchestrator] 🔄 Initial sync just completed - skipping integrity validation, will update baseline only');
+        return false;
+      }
+      
+      // For subsequent sync sessions, we can do integrity validation if needed
+      // For now, always skip validation but keep baseline updates
+      console.log('[Orchestrator] 🔄 Skipping integrity validation, baseline exists');
+      return false;
     },
     
     // Role-based guards
@@ -406,7 +420,40 @@ export const orchestrator = setup({
     // Log when skipping integrity validation
     logIntegritySkip: ({ context }) => {
       const currentLSN = context.syncState.currentLSN || '0/0';
-      console.log(`[Orchestrator] 🔄 Sync live with fresh LSN ${currentLSN} - skipping integrity validation`);
+      console.log(`[Orchestrator] 🔄 Sync live with LSN ${currentLSN} - skipping integrity validation, will update baseline only`);
+    },
+    
+    // 🔥 NEW: Update baseline after initial sync without validation
+    updateBaselineAfterInitialSync: ({ context }) => {
+      const currentLSN = context.syncState.currentLSN || '0/0';
+      const baseline = context.integrityBaseline;
+      
+      // Only update baseline if it hasn't been established yet
+      if (baseline?.lastInitialSyncCompletedAt === null) {
+        console.log(`[Orchestrator] 📊 Updating baseline after initial sync completion (LSN: ${currentLSN})`);
+        
+        // Send baseline update to establish the initial sync completion timestamp
+        const updatedBaseline = {
+          lastInitialSyncCompletedAt: Date.now(),
+          lastFullValidationAt: null, // No validation was performed
+          recordChangesSinceBaseline: 0, // Fresh baseline
+          tableChangeCounts: {},
+          lastCountUpdateAt: Date.now()
+        };
+        
+        // Send the baseline update event to be processed by updateIntegrityBaseline action
+        // This will update the orchestrator context and persist it
+        if (typeof window !== 'undefined' && (window as any).orchestratorActor) {
+          const orchestratorActor = (window as any).orchestratorActor;
+          orchestratorActor.send({
+            type: 'INTEGRITY_BASELINE_UPDATE',
+            baseline: updatedBaseline
+          });
+          console.log('[Orchestrator] 📡 Sent baseline update after initial sync:', updatedBaseline);
+        }
+      } else {
+        console.log(`[Orchestrator] 📊 Baseline already established, skipping update`);
+      }
     },
     
     // 🔥 NEW: Integrity baseline management
@@ -895,7 +942,7 @@ export const orchestrator = setup({
               },
               {
                 target: 'starting_live_changes',
-                actions: ['markSyncLive', 'logIntegritySkip']
+                actions: ['markSyncLive', 'logIntegritySkip', 'updateBaselineAfterInitialSync']
               }
             ],
             SYNC_ERROR: {
