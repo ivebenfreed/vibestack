@@ -60,6 +60,9 @@ logs
 # Documentation
 docs/
 
+# Reference implementations and external projects
+ref/
+
 local-neon/
 # CLI package specific
 packages/cli/.env
