@@ -28,14 +28,6 @@ function DebugIndexPage() {
       color: 'border-blue-200 hover:border-blue-300'
     },
     {
-      title: 'Legacy Sync Testing',
-      description: 'Legacy manual sync testing and debugging (old SyncManager)',
-      path: '/debug/sync-test',
-      color: 'border-gray-200 hover:border-gray-300 opacity-75',
-      badge: 'LEGACY'
-    },
-
-    {
       title: 'Live Query Tests',
       description: 'Test live query functionality',
       path: '/debug/live-query',
@@ -47,7 +39,6 @@ function DebugIndexPage() {
       path: '/debug/performance',
       color: 'border-orange-200 hover:border-orange-300'
     },
-
     {
       title: '🔥 VibeGrid Native (Clean Break)',
       description: 'NEWEST: Pure TanStack Table implementation with native meta property configuration. Zero XState complexity, instant performance, ~150 lines vs 950+ old lines.',
@@ -55,8 +46,6 @@ function DebugIndexPage() {
       color: 'border-emerald-200 hover:border-emerald-300 bg-emerald-50',
       badge: 'CLEAN BREAK'
     },
-
-    
     {
       title: '🧩 VibeGridFinal Tasks (Modular)',
       description: 'MODULAR: Demonstrates the new modularized VibeGridFinal architecture. Clean separation of concerns with preserved 42.54ms performance and 100% feature parity.',

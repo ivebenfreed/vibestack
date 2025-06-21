@@ -6,17 +6,10 @@ export function DebugNavigation() {
   const debugRoutes = [
     { path: '/debug/database', label: 'Database' },
     { path: '/debug/sync', label: 'Sync' },
-    
-    { path: '/debug/sync-test', label: 'Sync Testing' },
     { path: '/debug/live-query', label: 'Live Query' },
     { path: '/debug/performance', label: 'Live Query Performance' },
     { path: '/debug/multi-query', label: 'Multi-Query Test' },
-    
-    { path: '/debug/data-table-v2', label: 'Data Table V2' },
-    
-    
     { path: '/debug/vibegrid-native', label: 'VibeGrid Native' },
-    
     { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal Tasks' },
     { path: '/debug/typeorm-test', label: 'TypeORM Test' },
     { path: '/debug/tasks-new-pattern', label: 'Tasks New Pattern' },
