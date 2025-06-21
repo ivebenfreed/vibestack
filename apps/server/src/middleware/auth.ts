@@ -13,8 +13,8 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
 
     if (sessionData) {
       // Session found, set user and session in context
-      c.set('user', sessionData.user);
-      c.set('session', sessionData.session);
+      c.set('user', sessionData.user as any);
+      c.set('session', sessionData.session as any);
     } else {
       // No session found, explicitly set to null
       c.set('user', null);

@@ -29,7 +29,7 @@ sync.get('/ws', async (c) => {
     // Session is valid, proceed with WebSocket connection
     syncLogger.info('User authenticated for sync connection via session cookie', {
       clientId,
-      userId: sessionData.user.id
+      userId: (sessionData.user as any)?.id
     });
     
     // Create and return a Durable Object instance for this client
