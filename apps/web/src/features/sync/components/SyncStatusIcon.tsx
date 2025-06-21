@@ -20,6 +20,7 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
   
   // Destructure from the sync machine state
   const {
+    clientId,
     syncPhase,
     syncProgress,
     isInitialSync,
@@ -64,7 +65,14 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
                       statusText ? `Status: ${statusText}` :
                       'Status: Connecting...';
     
-    return `${baseStatus}\nLSN: ${currentLSN || '0/0'}`;
+    return baseStatus;
+  };
+
+  const getClientIdDisplay = () => {
+    if (!clientId) return 'unknown';
+    const firstPart = clientId.substring(0, 18);
+    const secondPart = clientId.substring(18);
+    return { firstPart, secondPart };
   };
 
   const getAriaLabel = (): string => {
@@ -97,7 +105,23 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{getTooltipText()}</p>
+          <div className="text-sm">
+            <div>{getTooltipText()}</div>
+            <div className="mt-1">
+              <div>Client ID:</div>
+              <div className="font-mono text-xs">
+                {clientId ? (
+                  <>
+                    <div>{clientId.substring(0, 18)}</div>
+                    <div>{clientId.substring(18)}</div>
+                  </>
+                ) : (
+                  'unknown'
+                )}
+              </div>
+            </div>
+            <div className="mt-1">LSN: {currentLSN || '0/0'}</div>
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

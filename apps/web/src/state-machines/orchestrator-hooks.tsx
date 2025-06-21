@@ -209,6 +209,7 @@ export function useSyncMachine() {
   
   return useSelector(actor, (snapshot) => {
     const syncState = snapshot.context.syncState;
+    const syncClientId = snapshot.context.syncClientId;
     // Remove excessive logging that was causing performance issues during scroll
     // console.log(`[useSyncMachine] 🔍 Reading syncState from orchestrator context:`, {
     //   phase: syncState.phase,
@@ -217,6 +218,9 @@ export function useSyncMachine() {
     // });
     
     return {
+      // Client ID from orchestrator context
+      clientId: syncClientId,
+      
       // Sync phase information
       syncPhase: syncState.phase,
       syncProgress: syncState.progress,
