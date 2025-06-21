@@ -12,6 +12,7 @@
     "dev:pwa-test": "pnpm _build:web:for_pwa_test && turbo run _start_servers_for_pwa_test --filter=vibestack-web --filter=server",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "type-check": "turbo run typecheck --filter=./apps/server && cd apps/web && npx tsc --noEmit",
     "quality": "pnpm --filter @repo/code-quality build && pnpm --filter @repo/code-quality quality",
     "prebuild": "pnpm quality",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
