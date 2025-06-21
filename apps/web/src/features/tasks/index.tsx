@@ -43,20 +43,13 @@ const Tasks: React.FC = () => {
   // 🔥 ENFORCED PATTERNS: Balanced Selectors (Required by DirectUsagePattern)
   // ============================================================================
   
-  // ✅ BALANCED SELECTOR: Detects both structural AND content changes
-  const useBalancedSelector = React.useCallback(() => {
-    return useSelector(tasksAtom, (tasksRecord) => {
-      if (!tasksRecord || typeof tasksRecord !== 'object') return []
-      
-      // Return tasks array sorted by updated timestamp (most recent first)
-      const tasksArray = Object.values(tasksRecord)
-      return tasksArray.sort((a, b) => {
-        const aTime = new Date(a.updatedAt || a.createdAt).getTime()
-        const bTime = new Date(b.updatedAt || b.createdAt).getTime()
-        return bTime - aTime // Latest first
-      })
-    }, shallowEqual)
-  }, [])
+  // ✅ FIXED: Balanced surgical selector - detects both structural AND content changes
+  const tasks = useSelector(tasksAtom, (tasksRecord) => {
+    if (!tasksRecord || typeof tasksRecord !== 'object') return []
+    
+    // Return tasks array without forced sorting - let table handle sorting
+    return Object.values(tasksRecord)
+  }, shallowEqual)
 
   // ✅ RELATIONSHIP SELECTORS: Using same balanced pattern
   const useRelationshipSelectors = React.useCallback(() => {
@@ -74,7 +67,6 @@ const Tasks: React.FC = () => {
   }, [])
 
   // Execute selectors
-  const tasks = useBalancedSelector()
   const { projects, users } = useRelationshipSelectors()
 
   // ============================================================================
@@ -182,7 +174,7 @@ const Tasks: React.FC = () => {
   
   const usagePattern: DirectUsagePattern<Task> = React.useMemo(() => {
     return createDirectUsagePattern<Task>({
-      useBalancedSelector,
+      useBalancedSelector: () => tasks,
       useRelationshipSelectors,
       handleSave,
       handleBulkAction,
@@ -191,7 +183,7 @@ const Tasks: React.FC = () => {
       tableId: 'tasks-grid',
       enablePersistence: true
     })
-  }, [useBalancedSelector, useRelationshipSelectors, handleSave, handleBulkAction, columns, relationshipData])
+  }, [tasks, useRelationshipSelectors, handleSave, handleBulkAction, columns, relationshipData])
 
   // ✅ COMPILE-TIME VALIDATION: Ensure patterns are followed
   const validation = React.useMemo(() => {
@@ -236,8 +228,8 @@ const Tasks: React.FC = () => {
               pageSize={10}
               className="border border-border rounded-lg"
               debugMode={true}
-                      debugEllipsis={false}
-        debugBorders={false}
+              debugEllipsis={false}
+              debugBorders={false}
               tableId="tasks-grid"
               enablePersistence={true}
               enableCrossTabSync={false}
