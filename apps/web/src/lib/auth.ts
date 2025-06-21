@@ -1,12 +1,23 @@
 import { createAuthClient } from "better-auth/react"; // Use React client
 
 // Define the base URL for the Better Auth server
-// In local development, we'll use the current origin instead of an empty string
-// This works with Vite's proxy configuration
-const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const authApiBaseUrl = isLocalDev 
-  ? window.location.origin // Use current origin for local development
-  : (import.meta.env.VITE_API_URL || "http://127.0.0.1:8787");
+// Using same-origin architecture - everything from same domain
+const currentHostname = window.location.hostname;
+const isLocalDev = currentHostname === 'localhost' || currentHostname === '127.0.0.1';
+
+// Debug logging to see what's happening
+console.log('[AUTH] Environment detection:', {
+  hostname: currentHostname,
+  isLocalDev,
+  origin: window.location.origin,
+  importMetaEnv: import.meta.env,
+  NODE_ENV: import.meta.env.NODE_ENV,
+  PROD: import.meta.env.PROD
+});
+
+// Use same origin for all environments - no cross-origin requests needed
+const authApiBaseUrl = window.location.origin;
+console.log('[AUTH] Using same-origin API URL:', authApiBaseUrl);
 
 // Create the Better Auth client instance
 export const authClient = createAuthClient({

@@ -30,10 +30,9 @@ const DebugSidebarContent = React.memo(function DebugSidebarContent() {
       title: "Data Tables",
       items: [
         { title: "Data Table V2", url: "/debug/data-table-v2", icon: Table },
-        { title: "VibeGrid Tasks", url: "/debug/vibegrid-tasks", icon: Grid3X3 },
+
         { title: "VibeGrid Native", url: "/debug/vibegrid-native", icon: Grid3X3 },
-        { title: "VibeGrid Generated", url: "/debug/vibegrid-generated", icon: Grid3X3 },
-        { title: "VibeGrid Registry", url: "/debug/vibegrid-registry", icon: Grid3X3 },
+
         { title: "VibeGridFinal Tasks", url: "/debug/vibegridfinal-tasks", icon: Grid3X3 },
       ]
     },

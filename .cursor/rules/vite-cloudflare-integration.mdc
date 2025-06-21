@@ -1,0 +1,161 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Vite + Cloudflare Workers Integration
+
+## Critical Vite Configuration
+
+### Base Path Configuration
+**CRITICAL:** Set `base: './'` in [vite.config.ts](mdc:apps/web/vite.config.ts) to fix TypeORM module resolution in Workers.
+
+```typescript
+export default defineConfig({
+  base: './', // Essential for Workers module resolution
+  plugins: [
+    ...(process.env.NODE_ENV === 'production' ? [cloudflare()] : []),
+  ]
+})
+```
+
+**Why:** Cloudflare Workers need relative module paths, not absolute paths. Without this, you'll get:
+```
+"Failed to resolve module specifier 'typeorm'. Relative references must start with either "/", "./", or "../"."
+```
+
+### Cloudflare Plugin Configuration
+- **Pattern:** Only enable in production builds to avoid dev conflicts
+- **Environment Selection:** Use `CLOUDFLARE_ENV` environment variable, not plugin options
+- **Generated Config:** Plugin creates redirected wrangler.json in dist directory
+
+### TypeORM Bundling
+```typescript
+// In vite.config.ts
+resolve: {
+  alias: {
+    typeorm: 'typeorm/browser', // Use browser bundle
+  }
+},
+build: {
+  rollupOptions: {
+    // Don't externalize typeorm - bundle it
+    // external: ["typeorm"] // NEVER do this with Workers
+  }
+}
+```
+
+## Environment Handling Patterns
+
+### Build-Time Environment Selection
+```bash
+# Correct pattern for Cloudflare Vite plugin
+CLOUDFLARE_ENV=staging vite build
+CLOUDFLARE_ENV=production vite build
+
+# NOT this (will fail with redirected config error):
+vite build && wrangler deploy --env staging
+```
+
+### Package.json Script Pattern
+```json
+{
+  "cf:deploy:staging": "CLOUDFLARE_ENV=staging npm run cf:build && wrangler deploy",
+  "cf:deploy:production": "CLOUDFLARE_ENV=production npm run cf:build && wrangler deploy"
+}
+```
+
+### Environment Variable Mapping
+- **Build Time:** `CLOUDFLARE_ENV` selects wrangler.toml environment
+- **Runtime:** Environment vars from wrangler.toml available in worker
+- **Development:** Use [.dev.vars](mdc:apps/server/.dev.vars) for local secrets
+
+## Worker Configuration
+
+### Assets Configuration
+```toml
+# In wrangler.toml
+[assets]
+directory = "./dist/client"
+not_found_handling = "single-page-application"
+```
+
+### API Proxy Pattern
+```typescript
+// In worker/index.ts
+if (url.pathname.startsWith('/api/')) {
+  // Proxy to backend worker
+  const backendUrl = new URL(url.pathname, env.API_BASE_URL);
+  return fetch(backendUrl, request);
+}
+// Serve static assets
+return env.ASSETS.fetch(request);
+```
+
+## Development Workflow
+
+### Local Development
+1. **Frontend:** `vite dev` (with proxy to backend)
+2. **Backend:** `wrangler dev --inspector-port=9230`
+3. **Database:** Local PGlite or remote Neon
+
+### Production Build Process
+1. **Build:** `CLOUDFLARE_ENV=production vite build`
+2. **Generated:** `dist/vibestack_web/wrangler.json` (flattened config)
+3. **Deploy:** `wrangler deploy` (uses generated config)
+
+## Common Issues & Solutions
+
+### Module Resolution Errors
+```
+Error: "Failed to resolve module specifier 'typeorm'"
+Solution: Add base: './' to vite.config.ts
+```
+
+### Environment Flag Conflicts
+```
+Error: "You have specified the environment but are using a redirected configuration"
+Solution: Use CLOUDFLARE_ENV during build, remove --env from deploy
+```
+
+### TypeORM Browser Compatibility
+```typescript
+// Use browser-compatible alias
+resolve: {
+  alias: {
+    typeorm: 'typeorm/browser'
+  }
+}
+```
+
+### Port Conflicts in Development
+```bash
+# Backend
+wrangler dev --inspector-port=9230
+
+# Frontend (when testing Workers)
+wrangler dev --inspector-port=9231
+```
+
+## File Structure After Build
+
+```
+dist/
+├── client/           # Static assets for serving
+│   ├── assets/
+│   ├── index.html
+│   └── ...
+└── vibestack_web/    # Worker deployment files
+    ├── wrangler.json # Generated, flattened config
+    ├── index.js      # Worker entry point
+    └── ...
+```
+
+## Best Practices
+
+1. **Always set `base: './'` for Workers compatibility**
+2. **Use CLOUDFLARE_ENV for environment selection**
+3. **Bundle TypeORM, don't externalize it**
+4. **Test locally with wrangler dev before deploying**
+5. **Use inspector ports to avoid conflicts**
+6. **Keep Cloudflare plugin production-only in dev**

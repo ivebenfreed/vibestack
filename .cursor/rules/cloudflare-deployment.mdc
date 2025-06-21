@@ -1,0 +1,153 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Cloudflare Workers Deployment Architecture
+
+## Overview
+This project uses a same-origin architecture where both frontend and backend are deployed as Cloudflare Workers, with the frontend proxying API requests to the backend worker.
+
+## Architecture Pattern
+
+### Same-Origin Setup
+- **Frontend:** React SPA served from `app.codevibesmatter.com` (production) or `dev.codevibesmatter.com` (staging)
+- **Backend:** Hono API Worker accessed internally via workers.dev URLs
+- **API Proxy:** Frontend worker proxies `/api/*` requests to backend worker
+- **Authentication:** Same-origin cookies with SameSite=Lax
+
+### Environment Structure
+```
+Production:
+├── Frontend: app.codevibesmatter.com
+├── Backend: vibestack-server-production.team-c5f.workers.dev (internal)
+└── Database: Neon PostgreSQL (production)
+
+Staging:
+├── Frontend: dev.codevibesmatter.com  
+├── Backend: vibestack-server-staging.team-c5f.workers.dev (internal)
+└── Database: Neon PostgreSQL (staging)
+```
+
+## Configuration Files
+
+### Backend Configuration
+- **File:** [apps/server/wrangler.toml](mdc:apps/server/wrangler.toml)
+- **Pattern:** Environment-specific sections with separate databases and secrets
+- **Key Settings:**
+  - No custom domains (accessed internally)
+  - Environment-specific Durable Objects and KV bindings
+  - Separate database URLs per environment
+
+### Frontend Configuration  
+- **File:** [apps/web/wrangler.toml](mdc:apps/web/wrangler.toml)
+- **Pattern:** Custom domains with API proxy configuration
+- **Key Settings:**
+  - Assets configuration for static file serving
+  - Environment-specific API_BASE_URL pointing to backend workers
+  - Custom domain routes per environment
+
+### Vite Configuration
+- **File:** [apps/web/vite.config.ts](mdc:apps/web/vite.config.ts)
+- **Critical:** `base: './'` for proper module resolution in Workers
+- **Pattern:** Cloudflare plugin only enabled in production builds
+
+## Deployment Commands
+
+### Environment Handling with Cloudflare Vite Plugin
+**CRITICAL:** When using `@cloudflare/vite-plugin`, environments are selected via `CLOUDFLARE_ENV` environment variable during build time, NOT via `--env` flags during deployment.
+
+```bash
+# Staging Deployment
+CLOUDFLARE_ENV=staging npm run cf:build && wrangler deploy
+
+# Production Deployment  
+CLOUDFLARE_ENV=production npm run cf:build && wrangler deploy
+```
+
+### Package.json Scripts Pattern
+- **File:** [apps/web/package.json](mdc:apps/web/package.json)
+- **Staging:** `"cf:deploy:staging": "CLOUDFLARE_ENV=staging npm run cf:build && wrangler deploy"`
+- **Production:** `"cf:deploy:production": "CLOUDFLARE_ENV=production npm run cf:build && wrangler deploy"`
+
+## Secrets Management
+
+### Backend Secrets (via wrangler secret put)
+```bash
+# Required secrets per environment:
+- DATABASE_URL (environment-specific Neon database)
+- BETTER_AUTH_SECRET (shared across environments)  
+- BETTER_AUTH_URL (environment-specific domain)
+- BOOTSTRAP_SECRET (shared across environments)
+- NEON_API_KEY (shared across environments)
+- API_URL (environment-specific domain)
+```
+
+### Development Secrets
+- **File:** [apps/server/.dev.vars](mdc:apps/server/.dev.vars)
+- **Pattern:** Use for local development values
+- **Usage:** Can copy values to staging/production via `wrangler secret put`
+
+## Authentication Configuration
+
+### Better Auth Setup
+- **File:** [apps/server/src/lib/auth.ts](mdc:apps/server/src/lib/auth.ts)
+- **Pattern:** Dynamic baseUrl based on environment
+- **Key Settings:**
+  - `baseUrl: env.BETTER_AUTH_URL` (environment-specific)
+  - `trustedOrigins: [env.API_URL]` (same-origin)
+  - Cookie settings: `secure: true, sameSite: "lax"`
+
+### Frontend Auth Configuration  
+- **File:** [apps/web/src/lib/auth.ts](mdc:apps/web/src/lib/auth.ts)
+- **Pattern:** Always use `window.location.origin` for same-origin
+- **Critical:** No cross-origin detection needed with same-origin architecture
+
+## Worker Entry Points
+
+### Frontend Worker
+- **File:** [apps/web/worker/index.ts](mdc:apps/web/worker/index.ts)
+- **Function:** Serves static assets and proxies API requests
+- **Pattern:** `/api/*` requests forwarded to backend worker
+
+### Backend Worker
+- **File:** [apps/server/src/index.ts](mdc:apps/server/src/index.ts)
+- **Function:** Hono API with database, auth, and business logic
+- **Pattern:** Internal worker accessed via service bindings
+
+## Common Issues & Solutions
+
+### TypeORM Module Resolution
+- **Issue:** `"Failed to resolve module specifier 'typeorm'"`
+- **Solution:** Set `base: './'` in [vite.config.ts](mdc:apps/web/vite.config.ts)
+- **Reason:** Workers need relative module paths, not absolute
+
+### Environment Flag Conflicts
+- **Issue:** `"You have specified the environment but are using a redirected configuration"`
+- **Solution:** Use `CLOUDFLARE_ENV` during build, not `--env` during deploy
+- **Pattern:** Let Vite plugin handle environment selection
+
+### CORS Issues
+- **Issue:** Cross-origin authentication failures
+- **Solution:** Use same-origin architecture with API proxy
+- **Benefit:** Eliminates CORS complexity entirely
+
+## Development Workflow
+
+1. **Local Development:** Use Vite dev server with proxy to local Wrangler
+2. **Staging Testing:** Deploy to staging environment for integration testing  
+3. **Production Deployment:** Deploy to production with confidence
+
+### Port Configuration
+- **Frontend Dev:** `vite dev` (default port)
+- **Backend Dev:** `wrangler dev --inspector-port=9230` (avoid port conflicts)
+- **Frontend CF Dev:** `wrangler dev --inspector-port=9230` (when testing Workers)
+
+## Best Practices
+
+1. **Always test staging before production**
+2. **Use same-origin architecture to avoid CORS complexity**
+3. **Keep secrets in Cloudflare, not in code**
+4. **Use environment-specific databases**
+5. **Follow the CLOUDFLARE_ENV pattern for consistent deployments**
+6. **Maintain separate KV/Durable Object bindings per environment**

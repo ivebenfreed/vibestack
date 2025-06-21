@@ -291,27 +291,15 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             url: '/debug/database',
             icon: IconBug,
           },
-          {
-            title: 'Data Table',
-            url: '/debug/data-table',
-            icon: IconBug,
-          },
 
-          {
-            title: 'Data Table Atom',
-            url: '/debug/data-table-atom',
-            icon: IconBug,
-          },
+
+
           {
             title: 'Sync',
             url: '/debug/sync',
             icon: IconBug,
           },
-          {
-            title: 'Sync Changes',
-            url: '/debug/sync-changes',
-            icon: IconBug,
-          },
+
           {
             title: 'Sync Testing',
             url: '/debug/sync-test',
@@ -342,26 +330,13 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             url: '/debug/tasks-new-pattern',
             icon: IconChecklist,
           },
-          {
-            title: 'VibeGrid Tasks',
-            url: '/debug/vibegrid-tasks',
-            icon: IconChecklist,
-          },
+
           {
             title: 'VibeGrid Native',
             url: '/debug/vibegrid-native',
             icon: IconChecklist,
           },
-          {
-            title: 'VibeGrid Generated',
-            url: '/debug/vibegrid-generated',
-            icon: IconChecklist,
-          },
-          {
-            title: 'VibeGrid Registry',
-            url: '/debug/vibegrid-registry',
-            icon: IconChecklist,
-          },
+
           {
             title: 'VibeGridFinal Tasks',
             url: '/debug/vibegridfinal-tasks',

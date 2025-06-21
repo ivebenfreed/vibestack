@@ -34,12 +34,7 @@ function DebugIndexPage() {
       color: 'border-gray-200 hover:border-gray-300 opacity-75',
       badge: 'LEGACY'
     },
-    {
-      title: 'Sync Changes Monitor',
-      description: 'Monitor sync changes in real-time',
-      path: '/debug/sync-changes',
-      color: 'border-yellow-200 hover:border-yellow-300'
-    },
+
     {
       title: 'Live Query Tests',
       description: 'Test live query functionality',
@@ -52,12 +47,7 @@ function DebugIndexPage() {
       path: '/debug/performance',
       color: 'border-orange-200 hover:border-orange-300'
     },
-    {
-      title: 'Data Table Tests',
-      description: 'Data table component testing',
-      path: '/debug/data-table',
-      color: 'border-gray-200 hover:border-gray-300'
-    },
+
     {
       title: '🔥 VibeGrid Native (Clean Break)',
       description: 'NEWEST: Pure TanStack Table implementation with native meta property configuration. Zero XState complexity, instant performance, ~150 lines vs 950+ old lines.',
@@ -65,27 +55,8 @@ function DebugIndexPage() {
       color: 'border-emerald-200 hover:border-emerald-300 bg-emerald-50',
       badge: 'CLEAN BREAK'
     },
-    {
-      title: '🔥 VibeGrid Generated (Fully Generated)',
-      description: 'NEWEST: Fully generated columns using TaskColumns from generated config. Universal cell renderer with all metadata, business logic, and relationships automatically included.',
-      path: '/debug/vibegrid-generated',
-      color: 'border-red-200 hover:border-red-300 bg-red-50',
-      badge: 'FULLY GENERATED'
-    },
-    {
-      title: '🔥 VibeGrid Registry (Scalable)',
-      description: 'SCALABLE: Uses existing native cell components with registry pattern. Supports 20+ cell types with component isolation and tree shaking. No universal renderer complexity.',
-      path: '/debug/vibegrid-registry',
-      color: 'border-purple-200 hover:border-purple-300 bg-purple-50',
-      badge: 'SCALABLE REGISTRY'
-    },
-    {
-      title: '🎯 VibeGrid Tasks Example',
-      description: 'Complete VibeGrid architecture demonstration with Tasks entity. Shows Domain Store → XState Machine → TanStack Table → React Aria UI integration.',
-      path: '/debug/vibegrid-tasks',
-      color: 'border-purple-200 hover:border-purple-300 bg-purple-50',
-      badge: 'LEGACY ARCHITECTURE'
-    },
+
+    
     {
       title: '🧩 VibeGridFinal Tasks (Modular)',
       description: 'MODULAR: Demonstrates the new modularized VibeGridFinal architecture. Clean separation of concerns with preserved 42.54ms performance and 100% feature parity.',
@@ -120,10 +91,6 @@ function DebugIndexPage() {
                   ? 'bg-emerald-100 text-emerald-800' 
                   : page.badge === 'NEW ARCHITECTURE' 
                   ? 'bg-green-100 text-green-800' 
-                  : page.badge === 'FULLY GENERATED'
-                  ? 'bg-red-100 text-red-800'
-                  : page.badge === 'SCALABLE REGISTRY'
-                  ? 'bg-purple-100 text-purple-800'
                   : page.badge === 'LEGACY ARCHITECTURE'
                   ? 'bg-orange-100 text-orange-800'
                   : page.badge === 'MODULAR ARCHITECTURE'
@@ -144,8 +111,6 @@ function DebugIndexPage() {
                 <Button variant="outline" className="w-full">
                   {page.badge === 'CLEAN BREAK' ? '🔥 Open Native Implementation' 
                    : page.badge === 'NEW ARCHITECTURE' ? '🚀 Open New Debug Panel' 
-                   : page.badge === 'FULLY GENERATED' ? '🔥 Open Generated Implementation'
-                   : page.badge === 'SCALABLE REGISTRY' ? '🔥 Open Registry Implementation'
                    : page.badge === 'MODULAR ARCHITECTURE' ? '🧩 Open Modular Implementation'
                    : 'Open Tool'}
                 </Button>

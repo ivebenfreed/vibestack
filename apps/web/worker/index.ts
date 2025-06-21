@@ -1,4 +1,7 @@
 interface Env {
+  ENVIRONMENT: string;
+  API_BASE_URL: string;
+  // Add other environment variables as needed
   // If you set up bindings in your wrangler.toml, define their types here.
   // For example, if you have a KV namespace:
   // MY_KV_NAMESPACE: KVNamespace;
@@ -16,33 +19,19 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
-    // Route requests starting with /api/ to the API handler
+    // Handle API requests - proxy to backend worker
     if (url.pathname.startsWith("/api/")) {
-      // Simple API endpoint example
-      // In a real app, you'd likely have more robust routing here.
-      return Response.json({
-        name: "Cloudflare", // Data returned by the API
-        message: "Hello from the Worker API!",
-        timestamp: new Date().toISOString(),
+      const backendUrl = `${env.API_BASE_URL}${url.pathname}${url.search}`;
+      
+      return fetch(backendUrl, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
       });
     }
 
-    // For non-API requests that aren't static assets handled by the `assets` config,
-    // the Cloudflare Vite plugin expects a 404 response for SPA mode.
-    // The plugin intercepts navigation requests (HTML) and invokes the
-    // `not_found_handling = "single-page-application"` behavior from wrangler.toml.
-    // For other non-asset, non-API requests (like fetching a non-existent image), 
-    // returning a 404 is appropriate.
-    return new Response(null, { status: 404 });
-
-    // Important Note from Tutorial regarding ASSETS binding:
-    // The tutorial *sometimes* shows using env.ASSETS.fetch(request) as a fallback.
-    // However, with `assets = { not_found_handling = "single-page-application" }` 
-    // and the Vite plugin, this is usually handled automatically for navigation requests.
-    // Manually calling env.ASSETS.fetch might interfere with the plugin's SPA handling.
-    // The safest approach for SPA mode is often to let the plugin handle asset serving
-    // and return 404 for unhandled non-API requests.
-    // If you were *not* using SPA mode or had different asset handling needs,
-    // you might use: return env.ASSETS.fetch(request);
+    // Handle static assets and SPA routing
+    // Use the ASSETS binding to serve static files and handle SPA routing
+    return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>; 

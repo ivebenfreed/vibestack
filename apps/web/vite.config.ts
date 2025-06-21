@@ -8,6 +8,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Use relative paths for proper module resolution in Workers
+  // See: https://github.com/vitejs/vite/discussions/15547
+  base: './',
   plugins: [
     // Conditionally include VitePWA only in production
     ...(process.env.NODE_ENV === 'production' ? [
@@ -37,7 +40,8 @@ export default defineConfig({
         }
       })
     ] : []),
-    // cloudflare(),
+    // Enable Cloudflare Workers deployment (only for builds, not dev)
+    ...(process.env.NODE_ENV === 'production' ? [cloudflare()] : []),
     TanStackRouterVite({
       target: 'react',
       autoCodeSplitting: true,
@@ -46,7 +50,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   optimizeDeps: {
-    include: ['reflect-metadata', 'class-transformer', 'class-validator', 'typeorm/browser'],
+    include: ['reflect-metadata', 'class-transformer', 'class-validator', 'typeorm', 'typeorm/browser'],
     exclude: ['@electric-sql/pglite']
   },
   esbuild: {
@@ -55,7 +59,14 @@ export default defineConfig({
     }
   },
   worker: {
-    format: 'es'
+    format: 'es',
+    rollupOptions: {
+      // Ensure TypeORM is bundled in the worker instead of being external
+      external: [],
+      output: {
+        format: 'es'
+      }
+    }
   },
   resolve: {
     alias: {
@@ -70,10 +81,11 @@ export default defineConfig({
       '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs',
     },
   },
-  // Add build options to externalize typeorm
+  // Build configuration for Cloudflare Workers
   build: {
     rollupOptions: {
-      external: ["typeorm"]
+      // Don't externalize typeorm - it needs to be bundled for Workers
+      // external: ["typeorm"] // REMOVED - this was causing the module resolution error
     }
   },
   server: {

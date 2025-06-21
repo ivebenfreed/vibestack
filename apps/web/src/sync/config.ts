@@ -13,12 +13,16 @@ const isDeployedPreview = import.meta.env.VITE_PREVIEW === 'true';
 const DEV_API_HOST = '127.0.0.1:8787';
 const DEV_WS_PROTOCOL = 'ws';
 
-// Production URLs
-const PROD_API_HOST = 'api.vibestack.app';
+// Production URLs - using same-origin architecture
+const PROD_API_HOST = 'app.codevibesmatter.com';
 const PROD_WS_PROTOCOL = 'wss';
 
+// Staging URLs - using same-origin architecture
+const STAGING_API_HOST = 'dev.codevibesmatter.com';
+const STAGING_WS_PROTOCOL = 'wss';
+
 // Production preview URLs
-const PREVIEW_API_HOST = 'preview.api.vibestack.app';
+const PREVIEW_API_HOST = 'preview.app.codevibesmatter.com';
 
 // Get configured API URL from environment if available
 // This supports different local development setups
@@ -41,17 +45,39 @@ export function getApiBaseUrl(): string {
     }
   }
   
-  // Otherwise use environment detection
-  if (isProduction) {
-    return `https://${PROD_API_HOST}`;
+  // Otherwise use environment detection based on hostname
+  try {
+    const hostname = window.location.hostname;
+    
+    // Staging environment
+    if (hostname === 'dev.codevibesmatter.com') {
+      return `https://${STAGING_API_HOST}`;
+    }
+    
+    // Production environment  
+    if (hostname === 'app.codevibesmatter.com') {
+      return `https://${PROD_API_HOST}`;
+    }
+    
+    // Preview environment
+    if (hostname.includes('preview')) {
+      return `https://${PREVIEW_API_HOST}`;
+    }
+    
+    // Default to local development
+    return `http://${DEV_API_HOST}`;
+  } catch (e) {
+    // Fallback for environments without window
+    if (isProduction) {
+      return `https://${PROD_API_HOST}`;
+    }
+    
+    if (isDeployedPreview) {
+      return `https://${PREVIEW_API_HOST}`;
+    }
+    
+    return `http://${DEV_API_HOST}`;
   }
-  
-  if (isDeployedPreview) {
-    return `https://${PREVIEW_API_HOST}`;
-  }
-  
-  // Default to local development
-  return `https://${DEV_API_HOST}`;
 }
 
 /**
@@ -63,24 +89,31 @@ export function getSyncWebSocketUrl(): string {
     return envWsUrl;
   }
   
-  // Otherwise use environment detection
-  if (isProduction) {
-    return `${PROD_WS_PROTOCOL}://${PROD_API_HOST}/api/sync`;
-  }
-  
-  if (isDeployedPreview) {
-    return `${PROD_WS_PROTOCOL}://${PREVIEW_API_HOST}/api/sync`;
-  }
-  
-  // Default to local development using Vite proxy
+  // Use same-origin architecture - always use current page's host
   try {
-    // Use the same origin as the current page (Vite will proxy to the server)
-    // This matches the behavior of getDefaultServerUrl() that was working before
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     return `${protocol}//${host}/api/sync`;
   } catch (e) {
     // Fallback for environments without window
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    
+    // Staging environment
+    if (hostname === 'dev.codevibesmatter.com') {
+      return `${STAGING_WS_PROTOCOL}://${STAGING_API_HOST}/api/sync`;
+    }
+    
+    // Production environment
+    if (hostname === 'app.codevibesmatter.com') {
+      return `${PROD_WS_PROTOCOL}://${PROD_API_HOST}/api/sync`;
+    }
+    
+    // Preview environment
+    if (hostname.includes('preview')) {
+      return `wss://${PREVIEW_API_HOST}/api/sync`;
+    }
+    
+    // Default to local development
     return `${DEV_WS_PROTOCOL}://${DEV_API_HOST}/api/sync`;
   }
 }

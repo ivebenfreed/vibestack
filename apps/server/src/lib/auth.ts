@@ -77,7 +77,13 @@ export function initializeAuth(env: Env) {
   dbLogger.debug("Initializing Better Auth", {
     databaseUrlType: typeof env.DATABASE_URL,
     secretType: typeof env.BETTER_AUTH_SECRET,
-    trustedOrigins: ['https://127.0.0.1:5173', 'http://127.0.0.1:5173', 'http://localhost:5173']
+    trustedOrigins: [
+      'https://127.0.0.1:5173', 
+      'http://127.0.0.1:5173', 
+      'http://localhost:5173',
+      'https://dev.codevibesmatter.com',
+      'https://app.codevibesmatter.com'
+    ]
   }, 'auth');
 
   const runtimeAuthConfig = {
@@ -88,13 +94,20 @@ export function initializeAuth(env: Env) {
       casing: "snake" as const // Use literal type
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseUrl: env.BETTER_AUTH_URL,
+    baseUrl: env.ENVIRONMENT === "staging" ? "https://dev.codevibesmatter.com" : "https://app.codevibesmatter.com",
     cookieOptions: {
-      secure: false,
+      secure: true,
       sameSite: "lax",
-      path: "/"
+      path: "/",
+      // No domain needed - same origin
     },
-    trustedOrigins: ['https://127.0.0.1:5173', 'http://127.0.0.1:5173', 'http://localhost:5173'] as string[],
+    trustedOrigins: [
+      'https://127.0.0.1:5173', 
+      'http://127.0.0.1:5173', 
+      'http://localhost:5173',
+      'https://dev.codevibesmatter.com',
+      'https://app.codevibesmatter.com'
+    ] as string[],
     emailAndPassword: {
       enabled: true,
     },

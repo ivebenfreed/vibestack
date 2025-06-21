@@ -1,0 +1,226 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Same-Origin Authentication Pattern
+
+## Problem Solved
+Cross-origin authentication between frontend and backend workers causes:
+- CORS policy violations
+- Cookie delivery issues with SameSite restrictions  
+- Complex domain management
+- Resource limit issues on free Cloudflare plans
+
+## Solution: Same-Origin Architecture
+
+### Architecture Overview
+```
+https://app.codevibesmatter.com
+├── Frontend Assets: React SPA (static files)
+├── API Proxy: /api/* → Backend Worker
+└── Authentication: Same-origin cookies ✅
+
+Internal Backend Worker:
+├── API routes, auth, database
+├── Durable Objects, KV storage  
+└── Hidden from public internet
+```
+
+## Implementation Pattern
+
+### Frontend Worker Configuration
+**File:** [apps/web/wrangler.toml](mdc:apps/web/wrangler.toml)
+
+```toml
+# Serve from single domain only
+[[env.production.routes]]
+pattern = "app.codevibesmatter.com"
+custom_domain = true
+
+# Assets configuration
+[assets]
+directory = "./dist/client"
+not_found_handling = "single-page-application"
+
+# Environment variables
+[env.production.vars]
+API_BASE_URL = "https://vibestack-server-production.team-c5f.workers.dev"
+```
+
+### API Proxy Implementation
+**File:** [apps/web/worker/index.ts](mdc:apps/web/worker/index.ts)
+
+```typescript
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    
+    // Proxy API requests to backend worker
+    if (url.pathname.startsWith('/api/')) {
+      const backendUrl = new URL(url.pathname, env.API_BASE_URL);
+      return fetch(backendUrl, {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+      });
+    }
+    
+    // Serve static assets
+    return env.ASSETS.fetch(request);
+  }
+};
+```
+
+### Backend Worker Configuration
+**File:** [apps/server/wrangler.toml](mdc:apps/server/wrangler.toml)
+
+```toml
+# NO custom domains - accessed internally only
+name = "vibestack-server-production"
+
+# Internal access via workers.dev URL
+# https://vibestack-server-production.team-c5f.workers.dev
+```
+
+### Authentication Configuration
+
+#### Backend Auth Setup
+**File:** [apps/server/src/lib/auth.ts](mdc:apps/server/src/lib/auth.ts)
+
+```typescript
+export const auth = betterAuth({
+  // Use frontend domain as base URL
+  baseUrl: env.BETTER_AUTH_URL, // "https://app.codevibesmatter.com"
+  
+  // Same-origin configuration
+  trustedOrigins: [env.API_URL], // ["https://app.codevibesmatter.com"]
+  
+  // Simple cookie configuration
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60 // 5 minutes
+    }
+  },
+  
+  // Cookie settings for same-origin
+  cookies: {
+    secure: true,
+    sameSite: "lax", // Works with same-origin
+    // No domain needed - defaults to current domain
+  }
+});
+```
+
+#### Frontend Auth Configuration
+**File:** [apps/web/src/lib/auth.ts](mdc:apps/web/src/lib/auth.ts)
+
+```typescript
+export const authClient = createAuthClient({
+  // Always use same-origin
+  baseURL: window.location.origin, // No cross-origin detection needed
+});
+```
+
+## Environment-Specific Configuration
+
+### Production Environment
+```
+Frontend: https://app.codevibesmatter.com
+Backend: https://vibestack-server-production.team-c5f.workers.dev (internal)
+Auth Base: https://app.codevibesmatter.com
+```
+
+### Staging Environment  
+```
+Frontend: https://dev.codevibesmatter.com
+Backend: https://vibestack-server-staging.team-c5f.workers.dev (internal)
+Auth Base: https://dev.codevibesmatter.com
+```
+
+## Benefits of Same-Origin Pattern
+
+### 1. Eliminates CORS Complexity
+- No preflight requests
+- No CORS headers needed
+- No cross-origin policy violations
+
+### 2. Simplified Cookie Management
+- SameSite=Lax works perfectly
+- No domain-specific cookie configuration
+- Automatic cookie delivery
+
+### 3. Resource Efficiency
+- Backend worker not exposed to public internet
+- Reduced CPU usage (no CORS processing)
+- Better performance on Cloudflare free plan
+
+### 4. Security Benefits
+- Backend API hidden from direct access
+- Single domain for security policies
+- Simplified CSP configuration
+
+## Migration from Cross-Origin
+
+### Before (Cross-Origin Issues)
+```typescript
+// Complex cross-origin detection
+const getBaseURL = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'app.codevibesmatter.com') {
+      return 'https://api.codevibesmatter.com';
+    }
+    // ... more complex logic
+  }
+};
+
+// CORS configuration needed
+app.use(cors({
+  origin: ['https://app.codevibesmatter.com'],
+  credentials: true
+}));
+```
+
+### After (Same-Origin Simplicity)
+```typescript
+// Simple same-origin
+const baseURL = window.location.origin;
+
+// No CORS configuration needed
+// Cookies work automatically
+```
+
+## Testing Same-Origin Setup
+
+### Verify API Proxy
+```bash
+curl https://app.codevibesmatter.com/api/health
+# Should return: "Server OK"
+```
+
+### Verify Authentication
+```bash
+# Sign in should set cookies on app.codevibesmatter.com domain
+curl -c cookies.txt https://app.codevibesmatter.com/api/auth/sign-in
+
+# Subsequent requests should include cookies automatically
+curl -b cookies.txt https://app.codevibesmatter.com/api/auth/get-session
+```
+
+## Best Practices
+
+1. **Single Domain Strategy:** Use one domain for frontend + API proxy
+2. **Internal Backend:** Keep backend worker on workers.dev (internal)
+3. **Simple Cookie Config:** Use SameSite=Lax with no domain restriction
+4. **Environment Consistency:** Apply same pattern to all environments
+5. **Test Same-Origin:** Verify cookies work without CORS headers
+
+## Common Pitfalls to Avoid
+
+1. **Don't expose backend worker publicly** - defeats the purpose
+2. **Don't use different domains** - breaks same-origin benefits  
+3. **Don't configure CORS** - not needed with same-origin
+4. **Don't set cookie domain** - let it default to current domain
+5. **Don't use SameSite=None** - Lax works better with same-origin

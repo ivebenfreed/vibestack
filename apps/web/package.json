@@ -12,7 +12,14 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "knip": "knip",
-    "test:sync-isolation": "tsx src/sync/testing/run-sync-isolation-test.ts"
+    "test:sync-isolation": "tsx src/sync/testing/run-sync-isolation-test.ts",
+    "cf:dev": "wrangler dev --inspector-port=9230",
+    "cf:build": "vite build",
+    "cf:preview": "npm run cf:build && wrangler dev --local --persist-to=./wrangler-state --inspector-port=9230",
+    "cf:deploy": "npm run cf:build && wrangler deploy",
+    "cf:deploy:staging": "CLOUDFLARE_ENV=staging npm run cf:build && wrangler deploy",
+    "cf:deploy:production": "CLOUDFLARE_ENV=production npm run cf:build && wrangler deploy",
+    "pages:deploy:production": "npm run build && wrangler pages deploy dist/client --project-name vibestack-web --compatibility-date 2025-06-21"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",

@@ -1,4 +1,43 @@
 name = "vibestack-web"
-compatibility_date = "2025-04-03" # Date from tutorial
-assets = { not_found_handling = "single-page-application" } 
-main = "./worker/index.ts" # Add main entry point for worker code 
+compatibility_date = "2025-04-03"
+compatibility_flags = ["nodejs_compat"]
+main = "./worker/index.ts"
+
+# Assets configuration for serving static files
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+# Environment variables for development
+[vars]
+ENVIRONMENT = "development"
+API_BASE_URL = "http://127.0.0.1:8787"
+VITE_API_URL = "http://127.0.0.1:8787"
+
+# Staging environment settings
+[env.staging]
+name = "vibestack-web-staging"
+
+# Custom domains for staging
+[[env.staging.routes]]
+pattern = "dev.codevibesmatter.com"
+custom_domain = true
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+API_BASE_URL = "https://vibestack-server-staging.team-c5f.workers.dev"
+VITE_API_URL = "https://vibestack-server-staging.team-c5f.workers.dev"
+
+# Production environment settings
+[env.production]
+name = "vibestack-web-production"
+
+# Custom domains for production
+[[env.production.routes]]
+pattern = "app.codevibesmatter.com"
+custom_domain = true
+
+[env.production.vars]
+ENVIRONMENT = "production"
+API_BASE_URL = "https://vibestack-server-production.team-c5f.workers.dev"
+VITE_API_URL = "https://vibestack-server-production.team-c5f.workers.dev" 

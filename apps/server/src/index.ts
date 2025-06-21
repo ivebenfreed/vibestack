@@ -33,7 +33,13 @@ apiApp.use('*', cors({
   origin: (origin) => {
     // Dynamically allow the specific frontend origin
     // or potentially others in the future
-    const allowedOrigins = ['https://127.0.0.1:5173', 'http://127.0.0.1:5173', 'http://localhost:5173'];
+    const allowedOrigins = [
+      'https://127.0.0.1:5173', 
+      'http://127.0.0.1:5173', 
+      'http://localhost:5173',
+      'https://dev.codevibesmatter.com',
+      'https://app.codevibesmatter.com'
+    ];
     if (!origin) {
       // For requests without origin, we return null to avoid setting the header
       return null;
@@ -115,7 +121,13 @@ const worker = {
     if (url.pathname === '/api/sync') {
       // --- BEGIN CORS CHECK for /api/sync ---
       const origin = request.headers.get('Origin');
-      const allowedOrigins = ['https://127.0.0.1:5173', 'http://127.0.0.1:5173', 'http://localhost:5173']; // Match the API allowed origins
+      const allowedOrigins = [
+        'https://127.0.0.1:5173', 
+        'http://127.0.0.1:5173', 
+        'http://localhost:5173',
+        'https://dev.codevibesmatter.com',
+        'https://app.codevibesmatter.com'
+      ]; // Match the API allowed origins
       let allowedOrigin = null;
 
       if (origin && allowedOrigins.includes(origin)) {
