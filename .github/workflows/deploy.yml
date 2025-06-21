@@ -112,15 +112,18 @@ jobs:
           command: deploy --env staging
           workingDirectory: apps/server
           
+      - name: Build Frontend for Staging
+        run: cd apps/web && pnpm build
+        env:
+          CLOUDFLARE_ENV: staging
+          
       - name: Deploy Frontend to Staging
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy --env staging
           workingDirectory: apps/web
-        env:
-          CLOUDFLARE_ENV: staging
 
   # Deploy production environment
   deploy-production:
@@ -173,15 +176,18 @@ jobs:
           command: deploy --env production
           workingDirectory: apps/server
           
+      - name: Build Frontend for Production
+        run: cd apps/web && pnpm build
+        env:
+          CLOUDFLARE_ENV: production
+          
       - name: Deploy Frontend to Production
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+          command: deploy --env production
           workingDirectory: apps/web
-        env:
-          CLOUDFLARE_ENV: production
 
   # Notification job (optional)
   notify:
