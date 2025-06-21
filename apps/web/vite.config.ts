@@ -36,7 +36,10 @@ export default defineConfig({
           ]
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'] // Cache JS, CSS, HTML, and image assets
+          globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // Cache JS, CSS, HTML, and image assets
+          // Fix for direct route navigation - allow all navigation routes
+          navigateFallback: 'index.html',
+          navigateFallbackAllowlist: [/.*/], // Allow all routes for SPA navigation
         }
       })
     ] : []),
