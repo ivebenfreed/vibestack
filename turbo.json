@@ -8,15 +8,18 @@
     },
     "dev": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
     },
     "dev:debug": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
     },
     "dev:info": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
     },
     "_start_servers_for_pwa_test": {
       "persistent": true,

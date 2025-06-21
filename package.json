@@ -3,9 +3,9 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "dev:debug": "turbo run dev:debug --filter=./apps/web --filter=./apps/server ",
-    "dev:info": "turbo run dev:info --filter=./apps/web --filter=./apps/server",
+    "dev": "turbo run dev --filter=./apps/web --filter=./apps/server --filter=./packages/cron-tester",
+    "dev:debug": "turbo run dev:debug --filter=./apps/web --filter=./apps/server --filter=./packages/cron-tester",
+    "dev:info": "turbo run dev:info --filter=./apps/web --filter=./apps/server --filter=./packages/cron-tester",
     "dev:web": "turbo run dev --filter=./apps/web",
     "dev:web:debug": "turbo run dev:debug --filter=./apps/web",
     "_build:web:for_pwa_test": "turbo build --filter=vibestack-web",

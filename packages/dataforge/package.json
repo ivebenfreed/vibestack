@@ -40,6 +40,7 @@
     "generate-column-configs": "node --loader ts-node/esm src/scripts/generate-column-configs.ts",
     "generate": "pnpm run generate-entities && pnpm run generate-column-configs",
     "compile": "tsup",
+    "build": "pnpm run forge:build",
     "migration:generate:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
     "migration:generate:client": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/client.ts migration:generate",
     "migration:run:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:run",
