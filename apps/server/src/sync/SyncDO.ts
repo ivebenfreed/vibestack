@@ -1225,14 +1225,36 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       // Send to all active connections
       for (const ws of webSockets) {
         try {
+          // Log BEFORE sending for live changes to track hibernation issues
+          if (message.type === 'srv_live_changes') {
+            syncLogger.info('Attempting to send live changes message to WebSocket', {
+              type: message.type,
+              messageId: message.messageId,
+              clientId: this.clientId,
+              wsReadyState: ws.readyState,
+              wsReadyStateLabel: ws.readyState === 0 ? 'CONNECTING' : 
+                                 ws.readyState === 1 ? 'OPEN' : 
+                                 ws.readyState === 2 ? 'CLOSING' : 'CLOSED'
+            }, MODULE_NAME);
+          }
+          
           ws.send(JSON.stringify(message));
           
-          // Log success at debug level for all messages to reduce noise
-          syncLogger.debug('Message sent successfully', {
-            type: message.type,
-            messageId: message.messageId,
-            clientId: this.clientId
-          }, MODULE_NAME);
+          // Log success at INFO level for live changes, DEBUG for others
+          if (message.type === 'srv_live_changes') {
+            syncLogger.info('Live changes message sent successfully to WebSocket', {
+              type: message.type,
+              messageId: message.messageId,
+              clientId: this.clientId,
+              wsReadyState: ws.readyState
+            }, MODULE_NAME);
+          } else {
+            syncLogger.debug('Message sent successfully', {
+              type: message.type,
+              messageId: message.messageId,
+              clientId: this.clientId
+            }, MODULE_NAME);
+          }
         } catch (sendError) {
           syncLogger.error('Error sending message to WebSocket', {
             type: message.type,
