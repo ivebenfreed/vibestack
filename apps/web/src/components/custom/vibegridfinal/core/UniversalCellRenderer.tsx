@@ -525,8 +525,29 @@ const CellDisplay = ({ value, cellType, config, relationshipData = {}, columnId 
 
     case 'relationship-single':
       if (!value) return <span className="display-text">- None -</span>
-      const displayField = relationshipData[columnId]?.displayField || 'name'
-      const relationshipDisplayValue = value[displayField] || value.name || value.id
+      
+      // Handle different value types for relationship-single cells
+      let relationshipDisplayValue = '- None -'
+      
+      if (typeof value === 'string') {
+        // Value is an ID - look it up in relationshipData
+        const relationshipOptions = relationshipData[columnId]?.data || []
+        const displayField = relationshipData[columnId]?.displayField || 'name'
+        const foundItem = relationshipOptions.find((item: any) => item.id === value)
+        
+        if (foundItem) {
+          relationshipDisplayValue = foundItem[displayField] || foundItem.name || foundItem.id || value
+        } else {
+          relationshipDisplayValue = value // Show the ID if no match found
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Value is an object - extract display field
+        const displayField = relationshipData[columnId]?.displayField || 'name'
+        relationshipDisplayValue = value[displayField] || value.name || value.id || '- None -'
+      } else {
+        relationshipDisplayValue = String(value)
+      }
+      
       return (
         <div className="relationship-content">
           <span className="relationship-text">{relationshipDisplayValue}</span>
@@ -574,7 +595,7 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   const columnId = column.columnDef.id as string
   
   // 🔍 DEBUG: Log cell type detection for relationship columns
-  if (false && (columnId === 'project' || columnId === 'assignee')) {
+  if (true && (columnId === 'project' || columnId === 'assignee')) {
     console.log(`🔍 Cell Debug [${columnId}]:`, {
       columnId,
       cellType,

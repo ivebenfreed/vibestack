@@ -911,6 +911,13 @@ export const syncMachineV2 = setup({
             clientId: context.clientId,
             serverLSN: message.serverLSN || context.currentLSN
           };
+        } else if (messageType === 'srv_live_start' && context.syncPhase === 'initial') {
+          console.log('[SyncMachineV2] Live sync start received during initial sync - treating as initial sync complete');
+          
+          // Send the INITIAL_SYNC_COMPLETE event to trigger state transition
+          self.send({ type: 'INITIAL_SYNC_COMPLETE' });
+          
+          // No acknowledgment needed for srv_live_start - it's a notification
         } else if (messageType === 'srv_catchup_completed') {
           console.log('[SyncMachineV2] Catchup sync completed message received');
           
