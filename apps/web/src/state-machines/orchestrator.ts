@@ -285,6 +285,15 @@ export const orchestrator = setup({
             emailVerified: authUser.emailVerified || false,
             image: authUser.image,
           };
+          
+          // Debug: log the user assignment in orchestrator
+          console.log('[Orchestrator] handleSignInSuccess - assigning user:', {
+            originalAuthUser: authUser,
+            finalUserInfo: userInfo,
+            roleFromAuthUser: authUser.role,
+            finalRole: userInfo.role
+          });
+          
           return userInfo;
         }
         return null;
@@ -806,7 +815,16 @@ export const orchestrator = setup({
                     target: 'authenticated',
                     guard: ({ event }) => event.output.authenticated,
                     actions: assign({
-                      user: ({ event }) => event.output.user || null,
+                      user: ({ event }) => {
+                        const user = event.output.user || null;
+                        // Debug: log auth check user assignment
+                        console.log('[Orchestrator] checkAuth - assigning user:', {
+                          rawUser: event.output.user,
+                          finalUser: user,
+                          userRole: user?.role
+                        });
+                        return user;
+                      },
                       authToken: ({ event }) => event.output.token || null,
                       sessionExpiry: ({ event }) => event.output.sessionExpiry || null,
                       authError: null,

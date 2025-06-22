@@ -9,14 +9,22 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
   // Try to get the session using headers from the raw request
   // Note: Ensure your getAuth provides an instance with the 'api' property
   if (auth.api && typeof auth.api.getSession === 'function') {
-    const sessionData = await auth.api.getSession({ headers: c.req.raw.headers });
-
-    if (sessionData) {
-      // Session found, set user and session in context
-      c.set('user', sessionData.user as any);
-      c.set('session', sessionData.session as any);
-    } else {
-      // No session found, explicitly set to null
+    try {
+      const sessionData = await auth.api.getSession({ headers: c.req.raw.headers });
+      
+      if (sessionData && sessionData.user) {
+        // Session found, set user and session in context
+        c.set('user', sessionData.user as any);
+        c.set('session', sessionData.session as any);
+        console.log('[Auth Middleware] ✅ User authenticated:', (sessionData.user as any)?.email || 'unknown');
+      } else {
+        // No session found, explicitly set to null
+        c.set('user', null);
+        c.set('session', null);
+        console.log('[Auth Middleware] ❌ No valid session for:', c.req.path);
+      }
+    } catch (error) {
+      console.error('[Auth Middleware] Error getting session:', error);
       c.set('user', null);
       c.set('session', null);
     }

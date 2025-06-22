@@ -30,7 +30,9 @@ export const checkAuthActor = fromPromise(async () => {
         hasSession: !!session.data.session,
         userRole: user.role,
         sessionExpiry,
-        tokenPresent: !!session.data.session?.token
+        tokenPresent: !!session.data.session?.token,
+        rawUserData: session.data.user, // Debug: log raw user data to see available fields
+        extractedRole: (session.data.user as any).role // Debug: log the extracted role specifically
       });
       
       return {
@@ -65,16 +67,38 @@ export const signInActor = fromPromise(async ({ input }: {
     // Dispatch auth event for any listeners
     window.dispatchEvent(new CustomEvent('auth:signin'));
     
-    // Extract user with role information
-    const user = result.data?.user ? {
-      ...result.data.user,
-      role: (result.data.user as any).role || 'member'
-    } : undefined;
+    // CRITICAL FIX: Sign-in response may not include full user data with role
+    // Get fresh session data immediately after successful sign-in to ensure we have the role
+    console.log('[signInActor] Sign-in successful, fetching full session data...');
+    const session = await authClient.getSession();
+    
+    if (!session?.data?.user) {
+      throw new Error('Failed to get session data after sign-in');
+    }
+    
+    // Use session user data which includes the role field
+    const user = {
+      id: session.data.user.id,
+      email: session.data.user.email,
+      name: session.data.user.name || session.data.user.email?.split('@')[0] || 'User',
+      role: (session.data.user as any).role || 'member',
+      emailVerified: session.data.user.emailVerified || false,
+      image: session.data.user.image,
+    };
+    
+    // Debug: log sign-in vs session data comparison
+    console.log('[signInActor] Data comparison:', {
+      signInUserData: result.data?.user,
+      signInRole: (result.data?.user as any)?.role,
+      sessionUserData: session.data.user,
+      sessionRole: (session.data.user as any).role,
+      finalUserRole: user.role
+    });
     
     return {
       success: true,
       user,
-      token: result.data?.token,
+      token: result.data?.token || session.data.session?.token,
     };
   } catch (error) {
     return {

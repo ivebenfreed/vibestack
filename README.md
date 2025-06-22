@@ -168,6 +168,20 @@ The project includes a comprehensive test suite for the sync functionality:
 pnpm --filter @repo/sync-test test
 ```
 
+## Acknowledgments
+
+VibeStack is built with amazing open-source technologies and draws inspiration from various community projects:
+
+- **[shadcn/ui](https://ui.shadcn.com/)** - Beautiful, accessible React components built with Radix UI and Tailwind CSS
+- **Shadcn-based admin templates** - UI patterns and design inspiration for modern admin dashboards
+- **[Radix UI](https://www.radix-ui.com/)** - Low-level UI primitives and accessibility features
+- **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[Tabler Icons](https://tabler.io/icons)** & **[Lucide React](https://lucide.dev/)** - Beautiful icon libraries
+
+Special thanks to the open-source community for creating the foundational tools that make VibeStack possible.
+
+For detailed attributions and credits, see [ATTRIBUTIONS.md](./ATTRIBUTIONS.md).
+
 ## License
 
 This project is private and proprietary. All rights reserved.

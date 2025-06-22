@@ -18,9 +18,9 @@ export default defineConfig({
         registerType: 'autoUpdate', // Automatically update the service worker when new content is available
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'], // Cache these static assets
         manifest: { // Basic PWA manifest generation
-          name: 'ShadAdmin',
-          short_name: 'ShadAdmin',
-          description: 'Admin Dashboard',
+          name: 'VibeStack',
+          short_name: 'VibeStack',
+          description: 'Local First, Sync Enabled Business Tool Platform',
           theme_color: '#ffffff',
           icons: [
             {

@@ -1,3 +1,12 @@
+/*
+ * VibeStack Global Styles
+ * 
+ * Built with Shadcn/UI components and design system
+ * - Shadcn/UI: https://ui.shadcn.com/ (MIT License)
+ * - Components and styling patterns inspired by Shadcn-based admin templates
+ * - CSS custom properties and theming based on Shadcn/UI conventions
+ */
+
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import url('./components/ui/global.css');

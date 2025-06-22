@@ -387,9 +387,9 @@ export const sidebarData: SidebarData = {
   },
   teams: [
     {
-      name: 'Shadcn Admin',
+      name: 'VibeStack',
       logo: Command,
-      plan: 'Vite + ShadcnUI',
+      plan: 'Local First Platform',
     },
     {
       name: 'Acme Inc',

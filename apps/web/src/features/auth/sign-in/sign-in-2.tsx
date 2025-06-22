@@ -19,7 +19,7 @@ export default function SignIn2() {
           >
             <path d='M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3' />
           </svg>
-          Shadcn Admin
+          VibeStack
         </div>
 
         <img
@@ -33,11 +33,10 @@ export default function SignIn2() {
         <div className='relative z-20 mt-auto'>
           <blockquote className='space-y-2'>
             <p className='text-lg'>
-              &ldquo;This template has saved me countless hours of work and
-              helped me deliver stunning designs to my clients faster than ever
-              before.&rdquo;
+              &ldquo;VibeStack's local-first architecture lets me work anywhere,
+              and the real-time sync keeps my team perfectly coordinated.&rdquo;
             </p>
-            <footer className='text-sm'>John Doe</footer>
+            <footer className='text-sm'>Sarah Chen, Product Manager</footer>
           </blockquote>
         </div>
       </div>

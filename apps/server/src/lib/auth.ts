@@ -94,12 +94,17 @@ export function initializeAuth(env: Env) {
       casing: "snake" as const // Use literal type
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseUrl: env.ENVIRONMENT === "staging" ? "https://dev.codevibesmatter.com" : "https://app.codevibesmatter.com",
+    baseUrl: env.ENVIRONMENT === "development" 
+      ? "http://localhost:5173"  // ✅ FIX: HTTP for development
+      : env.ENVIRONMENT === "staging" 
+        ? "https://dev.codevibesmatter.com" 
+        : "https://app.codevibesmatter.com",
     cookieOptions: {
-      secure: true,
+      secure: env.ENVIRONMENT !== "development", // ✅ FIX: Only secure in production/staging
       sameSite: "lax",
       path: "/",
-      // No domain needed - same origin
+      // ✅ FIX: Set domain for development to work with Vite proxy
+      domain: env.ENVIRONMENT === "development" ? "localhost" : undefined,
     },
     trustedOrigins: [
       'https://127.0.0.1:5173', 
@@ -145,18 +150,17 @@ export function initializeAuth(env: Env) {
       fields: {
         emailVerified: 'email_verified',
         createdAt: 'created_at',
-        updatedAt: 'updated_at'
-        // 'role' is a native column in the 'users' table,
-        // so it doesn't need to be in 'fields' for mapping if the column name matches the property name.
-        // However, to ensure better-auth processes it from input to hooks and then to DB,
-        // we declare it in additionalFields.
+        updatedAt: 'updated_at',
+        // Include role in fields mapping so it's included in session data
+        role: 'role'
       },
       additionalFields: {
         role: {
           type: "string" as const, // Matches UserRole enum (string values)
           required: false, // The DB has a default
           defaultValue: "member", // Default if not provided; DB default is also 'member'
-          input: true // Allow 'role' to be passed in the body of signUpEmail
+          input: true, // Allow 'role' to be passed in the body of signUpEmail
+          output: true // CRITICAL: Include role in session/user output
         }
       }
     },

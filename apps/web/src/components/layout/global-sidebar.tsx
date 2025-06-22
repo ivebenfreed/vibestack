@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { useUserRole, useAuth } from '@/state-machines/orchestrator-hooks'
 
 // Global sidebar width constant
 export const GLOBAL_SIDEBAR_WIDTH = 64
@@ -90,6 +91,26 @@ function VLogo() {
 
 export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
   const activeSection = useLayoutStore.activeSection()
+  const { isAuthenticated } = useAuth()
+  const { canAccess } = useUserRole()
+  
+  // Filter sidebar sections based on authentication and permissions
+  const visibleSections = React.useMemo(() => {
+    return globalSidebarData.filter(section => {
+      // Show home and projects to all authenticated users
+      if (section.id === 'home' || section.id === 'projects' || section.id === 'settings') {
+        return isAuthenticated
+      }
+      
+      // Show debug only to authenticated users with debug permissions
+      if (section.id === 'debug') {
+        return isAuthenticated && canAccess('debug_features')
+      }
+      
+      // Default: show to authenticated users
+      return isAuthenticated
+    })
+  }, [isAuthenticated, canAccess])
 
   return (
     <>
@@ -116,7 +137,7 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
         <div className="flex flex-1 flex-col items-center gap-1 p-2">
           {/* ⚡ PERFORMANCE: Increased delay to 800ms to prevent premature tooltip calculations */}
           <TooltipProvider delayDuration={800} skipDelayDuration={200}>
-            {globalSidebarData.map((section) => (
+            {visibleSections.map((section) => (
               <NavItem 
                 key={section.id}
                 sectionId={section.id}
@@ -136,7 +157,7 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
         style={{ height: `${MOBILE_BOTTOM_NAV_HEIGHT}px` }}
       >
         <div className="flex items-center justify-around h-full px-1">
-          {globalSidebarData.map((section) => (
+          {visibleSections.map((section) => (
             <MobileNavItem 
               key={section.id}
               sectionId={section.id}
