@@ -1100,15 +1100,58 @@ export const orchestrator = setup({
     },
     
     signing_out: {
+      entry: () => {
+        console.log('[Orchestrator] 🚪 Initiating sign-out process...');
+      },
+      
       invoke: {
         src: 'signOut',
-        onDone: {
-          target: 'initializing.auth.unauthenticated',
-          actions: ['clearAuthAndTriggerRouteCheck', 'invalidateAuthAndTriggerRecheck']
-        },
+        // Add timeout to prevent hanging
+        input: { timeout: 10000 },
+        onDone: [
+          {
+            // Successful sign-out
+            target: 'initializing.auth.unauthenticated',
+            guard: ({ event }) => {
+              const result = event.output;
+              console.log('[Orchestrator] Sign-out actor completed:', result);
+              return result?.success !== false;
+            },
+            actions: [
+              () => console.log('[Orchestrator] ✅ Sign-out successful, clearing auth state'),
+              'clearAuthAndTriggerRouteCheck', 
+              'invalidateAuthAndTriggerRecheck'
+            ]
+          },
+          {
+            // Failed sign-out but still clear state
+            target: 'initializing.auth.unauthenticated',
+            actions: [
+              ({ event }) => console.warn('[Orchestrator] ⚠️ Sign-out failed but forcing auth clear:', event.output),
+              'clearAuthAndTriggerRouteCheck', 
+              'invalidateAuthAndTriggerRecheck'
+            ]
+          }
+        ],
         onError: {
           target: 'initializing.auth.unauthenticated',
-          actions: ['clearAuthAndTriggerRouteCheck', 'invalidateAuthAndTriggerRecheck']
+          actions: [
+            ({ event }) => console.error('[Orchestrator] ❌ Sign-out actor error, forcing auth clear:', event.error),
+            'clearAuthAndTriggerRouteCheck', 
+            'invalidateAuthAndTriggerRecheck'
+          ]
+        }
+      },
+      
+      // Add a timeout fallback in case the actor never resolves
+      after: {
+        15000: {
+          target: 'initializing.auth.unauthenticated',
+          actions: [
+            () => console.error('[Orchestrator] 🚨 Sign-out timed out after 15 seconds, forcing auth clear'),
+            'clearAuthAndTriggerRouteCheck', 
+            'invalidateAuthAndTriggerRecheck'
+          ]
         }
       }
     },
