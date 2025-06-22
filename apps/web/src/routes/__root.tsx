@@ -171,6 +171,26 @@ orchestratorActor.subscribe((snapshot) => {
   saveOrchestratorState(snapshot)
 })
 
+// Monitor actor status and handle unexpected stops
+orchestratorActor.subscribe({
+  error: (error) => {
+    console.error('[ORCHESTRATOR] Actor error:', error)
+    // Store error in sessionStorage for debugging
+    sessionStorage.setItem('orchestrator-last-error', JSON.stringify({
+      error: error.message,
+      timestamp: Date.now()
+    }))
+  },
+  complete: () => {
+    console.warn('[ORCHESTRATOR] Actor completed/stopped unexpectedly')
+    // Store completion event for debugging
+    sessionStorage.setItem('orchestrator-stopped', JSON.stringify({
+      timestamp: Date.now(),
+      reason: 'completed'
+    }))
+  }
+})
+
 // Make orchestrator globally accessible for auth guards
 ;(window as any).orchestratorActor = orchestratorActor
 

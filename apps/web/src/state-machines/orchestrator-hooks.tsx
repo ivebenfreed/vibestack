@@ -94,11 +94,30 @@ export function useOrchestrator() {
     ...state,
     send: actor.send,
     
-    // Convenience actions
-    signIn: (email: string, password: string) => 
-      actor.send({ type: 'SIGN_IN', email, password }),
-    signOut: () => 
-      actor.send({ type: 'SIGN_OUT' }),
+    // Convenience actions with actor status check
+    signIn: (email: string, password: string) => {
+      if (actor.getSnapshot().status === 'stopped') {
+        console.error('[ORCHESTRATOR] Cannot sign in - actor is stopped');
+        window.location.reload();
+        return;
+      }
+      actor.send({ type: 'SIGN_IN', email, password });
+    },
+    signOut: () => {
+      if (actor.getSnapshot().status === 'stopped') {
+        console.error('[ORCHESTRATOR] Cannot sign out - actor is stopped, forcing manual sign-out');
+        window.dispatchEvent(new CustomEvent('auth:signout'));
+        window.location.href = '/sign-in';
+        return;
+      }
+      try {
+        actor.send({ type: 'SIGN_OUT' });
+      } catch (error) {
+        console.error('[ORCHESTRATOR] Error sending SIGN_OUT event:', error);
+        window.dispatchEvent(new CustomEvent('auth:signout'));
+        window.location.href = '/sign-in';
+      }
+    },
   };
 }
 
@@ -155,11 +174,33 @@ export function useAuth() {
         return name.slice(0, 2).toUpperCase();
       })(),
       
-      // Actions
-      signIn: (email: string, password: string) => 
-        actor.send({ type: 'SIGN_IN', email, password }),
-      signOut: () => 
-        actor.send({ type: 'SIGN_OUT' }),
+      // Actions with actor status check
+      signIn: (email: string, password: string) => {
+        if (actor.getSnapshot().status === 'stopped') {
+          console.error('[AUTH] Cannot sign in - orchestrator actor is stopped');
+          // Try to restart or handle gracefully
+          window.location.reload();
+          return;
+        }
+        actor.send({ type: 'SIGN_IN', email, password });
+      },
+      signOut: () => {
+        if (actor.getSnapshot().status === 'stopped') {
+          console.error('[AUTH] Cannot sign out - orchestrator actor is stopped, forcing manual sign-out');
+          // Manually trigger sign-out cleanup since actor is stopped
+          window.dispatchEvent(new CustomEvent('auth:signout'));
+          window.location.href = '/sign-in';
+          return;
+        }
+        try {
+          actor.send({ type: 'SIGN_OUT' });
+        } catch (error) {
+          console.error('[AUTH] Error sending SIGN_OUT event:', error);
+          // Fallback: manually trigger sign-out cleanup
+          window.dispatchEvent(new CustomEvent('auth:signout'));
+          window.location.href = '/sign-in';
+        }
+      },
     };
   });
 }
