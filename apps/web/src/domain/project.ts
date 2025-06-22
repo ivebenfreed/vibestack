@@ -144,7 +144,136 @@ export const projectActions = {
     console.log(`[ProjectService] Updated project ${projectId}`);
   },
 
-  // Create project
+  // ✅ PURE FUNCTION UPDATE: Direct database + sync tracking (no optimistic update)
+  updateProject: async (projectId: string, updates: Partial<Project>) => {
+    try {
+      console.log(`[ProjectAtoms] Background update for project ${projectId.slice(-8)}: ${Object.keys(updates).join(', ')}`);
+      
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(Project);
+      
+      // Get current project
+      const project = await repository.findOne({ where: { id: projectId } });
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+      
+      // Apply updates
+      const updatedData = {
+        ...updates,
+        updatedAt: new Date()
+      };
+      
+      // Update database
+      await repository.update(projectId, updatedData);
+      const updated = await repository.findOne({ where: { id: projectId } });
+      
+      if (!updated) {
+        throw new Error(`Failed to retrieve updated project ${projectId}`);
+      }
+      
+      // Get OutgoingChangeService from sync machine
+      try {
+        const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+        const outgoingChangeService = getGlobalOutgoingChangeService();
+        
+        if (outgoingChangeService) {
+          await outgoingChangeService.trackEntityChange('projects', 'update', updated);
+        } else {
+          console.warn('[ProjectAtoms] No OutgoingChangeService available - sync tracking skipped');
+        }
+      } catch (error) {
+        console.warn('[ProjectAtoms] Failed to get OutgoingChangeService:', error);
+      }
+      
+      console.log(`[ProjectAtoms] Successfully updated project ${projectId.slice(-8)} - live sync will update atoms`);
+    } catch (error) {
+      console.error(`[ProjectAtoms] Failed to update project ${projectId}:`, error);
+      throw error; // Let VibeGrid handle the error
+    }
+  },
+
+  // Internal atom-only update (used by service layer and fallback)
+  updateProjectAtomOnly: (projectId: string, updates: Partial<Project>) => {
+    const currentProjects = projectsAtom.get();
+    const currentProject = currentProjects[projectId];
+    
+    if (!currentProject) {
+      console.warn(`[ProjectAtoms] Project ${projectId} not found for update`);
+      return;
+    }
+    
+    // ✅ FIXED: Don't modify updatedAt if it's already provided (e.g., from LiveChangesManager)
+    const updatedProject = { 
+      ...currentProject, 
+      ...updates,
+      ...(updates.updatedAt ? {} : { updatedAt: new Date() })
+    };
+    
+    // Update projects record
+    projectsAtom.set({
+      ...currentProjects,
+      [projectId]: updatedProject
+    });
+    
+    console.log(`[ProjectAtoms] Updated project atom ${projectId}`);
+  },
+
+  // ✅ PURE FUNCTION DELETE: Direct database + sync tracking (no service overhead)
+  deleteProject: async (projectId: string) => {
+    try {
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(Project);
+      
+      // Check if project exists
+      const project = await repository.findOne({ where: { id: projectId } });
+      if (!project) {
+        throw new Error(`Project with ID ${projectId} not found`);
+      }
+      
+      // Delete from database
+      const result = await repository.delete(projectId);
+      const success = (result.affected ?? 0) > 0;
+      
+      if (success) {
+        // Get OutgoingChangeService from sync machine
+        try {
+          const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+          const outgoingChangeService = getGlobalOutgoingChangeService();
+          
+          if (outgoingChangeService) {
+            await outgoingChangeService.trackEntityChange('projects', 'delete', { id: projectId });
+          } else {
+            console.warn('[ProjectAtoms] No OutgoingChangeService available - sync tracking skipped');
+          }
+        } catch (error) {
+          console.warn('[ProjectAtoms] Failed to get OutgoingChangeService:', error);
+        }
+        
+        // Remove from atom
+        projectActions.deleteProjectAtomOnly(projectId);
+      }
+      
+      console.log(`[ProjectAtoms] Deleted project ${projectId} via pure function (with sync tracking)`);
+    } catch (error) {
+      console.error(`[ProjectAtoms] Failed to delete project ${projectId}:`, error);
+      // Fallback to atom-only delete
+      projectActions.deleteProjectAtomOnly(projectId);
+    }
+  },
+
+  // Internal atom-only delete (used by service layer and fallback)
+  deleteProjectAtomOnly: (projectId: string) => {
+    const currentProjects = projectsAtom.get();
+    
+    // Remove from projects record
+    const { [projectId]: removed, ...remainingProjects } = currentProjects;
+    projectsAtom.set(remainingProjects);
+    
+    console.log(`[ProjectAtoms] Deleted project atom ${projectId}`);
+  },
+
+  // Create project (always goes through service for proper creation workflow)
   createProject: (project: Project) => {
     const currentProjects = projectsAtom.get();
     
@@ -154,18 +283,7 @@ export const projectActions = {
       [project.id]: { ...project, updatedAt: new Date() }
     });
     
-    console.log(`[ProjectService] Created project ${project.id}`);
-  },
-
-  // Delete project
-  deleteProject: (projectId: string) => {
-    const currentProjects = projectsAtom.get();
-    
-    // Remove from projects record
-    const { [projectId]: removed, ...remainingProjects } = currentProjects;
-    projectsAtom.set(remainingProjects);
-    
-    console.log(`[ProjectService] Deleted project ${projectId}`);
+    console.log(`[ProjectAtoms] Created project ${project.id}`);
   },
 };
 

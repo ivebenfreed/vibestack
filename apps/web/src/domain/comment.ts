@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 // Note: Live changes types moved to centralized LiveChangesManager
 
 // Main comments store - holds all comments in normalized format
-const commentsAtom = createAtom<Record<string, Comment>>({});
+export const commentsAtom = createAtom<Record<string, Comment>>({});
 
 // Note: Live changes state removed - now handled centrally by LiveChangesManager
 
@@ -142,17 +142,71 @@ export const commentActions = {
     console.log(`[CommentService] Bulk loaded ${comments.length} comments`);
   },
 
-  // Update individual comment
-  updateComment: (commentId: string, updates: Partial<Comment>) => {
+  // ✅ PURE FUNCTION UPDATE: Direct database + sync tracking (no optimistic update)
+  updateComment: async (commentId: string, updates: Partial<Comment>) => {
+    try {
+      console.log(`[CommentAtoms] Background update for comment ${commentId.slice(-8)}: ${Object.keys(updates).join(', ')}`);
+      
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(Comment);
+      
+      // Get current comment
+      const comment = await repository.findOne({ where: { id: commentId } });
+      if (!comment) {
+        throw new Error(`Comment with ID ${commentId} not found`);
+      }
+      
+      // Apply updates
+      const updatedData = {
+        ...updates,
+        updatedAt: new Date()
+      };
+      
+      // Update database
+      await repository.update(commentId, updatedData);
+      const updated = await repository.findOne({ where: { id: commentId } });
+      
+      if (!updated) {
+        throw new Error(`Failed to retrieve updated comment ${commentId}`);
+      }
+      
+      // Get OutgoingChangeService from sync machine
+      try {
+        const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+        const outgoingChangeService = getGlobalOutgoingChangeService();
+        
+        if (outgoingChangeService) {
+          await outgoingChangeService.trackEntityChange('comments', 'update', updated);
+        } else {
+          console.warn('[CommentAtoms] No OutgoingChangeService available - sync tracking skipped');
+        }
+      } catch (error) {
+        console.warn('[CommentAtoms] Failed to get OutgoingChangeService:', error);
+      }
+      
+      console.log(`[CommentAtoms] Successfully updated comment ${commentId.slice(-8)} - live sync will update atoms`);
+    } catch (error) {
+      console.error(`[CommentAtoms] Failed to update comment ${commentId}:`, error);
+      throw error; // Let VibeGrid handle the error
+    }
+  },
+
+  // Internal atom-only update (used by service layer and fallback)
+  updateCommentAtomOnly: (commentId: string, updates: Partial<Comment>) => {
     const currentComments = commentsAtom.get();
     const currentComment = currentComments[commentId];
     
     if (!currentComment) {
-      console.warn(`[CommentService] Comment ${commentId} not found for update`);
+      console.warn(`[CommentAtoms] Comment ${commentId} not found for update`);
       return;
     }
     
-    const updatedComment = { ...currentComment, ...updates, updatedAt: new Date() };
+    // ✅ FIXED: Don't modify updatedAt if it's already provided (e.g., from LiveChangesManager)
+    const updatedComment = { 
+      ...currentComment, 
+      ...updates,
+      ...(updates.updatedAt ? {} : { updatedAt: new Date() })
+    };
     
     // Update comments record
     commentsAtom.set({
@@ -160,10 +214,64 @@ export const commentActions = {
       [commentId]: updatedComment
     });
     
-    console.log(`[CommentService] Updated comment ${commentId}`);
+    console.log(`[CommentAtoms] Updated comment atom ${commentId}`);
   },
 
-  // Create comment
+  // ✅ PURE FUNCTION DELETE: Direct database + sync tracking (no service overhead)
+  deleteComment: async (commentId: string) => {
+    try {
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(Comment);
+      
+      // Check if comment exists
+      const comment = await repository.findOne({ where: { id: commentId } });
+      if (!comment) {
+        throw new Error(`Comment with ID ${commentId} not found`);
+      }
+      
+      // Delete from database
+      const result = await repository.delete(commentId);
+      const success = (result.affected ?? 0) > 0;
+      
+      if (success) {
+        // Get OutgoingChangeService from sync machine
+        try {
+          const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+          const outgoingChangeService = getGlobalOutgoingChangeService();
+          
+          if (outgoingChangeService) {
+            await outgoingChangeService.trackEntityChange('comments', 'delete', { id: commentId });
+          } else {
+            console.warn('[CommentAtoms] No OutgoingChangeService available - sync tracking skipped');
+          }
+        } catch (error) {
+          console.warn('[CommentAtoms] Failed to get OutgoingChangeService:', error);
+        }
+        
+        // Remove from atom
+        commentActions.deleteCommentAtomOnly(commentId);
+      }
+      
+      console.log(`[CommentAtoms] Deleted comment ${commentId} via pure function (with sync tracking)`);
+    } catch (error) {
+      console.error(`[CommentAtoms] Failed to delete comment ${commentId}:`, error);
+      // Fallback to atom-only delete
+      commentActions.deleteCommentAtomOnly(commentId);
+    }
+  },
+
+  // Internal atom-only delete (used by service layer and fallback)
+  deleteCommentAtomOnly: (commentId: string) => {
+    const currentComments = commentsAtom.get();
+    
+    // Remove from comments record
+    const { [commentId]: removed, ...remainingComments } = currentComments;
+    commentsAtom.set(remainingComments);
+    
+    console.log(`[CommentAtoms] Deleted comment atom ${commentId}`);
+  },
+
+  // Create comment (always goes through service for proper creation workflow)
   createComment: (comment: Comment) => {
     const currentComments = commentsAtom.get();
     
@@ -173,18 +281,7 @@ export const commentActions = {
       [comment.id]: { ...comment, updatedAt: new Date() }
     });
     
-    console.log(`[CommentService] Created comment ${comment.id}`);
-  },
-
-  // Delete comment
-  deleteComment: (commentId: string) => {
-    const currentComments = commentsAtom.get();
-    
-    // Remove from comments record
-    const { [commentId]: removed, ...remainingComments } = currentComments;
-    commentsAtom.set(remainingComments);
-    
-    console.log(`[CommentService] Deleted comment ${commentId}`);
+    console.log(`[CommentAtoms] Created comment ${comment.id}`);
   },
 };
 

@@ -122,17 +122,71 @@ export const userActions = {
     console.log(`[UserAtoms] Bulk loaded ${users.length} users`);
   },
 
-  // Update individual user
-  updateUser: (userId: string, updates: Partial<User>) => {
+  // ✅ PURE FUNCTION UPDATE: Direct database + sync tracking (no optimistic update)
+  updateUser: async (userId: string, updates: Partial<User>) => {
+    try {
+      console.log(`[UserAtoms] Background update for user ${userId.slice(-8)}: ${Object.keys(updates).join(', ')}`);
+      
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(User);
+      
+      // Get current user
+      const user = await repository.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error(`User with ID ${userId} not found`);
+      }
+      
+      // Apply updates
+      const updatedData = {
+        ...updates,
+        updatedAt: new Date()
+      };
+      
+      // Update database
+      await repository.update(userId, updatedData);
+      const updated = await repository.findOne({ where: { id: userId } });
+      
+      if (!updated) {
+        throw new Error(`Failed to retrieve updated user ${userId}`);
+      }
+      
+      // Get OutgoingChangeService from sync machine
+      try {
+        const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+        const outgoingChangeService = getGlobalOutgoingChangeService();
+        
+        if (outgoingChangeService) {
+          await outgoingChangeService.trackEntityChange('users', 'update', updated);
+        } else {
+          console.warn('[UserAtoms] No OutgoingChangeService available - sync tracking skipped');
+        }
+      } catch (error) {
+        console.warn('[UserAtoms] Failed to get OutgoingChangeService:', error);
+      }
+      
+      console.log(`[UserAtoms] Successfully updated user ${userId.slice(-8)} - live sync will update atoms`);
+    } catch (error) {
+      console.error(`[UserAtoms] Failed to update user ${userId}:`, error);
+      throw error; // Let VibeGrid handle the error
+    }
+  },
+
+  // Internal atom-only update (used by service layer and fallback)
+  updateUserAtomOnly: (userId: string, updates: Partial<User>) => {
     const currentUsers = usersAtom.get();
     const currentUser = currentUsers[userId];
     
     if (!currentUser) {
-      console.warn(`[UserService] User ${userId} not found for update`);
+      console.warn(`[UserAtoms] User ${userId} not found for update`);
       return;
     }
     
-    const updatedUser = { ...currentUser, ...updates, updatedAt: new Date() };
+    // ✅ FIXED: Don't modify updatedAt if it's already provided (e.g., from LiveChangesManager)
+    const updatedUser = { 
+      ...currentUser, 
+      ...updates,
+      ...(updates.updatedAt ? {} : { updatedAt: new Date() })
+    };
     
     // Update users record
     usersAtom.set({
@@ -140,10 +194,64 @@ export const userActions = {
       [userId]: updatedUser
     });
     
-    console.log(`[UserService] Updated user ${userId}`);
+    console.log(`[UserAtoms] Updated user atom ${userId}`);
   },
 
-  // Create user
+  // ✅ PURE FUNCTION DELETE: Direct database + sync tracking (no service overhead)
+  deleteUser: async (userId: string) => {
+    try {
+      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
+      const repository = (await dataSource).getRepository(User);
+      
+      // Check if user exists
+      const user = await repository.findOne({ where: { id: userId } });
+      if (!user) {
+        throw new Error(`User with ID ${userId} not found`);
+      }
+      
+      // Delete from database
+      const result = await repository.delete(userId);
+      const success = (result.affected ?? 0) > 0;
+      
+      if (success) {
+        // Get OutgoingChangeService from sync machine
+        try {
+          const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
+          const outgoingChangeService = getGlobalOutgoingChangeService();
+          
+          if (outgoingChangeService) {
+            await outgoingChangeService.trackEntityChange('users', 'delete', { id: userId });
+          } else {
+            console.warn('[UserAtoms] No OutgoingChangeService available - sync tracking skipped');
+          }
+        } catch (error) {
+          console.warn('[UserAtoms] Failed to get OutgoingChangeService:', error);
+        }
+        
+        // Remove from atom
+        userActions.deleteUserAtomOnly(userId);
+      }
+      
+      console.log(`[UserAtoms] Deleted user ${userId} via pure function (with sync tracking)`);
+    } catch (error) {
+      console.error(`[UserAtoms] Failed to delete user ${userId}:`, error);
+      // Fallback to atom-only delete
+      userActions.deleteUserAtomOnly(userId);
+    }
+  },
+
+  // Internal atom-only delete (used by service layer and fallback)
+  deleteUserAtomOnly: (userId: string) => {
+    const currentUsers = usersAtom.get();
+    
+    // Remove from users record
+    const { [userId]: removed, ...remainingUsers } = currentUsers;
+    usersAtom.set(remainingUsers);
+    
+    console.log(`[UserAtoms] Deleted user atom ${userId}`);
+  },
+
+  // Create user (always goes through service for proper creation workflow)
   createUser: (user: User) => {
     const currentUsers = usersAtom.get();
     
@@ -153,18 +261,7 @@ export const userActions = {
       [user.id]: { ...user, updatedAt: new Date() }
     });
     
-    console.log(`[UserService] Created user ${user.id}`);
-  },
-
-  // Delete user
-  deleteUser: (userId: string) => {
-    const currentUsers = usersAtom.get();
-    
-    // Remove from users record
-    const { [userId]: removed, ...remainingUsers } = currentUsers;
-    usersAtom.set(remainingUsers);
-    
-    console.log(`[UserService] Deleted user ${userId}`);
+    console.log(`[UserAtoms] Created user ${user.id}`);
   },
 };
 
