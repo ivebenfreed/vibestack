@@ -10,8 +10,24 @@ import { useOrchestrator } from '@/state-machines/orchestrator-hooks'
 // Auth-aware wrapper component for database and sync services
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth() // Use new simple hook (one clean dependency)
+  const { currentPhase } = useOrchestrator()
   
-  if (isAuthenticated) {
+  // Wait for auth check to complete before mounting database providers
+  // This prevents race conditions where persisted auth state shows authenticated
+  // but actual auth check reveals user is unauthenticated
+  const isAuthCheckInProgress = currentPhase.includes('initializing') && currentPhase.includes('auth')
+  const shouldWaitForAuth = isAuthCheckInProgress || currentPhase === 'initializing'
+  
+  console.log('[AuthAwareProviders] Auth state:', { 
+    isAuthenticated, 
+    currentPhase, 
+    isAuthCheckInProgress,
+    shouldWaitForAuth,
+    shouldMountDatabase: isAuthenticated && !shouldWaitForAuth
+  });
+  
+  // Only mount database if authenticated AND auth check is definitely complete
+  if (isAuthenticated && !shouldWaitForAuth) {
     return (
       <VibestackPGliteProvider>
         <AbilityProvider>
@@ -21,7 +37,7 @@ export function AuthAwareProviders({ children }: { children: React.ReactNode }) 
     )
   }
   
-  // Unauthenticated: Simpler layout without database/sync providers
+  // Unauthenticated or auth check still in progress: Simpler layout without database/sync providers
   return (
     <AbilityProvider>
       <PublicLayout>

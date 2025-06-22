@@ -342,12 +342,17 @@ function AppWithInitialization() {
       const { authenticated, reason } = event.detail
       console.log('[Root] Auth state changed:', { authenticated, reason })
       
-      if (!authenticated && reason === 'sign-out') {
+      if (!authenticated && (reason === 'sign-out' || reason === 'unauthenticated')) {
         console.log('[Root] Sign-out detected, checking current route...')
         const currentPath = window.location.pathname
         
         // If on an authenticated route, redirect to sign-in
-        if (currentPath.startsWith('/_authenticated') || currentPath === '/') {
+        // Authenticated routes: everything except auth routes (/sign-in, /sign-up, etc.) and error routes
+        const isAuthRoute = currentPath.startsWith('/sign-') || currentPath.startsWith('/forgot-') || currentPath.startsWith('/otp');
+        const isErrorRoute = currentPath.match(/^\/(401|403|404|500|503)$/);
+        const isPublicRoute = isAuthRoute || isErrorRoute;
+        
+        if (!isPublicRoute) {
           console.log('[Root] Redirecting to sign-in after sign-out')
           navigate({ 
             to: '/sign-in', 

@@ -798,7 +798,10 @@ export const orchestrator = setup({
       on: {
         LSN_UPDATE: {
           actions: ['updateOrchestratorLSN', 'forwardLSNUpdate']
-        }
+        },
+        // Handle sign-out during initialization
+        SIGN_OUT: '../signing_out',
+        LOGOUT: '../signing_out'
       },
       
       // 🔥 REMOVED: Moved invoke machines to root level to persist across state transitions
@@ -856,6 +859,14 @@ export const orchestrator = setup({
             },
             
             unauthenticated: {
+              type: 'final',
+              entry: () => {
+                console.log('[Orchestrator] Entered unauthenticated state - STOPPING initialization, triggering redirect');
+                // Dispatch event to trigger navigation to sign-in if needed
+                window.dispatchEvent(new CustomEvent('auth:state-changed', {
+                  detail: { authenticated: false, reason: 'unauthenticated' }
+                }));
+              },
               on: {
                 SIGN_IN: 'signing_in',
                 AUTH_SUCCESS: {
@@ -865,7 +876,10 @@ export const orchestrator = setup({
                 LOGIN_SUCCESS: {
                   target: 'authenticated',
                   actions: 'storeAuthSuccess'
-                }
+                },
+                // Add sign-out handler to prevent being stuck in unauthenticated state
+                SIGN_OUT: '../../signing_out',
+                LOGOUT: '../../signing_out'
               }
             },
             
@@ -1119,8 +1133,7 @@ export const orchestrator = setup({
             },
             actions: [
               () => console.log('[Orchestrator] ✅ Sign-out successful, clearing auth state'),
-              'clearAuthAndTriggerRouteCheck', 
-              'invalidateAuthAndTriggerRecheck'
+              'clearAuthAndTriggerRouteCheck'
             ]
           },
           {
@@ -1128,8 +1141,7 @@ export const orchestrator = setup({
             target: 'initializing.auth.unauthenticated',
             actions: [
               ({ event }) => console.warn('[Orchestrator] ⚠️ Sign-out failed but forcing auth clear:', event.output),
-              'clearAuthAndTriggerRouteCheck', 
-              'invalidateAuthAndTriggerRecheck'
+              'clearAuthAndTriggerRouteCheck'
             ]
           }
         ],
@@ -1137,8 +1149,7 @@ export const orchestrator = setup({
           target: 'initializing.auth.unauthenticated',
           actions: [
             ({ event }) => console.error('[Orchestrator] ❌ Sign-out actor error, forcing auth clear:', event.error),
-            'clearAuthAndTriggerRouteCheck', 
-            'invalidateAuthAndTriggerRecheck'
+            'clearAuthAndTriggerRouteCheck'
           ]
         }
       },
@@ -1149,8 +1160,7 @@ export const orchestrator = setup({
           target: 'initializing.auth.unauthenticated',
           actions: [
             () => console.error('[Orchestrator] 🚨 Sign-out timed out after 15 seconds, forcing auth clear'),
-            'clearAuthAndTriggerRouteCheck', 
-            'invalidateAuthAndTriggerRecheck'
+            'clearAuthAndTriggerRouteCheck'
           ]
         }
       }
