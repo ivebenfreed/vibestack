@@ -137,10 +137,64 @@ const saveOrchestratorState = async (snapshot: any) => {
   }
 }
 
-// Create the orchestrator actor with built-in state restoration
-const persistedSnapshot = loadPersistedOrchestratorState()
+// 🔥 NEW: Actor restart mechanism
+const createOrchestratorActor = () => {
+  const persistedSnapshot = loadPersistedOrchestratorState()
+  console.log('[XSTATE] Creating orchestrator actor with persistence support...')
+  
+  const actor = createActor(orchestrator, {
+    input: { snapshot: persistedSnapshot }
+  })
+  
+  actor.start()
+  return actor
+}
 
-console.log('[XSTATE] Creating orchestrator actor with persistence support...')
+// Global actor restart function
+const restartOrchestratorActor = () => {
+  console.log('[XSTATE] 🔄 Restarting stopped orchestrator actor...')
+  
+  // Stop existing actor if it exists
+  if ((window as any).orchestratorActor) {
+    try {
+      (window as any).orchestratorActor.stop()
+    } catch (error) {
+      console.warn('[XSTATE] Error stopping existing actor during restart:', error)
+    }
+  }
+  
+  // Create new actor
+  const newActor = createOrchestratorActor()
+  
+  // Set up subscriptions again
+  newActor.subscribe((snapshot) => {
+    saveOrchestratorState(snapshot)
+  })
+  
+  newActor.subscribe({
+    error: (error) => {
+      console.error('[ORCHESTRATOR] Actor error:', error)
+      sessionStorage.setItem('orchestrator-last-error', JSON.stringify({
+        error: error.message,
+        timestamp: Date.now()
+      }))
+    },
+    complete: () => {
+      console.warn('[ORCHESTRATOR] Actor completed/stopped unexpectedly')
+      sessionStorage.setItem('orchestrator-stopped', JSON.stringify({
+        timestamp: Date.now(),
+        reason: 'completed'
+      }))
+    }
+  })
+  
+  // Update global reference
+  ;(window as any).orchestratorActor = newActor
+  ;(window as any).restartOrchestratorActor = restartOrchestratorActor
+  
+  console.log('[XSTATE] ✅ Orchestrator actor restarted successfully')
+  return newActor
+}
 
 // 🔥 HMR FIX: Clean up existing orchestrator before creating new one
 if (import.meta.hot && (window as any).orchestratorActor) {
@@ -148,34 +202,26 @@ if (import.meta.hot && (window as any).orchestratorActor) {
   const existingActor = (window as any).orchestratorActor
   
   try {
-    // Stop the existing actor and its child machines
     existingActor.stop()
     console.log('[XSTATE] 🔥 HMR: Existing orchestrator stopped')
   } catch (error) {
     console.warn('[XSTATE] 🔥 HMR: Error stopping existing orchestrator:', error)
   }
   
-  // Clear the global reference
   (window as any).orchestratorActor = null
 }
 
-const orchestratorActor = createActor(orchestrator, {
-  input: { snapshot: persistedSnapshot }
-})
+// Create initial actor and set up subscriptions
+const orchestratorActor = createOrchestratorActor()
 
-// Start the orchestrator
-orchestratorActor.start()
-
-// Subscribe to state changes for persistence
+// Set up subscriptions for initial actor
 orchestratorActor.subscribe((snapshot) => {
   saveOrchestratorState(snapshot)
 })
 
-// Monitor actor status and handle unexpected stops
 orchestratorActor.subscribe({
   error: (error) => {
     console.error('[ORCHESTRATOR] Actor error:', error)
-    // Store error in sessionStorage for debugging
     sessionStorage.setItem('orchestrator-last-error', JSON.stringify({
       error: error.message,
       timestamp: Date.now()
@@ -183,7 +229,6 @@ orchestratorActor.subscribe({
   },
   complete: () => {
     console.warn('[ORCHESTRATOR] Actor completed/stopped unexpectedly')
-    // Store completion event for debugging
     sessionStorage.setItem('orchestrator-stopped', JSON.stringify({
       timestamp: Date.now(),
       reason: 'completed'
@@ -191,8 +236,9 @@ orchestratorActor.subscribe({
   }
 })
 
-// Make orchestrator globally accessible for auth guards
+// Make orchestrator and restart function globally accessible
 ;(window as any).orchestratorActor = orchestratorActor
+;(window as any).restartOrchestratorActor = restartOrchestratorActor
 
 // 🔥 HMR FIX: Add HMR disposal handler
 if (import.meta.hot) {

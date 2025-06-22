@@ -94,28 +94,31 @@ export function useOrchestrator() {
     ...state,
     send: actor.send,
     
-    // Convenience actions with actor status check
+    // Convenience actions with actor restart capability
     signIn: (email: string, password: string) => {
-      if (actor.getSnapshot().status === 'stopped') {
-        console.error('[ORCHESTRATOR] Cannot sign in - actor is stopped');
-        window.location.reload();
+      const currentActor = (window as any).orchestratorActor;
+      if (currentActor.getSnapshot().status === 'stopped') {
+        console.log('[ORCHESTRATOR] Actor stopped, restarting before sign-in...');
+        const newActor = (window as any).restartOrchestratorActor();
+        newActor.send({ type: 'SIGN_IN', email, password });
         return;
       }
-      actor.send({ type: 'SIGN_IN', email, password });
+      currentActor.send({ type: 'SIGN_IN', email, password });
     },
     signOut: () => {
-      if (actor.getSnapshot().status === 'stopped') {
-        console.error('[ORCHESTRATOR] Cannot sign out - actor is stopped, forcing manual sign-out');
-        window.dispatchEvent(new CustomEvent('auth:signout'));
-        window.location.href = '/sign-in';
+      const currentActor = (window as any).orchestratorActor;
+      if (currentActor.getSnapshot().status === 'stopped') {
+        console.log('[ORCHESTRATOR] Actor stopped, restarting before sign-out...');
+        const newActor = (window as any).restartOrchestratorActor();
+        newActor.send({ type: 'SIGN_OUT' });
         return;
       }
       try {
-        actor.send({ type: 'SIGN_OUT' });
+        currentActor.send({ type: 'SIGN_OUT' });
       } catch (error) {
-        console.error('[ORCHESTRATOR] Error sending SIGN_OUT event:', error);
-        window.dispatchEvent(new CustomEvent('auth:signout'));
-        window.location.href = '/sign-in';
+        console.error('[ORCHESTRATOR] Error sending SIGN_OUT event, restarting actor...');
+        const newActor = (window as any).restartOrchestratorActor();
+        newActor.send({ type: 'SIGN_OUT' });
       }
     },
   };
@@ -174,31 +177,31 @@ export function useAuth() {
         return name.slice(0, 2).toUpperCase();
       })(),
       
-      // Actions with actor status check
+      // Actions with actor restart capability
       signIn: (email: string, password: string) => {
-        if (actor.getSnapshot().status === 'stopped') {
-          console.error('[AUTH] Cannot sign in - orchestrator actor is stopped');
-          // Try to restart or handle gracefully
-          window.location.reload();
+        const currentActor = (window as any).orchestratorActor;
+        if (currentActor.getSnapshot().status === 'stopped') {
+          console.log('[AUTH] Actor stopped, restarting before sign-in...');
+          const newActor = (window as any).restartOrchestratorActor();
+          newActor.send({ type: 'SIGN_IN', email, password });
           return;
         }
-        actor.send({ type: 'SIGN_IN', email, password });
+        currentActor.send({ type: 'SIGN_IN', email, password });
       },
       signOut: () => {
-        if (actor.getSnapshot().status === 'stopped') {
-          console.error('[AUTH] Cannot sign out - orchestrator actor is stopped, forcing manual sign-out');
-          // Manually trigger sign-out cleanup since actor is stopped
-          window.dispatchEvent(new CustomEvent('auth:signout'));
-          window.location.href = '/sign-in';
+        const currentActor = (window as any).orchestratorActor;
+        if (currentActor.getSnapshot().status === 'stopped') {
+          console.log('[AUTH] Actor stopped, restarting before sign-out...');
+          const newActor = (window as any).restartOrchestratorActor();
+          newActor.send({ type: 'SIGN_OUT' });
           return;
         }
         try {
-          actor.send({ type: 'SIGN_OUT' });
+          currentActor.send({ type: 'SIGN_OUT' });
         } catch (error) {
-          console.error('[AUTH] Error sending SIGN_OUT event:', error);
-          // Fallback: manually trigger sign-out cleanup
-          window.dispatchEvent(new CustomEvent('auth:signout'));
-          window.location.href = '/sign-in';
+          console.error('[AUTH] Error sending SIGN_OUT event, restarting actor...');
+          const newActor = (window as any).restartOrchestratorActor();
+          newActor.send({ type: 'SIGN_OUT' });
         }
       },
     };
