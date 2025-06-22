@@ -605,23 +605,9 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
     })
   }
   
-  // Generate the simple cell class name based on type with appropriate cursor
+  // Generate the simple cell class name based on type  
   const getCellClassName = (type: string) => {
-    const baseClasses = `vibe-cell vibe-cell--${type}`
-    
-    // Add cursor styles based on cell type and editability
-    if (isSystemField || config.editable === false) {
-      return `${baseClasses} cursor-default`
-    }
-    
-    // Interactive cell types should have pointer cursor
-    const interactiveCellTypes = ['enum', 'relationship-single', 'relationship-multi', 'boolean', 'date']
-    if (interactiveCellTypes.includes(type)) {
-      return `${baseClasses} cursor-pointer`
-    }
-    
-    // Text input types should have text cursor
-    return `${baseClasses} cursor-text`
+    return `vibe-cell vibe-cell--${type}`
   }
   
   // Consolidated state management
@@ -799,10 +785,19 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   // Determine which cell types need overlays vs content replacement
   const needsOverlay = ['enum', 'relationship-single', 'relationship-multi', 'boolean', 'date'].includes(cellType)
   
+  // Generate cursor class based on actual cell behavior
+  const getCursorClass = () => {
+    if (isSystemField || config.editable === false) {
+      return 'cursor-default'
+    }
+    // Overlay editing cells (dropdowns, pickers) use pointer cursor
+    return needsOverlay ? 'cursor-pointer' : 'cursor-text'
+  }
+  
   // For text-like types: replace content entirely when editing  
   if (editing.isEditing && config.editable !== false && !isSystemField && !needsOverlay) {
     return (
-      <div className={getCellClassName(cellType)}>
+      <div className={`${getCellClassName(cellType)} ${getCursorClass()}`}>
         <UniversalInput
           cellType={cellType}
           config={config}
@@ -820,7 +815,7 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   // Render display UI (always visible)
   return (
     <div 
-      className={getCellClassName(cellType)}
+      className={`${getCellClassName(cellType)} ${getCursorClass()}`}
       onClick={handleStartEdit}
       title={
         displayText
