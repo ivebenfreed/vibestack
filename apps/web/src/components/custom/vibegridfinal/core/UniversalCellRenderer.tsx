@@ -605,9 +605,23 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
     })
   }
   
-  // Generate the simple cell class name based on type
+  // Generate the simple cell class name based on type with appropriate cursor
   const getCellClassName = (type: string) => {
-    return `vibe-cell vibe-cell--${type}`
+    const baseClasses = `vibe-cell vibe-cell--${type}`
+    
+    // Add cursor styles based on cell type and editability
+    if (isSystemField || config.editable === false) {
+      return `${baseClasses} cursor-default`
+    }
+    
+    // Interactive cell types should have pointer cursor
+    const interactiveCellTypes = ['enum', 'relationship-single', 'relationship-multi', 'boolean', 'date']
+    if (interactiveCellTypes.includes(type)) {
+      return `${baseClasses} cursor-pointer`
+    }
+    
+    // Text input types should have text cursor
+    return `${baseClasses} cursor-text`
   }
   
   // Consolidated state management
