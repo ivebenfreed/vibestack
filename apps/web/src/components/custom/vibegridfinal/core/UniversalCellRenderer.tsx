@@ -594,8 +594,8 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   const isSystemField = meta?.systemField || false
   const columnId = column.columnDef.id as string
   
-  // 🔍 DEBUG: Log cell type detection for relationship columns
-  if (true && (columnId === 'project' || columnId === 'assignee')) {
+  // 🔍 DEBUG: Log cell type detection for relationship columns (disabled to prevent spam)
+  if (false && (columnId === 'project' || columnId === 'assignee')) {
     console.log(`🔍 Cell Debug [${columnId}]:`, {
       columnId,
       cellType,
