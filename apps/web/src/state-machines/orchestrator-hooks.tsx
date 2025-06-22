@@ -108,17 +108,23 @@ export function useOrchestrator() {
     signOut: () => {
       const currentActor = (window as any).orchestratorActor;
       if (currentActor.getSnapshot().status === 'stopped') {
-        console.log('[ORCHESTRATOR] Actor stopped, restarting before sign-out...');
-        const newActor = (window as any).restartOrchestratorActor();
-        newActor.send({ type: 'SIGN_OUT' });
+        console.log('[ORCHESTRATOR] Actor stopped during sign-out, performing direct cleanup...');
+        // Don't restart - just perform the sign-out cleanup directly
+        window.dispatchEvent(new CustomEvent('auth:signout'));
+        // Clear persisted state  
+        localStorage.removeItem('orchestrator-state');
+        // Redirect to sign-in
+        window.location.href = '/sign-in';
         return;
       }
       try {
         currentActor.send({ type: 'SIGN_OUT' });
       } catch (error) {
-        console.error('[ORCHESTRATOR] Error sending SIGN_OUT event, restarting actor...');
-        const newActor = (window as any).restartOrchestratorActor();
-        newActor.send({ type: 'SIGN_OUT' });
+        console.error('[ORCHESTRATOR] Error sending SIGN_OUT event, performing direct cleanup...', error);
+        // Don't restart - just perform the sign-out cleanup directly
+        window.dispatchEvent(new CustomEvent('auth:signout'));
+        localStorage.removeItem('orchestrator-state');
+        window.location.href = '/sign-in';
       }
     },
   };
@@ -191,17 +197,23 @@ export function useAuth() {
       signOut: () => {
         const currentActor = (window as any).orchestratorActor;
         if (currentActor.getSnapshot().status === 'stopped') {
-          console.log('[AUTH] Actor stopped, restarting before sign-out...');
-          const newActor = (window as any).restartOrchestratorActor();
-          newActor.send({ type: 'SIGN_OUT' });
+          console.log('[AUTH] Actor stopped during sign-out, performing direct cleanup...');
+          // Don't restart - just perform the sign-out cleanup directly
+          window.dispatchEvent(new CustomEvent('auth:signout'));
+          // Clear persisted state
+          localStorage.removeItem('orchestrator-state');
+          // Redirect to sign-in
+          window.location.href = '/sign-in';
           return;
         }
         try {
           currentActor.send({ type: 'SIGN_OUT' });
         } catch (error) {
-          console.error('[AUTH] Error sending SIGN_OUT event, restarting actor...');
-          const newActor = (window as any).restartOrchestratorActor();
-          newActor.send({ type: 'SIGN_OUT' });
+          console.error('[AUTH] Error sending SIGN_OUT event, performing direct cleanup...', error);
+          // Don't restart - just perform the sign-out cleanup directly
+          window.dispatchEvent(new CustomEvent('auth:signout'));
+          localStorage.removeItem('orchestrator-state');
+          window.location.href = '/sign-in';
         }
       },
     };
