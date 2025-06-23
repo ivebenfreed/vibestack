@@ -321,14 +321,6 @@ export function useSync() {
   const context = syncSnapshot?.context || {};
   const state = syncSnapshot?.value || 'idle';
   
-  // Debug logging
-  console.log('[useSync] Sync machine state:', {
-    state,
-    syncPhase: context.syncPhase,
-    clientId: context.clientId,
-    currentLSN: context.currentLSN
-  });
-  
   // Check if state is a string or object with nested states
   const stateString = typeof state === 'string' ? state : JSON.stringify(state);
   
