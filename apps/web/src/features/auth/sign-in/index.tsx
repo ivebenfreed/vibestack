@@ -21,7 +21,7 @@ export default function SignIn() {
   useEffect(() => {
     if (isAuthenticated) {
       console.log('[SignIn] User authenticated - auto-redirecting')
-      const redirectTo = search.redirect || '/tasks' // Default to tasks page
+      const redirectTo = search.redirect || '/' // Default to home page
       navigate({ 
         to: redirectTo as any,
         replace: true 

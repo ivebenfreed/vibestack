@@ -29,7 +29,7 @@ export const Route = createFileRoute('/_authenticated')({
     if (!authActor) {
       throw redirect({
         to: '/sign-in',
-        search: { redirect: location.href },
+        search: { redirect: location.pathname },
         replace: true
       })
     }
@@ -64,7 +64,7 @@ export const Route = createFileRoute('/_authenticated')({
     if (!finalAuthSnapshot.matches('authenticated') || !finalAuthSnapshot.context.user) {
       throw redirect({
         to: '/sign-in',
-        search: { redirect: location.href },
+        search: { redirect: location.pathname },
         replace: true
       })
     }

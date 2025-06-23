@@ -82,8 +82,17 @@ export function useAuth() {
       }
       
       console.log('[useAuth] Immediate navigation to prevent component re-rendering');
+      // Get current location to preserve as redirect
+      const currentPath = window.location.pathname;
+      // Don't redirect back to sign-in or sign-up pages
+      const shouldPreserveRedirect = currentPath !== '/sign-in' && currentPath !== '/sign-up';
+      
       // Navigate immediately to unmount all authenticated components
-      navigate({ to: '/sign-in', replace: true });
+      navigate({ 
+        to: '/sign-in', 
+        search: shouldPreserveRedirect ? { redirect: currentPath } : {},
+        replace: true 
+      });
       
       console.log('[useAuth] Sending SIGN_OUT directly to AuthMachine');
       authActor.send({ type: 'SIGN_OUT' });
