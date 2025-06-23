@@ -1,6 +1,6 @@
 // In apps/web/src/routes/_authenticated/debug/route.tsx
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { useUserRole, useAuth } from '@/state-machines/orchestrator-hooks';
+import { useAuth } from '@/state-machines/orchestrator-hooks-v2';
 import { useEffect, useState, useRef } from 'react';
 
 export const Route = createFileRoute('/_authenticated/debug')({
@@ -10,13 +10,12 @@ export const Route = createFileRoute('/_authenticated/debug')({
 
 // Debug layout component with permission check using orchestrator state
 function DebugLayoutComponent() {
-  const { isAdmin, isSuperAdmin } = useUserRole();
   const { isAuthenticated, user } = useAuth();
   const [isCheckingPermissions, setIsCheckingPermissions] = useState(true);
   const lastLogRef = useRef<string>('');
   
   // Calculate debug access directly to avoid function reference instability
-  const canAccessDebug = isAdmin || isSuperAdmin;
+  const canAccessDebug = user?.role === 'admin' || user?.role === 'super_admin';
   
   // Check permissions immediately now that sign-in fetches full session data
   useEffect(() => {

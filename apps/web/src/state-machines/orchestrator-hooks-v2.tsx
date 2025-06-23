@@ -1,0 +1,290 @@
+import React, { useMemo } from 'react';
+import { useSelector } from '@xstate/react';
+import { useNavigate } from '@tanstack/react-router';
+import { authClient } from '@/lib/auth';
+import type { UserInfo } from './types';
+
+// Auth-focused hook - directly communicates with AuthMachine
+export function useAuth() {
+  const navigate = useNavigate();
+  
+  // Get AuthMachine directly from window (it's started independently)
+  // Don't memoize - always get the current actor reference
+  const authActor = (window as any).authMachineActor;
+
+  // Safety check: only proceed if authActor exists
+  if (!authActor) {
+    return {
+      user: null,
+      authError: null,
+      lastActivity: Date.now(),
+      isAuthenticated: false,
+      isSigningIn: false,
+      isSigningOut: false,
+      isCheckingAuth: true,
+      userRole: null,
+      isAdmin: false,
+      isSuperAdmin: false,
+      canAccessDebugFeatures: false,
+      displayName: 'User',
+      initials: 'U',
+      signIn: () => console.error('[useAuth] AuthMachine not available'),
+      signOut: () => console.error('[useAuth] AuthMachine not available'),
+      refreshAuth: () => console.error('[useAuth] AuthMachine not available'),
+    };
+  }
+  
+  const user = useSelector(authActor, (state) => state?.context?.user || null);
+  const authError = useSelector(authActor, (state) => state?.context?.authError || null);
+  const lastActivity = useSelector(authActor, (state) => state?.context?.lastActivity || Date.now());
+  
+  // Auth token and session expiry are private to AuthMachine - components shouldn't need them
+  // If needed for API calls, get them directly from authClient
+  
+  const isAuthenticated = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('authenticated') : false
+  );
+  const isSigningIn = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('signingIn') : false
+  );
+  const isSigningOut = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('signingOut') : false
+  );
+  const isCheckingAuth = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('checking') : true
+  );
+
+  const signIn = useMemo(() => (credentials: { email: string; password: string }) => {
+    if (authActor) {
+      // Check if actor is still active before sending events
+      const snapshot = authActor.getSnapshot();
+      if (snapshot.status === 'stopped') {
+        console.log('[useAuth] Auth actor is stopped, skipping SIGN_IN event');
+        return;
+      }
+      
+      console.log('[useAuth] Sending SIGN_IN directly to AuthMachine');
+      authActor.send({ type: 'SIGN_IN', credentials });
+    } else {
+      console.error('[useAuth] AuthMachine actor not available');
+    }
+  }, [authActor]);
+
+  const signOut = useMemo(() => () => {
+    if (authActor) {
+      // Check if actor is still active before sending events
+      const snapshot = authActor.getSnapshot();
+      if (snapshot.status === 'stopped') {
+        console.log('[useAuth] Auth actor is stopped, skipping SIGN_OUT event');
+        // Just navigate since actor is stopped
+        navigate({ to: '/sign-in', replace: true });
+        return;
+      }
+      
+      console.log('[useAuth] Immediate navigation to prevent component re-rendering');
+      // Navigate immediately to unmount all authenticated components
+      navigate({ to: '/sign-in', replace: true });
+      
+      console.log('[useAuth] Sending SIGN_OUT directly to AuthMachine');
+      authActor.send({ type: 'SIGN_OUT' });
+    } else {
+      console.error('[useAuth] AuthMachine actor not available');
+    }
+  }, [authActor, navigate]);
+
+  const refreshAuth = useMemo(() => () => {
+    if (authActor) {
+      // Check if actor is still active before sending events
+      const snapshot = authActor.getSnapshot();
+      if (snapshot.status === 'stopped') {
+        console.log('[useAuth] Auth actor is stopped, skipping CHECK_AUTH event');
+        return;
+      }
+      
+      console.log('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
+      authActor.send({ type: 'CHECK_AUTH' });
+    } else {
+      console.error('[useAuth] AuthMachine actor not available');
+    }
+  }, [authActor]);
+
+  // Computed display properties for backward compatibility
+  const displayName = useMemo(() => {
+    if (!user) return 'User';
+    return user.name || user.email?.split('@')[0] || 'User';
+  }, [user]);
+
+  const initials = useMemo(() => {
+    if (!user) return 'U';
+    const name = user.name || user.email?.split('@')[0] || 'User';
+    return name.slice(0, 2).toUpperCase();
+  }, [user]);
+
+  const userRole = user?.role || null;
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const isSuperAdmin = userRole === 'super_admin';
+
+  return {
+    // State
+    user,
+    authError,
+    lastActivity,
+    
+    // Status
+    isAuthenticated,
+    isSigningIn,
+    isSigningOut,
+    isCheckingAuth,
+    
+    // User role info
+    userRole,
+    isAdmin,
+    isSuperAdmin,
+    canAccessDebugFeatures: isAdmin,
+    
+    // User display info
+    displayName,
+    initials,
+    
+    // Actions
+    signIn,
+    signOut,
+    refreshAuth,
+  };
+}
+
+// App initialization hook - directly from OrchestratorV2
+export function useAppInit() {
+  // Get OrchestratorV2 directly from window (it's started independently)
+  const actor = useMemo(() => {
+    return (window as any).orchestratorV2Actor;
+  }, []);
+
+  // Safety check: only proceed if actor exists
+  if (!actor) {
+    return {
+      isDatabaseInitialized: false,
+      databaseError: null,
+      isSyncReady: false,
+      syncError: null,
+      connectionStatus: 'disconnected' as const,
+      liveChangesStatus: 'idle' as const,
+      isCheckingRequirements: true,
+      isInitializingDatabase: false,
+      isStartingSync: false,
+      isReady: false,
+      hasError: false,
+      retryInit: () => console.error('[useAppInit] OrchestratorV2 not available'),
+      restartSync: () => console.error('[useAppInit] OrchestratorV2 not available'),
+    };
+  }
+  
+  // Get data directly from child machine snapshots
+  const initMachineSnapshot = useSelector(actor, (state) => 
+    state.children?.appInitMachine?.getSnapshot?.()
+  );
+  
+  const isDatabaseInitialized = initMachineSnapshot?.context?.isDatabaseInitialized || false;
+  const databaseError = initMachineSnapshot?.context?.databaseError || null;
+  const isSyncReady = initMachineSnapshot?.context?.isSyncReady || false;
+  const syncError = initMachineSnapshot?.context?.syncError || null;
+  const connectionStatus = initMachineSnapshot?.context?.connectionStatus || 'disconnected';
+  const liveChangesStatus = initMachineSnapshot?.context?.liveChangesStatus || 'idle';
+
+  // Get AppInitMachine state directly
+  const appInitState = initMachineSnapshot?.value || 'idle';
+  
+  const isCheckingRequirements = appInitState === 'idle';
+  const isInitializingDatabase = appInitState === 'database';
+  const isStartingSync = appInitState === 'sync';
+  const isReady = appInitState === 'ready';
+  const hasError = appInitState === 'error';
+
+  const retryInit = useMemo(() => () => {
+    actor.send({ type: 'RETRY_INIT' });
+  }, [actor]);
+
+  const restartSync = useMemo(() => () => {
+    actor.send({ type: 'RESTART_SYNC' });
+  }, [actor]);
+
+  return {
+    // Database state
+    isDatabaseInitialized,
+    databaseError,
+    
+    // Sync state
+    isSyncReady,
+    syncError,
+    connectionStatus,
+    liveChangesStatus,
+    
+    // Status
+    isCheckingRequirements,
+    isInitializingDatabase,
+    isStartingSync,
+    isReady,
+    hasError,
+    
+    // Actions
+    retryInit,
+    restartSync,
+  };
+}
+
+// System hook - app initialization state directly from app init machine
+export function useSystem() {
+  // Get app init machine directly from orchestrator children
+  const appInitMachine = useMemo(() => {
+    const orchestratorActor = (window as any).orchestratorV2Actor;
+    return orchestratorActor?.getSnapshot()?.children?.appInitMachine;
+  }, []);
+
+  // Safety check: only proceed if app init machine exists
+  if (!appInitMachine) {
+    return {
+      isSystemReady: false,
+      isInitializing: false,
+      hasAnyError: false,
+      errors: [],
+    };
+  }
+  
+  // Subscribe directly to app init machine state changes
+  const appInitSnapshot = useSelector(appInitMachine, (state) => state);
+  
+  const isSystemReady = appInitSnapshot?.value === 'ready' || false;
+  const isInitializing = appInitSnapshot?.value && !['idle', 'ready', 'error'].includes(appInitSnapshot.value as string) || false;
+  
+  if (import.meta.env.MODE === 'development') {
+    console.log('[useSystem] isSystemReady selector:', { 
+      isReady: isSystemReady, 
+      appInitState: appInitSnapshot?.value, 
+      timestamp: Date.now() 
+    });
+  }
+  
+  // Get error states from app init machine
+  const databaseError = appInitSnapshot?.context?.databaseError || null;
+  const syncError = appInitSnapshot?.context?.syncError || null;
+  
+  const hasAnyError = !!(databaseError || syncError);
+
+  // Get all errors in one place
+  const errors: string[] = [];
+  if (databaseError) errors.push(databaseError);
+  if (syncError) errors.push(syncError);
+
+  return {
+    // High-level status
+    isSystemReady,
+    isInitializing,
+    hasAnyError,
+    
+    // Error aggregation
+    errors,
+  };
+}
+
+
+// No longer exporting context - using direct actor access pattern

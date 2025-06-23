@@ -8,15 +8,16 @@ import { useEffect, useState } from 'react'
 import { InitializationErrorBoundary } from '@/components/error-boundary'
 import { AuthAwareProviders } from '@/components/providers/AuthAwareProviders'
 import { Task, Project, User } from '@repo/dataforge/client-entities'
-import { useAuth } from '@/hooks/useSimpleAuth'
+// import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
 import { authClient } from '@/lib/auth'
 import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
 import { usePGliteContext } from '@/db/pglite-provider'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
-// 🔥 NEW: Import XState orchestrator
+// 🔥 NEW: Import XState orchestrator V2 and AuthMachine
 import { createActor } from 'xstate'
-import { orchestrator } from '@/state-machines/orchestrator'
-import { OrchestratorProvider, useSystemReadiness } from '@/state-machines/orchestrator-hooks'
+import { orchestratorV2 } from '@/state-machines/orchestrator-v2'
+import { authMachine } from '@/state-machines/machines/auth-machine'
+import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
 import React from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 
@@ -28,124 +29,17 @@ interface RouterContext {
   setUserAtoms: (users: User[]) => void
 }
 
-// 🔥 NEW: XState native persistence (simplified)
-const ORCHESTRATOR_STORAGE_KEY = 'orchestrator-state'
+// Pure event coordinator - no persistence needed (child machines handle their own)
 
-const loadPersistedOrchestratorState = () => {
-  try {
-    const stored = localStorage.getItem(ORCHESTRATOR_STORAGE_KEY)
-    if (stored) {
-      const persistedSnapshot = JSON.parse(stored)
-      
-      // Validate that persisted state has required structure
-      if (!persistedSnapshot.value || !persistedSnapshot.context) {
-        console.log('[XSTATE] Persisted state missing required structure, forcing clean start')
-        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
-        return null
-      }
-      
-      // Validate that context has essential properties (only what we actually persist)
-      const ctx = persistedSnapshot.context
-      const hasRequiredContext = typeof ctx === 'object' && 
-                                 ctx !== null &&
-                                 typeof ctx.syncClientId === 'string' &&
-                                 ctx.syncState && 
-                                 typeof ctx.syncState.currentLSN === 'string'
-      
-      if (!hasRequiredContext) {
-        console.log('[XSTATE] Persisted state has corrupted context, forcing clean start')
-        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
-        return null
-      }
-      
-      // Check age based on auth session expiry if available, otherwise fallback to 7 days
-      const sessionExpiry = persistedSnapshot.sessionExpiry
-      const lastActivity = ctx.lastActivity
-      const now = Date.now()
-      
-      // Use session expiry if available, otherwise default to 7 days
-      const maxAge = sessionExpiry ? 
-        new Date(sessionExpiry).getTime() - now : 
-        7 * 24 * 60 * 60 * 1000 // 7 days default
-      
-      if (sessionExpiry && now >= new Date(sessionExpiry).getTime()) {
-        console.log('[XSTATE] Persisted state expired with auth session, forcing clean start')
-        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
-        return null
-      } else if (!sessionExpiry && lastActivity && (now - lastActivity) > maxAge) {
-        console.log('[XSTATE] Persisted state is stale (no session expiry), forcing clean start')
-        localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
-        return null
-      }
-      
-      console.log('[XSTATE] Loading valid persisted orchestrator state:', persistedSnapshot.value)
-      console.log(`[XSTATE] 📥 Restored LSN: ${persistedSnapshot.context?.syncState?.currentLSN}, ClientID: ${persistedSnapshot.context?.syncClientId}`)
-      return persistedSnapshot
-    }
-  } catch (error) {
-    console.warn('[XSTATE] Failed to parse persisted state, forcing clean start:', error)
-    localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
-  }
-  return null
-}
+// No orchestrator state loading needed - using pure event coordinator
 
-const saveOrchestratorState = async (snapshot: any) => {
-  try {
-    // Check if user is authenticated before persisting
-    const user = snapshot.context.user
-    const authToken = snapshot.context.authToken
-    const sessionExpiry = snapshot.context.sessionExpiry
-    
-    if (user && authToken) {
-      const stateToPersist = {
-        value: snapshot.value,
-        context: {
-          user,
-          authToken,
-          sessionExpiry,
-          isDatabaseInitialized: snapshot.context.isDatabaseInitialized,
-          syncClientId: snapshot.context.syncClientId,
-          syncState: snapshot.context.syncState,
-          integrityBaseline: snapshot.context.integrityBaseline
-        }
-      }
-      
-      // Get previous LSN to avoid logging redundant saves
-      const previousState = localStorage.getItem(ORCHESTRATOR_STORAGE_KEY);
-      let previousLSN = '0/0';
-      if (previousState) {
-        try {
-          const parsed = JSON.parse(previousState);
-          previousLSN = parsed.context?.syncState?.currentLSN || '0/0';
-        } catch (e) {
-          // Ignore parse errors
-        }
-      }
-      
-      localStorage.setItem(ORCHESTRATOR_STORAGE_KEY, JSON.stringify(stateToPersist))
-      const ttlInfo = sessionExpiry ? `expires with session at ${sessionExpiry}` : 'no session expiry'
-      
-      // Only log when state value changes or LSN actually changes
-      const currentLSN = stateToPersist.context.syncState.currentLSN;
-      if (previousLSN !== currentLSN || !previousState) {
-        console.log(`[XSTATE] Persisted complete orchestrator state: ${stateToPersist.value} (${ttlInfo})`)
-        console.log(`[XSTATE] 💾 Persisted LSN: ${currentLSN}, ClientID: ${stateToPersist.context.syncClientId}`)
-      }
-    }
-  } catch (error) {
-    console.warn('[XSTATE] Failed to persist orchestrator state:', error)
-  }
-}
+// No orchestrator state saving needed - child machines handle their own persistence
 
-// 🔥 NEW: Actor restart mechanism
-const createOrchestratorActor = () => {
-  const persistedSnapshot = loadPersistedOrchestratorState()
-  console.log('[XSTATE] Creating orchestrator actor with persistence support...')
+// Create orchestrator v2 actor (pure event coordinator)
+const createOrchestratorV2Actor = () => {
+  console.log('[XSTATE] Creating orchestrator v2 actor (pure event coordinator)...')
   
-  const actor = createActor(orchestrator, {
-    input: { snapshot: persistedSnapshot }
-  })
-  
+  const actor = createActor(orchestratorV2)
   actor.start()
   return actor
 }
@@ -196,74 +90,210 @@ const restartOrchestratorActor = () => {
   return newActor
 }
 
-// 🔥 HMR FIX: Clean up existing orchestrator before creating new one
-if (import.meta.hot && (window as any).orchestratorActor) {
-  console.log('[XSTATE] 🔥 HMR: Cleaning up existing orchestrator actor...')
-  const existingActor = (window as any).orchestratorActor
-  
-  try {
-    existingActor.stop()
-    console.log('[XSTATE] 🔥 HMR: Existing orchestrator stopped')
-  } catch (error) {
-    console.warn('[XSTATE] 🔥 HMR: Error stopping existing orchestrator:', error)
+// 🔥 HMR FIX: Clean up existing actors before creating new ones
+if (import.meta.hot) {
+  if ((window as any).orchestratorV2Actor) {
+    console.log('[XSTATE] 🔥 HMR: Cleaning up existing orchestrator v2 actor...')
+    const existingActor = (window as any).orchestratorV2Actor
+    
+    try {
+      // Check if actor is still running before stopping
+      if (existingActor.getSnapshot().status !== 'stopped') {
+        existingActor.stop()
+        console.log('[XSTATE] 🔥 HMR: Existing orchestrator v2 stopped')
+      }
+    } catch (error) {
+      console.warn('[XSTATE] 🔥 HMR: Error stopping existing orchestrator v2:', error)
+    }
+    
+    (window as any).orchestratorV2Actor = null
   }
   
-  (window as any).orchestratorActor = null
+  if ((window as any).authMachineActor) {
+    console.log('[XSTATE] 🔥 HMR: Cleaning up existing auth machine actor...')
+    const existingAuthActor = (window as any).authMachineActor
+    
+    try {
+      // Check if actor is still running before stopping
+      const currentSnapshot = existingAuthActor.getSnapshot()
+      if (currentSnapshot.status !== 'stopped') {
+        if (currentSnapshot.matches('authenticated') && currentSnapshot.context.user) {
+          console.log('[XSTATE] 🔥 HMR: Preserving auth state for restart')
+          saveAuthState(existingAuthActor)
+        }
+        
+        existingAuthActor.stop()
+        console.log('[XSTATE] 🔥 HMR: Existing auth machine stopped')
+      } else {
+        console.log('[XSTATE] 🔥 HMR: Auth machine already stopped, skipping')
+      }
+    } catch (error) {
+      console.warn('[XSTATE] 🔥 HMR: Error stopping existing auth machine:', error)
+    }
+    
+    (window as any).authMachineActor = null
+  }
 }
 
-// Create initial actor and set up subscriptions
-const orchestratorActor = createOrchestratorActor()
+// 🔥 AUTH PERSISTENCE: Load and save AuthMachine state
+const AUTH_STORAGE_KEY = 'auth-machine-state'
 
-// Set up subscriptions for initial actor
-orchestratorActor.subscribe((snapshot) => {
-  saveOrchestratorState(snapshot)
+const loadPersistedAuthState = () => {
+  try {
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY)
+    if (stored) {
+      const persistedSnapshot = JSON.parse(stored)
+      
+      // Basic validation - XState 5 will handle format validation
+      if (!persistedSnapshot) {
+        console.log('[AuthMachine] No valid persisted state found')
+        localStorage.removeItem(AUTH_STORAGE_KEY)
+        return null
+      }
+      
+      console.log('[AuthMachine] Loading persisted auth state')
+      return persistedSnapshot
+    }
+  } catch (error) {
+    console.warn('[AuthMachine] Failed to parse persisted state:', error)
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+  }
+  return null
+}
+
+const saveAuthState = (actor: any) => {
+  try {
+    const snapshot = actor.getSnapshot()
+    // Only persist if user is authenticated
+    if (snapshot.context.user && snapshot.matches('authenticated')) {
+      // XState 5: Use getPersistedSnapshot() for proper snapshot format
+      const persistedSnapshot = actor.getPersistedSnapshot()
+      
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(persistedSnapshot))
+      console.log('[AuthMachine] Persisted auth state using XState 5 format:', snapshot.value)
+    } else {
+      // Clear persisted state if not authenticated
+      localStorage.removeItem(AUTH_STORAGE_KEY)
+    }
+  } catch (error) {
+    console.warn('[AuthMachine] Failed to persist auth state:', error)
+  }
+}
+
+// XState 5: Proper snapshot persistence
+const persistedAuthSnapshot = loadPersistedAuthState()
+
+// Create AuthMachine actor
+const authMachineActor = createActor(authMachine)
+
+// XState 5: Start with snapshot if available
+if (persistedAuthSnapshot) {
+  console.log('[AuthMachine] Starting with persisted snapshot')
+  authMachineActor.start(persistedAuthSnapshot)
+} else {
+  console.log('[AuthMachine] Starting fresh')
+  authMachineActor.start()
+}
+
+// Set up auth state persistence and direct init trigger
+authMachineActor.subscribe((snapshot) => {
+  saveAuthState(authMachineActor)
+  
+  const authenticated = snapshot.matches('authenticated')
+  const reason = snapshot.value === 'authenticated' ? 'authenticated' : 
+                 snapshot.value === 'unauthenticated' ? 'unauthenticated' :
+                 snapshot.value === 'signingOut' ? 'signing-out' : 'checking'
+  
+  console.log('[AuthMachine] State changed:', { authenticated, reason })
+  
+  // 🔥 DIRECT FLOW: When auth completes, directly start initialization
+  if (authenticated && snapshot.value === 'authenticated') {
+    console.log('[AuthMachine] ✅ Authentication complete - starting app initialization')
+    orchestratorV2Actor.send({ type: 'START_INIT' })
+  }
+  
+  // Emit custom event for navigation logic
+  window.dispatchEvent(new CustomEvent('auth:state-changed', {
+    detail: { authenticated, reason }
+  }))
 })
 
-orchestratorActor.subscribe({
+// Create orchestrator V2 actor - pure event coordinator
+const orchestratorV2Actor = createOrchestratorV2Actor()
+
+// Handle PGlite filesystem errors gracefully
+window.addEventListener('unhandledrejection', (event) => {
+  // Check if it's a PGlite ErrnoError that we can safely ignore
+  if (event.reason && event.reason.name === 'ErrnoError') {
+    console.warn('[PGlite] ErrnoError caught and handled:', event.reason.errno);
+    event.preventDefault(); // Prevent the error from being logged as uncaught
+  }
+})
+
+orchestratorV2Actor.subscribe({
   error: (error) => {
-    console.error('[ORCHESTRATOR] Actor error:', error)
-    sessionStorage.setItem('orchestrator-last-error', JSON.stringify({
+    console.error('[ORCHESTRATOR V2] Actor error:', error)
+    sessionStorage.setItem('orchestrator-v2-last-error', JSON.stringify({
       error: error.message,
       timestamp: Date.now()
     }))
   },
   complete: () => {
-    console.warn('[ORCHESTRATOR] Actor completed/stopped unexpectedly')
-    sessionStorage.setItem('orchestrator-stopped', JSON.stringify({
+    console.warn('[ORCHESTRATOR V2] Actor completed/stopped unexpectedly')
+    sessionStorage.setItem('orchestrator-v2-stopped', JSON.stringify({
       timestamp: Date.now(),
       reason: 'completed'
     }))
   }
 })
 
-// Make orchestrator and restart function globally accessible
-;(window as any).orchestratorActor = orchestratorActor
-;(window as any).restartOrchestratorActor = restartOrchestratorActor
+// Make both actors globally accessible
+;(window as any).authMachineActor = authMachineActor
+;(window as any).orchestratorV2Actor = orchestratorV2Actor
 
-// 🔥 HMR FIX: Add HMR disposal handler
+// 🔥 HMR FIX: Add HMR disposal handler for both actors
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    console.log('[XSTATE] 🔥 HMR Dispose: Cleaning up orchestrator...')
+    console.log('[XSTATE] 🔥 HMR Dispose: Cleaning up actors...')
     
-    if ((window as any).orchestratorActor) {
+    if ((window as any).orchestratorV2Actor) {
       try {
-        const actor = (window as any).orchestratorActor
+        const actor = (window as any).orchestratorV2Actor
         actor.stop()
-        console.log('[XSTATE] 🔥 HMR: Orchestrator stopped for HMR')
+        console.log('[XSTATE] 🔥 HMR: Orchestrator v2 stopped for HMR')
       } catch (error) {
-        console.warn('[XSTATE] 🔥 HMR: Error stopping orchestrator during dispose:', error)
+        console.warn('[XSTATE] 🔥 HMR: Error stopping orchestrator v2 during dispose:', error)
       }
     }
     
-    // Clear global reference
-    (window as any).orchestratorActor = null
+    if ((window as any).authMachineActor) {
+      try {
+        const authActor = (window as any).authMachineActor
+        authActor.stop()
+        console.log('[XSTATE] 🔥 HMR: Auth machine stopped for HMR')
+      } catch (error) {
+        console.warn('[XSTATE] 🔥 HMR: Error stopping auth machine during dispose:', error)
+      }
+    }
+    
+    // Clear global references
+    (window as any).orchestratorV2Actor = null
+    (window as any).authMachineActor = null
   })
 }
 
-// Clear persisted state on sign-out events
+// Clear auth state and reset app init on sign-out
 window.addEventListener('auth:signout', () => {
-  console.log('[XSTATE] Clearing persisted state on sign-out')
-  localStorage.removeItem(ORCHESTRATOR_STORAGE_KEY)
+  console.log('[XSTATE] Clearing auth state on sign-out')
+  localStorage.removeItem(AUTH_STORAGE_KEY)
+  // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
+  
+  // Reset app init machine to idle state for fresh initialization on next sign-in
+  const orchestratorActor = (window as any).orchestratorV2Actor
+  if (orchestratorActor) {
+    console.log('[XSTATE] Resetting app init machine on sign-out')
+    orchestratorActor.send({ type: 'RESET_INIT' })
+  }
 })
 
 // Note: DB_INIT_START is sent from AuthAwareProviders when user is authenticated
@@ -292,10 +322,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: function RootComponent() {
     return (
       <InitializationErrorBoundary>
-        {/* 🔥 NEW: Provide XState orchestrator at the top level */}
-        <OrchestratorProvider actor={orchestratorActor}>
-          <RootComponentInternal />
-        </OrchestratorProvider>
+        {/* 🔥 FIXED: No provider needed - using direct actor access */}
+        <RootComponentInternal />
       </InitializationErrorBoundary>
     );
   },
@@ -330,36 +358,20 @@ function RootComponentInternal() {
 }
 
 function AppWithInitialization() {
-  // 🔥 NEW: Use orchestrator system coordination  
-  const { isAuthenticated } = useAuth()
-  const { isSystemReady, canLoadRoutes, readinessChecks } = useSystemReadiness()
   const navigate = useNavigate()
   const router = useRouter()
   
-  // 🔥 NEW: Listen for auth state changes to handle navigation
+  // Listen for auth state changes to handle navigation
   React.useEffect(() => {
     const handleAuthStateChange = (event: CustomEvent) => {
       const { authenticated, reason } = event.detail
       console.log('[Root] Auth state changed:', { authenticated, reason })
       
-      if (!authenticated && (reason === 'sign-out' || reason === 'unauthenticated')) {
-        console.log('[Root] Sign-out detected, checking current route...')
-        const currentPath = window.location.pathname
-        
-        // If on an authenticated route, redirect to sign-in
-        // Authenticated routes: everything except auth routes (/sign-in, /sign-up, etc.) and error routes
-        const isAuthRoute = currentPath.startsWith('/sign-') || currentPath.startsWith('/forgot-') || currentPath.startsWith('/otp');
-        const isErrorRoute = currentPath.match(/^\/(401|403|404|500|503)$/);
-        const isPublicRoute = isAuthRoute || isErrorRoute;
-        
-        if (!isPublicRoute) {
-          console.log('[Root] Redirecting to sign-in after sign-out')
-          navigate({ 
-            to: '/sign-in', 
-            search: { redirect: currentPath },
-            replace: true 
-          })
-        }
+      // Note: Immediate navigation now handled in useAuth.signOut() to prevent component re-rendering
+      if (!authenticated && reason === 'unauthenticated' && !window.location.pathname.startsWith('/sign-')) {
+        // Handle edge cases where auth check fails (not from sign-out)
+        console.log('[Root] Unauthenticated state detected, redirecting to sign-in')
+        navigate({ to: '/sign-in', replace: true })
       }
     }
     
@@ -368,30 +380,7 @@ function AppWithInitialization() {
     return () => {
       window.removeEventListener('auth:state-changed', handleAuthStateChange as EventListener)
     }
-  }, [navigate])
-  
-  // 🔥 DEBUG: Log orchestrator state in development (only on changes)
-  const prevStateRef = React.useRef<string>('')
-  React.useEffect(() => {
-    if (import.meta.env.MODE === 'development') {
-      const currentState = JSON.stringify({
-        isSystemReady,
-        canLoadRoutes,
-        isAuthenticated
-      })
-      
-      // Only log if state actually changed
-      if (currentState !== prevStateRef.current) {
-        console.log('[Orchestrator Debug] System state changed:', {
-          isSystemReady,
-          canLoadRoutes,
-          readinessChecks,
-          isAuthenticated
-        });
-        prevStateRef.current = currentState
-      }
-    }
-  }, [isSystemReady, canLoadRoutes, readinessChecks, isAuthenticated]);
+  }, [navigate]);
   
   // Remove UnifiedLoadingScreen from root - it should only be on authenticated routes
   return (

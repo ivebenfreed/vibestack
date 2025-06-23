@@ -19,6 +19,7 @@ import { OutgoingChangeService, OutgoingChangeServiceConfig } from '../../sync/O
 import { IntegrityService, IntegrityServiceConfig } from '../../sync/IntegrityService';
 import { LSNService } from '../../sync/LSNService';
 import { NewPGliteDataSource } from '../../db/newtypeorm/NewDataSource';
+import { getSyncWebSocketUrl } from '../../sync/config';
 
 // Service registry outside of XState context to prevent serialization issues
 const serviceRegistry = new Map<string, {
@@ -56,6 +57,83 @@ if (import.meta.hot) {
     destroyGlobalSyncServices();
   });
 }
+
+// 🔥 AUTH-AWARE CLEANUP: Automatically destroy sync services when user signs out
+let authCleanupInitialized = false;
+
+export const initializeAuthAwareSyncCleanup = () => {
+  if (authCleanupInitialized) return;
+  authCleanupInitialized = true;
+
+  console.log('[SyncMachineV2] 🔐 Initializing auth-aware sync cleanup...');
+  
+  const authActor = (window as any).authMachineActor;
+  if (!authActor) {
+    console.warn('[SyncMachineV2] AuthMachine actor not available for cleanup subscription');
+    return;
+  }
+
+  // Subscribe to auth state changes
+  const subscription = authActor.subscribe((snapshot: any) => {
+    const isAuthenticated = snapshot.matches('authenticated');
+    const isSigningOut = snapshot.matches('signingOut');
+    
+    console.log('[SyncMachineV2] 🔐 Auth state change:', { 
+      state: snapshot.value, 
+      isAuthenticated, 
+      isSigningOut,
+      hasGlobalServices: !!globalServices 
+    });
+    
+    // If user is signing out or no longer authenticated, destroy sync services
+    if ((isSigningOut || !isAuthenticated) && globalServices) {
+      console.log('[SyncMachineV2] 🔐 User signed out, destroying sync services and resetting machine state');
+      destroyGlobalSyncServices();
+      
+      // Also reset the sync machine state to idle for clean restart
+      const orchestratorActor = (window as any).orchestratorV2Actor;
+      console.log('[SyncMachineV2] 🔐 Attempting to find sync actor for reset...', {
+        hasOrchestrator: !!orchestratorActor
+      });
+      
+      if (orchestratorActor) {
+        const orchestratorSnapshot = orchestratorActor.getSnapshot();
+        const appInitMachine = orchestratorSnapshot?.children?.appInitMachine;
+        console.log('[SyncMachineV2] 🔐 App init machine check:', {
+          hasAppInit: !!appInitMachine
+        });
+        
+        if (appInitMachine) {
+          const appInitSnapshot = appInitMachine.getSnapshot();
+          const syncActor = appInitSnapshot?.children?.syncMachine;
+          console.log('[SyncMachineV2] 🔐 Sync actor check:', {
+            hasSyncActor: !!syncActor,
+            syncActorState: syncActor?.getSnapshot()?.value
+          });
+          
+          if (syncActor) {
+            console.log('[SyncMachineV2] 🔐 Sending DISCONNECT to reset sync machine state');
+            syncActor.send({ type: 'DISCONNECT' });
+          } else {
+            console.warn('[SyncMachineV2] 🔐 Sync actor not found for reset');
+          }
+        } else {
+          console.warn('[SyncMachineV2] 🔐 App init machine not found');
+        }
+      } else {
+        console.warn('[SyncMachineV2] 🔐 Orchestrator actor not found');
+      }
+    }
+  });
+
+  // Clean up subscription on sign-out
+  window.addEventListener('auth:signout', () => {
+    subscription?.unsubscribe?.();
+    authCleanupInitialized = false;
+  });
+
+  console.log('[SyncMachineV2] ✅ Auth-aware cleanup initialized');
+};
 
 // Function to access global OutgoingChangeService for domain functions
 export const getGlobalOutgoingChangeService = (): OutgoingChangeService | null => {
@@ -134,7 +212,7 @@ const setServices = (context: SyncMachineContext, services: {
 
 export type SyncMachineEvent =
   // Lifecycle
-  | { type: 'CONNECT'; serverUrl: string; clientId: string; currentLSN: string }
+  | { type: 'CONNECT' }
   | { type: 'DISCONNECT' }
   | { type: 'RECONNECT' }
   | { type: 'RESET' }
@@ -309,6 +387,9 @@ export const syncMachineV2 = setup({
         integrityService
       };
       
+      // Initialize auth-aware cleanup for the first time services are created
+      initializeAuthAwareSyncCleanup();
+      
       console.log('[SyncMachineV2] Services initialized successfully');
       
       return {
@@ -401,12 +482,18 @@ export const syncMachineV2 = setup({
   },
   
   actions: {
-    initializeContext: assign(({ event }) => {
+    initializeContext: assign(({ event, context }) => {
       if (event.type === 'CONNECT') {
+        const serverUrl = getSyncWebSocketUrl();
+        
+        console.log('[SyncMachineV2] CONNECT event received - sync machine handles everything:', {
+          clientId: context.clientId,
+          currentLSN: context.currentLSN,
+          serverUrl
+        });
+        
         return {
-          serverUrl: event.serverUrl,
-          clientId: event.clientId,
-          currentLSN: event.currentLSN,
+          serverUrl,
           serviceRegistryKey: null, // Will be set when services are initialized
           syncPhase: null,
           error: null,
@@ -648,6 +735,21 @@ export const syncMachineV2 = setup({
       }
       return updates;
     }),
+    
+    saveSyncState: ({ context }) => {
+      // Sync machine saves its own state
+      const SYNC_STATE_KEY = 'sync-machine-state';
+      try {
+        const stateToSave = {
+          clientId: context.clientId,
+          currentLSN: context.currentLSN
+        };
+        localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(stateToSave));
+        console.log('[SyncMachineV2] Saved own state:', stateToSave);
+      } catch (error) {
+        console.warn('[SyncMachineV2] Failed to save state:', error);
+      }
+    },
     
     incrementReconnectAttempts: assign({
       reconnectAttempts: ({ context }) => context.reconnectAttempts + 1
@@ -1198,42 +1300,77 @@ export const syncMachineV2 = setup({
     },
     INTEGRITY_RESET_DISCONNECTION_COMPLETE: {
       actions: ['logDisconnectionComplete']
-    }
+    },
   },
   
-  context: {
-    serviceRegistryKey: null,
-    serverUrl: null,
-    clientId: null,
-    currentLSN: '0/0',
-    serverLSN: null,
-    syncPhase: null,
-    error: null,
-    lastError: null,
-    reconnectAttempts: 0,
-    integrityRetryAttempts: 0,
-    shouldReconnectAfterDisconnect: false,
-    autoReconnectDisabled: false,
-    lastSyncTime: null,
-    messagesProcessed: 0,
-    phaseProgress: {
-      initial: {
-        completedTables: 0,
-        totalTables: 0,
-        currentTable: null,
-        tablesRemaining: []
-      },
-      catchup: {
-        batchesProcessed: 0,
-        changesProcessed: 0,
-        estimatedRemaining: 0
-      },
-      live: {
-        messagesProcessed: 0,
-        lastActivity: null,
-        throughputPerSec: 0
+  context: () => {
+    // Load own persisted state - sync machine owns its persistence completely
+    const SYNC_STATE_KEY = 'sync-machine-state';
+    let persistedClientId: string | null = null;
+    let persistedLSN = '0/0';
+    
+    try {
+      const stored = localStorage.getItem(SYNC_STATE_KEY);
+      if (stored) {
+        const parsedState = JSON.parse(stored);
+        if (parsedState.clientId && parsedState.currentLSN) {
+          persistedClientId = parsedState.clientId;
+          persistedLSN = parsedState.currentLSN;
+          console.log('[SyncMachineV2] Loaded own persisted state:', {
+            clientId: persistedClientId,
+            currentLSN: persistedLSN
+          });
+        }
       }
+    } catch (error) {
+      console.warn('[SyncMachineV2] Failed to load persisted state:', error);
+      localStorage.removeItem(SYNC_STATE_KEY);
     }
+    
+    // Generate client ID if none persisted
+    if (!persistedClientId) {
+      persistedClientId = crypto.randomUUID();
+      console.log('[SyncMachineV2] Generated new client ID:', persistedClientId);
+    }
+    
+    console.log('[SyncMachineV2] Initializing with state:', {
+      clientId: persistedClientId,
+      currentLSN: persistedLSN
+    });
+    
+    return {
+      serviceRegistryKey: null,
+      serverUrl: null, // Will be set when CONNECT is called
+      clientId: persistedClientId,
+      currentLSN: persistedLSN,
+      syncPhase: null,
+      error: null,
+      lastError: null,
+      reconnectAttempts: 0,
+      integrityRetryAttempts: 0,
+      shouldReconnectAfterDisconnect: false,
+      autoReconnectDisabled: false,
+      lastSyncTime: null,
+      messagesProcessed: 0,
+      phaseProgress: {
+        initial: {
+          completedTables: 0,
+          totalTables: 0,
+          currentTable: null,
+          tablesRemaining: []
+        },
+        catchup: {
+          batchesProcessed: 0,
+          changesProcessed: 0,
+          estimatedRemaining: 0
+        },
+        live: {
+          messagesProcessed: 0,
+          lastActivity: null,
+          throughputPerSec: 0
+        }
+      }
+    };
   },
   
   states: {
@@ -1410,7 +1547,7 @@ export const syncMachineV2 = setup({
           ]
         },
         LSN_UPDATE: {
-          actions: ['updateLSN']
+          actions: ['updateLSN', 'saveSyncState']
         },
         WS_DISCONNECTED: {
           target: 'reconnecting',
@@ -1450,7 +1587,7 @@ export const syncMachineV2 = setup({
           ]
         },
         LSN_UPDATE: {
-          actions: ['updateLSN']
+          actions: ['updateLSN', 'saveSyncState']
         },
         WS_DISCONNECTED: {
           target: 'reconnecting',
@@ -1573,7 +1710,8 @@ export const syncMachineV2 = setup({
         LSN_UPDATE: {
           actions: [
             ({ event }) => console.log('[SyncMachineV2] 📍 LSN_UPDATE in live_sync:', { from: 'unknown', to: event.lsn }),
-            'updateLSN'
+            'updateLSN',
+            'saveSyncState'
           ]
         },
         // Integrity validation events
@@ -1620,6 +1758,15 @@ export const syncMachineV2 = setup({
         SERVICE_ERROR: {
           target: 'error',
           actions: ['recordError', 'logState']
+        },
+        
+        // Handle disconnect (e.g., user sign-out) to reset machine state
+        DISCONNECT: {
+          target: 'idle',
+          actions: [
+            () => console.log('[SyncMachineV2] 🔐 DISCONNECT received in live_sync - resetting to idle'),
+            'logState'
+          ]
         }
       }
     },
@@ -1803,7 +1950,8 @@ export const syncMachineV2 = setup({
             }),
             // ✅ CRITICAL: Send LSN reset to orchestrator so it updates its context
             sendParent({ type: 'LSN_UPDATE', lsn: '0/0' }),
-            sendParent({ type: 'INTEGRITY_RESET_COMPLETED' })
+            sendParent({ type: 'INTEGRITY_RESET_COMPLETED' }),
+            'saveSyncState' // Save the reset state
           ]
         },
         

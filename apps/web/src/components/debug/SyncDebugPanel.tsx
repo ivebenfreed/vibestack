@@ -1,11 +1,46 @@
 import React, { useState } from 'react';
-import { useSyncMachine, useSystemReadiness, useConnection, useOrchestratorActor } from '@/state-machines/orchestrator-hooks';
+import { useAuth, useAppInit, useSystem, OrchestratorV2Context } from '@/state-machines/orchestrator-hooks-v2';
 
 export function SyncDebugPanel() {
-  const sync = useSyncMachine();
-  const readiness = useSystemReadiness();
-  const connection = useConnection();
-  const orchestratorActor = useOrchestratorActor();
+  const { isAuthenticated, user } = useAuth();
+  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  const { isSystemReady } = useSystem();
+  const orchestratorActor = OrchestratorV2Context.useActorRef();
+  
+  // Map v2 data to legacy sync machine structure for compatibility
+  const sync = {
+    currentLSN: null, // Not available in v2
+    error: syncError,
+    isError: !!syncError,
+    isConnecting: connectionStatus === 'connecting',
+    isInitialSync: connectionStatus === 'connecting' && !isSyncReady,
+    isCatchupSync: false, // Not available in v2
+    isLiveSync: isSyncReady && liveChangesStatus === 'connected',
+    isIdle: connectionStatus === 'disconnected',
+    isActive: connectionStatus === 'connected' || connectionStatus === 'connecting',
+    syncPhase: isSyncReady ? 'live' : 'connecting',
+    machineState: connectionStatus,
+    syncProgress: 0, // Not available in v2
+    syncPhaseProgress: null, // Not available in v2
+    statusText: isSyncReady && liveChangesStatus === 'connected' ? 'Live' :
+                connectionStatus === 'connecting' ? 'Connecting...' :
+                'Disconnected'
+  };
+  
+  const connection = {
+    isOnline: connectionStatus === 'connected'
+  };
+  
+  const readiness = {
+    isSystemReady,
+    canLoadRoutes: isSystemReady,
+    readinessChecks: {
+      auth: isAuthenticated,
+      database: true, // Assume initialized if we're here
+      sync: isSyncReady,
+      liveChanges: liveChangesStatus === 'connected'
+    }
+  };
   
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [isRunningTest, setIsRunningTest] = useState(false);

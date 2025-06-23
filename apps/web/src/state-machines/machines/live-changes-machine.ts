@@ -4,6 +4,65 @@ import { setup, assign, fromPromise, sendParent } from 'xstate';
 // Service Registry Pattern (matching sync machine v2)
 // ============================================================================
 
+// 🔥 AUTH-AWARE CLEANUP: Automatically destroy live changes services when user signs out
+let authCleanupInitialized = false;
+
+export const initializeAuthAwareLiveChangesCleanup = () => {
+  if (authCleanupInitialized) return;
+  authCleanupInitialized = true;
+
+  console.log('[LiveChangesMachine] 🔐 Initializing auth-aware live changes cleanup...');
+  
+  const authActor = (window as any).authMachineActor;
+  if (!authActor) {
+    console.warn('[LiveChangesMachine] AuthMachine actor not available for cleanup subscription');
+    return;
+  }
+
+  // Subscribe to auth state changes
+  const subscription = authActor.subscribe((snapshot: any) => {
+    const isAuthenticated = snapshot.matches('authenticated');
+    const isSigningOut = snapshot.matches('signingOut');
+    
+    console.log('[LiveChangesMachine] 🔐 Auth state change:', { 
+      state: snapshot.value, 
+      isAuthenticated, 
+      isSigningOut
+    });
+    
+    // If user is signing out or no longer authenticated, send SIGNOUT to live changes machine
+    if (isSigningOut || !isAuthenticated) {
+      console.log('[LiveChangesMachine] 🔐 User signed out, sending SIGNOUT to live changes machine');
+      
+      // Find and send SIGNOUT to live changes machine
+      const orchestratorActor = (window as any).orchestratorV2Actor;
+      if (orchestratorActor) {
+        const orchestratorSnapshot = orchestratorActor.getSnapshot();
+        const appInitMachine = orchestratorSnapshot?.children?.appInitMachine;
+        if (appInitMachine) {
+          const appInitSnapshot = appInitMachine.getSnapshot();
+          const liveChangesMachine = appInitSnapshot?.children?.liveChangesMachine;
+          if (liveChangesMachine) {
+            console.log('[LiveChangesMachine] 🔐 Sending SIGNOUT to live changes machine');
+            liveChangesMachine.send({ type: 'SIGNOUT' });
+          }
+        }
+      }
+    }
+  });
+
+  // Store subscription for cleanup
+  (window as any).liveChangesAuthSubscription = subscription;
+};
+
+// Initialize auth cleanup when module loads
+if (typeof window !== 'undefined') {
+  // Delay to ensure auth machine is available
+  setTimeout(() => {
+    initializeAuthAwareLiveChangesCleanup();
+  }, 100);
+}
+
 const liveChangesServiceRegistry = new Map<string, {
   liveChangesManager: any | null;
 }>();
@@ -47,7 +106,8 @@ export type LiveChangesEvent =
   | { type: 'PROCESSING_COMPLETE'; count: number }
   | { type: 'ERROR'; error: string }
   | { type: 'RESET' }
-  | { type: 'CLEANUP_SERVICES' };
+  | { type: 'CLEANUP_SERVICES' }
+  | { type: 'SIGNOUT' };
 
 export const liveChangesMachine = setup({
   types: {
@@ -310,6 +370,13 @@ export const liveChangesMachine = setup({
           target: 'stopping',
           actions: 'cleanupServicesAction'
         },
+        SIGNOUT: {
+          target: 'stopping',
+          actions: [
+            () => console.log('[LiveChangesMachine] 🔐 SIGNOUT received in active state - cleaning up'),
+            'cleanupServicesAction'
+          ]
+        },
         PAUSE: {
           target: 'paused',
           actions: ['pause', 'pauseServices']
@@ -363,6 +430,13 @@ export const liveChangesMachine = setup({
         STOP: {
           target: 'stopping',
           actions: 'cleanupServicesAction'
+        },
+        SIGNOUT: {
+          target: 'stopping',
+          actions: [
+            () => console.log('[LiveChangesMachine] 🔐 SIGNOUT received in paused state - cleaning up'),
+            'cleanupServicesAction'
+          ]
         }
       }
     },

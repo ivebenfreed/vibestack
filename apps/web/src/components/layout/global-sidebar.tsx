@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
 import { useLayoutStore } from '@/stores/layoutStore'
-import { useUserRole, useAuth } from '@/state-machines/orchestrator-hooks'
+import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
 
 // Global sidebar width constant
 export const GLOBAL_SIDEBAR_WIDTH = 64
@@ -91,8 +91,7 @@ function VLogo() {
 
 export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
   const activeSection = useLayoutStore.activeSection()
-  const { isAuthenticated } = useAuth()
-  const { canAccess } = useUserRole()
+  const { isAuthenticated, user } = useAuth()
   
   // Filter sidebar sections based on authentication and permissions
   const visibleSections = React.useMemo(() => {
@@ -104,13 +103,14 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
       
       // Show debug only to authenticated users with debug permissions
       if (section.id === 'debug') {
-        return isAuthenticated && canAccess('debug_features')
+        const canAccessDebug = user?.role === 'admin' || user?.role === 'super_admin'
+        return isAuthenticated && canAccessDebug
       }
       
       // Default: show to authenticated users
       return isAuthenticated
     })
-  }, [isAuthenticated, canAccess])
+  }, [isAuthenticated, user?.role])
 
   return (
     <>

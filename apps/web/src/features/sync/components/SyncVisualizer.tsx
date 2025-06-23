@@ -1,5 +1,5 @@
 import React from 'react';
-import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
+import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSyncVisualizationState } from '../hooks/useSyncVisualizationState';
 import { SyncVisualizationCore } from './SyncVisualizationCore';
@@ -9,22 +9,23 @@ interface SyncVisualizerProps {
 }
 
 export function SyncVisualizer({ className }: SyncVisualizerProps) {
-  const { isOnline } = useOrchestrator();
-  const syncMachineState = useSyncMachine();
+  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  const { isSystemReady } = useSystem();
   
-  // Destructure from the sync machine state
-  const { 
-    syncPhase, 
-    syncProgress,
-    syncPhaseProgress,
-    isLiveSync,
-    currentLSN,
-    isInitialSync,
-    isCatchupSync,
-    machineState,
-    isConnecting,
-    statusText
-  } = syncMachineState;
+  // Map v2 data to legacy sync machine structure
+  const isOnline = connectionStatus === 'connected';
+  const syncPhase = isSyncReady ? 'live' : 'connecting';
+  const syncProgress = 0; // Not available in v2
+  const syncPhaseProgress = null; // Not available in v2
+  const isLiveSync = isSyncReady && liveChangesStatus === 'connected';
+  const currentLSN = '0/0'; // Not available in v2
+  const isInitialSync = connectionStatus === 'connecting' && !isSyncReady;
+  const isCatchupSync = false; // Not available in v2
+  const machineState = connectionStatus;
+  const isConnecting = connectionStatus === 'connecting';
+  const statusText = isLiveSync ? 'Live' :
+                    isConnecting ? 'Connecting...' :
+                    'Disconnected';
   
   const { errorInfo } = useSyncVisualizationState();
 

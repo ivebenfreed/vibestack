@@ -55,13 +55,25 @@ export const signInActor = fromPromise(async ({ input }: {
   input: { email: string; password: string } 
 }) => {
   try {
+    console.log('[signInActor] Starting sign-in process for:', input.email);
+    
     const result = await authClient.signIn.email({
       email: input.email,
       password: input.password,
     });
     
+    console.log('[signInActor] Auth client result:', {
+      hasError: !!result.error,
+      hasData: !!result.data,
+      errorMessage: result.error?.message
+    });
+    
     if (result.error) {
-      throw new Error(result.error.message);
+      console.error('[signInActor] Sign-in failed with error:', result.error.message);
+      return {
+        success: false,
+        error: result.error.message,
+      };
     }
     
     // Dispatch auth event for any listeners
@@ -72,8 +84,19 @@ export const signInActor = fromPromise(async ({ input }: {
     console.log('[signInActor] Sign-in successful, fetching full session data...');
     const session = await authClient.getSession();
     
+    console.log('[signInActor] Session fetch result:', {
+      hasSession: !!session,
+      hasData: !!session?.data,
+      hasUser: !!session?.data?.user,
+      userId: session?.data?.user?.id
+    });
+    
     if (!session?.data?.user) {
-      throw new Error('Failed to get session data after sign-in');
+      console.error('[signInActor] Failed to get session data after sign-in');
+      return {
+        success: false,
+        error: 'Failed to get session data after sign-in',
+      };
     }
     
     // Use session user data which includes the role field
@@ -86,21 +109,27 @@ export const signInActor = fromPromise(async ({ input }: {
       image: session.data.user.image,
     };
     
-    // Debug: log sign-in vs session data comparison
-    console.log('[signInActor] Data comparison:', {
-      signInUserData: result.data?.user,
-      signInRole: (result.data?.user as any)?.role,
-      sessionUserData: session.data.user,
-      sessionRole: (session.data.user as any).role,
-      finalUserRole: user.role
+    console.log('[signInActor] Successfully created user object:', {
+      userId: user.id,
+      userEmail: user.email,
+      userRole: user.role,
+      userName: user.name
     });
     
+    // Return the successful result
+    const authToken = result.data?.token || session.data.session?.token || 'authenticated';
+    const sessionExpiry = session.data.session?.expiresAt ? 
+      new Date(session.data.session.expiresAt).toISOString() : 
+      null;
+    
+    console.log('[signInActor] Returning success result with user data');
     return {
-      success: true,
       user,
-      token: result.data?.token || session.data.session?.token,
+      authToken,
+      sessionExpiry,
     };
   } catch (error) {
+    console.error('[signInActor] Unexpected error during sign-in:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Sign-in failed',
@@ -108,227 +137,26 @@ export const signInActor = fromPromise(async ({ input }: {
   }
 });
 
-// Actor for handling sign-out - robust with timeout and error handling
+// Actor for handling sign-out - simple and clean
 export const signOutActor = fromPromise(async () => {
-  const SIGN_OUT_TIMEOUT = 10000; // 10 seconds timeout
-  
   try {
-    console.log('[signOutActor] Starting robust sign-out process...');
+    // Simply sign out from auth provider
+    await authClient.signOut();
     
-    // Create a timeout promise to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Sign-out process timed out after 10 seconds'));
-      }, SIGN_OUT_TIMEOUT);
-    });
+    // Clear auth-related localStorage
+    localStorage.removeItem('auth-machine-state');
     
-    // Create the main sign-out logic
-    const signOutProcess = async () => {
-      // Step 1: Sign out from auth provider (critical step)
-      console.log('[signOutActor] Step 1: Signing out from auth provider...');
-      try {
-        await authClient.signOut();
-        console.log('[signOutActor] Successfully signed out from auth provider');
-      } catch (authError) {
-        console.warn('[signOutActor] Auth provider sign-out failed, continuing with cleanup:', authError);
-        // Continue with cleanup even if auth sign-out fails
-      }
-      
-      // Step 2: Clear auth-related state only (preserve sync state)
-      console.log('[signOutActor] Step 2: Clearing auth-related state (preserving sync data)...');
-      // Note: Sync cleanup is handled automatically by orchestrator state transition
-      try {
-        // First, preserve sync-related data from orchestrator state
-        let preservedSyncData = null;
-        try {
-          const orchestratorState = localStorage.getItem('orchestrator-state');
-          if (orchestratorState) {
-            const parsedState = JSON.parse(orchestratorState);
-            if (parsedState?.context) {
-              // Preserve sync-related data
-              preservedSyncData = {
-                syncClientId: parsedState.context.syncClientId,
-                syncState: parsedState.context.syncState,
-                syncLastSyncTime: parsedState.context.syncLastSyncTime,
-                integrityBaseline: parsedState.context.integrityBaseline
-              };
-              console.log('[signOutActor] Preserved sync data:', {
-                clientId: preservedSyncData.syncClientId,
-                currentLSN: preservedSyncData.syncState?.currentLSN,
-                lastSyncTime: preservedSyncData.syncLastSyncTime
-              });
-            }
-          }
-        } catch (e) {
-          console.warn('[signOutActor] Could not preserve sync data:', e);
-        }
-        
-        // Clear auth-related storage keys only
-        const authKeysToRemove = [
-          'auth-token',
-          'user-session',
-          'better-auth.session'  // Better Auth session key
-        ];
-        
-        authKeysToRemove.forEach(key => {
-          try {
-            localStorage.removeItem(key);
-          } catch (e) {
-            console.warn(`Failed to remove ${key}:`, e);
-          }
-        });
-        
-        // Clear orchestrator state but restore sync data
-        try {
-          localStorage.removeItem('orchestrator-state');
-          
-          // If we preserved sync data, create a minimal orchestrator state with just sync info
-          if (preservedSyncData) {
-            const minimalState = {
-              context: {
-                // Reset auth state
-                user: null,
-                authToken: null,
-                authError: null,
-                sessionExpiry: null,
-                
-                // Reset system state
-                isDatabaseInitialized: false,
-                databaseError: null,
-                isOnline: navigator.onLine,
-                isSyncLive: false,
-                liveChangesActive: false,
-                isSystemReady: false,
-                
-                // Preserve sync data
-                ...preservedSyncData,
-                
-                // Reset timing
-                startupTime: Date.now(),
-                lastActivity: Date.now()
-              }
-            };
-            
-            localStorage.setItem('orchestrator-state', JSON.stringify(minimalState));
-            console.log('[signOutActor] Restored orchestrator state with preserved sync data');
-          }
-        } catch (e) {
-          console.warn('[signOutActor] Failed to manage orchestrator state:', e);
-        }
-        
-        // Clear session storage except sync-related items
-        try {
-          // Don't clear all session storage - just auth-related items
-          const sessionKeysToRemove = [
-            'auth-session',
-            'user-token',
-            'auth-state'
-          ];
-          
-          sessionKeysToRemove.forEach(key => {
-            try {
-              sessionStorage.removeItem(key);
-            } catch (e) {
-              console.warn(`Failed to remove session ${key}:`, e);
-            }
-          });
-        } catch (e) {
-          console.warn('Failed to clear session storage items:', e);
-        }
-        
-        console.log('[signOutActor] Auth state cleared (sync data preserved)');
-      } catch (storageError) {
-        console.warn('[signOutActor] Storage cleanup failed:', storageError);
-      }
-      
-      // Step 3: Dispatch auth state change event (critical for UI updates)
-      console.log('[signOutActor] Step 3: Notifying auth state change...');
-      try {
-        window.dispatchEvent(new CustomEvent('auth:state-changed', { 
-          detail: { authenticated: false, reason: 'sign-out', timestamp: Date.now() }
-        }));
-        
-        // Also dispatch a more general sign-out event
-        window.dispatchEvent(new CustomEvent('auth:signout', {
-          detail: { timestamp: Date.now() }
-        }));
-        
-        console.log('[signOutActor] Auth state change events dispatched');
-      } catch (eventError) {
-        console.warn('[signOutActor] Failed to dispatch events:', eventError);
-      }
-      
-      return { success: true, timestamp: Date.now() };
-    };
-    
-    // Race between timeout and sign-out process
-    const result = await Promise.race([signOutProcess(), timeoutPromise]);
-    
-    console.log('[signOutActor] ✅ Sign-out completed successfully');
-    return result;
-    
+    // Success - auth machine will handle the state transition
+    return { success: true };
   } catch (error) {
     console.error('[signOutActor] Sign-out failed:', error);
     
-    // Even if sign-out fails, try to clear auth state as a fallback (preserve sync data)
-    console.log('[signOutActor] Attempting emergency auth cleanup (preserving sync data)...');
-    try {
-      // Try to preserve sync data even in emergency
-      let preservedSyncData = null;
-      try {
-        const orchestratorState = localStorage.getItem('orchestrator-state');
-        if (orchestratorState) {
-          const parsedState = JSON.parse(orchestratorState);
-          if (parsedState?.context) {
-            preservedSyncData = {
-              syncClientId: parsedState.context.syncClientId,
-              syncState: parsedState.context.syncState,
-              syncLastSyncTime: parsedState.context.syncLastSyncTime,
-              integrityBaseline: parsedState.context.integrityBaseline
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('[signOutActor] Emergency: Could not preserve sync data');
-      }
-      
-      // Clear orchestrator state
-      localStorage.removeItem('orchestrator-state');
-      
-      // Restore minimal state with sync data if available
-      if (preservedSyncData) {
-        const minimalState = {
-          context: {
-            user: null,
-            authToken: null,
-            authError: null,
-            sessionExpiry: null,
-            isDatabaseInitialized: false,
-            databaseError: null,
-            isOnline: navigator.onLine,
-            isSyncLive: false,
-            liveChangesActive: false,
-            isSystemReady: false,
-            ...preservedSyncData,
-            startupTime: Date.now(),
-            lastActivity: Date.now()
-          }
-        };
-        localStorage.setItem('orchestrator-state', JSON.stringify(minimalState));
-        console.log('[signOutActor] Emergency: Restored state with preserved sync data');
-      }
-      
-      window.dispatchEvent(new CustomEvent('auth:state-changed', { 
-        detail: { authenticated: false, reason: 'sign-out-error', error: error.message }
-      }));
-    } catch (emergencyError) {
-      console.error('[signOutActor] Emergency cleanup also failed:', emergencyError);
-    }
+    // Even on error, clear auth state
+    localStorage.removeItem('auth-machine-state');
     
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: Date.now()
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 });

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useOrchestrator } from '@/state-machines/orchestrator-hooks';
+import { useAuth, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen';
 
 interface SystemReadyGuardProps {
   children: React.ReactNode;
@@ -14,7 +15,8 @@ interface SystemReadyGuardProps {
  * This prevents expensive orchestrator state checks on every route change.
  */
 export function SystemReadyGuard({ children }: SystemReadyGuardProps) {
-  const { isSystemReady, user } = useOrchestrator();
+  const { user } = useAuth();
+  const { isSystemReady } = useSystem();
   
   // Cache the ready state to avoid re-checking on every route change
   const [cachedIsReady, setCachedIsReady] = useState(false);
@@ -53,7 +55,7 @@ export function SystemReadyGuard({ children }: SystemReadyGuardProps) {
   const shouldRender = cachedIsReady || isSystemReady;
   
   if (!shouldRender) {
-    return null;
+    return <UnifiedLoadingScreen />;
   }
   
   // System is ready - render the route content
@@ -69,7 +71,7 @@ export function SystemReadyGuard({ children }: SystemReadyGuardProps) {
  * Best for scenarios where you want zero overhead after initial app boot.
  */
 export function SystemReadyGuardUltraCache({ children }: SystemReadyGuardProps) {
-  const { isSystemReady } = useOrchestrator();
+  const { isSystemReady } = useSystem();
   
   // Once ready, always ready (until page refresh)
   const isReadyRef = useRef(false);

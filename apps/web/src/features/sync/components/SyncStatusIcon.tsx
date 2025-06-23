@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
+import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -15,21 +15,21 @@ interface SyncStatusIconProps {
 }
 
 const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className }) => {
-  const { isOnline } = useOrchestrator();
-  const syncMachineState = useSyncMachine();
+  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  const { isSystemReady, hasAnyError } = useSystem();
   
-  // Destructure from the sync machine state
-  const {
-    clientId,
-    syncPhase,
-    syncProgress,
-    isInitialSync,
-    isCatchupSync,
-    isLiveSync,
-    isError,
-    currentLSN,
-    statusText
-  } = syncMachineState;
+  // Map v2 data to component state  
+  const isOnline = connectionStatus === 'connected';
+  const isError = hasAnyError || !!syncError;
+  const isLiveSync = isSyncReady && liveChangesStatus === 'connected';
+  const isInitialSync = connectionStatus === 'connecting' && !isSyncReady;
+  const isCatchupSync = false; // Not available in v2
+  const clientId = null; // Not available in v2
+  const currentLSN = null; // Not available in v2
+  const statusText = isLiveSync ? 'Live' : 
+                     isInitialSync ? 'Connecting...' :
+                     isError ? 'Error' :
+                     'Disconnected';
 
   // Remove excessive logging that was causing performance issues during scroll
   // console.log('[SyncStatusIcon] State:', {
@@ -120,7 +120,7 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
                 )}
               </div>
             </div>
-            <div className="mt-1">LSN: {currentLSN || '0/0'}</div>
+            {currentLSN && <div className="mt-1">LSN: {currentLSN}</div>}
           </div>
         </TooltipContent>
       </Tooltip>

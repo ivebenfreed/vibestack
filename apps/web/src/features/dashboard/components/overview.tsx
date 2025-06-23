@@ -1,12 +1,14 @@
 import { useContext } from 'react';
-import { useOrchestrator } from '@/state-machines/orchestrator-hooks'; // Orchestrator hook
+import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2'; // Orchestrator V2 hooks
 // Removed unused imports: SyncState, Badge, icons, formatDateTime, getSyncStatusVisuals
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function Overview() {
-  // Use orchestrator for sync loading state
-  const { isSyncLive, isDatabaseReady } = useOrchestrator();
-  const isSyncLoading = !isSyncLive || !isDatabaseReady; 
+  // Use v2 orchestrator for sync loading state
+  const { isDatabaseInitialized, isSyncReady, liveChangesStatus } = useAppInit();
+  const { isSystemReady } = useSystem();
+  const isSyncLive = isSyncReady && liveChangesStatus === 'connected';
+  const isSyncLoading = !isSyncLive || !isDatabaseInitialized; 
 
   if (isSyncLoading) {
     return (

@@ -11,66 +11,22 @@ import { UserService } from '@/domain/user'
 import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
 import { Project, Task, User } from '@repo/dataforge/client-entities'
 import { getDefaultStore } from 'jotai'
-import { useSystemReadiness } from '@/state-machines/orchestrator-hooks'
-import { EnhancedLoadingSkeleton } from '@/components/loading/enhanced-loading-skeleton'
-import { SystemReadyGuard } from '@/components/guards/SystemReadyGuard'
-import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 
-// Global debouncer to prevent multiple auth checks during rapid preloading
-let lastAuthCheck: {
-  timestamp: number
-  result: 'authenticated' | 'unauthenticated'
-  executionId: string
-  url: string
-} | null = null
+// Track if we've verified system readiness in this session
+let hasVerifiedSystemThisSession = false;
 
-// ⚡ PERFORMANCE: Moderate debounce time now that route loaders are removed
-const AUTH_DEBOUNCE_MS = 500 // Prevent duplicate auth checks within 500ms
+// Reset on sign-out
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:signout', () => {
+    hasVerifiedSystemThisSession = false;
+  });
+}
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
-    const now = Date.now()
-    const executionId = Math.random().toString(36).substr(2, 9)
-    const currentUrl = location.href
-    
-    // Debug: Track debouncer state
-    console.log(`[AuthenticatedRoute] BeforeLoad execution ${executionId}:`, {
-      url: currentUrl,
-      timestamp: now,
-      lastCheck: lastAuthCheck ? {
-        timestamp: lastAuthCheck.timestamp,
-        timeDiff: now - lastAuthCheck.timestamp,
-        withinDebounce: (now - lastAuthCheck.timestamp) < AUTH_DEBOUNCE_MS,
-        executionId: lastAuthCheck.executionId,
-        sameUrl: lastAuthCheck.url === currentUrl
-      } : null
-    })
-    
-    // ⚡ PERFORMANCE: More aggressive debouncing - also check if same URL to skip redundant checks
-    if (lastAuthCheck && 
-        (now - lastAuthCheck.timestamp) < AUTH_DEBOUNCE_MS &&
-        lastAuthCheck.url === currentUrl) {
-      console.log(`[AuthenticatedRoute] DEBOUNCED execution ${executionId} - returning cached result (same URL)`)
-      // Return cached result silently (no logging during rapid preload calls)
-      if (lastAuthCheck.result === 'unauthenticated') {
-        throw redirect({
-          to: '/sign-in',
-          search: { redirect: location.href },
-          replace: true
-        })
-      }
-      return // authenticated - proceed silently
-    }
-    
-    console.log(`[AuthenticatedRoute] EXECUTING auth check ${executionId}`)
-    
-    // XState-based auth guard - simple state checks only
-    const orchestratorActor = (window as any).orchestratorActor
-    
-    // Fallback: if XState isn't ready yet, redirect to sign-in
-    if (!orchestratorActor) {
-      console.log('[AuthenticatedRoute] No orchestrator actor found - redirecting to sign-in')
-      lastAuthCheck = { timestamp: now, result: 'unauthenticated', executionId, url: currentUrl }
+    // Get auth actor - if not available, redirect to sign-in
+    const authActor = (window as any).authMachineActor
+    if (!authActor) {
       throw redirect({
         to: '/sign-in',
         search: { redirect: location.href },
@@ -78,94 +34,125 @@ export const Route = createFileRoute('/_authenticated')({
       })
     }
     
-    const snapshot = orchestratorActor.getSnapshot()
-    
-    // Debug: Log the actual orchestrator state (only for non-debounced checks)
-    console.log('[AuthenticatedRoute] Orchestrator state check:', {
-      hasUser: !!snapshot.context.user,
-      hasAuthToken: !!snapshot.context.authToken,
-      isSystemReady: snapshot.context.isSystemReady,
-      canLoadRoutes: snapshot.context.isSystemReady, // Use system ready as route loading flag
-      machineState: snapshot.value,
-      userEmail: snapshot.context.user?.email
-    })
-    
-    // Simple XState guards - no complex logic or subscriptions
-    
-    // If clearly unauthenticated, redirect immediately
-    if (snapshot.value === 'initializing.auth.unauthenticated') {
-      console.log('[AuthenticatedRoute] Unauthenticated state - redirecting')
-      lastAuthCheck = { timestamp: now, result: 'unauthenticated', executionId, url: currentUrl }
-      throw redirect({
-        to: '/sign-in',
-        search: { redirect: location.href },
-        replace: true
-      })
-    }
-    
-    // 🔥 CRITICAL FIX: Check both authentication AND system readiness
-    if (snapshot.context.user && snapshot.context.authToken) {
-      // User is authenticated, but check if system is ready for route loading
-      if (!snapshot.context.isSystemReady) {
-        console.log('[AuthenticatedRoute] User authenticated but system not ready - waiting for initialization...')
-        
-        // Return a promise that resolves when system becomes ready
-        return new Promise((resolve, reject) => {
-          const checkSystemReady = () => {
-            const currentSnapshot = orchestratorActor.getSnapshot()
-            if (currentSnapshot.context.isSystemReady) {
-              console.log('[AuthenticatedRoute] System ready - proceeding with route')
-              lastAuthCheck = { timestamp: Date.now(), result: 'authenticated', executionId, url: currentUrl }
-              resolve(undefined)
-            } else if (currentSnapshot.value === 'initializing.auth.unauthenticated') {
-              // User became unauthenticated while waiting
-              console.log('[AuthenticatedRoute] User became unauthenticated while waiting - redirecting')
-              reject(redirect({
-                to: '/sign-in',
-                search: { redirect: location.href },
-                replace: true
-              }))
-            } else {
-              // Still not ready, check again in a bit
-              setTimeout(checkSystemReady, 100)
-            }
-          }
-          
-          checkSystemReady()
-        })
-      }
+    // If auth machine is still checking, wait for it to resolve
+    const currentSnapshot = authActor.getSnapshot()
+    if (currentSnapshot.matches('checking')) {
+      console.log('[AuthenticatedRoute] Waiting for auth resolution...')
       
-      console.log('[AuthenticatedRoute] User authenticated and system ready - proceeding with route')
-      lastAuthCheck = { timestamp: now, result: 'authenticated', executionId, url: currentUrl }
-      return
+      await new Promise<void>((resolve) => {
+        let resolved = false
+        
+        const subscription = authActor.subscribe((snapshot: any) => {
+          if (!resolved && !snapshot.matches('checking')) {
+            resolved = true
+            subscription.unsubscribe()
+            resolve()
+          }
+        })
+        
+        // Check again immediately in case it resolved while setting up subscription
+        if (!authActor.getSnapshot().matches('checking')) {
+          resolved = true
+          subscription.unsubscribe()
+          resolve()
+        }
+      })
     }
     
-    // For any intermediate/unknown states, redirect to sign-in to be safe
-    console.log('[AuthenticatedRoute] Intermediate/unknown state - redirecting to sign-in')
-    lastAuthCheck = { timestamp: now, result: 'unauthenticated', executionId, url: currentUrl }
-    throw redirect({
-      to: '/sign-in',
-      search: { redirect: location.href },
-      replace: true
-    })
+    // Check final auth state
+    const finalAuthSnapshot = authActor.getSnapshot()
+    if (!finalAuthSnapshot.matches('authenticated') || !finalAuthSnapshot.context.user) {
+      throw redirect({
+        to: '/sign-in',
+        search: { redirect: location.href },
+        replace: true
+      })
+    }
+    
+    // Only check system ready once per session (after sign-in)
+    if (!hasVerifiedSystemThisSession) {
+      const orchestratorActor = (window as any).orchestratorV2Actor
+      if (orchestratorActor) {
+        // Get app init machine directly from orchestrator children
+        const orchestratorSnapshot = orchestratorActor.getSnapshot()
+        const appInitMachine = orchestratorSnapshot?.children?.appInitMachine
+        
+        if (!appInitMachine) {
+          console.error('[AuthenticatedRoute] App init machine not found in orchestrator children')
+          return
+        }
+        
+        const appInitSnapshot = appInitMachine.getSnapshot()
+        const isSystemReady = appInitSnapshot?.value === 'ready' || false
+        
+        console.log('[AuthenticatedRoute] System check:', {
+          hasAppInitMachine: !!appInitMachine,
+          appInitState: appInitSnapshot?.value,
+          isSystemReady
+        })
+        
+        if (!isSystemReady) {
+          console.log('[AuthenticatedRoute] First access this session - waiting for system initialization...')
+          
+          await new Promise<void>((resolve) => {
+            let resolved = false
+            
+            // Subscribe directly to app init machine changes
+            const subscription = appInitMachine.subscribe((snapshot: any) => {
+              // Also check sync machine state when we're in sync state
+              let syncMachineInfo = ''
+              if (snapshot?.value === 'sync') {
+                const orchestratorSnapshot = orchestratorActor.getSnapshot()
+                const syncMachine = orchestratorSnapshot?.children?.appInitMachine?.getSnapshot()?.children?.syncMachine
+                if (syncMachine) {
+                  const syncSnapshot = syncMachine.getSnapshot()
+                  syncMachineInfo = ` | Sync: ${syncSnapshot?.value} (phase: ${syncSnapshot?.context?.syncPhase})`
+                }
+              }
+              
+              console.log('[AuthenticatedRoute] App init machine change:', {
+                state: snapshot?.value,
+                isReady: snapshot?.value === 'ready',
+                syncInfo: syncMachineInfo
+              })
+              
+              if (!resolved && snapshot?.value === 'ready') {
+                console.log('[AuthenticatedRoute] ✅ App init machine reached ready state!')
+                resolved = true
+                subscription.unsubscribe()
+                resolve()
+              }
+            })
+            
+            // Check again immediately in case it resolved while setting up subscription
+            const currentSnapshot = appInitMachine.getSnapshot()
+            if (currentSnapshot?.value === 'ready') {
+              console.log('[AuthenticatedRoute] ✅ Already ready during subscription setup')
+              resolved = true
+              subscription.unsubscribe()
+              resolve()
+            }
+          })
+        }
+        
+        // Mark as verified for this session
+        hasVerifiedSystemThisSession = true;
+        console.log('[AuthenticatedRoute] System verified for this session')
+      }
+    }
   },
   component: RouteComponent,
 })
 
 function RouteComponent() {
   return (
-    <>
-      <SystemReadyGuard>
-        <SearchProvider>
-          <AuthenticatedContent />
-        </SearchProvider>
-      </SystemReadyGuard>
-    </>
+    <SearchProvider>
+      <AuthenticatedContent />
+    </SearchProvider>
   )
 }
 
 function AuthenticatedContent() {
-  const { isSystemReady } = useSystemReadiness()
   const location = useLocation()
   
   // ⚡ PERFORMANCE: No layout store updates - using pure route-based highlighting

@@ -2,123 +2,76 @@
 ## Autonomous Subsystem Architecture
 
 **Date Created**: January 2025  
-**Updated**: January 2025 with architectural clarity  
-**Current Problem**: sync-machine-v2.ts is 1,930 lines - massive bloat + incorrect orchestrator coupling  
-**Target**: Self-contained sync subsystem with clean orchestrator boundaries
+**Updated**: June 2025 with Orchestrator V2 architecture  
+**Current Problem**: `sync-machine-v2.ts` is 1,990 lines - massive bloat and coupled to the `app-init-machine`.
+**Target**: Self-contained sync subsystem with clean boundaries, invoked by the `app-init-machine`.
 
 ---
 
 ## 🔍 Architectural Reality Check
 
-### **Current Problematic State**
+### **Current V2 Architecture (June 2025)**
 ```
-📊 Current (Incorrect) Architecture:
-├── orchestrator.ts (1,200+ lines) - Acting as sync's external storage 🚨
-├── sync-machine-v2.ts (1,930 lines) - BLOATED + orchestrator-dependent 🚨
-├── WebSocketService.ts (263 lines) - Well-sized ✅
-├── IncomingChangeService.ts (489 lines) - Well-sized ✅
-├── OutgoingChangeService.ts (808 lines) - Acceptable size ⚠️ 
-└── IntegrityService.ts (1,809 lines) - BLOATED service 🚨
-
-❌ Problem: Orchestrator manages sync state (clientId, LSN, baseline)
-❌ Problem: Complex sendParent() coordination between machines
-❌ Problem: Duplicate state tracking and synchronization
-❌ Problem: Sync machine cannot operate independently
+📊 Current Architecture:
+├── orchestrator-v2.ts (202 lines) - Lean coordinator ✅
+│   └── invokes app-init-machine.ts
+├── auth-machine.ts (287 lines) - Independent auth lifecycle ✅
+├── app-init-machine.ts (389 lines) - Manages startup sequence ✅
+│   └── currently invokes sync-machine-v2.ts (the monolith)
+└── sync-machine-v2.ts (1,990 lines) - BLOATED + init-dependent 🚨
 ```
 
-### **Key Insight: Orchestrator ≠ Sync Orchestrator**
-```typescript
-// What orchestrator ACTUALLY does:
-✅ Session Management (auth, persistent clientId)  
-✅ App Lifecycle (database init, system readiness)
-✅ UI State Coordination (high-level status for components)
+### **Key Insight: App-Init is the New Orchestrator for Sync**
+The `orchestrator-v2` has successfully been refactored into a lean coordinator. The `app-init-machine` has taken over the responsibility of managing the application's startup sequence, which includes initializing the sync subsystem.
 
-// What orchestrator should NOT do:
-❌ Sync State Management (LSN, phase, progress)
-❌ Service Lifecycle Management  
-❌ Change Processing Coordination
-❌ Acting as sync machine's external storage
-```
+The problem described in this plan—the monolithic `sync-machine-v2.ts`—remains, but its integration point has shifted from the orchestrator to the `app-init-machine`.
 
 ### **Identified Bloat Sources**
 
-#### 1. **sync-machine-v2.ts (1,930 lines)**
+#### 1. **sync-machine-v2.ts (1,990 lines)**
 - **120+ console.log statements** scattered throughout
 - **45+ event types** with complex typing
-- **Complex service management** with global registry pattern
-- **Massive action arrays** (50+ complex action chains)
 - **Mixed concerns** - state management + service coordination + logging + error handling
 
-#### 2. **IntegrityService.ts (1,809 lines)**
-- **Single class doing too much** - validation + reset + fingerprinting + server communication
-- **Complex baseline management** mixed with core validation
-- **Heavy server integration** within service class
-- **Extensive logging pollution**
+#### 2. **IntegrityService.ts (1,809 lines - still relevant)**
+- Although not part of the sync machine itself, its complexity is a related problem that this plan addresses.
+- **Single class doing too much** - validation + reset + fingerprinting + server communication.
 
 ---
 
 ## 🎯 Autonomous Subsystem Strategy
 
 ### **Development Approach: Clean Slate Implementation**
-```
-🔄 REFACTORING STRATEGY:
-├── Keep sync-machine-v2.ts as reference (unchanged)
-├── Create new files from scratch with clean architecture
-├── Migrate incrementally once new architecture proven
-└── Easy rollback if issues discovered
-
-📂 File Structure:
-├── Reference (keep unchanged):
-│   └── sync-machine-v2.ts (1,930 lines) - Reference implementation
-└── New Implementation:
-    ├── sync-machine-v3.ts (500 lines) - Clean autonomous machine
-    ├── integrity-machine.ts (300 lines) - Child machine
-    └── utils/ - Supporting classes
-```
+The strategy remains the same: create a new, clean `sync-machine-v3.ts` from scratch and have `app-init-machine` use it once it's ready.
 
 ### **Target Architecture: Clean Boundaries**
 ```
 📊 New Architecture (Proper Separation):
 
-🏗️ APP SHELL (orchestrator.ts - 600 lines, 50% reduction)
-├── Session Management (user, authToken, clientId generation)
-├── App Lifecycle (auth → database → sync coordination) 
-└── Simple Event Coordination (INITIALIZE_SYNC → SYNC_READY)
+🏗️ APP SHELL
+├── orchestrator-v2.ts - Remains the lean top-level coordinator
+├── auth-machine.ts - Remains the independent auth manager
+└── app-init-machine.ts - Manages startup, invokes sync
+    └── INITIALIZE_SYNC event →
 
 🔄 SYNC SUBSYSTEM (completely autonomous)
 ├── sync-machine-v3.ts (500 lines) - NEW clean implementation
 │   ├── SyncPersistence (clientId, LSN, baseline management)
-│   ├── Service Coordination (WebSocket, Incoming, Outgoing, Integrity) 
+│   ├── Service Coordination (WebSocket, Incoming, Outgoing, Integrity)
 │   ├── Init Flow (load state → setup services → connect → ready)
-│   └── Operational Flow (determine phase → sync → persist)
-├── integrity-machine.ts (300 lines) - NEW child machine
-├── services/ (Focused cleanup)
-│   ├── WebSocketService.ts (263 lines) - Keep as-is ✅
-│   ├── IncomingChangeService.ts (489 lines) - Keep as-is ✅
-│   ├── OutgoingChangeService.ts (600 lines) - Minor cleanup
-│   └── integrity/
-│       ├── IntegrityValidator.ts (400 lines) - NEW pure validation
-│       ├── IntegrityResetManager.ts (300 lines) - NEW reset operations  
-│       └── FingerprintGenerator.ts (200 lines) - NEW utilities
-└── utils/
-    ├── SyncLogger.ts (100 lines) - NEW centralized logging
-    └── SyncPersistence.ts (150 lines) - NEW state management
+│   └── Emits SYNC_READY event
+├── integrity-machine.ts (300 lines) - NEW child machine for integrity checks
+└── services/ & utils/ - Refactored and focused services
 
-Total New Implementation: ~2,500 lines
-Reference Implementation: 1,930 lines (kept for comparison)
-Net Reduction: 50% when reference removed
+Total New Sync Implementation: ~2,500 lines
 Clean Subsystem Boundaries: 100% ✅
 ```
 
 ### **Communication Pattern**
 ```typescript
 // Simple init coordination:
-Orchestrator: auth ✅ → database ✅ → INITIALIZE_SYNC → wait for SYNC_READY
-Sync Machine: autonomous operation with internal persistence
-
-// Runtime operation:  
-Orchestrator: read-only status monitoring (optional)
-Sync Machine: completely independent operation
+App-Init-Machine: db ready ✅ → send INITIALIZE_SYNC to sync machine → wait for SYNC_READY
+Sync Machine: runs its own autonomous operation with internal persistence
 ```
 
 ---
@@ -128,7 +81,7 @@ Sync Machine: completely independent operation
 ### **Phase 0: Establish Autonomous Sync Architecture** 
 **Timeline**: 2-3 days | **Risk**: Medium | **Impact**: Very High
 
-This is the foundational change that enables all subsequent improvements.
+This is the foundational change. Steps 0.1 and 0.2 remain the same.
 
 #### Step 0.1: Create Self-Contained Sync Persistence
 **Files**: Create `apps/web/src/sync/utils/SyncPersistence.ts`
@@ -280,110 +233,57 @@ export const syncMachineV3 = setup({
 });
 ```
 
-#### Step 0.3: Update Orchestrator to Use New Sync Machine
-**Files**: Modify `apps/web/src/state-machines/orchestrator.ts`
+#### Step 0.3: Update App-Init-Machine to Use New Sync Machine
+**Files**: Modify `apps/web/src/state-machines/machines/app-init-machine.ts`
 
 ```typescript
-// Remove all sync state management from orchestrator
-export interface OrchestratorContext {
-  // ONLY app-level concerns
-  user: UserInfo | null;
-  authToken: string | null;
-  authError: string | null;
-  sessionExpiry: string | null;
-  
-  isDatabaseInitialized: boolean;
-  databaseError: string | null;
-  isOnline: boolean;
-  
-  // Optional: read-only sync status for UI
-  isSyncReady: boolean;
-  
-  isSystemReady: boolean;
-  startupTime: number;
-  lastActivity: number;
-}
+// In app-init-machine.ts
 
-export const orchestrator = setup({
-  invoke: [
-    {
-      id: 'connectionMachine',
-      src: 'connectionMachine',
-      onSnapshot: {
-        actions: assign({
-          isOnline: ({ event }) => event.snapshot.value === 'online'
-        })
-      }
-    },
-    {
-      id: 'syncMachine',
-      src: 'syncMachineV3'  // NEW: Use clean implementation
-      // No complex onSnapshot - sync is autonomous
-    }
-  ]
+export const appInitMachine = setup({
+  actors: {
+    // ... other actors
+    syncMachine: syncMachineV3, // NEW: Use clean implementation
+  },
+  // ...
 }).createMachine({
+  // ...
   states: {
     initializing: {
-      initial: 'auth',
-      states: {
-        auth: {
-          invoke: {
-            src: 'checkAuth',
-            onDone: [
-              {
-                target: 'authenticated',
-                guard: ({ event }) => event.output.authenticated,
-                actions: assign({
-                  user: ({ event }) => event.output.user,
-                  authToken: ({ event }) => event.output.token
-                })
-              },
-              { target: 'unauthenticated' }
-            ]
+      // ... other states
+      sync: {
+        // Replace direct logic with an invoked actor
+        invoke: {
+          id: 'syncMachine',
+          src: 'syncMachine',
+          onSnapshot: {
+             actions: assign({
+                // Update app-init context with sync status
+                isSyncReady: ({ event }) => event.snapshot.matches('operational'),
+                syncState: ({ event }) => ({ /* map context from event.snapshot.context */ }),
+             })
+          },
+        },
+        entry: sendTo('syncMachine', { type: 'INITIALIZE_SYNC' }),
+        on: {
+          SYNC_READY: {
+            target: 'live_changes', // Or whatever the next step is
+            actions: assign({ isSyncReady: true })
           }
-        },
-        authenticated: {
-          always: 'database'
-        },
-        database: {
-          invoke: {
-            src: 'initializeDatabase',
-            onDone: 'sync'
-          }
-        },
-        sync: {
-          entry: sendTo('syncMachine', { type: 'INITIALIZE_SYNC' }),
-          on: {
-            SYNC_READY: {
-              target: 'complete',
-              actions: assign({ isSyncReady: true })
-            }
-          }
-        },
-        complete: {
-          type: 'final'
         }
       },
-      onDone: 'ready'
-    },
-    
-    ready: {
-      // App fully operational - sync runs autonomously
-      entry: assign({
-        isSystemReady: true,
-        lastActivity: () => Date.now()
-      })
+      // ...
     }
   }
 });
 ```
 
 **Success Criteria**:
-- New sync-machine-v3.ts implements clean autonomous architecture
-- Original sync-machine-v2.ts kept as reference (unchanged)
-- Orchestrator updated to use new sync machine
-- Clean INITIALIZE_SYNC → SYNC_READY handshake
-- Easy rollback to v2 if issues discovered
+- New `sync-machine-v3.ts` implements clean autonomous architecture.
+- Original `sync-machine-v2.ts` is kept as a reference.
+- `app-init-machine.ts` is updated to invoke `syncMachineV3`.
+- A clean `INITIALIZE_SYNC` → `SYNC_READY` handshake is established.
+
+---
 
 ### **Phase 1: Extract Logging Infrastructure** 
 **Timeline**: 1-2 days | **Risk**: Low | **Impact**: High
@@ -818,397 +718,105 @@ export class IntegrityService {
 
 ---
 
-### **Phase 6: Update Orchestrator Hooks and Integration**
+### **Phase 6: Update Hooks and Integration**
 **Timeline**: 1-2 days | **Risk**: Low | **Impact**: Medium
 
-Now that sync is autonomous, orchestrator integration becomes much simpler.
+The new V2 architecture provides a clear pattern for this. We will create hooks that access the sync machine actor directly, just as `useAuth` accesses the `authMachine` actor.
 
-#### Step 6.1: Replace Orchestrator Sync Hooks with Direct Sync Machine Hooks
-**Files**: Modify `apps/web/src/state-machines/orchestrator-hooks.tsx`
+#### Step 6.1: Expose Sync Machine Actor Globally
+**Files**: Modify `apps/web/src/state-machines/machines/app-init-machine.ts`
 
 ```typescript
-// ❌ REMOVE: Old orchestrator-dependent sync hooks
-// export function useSync() { ... }           // Remove - replace with direct sync access
-// export function useSyncMachine() { ... }    // Remove - replace with direct sync access
+// In app-init-machine.ts, inside the invoke block for the syncMachine
 
-// ✅ NEW: Direct sync machine hooks (autonomous)
-export function useSyncMachine() {
-  // Direct access to autonomous sync machine - no orchestrator coupling
-  const syncActor = (window as any).syncActor;
-  
-  return useSelector(syncActor, (snapshot) => {
-    if (!snapshot) return {
-      // Default state when sync machine not ready
-      clientId: null,
-      syncPhase: null, 
-      currentLSN: '0/0',
-      isConnected: false,
-      error: null,
-      isInitialSync: false,
-      isCatchupSync: false,
-      isLiveSync: false,
-      isError: false,
-      isConnecting: false,
-      isIdle: true,
-      machineState: 'idle',
-      syncPhaseProgress: null,
-      isActive: false,
-      statusText: 'Idle'
-    };
-    
-    const context = snapshot.context;
-    const state = snapshot.value;
-    
-    return {
-      // Core sync state
-      clientId: context.clientId,
-      syncPhase: context.phase,
-      currentLSN: context.currentLSN,
-      
-      // Connection status
-      isConnected: context.services?.webSocket !== null,
-      error: context.error,
-      
-      // State booleans
-      isInitialSync: context.phase === 'initial',
-      isCatchupSync: context.phase === 'catchup', 
-      isLiveSync: context.phase === 'live',
-      isError: state === 'error' || !!context.error,
-      isConnecting: state === 'connecting' || state.includes?.('connecting'),
-      isIdle: state === 'idle',
-      
-      // Machine state
-      machineState: typeof state === 'string' ? state : Object.keys(state)[0],
-      
-      // Detailed progress (if available)
-      syncPhaseProgress: context.phaseProgress,
-      
-      // Convenience getters
-      get isActive() {
-        const activeStates = ['connecting', 'operational', 'syncing'];
-        const machineState = typeof state === 'string' ? state : Object.keys(state)[0];
-        return activeStates.includes(machineState) || context.phase !== null;
+invoke: {
+  id: 'syncMachine',
+  src: 'syncMachineV3',
+  onSnapshot: {
+    actions: [
+      // Expose the actor globally for direct hook access
+      ({ event }) => {
+        (window as any).syncMachineActor = event.snapshot._event.origin;
       },
-      
-      get statusText() {
-        if (context.error) return 'Error';
-        if (state === 'connecting') return 'Connecting...';
-        if (context.phase === 'initial') return 'Initial Sync';
-        if (context.phase === 'catchup') return 'Catchup Sync';
-        if (context.phase === 'live') return 'Live';
-        return 'Idle';
-      }
-    };
-  });
-}
-
-// ✅ NEW: Simple sync status hook for basic use cases
-export function useSync() {
-  const syncMachine = useSyncMachine();
-  
-  return {
-    // Simplified sync state for basic components
-    isSyncLive: syncMachine.isLiveSync,
-    isWaiting: syncMachine.isConnecting,
-    isSyncing: syncMachine.isActive,
-    isSyncActive: syncMachine.isActive
-  };
-}
-```
-
-#### Step 6.2: Update Components to Use Direct Sync Hooks
-**Files**: Update all components using sync-related orchestrator hooks
-
-```bash
-# Find all usages of orchestrator-based sync hooks
-grep -r "useSyncMachine\|useSync" apps/web/src/ --include="*.tsx" --include="*.ts"
-
-# Update imports in affected files:
-# OLD: import { useSyncMachine } from '@/state-machines/orchestrator-hooks';
-# NEW: import { useSyncMachine } from '@/state-machines/orchestrator-hooks'; // (now direct)
-
-# Key files to update:
-# - apps/web/src/features/sync/hooks/useSyncVisualizationState.ts
-# - apps/web/src/features/sync/components/SyncVisualizer.tsx  
-# - apps/web/src/components/debug/SyncDebugPanel.tsx
-# - apps/web/src/sync/SyncService.ts
-# - apps/web/src/sync/SyncManager.ts
-```
-
-#### Step 6.3: Expose Sync Machine Globally for Direct Access
-**Files**: Modify `apps/web/src/state-machines/orchestrator.ts`
-
-```typescript
-// Expose sync machine globally for direct hook access
-export const orchestrator = setup({
-  invoke: [
-    {
-      id: 'syncMachine',
-      src: 'syncMachineV3',  // Use new clean implementation
-      onSnapshot: {
-        actions: [
-          // Store reference globally for direct hook access
-          ({ event }) => {
-            (window as any).syncActor = event.snapshot._event.origin;
-          },
-          // Minimal status tracking in orchestrator (only for system readiness)
-          assign({
-            isSyncReady: ({ event }) => event.snapshot.context.phase !== null
-          })
-        ]
-      }
-    }
-  ]
-  // ... rest of orchestrator
-});
-```
-
-#### Step 6.4: Create Direct Sync Machine Provider (Optional)
-**Files**: Create `apps/web/src/state-machines/sync-hooks.tsx`
-
-```typescript
-// Optional: Direct sync machine provider for better performance
-import React, { createContext, useContext, ReactNode } from 'react';
-import { useSelector } from '@xstate/react';
-import type { ActorRefFrom } from 'xstate';
-import type { syncMachineV2 } from './machines/sync-machine-v2';
-
-type SyncActor = ActorRefFrom<typeof syncMachineV2>;
-
-const SyncContext = createContext<SyncActor | null>(null);
-
-export function SyncProvider({ children }: { children: ReactNode }) {
-  // Get sync actor from global reference (set by orchestrator)
-  const syncActor = (window as any).syncActor as SyncActor;
-  
-  return (
-    <SyncContext.Provider value={syncActor}>
-      {children}
-    </SyncContext.Provider>
-  );
-}
-
-export function useSyncActor(): SyncActor | null {
-  return useContext(SyncContext);
-}
-
-// High-performance direct sync hooks
-export function useSyncMachineOptimized() {
-  const actor = useSyncActor();
-  
-  return useSelector(actor, (snapshot) => {
-    // Same implementation as orchestrator-hooks version
-    // but with direct actor access (better performance)
-  });
-}
-```
-
-**Success Criteria**:
-- All sync-related hooks access sync machine directly (no orchestrator coupling)
-- Orchestrator hooks only provide app-level state (auth, database, system readiness)
-- No breaking changes to existing UI components (same hook names, same return values)
-- Clean separation: Orchestrator = app shell, Sync hooks = sync machine direct access
-- Better performance: no orchestrator snapshot overhead for sync state reads
-
----
-
-### **Phase 7: Remove Orchestrator Sync State**
-**Timeline**: 1 day | **Risk**: Low | **Impact**: Medium
-
-Final cleanup - remove all sync state management from orchestrator.
-
-#### Step 7.1: Finalize Orchestrator Integration
-**Files**: Update `apps/web/src/state-machines/orchestrator.ts`
-
-```typescript
-// Update orchestrator to use new sync machine and remove sync state
-export interface OrchestratorContext {
-  // App-level state only
-  user: UserInfo | null;
-  authToken: string | null;
-  authError: string | null;
-  sessionExpiry: string | null;
-  
-  isDatabaseInitialized: boolean;
-  databaseError: string | null;
-  isOnline: boolean;
-  
-  // Minimal sync coordination
-  isSyncReady: boolean;
-  
-  isSystemReady: boolean;
-  startupTime: number;
-  lastActivity: number;
-  
-  // REMOVED: All sync-specific state
-  // syncClientId: string; ❌
-  // syncState: { ... }; ❌  
-  // syncPendingChangesCount: number; ❌
-  // syncLastSyncTime: Date | null; ❌
-  // integrityBaseline: { ... }; ❌
-}
-```
-
-#### Step 7.2: Update All Orchestrator Actions
-**Files**: Continue modifying orchestrator.ts
-
-```bash
-# Remove sync state management actions:
-# - updateSyncPendingCount ❌
-# - updateSyncLastSyncTime ❌ 
-# - resetSyncClientId ❌
-# - updateIntegrityBaseline ❌
-# - triggerIntegrityValidation ❌
-
-# Keep only:
-# - initializeDatabase ✅
-# - checkAuth ✅
-# - markSystemReady ✅
-```
-
-#### Step 7.3: Verify Complete Sync Decoupling
-**Files**: Search codebase for orchestrator sync coupling
-
-```bash
-# Find any remaining sync state access via orchestrator
-grep -r "syncClientId\|syncState\|syncPendingChanges" apps/web/src/
-
-# Find any components still using orchestrator for sync data
-grep -r "snapshot\.context\.sync" apps/web/src/
-
-# Ensure all sync hooks are using direct sync machine access
-grep -r "useOrchestratorActor.*sync\|orchestrator.*sync" apps/web/src/
-
-# Update any remaining references to use direct sync machine hooks
-```
-
-#### Step 7.4: Update Sync-Related Services  
-**Files**: Update `SyncService.ts`, `SyncManager.ts`, etc.
-
-```typescript
-// apps/web/src/sync/SyncService.ts - Update to use new sync machine
-export class SyncService {
-  public getSyncStatus(): SyncStatus {
-    try {
-      // ❌ OLD: Access orchestrator context
-      // const snapshot = this.getOrchestratorSnapshot();
-      // const syncState = snapshot.context.syncState;
-      
-      // ✅ NEW: Direct access to new sync machine
-      const syncActor = (window as any).syncActor;  // Now points to syncMachineV3
-      if (!syncActor) return 'disconnected';
-      
-      const snapshot = syncActor.getSnapshot();
-      const context = snapshot.context;
-      const state = snapshot.value;
-      
-      // Map sync machine state directly to SyncStatus
-      if (state === 'idle' && !context.phase) return 'disconnected';
-      if (state === 'connecting') return 'connecting';
-      if (context.phase === 'initial') return 'initial_sync';
-      if (context.phase === 'catchup') return 'catchup';
-      if (context.phase === 'live') return 'live';
-      if (context.error) return 'error';
-      return 'disconnected';
-    } catch (error) {
-      return 'disconnected';
-    }
+      // ... also update app-init context here
+    ]
   }
 }
 ```
 
-**Success Criteria**:
-- Orchestrator updated to use new sync machine (syncMachineV3)
-- All sync state access goes through new sync machine
-- Clean architectural boundaries maintained
-- Original sync-machine-v2.ts available for rollback if needed
-- No functionality lost
-- Easy migration path completed
+#### Step 6.2: Create Direct Sync Machine Hooks
+**Files**: Create/modify `apps/web/src/state-machines/orchestrator-hooks-v2.tsx`
 
----
+```typescript
+// In orchestrator-hooks-v2.tsx
 
-## 🚨 Risk Mitigation Strategies
+// NEW: Direct hook for the autonomous sync machine
+export function useSync() {
+  const syncActor = useMemo(() => {
+    return (window as any).syncMachineActor;
+  }, []);
 
-### **High-Risk Operations**
-1. **Phase 0 (Autonomous Architecture)** - Foundation change
-   - **Mitigation**: Feature branch, preserve existing functionality during transition
-   - **Rollback Plan**: Keep current orchestrator sync state until proven
-   - **Testing**: Verify autonomous sync maintains all current functionality
+  if (!syncActor) {
+    return { /* return a default/loading state */ };
+  }
 
-2. **Phase 4 (Machine Optimization)** - Internal state machine changes
-   - **Mitigation**: Incremental refactoring, preserve external interfaces
-   - **Testing**: All sync scenarios (initial, catchup, live, integrity)
+  const syncState = useSelector(syncActor, (state) => {
+    // Return a selector with all the UI state needed
+    return {
+      phase: state.context.phase,
+      currentLSN: state.context.currentLSN,
+      isConnected: state.matches('operational'),
+      // ... and so on
+    };
+  });
 
-3. **Phase 5 (Integrity Child Machine)** - Complex integrity refactoring  
-   - **Mitigation**: Child machine pattern reduces coordination complexity vs. peer machines
-   - **Rollback Plan**: Keep current IntegrityService until child machine proven
-   - **Testing**: All integrity scenarios (baseline validation, progressive escalation, full reset)
-   - **Key Risk**: Progressive escalation logic (resync → baseline → full reset) must work correctly
-
-### **Testing Strategy**
-```bash
-# Test sync scenarios after each phase
-npm run test:sync
-npm run test:integrity  
-npm run test:orchestrator
-
-# Manual testing checklist:
-- [ ] Initial sync from scratch
-- [ ] Catchup sync after offline
-- [ ] Live sync real-time updates
-- [ ] Integrity validation scenarios
-- [ ] Reset scenarios
-- [ ] Error recovery
+  return syncState;
+}
 ```
 
----
+#### Step 6.3: Update Components to Use Direct Sync Hooks
+This step remains the same: find all components using old sync hooks and update them to use the new `useSync` hook.
 
-## 📊 Success Metrics
-
-### **Code Quality Metrics**
-- **File Size Reduction**: 74% reduction in largest file (1,930 → 500 lines sync + 300 lines integrity)
-- **Total Line Reduction**: 50% overall reduction (5,100 → 2,500 lines)  
-- **Orchestrator Simplification**: 50% reduction (1,200 → 600 lines)
-- **IntegrityService Elimination**: 100% extraction (1,809 → 0 lines, split into focused classes)
-- **Logging Cleanup**: Zero console.log statements in state machines
-- **Type Organization**: Centralized event type definitions
-
-### **Architecture Metrics**  
-- **Autonomous Subsystem**: Sync machine operates completely independently
-- **Clean Boundaries**: Clear separation between app shell and sync subsystem
-- **Testability**: Sync machine can be tested in complete isolation
-- **Maintainability**: No file over 800 lines, focused responsibilities
-- **Simplified Communication**: Only 2 coordination events (INITIALIZE_SYNC, SYNC_READY)
-
-### **Performance Metrics**
-- **Bundle Size**: Reduced due to better tree-shaking
-- **Runtime Performance**: Improved due to focused state machines
-- **Memory Usage**: Reduced due to eliminated service duplication
+**Success Criteria**:
+- All sync-related UI components get their state directly from the `syncMachineActor`.
+- The `app-init-machine` and `orchestrator-v2` are no longer involved in passing sync-specific state to the UI.
 
 ---
 
-## 🎯 Post-Refactor Maintenance
+### **Phase 7: Remove Sync State from App-Init & Orchestrator**
+**Timeline**: 1 day | **Risk**: Low | **Impact**: Medium
 
-### **New Development Guidelines**
-1. **Autonomous Subsystems**: Each subsystem manages its own state and persistence
-2. **Clean Boundaries**: Orchestrator = app shell, Sync = data synchronization
-3. **Simple Coordination**: Use event-driven init flow (INITIALIZE → READY pattern)
-4. **State Ownership**: No shared state between orchestrator and sync machine
-5. **Service Management**: Services owned by their respective subsystems
-6. **Child Machine Pattern**: Complex subsystem concerns (like integrity) use child machines, not peer machines
-7. **Progressive Complexity**: Start with single machine, split into child machines only when needed
-8. **Logging**: Use SyncLogger, not console.log
-9. **Testing**: Subsystems must be testable in complete isolation, child machines testable independently
+The final cleanup step.
 
-### **Monitoring**
-- **File Size Monitoring**: Alert if any file exceeds 600 lines
-- **Performance Monitoring**: Track sync performance metrics
-- **Error Monitoring**: Centralized error tracking through SyncLogger
+#### Step 7.1: Finalize App-Init-Machine Integration
+**Files**: Update `apps/web/src/state-machines/machines/app-init-machine.ts`
 
-### **Documentation Updates**
-- Update architecture documentation
-- Create developer onboarding guide for new sync architecture
-- Document troubleshooting procedures for each machine
+```typescript
+// In app-init-machine.ts context
+export interface AppInitContext {
+  // ...
+  // Keep only what's necessary for coordinating the startup sequence
+  isSyncReady: boolean;
+
+  // REMOVE all detailed sync state that's now managed by sync-machine-v3
+  // syncState: { ... } ❌
+  // integrityBaseline: { ... } ❌
+}
+```
+
+#### Step 7.2: Finalize Orchestrator Integration
+**Files**: Update `apps/web/src/state-machines/orchestrator-v2.ts`
+
+The `orchestrator-v2` already seems to follow this pattern, merely reflecting state from `app-init-machine`. This step becomes a verification to ensure no sync-specific logic has crept in.
+
+**Success Criteria**:
+- The `app-init-machine`'s context is lean and only contains what's needed for its coordination role.
+- All detailed sync state is owned and managed exclusively by `sync-machine-v3`.
+- The architecture is fully decoupled.
+---
+
+## 🚨 Risk Mitigation & Success Metrics (Unchanged)
+The risk mitigation, testing strategy, and success metrics from the original plan are still fully applicable.
 
 ---
 
@@ -1216,24 +824,16 @@ npm run test:orchestrator
 
 ### **Before: Problematic Coupling**
 ```
-❌ Orchestrator acting as sync's external storage
-❌ Complex sendParent() coordination between machines  
-❌ Duplicate state tracking and synchronization
-❌ 1,930-line monolithic sync machine
-❌ Sync machine cannot operate independently
+❌ app-init-machine tightly coupled with a monolithic sync-machine-v2
+❌ 1,930-line sync machine is hard to test and maintain
 ```
 
 ### **After: Clean Autonomous Architecture**
 ```
-✅ Orchestrator = App shell (auth, database, system coordination)
-✅ Sync Machine = Self-contained subsystem with persistence
-  ├── Integrity Machine = Child machine for validation/reset lifecycle
-  ├── Service Classes = Focused validation, reset, fingerprint utilities
-  └── Direct Hooks = useSyncMachine(), useSync() access sync directly
-✅ Simple init coordination (INITIALIZE_SYNC → SYNC_READY)
+✅ app-init-machine invokes an autonomous sync-machine-v3
+✅ sync-machine-v3 manages its own state, services, and persistence
+✅ UI components subscribe directly to sync-machine-v3 state via new hooks
 ✅ 500-line focused sync machine (74% reduction)
-✅ 300-line integrity child machine
-✅ Sync subsystem operates completely independently
 ✅ Clear subsystem boundaries and ownership
 ```
 

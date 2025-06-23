@@ -1,34 +1,25 @@
 import { useMemo } from 'react'
 // Remove authClient.useSession() import to stop duplicate HTTP requests
 // import { authClient } from '@/lib/auth' 
-import { useAuth as useOrchestratorAuth } from '@/state-machines/orchestrator-hooks'
+import { useAuth as useOrchestratorAuth } from '@/state-machines/orchestrator-hooks-v2'
 import type { UserInfo } from '@/state-machines/types'
 
 export function useAuth() {
-  // Only use orchestrator auth state - no more duplicate HTTP requests
+  // Use orchestrator auth state with computed properties
   const { 
     user,
-    displayName: xstateDisplayName,
-    initials: xstateInitials,
     authToken,
     isAuthenticated,
     isSigningIn,
     isSigningOut,
     authError,
+    isAdmin,
+    isSuperAdmin,
+    displayName,
+    initials,
     signIn,
     signOut
   } = useOrchestratorAuth()
-  
-  // Computed properties based on orchestrator state only
-  const isAdmin = useMemo(() => 
-    user?.role === 'admin' || user?.role === 'super_admin', 
-    [user?.role]
-  )
-  
-  const displayName = useMemo(() => 
-    user?.name || user?.email?.split('@')[0] || xstateDisplayName || 'User',
-    [user?.name, user?.email, xstateDisplayName]
-  )
   
   return {
     // User info from orchestrator
@@ -40,14 +31,14 @@ export function useAuth() {
     isLoading: isSigningIn,
     error: authError,
     
-    // Computed properties
+    // Computed properties from v2 hook
     isAdmin,
-    isSuperAdmin: user?.role === 'super_admin',
+    isSuperAdmin,
     isMember: user?.role === 'member',
     isViewer: user?.role === 'viewer',
     canAccessDebug: isAdmin,
     displayName,
-    initials: user ? displayName.slice(0, 2).toUpperCase() : xstateInitials,
+    initials,
     
     // Actions from orchestrator
     signOut,

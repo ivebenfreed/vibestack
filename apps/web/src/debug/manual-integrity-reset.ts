@@ -488,18 +488,32 @@ if (typeof window !== 'undefined') {
   (window as any).debugGetIntegrityService = getIntegrityService;
   (window as any).debugResetBaseline = resetIntegrityBaseline;
   
-  console.log('[DEBUG] 🛠️ Manual integrity functions available:');
-  console.log('  State Machine Functions:');
-  console.log('    window.debugReset() - Trigger reset via state machine');
-  console.log('    window.debugValidate() - Trigger validation via state machine');
-  console.log('  Direct Service Functions:');
-  console.log('    window.debugResetDirect(reason?, resetType?) - Direct reset (bypass state machine)');
-  console.log('    window.debugResetProper(reason?, resetType?) - Proper reset (via state machine with disconnect/reconnect)');
-  console.log('    window.debugValidateDirect(reason?) - Direct validation (bypass state machine)');
-  console.log('    window.debugFingerprints() - Generate fingerprints directly');
-  console.log('    window.debugIntegrityStatus() - Show current integrity status');
-  console.log('    window.debugResetBaseline(reason?) - Reset baseline to force full validation');
-  console.log('  Utility Functions:');
-  console.log('    window.debugClearData() - Clear all local data');
-  console.log('    window.debugGetIntegrityService() - Get IntegrityService instance');
+  // Add a function to show debug help when requested
+  (window as any).debugIntegrityHelp = () => {
+    console.log('[DEBUG] 🛠️ Manual integrity functions available:');
+    console.log('  State Machine Functions:');
+    console.log('    window.debugReset() - Trigger reset via state machine');
+    console.log('    window.debugValidate() - Trigger validation via state machine');
+    console.log('  Direct Service Functions:');
+    console.log('    window.debugResetDirect(reason?, resetType?) - Direct reset (bypass state machine)');
+    console.log('    window.debugResetProper(reason?, resetType?) - Proper reset (via state machine with disconnect/reconnect)');
+    console.log('    window.debugValidateDirect(reason?) - Direct validation (bypass state machine)');
+    console.log('    window.debugFingerprints() - Generate fingerprints directly');
+    console.log('    window.debugIntegrityStatus() - Show current integrity status');
+    console.log('    window.debugResetBaseline(reason?) - Reset baseline to force full validation');
+    console.log('  Utility Functions:');
+    console.log('    window.debugClearData() - Clear all local data');
+    console.log('    window.debugGetIntegrityService() - Get IntegrityService instance');
+    console.log('  Help:');
+    console.log('    window.debugIntegrityHelp() - Show this help message');
+  };
+  
+  // Only show the help automatically on debug pages (not on app startup)
+  const isDebugPage = window.location.pathname.includes('/debug') || 
+                     window.location.pathname.includes('/admin') ||
+                     window.location.search.includes('debug=true');
+                     
+  if (isDebugPage && import.meta.env.MODE === 'development') {
+    console.log('[DEBUG] Debug page detected. Type window.debugIntegrityHelp() for available functions.');
+  }
 } 

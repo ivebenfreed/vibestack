@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { useAuth } from '@/state-machines/orchestrator-hooks'
+import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
 import { Route } from '../../sign-in'
 
 type UserAuthFormProps = HTMLAttributes<HTMLFormElement>
@@ -82,7 +82,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       console.log("[AUTH] Attempting sign-in with orchestrator:", data.email);
       
       // Use ONLY the orchestrator sign-in - remove dual system
-      signIn(data.email, data.password);
+      signIn({ email: data.email, password: data.password });
       
       // Don't manually navigate - let the useEffect handle it when isAuthenticated becomes true
       // The orchestrator will update isAuthenticated state when sign-in is successful
