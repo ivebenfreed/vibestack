@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth, useSystem, useAppInit } from '@/state-machines/orchestrator-hooks-v2';
 import { Loader2, Database, Shield, Wifi, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface UnifiedLoadingScreenProps {
@@ -9,6 +9,13 @@ interface UnifiedLoadingScreenProps {
 export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
   const { isAuthenticated, isCheckingAuth, isSigningIn } = useAuth();
   const { isSystemReady } = useSystem();
+  const { 
+    isCheckingRequirements, 
+    isInitializingDatabase, 
+    isStartingSync, 
+    isStartingLiveChanges, 
+    isReady 
+  } = useAppInit();
   
   // Simple reactive loading - no timeouts or complex state management
   const shouldShow = !isSystemReady;
@@ -20,6 +27,13 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
       shouldShow,
       isAuthenticated,
       isCheckingAuth,
+      appInitStates: {
+        isCheckingRequirements,
+        isInitializingDatabase,
+        isStartingSync,
+        isStartingLiveChanges,
+        isReady
+      },
       timestamp: Date.now()
     });
   }
@@ -48,6 +62,59 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
         colorClasses: {
           bg: 'bg-blue-50 dark:bg-blue-950',
           icon: 'text-blue-600 dark:text-blue-400',
+        }
+      };
+    }
+
+    // App initialization states
+    if (isCheckingRequirements) {
+      return {
+        phase: 'starting',
+        icon: Loader2,
+        title: 'Starting...',
+        message: 'Preparing application...',
+        colorClasses: {
+          bg: 'bg-gray-50 dark:bg-gray-950',
+          icon: 'text-gray-600 dark:text-gray-400',
+        }
+      };
+    }
+
+    if (isInitializingDatabase) {
+      return {
+        phase: 'database',
+        icon: Database,
+        title: 'Setting up database...',
+        message: 'Initializing local storage...',
+        colorClasses: {
+          bg: 'bg-green-50 dark:bg-green-950',
+          icon: 'text-green-600 dark:text-green-400',
+        }
+      };
+    }
+
+    if (isStartingSync) {
+      return {
+        phase: 'sync',
+        icon: Wifi,
+        title: 'Syncing data...',
+        message: 'Connecting and syncing...',
+        colorClasses: {
+          bg: 'bg-purple-50 dark:bg-purple-950',
+          icon: 'text-purple-600 dark:text-purple-400',
+        }
+      };
+    }
+
+    if (isStartingLiveChanges) {
+      return {
+        phase: 'live-changes',
+        icon: RefreshCw,
+        title: 'Preparing live updates...',
+        message: 'Setting up real-time sync...',
+        colorClasses: {
+          bg: 'bg-orange-50 dark:bg-orange-950',
+          icon: 'text-orange-600 dark:text-orange-400',
         }
       };
     }

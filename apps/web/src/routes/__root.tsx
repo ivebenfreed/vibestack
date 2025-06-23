@@ -17,7 +17,7 @@ import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
 import { appInitMachine } from '@/state-machines/machines/app-init-machine'
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth, useSystem } from '@/state-machines/orchestrator-hooks-v2'
 import React from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 
@@ -39,49 +39,19 @@ const createAppInitActor = () => {
 }
 
 
-// 🔥 HMR FIX: Clean up existing actors before creating new ones
-if (import.meta.hot) {
-  if ((window as any).appInitActor) {
-    console.log('[XSTATE] 🔥 HMR: Cleaning up existing app init actor...')
-    const existingActor = (window as any).appInitActor
-    
-    try {
-      // Check if actor is still running before stopping
-      if (existingActor.getSnapshot().status !== 'stopped') {
-        existingActor.stop()
-        console.log('[XSTATE] 🔥 HMR: Existing app init actor stopped')
-      }
-    } catch (error) {
-      console.warn('[XSTATE] 🔥 HMR: Error stopping existing app init actor:', error)
-    }
-    
-    (window as any).appInitActor = null
-  }
+// 🔥 HMR FIX: Check for preserved actors from previous module
+if (import.meta.hot && import.meta.hot.data.authMachineActor) {
+  console.log('[XSTATE] 🔥 HMR: Found preserved actors from previous module')
   
-  if ((window as any).authMachineActor) {
-    console.log('[XSTATE] 🔥 HMR: Cleaning up existing auth machine actor...')
-    const existingAuthActor = (window as any).authMachineActor
-    
-    try {
-      // Check if actor is still running before stopping
-      const currentSnapshot = existingAuthActor.getSnapshot()
-      if (currentSnapshot.status !== 'stopped') {
-        if (currentSnapshot.matches('authenticated') && currentSnapshot.context.user) {
-          console.log('[XSTATE] 🔥 HMR: Preserving auth state for restart')
-          saveAuthState(existingAuthActor)
-        }
-        
-        existingAuthActor.stop()
-        console.log('[XSTATE] 🔥 HMR: Existing auth machine stopped')
-      } else {
-        console.log('[XSTATE] 🔥 HMR: Auth machine already stopped, skipping')
-      }
-    } catch (error) {
-      console.warn('[XSTATE] 🔥 HMR: Error stopping existing auth machine:', error)
-    }
-    
-    (window as any).authMachineActor = null
-  }
+  // Restore preserved actors
+  ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
+  ;(window as any).appInitActor = import.meta.hot.data.appInitActor
+  
+  // Clear from hot data
+  import.meta.hot.data.authMachineActor = null
+  import.meta.hot.data.appInitActor = null
+  
+  console.log('[XSTATE] 🔥 HMR: Actors restored successfully')
 }
 
 // 🔥 AUTH PERSISTENCE: Load and save AuthMachine state
@@ -132,43 +102,85 @@ const saveAuthState = (actor: any) => {
 // XState 5: Proper snapshot persistence
 const persistedAuthSnapshot = loadPersistedAuthState()
 
-// Create AuthMachine actor
-const authMachineActor = createActor(authMachine)
+// Create AuthMachine actor (only if not already exists from HMR)
+let authMachineActor = (window as any).authMachineActor
 
-// XState 5: Start with snapshot if available
-if (persistedAuthSnapshot) {
-  console.log('[AuthMachine] Starting with persisted snapshot')
-  authMachineActor.start(persistedAuthSnapshot)
-} else {
-  console.log('[AuthMachine] Starting fresh')
-  authMachineActor.start()
-}
-
-// Set up auth state persistence and direct init trigger
-authMachineActor.subscribe((snapshot) => {
-  saveAuthState(authMachineActor)
+if (!authMachineActor) {
+  console.log('[AuthMachine] Creating new auth machine actor')
+  authMachineActor = createActor(authMachine)
   
-  const authenticated = snapshot.matches('authenticated')
-  const reason = snapshot.value === 'authenticated' ? 'authenticated' : 
-                 snapshot.value === 'unauthenticated' ? 'unauthenticated' :
-                 snapshot.value === 'signingOut' ? 'signing-out' : 'checking'
-  
-  console.log('[AuthMachine] State changed:', { authenticated, reason })
-  
-  // 🔥 DIRECT FLOW: When auth completes, directly start initialization
-  if (authenticated && snapshot.value === 'authenticated') {
-    console.log('[AuthMachine] ✅ Authentication complete - starting app initialization')
-    appInitActor.send({ type: 'START_INIT' })
+  // XState 5: Start with snapshot if available
+  if (persistedAuthSnapshot) {
+    console.log('[AuthMachine] Starting with persisted snapshot')
+    authMachineActor.start(persistedAuthSnapshot)
+  } else {
+    console.log('[AuthMachine] Starting fresh')
+    authMachineActor.start()
   }
   
-  // Emit custom event for navigation logic
-  window.dispatchEvent(new CustomEvent('auth:state-changed', {
-    detail: { authenticated, reason }
-  }))
-})
+  // Store globally
+  ;(window as any).authMachineActor = authMachineActor
+  
+  // Set up subscriptions for new actor
+  authMachineActor.subscribe((snapshot) => {
+    saveAuthState(authMachineActor)
+    
+    const authenticated = snapshot.matches('authenticated')
+    const reason = snapshot.value === 'authenticated' ? 'authenticated' : 
+                   snapshot.value === 'unauthenticated' ? 'unauthenticated' :
+                   snapshot.value === 'signingOut' ? 'signing-out' : 'checking'
+    
+    console.log('[AuthMachine] State changed:', { authenticated, reason })
+    
+    // 🔥 DIRECT FLOW: When auth completes, directly start initialization
+    if (authenticated && snapshot.value === 'authenticated') {
+      console.log('[AuthMachine] ✅ Authentication complete - starting app initialization')
+      const currentAppInitActor = (window as any).appInitActor
+      if (currentAppInitActor) {
+        currentAppInitActor.send({ type: 'START_INIT' })
+      }
+    }
+    
+    // Emit custom event for navigation logic
+    window.dispatchEvent(new CustomEvent('auth:state-changed', {
+      detail: { authenticated, reason }
+    }))
+  })
+} else {
+  console.log('[AuthMachine] 🔥 HMR: Using existing auth machine actor')
+}
 
-// Create app init machine actor directly
-const appInitActor = createAppInitActor()
+
+// Create app init machine actor (only if not already exists from HMR)
+let appInitActor = (window as any).appInitActor
+
+if (!appInitActor) {
+  console.log('[APP INIT] Creating new app init machine actor')
+  appInitActor = createAppInitActor()
+  
+  // Store globally
+  ;(window as any).appInitActor = appInitActor
+  
+  // Set up subscriptions for new actor
+  appInitActor.subscribe({
+    error: (error) => {
+      console.error('[APP INIT] Actor error:', error)
+      sessionStorage.setItem('app-init-last-error', JSON.stringify({
+        error: error.message,
+        timestamp: Date.now()
+      }))
+    },
+    complete: () => {
+      console.warn('[APP INIT] Actor completed/stopped unexpectedly')
+      sessionStorage.setItem('app-init-stopped', JSON.stringify({
+        timestamp: Date.now(),
+        reason: 'completed'
+      }))
+    }
+  })
+} else {
+  console.log('[APP INIT] 🔥 HMR: Using existing app init machine actor')
+}
 
 // Handle PGlite filesystem errors gracefully
 window.addEventListener('unhandledrejection', (event) => {
@@ -179,55 +191,25 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
-appInitActor.subscribe({
-  error: (error) => {
-    console.error('[APP INIT] Actor error:', error)
-    sessionStorage.setItem('app-init-last-error', JSON.stringify({
-      error: error.message,
-      timestamp: Date.now()
-    }))
-  },
-  complete: () => {
-    console.warn('[APP INIT] Actor completed/stopped unexpectedly')
-    sessionStorage.setItem('app-init-stopped', JSON.stringify({
-      timestamp: Date.now(),
-      reason: 'completed'
-    }))
-  }
-})
 
-// Make both actors globally accessible
-;(window as any).authMachineActor = authMachineActor
-;(window as any).appInitActor = appInitActor
+// Actors are already globally accessible (assigned during creation)
 
-// 🔥 HMR FIX: Add HMR disposal handler for both actors
+// 🔥 HMR FIX: Preserve actors across HMR updates
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    console.log('[XSTATE] 🔥 HMR Dispose: Cleaning up actors...')
+    console.log('[XSTATE] 🔥 HMR Dispose: Preserving actors for next module...')
     
-    if ((window as any).appInitActor) {
-      try {
-        const actor = (window as any).appInitActor
-        actor.stop()
-        console.log('[XSTATE] 🔥 HMR: App init actor stopped for HMR')
-      } catch (error) {
-        console.warn('[XSTATE] 🔥 HMR: Error stopping app init actor during dispose:', error)
-      }
-    }
+    // Store actor references in hot data to preserve across HMR
+    import.meta.hot.data.authMachineActor = (window as any).authMachineActor
+    import.meta.hot.data.appInitActor = (window as any).appInitActor
     
-    if ((window as any).authMachineActor) {
-      try {
-        const authActor = (window as any).authMachineActor
-        authActor.stop()
-        console.log('[XSTATE] 🔥 HMR: Auth machine stopped for HMR')
-      } catch (error) {
-        console.warn('[XSTATE] 🔥 HMR: Error stopping auth machine during dispose:', error)
-      }
-    }
-    
-    // Clear global references
-    (window as any).appInitActor = null
-    (window as any).authMachineActor = null
+    // Don't stop actors - let them continue running
+    console.log('[XSTATE] 🔥 HMR: Actors preserved for hot reload')
+  })
+  
+  // On accept, restore the preserved actors
+  import.meta.hot.accept(() => {
+    console.log('[XSTATE] 🔥 HMR Accept: Module reloaded')
   })
 }
 
@@ -309,6 +291,8 @@ function RootComponentInternal() {
 function AppWithInitialization() {
   const navigate = useNavigate()
   const router = useRouter()
+  const { isSystemReady } = useSystem()
+  const { isAuthenticated } = useAuth()
   
   // Listen for auth state changes to handle navigation
   React.useEffect(() => {
@@ -331,10 +315,11 @@ function AppWithInitialization() {
     }
   }, [navigate]);
   
-  // Remove UnifiedLoadingScreen from root - it should only be on authenticated routes
+  // Show UnifiedLoadingScreen overlay only when authenticated but system is not ready
   return (
     <>
       <Outlet />
+      {isAuthenticated && !isSystemReady && <UnifiedLoadingScreen />}
       <Toaster duration={3000} />
       {import.meta.env.MODE === 'development' && (
         <TanStackRouterDevtools position='bottom-right' />

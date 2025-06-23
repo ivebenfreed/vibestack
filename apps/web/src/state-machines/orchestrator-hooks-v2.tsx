@@ -204,6 +204,7 @@ export function useAppInit() {
   const isCheckingRequirements = appInitState === 'idle';
   const isInitializingDatabase = appInitState === 'database';
   const isStartingSync = appInitState === 'sync';
+  const isStartingLiveChanges = appInitState === 'live_changes';
   const isReady = appInitState === 'ready';
   const hasError = appInitState === 'error';
 
@@ -230,6 +231,7 @@ export function useAppInit() {
     isCheckingRequirements,
     isInitializingDatabase,
     isStartingSync,
+    isStartingLiveChanges,
     isReady,
     hasError,
     
