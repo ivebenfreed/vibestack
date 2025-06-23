@@ -283,5 +283,81 @@ export function useSystem() {
   };
 }
 
+// Direct sync machine hook - accesses sync machine state directly
+export function useSync() {
+  // Get sync machine from app init machine's children
+  const syncMachine = useMemo(() => {
+    const appInitActor = (window as any).appInitActor;
+    if (!appInitActor) return null;
+    
+    const appInitSnapshot = appInitActor.getSnapshot();
+    return appInitSnapshot?.children?.syncMachine;
+  }, []);
+
+  // Safety check: return default state if sync machine not available
+  if (!syncMachine) {
+    return {
+      clientId: null,
+      currentLSN: null,
+      syncPhase: null,
+      isConnected: false,
+      error: null,
+      isInitialSync: false,
+      isCatchupSync: false,
+      isLiveSync: false,
+      isError: false,
+      isConnecting: false,
+      isIdle: true,
+      machineState: 'idle',
+      syncPhaseProgress: null,
+      isActive: false,
+      statusText: 'Idle'
+    };
+  }
+
+  // Subscribe to sync machine state changes
+  const syncSnapshot = useSelector(syncMachine, (state) => state);
+  
+  const context = syncSnapshot?.context || {};
+  const state = syncSnapshot?.value || 'idle';
+  
+  return {
+    // Core sync state
+    clientId: context.clientId,
+    currentLSN: context.currentLSN,
+    syncPhase: context.syncPhase,
+    
+    // Connection status
+    isConnected: state.includes?.('operational') || false,
+    error: context.error,
+    
+    // State booleans
+    isInitialSync: context.syncPhase === 'initial',
+    isCatchupSync: context.syncPhase === 'catchup',
+    isLiveSync: context.syncPhase === 'live',
+    isError: state === 'error' || !!context.error,
+    isConnecting: state === 'connecting' || state.includes?.('connecting'),
+    isIdle: state === 'idle',
+    
+    // Machine state
+    machineState: typeof state === 'string' ? state : Object.keys(state)[0],
+    
+    // Detailed progress (if available)
+    syncPhaseProgress: context.phaseProgress,
+    
+    // Convenience getters
+    isActive: ['connecting', 'operational', 'syncing'].some(s => 
+      typeof state === 'string' ? state === s : state[s] !== undefined
+    ),
+    
+    statusText: context.error ? 'Error' :
+                state === 'connecting' ? 'Connecting...' :
+                context.syncPhase === 'initial' ? 'Initial Sync' :
+                context.syncPhase === 'catchup' ? 'Catchup Sync' :
+                context.syncPhase === 'live' ? 'Live' :
+                'Idle'
+  };
+}
+
 
 // No longer exporting context - using direct actor access pattern

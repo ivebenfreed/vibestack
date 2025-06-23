@@ -6,7 +6,8 @@ export { appInitMachine } from './machines/app-init-machine';
 export { 
   useAuth, 
   useAppInit,
-  useSystem
+  useSystem,
+  useSync
 } from './orchestrator-hooks-v2';
 
 // 🔴 LEGACY: Old orchestrator (LEGACY - replaced by orchestrator-v2)

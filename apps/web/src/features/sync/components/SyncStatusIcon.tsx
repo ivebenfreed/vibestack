@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { useSync } from '@/state-machines';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -15,21 +15,23 @@ interface SyncStatusIconProps {
 }
 
 const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className }) => {
-  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
-  const { isSystemReady, hasAnyError } = useSystem();
+  const {
+    clientId,
+    currentLSN,
+    syncPhase,
+    isConnected,
+    error,
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    isConnecting,
+    isIdle,
+    statusText
+  } = useSync();
   
-  // Map v2 data to component state  
-  const isOnline = connectionStatus === 'connected';
-  const isError = hasAnyError || !!syncError;
-  const isLiveSync = isSyncReady && liveChangesStatus === 'connected';
-  const isInitialSync = connectionStatus === 'connecting' && !isSyncReady;
-  const isCatchupSync = false; // Not available in v2
-  const clientId = null; // Not available in v2
-  const currentLSN = null; // Not available in v2
-  const statusText = isLiveSync ? 'Live' : 
-                     isInitialSync ? 'Connecting...' :
-                     isError ? 'Error' :
-                     'Disconnected';
+  // Derived state
+  const isOnline = isConnected;
 
   // Remove excessive logging that was causing performance issues during scroll
   // console.log('[SyncStatusIcon] State:', {
@@ -61,7 +63,7 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
 
   const getTooltipText = (): string => {
     const baseStatus = !isOnline ? 'Status: Disconnected' :
-                      isError ? 'Status: Error' :
+                      isError ? `Status: Error${error ? `: ${error}` : ''}` :
                       statusText ? `Status: ${statusText}` :
                       'Status: Connecting...';
     
