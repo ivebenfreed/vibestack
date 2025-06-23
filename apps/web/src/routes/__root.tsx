@@ -13,10 +13,10 @@ import { authClient } from '@/lib/auth'
 import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
 import { usePGliteContext } from '@/db/pglite-provider'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
-// 🔥 NEW: Import XState orchestrator V2 and AuthMachine
+// 🔥 NEW: Import XState machines directly (no orchestrator needed)
 import { createActor } from 'xstate'
-import { orchestratorV2 } from '@/state-machines/orchestrator-v2'
 import { authMachine } from '@/state-machines/machines/auth-machine'
+import { appInitMachine } from '@/state-machines/machines/app-init-machine'
 import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
 import React from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
@@ -29,84 +29,33 @@ interface RouterContext {
   setUserAtoms: (users: User[]) => void
 }
 
-// Pure event coordinator - no persistence needed (child machines handle their own)
-
-// No orchestrator state loading needed - using pure event coordinator
-
-// No orchestrator state saving needed - child machines handle their own persistence
-
-// Create orchestrator v2 actor (pure event coordinator)
-const createOrchestratorV2Actor = () => {
-  console.log('[XSTATE] Creating orchestrator v2 actor (pure event coordinator)...')
+// Create app init machine actor directly (no orchestrator needed)
+const createAppInitActor = () => {
+  console.log('[XSTATE] Creating app init machine actor...')
   
-  const actor = createActor(orchestratorV2)
+  const actor = createActor(appInitMachine)
   actor.start()
   return actor
 }
 
-// Global actor restart function
-const restartOrchestratorActor = () => {
-  console.log('[XSTATE] 🔄 Restarting stopped orchestrator actor...')
-  
-  // Stop existing actor if it exists
-  if ((window as any).orchestratorActor) {
-    try {
-      (window as any).orchestratorActor.stop()
-    } catch (error) {
-      console.warn('[XSTATE] Error stopping existing actor during restart:', error)
-    }
-  }
-  
-  // Create new actor
-  const newActor = createOrchestratorActor()
-  
-  // Set up subscriptions again
-  newActor.subscribe((snapshot) => {
-    saveOrchestratorState(snapshot)
-  })
-  
-  newActor.subscribe({
-    error: (error) => {
-      console.error('[ORCHESTRATOR] Actor error:', error)
-      sessionStorage.setItem('orchestrator-last-error', JSON.stringify({
-        error: error.message,
-        timestamp: Date.now()
-      }))
-    },
-    complete: () => {
-      console.warn('[ORCHESTRATOR] Actor completed/stopped unexpectedly')
-      sessionStorage.setItem('orchestrator-stopped', JSON.stringify({
-        timestamp: Date.now(),
-        reason: 'completed'
-      }))
-    }
-  })
-  
-  // Update global reference
-  ;(window as any).orchestratorActor = newActor
-  ;(window as any).restartOrchestratorActor = restartOrchestratorActor
-  
-  console.log('[XSTATE] ✅ Orchestrator actor restarted successfully')
-  return newActor
-}
 
 // 🔥 HMR FIX: Clean up existing actors before creating new ones
 if (import.meta.hot) {
-  if ((window as any).orchestratorV2Actor) {
-    console.log('[XSTATE] 🔥 HMR: Cleaning up existing orchestrator v2 actor...')
-    const existingActor = (window as any).orchestratorV2Actor
+  if ((window as any).appInitActor) {
+    console.log('[XSTATE] 🔥 HMR: Cleaning up existing app init actor...')
+    const existingActor = (window as any).appInitActor
     
     try {
       // Check if actor is still running before stopping
       if (existingActor.getSnapshot().status !== 'stopped') {
         existingActor.stop()
-        console.log('[XSTATE] 🔥 HMR: Existing orchestrator v2 stopped')
+        console.log('[XSTATE] 🔥 HMR: Existing app init actor stopped')
       }
     } catch (error) {
-      console.warn('[XSTATE] 🔥 HMR: Error stopping existing orchestrator v2:', error)
+      console.warn('[XSTATE] 🔥 HMR: Error stopping existing app init actor:', error)
     }
     
-    (window as any).orchestratorV2Actor = null
+    (window as any).appInitActor = null
   }
   
   if ((window as any).authMachineActor) {
@@ -209,7 +158,7 @@ authMachineActor.subscribe((snapshot) => {
   // 🔥 DIRECT FLOW: When auth completes, directly start initialization
   if (authenticated && snapshot.value === 'authenticated') {
     console.log('[AuthMachine] ✅ Authentication complete - starting app initialization')
-    orchestratorV2Actor.send({ type: 'START_INIT' })
+    appInitActor.send({ type: 'START_INIT' })
   }
   
   // Emit custom event for navigation logic
@@ -218,8 +167,8 @@ authMachineActor.subscribe((snapshot) => {
   }))
 })
 
-// Create orchestrator V2 actor - pure event coordinator
-const orchestratorV2Actor = createOrchestratorV2Actor()
+// Create app init machine actor directly
+const appInitActor = createAppInitActor()
 
 // Handle PGlite filesystem errors gracefully
 window.addEventListener('unhandledrejection', (event) => {
@@ -230,17 +179,17 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
-orchestratorV2Actor.subscribe({
+appInitActor.subscribe({
   error: (error) => {
-    console.error('[ORCHESTRATOR V2] Actor error:', error)
-    sessionStorage.setItem('orchestrator-v2-last-error', JSON.stringify({
+    console.error('[APP INIT] Actor error:', error)
+    sessionStorage.setItem('app-init-last-error', JSON.stringify({
       error: error.message,
       timestamp: Date.now()
     }))
   },
   complete: () => {
-    console.warn('[ORCHESTRATOR V2] Actor completed/stopped unexpectedly')
-    sessionStorage.setItem('orchestrator-v2-stopped', JSON.stringify({
+    console.warn('[APP INIT] Actor completed/stopped unexpectedly')
+    sessionStorage.setItem('app-init-stopped', JSON.stringify({
       timestamp: Date.now(),
       reason: 'completed'
     }))
@@ -249,20 +198,20 @@ orchestratorV2Actor.subscribe({
 
 // Make both actors globally accessible
 ;(window as any).authMachineActor = authMachineActor
-;(window as any).orchestratorV2Actor = orchestratorV2Actor
+;(window as any).appInitActor = appInitActor
 
 // 🔥 HMR FIX: Add HMR disposal handler for both actors
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     console.log('[XSTATE] 🔥 HMR Dispose: Cleaning up actors...')
     
-    if ((window as any).orchestratorV2Actor) {
+    if ((window as any).appInitActor) {
       try {
-        const actor = (window as any).orchestratorV2Actor
+        const actor = (window as any).appInitActor
         actor.stop()
-        console.log('[XSTATE] 🔥 HMR: Orchestrator v2 stopped for HMR')
+        console.log('[XSTATE] 🔥 HMR: App init actor stopped for HMR')
       } catch (error) {
-        console.warn('[XSTATE] 🔥 HMR: Error stopping orchestrator v2 during dispose:', error)
+        console.warn('[XSTATE] 🔥 HMR: Error stopping app init actor during dispose:', error)
       }
     }
     
@@ -277,7 +226,7 @@ if (import.meta.hot) {
     }
     
     // Clear global references
-    (window as any).orchestratorV2Actor = null
+    (window as any).appInitActor = null
     (window as any).authMachineActor = null
   })
 }
@@ -289,10 +238,10 @@ window.addEventListener('auth:signout', () => {
   // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
   
   // Reset app init machine to idle state for fresh initialization on next sign-in
-  const orchestratorActor = (window as any).orchestratorV2Actor
-  if (orchestratorActor) {
+  const appInitActor = (window as any).appInitActor
+  if (appInitActor) {
     console.log('[XSTATE] Resetting app init machine on sign-out')
-    orchestratorActor.send({ type: 'RESET_INIT' })
+    appInitActor.send({ type: 'RESET' })
   }
 })
 

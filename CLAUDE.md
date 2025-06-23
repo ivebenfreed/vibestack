@@ -5,7 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Core Development
-- `pnpm dev` - Start development servers for web and server applications
 - `pnpm build` - Build all packages and applications
 - `pnpm lint` - Run ESLint with maximum 10000 warnings
 - `pnpm lint:fix` - Fix ESLint issues automatically

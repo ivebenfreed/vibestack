@@ -153,11 +153,11 @@ export function useAuth() {
   };
 }
 
-// App initialization hook - directly from OrchestratorV2
+// App initialization hook - directly from AppInitMachine
 export function useAppInit() {
-  // Get OrchestratorV2 directly from window (it's started independently)
+  // Get AppInitMachine directly from window (it's started independently)
   const actor = useMemo(() => {
-    return (window as any).orchestratorV2Actor;
+    return (window as any).appInitActor;
   }, []);
 
   // Safety check: only proceed if actor exists
@@ -174,15 +174,13 @@ export function useAppInit() {
       isStartingSync: false,
       isReady: false,
       hasError: false,
-      retryInit: () => console.error('[useAppInit] OrchestratorV2 not available'),
-      restartSync: () => console.error('[useAppInit] OrchestratorV2 not available'),
+      retryInit: () => console.error('[useAppInit] AppInitMachine not available'),
+      restartSync: () => console.error('[useAppInit] AppInitMachine not available'),
     };
   }
   
-  // Get data directly from child machine snapshots
-  const initMachineSnapshot = useSelector(actor, (state) => 
-    state.children?.appInitMachine?.getSnapshot?.()
-  );
+  // Get data directly from app init machine snapshot
+  const initMachineSnapshot = useSelector(actor, (state) => state);
   
   const isDatabaseInitialized = initMachineSnapshot?.context?.isDatabaseInitialized || false;
   const databaseError = initMachineSnapshot?.context?.databaseError || null;
@@ -234,10 +232,9 @@ export function useAppInit() {
 
 // System hook - app initialization state directly from app init machine
 export function useSystem() {
-  // Get app init machine directly from orchestrator children
+  // Get app init machine directly from window
   const appInitMachine = useMemo(() => {
-    const orchestratorActor = (window as any).orchestratorV2Actor;
-    return orchestratorActor?.getSnapshot()?.children?.appInitMachine;
+    return (window as any).appInitActor;
   }, []);
 
   // Safety check: only proceed if app init machine exists

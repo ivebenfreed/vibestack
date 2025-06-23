@@ -91,37 +91,27 @@ export const initializeAuthAwareSyncCleanup = () => {
       destroyGlobalSyncServices();
       
       // Also reset the sync machine state to idle for clean restart
-      const orchestratorActor = (window as any).orchestratorV2Actor;
+      const appInitActor = (window as any).appInitActor;
       console.log('[SyncMachineV2] 🔐 Attempting to find sync actor for reset...', {
-        hasOrchestrator: !!orchestratorActor
+        hasAppInit: !!appInitActor
       });
       
-      if (orchestratorActor) {
-        const orchestratorSnapshot = orchestratorActor.getSnapshot();
-        const appInitMachine = orchestratorSnapshot?.children?.appInitMachine;
-        console.log('[SyncMachineV2] 🔐 App init machine check:', {
-          hasAppInit: !!appInitMachine
+      if (appInitActor) {
+        const appInitSnapshot = appInitActor.getSnapshot();
+        const syncActor = appInitSnapshot?.children?.syncMachine;
+        console.log('[SyncMachineV2] 🔐 Sync actor check:', {
+          hasSyncActor: !!syncActor,
+          syncActorState: syncActor?.getSnapshot()?.value
         });
         
-        if (appInitMachine) {
-          const appInitSnapshot = appInitMachine.getSnapshot();
-          const syncActor = appInitSnapshot?.children?.syncMachine;
-          console.log('[SyncMachineV2] 🔐 Sync actor check:', {
-            hasSyncActor: !!syncActor,
-            syncActorState: syncActor?.getSnapshot()?.value
-          });
-          
-          if (syncActor) {
-            console.log('[SyncMachineV2] 🔐 Sending DISCONNECT to reset sync machine state');
-            syncActor.send({ type: 'DISCONNECT' });
-          } else {
-            console.warn('[SyncMachineV2] 🔐 Sync actor not found for reset');
-          }
+        if (syncActor) {
+          console.log('[SyncMachineV2] 🔐 Sending DISCONNECT to reset sync machine state');
+          syncActor.send({ type: 'DISCONNECT' });
         } else {
-          console.warn('[SyncMachineV2] 🔐 App init machine not found');
+          console.warn('[SyncMachineV2] 🔐 Sync actor not found for reset');
         }
       } else {
-        console.warn('[SyncMachineV2] 🔐 Orchestrator actor not found');
+        console.warn('[SyncMachineV2] 🔐 App init actor not found for sync reset');
       }
     }
   });

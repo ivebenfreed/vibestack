@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useAuth, useAppInit, useSystem, OrchestratorV2Context } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth, useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
 
 export function SyncDebugPanel() {
   const { isAuthenticated, user } = useAuth();
   const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
   const { isSystemReady } = useSystem();
-  const orchestratorActor = OrchestratorV2Context.useActorRef();
   
   // Map v2 data to legacy sync machine structure for compatibility
   const sync = {

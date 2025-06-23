@@ -1,13 +1,12 @@
 // Main exports for XState universal state management
-export { orchestratorV2 } from './orchestrator-v2';
+export { authMachine } from './machines/auth-machine';
+export { appInitMachine } from './machines/app-init-machine';
 
-// 🔥 NEW: Orchestrator V2 hooks (preferred)
+// 🔥 NEW: Direct machine hooks (no orchestrator needed)
 export { 
-  OrchestratorV2Provider, 
   useAuth, 
   useAppInit,
-  useSystem,
-  OrchestratorV2Context
+  useSystem
 } from './orchestrator-hooks-v2';
 
 // 🔴 LEGACY: Old orchestrator (LEGACY - replaced by orchestrator-v2)

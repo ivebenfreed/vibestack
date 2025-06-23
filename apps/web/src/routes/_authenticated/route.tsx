@@ -71,14 +71,13 @@ export const Route = createFileRoute('/_authenticated')({
     
     // Only check system ready once per session (after sign-in)
     if (!hasVerifiedSystemThisSession) {
-      const orchestratorActor = (window as any).orchestratorV2Actor
-      if (orchestratorActor) {
-        // Get app init machine directly from orchestrator children
-        const orchestratorSnapshot = orchestratorActor.getSnapshot()
-        const appInitMachine = orchestratorSnapshot?.children?.appInitMachine
+      const appInitActor = (window as any).appInitActor
+      if (appInitActor) {
+        // Get app init machine directly
+        const appInitMachine = appInitActor
         
         if (!appInitMachine) {
-          console.error('[AuthenticatedRoute] App init machine not found in orchestrator children')
+          console.error('[AuthenticatedRoute] App init machine not found')
           return
         }
         
@@ -102,8 +101,8 @@ export const Route = createFileRoute('/_authenticated')({
               // Also check sync machine state when we're in sync state
               let syncMachineInfo = ''
               if (snapshot?.value === 'sync') {
-                const orchestratorSnapshot = orchestratorActor.getSnapshot()
-                const syncMachine = orchestratorSnapshot?.children?.appInitMachine?.getSnapshot()?.children?.syncMachine
+                const appInitSnapshot = appInitActor.getSnapshot()
+                const syncMachine = appInitSnapshot?.children?.syncMachine
                 if (syncMachine) {
                   const syncSnapshot = syncMachine.getSnapshot()
                   syncMachineInfo = ` | Sync: ${syncSnapshot?.value} (phase: ${syncSnapshot?.context?.syncPhase})`

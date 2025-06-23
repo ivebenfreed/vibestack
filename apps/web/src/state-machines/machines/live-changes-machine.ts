@@ -35,17 +35,13 @@ export const initializeAuthAwareLiveChangesCleanup = () => {
       console.log('[LiveChangesMachine] 🔐 User signed out, sending SIGNOUT to live changes machine');
       
       // Find and send SIGNOUT to live changes machine
-      const orchestratorActor = (window as any).orchestratorV2Actor;
-      if (orchestratorActor) {
-        const orchestratorSnapshot = orchestratorActor.getSnapshot();
-        const appInitMachine = orchestratorSnapshot?.children?.appInitMachine;
-        if (appInitMachine) {
-          const appInitSnapshot = appInitMachine.getSnapshot();
-          const liveChangesMachine = appInitSnapshot?.children?.liveChangesMachine;
-          if (liveChangesMachine) {
-            console.log('[LiveChangesMachine] 🔐 Sending SIGNOUT to live changes machine');
-            liveChangesMachine.send({ type: 'SIGNOUT' });
-          }
+      const appInitActor = (window as any).appInitActor;
+      if (appInitActor) {
+        const appInitSnapshot = appInitActor.getSnapshot();
+        const liveChangesMachine = appInitSnapshot?.children?.liveChangesMachine;
+        if (liveChangesMachine) {
+          console.log('[LiveChangesMachine] 🔐 Sending SIGNOUT to live changes machine');
+          liveChangesMachine.send({ type: 'SIGNOUT' });
         }
       }
     }
