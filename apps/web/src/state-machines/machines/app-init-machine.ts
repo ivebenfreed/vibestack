@@ -1,6 +1,6 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
-import { syncMachineV2 } from './sync-machine-v2';
+import { syncMachineV3 } from './sync-machine-v3';
 import { liveChangesMachine } from './live-changes-machine';
 
 export interface AppInitContext {
@@ -114,7 +114,7 @@ export const appInitMachine = setup({
   
   actors: {
     waitForDatabase: waitForDatabaseActor,
-    syncMachine: syncMachineV2,
+    syncMachine: syncMachineV3,
     liveChangesMachine,
   },
   

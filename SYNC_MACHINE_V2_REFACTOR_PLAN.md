@@ -2,7 +2,7 @@
 ## Autonomous Subsystem Architecture
 
 **Date Created**: January 2025  
-**Updated**: June 2025 with Orchestrator V2 architecture  
+**Updated**: June 2025 with direct state machine architecture - Orchestrator V1 deprecated  
 **Current Problem**: `sync-machine-v2.ts` is 1,990 lines - massive bloat and coupled to the `app-init-machine`.
 **Target**: Self-contained sync subsystem with clean boundaries, invoked by the `app-init-machine`.
 
@@ -10,21 +10,26 @@
 
 ## 🔍 Architectural Reality Check
 
-### **Current V2 Architecture (June 2025)**
+### **Current Direct State Machine Architecture (June 2025)**
 ```
 📊 Current Architecture:
-├── orchestrator-v2.ts (202 lines) - Lean coordinator ✅
-│   └── invokes app-init-machine.ts
-├── auth-machine.ts (287 lines) - Independent auth lifecycle ✅
-├── app-init-machine.ts (389 lines) - Manages startup sequence ✅
-│   └── currently invokes sync-machine-v2.ts (the monolith)
+├── __root.tsx - Creates and manages actors directly (no orchestrator) ✅
+├── auth-machine.ts (287 lines) - Independent auth lifecycle ✅  
+├── app-init-machine.ts (411 lines) - Manages startup sequence ✅
+│   ├── invokes syncMachineV2 as child actor
+│   └── invokes liveChangesMachine as child actor
 └── sync-machine-v2.ts (1,990 lines) - BLOATED + init-dependent 🚨
 ```
 
-### **Key Insight: App-Init is the New Orchestrator for Sync**
-The `orchestrator-v2` has successfully been refactored into a lean coordinator. The `app-init-machine` has taken over the responsibility of managing the application's startup sequence, which includes initializing the sync subsystem.
+### **Key Architectural Change: Direct Actor Management**
+We've successfully eliminated the orchestrator pattern entirely. The `__root.tsx` component now creates and manages state machine actors directly using the global window pattern:
 
-The problem described in this plan—the monolithic `sync-machine-v2.ts`—remains, but its integration point has shifted from the orchestrator to the `app-init-machine`.
+- `authMachineActor` on `(window as any).authMachineActor`
+- `appInitActor` on `(window as any).appInitActor`
+
+The hooks in `orchestrator-hooks-v2.tsx` access these global actors directly using `useSelector`, providing a clean separation between state machines and UI components.
+
+The `app-init-machine` now manages the complete application initialization sequence and invokes child actors for sync and live changes.
 
 ### **Identified Bloat Sources**
 
@@ -46,323 +51,355 @@ The strategy remains the same: create a new, clean `sync-machine-v3.ts` from scr
 
 ### **Target Architecture: Clean Boundaries**
 ```
-📊 New Architecture (Proper Separation):
+📊 New Architecture (Direct Actor Pattern):
 
 🏗️ APP SHELL
-├── orchestrator-v2.ts - Remains the lean top-level coordinator
-├── auth-machine.ts - Remains the independent auth manager
-└── app-init-machine.ts - Manages startup, invokes sync
-    └── INITIALIZE_SYNC event →
+├── __root.tsx - Direct actor creation and HMR preservation ✅
+├── auth-machine.ts - Independent auth lifecycle ✅
+└── app-init-machine.ts - Manages startup sequence ✅
+    ├── invokes sync-machine-v3.ts as child actor →
+    └── invokes live-changes-machine.ts as child actor →
 
 🔄 SYNC SUBSYSTEM (completely autonomous)
 ├── sync-machine-v3.ts (500 lines) - NEW clean implementation
 │   ├── SyncPersistence (clientId, LSN, baseline management)
 │   ├── Service Coordination (WebSocket, Incoming, Outgoing, Integrity)
 │   ├── Init Flow (load state → setup services → connect → ready)
-│   └── Emits SYNC_READY event
+│   └── Sends SYNC_LIVE event to parent app-init-machine
 ├── integrity-machine.ts (300 lines) - NEW child machine for integrity checks
 └── services/ & utils/ - Refactored and focused services
 
+🎯 UI HOOKS PATTERN
+├── orchestrator-hooks-v2.tsx - Direct actor access with useSelector ✅
+├── useAuth() → (window as any).authMachineActor ✅
+├── useAppInit() → (window as any).appInitActor ✅
+└── useSync() → sync machine child actor from app-init ✅
+
 Total New Sync Implementation: ~2,500 lines
 Clean Subsystem Boundaries: 100% ✅
+Direct Actor Access Pattern: 100% ✅
 ```
 
 ### **Communication Pattern**
 ```typescript
-// Simple init coordination:
-App-Init-Machine: db ready ✅ → send INITIALIZE_SYNC to sync machine → wait for SYNC_READY
-Sync Machine: runs its own autonomous operation with internal persistence
+// Direct actor coordination:
+App-Init-Machine: db ready ✅ → starts sync child actor → waits for SYNC_LIVE event
+Sync Machine: runs autonomously, emits SYNC_LIVE when ready for live changes
+UI Components: access actors directly via global window references
 ```
 
 ---
 
 ## 📋 Step-by-Step Implementation Plan
 
-### **Phase 0: Establish Autonomous Sync Architecture** 
-**Timeline**: 2-3 days | **Risk**: Medium | **Impact**: Very High
+### **Phase 0: Create Minimal Sync Machine V3 Shell + IntegrityService Split**
+**Timeline**: 2-3 days | **Risk**: Low-Medium | **Impact**: Very High - Working foundation + biggest bloat reduction
 
-This is the foundational change. Steps 0.1 and 0.2 remain the same.
+**Strategy**: Combine minimal shell approach with most impactful refactor - splitting the massive IntegrityService. This gives immediate testability AND tackles the biggest architectural problem.
 
-#### Step 0.1: Create Self-Contained Sync Persistence
-**Files**: Create `apps/web/src/sync/utils/SyncPersistence.ts`
-
-```typescript
-// Sync machine owns its complete state
-export class SyncPersistence {
-  private readonly STORAGE_KEY = 'vibestack_sync_state';
-
-  async loadState(): Promise<SyncMachineContext> {
-    const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (error) {
-        console.warn('[SyncPersistence] Failed to parse stored state:', error);
-      }
-    }
-    
-    // First run - generate fresh state
-    return {
-      clientId: crypto.randomUUID(),
-      currentLSN: '0/0',
-      lastSyncTime: null,
-      phase: null,
-      integrityBaseline: {
-        lastInitialSyncCompletedAt: null,
-        recordChangesSinceBaseline: 0,
-        lastFullValidationAt: null,
-        maxRecordsBeforeReset: 10000
-      }
-    };
-  }
-
-  async saveState(context: Partial<SyncMachineContext>): Promise<void> {
-    const current = await this.loadState();
-    const updated = { ...current, ...context };
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updated));
-  }
-
-  async clearState(): Promise<void> {
-    localStorage.removeItem(this.STORAGE_KEY);
-  }
-}
-```
-
-#### Step 0.2: Create New Clean Sync Machine
+#### Step 0.1: Create Minimal Sync Machine V3 Shell (Day 1)
 **Files**: Create `apps/web/src/state-machines/machines/sync-machine-v3.ts`
 
+- [x] Create sync-machine-v3.ts with minimal shell matching v2's interface
+- [x] Use exact same localStorage persistence pattern as v2 ('sync-machine-state' key)  
+- [x] Import existing services (WebSocketService, IncomingChangeService, OutgoingChangeService)
+- [x] Implement same context loading/saving as v2 (lines 730-741, 1296-1328)
+- [x] Send SYNC_LIVE event to parent matching v2's behavior
+- [x] Test shell works with simple 1.5 second delay simulation
+
 ```typescript
-// NEW FILE: Clean implementation from scratch
-import { SyncPersistence } from '../../sync/utils/SyncPersistence';
-import { ServiceCoordinator } from '../../sync/utils/ServiceCoordinator';
-
+// Minimal shell using v2's exact patterns - REPLACES SyncPersistence class approach
 export const syncMachineV3 = setup({
-  actors: {
-    loadPersistedState: fromPromise(async (): Promise<SyncMachineContext> => {
-      const persistence = new SyncPersistence();
-      return persistence.loadState();
-    }),
-    
-    saveState: fromPromise(async ({ input }: { 
-      input: Partial<SyncMachineContext> 
-    }): Promise<void> => {
-      const persistence = new SyncPersistence();
-      await persistence.saveState(input);
-    }),
-
-    initializeServices: fromPromise(async ({ input }) => {
-      // Move existing service initialization here
-      // Remove dependence on orchestrator context
-      return ServiceCoordinator.initialize(input.context);
-    })
-  },
-
   actions: {
-    persistState: ({ context }) => {
-      // Auto-persist critical state changes
-      const persistence = new SyncPersistence();
-      persistence.saveState(context);
-    },
-
-    notifyOrchestrator: sendParent({ type: 'SYNC_READY' })
-  }
-}).createMachine({
-  id: 'sync',
-  initial: 'idle',
-  
-  states: {
-    idle: {
-      // Wait for orchestrator to tell us to start
-      on: {
-        INITIALIZE_SYNC: 'initializing'
+    // Same localStorage pattern as v2 (lines 730-741)
+    saveOwnState: ({ context }) => {
+      const SYNC_STATE_KEY = 'sync-machine-state';
+      try {
+        const stateToSave = {
+          clientId: context.syncClientId,
+          currentLSN: context.currentLSN
+        };
+        localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(stateToSave));
+        console.log('[SyncMachineV3] 💾 Shell saved state:', stateToSave);
+      } catch (error) {
+        console.warn('[SyncMachineV3] Failed to save state:', error);
       }
     },
-    
-    initializing: {
-      initial: 'loading_state',
-      
-      states: {
-        loading_state: {
-          invoke: {
-            src: 'loadPersistedState',
-            onDone: {
-              target: 'setting_up_services',
-              actions: assign(({ event }) => event.output)
-            },
-            onError: {
-              target: 'setting_up_services',
-              actions: assign({
-                clientId: crypto.randomUUID(),
-                currentLSN: '0/0'
-              })
-            }
-          }
-        },
-        
-        setting_up_services: {
-          invoke: {
-            src: 'initializeServices', 
-            input: ({ context }) => ({ context }),
-            onDone: 'ready'
-          }
-        },
-        
-        ready: {
-          type: 'final'
-        }
-      },
-      
-      onDone: {
-        target: 'operational',
-        actions: ['notifyOrchestrator']
-      }
-    },
-    
-    operational: {
-      // Existing sync logic continues here
-      // Remove all sendParent() calls except critical coordination
-    }
-  },
-  
-  // Auto-persist on state changes
-  on: {
-    LSN_UPDATE: {
-      actions: ['updateLSN', 'persistState']
-    }
+    notifyParentLive: sendParent({ type: 'SYNC_LIVE' })
   }
+  // ... rest of minimal implementation
 });
 ```
 
-#### Step 0.3: Update App-Init-Machine to Use New Sync Machine
-**Files**: Modify `apps/web/src/state-machines/machines/app-init-machine.ts`
+#### Step 0.2: Split IntegrityService by Responsibility (Days 2-3)
+**Files**: Split the 1,809-line monolith following the refactor plan
+
+- [x] Create `apps/web/src/sync/integrity/` directory
+- [x] Extract `IntegrityValidator.ts` (~400 lines) - pure validation logic
+- [x] Extract `IntegrityReset.ts` (~300 lines) - reset operations only  
+- [x] Extract `FingerprintGenerator.ts` (~200 lines) - fingerprint utilities
+- [x] Rewrite `IntegrityService.ts` as coordinator (~418 lines - 76% reduction!)
+- [x] Test integrity operations work with split services
+- [x] Verify same interface maintained for existing consumers
 
 ```typescript
-// In app-init-machine.ts
+// New streamlined IntegrityService coordinator (76% reduction achieved)
+export class IntegrityService {
+  private validator: IntegrityValidator;
+  private reset: IntegrityReset;
+  private fingerprinter: FingerprintGenerator;
+  
+  constructor(config: any, dataSource: any) {
+    this.validator = new IntegrityValidator(dataSource, config);
+    this.reset = new IntegrityReset(dataSource, config);
+    this.fingerprinter = new FingerprintGenerator(dataSource);
+  }
+
+  // Delegate to appropriate sub-service  
+  async validateIntegrity(reason?: string): Promise<IntegrityValidationResult> {
+    return this.validator.validateIntegrity(reason);
+  }
+
+  async executeReset(reason: string, resetType: ResetType): Promise<IntegrityResetResult> {
+    return this.reset.executeReset(reason, resetType);
+  }
+  
+  // Keep same interface - just delegate internally
+}
+```
+
+#### Step 0.3: Integration and Testing (Day 3)
+**Files**: Update app-init-machine.ts and test with existing services
+
+- [x] Update app-init-machine.ts: Change `syncMachine: syncMachineV2` to `syncMachine: syncMachineV3`
+- [x] Test V3 shell works with existing WebSocketService  
+- [x] Test V3 shell works with existing IncomingChangeService
+- [x] Test V3 shell works with existing OutgoingChangeService
+- [x] Test split IntegrityService works with V3 shell
+- [x] Verify app reaches "ready" state same as V2
+- [x] Test state persistence survives browser refresh
+- [x] Test easy switching between V2/V3 for comparison
+
+```typescript
+// In app-init-machine.ts - updated for current direct actor pattern
 
 export const appInitMachine = setup({
   actors: {
     // ... other actors
     syncMachine: syncMachineV3, // NEW: Use clean implementation
+    liveChangesMachine, // Already using this pattern
   },
+  
+  actions: {
+    startSync: sendTo('syncMachine', { type: 'CONNECT' }), // NEW: Send CONNECT instead of INITIALIZE_SYNC
+  }
   // ...
 }).createMachine({
-  // ...
-  states: {
-    initializing: {
-      // ... other states
-      sync: {
-        // Replace direct logic with an invoked actor
-        invoke: {
-          id: 'syncMachine',
-          src: 'syncMachine',
-          onSnapshot: {
-             actions: assign({
-                // Update app-init context with sync status
-                isSyncReady: ({ event }) => event.snapshot.matches('operational'),
-                syncState: ({ event }) => ({ /* map context from event.snapshot.context */ }),
-             })
-          },
-        },
-        entry: sendTo('syncMachine', { type: 'INITIALIZE_SYNC' }),
-        on: {
-          SYNC_READY: {
-            target: 'live_changes', // Or whatever the next step is
-            actions: assign({ isSyncReady: true })
-          }
-        }
+  // Invoke child machines at root level (current pattern)
+  invoke: [
+    {
+      id: 'syncMachine',
+      src: 'syncMachine', // NEW: Use syncMachineV3
+      input: ({ context }) => ({
+        syncClientId: context.syncClientId,
+        currentLSN: context.syncState.currentLSN,
+      }),
+      onDone: {
+        actions: () => console.log('[AppInitMachine] Sync machine completed')
       },
-      // ...
-    }
+      onError: {
+        actions: () => console.log('[AppInitMachine] Sync machine error')
+      }
+    },
+    // ... liveChangesMachine invoke (unchanged)
+  ],
+  
+  states: {
+    // ...
+    sync: {
+      entry: [
+        () => console.log('[AppInitMachine] Starting sync machine'),
+        'startSync' // Send CONNECT event to child sync machine
+      ],
+      
+      on: {
+        SYNC_LIVE: { // Listen for this event from sync machine
+          target: 'live_changes',
+          actions: [
+            'markSyncReady',
+            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine')
+          ]
+        },
+        // ... other events
+      }
+    },
+    // ...
   }
 });
 ```
 
 **Success Criteria**:
-- New `sync-machine-v3.ts` implements clean autonomous architecture.
-- Original `sync-machine-v2.ts` is kept as a reference.
-- `app-init-machine.ts` is updated to invoke `syncMachineV3`.
-- A clean `INITIALIZE_SYNC` → `SYNC_READY` handshake is established.
+- [x] New `sync-machine-v3.ts` shell works with 1.5s delay simulation
+- [x] IntegrityService reduced from 1,809 to 418 lines (76% reduction)
+- [x] Original `sync-machine-v2.ts` kept unchanged as reference
+- [x] App reaches "ready" state with V3 same as V2
+- [x] Same localStorage persistence pattern as V2  
+- [x] `useSync()` hook works unchanged (same context shape)
+- [x] Clear V3 logs distinguish from V2 for comparison
+- [x] Easy switching between V2/V3 via single import change
+- [x] Foundation ready for incremental service integration
 
 ---
 
-### **Phase 1: Extract Logging Infrastructure** 
-**Timeline**: 1-2 days | **Risk**: Low | **Impact**: High
+### **Phase 1: Add Real Service Integration to V3 Shell** 
+**Timeline**: 2-3 days | **Risk**: Medium | **Impact**: High
 
-#### Step 1.1: Create Centralized Logger
-**Files**: Create `apps/web/src/sync/utils/SyncLogger.ts`
+**Strategy**: Now that we have a working V3 shell, incrementally add real functionality comparing each piece to V2.
+
+#### Step 1.1: Add WebSocket Connection 
+**Files**: Enhance `apps/web/src/state-machines/machines/sync-machine-v3.ts`
+
+- [x] Import and integrate existing WebSocketService (no changes to service itself)
+- [x] Add WebSocket connection states to V3 (compare to V2's WS handling)
+- [x] Test connection establishment and message handling
+- [x] Verify WebSocket callbacks work with V3's event system
+- [x] Compare WebSocket logs between V2 and V3
+
+#### Step 1.2: Add Incoming Changes Processing
+**Files**: Enhance `apps/web/src/state-machines/machines/sync-machine-v3.ts`
+
+- [x] Integrate existing IncomingChangeService (no changes to service itself)
+- [x] Add incoming changes handling states to V3 
+- [x] Test message processing and data updates
+- [x] Compare incoming change logs between V2 and V3
+- [x] Verify change application works correctly
+
+#### Step 1.3: Add Outgoing Changes Processing  
+**Files**: Enhance `apps/web/src/state-machines/machines/sync-machine-v3.ts`
+
+- [x] Integrate existing OutgoingChangeService (no changes to service itself)
+- [x] Add outgoing changes handling states to V3
+- [x] Test change detection and transmission
+- [x] Compare outgoing change logs between V2 and V3  
+- [x] Verify change queuing and sending works correctly
+
+#### Step 1.4: Enhanced Pre-Live Validation Process
+**Files**: Continue enhancing `apps/web/src/state-machines/machines/sync-machine-v3.ts`
+
+**Problem**: Currently V2 sends `SYNC_LIVE` immediately after sync completion without ensuring:
+1. Pending outgoing changes are sent first
+2. Data integrity is validated before going live
+
+**Solution**: Add pre-live validation state between sync completion and live mode.
+
+- [x] Add `pre_live_validation` state between sync completion and live mode
+- [x] Update `INITIAL_SYNC_COMPLETE` transition to target `pre_live_validation` instead of `live_sync`
+- [x] Update `CATCHUP_SYNC_COMPLETE` transition to target `pre_live_validation` instead of `live_sync`
+- [x] Move `sendParent({ type: 'SYNC_LIVE' })` from sync completion to validation success only
+- [x] Implement `performPreLiveValidation` actor with outgoing changes check
+- [x] Use `OutgoingChangeService.getPendingChangesCount()` to check for pending changes
+- [x] Use `OutgoingChangeService.sendQueuedChanges()` to send pending changes if any exist
+- [x] Implement integrity validation using the new split `IntegrityService.validateIntegrity('pre-live-sync-check')` (from Step 0.2)
+- [x] Add error handling for validation failures (retry/reset logic based on integrity result)
+- [x] Test that `SYNC_LIVE` event is only sent after successful validation
+- [x] Verify outgoing changes are sent before integrity validation runs
+- [x] Test validation failure scenarios and appropriate error recovery
 
 ```typescript
-// New centralized logging utility
-export class SyncLogger {
-  private prefix: string;
-  private debugMode: boolean;
-
-  constructor(prefix: string, debugMode = false) {
-    this.prefix = prefix;
-    this.debugMode = debugMode;
-  }
-
-  debug(message: string, data?: any) {
-    if (this.debugMode) console.log(`${this.prefix} 🔍 ${message}`, data);
-  }
-
-  info(message: string, data?: any) {
-    console.log(`${this.prefix} ℹ️ ${message}`, data);
-  }
-
-  warn(message: string, data?: any) {
-    console.warn(`${this.prefix} ⚠️ ${message}`, data);
-  }
-
-  error(message: string, error?: any) {
-    console.error(`${this.prefix} ❌ ${message}`, error);
-  }
-
-  stateTransition(from: string, to: string, trigger: string) {
-    console.log(`${this.prefix} 🔄 ${from} → ${to} (${trigger})`);
-  }
-
-  lifecycle(event: string, context?: any) {
-    console.log(`${this.prefix} 🎯 ${event}`, context);
+// Enhanced state flow - replaces immediate SYNC_LIVE sending
+states: {
+  // ... existing states
+  
+  pre_live_validation: {
+    entry: () => console.log('[SyncMachineV3] 🔍 Starting pre-live validation checks'),
+    
+    invoke: {
+      src: 'performPreLiveValidation',
+      onDone: {
+        target: 'live_sync',
+        actions: [
+          assign({ syncPhase: 'live' }),
+          sendParent({ type: 'SYNC_LIVE' }), // Only send after validation
+          () => console.log('[SyncMachineV3] ✅ Pre-live validation passed')
+        ]
+      },
+      onError: {
+        target: 'error', 
+        actions: 'recordError'
+      }
+    }
+  },
+  
+  // Updated sync completion transitions:
+  INITIAL_SYNC_COMPLETE: {
+    target: 'pre_live_validation', // Changed from 'live_sync'
+    actions: [
+      assign({ syncPhase: 'validating' }),
+      'clearInitialSyncQueue',
+      // Removed: sendParent({ type: 'SYNC_LIVE' })
+      'logState'
+    ]
   }
 }
 
-// Factory for sync loggers
-export const createSyncLogger = (component: string) => 
-  new SyncLogger(`[${component}]`, process.env.NODE_ENV === 'development');
-```
-
-#### Step 1.2: Implement Clean Logging in New Sync Machine
-**Files**: Use in `apps/web/src/state-machines/machines/sync-machine-v3.ts`
-
-**Goal**: Build new sync machine with clean logging from start (no migration needed)
-
-```typescript
-// In new sync-machine-v3.ts - clean implementation from scratch
-import { createSyncLogger } from '../../sync/utils/SyncLogger';
-const logger = createSyncLogger('SyncMachineV3');
-
-// Replace patterns like:
-// OLD: console.log('[SyncMachineV2] 🔧 Initializing services...');
-// NEW: logger.info('Initializing services...');
-
-// OLD: console.log(`[SyncMachineV2] 🔄 State transition triggered by: ${event.type}`);
-// NEW: logger.stateTransition(currentState, nextState, event.type);
+// Pre-live validation actor implementation:
+actors: {
+  performPreLiveValidation: fromPromise(async ({ input }) => {
+    const { context } = input;
+    const services = getServices(context);
+    
+    // Step 1: Check and send pending outgoing changes
+    const pendingCount = services.outgoingChangeService.getPendingChangesCount();
+    if (pendingCount > 0) {
+      console.log(`[SyncMachineV3] 📤 Sending ${pendingCount} pending changes`);
+      await services.outgoingChangeService.sendQueuedChanges();
+    }
+    
+    // Step 2: Run integrity validation (using new split IntegrityService from Step 0.2)
+    const integrityResult = await services.integrityService.validateIntegrity('pre-live-sync-check');
+    if (!integrityResult.isValid) {
+      throw new Error(`Integrity validation failed: ${integrityResult.recommendedAction}`);
+    }
+    
+    return { success: true };
+  })
+}
 ```
 
 **Success Criteria**: 
-- New sync-machine-v3.ts built with clean logging from start
-- Zero console.log/console.error in new implementation
-- All logging goes through SyncLogger
-- Reference sync-machine-v2.ts unchanged for comparison
+- [x] V3 establishes WebSocket connections like V2
+- [x] V3 processes incoming changes like V2
+- [x] V3 sends outgoing changes like V2
+- [x] **NEW:** V3 validates pending changes before declaring live sync ready
+- [x] **NEW:** V3 runs integrity validation before sending SYNC_LIVE event
+- [x] **NEW:** SYNC_LIVE event only sent after successful pre-live validation
+- [x] **NEW:** Outgoing changes are sent before integrity validation runs
+- [x] All existing services work unchanged with V3
+- [x] Logs show clear comparison between V2 and V3 behavior
+- [x] Real sync functionality working with enhanced reliability and data consistency
 
 ---
 
-### **Phase 2: Extract Event Type Definitions**
-**Timeline**: 1 day | **Risk**: Low | **Impact**: Medium
+### **Phase 2: Extract Logging Infrastructure and Event Types**
+**Timeline**: 1-2 days | **Risk**: Low | **Impact**: Medium
 
-#### Step 2.1: Create Shared Event Types
+**Strategy**: Clean up logging and type organization now that V3 has real functionality.
+
+#### Step 2.1: Create Centralized Logger (Optional Enhancement)
+**Files**: Create `apps/web/src/sync/utils/SyncLogger.ts`
+
+- [x] Create SyncLogger class to replace scattered console.log statements
+- [x] Add development-aware logging levels (debug, info, warn, error)
+- [x] Include state transition and lifecycle logging helpers
+- [x] Optionally refactor V3 to use centralized logging (compare to V2's direct console.log)
+
+#### Step 2.2: Extract Event Type Definitions
 **Files**: Create `apps/web/src/sync/utils/EventTypes.ts`
+
+- [x] Extract event types from V2's massive union type
+- [x] Organize into ConnectionEvents, SyncPhaseEvents, IntegrityEvents, ServiceEvents
+- [x] Use clean event types in V3 implementation
+- [x] Maintain type safety and IntelliSense support
 
 ```typescript
 // Extract the massive SyncMachineEvent union type
@@ -413,10 +450,13 @@ export const syncMachineV3 = setup({
 ```
 
 **Success Criteria**:
-- Event types externalized and reusable  
-- New sync-machine-v3.ts built with clean type organization
-- Original sync-machine-v2.ts unchanged for reference
-- Better type organization and maintainability
+- [x] Event types externalized and reusable  
+- [x] New sync-machine-v3.ts built with clean type organization
+- [x] Original sync-machine-v2.ts unchanged for reference
+- [x] Better type organization and maintainability
+- [x] Centralized logging system with development-aware levels
+- [x] State transition and service logging helpers
+- [x] Event categorization for filtering and monitoring
 
 ---
 
@@ -428,97 +468,33 @@ Since sync machine is now autonomous, we can simplify service management without
 #### Step 3.1: Create Simple Service Coordinator
 **Files**: Create `apps/web/src/sync/utils/ServiceCoordinator.ts`
 
-```typescript
-// Simplified service management for autonomous sync
-export class ServiceCoordinator {
-  private services: {
-    webSocket: WebSocketService | null;
-    incoming: IncomingChangeService | null;
-    outgoing: OutgoingChangeService | null;  
-    integrity: IntegrityService | null;
-  } = {
-    webSocket: null,
-    incoming: null,
-    outgoing: null,
-    integrity: null
-  };
-
-  async initialize(context: SyncMachineContext): Promise<Services> {
-    // Move service initialization logic here
-    // No orchestrator dependencies - everything from context
-    const { clientId, currentLSN } = context;
-    
-    // Initialize services with sync machine context only
-    this.services.webSocket = new WebSocketService({
-      clientId,
-      lsn: currentLSN,
-      serverUrl: 'ws://127.0.0.1:8787/ws'
-    });
-    
-    // ... initialize other services
-    return this.services;
-  }
-
-  setupCallbacks(eventHandler: (event: any) => void): void {
-    // Simplified callback setup - just relay events to sync machine
-    this.services.webSocket?.setCallbacks({
-      onMessage: (msg) => eventHandler({ type: 'WS_MESSAGE', message: msg }),
-      onStatusChange: (status) => eventHandler({ type: 'WS_STATUS_CHANGE', status })
-    });
-    
-    // ... setup other service callbacks
-  }
-
-  getServices(): Services {
-    return this.services;
-  }
-
-  destroy(): void {
-    Object.values(this.services).forEach(service => service?.destroy?.());
-  }
-}
-```
+- [x] Create ServiceCoordinator class for autonomous sync management
+- [x] Remove orchestrator dependencies - everything from sync machine context only
+- [x] Implement simplified service initialization pattern
+- [x] Add streamlined callback setup that relays events to sync machine
+- [x] Include service health monitoring and statistics
+- [x] Integrate with Phase 2 logging system
 
 #### Step 3.2: Build Service Coordination into New Sync Machine
 **Files**: Implement in `apps/web/src/state-machines/machines/sync-machine-v3.ts`
 
-```typescript
-// In new sync-machine-v3.ts - clean implementation
-import { ServiceCoordinator } from '../../sync/utils/ServiceCoordinator';
-
-// Single service coordinator instance
-const serviceCoordinator = new ServiceCoordinator();
-
-export const syncMachineV3 = setup({
-  actors: {
-    initializeServices: fromPromise(async ({ input }) => {
-      return serviceCoordinator.initialize(input.context);
-    })
-  },
-  
-  actions: {
-    setupServiceCallbacks: ({ self }) => {
-      serviceCoordinator.setupCallbacks((event) => {
-        self.send(event);
-      });
-    },
-    
-    cleanupServices: () => {
-      serviceCoordinator.destroy();
-    }
-  }
-  
-  // Remove complex service management actions
-  // Much simpler now that sync is autonomous
-});
-```
+- [x] Replace complex inline service management with ServiceCoordinator
+- [x] Update context to use ServiceCoordinator pattern
+- [x] Simplify service initialization actor to use ServiceCoordinator
+- [x] Update WebSocket connection actor to work with ServiceCoordinator
+- [x] Update pre-live validation actor to use ServiceCoordinator
+- [x] Replace complex setupServiceCallbacks with simple delegation
+- [x] Update message routing to use services from ServiceCoordinator
 
 **Success Criteria**:
-- Service coordination built into new sync machine from start
-- No orchestrator dependencies in service management  
-- Clean service management architecture in sync-machine-v3.ts
-- Services initialized with sync machine context only
-- Original sync-machine-v2.ts unchanged for reference
+- [x] Service coordination built into new sync machine from start
+- [x] No orchestrator dependencies in service management  
+- [x] Clean service management architecture in sync-machine-v3.ts
+- [x] Services initialized with sync machine context only
+- [x] Original sync-machine-v2.ts unchanged for reference
+- [x] Integrated with Phase 2 logging and event types
+- [x] Autonomous operation with clean boundaries
+- [x] Service health monitoring and error handling
 
 ---
 
@@ -723,96 +699,133 @@ export class IntegrityService {
 
 The new V2 architecture provides a clear pattern for this. We will create hooks that access the sync machine actor directly, just as `useAuth` accesses the `authMachine` actor.
 
-#### Step 6.1: Expose Sync Machine Actor Globally
-**Files**: Modify `apps/web/src/state-machines/machines/app-init-machine.ts`
+#### Step 6.1: Access Sync Machine Actor from App Init
+**Files**: Update `apps/web/src/state-machines/orchestrator-hooks-v2.tsx`
 
 ```typescript
-// In app-init-machine.ts, inside the invoke block for the syncMachine
+// In orchestrator-hooks-v2.tsx - following current direct access pattern
 
-invoke: {
-  id: 'syncMachine',
-  src: 'syncMachineV3',
-  onSnapshot: {
-    actions: [
-      // Expose the actor globally for direct hook access
-      ({ event }) => {
-        (window as any).syncMachineActor = event.snapshot._event.origin;
-      },
-      // ... also update app-init context here
-    ]
-  }
-}
-```
-
-#### Step 6.2: Create Direct Sync Machine Hooks
-**Files**: Create/modify `apps/web/src/state-machines/orchestrator-hooks-v2.tsx`
-
-```typescript
-// In orchestrator-hooks-v2.tsx
-
-// NEW: Direct hook for the autonomous sync machine
 export function useSync() {
-  const syncActor = useMemo(() => {
-    return (window as any).syncMachineActor;
+  // Get sync machine from app init machine's children (current pattern)
+  const syncMachine = useMemo(() => {
+    const appInitActor = (window as any).appInitActor;
+    if (!appInitActor) return null;
+    
+    const appInitSnapshot = appInitActor.getSnapshot();
+    return appInitSnapshot?.children?.syncMachine; // Access child actor
   }, []);
 
-  if (!syncActor) {
+  // Safety check: return default state if sync machine not available
+  if (!syncMachine) {
     return { /* return a default/loading state */ };
   }
 
-  const syncState = useSelector(syncActor, (state) => {
-    // Return a selector with all the UI state needed
-    return {
-      phase: state.context.phase,
-      currentLSN: state.context.currentLSN,
-      isConnected: state.matches('operational'),
-      // ... and so on
-    };
-  });
-
-  return syncState;
+  // Subscribe to sync machine state changes
+  const syncSnapshot = useSelector(syncMachine, (state) => state);
+  
+  // Return clean UI state from sync machine context
+  return {
+    phase: syncSnapshot?.context?.phase,
+    currentLSN: syncSnapshot?.context?.currentLSN,
+    isConnected: syncSnapshot?.matches('operational'),
+    // ... and so on
+  };
 }
 ```
+
+Note: This follows the exact same pattern already implemented in the current `useSync()` hook.
+
+#### Step 6.2: Verify Current Hook Pattern Works with New Sync Machine
+**Files**: Verify `apps/web/src/state-machines/orchestrator-hooks-v2.tsx`
+
+The current `useSync()` hook already implements the correct pattern:
+
+```typescript
+// Current implementation (lines 298-382) already follows best practices:
+export function useSync() {
+  // Get sync machine from app init machine's children
+  const syncMachine = useMemo(() => {
+    const appInitActor = (window as any).appInitActor;
+    if (!appInitActor) return null;
+    
+    const appInitSnapshot = appInitActor.getSnapshot();
+    return appInitSnapshot?.children?.syncMachine;
+  }, []);
+
+  // Subscribe to sync machine state changes  
+  const syncSnapshot = useSelector(syncMachine, (state) => state);
+
+  // Returns comprehensive sync state for UI components
+  return {
+    clientId: context.clientId,
+    currentLSN: context.currentLSN,
+    syncPhase: context.syncPhase,
+    isConnected,
+    // ... complete sync state
+  };
+}
+```
+
+**Action Required**: Simply update the `syncMachine` actor reference to use `syncMachineV3` instead of `syncMachineV2` when ready.
 
 #### Step 6.3: Update Components to Use Direct Sync Hooks
 This step remains the same: find all components using old sync hooks and update them to use the new `useSync` hook.
 
 **Success Criteria**:
-- All sync-related UI components get their state directly from the `syncMachineActor`.
-- The `app-init-machine` and `orchestrator-v2` are no longer involved in passing sync-specific state to the UI.
+- All sync-related UI components get their state directly from the sync machine child actor.
+- The `app-init-machine` only needs to coordinate the sync machine lifecycle, not pass detailed state.
+- No changes needed to existing hook consumers - the interface remains the same.
 
 ---
 
-### **Phase 7: Remove Sync State from App-Init & Orchestrator**
+### **Phase 7: Remove Sync State from App-Init Machine**
 **Timeline**: 1 day | **Risk**: Low | **Impact**: Medium
 
-The final cleanup step.
+The final cleanup step to achieve full separation.
 
 #### Step 7.1: Finalize App-Init-Machine Integration
 **Files**: Update `apps/web/src/state-machines/machines/app-init-machine.ts`
 
 ```typescript
-// In app-init-machine.ts context
+// In app-init-machine.ts context - remove detailed sync state
 export interface AppInitContext {
-  // ...
-  // Keep only what's necessary for coordinating the startup sequence
+  // Database state
+  isDatabaseInitialized: boolean;
+  databaseError: string | null;
+  
+  // Connection state
+  isOnline: boolean;
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+  
+  // Simplified sync coordination (keep only what's needed for startup sequence)
   isSyncReady: boolean;
-
-  // REMOVE all detailed sync state that's now managed by sync-machine-v3
-  // syncState: { ... } ❌
-  // integrityBaseline: { ... } ❌
+  syncError: string | null;
+  liveChangesStatus: 'idle' | 'connecting' | 'connected' | 'error';
+  
+  // REMOVE all detailed sync state that's now managed by sync-machine-v3:
+  // syncClientId: string; ❌ (move to sync machine)
+  // syncState: { ... } ❌ (move to sync machine)  
+  // integrityBaseline: { ... } ❌ (move to sync machine)
+  
+  // Timing
+  initStartTime: number;
+  lastActivity: number;
 }
 ```
 
-#### Step 7.2: Finalize Orchestrator Integration
-**Files**: Update `apps/web/src/state-machines/orchestrator-v2.ts`
+#### Step 7.2: Verify Clean Architecture
+**Note**: There is no longer an `orchestrator-v2.ts` to clean up - we've successfully eliminated the orchestrator pattern entirely.
 
-The `orchestrator-v2` already seems to follow this pattern, merely reflecting state from `app-init-machine`. This step becomes a verification to ensure no sync-specific logic has crept in.
+The architecture now has clean boundaries:
+- `auth-machine.ts` - Independent auth lifecycle
+- `app-init-machine.ts` - Startup sequence coordination only
+- `sync-machine-v3.ts` - Autonomous sync subsystem with own state
+- `orchestrator-hooks-v2.tsx` - Direct actor access for UI
 
 **Success Criteria**:
-- The `app-init-machine`'s context is lean and only contains what's needed for its coordination role.
+- The `app-init-machine`'s context contains only coordination state, not detailed sync state.
 - All detailed sync state is owned and managed exclusively by `sync-machine-v3`.
-- The architecture is fully decoupled.
+- The architecture achieves full decoupling and autonomous operation.
 ---
 
 ## 🚨 Risk Mitigation & Success Metrics (Unchanged)
@@ -825,20 +838,23 @@ The risk mitigation, testing strategy, and success metrics from the original pla
 ### **Before: Problematic Coupling**
 ```
 ❌ app-init-machine tightly coupled with a monolithic sync-machine-v2
-❌ 1,930-line sync machine is hard to test and maintain
+❌ 1,990-line sync machine is hard to test and maintain
+❌ Complex orchestrator pattern with unnecessary indirection
 ```
 
-### **After: Clean Autonomous Architecture**
+### **After: Clean Direct Actor Architecture**
 ```
-✅ app-init-machine invokes an autonomous sync-machine-v3
+✅ Direct actor creation and management in __root.tsx with HMR preservation
+✅ app-init-machine invokes autonomous sync-machine-v3 as child actor
 ✅ sync-machine-v3 manages its own state, services, and persistence
-✅ UI components subscribe directly to sync-machine-v3 state via new hooks
-✅ 500-line focused sync machine (74% reduction)
-✅ Clear subsystem boundaries and ownership
+✅ UI components access actors directly via global window references
+✅ Clean hook pattern with useSelector for precise subscriptions
+✅ 500-line focused sync machine (75% reduction)
+✅ Clear subsystem boundaries and autonomous operation
 ```
 
 ### **Key Architectural Insight**
-The orchestrator was never actually orchestrating sync - it was just providing session management and acting as sync's external storage. By creating a new autonomous sync machine with its own persistence layer from scratch, we achieve significant bloat reduction and much cleaner architecture while keeping the original as a safety net.
+We've successfully eliminated the orchestrator pattern entirely. The new direct actor management approach provides cleaner boundaries, better testability, and HMR preservation while maintaining the same UI hook interfaces. By creating an autonomous sync machine with its own persistence layer from scratch, we achieve significant bloat reduction and much cleaner architecture while keeping the original as a safety net.
 
 ### **Migration Strategy**
 ```
@@ -846,9 +862,16 @@ The orchestrator was never actually orchestrating sync - it was just providing s
 1. Keep sync-machine-v2.ts unchanged (reference)
 2. Build sync-machine-v3.ts from scratch with clean architecture  
 3. Create new supporting files (integrity-machine.ts, utilities)
-4. Update orchestrator to use v3
+4. Update app-init-machine.ts to use syncMachineV3 as child actor
 5. Test thoroughly with easy rollback to v2
 6. Remove v2 only after v3 proven in production
+
+Key Benefits of Current Architecture:
+✅ Direct actor access eliminates orchestrator complexity
+✅ HMR preservation maintains development experience
+✅ Child actor pattern provides clean lifecycle management
+✅ Global window references enable simple hook implementation
+✅ useSelector provides surgical UI updates
 ```
 
 ---

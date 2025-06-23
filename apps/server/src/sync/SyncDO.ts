@@ -315,7 +315,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }
     });
 
-    // Add handler for integrity validation requests
+    // Add handler for integrity validation requests (both baseline and full validation)
     this.onMessage('clt_integrity_validation', async (message: ClientMessage) => {
       const validationMessage = message as any;
       
@@ -389,6 +389,88 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           } as any);
         } catch (sendError) {
           syncLogger.error('Failed to send integrity validation error response', {
+            clientId: validationMessage.clientId || this.clientId,
+            error: sendError instanceof Error ? sendError.message : String(sendError)
+          }, MODULE_NAME);
+        }
+      }
+    });
+
+    // Add handler specifically for baseline integrity validation requests
+    this.onMessage('clt_integrity_baseline_validation', async (message: ClientMessage) => {
+      const validationMessage = message as any;
+      
+      syncLogger.info('Received baseline integrity validation request', {
+        clientId: validationMessage.clientId || this.clientId,
+        baselineTimestamp: validationMessage.baselineTimestamp,
+        recordCount: validationMessage.recordCount,
+        tableCount: Object.keys(validationMessage.fingerprints || {}).length
+      }, MODULE_NAME);
+      
+      try {
+        // Import IntegrityManager for validation
+        const { IntegrityManager } = await import('./integrity-manager');
+        const context = this.getContext();
+        const integrityManager = new IntegrityManager(context, this);
+        
+        // Perform baseline validation with the baseline validation support
+        const result = await integrityManager.validateClientIntegrity({
+          clientId: validationMessage.clientId || this.clientId,
+          currentLSN: validationMessage.currentLSN,
+          tableFingerprints: validationMessage.fingerprints,
+          timestamp: validationMessage.timestamp,
+          validationType: 'baseline_incremental', // Force baseline validation type
+          baselineTimestamp: validationMessage.baselineTimestamp,
+          recordCount: validationMessage.recordCount?.totalChanges || 0
+        });
+        
+        // Send response back to client
+        await this.send({
+          type: 'srv_integrity_validation_response',
+          clientId: validationMessage.clientId || this.clientId,
+          messageId: `baseline_response_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          isValid: result.isValid,
+          issues: result.issues,
+          recommendedAction: result.recommendedAction,
+          serverFingerprints: result.serverFingerprints,
+          validationTimestamp: result.validationTimestamp
+        } as any);
+        
+        syncLogger.info('Baseline integrity validation completed and response sent', {
+          clientId: validationMessage.clientId || this.clientId,
+          isValid: result.isValid,
+          issueCount: result.issues.length,
+          recommendedAction: result.recommendedAction
+        }, MODULE_NAME);
+        
+      } catch (error) {
+        syncLogger.error('Error processing baseline integrity validation', {
+          clientId: validationMessage.clientId || this.clientId,
+          error: error instanceof Error ? error.message : String(error)
+        }, MODULE_NAME);
+        
+        // Send error response
+        try {
+          await this.send({
+            type: 'srv_integrity_validation_response',
+            clientId: validationMessage.clientId || this.clientId,
+            messageId: `baseline_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: Date.now(),
+            isValid: false,
+            issues: [{
+              type: 'data_corruption',
+              table: 'unknown',
+              severity: 'critical',
+              description: `Baseline validation failed: ${error instanceof Error ? error.message : String(error)}`,
+              details: {}
+            }],
+            recommendedAction: 'none',
+            serverFingerprints: {},
+            validationTimestamp: Date.now()
+          } as any);
+        } catch (sendError) {
+          syncLogger.error('Failed to send baseline integrity validation error response', {
             clientId: validationMessage.clientId || this.clientId,
             error: sendError instanceof Error ? sendError.message : String(sendError)
           }, MODULE_NAME);

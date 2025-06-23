@@ -139,13 +139,27 @@ export class WebSocketService {
    * Send message to server
    */
   send(message: any): void {
+    console.log('[WebSocketService] 🔍 DEBUG: Send called', {
+      hasWebSocket: !!this.ws,
+      readyState: this.ws?.readyState,
+      messageType: message?.type,
+      isOpen: this.ws?.readyState === WebSocket.OPEN
+    });
+
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.error('[WebSocketService] ❌ WebSocket not ready for sending:', {
+        hasWebSocket: !!this.ws,
+        readyState: this.ws?.readyState,
+        OPEN: WebSocket.OPEN
+      });
       throw new Error('WebSocket is not connected');
     }
 
     try {
       const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+      console.log('[WebSocketService] ✅ Sending message:', message.type);
       this.ws.send(messageStr);
+      console.log('[WebSocketService] ✅ Message sent successfully');
     } catch (error) {
       console.error('[WebSocketService] Error sending message:', error);
       this.callbacks.onError?.(new Error('Failed to send WebSocket message'));
