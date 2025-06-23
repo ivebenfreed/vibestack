@@ -321,6 +321,24 @@ export function useSync() {
   const context = syncSnapshot?.context || {};
   const state = syncSnapshot?.value || 'idle';
   
+  // Debug logging
+  console.log('[useSync] Sync machine state:', {
+    state,
+    syncPhase: context.syncPhase,
+    clientId: context.clientId,
+    currentLSN: context.currentLSN
+  });
+  
+  // Check if state is a string or object with nested states
+  const stateString = typeof state === 'string' ? state : JSON.stringify(state);
+  
+  // Determine connection status based on actual sync machine states
+  const isConnected = stateString.includes('live_sync') || 
+                     stateString.includes('initial_sync') || 
+                     stateString.includes('catchup_sync') ||
+                     stateString.includes('determining_sync_phase') ||
+                     stateString.includes('services_ready');
+  
   return {
     // Core sync state
     clientId: context.clientId,
@@ -328,15 +346,15 @@ export function useSync() {
     syncPhase: context.syncPhase,
     
     // Connection status
-    isConnected: state.includes?.('operational') || false,
+    isConnected,
     error: context.error,
     
     // State booleans
-    isInitialSync: context.syncPhase === 'initial',
-    isCatchupSync: context.syncPhase === 'catchup',
-    isLiveSync: context.syncPhase === 'live',
+    isInitialSync: context.syncPhase === 'initial' || state === 'initial_sync',
+    isCatchupSync: context.syncPhase === 'catchup' || state === 'catchup_sync',
+    isLiveSync: context.syncPhase === 'live' || state === 'live_sync',
     isError: state === 'error' || !!context.error,
-    isConnecting: state === 'connecting' || state.includes?.('connecting'),
+    isConnecting: state === 'connecting' || stateString.includes('connecting'),
     isIdle: state === 'idle',
     
     // Machine state
@@ -346,16 +364,17 @@ export function useSync() {
     syncPhaseProgress: context.phaseProgress,
     
     // Convenience getters
-    isActive: ['connecting', 'operational', 'syncing'].some(s => 
-      typeof state === 'string' ? state === s : state[s] !== undefined
+    isActive: ['connecting', 'initial_sync', 'catchup_sync', 'live_sync', 'determining_sync_phase'].some(s => 
+      stateString.includes(s)
     ),
     
     statusText: context.error ? 'Error' :
                 state === 'connecting' ? 'Connecting...' :
-                context.syncPhase === 'initial' ? 'Initial Sync' :
-                context.syncPhase === 'catchup' ? 'Catchup Sync' :
-                context.syncPhase === 'live' ? 'Live' :
-                'Idle'
+                state === 'initial_sync' || context.syncPhase === 'initial' ? 'Initial Sync' :
+                state === 'catchup_sync' || context.syncPhase === 'catchup' ? 'Catchup Sync' :
+                state === 'live_sync' || context.syncPhase === 'live' ? 'Live' :
+                state === 'idle' ? 'Idle' :
+                'Syncing'
   };
 }
 
