@@ -70,13 +70,23 @@ export type LSNEvents =
 
 export type IntegrityEvents =
   | { type: 'INTEGRITY_VALIDATE'; reason?: string }
+  | { type: 'INTEGRITY_VALIDATION_SUCCESS'; result: any }
   | { type: 'INTEGRITY_VALIDATION_COMPLETED'; result: any }
   | { type: 'INTEGRITY_VALIDATION_ERROR'; error: Error; reason?: string }
+  | { type: 'INTEGRITY_VALIDATION_FAILED'; error: Error }
+  | { type: 'INTEGRITY_VALIDATION_STARTED'; reason: string }
   | { type: 'INTEGRITY_RESET_REQUIRED'; reason: string }
+  | { type: 'INTEGRITY_RESET_START'; reason: string; resetType?: 'full_reset' | 'table_reset' }
+  | { type: 'INTEGRITY_RESET_STARTED'; reason: string; resetType: string }
+  | { type: 'INTEGRITY_RESET_COMPLETE'; result: any }
   | { type: 'INTEGRITY_RESET_COMPLETED'; result: any }
+  | { type: 'INTEGRITY_RESET_ERROR'; error: Error }
   | { type: 'INTEGRITY_BASELINE_ESTABLISHED'; timestamp: number }
   | { type: 'INTEGRITY_BASELINE_EXPIRED'; reason: string }
-  | { type: 'SERVER_INTEGRITY_RESET_COMMAND'; command: any; reason: string };
+  | { type: 'RESET_INTEGRITY_BASELINE' }
+  | { type: 'SERVER_INTEGRITY_RESET_COMMAND'; command: any; reason: string }
+  | { type: 'SERVER_INTEGRITY_RESET_COMPLETED'; result: any; command: any }
+  | { type: 'INTEGRITY_RESET_DISCONNECTION_COMPLETE'; timestamp: number };
 
 // ============================================================================
 // Service Events - Service coordination and errors
@@ -165,9 +175,12 @@ export const EVENT_CATEGORIES = {
     'LSN_UPDATE', 'LSN_SYNC_REQUIRED', 'LSN_CONFLICT_DETECTED', 'LSN_RESET'
   ],
   INTEGRITY: [
-    'INTEGRITY_VALIDATE', 'INTEGRITY_VALIDATION_COMPLETED', 'INTEGRITY_VALIDATION_ERROR',
-    'INTEGRITY_RESET_REQUIRED', 'INTEGRITY_RESET_COMPLETED', 'INTEGRITY_BASELINE_ESTABLISHED',
-    'INTEGRITY_BASELINE_EXPIRED', 'SERVER_INTEGRITY_RESET_COMMAND'
+    'INTEGRITY_VALIDATE', 'INTEGRITY_VALIDATION_SUCCESS', 'INTEGRITY_VALIDATION_COMPLETED', 
+    'INTEGRITY_VALIDATION_ERROR', 'INTEGRITY_VALIDATION_FAILED', 'INTEGRITY_VALIDATION_STARTED',
+    'INTEGRITY_RESET_REQUIRED', 'INTEGRITY_RESET_START', 'INTEGRITY_RESET_STARTED',
+    'INTEGRITY_RESET_COMPLETE', 'INTEGRITY_RESET_COMPLETED', 'INTEGRITY_RESET_ERROR',
+    'INTEGRITY_BASELINE_ESTABLISHED', 'INTEGRITY_BASELINE_EXPIRED', 'RESET_INTEGRITY_BASELINE',
+    'SERVER_INTEGRITY_RESET_COMMAND', 'SERVER_INTEGRITY_RESET_COMPLETED', 'INTEGRITY_RESET_DISCONNECTION_COMPLETE'
   ],
   SERVICE: [
     'SERVICE_INITIALIZED', 'SERVICE_ERROR', 'SERVICE_DESTROYED', 'SERVICES_READY',
@@ -223,17 +236,23 @@ export function isErrorEvent(event: SyncMachineEvent): event is ErrorEvents {
   return EVENT_CATEGORIES.ERROR.includes(event.type as any);
 }
 
-export function isNoiseEvent(eventType: string): boolean {
+export function isNoiseEvent(eventType: string, message?: any): boolean {
   // Events that should be filtered out from normal logging
-  const noiseEvents = ['HEARTBEAT_RECEIVED', 'WS_MESSAGE'];
+  const noiseEvents = ['HEARTBEAT_RECEIVED'];
+  
+  // Filter heartbeat WS_MESSAGE events specifically
+  if (eventType === 'WS_MESSAGE' && message?.type === 'srv_heartbeat') {
+    return true;
+  }
+  
   return noiseEvents.includes(eventType);
 }
 
-export function shouldLogEvent(eventType: string, logLevel: 'debug' | 'info' | 'warn' | 'error' = 'info'): boolean {
+export function shouldLogEvent(eventType: string, logLevel: 'debug' | 'info' | 'warn' | 'error' = 'info', message?: any): boolean {
   if (logLevel === 'debug') return true;
   
   // Filter noise events for higher log levels
-  if (isNoiseEvent(eventType)) return false;
+  if (isNoiseEvent(eventType, message)) return false;
   
   // Always log errors and warnings
   const category = getEventCategory(eventType);

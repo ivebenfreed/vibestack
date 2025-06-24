@@ -218,6 +218,8 @@ function Sidebar({
         data-slot='sidebar-gap'
         className={cn(
           'relative bg-transparent transition-[width] duration-200 ease-linear',
+          // Disable transitions when transitioning from hidden to visible
+          'group-data-[disable-transition=true]:transition-none',
           // Responsive: no width on mobile, full width on desktop
           'w-0 md:w-(--sidebar-width)',
           'group-data-[collapsible=offcanvas]:w-0',
@@ -231,6 +233,8 @@ function Sidebar({
         data-slot='sidebar-container'
         className={cn(
           'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex',
+          // Disable transitions when transitioning from hidden to visible
+          'group-data-[disable-transition=true]:transition-none',
           side === 'left'
             ? `left-[${leftOffset}px] group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]`
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',

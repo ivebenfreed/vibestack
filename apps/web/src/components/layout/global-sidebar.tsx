@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStoreV2 } from '@/stores/layoutStoreV2'
 import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
 
 // Global sidebar width constant
@@ -90,7 +90,7 @@ function VLogo() {
 }
 
 export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
-  const activeSection = useLayoutStore.activeSection()
+  const activeSection = useLayoutStoreV2.activeSection()
   const { isAuthenticated, user } = useAuth()
   
   // Filter sidebar sections based on authentication and permissions

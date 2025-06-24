@@ -17,6 +17,7 @@ import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
 import { appInitMachine } from '@/state-machines/machines/app-init-machine'
+import { syncMachineV3 } from '@/state-machines/machines/sync-machine-v3'
 import { useAuth, useSystem } from '@/state-machines/orchestrator-hooks-v2'
 import React from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
@@ -45,10 +46,12 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
   
   // Restore preserved actors
   ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
+  ;(window as any).syncMachineActor = import.meta.hot.data.syncMachineActor
   ;(window as any).appInitActor = import.meta.hot.data.appInitActor
   
   // Clear from hot data
   import.meta.hot.data.authMachineActor = null
+  import.meta.hot.data.syncMachineActor = null
   import.meta.hot.data.appInitActor = null
   
   console.log('[XSTATE] 🔥 HMR: Actors restored successfully')
@@ -56,6 +59,9 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
 
 // 🔥 AUTH PERSISTENCE: Load and save AuthMachine state
 const AUTH_STORAGE_KEY = 'auth-machine-state'
+
+// 🔥 SYNC PERSISTENCE: Load and save SyncMachine state  
+const SYNC_STORAGE_KEY = 'sync-machine-state'
 
 const loadPersistedAuthState = () => {
   try {
@@ -99,8 +105,65 @@ const saveAuthState = (actor: any) => {
   }
 }
 
+const loadPersistedSyncState = () => {
+  try {
+    const stored = localStorage.getItem(SYNC_STORAGE_KEY)
+    if (stored) {
+      const persistedSnapshot = JSON.parse(stored)
+      
+      // Basic validation
+      if (!persistedSnapshot || !persistedSnapshot.context) {
+        console.log('[SyncMachine] No valid persisted state found')
+        localStorage.removeItem(SYNC_STORAGE_KEY)
+        return null
+      }
+      
+      console.log('[SyncMachine] Loading persisted sync state:', {
+        clientId: persistedSnapshot.context.clientId,
+        currentLSN: persistedSnapshot.context.currentLSN
+      })
+      return persistedSnapshot
+    }
+  } catch (error) {
+    console.warn('[SyncMachine] Failed to parse persisted state:', error)
+    localStorage.removeItem(SYNC_STORAGE_KEY)
+  }
+  return null
+}
+
+const saveSyncState = (actor: any) => {
+  try {
+    const snapshot = actor.getSnapshot()
+    // Only persist essential state (avoid circular references in ServiceCoordinator)
+    const essentialState = {
+      value: snapshot.value,
+      context: {
+        clientId: snapshot.context.clientId,
+        currentLSN: snapshot.context.currentLSN,
+        serverLSN: snapshot.context.serverLSN,
+        syncPhase: snapshot.context.syncPhase,
+        isConnected: snapshot.context.isConnected,
+        error: snapshot.context.error,
+        reconnectAttempts: snapshot.context.reconnectAttempts,
+        lastSyncTime: snapshot.context.lastSyncTime
+        // Exclude serviceCoordinator and serverUrl to avoid circular references
+      }
+    }
+    
+    localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(essentialState))
+    console.log('[SyncMachine] Persisted essential sync state:', { 
+      state: snapshot.value,
+      clientId: snapshot.context.clientId,
+      currentLSN: snapshot.context.currentLSN
+    })
+  } catch (error) {
+    console.warn('[SyncMachine] Failed to persist sync state:', error)
+  }
+}
+
 // XState 5: Proper snapshot persistence
 const persistedAuthSnapshot = loadPersistedAuthState()
+const persistedSyncSnapshot = loadPersistedSyncState()
 
 // Create AuthMachine actor (only if not already exists from HMR)
 let authMachineActor = (window as any).authMachineActor
@@ -150,6 +213,47 @@ if (!authMachineActor) {
   console.log('[AuthMachine] 🔥 HMR: Using existing auth machine actor')
 }
 
+// Create SyncMachine actor (only if not already exists from HMR)
+let syncMachineActor = (window as any).syncMachineActor
+
+if (!syncMachineActor) {
+  console.log('[SyncMachine] Creating new sync machine actor')
+  syncMachineActor = createActor(syncMachineV3)
+  
+  // XState 5: Start with snapshot if available
+  if (persistedSyncSnapshot) {
+    console.log('[SyncMachine] Starting with persisted snapshot')
+    syncMachineActor.start(persistedSyncSnapshot)
+  } else {
+    console.log('[SyncMachine] Starting fresh')
+    syncMachineActor.start()
+  }
+  
+  // Store globally
+  ;(window as any).syncMachineActor = syncMachineActor
+  
+  // Set up subscriptions for new actor
+  syncMachineActor.subscribe((snapshot) => {
+    saveSyncState(syncMachineActor)
+    
+    console.log('[SyncMachine] State changed:', { 
+      state: snapshot.value,
+      phase: snapshot.context.syncPhase,
+      lsn: snapshot.context.currentLSN 
+    })
+    
+    // Send SYNC_READY to app-init when sync machine is ready for live sync
+    if (snapshot.value === 'live_sync') {
+      console.log('[SyncMachine] ✅ Sync ready - notifying app init')
+      const currentAppInitActor = (window as any).appInitActor
+      if (currentAppInitActor) {
+        currentAppInitActor.send({ type: 'SYNC_LIVE' })
+      }
+    }
+  })
+} else {
+  console.log('[SyncMachine] 🔥 HMR: Using existing sync machine actor')
+}
 
 // Create app init machine actor (only if not already exists from HMR)
 let appInitActor = (window as any).appInitActor
@@ -201,6 +305,7 @@ if (import.meta.hot) {
     
     // Store actor references in hot data to preserve across HMR
     import.meta.hot.data.authMachineActor = (window as any).authMachineActor
+    import.meta.hot.data.syncMachineActor = (window as any).syncMachineActor
     import.meta.hot.data.appInitActor = (window as any).appInitActor
     
     // Don't stop actors - let them continue running
@@ -218,6 +323,13 @@ window.addEventListener('auth:signout', () => {
   console.log('[XSTATE] Clearing auth state on sign-out')
   localStorage.removeItem(AUTH_STORAGE_KEY)
   // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
+  
+  // Reset sync machine to idle state for fresh initialization on next sign-in
+  const syncMachineActor = (window as any).syncMachineActor
+  if (syncMachineActor) {
+    console.log('[XSTATE] Resetting sync machine on sign-out')
+    syncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
+  }
   
   // Reset app init machine to idle state for fresh initialization on next sign-in
   const appInitActor = (window as any).appInitActor

@@ -1,8 +1,6 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { GlobalSidebar, GLOBAL_SIDEBAR_WIDTH } from '@/components/layout/global-sidebar'
-import { SidebarLayout } from '@/components/layout/SidebarLayout'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { SidebarLayoutV3 } from '@/components/layout/dual-sidebar'
 import { SearchProvider } from '@/context/search-context'
 import SkipToMain from '@/components/skip-to-main'
 import { ProjectService } from '@/domain/project'
@@ -152,18 +150,10 @@ function RouteComponent() {
 }
 
 function AuthenticatedContent() {
-  const location = useLocation()
-  
-  // ⚡ PERFORMANCE: No layout store updates - using pure route-based highlighting
-  // The sidebar uses matchRoute for highlighting, which is much lighter than layout store updates
-  
   return (
-    <div className="layout-container">
-      <GlobalSidebar />
-      <div>
-        <SkipToMain />
-        <SidebarLayout />
-      </div>
-    </div>
+    <>
+      <SkipToMain />
+      <SidebarLayoutV3 />
+    </>
   )
 }

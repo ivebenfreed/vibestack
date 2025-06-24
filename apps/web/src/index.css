@@ -52,6 +52,9 @@
   --sidebar-ring: var(--ring);
   --global-sidebar-width: 64px;
   --header-height: 64px;
+  --app-sidebar-width: 16rem;
+  --app-sidebar-width-mobile: 18rem;
+  --app-sidebar-width-icon: 3.5rem;
 }
 
 .dark {
@@ -119,7 +122,11 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-global-sidebar-width: var(--global-sidebar-width);
+  --layout-global-sidebar-width: var(--global-sidebar-width);
+  --layout-header-height: var(--header-height);
+  --layout-app-sidebar-width: var(--app-sidebar-width);
+  --layout-app-sidebar-width-mobile: var(--app-sidebar-width-mobile);
+  --layout-app-sidebar-width-icon: var(--app-sidebar-width-icon);
 }
 
 @layer base {
@@ -149,15 +156,86 @@
     }
   }
 
-  /* Layout system CSS - works with Shadcn sidebar */
-  .layout-container {
-    margin-left: var(--global-sidebar-width);
+  /* Dual Sidebar Layout System - Tailwind v4 CSS Grid */
+  .dual-sidebar-layout {
+    display: grid;
+    grid-template-columns: var(--global-sidebar-width) 0 1fr;
+    grid-template-rows: 1fr;
+    min-height: 100vh;
+    width: 100%;
+    /* Container queries for responsive design */
+    container-type: inline-size;
+    container-name: sidebar-layout;
+    /* Smooth transitions with Tailwind v4 @starting-style */
+    transition: grid-template-columns 200ms ease-out;
   }
-
+  
+  /* Initial state when element is created */
+  @starting-style {
+    .dual-sidebar-layout {
+      grid-template-columns: var(--global-sidebar-width) 0 1fr;
+    }
+  }
+  
+  .dual-sidebar-layout[data-app-sidebar-visible="false"] {
+    grid-template-columns: var(--global-sidebar-width) 1fr;
+  }
+  
+  .dual-sidebar-layout[data-app-sidebar-visible="false"] .dual-sidebar-inset {
+    grid-column: 2;
+  }
+  
+  .dual-sidebar-layout[data-app-sidebar-expanded="false"][data-app-sidebar-visible="true"] {
+    grid-template-columns: var(--global-sidebar-width) var(--app-sidebar-width-icon) 1fr;
+  }
+  
+  .dual-sidebar-layout[data-app-sidebar-expanded="true"][data-app-sidebar-visible="true"] {
+    grid-template-columns: var(--global-sidebar-width) var(--app-sidebar-width) 1fr;
+  }
+  
+  .dual-sidebar-inset {
+    grid-column: 3;
+    background: var(--background);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+    width: 100%;
+    /* Smooth transition for content area */
+    transition: grid-column 200ms ease-out;
+  }
+  
+  /* Smooth transitions for sidebar width changes */
+  .app-sidebar-desktop {
+    transition: width 200ms ease-out;
+  }
+  
+  @starting-style {
+    .app-sidebar-desktop {
+      width: 0;
+    }
+  }
+  
+  /* Mobile responsive using container queries */
+  @container sidebar-layout (max-width: 768px) {
+    .dual-sidebar-layout {
+      grid-template-columns: 1fr !important;
+    }
+    
+    .dual-sidebar-inset {
+      grid-column: 1;
+    }
+  }
+  
+  /* Fallback for browsers without container query support */
   @media (max-width: 768px) {
-    .layout-container {
-      margin-left: 0;
-      padding-bottom: 64px; /* Mobile bottom nav */
+    .dual-sidebar-layout:not([style*="container"]) {
+      grid-template-columns: 1fr !important;
+    }
+    
+    .dual-sidebar-inset:not([style*="container"]) {
+      grid-column: 1;
     }
   }
 }
@@ -175,6 +253,119 @@
   /* Hide scrollbar for IE, Edge and Firefox */
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
+}
+
+/* Phase 3: Tailwind v4 Component Composition Utilities */
+@utility sidebar-menu-button {
+  @apply flex w-full items-center gap-2 rounded-md p-2 
+         text-left text-sm outline-hidden ring-sidebar-ring 
+         hover:bg-sidebar-accent hover:text-sidebar-accent-foreground 
+         focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground 
+         disabled:pointer-events-none disabled:opacity-50 
+         aria-disabled:pointer-events-none aria-disabled:opacity-50 
+         data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium 
+         data-[active=true]:text-sidebar-accent-foreground 
+         data-[state=open]:hover:bg-sidebar-accent 
+         data-[state=open]:hover:text-sidebar-accent-foreground 
+         [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0;
+}
+
+@utility sidebar-menu-button-collapsed {
+  @apply sidebar-menu-button size-10 p-0 justify-center overflow-visible;
+  /* Ensure any child elements are also centered */
+  & > * {
+    @apply flex items-center justify-center;
+  }
+}
+
+@utility sidebar-menu-button-expanded {
+  @apply sidebar-menu-button overflow-hidden;
+}
+
+@utility sidebar-menu-sub-button {
+  @apply text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent 
+         hover:text-sidebar-accent-foreground active:bg-sidebar-accent 
+         active:text-sidebar-accent-foreground [&>svg]:text-sidebar-accent-foreground 
+         flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md 
+         px-2 outline-hidden focus-visible:ring-2 disabled:pointer-events-none 
+         disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 
+         [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 text-sm
+         data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground;
+}
+
+@utility sidebar-group-label {
+  @apply text-sidebar-foreground/70 ring-sidebar-ring flex h-8 shrink-0 items-center 
+         rounded-md px-2 text-xs font-medium outline-hidden 
+         focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0;
+}
+
+@utility sidebar-group-label-collapsed {
+  @apply sidebar-group-label -mt-8 opacity-0;
+}
+
+/* Advanced v4 Layout Utilities */
+@utility flex-center {
+  @apply flex items-center justify-center;
+}
+
+@utility flex-between {
+  @apply flex items-center justify-between;
+}
+
+@utility flex-start {
+  @apply flex items-center justify-start;
+}
+
+@utility flex-col-center {
+  @apply flex flex-col items-center justify-center;
+}
+
+@utility text-truncate {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
+}
+
+@utility interactive-element {
+  @apply transition-colors duration-200 ease-out;
+  @apply hover:bg-accent hover:text-accent-foreground;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  @apply active:scale-98;
+}
+
+@utility glass-card {
+  @apply backdrop-blur-md bg-background/80 border border-border/50 shadow-lg;
+}
+
+@utility error-state {
+  @apply border-destructive bg-destructive/5 text-destructive;
+}
+
+@utility success-state {
+  @apply border-green-500 bg-green-500/5 text-green-700 dark:text-green-400;
+}
+
+/* Tailwind v4 Advanced Responsive Utilities */
+@utility mobile-only {
+  @apply block md:hidden;
+}
+
+@utility desktop-only {
+  @apply hidden md:block;
+}
+
+@utility responsive-grid {
+  @apply grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3;
+}
+
+@utility responsive-text {
+  @apply text-sm md:text-base lg:text-lg;
+}
+
+@utility responsive-padding {
+  @apply p-4 md:p-6 lg:p-8;
+}
+
+@utility responsive-margin {
+  @apply m-4 md:m-6 lg:m-8;
 }
 
 @utility faded-bottom {

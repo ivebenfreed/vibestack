@@ -74,55 +74,60 @@ export async function manualIntegrityValidation() {
 }
 
 /**
- * ✅ NEW: Direct access to IntegrityService for debug testing
+ * ✅ UPDATED: Direct access to IntegrityService for debug testing (V3 system)
  */
 export async function getIntegrityService(): Promise<any> {
   try {
-    // Method 1: Access globalServices directly from sync-machine-v2.ts (most reliable)
+    // Method 1: Access V3 services via app init machine's sync machine
+    try {
+      const appInitActor = (window as any).appInitActor;
+      if (appInitActor) {
+        const appInitSnapshot = appInitActor.getSnapshot();
+        const syncActor = appInitSnapshot?.children?.syncMachine;
+        
+        if (syncActor) {
+          const snapshot = syncActor.getSnapshot();
+          console.log('[DEBUG] 🔍 Sync machine state:', snapshot.value);
+          
+          // Check for services in context via serviceCoordinator
+          if (snapshot.context?.serviceCoordinator) {
+            const services = snapshot.context.serviceCoordinator.getServices();
+            if (services?.integrity) {
+              console.log('[DEBUG] ✅ Found IntegrityService via sync machine V3 serviceCoordinator');
+              return services.integrity;
+            } else {
+              console.log('[DEBUG] 🔍 ServiceCoordinator found but no IntegrityService:', {
+                hasServiceCoordinator: !!snapshot.context.serviceCoordinator,
+                hasServices: !!services,
+                hasWebSocket: !!services?.webSocket,
+                hasIncomingChanges: !!services?.incomingChanges,
+                hasOutgoingChanges: !!services?.outgoingChanges,
+                hasIntegrityService: !!services?.integrity
+              });
+            }
+          }
+        } else {
+          console.log('[DEBUG] ⚠️ No sync machine found in app init children');
+        }
+      } else {
+        console.log('[DEBUG] ⚠️ No app init actor available');
+      }
+    } catch (v3Error) {
+      console.log('[DEBUG] ⚠️ Could not access V3 services:', v3Error instanceof Error ? v3Error.message : String(v3Error));
+    }
+
+
+    // Method 2: Fallback to V2 system
     try {
       const { getGlobalServices } = await import('../state-machines/machines/sync-machine-v2');
       const globalServices = getGlobalServices();
       
       if (globalServices?.integrityService) {
-        console.log('[DEBUG] ✅ Found IntegrityService via globalServices export');
+        console.log('[DEBUG] ✅ Found IntegrityService via V2 globalServices (fallback)');
         return globalServices.integrityService;
-      } else {
-        console.log('[DEBUG] 🔍 GlobalServices found but no IntegrityService:', {
-          hasGlobalServices: !!globalServices,
-          hasWebSocketService: !!globalServices?.webSocketService,
-          hasIncomingChangeService: !!globalServices?.incomingChangeService,
-          hasOutgoingChangeService: !!globalServices?.outgoingChangeService,
-          hasIntegrityService: !!globalServices?.integrityService
-        });
       }
-    } catch (importError) {
-      console.log('[DEBUG] ⚠️ Could not import globalServices:', importError instanceof Error ? importError.message : String(importError));
-    }
-
-    // Method 2: Try sync machine context
-    const syncActor = (window as any).syncActor;
-    if (syncActor) {
-      const snapshot = syncActor.getSnapshot();
-      console.log('[DEBUG] 🔍 Sync machine state:', snapshot.value);
-      console.log('[DEBUG] 🔍 Sync machine context keys:', Object.keys(snapshot.context || {}));
-      
-      // Check for services in context  
-      if (snapshot.context?.services?.integrityService) {
-        console.log('[DEBUG] ✅ Found IntegrityService via sync machine context');
-        return snapshot.context.services.integrityService;
-      }
-    }
-
-    // Method 3: Check orchestrator for debugging
-    const orchestrator = (window as any).orchestratorActor;
-    if (orchestrator) {
-      const snapshot = orchestrator.getSnapshot();
-      console.log('[DEBUG] 🔍 Orchestrator context keys:', Object.keys(snapshot.context || {}));
-      
-      if (snapshot.context?.services?.integrityService) {
-        console.log('[DEBUG] ✅ Found IntegrityService via orchestrator context');
-        return snapshot.context.services.integrityService;
-      }
+    } catch (v2Error) {
+      console.log('[DEBUG] ⚠️ V2 fallback also failed:', v2Error instanceof Error ? v2Error.message : String(v2Error));
     }
 
     console.warn('[DEBUG] ⚠️ IntegrityService not found - system may not be fully initialized');
@@ -207,66 +212,90 @@ export async function resetIntegrityDirect(
 }
 
 /**
- * ✅ NEW: State-machine-aware integrity reset (proper disconnect/reconnect)
+ * ✅ UPDATED: State-machine-aware integrity reset using new V3 system
  */
 export async function resetIntegrityViaSyncMachine(
   reason: string = 'Debug reset via sync machine', 
   resetType: 'full_reset' | 'table_reset' = 'full_reset'
 ): Promise<any> {
   try {
-    console.log(`[DEBUG] 🚨 Starting state-machine-aware integrity reset (${resetType})...`);
+    console.log(`[DEBUG] 🚨 Starting V3 state-machine-aware integrity reset (${resetType})...`);
     
-    // Get the orchestrator to send the proper event
-    const orchestrator = (window as any).orchestratorActor;
-    if (!orchestrator) {
-      console.error('[DEBUG] Orchestrator not available - cannot use state machine reset');
-      return null;
+    // Method 1: Use IntegrityService directly (most reliable for V3)
+    const integrityService = await getIntegrityService();
+    if (integrityService) {
+      console.log('[DEBUG] 📤 Using IntegrityService.executeReset() for controlled reset...');
+      
+      const result = await integrityService.executeReset(reason, resetType);
+      
+      console.log('[DEBUG] ✅ V3 reset completed via IntegrityService:', {
+        success: result.success,
+        tablesCleared: result.tablesCleared?.length || 0,
+        lsnReset: result.lsnReset,
+        error: result.error
+      });
+
+      return result;
     }
 
-    console.log('[DEBUG] 📤 Sending INTEGRITY_RESET_REQUIRED to orchestrator...');
+    // Method 2: Fallback to sync machine events if IntegrityService not available
+    const syncActor = (window as any).syncActor;
+    if (!syncActor) {
+      console.error('[DEBUG] No sync machine actor available');
+      return { success: false, error: 'No sync machine actor available' };
+    }
+
+    console.log('[DEBUG] 📤 Fallback: Sending RESET event to sync machine...');
     
-    // Send the event that will trigger the proper state machine flow
-    orchestrator.send({
-      type: 'INTEGRITY_RESET_REQUIRED',
+    // Send RESET event to sync machine
+    syncActor.send({
+      type: 'RESET',
       reason,
       resetType,
       triggerType: 'debug_manual'
     });
 
-    console.log('[DEBUG] ✅ Reset event sent to orchestrator - state machine will handle the flow');
-    console.log('[DEBUG] 🔍 Monitor the console for sync machine state transitions');
+    console.log('[DEBUG] ✅ Reset event sent to sync machine - monitoring state transitions...');
     
-    // Return a promise that resolves when the reset is complete
+    // Monitor sync machine state for completion
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.warn('[DEBUG] ⚠️ Reset timeout - no completion event received after 30 seconds');
+        console.warn('[DEBUG] ⚠️ Reset timeout - no completion after 30 seconds');
         resolve({ success: false, error: 'Reset timeout', warning: 'Check console for sync machine state' });
       }, 30000);
 
-      // Listen for reset completion (orchestrator will receive this from sync machine)
       const checkComplete = () => {
         try {
-          const snapshot = orchestrator.getSnapshot();
-          // Check if we're back in a stable state (not resetting anymore)
-          const isResetting = snapshot.value === 'sync_resetting_integrity' || 
-                            snapshot.context.syncState?.machineState === 'resetting_integrity';
+          const snapshot = syncActor.getSnapshot();
+          const currentState = typeof snapshot.value === 'string' ? snapshot.value : Object.keys(snapshot.value)[0];
           
-          if (!isResetting && snapshot.context.syncState?.machineState === 'live_sync') {
+          console.log('[DEBUG] 🔍 Current sync machine state:', currentState);
+          
+          // Check if we're back in a normal state (not idle/error)
+          if (currentState === 'live_sync' || currentState === 'connected') {
             clearTimeout(timeout);
-            console.log('[DEBUG] ✅ Reset completed - sync machine back in live_sync state');
+            console.log('[DEBUG] ✅ Reset completed - sync machine back in operational state:', currentState);
             resolve({ 
               success: true, 
-              machineState: snapshot.context.syncState?.machineState,
-              currentLSN: snapshot.context.syncState?.currentLSN 
+              machineState: currentState,
+              currentLSN: snapshot.context?.currentLSN || 'unknown'
             });
             return;
           }
+          
+          // If still in reset-related states, keep checking
+          if (currentState === 'idle' || currentState === 'error' || currentState === 'connecting') {
+            setTimeout(checkComplete, 500);
+            return;
+          }
+          
+          // Unknown state - keep checking
+          setTimeout(checkComplete, 500);
+          
         } catch (error) {
-          // Continue checking
+          // Continue checking on error
+          setTimeout(checkComplete, 500);
         }
-        
-        // Keep checking every 500ms
-        setTimeout(checkComplete, 500);
       };
       
       // Start checking after a brief delay
@@ -274,7 +303,7 @@ export async function resetIntegrityViaSyncMachine(
     });
 
   } catch (error) {
-    console.error('[DEBUG] ❌ State machine reset failed:', error);
+    console.error('[DEBUG] ❌ V3 state machine reset failed:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -300,6 +329,142 @@ export async function generateFingerprintsDirect(): Promise<any> {
   } catch (error) {
     console.error('[DEBUG] ❌ Fingerprint generation failed:', error);
     return null;
+  }
+}
+
+/**
+ * ✅ NEW: Manual LSN reset (for testing sync restart without full reset)
+ */
+export async function resetLSNManual(newLSN: string = '0/0', reason: string = 'Manual LSN reset'): Promise<any> {
+  try {
+    console.log(`[DEBUG] 🔄 Manually resetting LSN to: ${newLSN}`);
+    console.log(`[DEBUG] 🔄 Reason: ${reason}`);
+    
+    const results = {
+      syncMachineState: false,
+      orchestratorState: false,
+      machineEvent: false,
+      syncRestart: false
+    };
+
+    // Method 1: Reset in sync machine state (localStorage)
+    try {
+      const SYNC_STATE_KEY = 'sync-machine-state';
+      const stored = localStorage.getItem(SYNC_STATE_KEY);
+      if (stored) {
+        const parsedState = JSON.parse(stored);
+        const oldLSN = parsedState.currentLSN;
+        parsedState.currentLSN = newLSN;
+        localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(parsedState));
+        console.log(`[DEBUG] ✅ LSN reset in sync machine localStorage: ${oldLSN} → ${newLSN}`);
+        results.syncMachineState = true;
+      } else {
+        console.log('[DEBUG] ⚠️ No sync machine state found in localStorage');
+      }
+    } catch (error) {
+      console.warn('[DEBUG] ❌ Error resetting LSN in sync machine state:', error);
+    }
+
+    // Method 2: Reset in orchestrator state (if exists)
+    try {
+      const ORCHESTRATOR_STATE_KEY = 'orchestrator-state';
+      const orchestratorStored = localStorage.getItem(ORCHESTRATOR_STATE_KEY);
+      if (orchestratorStored) {
+        const orchestratorState = JSON.parse(orchestratorStored);
+        if (orchestratorState.syncState) {
+          const oldLSN = orchestratorState.syncState.currentLSN;
+          orchestratorState.syncState.currentLSN = newLSN;
+          localStorage.setItem(ORCHESTRATOR_STATE_KEY, JSON.stringify(orchestratorState));
+          console.log(`[DEBUG] ✅ LSN reset in orchestrator localStorage: ${oldLSN} → ${newLSN}`);
+          results.orchestratorState = true;
+        }
+      } else {
+        console.log('[DEBUG] ⚠️ No orchestrator state found in localStorage');
+      }
+    } catch (error) {
+      console.warn('[DEBUG] ❌ Error resetting LSN in orchestrator state:', error);
+    }
+
+    // Method 3: Send LSN_UPDATE event to sync machine via app init machine
+    try {
+      const appInitActor = (window as any).appInitActor;
+      if (appInitActor) {
+        const appInitSnapshot = appInitActor.getSnapshot();
+        const syncActor = appInitSnapshot?.children?.syncMachine;
+        
+        if (syncActor) {
+          syncActor.send({
+            type: 'LSN_UPDATE',
+            lsn: newLSN,
+            reason: reason
+          });
+          console.log(`[DEBUG] ✅ LSN_UPDATE event sent to sync machine: ${newLSN}`);
+          results.machineEvent = true;
+        } else {
+          console.log('[DEBUG] ⚠️ No sync machine found in app init children');
+          console.log('[DEBUG] App init state:', appInitSnapshot?.value);
+          console.log('[DEBUG] App init children:', Object.keys(appInitSnapshot?.children || {}));
+        }
+      } else {
+        console.log('[DEBUG] ⚠️ No app init actor available');
+      }
+    } catch (error) {
+      console.warn('[DEBUG] ❌ Error sending LSN_UPDATE to sync machine:', error);
+    }
+
+    // Method 4: Trigger controlled sync restart after LSN reset
+    try {
+      console.log('[DEBUG] 🔄 Triggering controlled sync restart after LSN reset...');
+      
+      const appInitActor = (window as any).appInitActor;
+      if (appInitActor) {
+        const appInitSnapshot = appInitActor.getSnapshot();
+        const syncActor = appInitSnapshot?.children?.syncMachine;
+        
+        if (syncActor) {
+          // Step 1: Disconnect to clean state
+          console.log('[DEBUG] Step 1: Sending DISCONNECT event...');
+          syncActor.send({ type: 'DISCONNECT', reason: 'LSN reset - preparing for fresh sync' });
+          
+          // Step 2: Wait for disconnect, then reconnect
+          setTimeout(() => {
+            // Re-get sync actor in case it changed
+            const currentSnapshot = appInitActor.getSnapshot();
+            const currentSyncActor = currentSnapshot?.children?.syncMachine;
+            
+            if (currentSyncActor) {
+              console.log('[DEBUG] Step 2: Sending CONNECT event for fresh sync...');
+              currentSyncActor.send({ type: 'CONNECT', reason: `LSN reset fresh sync from ${newLSN}` });
+              console.log('[DEBUG] ✅ Controlled restart sequence completed');
+            } else {
+              console.log('[DEBUG] ⚠️ Sync machine not available after disconnect');
+            }
+          }, 1000); // Longer delay to ensure clean disconnect
+          
+          results.syncRestart = true;
+        } else {
+          console.log('[DEBUG] ⚠️ No sync machine found for restart');
+        }
+      } else {
+        console.log('[DEBUG] ⚠️ No app init actor available for restart');
+      }
+    } catch (error) {
+      console.warn('[DEBUG] ❌ Error triggering sync restart:', error);
+    }
+
+    console.log('[DEBUG] 📊 LSN reset results:', results);
+    
+    return {
+      success: Object.values(results).some(Boolean),
+      newLSN,
+      reason,
+      results,
+      recommendation: newLSN === '0/0' ? 'Monitor console for initial sync from server' : 'Monitor sync for continuation from new LSN'
+    };
+
+  } catch (error) {
+    console.error('[DEBUG] ❌ Manual LSN reset failed:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -487,6 +652,7 @@ if (typeof window !== 'undefined') {
   (window as any).debugIntegrityStatus = showIntegrityStatus;
   (window as any).debugGetIntegrityService = getIntegrityService;
   (window as any).debugResetBaseline = resetIntegrityBaseline;
+  (window as any).debugResetLSN = resetLSNManual;
   
   // Add a function to show debug help when requested
   (window as any).debugIntegrityHelp = () => {
@@ -501,6 +667,7 @@ if (typeof window !== 'undefined') {
     console.log('    window.debugFingerprints() - Generate fingerprints directly');
     console.log('    window.debugIntegrityStatus() - Show current integrity status');
     console.log('    window.debugResetBaseline(reason?) - Reset baseline to force full validation');
+    console.log('    window.debugResetLSN(newLSN?, reason?) - Reset LSN manually (default: "0/0")');
     console.log('  Utility Functions:');
     console.log('    window.debugClearData() - Clear all local data');
     console.log('    window.debugGetIntegrityService() - Get IntegrityService instance');

@@ -183,6 +183,38 @@ export class IntegrityService {
         recommendedAction: result.recommendedAction
       });
 
+      // Auto-execute reset if recommended by validator
+      if (result.recommendedAction === 'reset' && this.config.autoResetOnFailure) {
+        console.log(`[IntegrityService] Auto-executing reset due to validation recommendation: ${result.resetReason}`);
+        
+        try {
+          const resetResult = await this.reset.executeReset(
+            result.resetReason || `Validation failure: ${reason}`,
+            'full_reset'
+          );
+          
+          if (resetResult.success) {
+            console.log(`[IntegrityService] ✅ Auto-reset completed successfully`);
+            // Return a successful validation result after reset
+            return {
+              isValid: true,
+              issues: [],
+              recommendedAction: 'none',
+              validationType: 'auto_reset_completed',
+              resetReason: `Auto-reset completed: ${result.resetReason}`
+            };
+          } else {
+            console.error(`[IntegrityService] ❌ Auto-reset failed:`, resetResult.error);
+            // Return the original validation failure if reset failed
+            return result;
+          }
+        } catch (resetError) {
+          console.error(`[IntegrityService] ❌ Auto-reset threw error:`, resetError);
+          // Return the original validation failure if reset threw
+          return result;
+        }
+      }
+
       return result;
 
     } catch (error) {

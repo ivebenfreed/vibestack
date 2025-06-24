@@ -296,13 +296,9 @@ export function useSystem() {
 
 // Direct sync machine hook - accesses sync machine state directly
 export function useSync() {
-  // Get sync machine from app init machine's children
+  // Get sync machine from global actor (no longer a child of app-init)
   const syncMachine = useMemo(() => {
-    const appInitActor = (window as any).appInitActor;
-    if (!appInitActor) return null;
-    
-    const appInitSnapshot = appInitActor.getSnapshot();
-    return appInitSnapshot?.children?.syncMachine;
+    return (window as any).syncMachineActor || null;
   }, []);
 
   // Safety check: return default state if sync machine not available

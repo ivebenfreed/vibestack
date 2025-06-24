@@ -31,6 +31,7 @@ export type CltMessageType =
   | 'clt_init_processed'   // Client signals initial sync data was processed
   | 'clt_catchup_received' // Client acknowledges receipt of catchup sync chunk
   | 'clt_integrity_validation' // Client requests integrity validation
+  | 'clt_integrity_baseline_validation' // Client requests baseline integrity validation
   | 'clt_integrity_reset_ack'; // Client acknowledges integrity reset
 
 // Base message interface for all messages

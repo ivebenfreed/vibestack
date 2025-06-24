@@ -3,7 +3,7 @@ import { Outlet, useLocation } from '@tanstack/react-router'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { Header, HEADER_HEIGHT } from '@/components/layout/header'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 
 export function SidebarLayout() {
   const location = useLocation()
@@ -23,6 +23,27 @@ export function SidebarLayout() {
     return false // default to hidden
   }, [location.pathname])
   
+  // Track previous sidebar visibility to detect transitions
+  const prevShouldShowSidebar = useRef(shouldShowSidebar)
+  const isTransitioningToVisible = !prevShouldShowSidebar.current && shouldShowSidebar
+  
+  // Update ref after checking transition
+  useEffect(() => {
+    prevShouldShowSidebar.current = shouldShowSidebar
+  }, [shouldShowSidebar])
+  
+  // Clear the transition-disabling flag after the DOM has updated
+  useEffect(() => {
+    if (isTransitioningToVisible) {
+      // Use requestAnimationFrame to ensure the DOM has updated before re-enabling transitions
+      const timeoutId = setTimeout(() => {
+        // The transition is complete, allow normal behavior
+      }, 50) // Small delay to ensure the sidebar is properly rendered in icon mode
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isTransitioningToVisible])
+  
   // Read sidebar state from cookie for manual toggle state
   const sidebarState = Cookies.get('sidebar_state')
   const defaultManualState = sidebarState === null ? true : sidebarState === 'true'
@@ -32,9 +53,9 @@ export function SidebarLayout() {
   
   // Determine the collapsible mode and open state:
   // - When sidebar should be hidden by route: use "offcanvas" mode, always closed
-  // - When sidebar should be visible: use "icon" mode, respect manual toggle
+  // - When sidebar should be visible: use "icon" mode, but start collapsed if transitioning from hidden
   const collapsibleMode = shouldShowSidebar ? 'icon' : 'offcanvas'
-  const isOpen = shouldShowSidebar ? manualToggleState : false
+  const isOpen = shouldShowSidebar ? (isTransitioningToVisible ? false : manualToggleState) : false
   
   // When section changes and sidebar becomes visible, restore manual toggle state
   useEffect(() => {
@@ -63,7 +84,10 @@ export function SidebarLayout() {
       onOpenChange={handleOpenChange}
     >
       {/* Use dynamic collapsible mode: "offcanvas" for complete hide, "icon" for responsive */}
-      <AppSidebar collapsible={collapsibleMode} />
+      <AppSidebar 
+        collapsible={collapsibleMode} 
+        data-disable-transition={isTransitioningToVisible}
+      />
       
       <SidebarInset className="flex flex-col min-h-0 !ml-0">
         <Header fixed />

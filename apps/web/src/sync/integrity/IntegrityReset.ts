@@ -182,8 +182,8 @@ export class IntegrityReset {
         await this.resetIntegrityBaseline('Post-reset baseline reset');
         console.log('[IntegrityReset] 🔄 Baseline reset - next validation will start fresh');
         
-        await this.reEnableAutoReconnect();
-        console.log('[IntegrityReset] 🔄 Auto-reconnect re-enabled - sync machines will handle reconnection automatically');
+        await this.triggerSyncRestart();
+        console.log('[IntegrityReset] 🔄 Sync restart triggered - machine will reconnect and resync from LSN 0/0');
       }
 
       return result;
@@ -403,23 +403,35 @@ export class IntegrityReset {
   }
 
   /**
-   * Re-enable auto-reconnect after reset
+   * Trigger controlled sync restart after reset - disconnect then reconnect for full sync
    */
-  private async reEnableAutoReconnect(): Promise<void> {
+  private async triggerSyncRestart(): Promise<void> {
     try {
-      console.log('[IntegrityReset] Re-enabling auto-reconnect after reset...');
+      console.log('[IntegrityReset] Triggering controlled sync restart after reset...');
       
-      // Send event to sync machine to re-enable auto-reconnect
+      // Step 1: Send DISCONNECT to ensure clean state
+      console.log('[IntegrityReset] Step 1: Disconnecting sync machine...');
       this.sendEventToMachine({ 
-        type: 'ENABLE_AUTO_RECONNECT_AFTER_RESET', 
-        reason: 'Post-reset reconnection' 
+        type: 'DISCONNECT', 
+        reason: 'Pre-reconnect disconnect for clean reset' 
       });
 
-      console.log('[IntegrityReset] ✅ Auto-reconnect re-enabled');
+      // Step 2: Wait for disconnect to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 3: Send CONNECT to restart sync flow from clean state
+      console.log('[IntegrityReset] Step 2: Reconnecting sync machine for fresh sync...');
+      this.sendEventToMachine({ 
+        type: 'CONNECT', 
+        reason: 'Post-reset fresh sync with LSN 0/0' 
+      });
+
+      console.log('[IntegrityReset] ✅ Controlled restart sequence completed - sync machine will: idle → connecting → initial sync from LSN 0/0');
 
     } catch (error) {
-      console.error('[IntegrityReset] Error re-enabling auto-reconnect:', error);
-      // Don't throw - sync machines should handle this gracefully
+      console.error('[IntegrityReset] Error triggering controlled sync restart:', error);
+      // Don't throw - but log prominently since this is critical for resync
+      console.error('[IntegrityReset] ❌ CRITICAL: Sync restart failed - manual reconnection may be needed');
     }
   }
 

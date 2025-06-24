@@ -407,6 +407,7 @@ export default function IntegrityDebugPage() {
                       <div>• <code>window.debugFingerprints()</code> - Generate fingerprints</div>
                       <div>• <code>window.debugIntegrityStatus()</code> - Show current status</div>
                       <div>• <code>window.debugResetBaseline(reason?)</code> - Reset baseline for full validation</div>
+                      <div>• <code>window.debugResetLSN(newLSN?, reason?)</code> - Reset LSN manually</div>
                     </div>
                   </div>
                 </div>
@@ -504,6 +505,76 @@ export default function IntegrityDebugPage() {
             >
               🔄 Reset Baseline (Force Full Validation)
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 1.6: LSN Reset */}
+      <Card className="border-cyan-200 bg-cyan-50/50">
+        <CardHeader>
+          <CardTitle className="text-cyan-800">Step 1.6: Manual LSN Reset</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Reset the LSN (Log Sequence Number) to trigger a fresh sync without clearing local data. 
+              Setting LSN to "0/0" will trigger a full initial sync from the server.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <Button 
+                onClick={async () => {
+                  try {
+                    addLog('🔄 Resetting LSN to 0/0 (full resync)...');
+                    const result = await (window as any).debugResetLSN?.('0/0', 'Debug page full resync');
+                    if (result?.success) {
+                      addLog(`✅ LSN reset to ${result.newLSN}`);
+                      addLog('🔄 Sync restart triggered - monitor for initial sync');
+                      if (result.results) {
+                        addLog(`📊 Reset results: ${JSON.stringify(result.results)}`);
+                      }
+                      setTimeout(refreshState, 2000);
+                    } else {
+                      addLog(`❌ LSN reset failed: ${result?.error || 'Unknown error'}`);
+                    }
+                  } catch (error) {
+                    addLog(`❌ LSN reset error: ${error}`);
+                  }
+                }}
+                variant="outline"
+                className="border-cyan-200 text-cyan-600 hover:bg-cyan-50"
+              >
+                🔄 Reset LSN to 0/0 (Full Resync)
+              </Button>
+              
+              <Button 
+                onClick={async () => {
+                  const newLSN = prompt('Enter new LSN (e.g., "1/ABC123" or "0/0"):', '0/0');
+                  if (newLSN) {
+                    try {
+                      addLog(`🔄 Resetting LSN to ${newLSN}...`);
+                      const result = await (window as any).debugResetLSN?.(newLSN, 'Debug page custom LSN');
+                      if (result?.success) {
+                        addLog(`✅ LSN reset to ${result.newLSN}`);
+                        addLog(`💡 ${result.recommendation}`);
+                        if (result.results) {
+                          addLog(`📊 Reset results: ${JSON.stringify(result.results)}`);
+                        }
+                        setTimeout(refreshState, 2000);
+                      } else {
+                        addLog(`❌ LSN reset failed: ${result?.error || 'Unknown error'}`);
+                      }
+                    } catch (error) {
+                      addLog(`❌ LSN reset error: ${error}`);
+                    }
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="border-cyan-200 text-cyan-600 hover:bg-cyan-50"
+              >
+                🎯 Custom LSN
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

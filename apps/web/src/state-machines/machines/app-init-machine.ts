@@ -1,6 +1,5 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
-import { syncMachineV3 } from './sync-machine-v3';
 import { liveChangesMachine } from './live-changes-machine';
 
 export interface AppInitContext {
@@ -12,47 +11,13 @@ export interface AppInitContext {
   isOnline: boolean;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   
-  // Sync state
+  // Simplified sync coordination (keep only what's needed for startup sequence)
   isSyncReady: boolean;
   syncError: string | null;
   liveChangesStatus: 'idle' | 'connecting' | 'connected' | 'error';
   
   // System ready state derived from machine state (not persisted)
-  
-  // Sync configuration
-  syncClientId: string;
-  syncState: {
-    phase: 'initial' | 'catchup' | 'live' | null;
-    progress: number;
-    currentLSN: string;
-    error: string | null;
-    machineState: string;
-    phaseProgress: {
-      initial: {
-        completedTables: number;
-        totalTables: number;
-        currentTable: string | null;
-        tablesRemaining: string[];
-      };
-      catchup: {
-        batchesProcessed: number;
-        changesProcessed: number;
-        estimatedRemaining: number;
-      };
-      live: {
-        messagesProcessed: number;
-        lastActivity: number | null;
-        throughputPerSec: number;
-      };
-    };
-  };
-  integrityBaseline: {
-    lastInitialSyncCompletedAt: string | null;
-    lastFullValidationAt: string | null;
-    recordChangesSinceBaseline: number;
-    maxRecordsBeforeReset: number;
-    validationStrategy: 'baseline_with_threshold' | 'full_validation_periodic' | 'hybrid';
-  };
+  // All detailed sync state now managed by independent sync machine
   
   // Timing
   initStartTime: number;
@@ -114,7 +79,6 @@ export const appInitMachine = setup({
   
   actors: {
     waitForDatabase: waitForDatabaseActor,
-    syncMachine: syncMachineV3,
     liveChangesMachine,
   },
   
@@ -172,7 +136,15 @@ export const appInitMachine = setup({
 
     // No longer needed - using event-driven initialization
     
-    startSync: sendTo('syncMachine', { type: 'CONNECT' }),
+    startSync: () => {
+      console.log('[AppInitMachine] Starting global sync machine')
+      const syncMachineActor = (window as any).syncMachineActor
+      if (syncMachineActor) {
+        syncMachineActor.send({ type: 'CONNECT' })
+      } else {
+        console.warn('[AppInitMachine] Sync machine actor not available')
+      }
+    },
     
     startLiveChanges: sendTo('liveChangesMachine', {
       type: 'START',
@@ -193,61 +165,12 @@ export const appInitMachine = setup({
     isSyncReady: false,
     syncError: null,
     liveChangesStatus: 'idle' as const,
-    syncClientId: input?.persistedData?.syncClientId || crypto.randomUUID(),
-    syncState: input?.persistedData?.syncState || {
-      phase: null,
-      progress: 0,
-      currentLSN: '0/0',
-      error: null,
-      machineState: 'idle',
-      phaseProgress: {
-        initial: { 
-          completedTables: 0, 
-          totalTables: 0, 
-          currentTable: null, 
-          tablesRemaining: [] 
-        },
-        catchup: { 
-          batchesProcessed: 0, 
-          changesProcessed: 0, 
-          estimatedRemaining: 0 
-        },
-        live: { 
-          messagesProcessed: 0, 
-          lastActivity: null, 
-          throughputPerSec: 0 
-        }
-      }
-    },
-    integrityBaseline: input?.persistedData?.integrityBaseline || {
-      lastInitialSyncCompletedAt: null,
-      lastFullValidationAt: null,
-      recordChangesSinceBaseline: 0,
-      maxRecordsBeforeReset: 10000,
-      validationStrategy: 'baseline_with_threshold' as const,
-    },
     initStartTime: Date.now(),
     lastActivity: Date.now(),
   }),
   
   // Invoke child machines at root level to persist across state transitions
   invoke: [
-    {
-      id: 'syncMachine',
-      src: 'syncMachine',
-      input: ({ context }) => ({
-        // Pass sync client data to sync machine
-        syncClientId: context.syncClientId,
-        currentLSN: context.syncState.currentLSN,
-      }),
-      // Receive events directly from sync machine
-      onDone: {
-        actions: () => console.log('[AppInitMachine] Sync machine completed')
-      },
-      onError: {
-        actions: () => console.log('[AppInitMachine] Sync machine error')
-      }
-    },
     {
       id: 'liveChangesMachine',
       src: 'liveChangesMachine',
