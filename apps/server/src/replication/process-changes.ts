@@ -368,6 +368,15 @@ export async function transformWALChanges(
           continue;
         }
 
+        // Extract clientId early for filtering
+        const clientId = extractColumnValue(change, 'client_id');
+        
+        // DUAL-PATH FILTER: Skip client-originated changes (handled by primary path)
+        if (clientId) {
+          addFilterReason(filteredReasons, `Client-originated change (clientId: ${clientId})`);
+          continue;
+        }
+        
         // Track for summary stats
         if (!changesByTable[change.table]) {
           changesByTable[change.table] = {};
@@ -758,19 +767,89 @@ export async function processChanges(
       };
     }
 
-    // Step 2: Notify clients about new changes FIRST for lower latency
-    // We do this before storing in the database so clients get updates faster
-    let notificationResults: any = null;
+    // Step 2: Push system changes to clients using handlePushedLiveChanges
+    // Since client-originated changes are filtered out, only system changes remain
     try {
       const clientIds = await getAllClientIds(env);
       
-      // Skip notification if no clients to notify, but still store in DB
       if (clientIds.length === 0) {
         replicationLogger.debug('No clients to notify, skipping notification step', {
           changeCount: tableChanges.length
         }, MODULE_NAME);
-        // Continue to database storage step
-      } else {
+      } else if (tableChanges.length > 0) {
+        const { handlePushedLiveChanges } = await import('../sync/live-push');
+        
+        replicationLogger.info('Pushing system changes to all clients', {
+          changeCount: tableChanges.length,
+          clientCount: clientIds.length,
+          tables: [...new Set(tableChanges.map(c => c.table))]
+        }, MODULE_NAME);
+        
+        // Process all clients in parallel
+        const results = await Promise.all(
+          clientIds.map(async (clientId) => {
+            try {
+              const clientDoId = env.SYNC.idFromName(`client:${clientId}`);
+              const clientDo = env.SYNC.get(clientDoId);
+              
+              // Create a simple message handler that sends to SyncDO
+              const messageHandler = {
+                send: async (message: any) => {
+                  const response = await clientDo.fetch(
+                    `https://internal/new-changes?clientId=${encodeURIComponent(clientId)}`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        lsn: lastLSN,
+                        changeCount: tableChanges.length,
+                        changes: tableChanges
+                      })
+                    }
+                  );
+                  if (response.status !== 200) {
+                    throw new Error(`Failed to send: ${response.status}`);
+                  }
+                }
+              };
+              
+              // Use handlePushedLiveChanges which will filter and send appropriately
+              const result = await handlePushedLiveChanges(
+                tableChanges,
+                lastLSN,
+                clientId,
+                messageHandler
+              );
+              
+              return {
+                clientId,
+                success: result.success,
+                changeCount: result.changeCount
+              };
+            } catch (error) {
+              replicationLogger.error('Failed to push system changes to client', {
+                clientId,
+                error: error instanceof Error ? error.message : String(error)
+              }, MODULE_NAME);
+              return {
+                clientId,
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+              };
+            }
+          })
+        );
+        
+        const successCount = results.filter(r => r.success).length;
+        const failureCount = results.filter(r => !r.success).length;
+        
+        replicationLogger.info('System change notifications completed', {
+          total: clientIds.length,
+          successful: successCount,
+          failed: failureCount,
+          processingTime: Date.now() - startTime
+        }, MODULE_NAME);
+      }
       
       // Filter changes by originating client to implement anti-echo at source
       const changesByClient = new Map<string, TableChange[]>();
@@ -1009,9 +1088,11 @@ export async function processChanges(
       
       } // End of else block for client notification
     } catch (notifyError) {
-      replicationLogger.error('Client notification process failed', {
-        error: notifyError instanceof Error ? notifyError.message : String(notifyError)
+      replicationLogger.error('System change notification failed', {
+        error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+        changeCount: tableChanges.length
       }, MODULE_NAME);
+      // Continue to store in database even if notifications fail
     }
     
     // Step 3: Store raw changes in history AFTER clients have been notified
