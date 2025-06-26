@@ -29,8 +29,8 @@ export interface WebSocketServiceCallbacks {
 export class WebSocketService {
   private ws: WebSocket | null = null;
   private callbacks: WebSocketServiceCallbacks = {};
-  private heartbeatTimer: NodeJS.Timeout | null = null;
-  private reconnectTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   
   // Connection tracking
   private currentStatus: 'connecting' | 'connected' | 'disconnected' | 'error' = 'disconnected';
@@ -88,7 +88,10 @@ export class WebSocketService {
         this.setStatus('connected');
         
         if (this.config.enableHeartbeat !== false) {
+          syncLogger.info('connection', `Starting heartbeat with interval ${this.config.heartbeatInterval || 30000}ms`);
           this.startHeartbeat();
+        } else {
+          syncLogger.warn('connection', 'Heartbeat disabled in configuration');
         }
       };
 
@@ -232,7 +235,15 @@ export class WebSocketService {
     this.stopHeartbeat();
     
     const interval = this.config.heartbeatInterval || 30000; // 30 seconds default
+    syncLogger.info('connection', `Setting up heartbeat timer with ${interval}ms interval`);
+    
     this.heartbeatTimer = setInterval(() => {
+      syncLogger.debug('connection', 'Heartbeat timer fired', {
+        isConnected: this.isConnected(),
+        clientId: this.config.clientId,
+        lsn: this.config.lsn
+      });
+      
       if (this.isConnected()) {
         try {
           this.send({
@@ -242,15 +253,21 @@ export class WebSocketService {
             messageId: `heartbeat_${Date.now()}`,
             timestamp: Date.now()
           });
+          syncLogger.debug('connection', 'Heartbeat sent successfully');
         } catch (error) {
           syncLogger.error('connection', 'Error sending heartbeat', error);
         }
+      } else {
+        syncLogger.warn('connection', 'Heartbeat timer fired but connection not ready');
       }
     }, interval);
+    
+    syncLogger.info('connection', `Heartbeat timer started with ID: ${this.heartbeatTimer}`);
   }
 
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
+      syncLogger.info('connection', `Stopping heartbeat timer: ${this.heartbeatTimer}`);
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
