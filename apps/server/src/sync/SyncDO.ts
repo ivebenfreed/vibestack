@@ -2350,6 +2350,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
 
   /**
    * Send conflict resolution to a specific SyncDO instance with isConflictResolution flag
+   * Implements "mark inactive on fail" approach for failed broadcasts
    */
   private async sendConflictResolutionToSyncDO(targetClientId: string, conflictedChanges: TableChange[], originClientId: string): Promise<void> {
     try {
@@ -2379,35 +2380,56 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }
 
     } catch (error) {
-      syncLogger.error('Error sending conflict resolution to SyncDO', {
+      syncLogger.error('Error sending conflict resolution to SyncDO - marking client inactive', {
         targetClientId,
         originClientId,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
+      
+      // Mark the failed client as inactive using "mark inactive on fail" approach
+      await this.markClientsInactive([targetClientId]);
+      
       throw error;
     }
   }
 
   /**
    * Get list of active clients from KV registry
+   * Uses "mark inactive on fail" approach instead of TTL-based expiration
    */
   private async getActiveClientsFromRegistry(): Promise<string[]> {
     try {
       // List all client keys from KV
       const listResult = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
       const activeClients: string[] = [];
+      const failedClients: string[] = [];
 
       for (const key of listResult.keys) {
         const clientId = key.name.replace('client:', '');
         
-        // Get client data to check if active
-        const clientData = await this.env.CLIENT_REGISTRY.get(key.name);
-        if (clientData) {
-          const data = JSON.parse(clientData);
-          if (data.active && data.lastSeen > Date.now() - 300000) { // Active within 5 minutes
-            activeClients.push(clientId);
+        try {
+          // Get client data to check if active
+          const clientData = await this.env.CLIENT_REGISTRY.get(key.name);
+          if (clientData) {
+            const data = JSON.parse(clientData);
+            // Only check active flag - no TTL-based expiration
+            if (data.active === true) {
+              activeClients.push(clientId);
+            }
           }
+        } catch (clientError) {
+          // Mark this client as failed for cleanup
+          failedClients.push(clientId);
+          syncLogger.warn('Failed to read client data during registry lookup', {
+            clientId,
+            error: clientError instanceof Error ? clientError.message : String(clientError)
+          }, MODULE_NAME);
         }
+      }
+
+      // Clean up failed clients by marking them inactive
+      if (failedClients.length > 0) {
+        await this.markClientsInactive(failedClients);
       }
 
       return activeClients;
@@ -2420,8 +2442,56 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   }
 
   /**
+   * Mark multiple clients as inactive in KV registry
+   * Used by "mark inactive on fail" approach when clients can't be reached
+   */
+  private async markClientsInactive(clientIds: string[]): Promise<void> {
+    const promises = clientIds.map(async (clientId) => {
+      try {
+        const key = `client:${clientId}`;
+        const existingData = await this.env.CLIENT_REGISTRY.get(key);
+        
+        if (existingData) {
+          let data;
+          try {
+            data = JSON.parse(existingData);
+          } catch (parseError) {
+            // Create new data object if parsing fails
+            data = {};
+          }
+          
+          // Mark as inactive and record when it failed
+          await this.env.CLIENT_REGISTRY.put(
+            key,
+            JSON.stringify({
+              ...data,
+              active: false,
+              lastSeen: data.lastSeen || Date.now(),
+              disconnectedAt: Date.now(),
+              markedInactiveReason: 'registry_access_failed'
+            })
+          );
+          
+          syncLogger.debug('Marked client inactive due to access failure', {
+            clientId,
+            reason: 'registry_access_failed'
+          }, MODULE_NAME);
+        }
+      } catch (error) {
+        syncLogger.error('Failed to mark client as inactive', {
+          clientId,
+          error: error instanceof Error ? error.message : String(error)
+        }, MODULE_NAME);
+      }
+    });
+    
+    await Promise.allSettled(promises);
+  }
+
+  /**
    * Send changes to a specific SyncDO instance
    * Follows the exact same pattern as ReplicationDO -> SyncDO communication
+   * Implements "mark inactive on fail" approach for failed broadcasts
    */
   private async sendChangesToSyncDO(targetClientId: string, changes: TableChange[]): Promise<void> {
     try {
@@ -2469,10 +2539,14 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }, MODULE_NAME);
 
     } catch (error) {
-      syncLogger.error('Error sending changes to SyncDO', {
+      syncLogger.error('Error sending changes to SyncDO - marking client inactive', {
         targetClientId,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
+      
+      // Mark the failed client as inactive using "mark inactive on fail" approach
+      await this.markClientsInactive([targetClientId]);
+      
       throw error;
     }
   }
