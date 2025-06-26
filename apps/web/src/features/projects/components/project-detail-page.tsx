@@ -12,7 +12,6 @@ import NewEditableMultiSelect from '@/components/custom/NewEditableMultiSelect'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Label } from '@/components/ui/label'
-import { usePGliteContext } from '@/db/pglite-provider'
 import { LiveQueryPerformanceMonitor } from '../../debug/components/LiveQueryPerformanceMonitor'
 import ProjectTasksSection from './project-tasks-section'
 import { useSelector } from '@xstate/store/react'
@@ -25,7 +24,6 @@ interface ProjectDetailPageProps {
 }
 
 export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ projectId: propProjectId }) => {
-  const { services } = usePGliteContext()
   const searchParams = useSearch({ from: '/_authenticated/projects/$projectId' }) as any
   const routeParams = useParams({ from: '/_authenticated/projects/$projectId' })
   const projectId = propProjectId || routeParams.projectId
@@ -65,18 +63,19 @@ export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ projectId:
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [])
 
-  // 🎯 BUSINESS LOGIC: Update handlers using domain services
+  // 🎯 BUSINESS LOGIC: Update handlers using new 3-path architecture
   const handleUpdateProjectField = async (
     fieldName: keyof Pick<Project, 'name' | 'description' | 'status'>,
     value: any
   ) => {
-    if (!finalProject || !services?.projects) {
-      toast.error('Project data or services not available.')
-      throw new Error('Project data or services not available.')
+    if (!finalProject) {
+      toast.error('Project data not available.')
+      throw new Error('Project data not available.')
     }
 
     try {
-      await services.projects.updateProject(finalProject.id, { [fieldName]: value })
+      const { updateProjectUI } = await import('@/domain/project')
+      await updateProjectUI(finalProject.id, { [fieldName]: value })
       toast.success(`Project ${fieldName} updated successfully.`)
     } catch (err) {
       console.error(`Error updating project ${fieldName}:`, err)
@@ -86,13 +85,14 @@ export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ projectId:
   }
 
   const handleUpdateProjectMembers = async (userIds: string[]) => {
-    if (!finalProject || !services?.projects) {
-      toast.error('Project data or services not available.')
-      throw new Error('Project data or services not available.')
+    if (!finalProject) {
+      toast.error('Project data not available.')
+      throw new Error('Project data not available.')
     }
 
     try {
-      await services.projects.updateProjectMembers(finalProject.id, userIds)
+      const { updateProjectMembersUI } = await import('@/domain/project')
+      await updateProjectMembersUI(finalProject.id, userIds)
       toast.success('Project members updated successfully.')
     } catch (err) {
       console.error('Error updating project members:', err)

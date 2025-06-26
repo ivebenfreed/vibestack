@@ -36,7 +36,7 @@ function SidebarGroup({ children, className }: { children: React.ReactNode; clas
   const { appSidebarExpanded } = useDualSidebar()
   
   return (
-    <div className={`relative flex w-full min-w-0 flex-col ${appSidebarExpanded ? 'p-2' : 'p-0'} ${className || ''}`}>
+    <div className={`${appSidebarExpanded ? 'sidebar-group-expanded' : 'sidebar-group-collapsed'} ${className || ''}`}>
       {children}
     </div>
   )
@@ -54,7 +54,7 @@ function SidebarGroupLabel({ children }: { children: React.ReactNode }) {
 
 function SidebarMenu({ children }: { children: React.ReactNode }) {
   return (
-    <ul className="flex w-full min-w-0 flex-col gap-1">
+    <ul className="sidebar-menu">
       {children}
     </ul>
   )
@@ -62,7 +62,7 @@ function SidebarMenu({ children }: { children: React.ReactNode }) {
 
 function SidebarMenuItem({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <li className={`group/menu-item relative ${className || ''}`}>
+    <li className={`sidebar-menu-item ${className || ''}`}>
       {children}
     </li>
   )
@@ -85,10 +85,7 @@ function SidebarMenuButton({
 }) {
   const { appSidebarExpanded } = useDualSidebar()
   
-  const buttonClasses = `
-    ${appSidebarExpanded ? 'sidebar-menu-button-expanded' : 'sidebar-menu-button-collapsed'}
-    ${className || ''}
-  `
+  const buttonClasses = `${appSidebarExpanded ? 'sidebar-menu-button-expanded' : 'sidebar-menu-button-collapsed'} ${className || ''}`
   
   if (asChild) {
     return (
@@ -118,11 +115,7 @@ function SidebarMenuSub({ children }: { children: React.ReactNode }) {
   const { appSidebarExpanded } = useDualSidebar()
   
   return (
-    <ul className={`
-      border-sidebar-border mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 
-      border-l px-2.5 py-0.5
-      ${!appSidebarExpanded ? 'hidden' : ''}
-    `}>
+    <ul className={appSidebarExpanded ? 'sidebar-menu-sub' : 'sidebar-menu-sub-collapsed'}>
       {children}
     </ul>
   )
@@ -130,7 +123,7 @@ function SidebarMenuSub({ children }: { children: React.ReactNode }) {
 
 function SidebarMenuSubItem({ children }: { children: React.ReactNode }) {
   return (
-    <li className="group/menu-sub-item relative">
+    <li className="sidebar-menu-sub-item">
       {children}
     </li>
   )

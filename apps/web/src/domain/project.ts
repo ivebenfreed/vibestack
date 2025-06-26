@@ -1,24 +1,29 @@
-import { v4 as uuidv4 } from 'uuid';
-import { DeepPartial } from 'typeorm';
-import { Project, User, ProjectStatus } from '@repo/dataforge/client-entities';
-import { BaseRepository, BaseService, DatabaseServiceError, EventDispatcher } from './base';
-import { OutgoingChangeService } from '../sync/OutgoingChangeService';
-import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
-import { RelationshipChangeEncoder } from '../db/relationship-change-encoder';
+import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
 import { useMemo } from 'react';
+
+// Imports for 3-path architecture wrapper functions
+import { 
+  createProjectUI as generatedCreateProjectUI,
+  updateProjectUI as generatedUpdateProjectUI,
+  deleteProjectUI as generatedDeleteProjectUI,
+  createProjectIncoming as generatedCreateProjectIncoming,
+  updateProjectIncoming as generatedUpdateProjectIncoming,
+  deleteProjectIncoming as generatedDeleteProjectIncoming,
+  createProjectLiveChanges as generatedCreateProjectLiveChanges,
+  updateProjectLiveChanges as generatedUpdateProjectLiveChanges,
+  deleteProjectLiveChanges as generatedDeleteProjectLiveChanges,
+  type CreateProjectInput,
+  type UpdateProjectInput
+} from '@repo/dataforge/project-operations';
 
 // ============================================================================
 // 🎯 PURE XSTATE ATOMIC STORE IMPLEMENTATION
 // ============================================================================
 
-// Note: Live changes types moved to centralized LiveChangesManager
-
 // Main projects store - holds all projects in normalized format
 export const projectsAtom = createAtom<Record<string, Project>>({});
-
-// Note: Live changes state removed - now handled centrally by LiveChangesManager
 
 // ============================================================================
 // React Hooks (Pure XState)
@@ -32,837 +37,326 @@ export const useProjectAtoms = {
       (projectsRecord) => {
         const projects = Object.values(projectsRecord);
         return projects.sort((a, b) => {
-          const aTime = new Date(a.updatedAt || a.createdAt).getTime();
-          const bTime = new Date(b.updatedAt || b.createdAt).getTime();
-          return bTime - aTime; // Latest first
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
       },
       shallowEqual
     );
   },
 
-  // Individual project by ID
-  project: (projectId: string) => {
+  // Single project by ID
+  projectById: (id: string) => {
     return useSelector(
       projectsAtom,
-      (projectsRecord) => projectsRecord[projectId] || null
+      (projectsRecord) => projectsRecord[id] || null,
+      shallowEqual
     );
   },
 
-  // Note: No need for separate projectIds with XState selectors
-
-  // Project stats
-  projectStats: () => {
+  // Projects by owner ID
+  projectsByOwner: (ownerId: string) => {
     return useSelector(
       projectsAtom,
       (projectsRecord) => {
         const projects = Object.values(projectsRecord);
-        const total = projects.length;
-        
-        return { total };
+        return projects
+          .filter(project => project.ownerId === ownerId)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       },
       shallowEqual
     );
   },
 
-  // Note: Live changes state now managed centrally
+  // Projects by status
+  projectsByStatus: (status: ProjectStatus) => {
+    return useSelector(
+      projectsAtom,
+      (projectsRecord) => {
+        const projects = Object.values(projectsRecord);
+        return projects
+          .filter(project => project.status === status)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      },
+      shallowEqual
+    );
+  },
+
+  // Active projects
+  activeProjects: () => {
+    return useSelector(
+      projectsAtom,
+      (projectsRecord) => {
+        const projects = Object.values(projectsRecord);
+        return projects
+          .filter(project => project.status === ProjectStatus.ACTIVE)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      },
+      shallowEqual
+    );
+  },
+
+  // Project count
+  projectCount: () => {
+    return useSelector(
+      projectsAtom,
+      (projectsRecord) => Object.keys(projectsRecord).length
+    );
+  },
+
+  // Projects by multiple filters
+  filteredProjects: (filters: {
+    ownerId?: string;
+    status?: ProjectStatus;
+    category?: string;
+  }) => {
+    return useSelector(
+      projectsAtom,
+      (projectsRecord) => {
+        const projects = Object.values(projectsRecord);
+        return projects
+          .filter(project => {
+            if (filters.ownerId && project.ownerId !== filters.ownerId) return false;
+            if (filters.status && project.status !== filters.status) return false;
+            if (filters.category && project.category !== filters.category) return false;
+            return true;
+          })
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      },
+      shallowEqual
+    );
+  }
 };
 
 // ============================================================================
-// Actions (Pure XState)
+// XState Atom Actions
 // ============================================================================
 
 export const projectActions = {
-  // 🎯 COMPARTMENTALIZED LOADING: Atoms handle their own database loading
-  ensureLoaded: async () => {
-    const current = projectsAtom.get();
-    if (Object.keys(current).length > 0) {
-      console.log(`[ProjectAtoms] Projects already loaded - skipping (${Object.keys(current).length} projects)`);
-      return; // Already loaded
-    }
-    
-    console.log('[ProjectAtoms] Loading projects from database...');
-    try {
-      // ✅ FIXED: Use global datasource singleton to prevent race conditions
-      const { getGlobalDataSource } = await import('../db/global-datasource');
-      const dataSource = await getGlobalDataSource();
-      
-      if (!dataSource.isInitialized) {
-        console.warn('[ProjectAtoms] DataSource not ready, skipping load');
-        return;
-      }
-      
-      const projects = await dataSource.getRepository(Project).find({ relations: ['members'] });
-      
-      // Create normalized record
-      const projectsRecord: Record<string, Project> = {};
-      projects.forEach(project => {
-        projectsRecord[project.id] = project;
-      });
-      
-      // Update atom
-      projectsAtom.set(projectsRecord);
-      console.log(`[ProjectAtoms] ✅ Loaded ${projects.length} projects`);
-      
-    } catch (error) {
-      console.error('[ProjectAtoms] Failed to load projects:', error);
-      // Don't throw - let components handle empty state gracefully
-    }
-  },
-
-  // Bulk load projects (for external data sources)
-  loadProjects: (projects: Project[]) => {
-    // Create normalized record - no presorting needed with XState selectors
-    const projectsRecord: Record<string, Project> = {};
-    projects.forEach(project => {
-      projectsRecord[project.id] = project;
-    });
-    
-    // Update atom
-    projectsAtom.set(projectsRecord);
-    console.log(`[ProjectAtoms] Bulk loaded ${projects.length} projects - atom now contains ${Object.keys(projectsRecord).length} projects`);
-  },
-
-  // Update individual project
-  updateProject: (projectId: string, updates: Partial<Project>) => {
-    const currentProjects = projectsAtom.get();
-    const currentProject = currentProjects[projectId];
-    
-    if (!currentProject) {
-      console.warn(`[ProjectService] Project ${projectId} not found for update`);
-      return;
-    }
-    
-    const updatedProject = { ...currentProject, ...updates, updatedAt: new Date() };
-    
-    // Update projects record
-    projectsAtom.set({
-      ...currentProjects,
-      [projectId]: updatedProject
-    });
-    
-    console.log(`[ProjectService] Updated project ${projectId}`);
-  },
-
-  // ✅ PURE FUNCTION UPDATE: Direct database + sync tracking (no optimistic update)
-  updateProject: async (projectId: string, updates: Partial<Project>) => {
-    try {
-      console.log(`[ProjectAtoms] Background update for project ${projectId.slice(-8)}: ${Object.keys(updates).join(', ')}`);
-      
-      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
-      const repository = (await dataSource).getRepository(Project);
-      
-      // Get current project
-      const project = await repository.findOne({ where: { id: projectId } });
-      if (!project) {
-        throw new Error(`Project with ID ${projectId} not found`);
-      }
-      
-      // Apply updates
-      const updatedData = {
-        ...updates,
-        updatedAt: new Date()
-      };
-      
-      // Update database
-      await repository.update(projectId, updatedData);
-      const updated = await repository.findOne({ where: { id: projectId } });
-      
-      if (!updated) {
-        throw new Error(`Failed to retrieve updated project ${projectId}`);
-      }
-      
-      // Get OutgoingChangeService from sync machine
-      try {
-        const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
-        const outgoingChangeService = getGlobalOutgoingChangeService();
-        
-        if (outgoingChangeService) {
-          await outgoingChangeService.trackEntityChange('projects', 'update', updated);
-        } else {
-          console.warn('[ProjectAtoms] No OutgoingChangeService available - sync tracking skipped');
-        }
-      } catch (error) {
-        console.warn('[ProjectAtoms] Failed to get OutgoingChangeService:', error);
-      }
-      
-      console.log(`[ProjectAtoms] Successfully updated project ${projectId.slice(-8)} - live sync will update atoms`);
-    } catch (error) {
-      console.error(`[ProjectAtoms] Failed to update project ${projectId}:`, error);
-      throw error; // Let VibeGrid handle the error
-    }
-  },
-
-  // Internal atom-only update (used by service layer and fallback)
-  updateProjectAtomOnly: (projectId: string, updates: Partial<Project>) => {
-    const currentProjects = projectsAtom.get();
-    const currentProject = currentProjects[projectId];
-    
-    if (!currentProject) {
-      console.warn(`[ProjectAtoms] Project ${projectId} not found for update`);
-      return;
-    }
-    
-    // ✅ FIXED: Don't modify updatedAt if it's already provided (e.g., from LiveChangesManager)
-    const updatedProject = { 
-      ...currentProject, 
-      ...updates,
-      ...(updates.updatedAt ? {} : { updatedAt: new Date() })
-    };
-    
-    // Update projects record
-    projectsAtom.set({
-      ...currentProjects,
-      [projectId]: updatedProject
-    });
-    
-    console.log(`[ProjectAtoms] Updated project atom ${projectId}`);
-  },
-
-  // ✅ PURE FUNCTION DELETE: Direct database + sync tracking (no service overhead)
-  deleteProject: async (projectId: string) => {
-    try {
-      const dataSource = await import('../db/newtypeorm/NewDataSource').then(m => m.getNewPGliteDataSource());
-      const repository = (await dataSource).getRepository(Project);
-      
-      // Check if project exists
-      const project = await repository.findOne({ where: { id: projectId } });
-      if (!project) {
-        throw new Error(`Project with ID ${projectId} not found`);
-      }
-      
-      // Delete from database
-      const result = await repository.delete(projectId);
-      const success = (result.affected ?? 0) > 0;
-      
-      if (success) {
-        // Get OutgoingChangeService from sync machine
-        try {
-          const { getGlobalOutgoingChangeService } = await import('../state-machines/machines/sync-machine-v2');
-          const outgoingChangeService = getGlobalOutgoingChangeService();
-          
-          if (outgoingChangeService) {
-            await outgoingChangeService.trackEntityChange('projects', 'delete', { id: projectId });
-          } else {
-            console.warn('[ProjectAtoms] No OutgoingChangeService available - sync tracking skipped');
-          }
-        } catch (error) {
-          console.warn('[ProjectAtoms] Failed to get OutgoingChangeService:', error);
-        }
-        
-        // Remove from atom
-        projectActions.deleteProjectAtomOnly(projectId);
-      }
-      
-      console.log(`[ProjectAtoms] Deleted project ${projectId} via pure function (with sync tracking)`);
-    } catch (error) {
-      console.error(`[ProjectAtoms] Failed to delete project ${projectId}:`, error);
-      // Fallback to atom-only delete
-      projectActions.deleteProjectAtomOnly(projectId);
-    }
-  },
-
-  // Internal atom-only delete (used by service layer and fallback)
-  deleteProjectAtomOnly: (projectId: string) => {
-    const currentProjects = projectsAtom.get();
-    
-    // Remove from projects record
-    const { [projectId]: removed, ...remainingProjects } = currentProjects;
-    projectsAtom.set(remainingProjects);
-    
-    console.log(`[ProjectAtoms] Deleted project atom ${projectId}`);
-  },
-
-  // Create project (always goes through service for proper creation workflow)
+  // Create new project in atom
   createProject: (project: Project) => {
     const currentProjects = projectsAtom.get();
-    
-    // Add to projects record
     projectsAtom.set({
       ...currentProjects,
-      [project.id]: { ...project, updatedAt: new Date() }
+      [project.id]: project
     });
-    
-    console.log(`[ProjectAtoms] Created project ${project.id}`);
   },
+
+  // Update existing project in atom
+  updateProjectAtomOnly: (id: string, updates: Partial<Project>) => {
+    const currentProjects = projectsAtom.get();
+    const existingProject = currentProjects[id];
+    if (!existingProject) {
+      console.warn(`[ProjectActions] Project ${id} not found for update`);
+      return;
+    }
+    
+    projectsAtom.set({
+      ...currentProjects,
+      [id]: { ...existingProject, ...updates }
+    });
+  },
+
+  // Delete project from atom
+  deleteProjectAtomOnly: (id: string) => {
+    const currentProjects = projectsAtom.get();
+    const { [id]: deleted, ...remaining } = currentProjects;
+    projectsAtom.set(remaining);
+  },
+
+  // Load multiple projects (for initial load)
+  loadProjects: (projects: Project[]) => {
+    const projectsRecord = projects.reduce((acc, project) => {
+      acc[project.id] = project;
+      return acc;
+    }, {} as Record<string, Project>);
+    
+    projectsAtom.set(projectsRecord);
+  },
+
+  // Clear all projects
+  clearProjects: () => {
+    projectsAtom.set({});
+  },
+
+  // Ensure projects are loaded (high-performance direct check)
+  ensureLoaded: async () => {
+    if (Object.keys(projectsAtom.get()).length === 0) {
+      const { getGlobalDataSource } = await import('@/db/global-datasource');
+      const dataSource = await getGlobalDataSource();
+      const projects = await dataSource.getRepository(Project).find({
+        relations: ['owner', 'members']
+      });
+      projectActions.loadProjects(projects);
+    }
+  }
 };
 
 // ============================================================================
-// Note: Live Changes Integration removed - now handled centrally by LiveChangesManager
+// 3-Path Architecture Wrapper Functions
 // ============================================================================
 
-// ============================================================================
-// Atomic Store Implementation (ProjectAtomStore replacement)
-// ============================================================================
-
-class ProjectAtomStore {
-  // XState atoms for compatibility with existing interfaces
-  projectsAtom = projectsAtom
+/**
+ * Create project from UI - thin wrapper around generated function
+ */
+export async function createProjectUI(projectData: CreateProjectInput): Promise<Project> {
+  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
   
-  // Compatibility methods for existing code
-  getProjectAtom = (id: string) => {
-    return {
-      get: () => {
-        const projectsRecord = projectsAtom.get();
-        return projectsRecord[id] || null;
-      },
-      isXStateAtom: true,
-      projectId: id
-    };
-  }
-
-  // Derived atom equivalent for compatibility
-  allProjectsAtom = {
-    get: () => Object.values(projectsAtom.get())
-  }
-
-  // Bulk load compatibility
-  syncBulkLoad = {
-    set: (projects: Project[]) => projectActions.loadProjects(projects)
-  }
-
-  // Note: Live changes methods removed - now handled centrally by LiveChangesManager
+  const dataSource = await getNewPGliteDataSource();
+  const services = getGlobalServicesV3();
+  
+  return generatedCreateProjectUI(projectData, {
+    dataSource,
+    EntityClass: Project,
+    atomActions: projectActions,
+    outgoingChangeService: services?.outgoingChangeService || null
+  });
 }
 
+/**
+ * Update project from UI - thin wrapper around generated function
+ */
+export async function updateProjectUI(projectId: string, updates: UpdateProjectInput): Promise<Project> {
+  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
+  
+  const dataSource = await getNewPGliteDataSource();
+  const services = getGlobalServicesV3();
+  
+  return generatedUpdateProjectUI(projectId, updates, {
+    dataSource,
+    EntityClass: Project,
+    atomActions: projectActions,
+    outgoingChangeService: services?.outgoingChangeService || null
+  });
+}
 
+/**
+ * Delete project from UI - thin wrapper around generated function
+ */
+export async function deleteProjectUI(projectId: string): Promise<boolean> {
+  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
+  
+  const dataSource = await getNewPGliteDataSource();
+  const services = getGlobalServicesV3();
+  
+  return generatedDeleteProjectUI(projectId, {
+    dataSource,
+    EntityClass: Project,
+    atomActions: projectActions,
+    outgoingChangeService: services?.outgoingChangeService || null
+  });
+}
 
-// Repository
-export class ProjectRepository extends BaseRepository<Project> {
-  constructor(dataSource: NewPGliteDataSource) {
-    if (!dataSource.isInitialized) {
-      throw new Error('DataSource must be initialized before creating ProjectRepository');
-    }
-    super(dataSource.getRepository(Project), 'project', dataSource);
-  }
+/**
+ * Create project from incoming sync - thin wrapper around generated function
+ */
+export async function createProjectIncoming(projectData: Project): Promise<Project> {
+  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+  const dataSource = await getNewPGliteDataSource();
+  
+  return generatedCreateProjectIncoming(projectData, {
+    dataSource,
+    EntityClass: Project
+  });
+}
 
-  /**
-   * Get project members
-   */
-  async getMembers(projectId: string): Promise<User[]> {
-    const project = await this.repository.findOne({
-      where: { id: projectId } as any,
-      relations: ['members']
+/**
+ * Update project from incoming sync - thin wrapper around generated function
+ */
+export async function updateProjectIncoming(projectId: string, updates: Partial<Project>): Promise<Project> {
+  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+  const dataSource = await getNewPGliteDataSource();
+  
+  return generatedUpdateProjectIncoming(projectId, updates, {
+    dataSource,
+    EntityClass: Project
+  });
+}
+
+/**
+ * Delete project from incoming sync - thin wrapper around generated function
+ */
+export async function deleteProjectIncoming(projectId: string): Promise<void> {
+  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+  const dataSource = await getNewPGliteDataSource();
+  
+  return generatedDeleteProjectIncoming(projectId, {
+    dataSource,
+    EntityClass: Project
+  });
+}
+
+/**
+ * Create project from live changes - thin wrapper around generated function
+ */
+export function createProjectLiveChanges(projectData: Project): void {
+  generatedCreateProjectLiveChanges(projectData, {
+    atomActions: projectActions
+  });
+}
+
+/**
+ * Update project from live changes - thin wrapper around generated function
+ */
+export function updateProjectLiveChanges(projectId: string, updates: Partial<Project>): void {
+  generatedUpdateProjectLiveChanges(projectId, updates, {
+    atomActions: projectActions
+  });
+}
+
+/**
+ * Delete project from live changes - thin wrapper around generated function
+ */
+export function deleteProjectLiveChanges(projectId: string): void {
+  generatedDeleteProjectLiveChanges(projectId, {
+    atomActions: projectActions
+  });
+}
+
+/**
+ * Bulk create projects from incoming sync - optimized for chunked data
+ * Used by IncomingChangeService for performance when processing chunks
+ */
+export async function bulkCreateProjectsIncoming(projectsData: Project[]): Promise<Project[]> {
+  if (projectsData.length === 0) return [];
+  
+  console.log(`[ProjectDomain] Bulk creating ${projectsData.length} projects from incoming sync`);
+  const startTime = Date.now();
+  
+  try {
+    const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
+    const dataSource = await getNewPGliteDataSource();
+    
+    // Apply to database
+    const projectRepo = dataSource.getRepository(Project);
+    const result = await projectRepo.insert(projectsData);
+    
+    // Get the inserted projects
+    const insertedProjects = projectsData;
+    
+    // Update atoms in batch
+    const currentProjects = projectsAtom.get();
+    const newProjectsRecord = { ...currentProjects };
+    
+    insertedProjects.forEach(project => {
+      newProjectsRecord[project.id] = project;
     });
     
-    if (!project || !project.members) {
-      return [];
-    }
-
-    // Handle both sync and async members (TypeORM Promise relations)
-    if (project.members instanceof Promise) {
-      return await project.members;
-    }
+    projectsAtom.set(newProjectsRecord);
     
-    return project.members as User[];
-  }
-
-  /**
-   * Update project members using differential updates (only change what's different)
-   * Much more efficient than DELETE ALL + INSERT ALL
-   */
-  async updateMembers(projectId: string, newUserIds: string[]): Promise<void> {
-    // Get current members to calculate differences
-    const currentMembers = await this.getMembers(projectId);
-    const currentUserIds = new Set(currentMembers.map(m => m.id));
-    const newUserIdSet = new Set(newUserIds);
+    const processingTime = Date.now() - startTime;
+    const throughput = (projectsData.length / processingTime) * 1000;
+    console.log(`[ProjectDomain] ✅ Bulk inserted ${projectsData.length} projects in ${processingTime}ms (${throughput.toFixed(0)} projects/sec)`);
     
-    // Calculate what needs to be added and removed
-    const toAdd = newUserIds.filter(id => !currentUserIds.has(id));
-    const toRemove = Array.from(currentUserIds).filter(id => !newUserIdSet.has(id));
+    return insertedProjects;
     
-    // Early return if no changes needed
-    if (toAdd.length === 0 && toRemove.length === 0) {
-      console.log(`[ProjectRepository] No member changes needed for project ${projectId}`);
-      return;
-    }
-
-    console.log(`[ProjectRepository] Updating members for project ${projectId}:`, {
-      currentCount: currentMembers.length,
-      newCount: newUserIds.length,
-      toAdd: toAdd.length,
-      toRemove: toRemove.length
-    });
-
-    // Handle empty member list case
-    if (newUserIds.length === 0) {
-      // Just remove all members
-      await this.safeQuery(
-        'DELETE FROM project_members WHERE project_id = $1',
-        [projectId]
-      );
-      return;
-    }
-
-    // Use transaction for differential updates
-    const queryRunner = this.repository.manager.connection.createQueryRunner();
-    
-    try {
-      await queryRunner.startTransaction();
-      
-      // Remove members that should no longer be in the project
-      if (toRemove.length > 0) {
-        const placeholders = toRemove.map((_, index) => `$${index + 2}`).join(', ');
-        await queryRunner.query(
-          `DELETE FROM project_members WHERE project_id = $1 AND user_id IN (${placeholders})`,
-          [projectId, ...toRemove]
-        );
-      }
-      
-      // Add new members to the project
-      if (toAdd.length > 0) {
-        const values = toAdd.map((userId, index) => 
-          `($1, $${index + 2})`
-        ).join(', ');
-        
-        await queryRunner.query(
-          `INSERT INTO project_members (project_id, user_id) VALUES ${values}`,
-          [projectId, ...toAdd]
-        );
-      }
-      
-      await queryRunner.commitTransaction();
-      
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  /**
-   * Add a member to project
-   */
-  async addMember(projectId: string, userId: string): Promise<void> {
-    await this.safeQuery(
-      'INSERT INTO project_members (project_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [projectId, userId]
-    );
-  }
-
-  /**
-   * Remove a member from project
-   */
-  async removeMember(projectId: string, userId: string): Promise<void> {
-    await this.safeQuery(
-      'DELETE FROM project_members WHERE project_id = $1 AND user_id = $2',
-      [projectId, userId]
-    );
-  }
-
-  /**
-   * Optimized query to get project with members
-   */
-  async getProjectWithMembers(projectId: string): Promise<Project | null> {
-    return await this.repository
-      .createQueryBuilder('project')
-      .leftJoinAndSelect('project.members', 'member')
-      .where('project.id = :id', { id: projectId })
-      .getOne();
+  } catch (error) {
+    console.error(`[ProjectDomain] ❌ Bulk insert failed for ${projectsData.length} projects:`, error);
+    throw error;
   }
 }
 
-// Service
-export class ProjectService extends BaseService<Project> {
-  // 🎯 CONNECT: Service points to co-located atomic store (defined after class)
-  static atoms: ProjectAtomStore;
-
-  constructor(
-    protected projectRepository: ProjectRepository,
-    protected outgoingChangeService: OutgoingChangeService
-  ) {
-    super(projectRepository, 'projects', outgoingChangeService);
-    
-    // Set up entity-specific sync processing methods
-    this.validateSyncData = this.validateProjectSyncData.bind(this);
-  }
-
-  /**
-   * Override to specify project-specific date fields
-   */
-  getDateFields(): string[] {
-    return ['createdAt', 'updatedAt'];
-  }
-
-  /**
-   * Validate project sync data
-   */
-  private validateProjectSyncData(data: Record<string, any>, operation: 'INSERT' | 'UPDATE' | 'DELETE'): void {
-    if (operation === 'INSERT') {
-      if (!data.name) {
-        throw new Error(`Project INSERT requires name. Received: ${JSON.stringify(data)}`);
-      }
-    }
-    
-    if (operation === 'UPDATE' || operation === 'DELETE') {
-      if (!data.id) {
-        throw new Error(`Project ${operation} requires an id. Received: ${JSON.stringify(data)}`);
-      }
-    }
-  }
-
-  async get(id: string): Promise<Project | null> {
-    try {
-      return await this.repository.findById(id);
-    } catch (error) {
-      throw new DatabaseServiceError(
-        `Failed to get project with ID ${id}`,
-        'get',
-        error
-      );
-    }
-  }
-
-  async createProject(projectData: { name: string; description?: string; ownerId?: string }): Promise<Project> {
-    try {
-      const now = new Date();
-      const projectId = uuidv4();
-      
-      const newProject = {
-        id: projectId,
-        name: projectData.name,
-        description: projectData.description || '',
-        ownerId: projectData.ownerId || null,
-        status: 'active', // Default status
-        createdAt: now,
-        updatedAt: now
-      } as Project;
-
-      // ✅ USE INHERITED METHOD: createWithProcessing handles sync tracking automatically
-      const createdProject = await this.createWithProcessing(newProject as Record<string, any>);
-      
-      // ✅ OPTIMISTIC UPDATE: Add new project to atom immediately
-      projectActions.createProject(createdProject);
-      
-      // Optimized event dispatching
-      EventDispatcher.emit('project:created', { project: createdProject });
-      
-      return createdProject;
-    } catch (error) {
-      throw new DatabaseServiceError(
-        `Failed to create project "${projectData.name}"`,
-        'createProject',
-        error
-      );
-    }
-  }
-
-  async updateProject(id: string, changes: Partial<Project>): Promise<Project> {
-    try {
-      const project = await this.repository.findById(id);
-      if (!project) {
-        throw new Error(`Project with ID ${id} not found`);
-      }
-      
-      const updatedData = {
-        ...changes,
-        updatedAt: new Date()
-      } as DeepPartial<Project>;
-      
-      // ✅ USE INHERITED METHOD: updateWithProcessing handles sync tracking automatically
-      const updatedProject = await this.updateWithProcessing(id, updatedData as Record<string, any>);
-      
-      // ✅ OPTIMISTIC UPDATE: Update project in atom immediately
-      projectActions.updateProject(id, updatedProject);
-      
-      // Optimized event dispatching
-      EventDispatcher.emit('project:updated', { project: updatedProject });
-      
-      return updatedProject;
-    } catch (error) {
-      throw new DatabaseServiceError(
-        `Failed to update project with ID ${id}`,
-        'updateProject',
-        error
-      );
-    }
-  }
-
-  async deleteProject(id: string): Promise<boolean> {
-    try {
-      const project = await this.repository.findById(id);
-      if (!project) {
-        throw new Error(`Project with ID ${id} not found`);
-      }
-      
-      // ✅ USE INHERITED METHOD: deleteWithProcessing handles sync tracking automatically
-      const success = await this.deleteWithProcessing(id);
-      
-      // ✅ OPTIMISTIC UPDATE: Remove project from atom immediately
-      if (success) {
-        projectActions.deleteProject(id);
-        
-        // Optimized event dispatching
-        EventDispatcher.emit('project:deleted', { projectId: id });
-      }
-      
-      return success;
-    } catch (error) {
-      throw new DatabaseServiceError(
-        `Failed to delete project with ID ${id}`,
-        'deleteProject',
-        error
-      );
-    }
-  }
-
-  // Project Member Management Methods
-
-  async getProjectMembers(projectId: string): Promise<User[]> {
-    try {
-      return await this.projectRepository.getMembers(projectId);
-    } catch (error) {
-      throw new DatabaseServiceError(
-        `Failed to get members for project with ID ${projectId}`,
-        'getProjectMembers',
-        error
-      );
-    }
-  }
-
-  async updateProjectMembers(projectId: string, userIds: string[]): Promise<User[]> {
-    try {
-      // Check if project exists
-      const project = await this.repository.findById(projectId);
-      if (!project) {
-        throw new Error(`Project with ID ${projectId} not found`);
-      }
-
-      // Update the members using repository
-      await this.projectRepository.updateMembers(projectId, userIds);
-
-      // Get the updated members list
-      const updatedMembers = await this.projectRepository.getMembers(projectId);
-
-      // Use RelationshipChangeEncoder for TypeORM-native sync
-      const relationshipChange = RelationshipChangeEncoder.encodeRelationshipChange(
-        'projects',
-        projectId,
-        'members',
-        'set',
-        userIds
-      );
-
-      // Track change for sync - NON-BLOCKING (fire and forget)
-      this.outgoingChangeService.trackEntityChange(
-        'projects',
-        'update',
-        {
-          id: projectId,
-          updatedAt: relationshipChange.updatedAt,
-          clientId: relationshipChange.clientId,
-          // TODO: Add relationship metadata support to OutgoingChangeService
-          _relationshipUpdate: {
-            relationshipUpdates: relationshipChange.relationshipUpdates,
-            entityRelations: relationshipChange.entityRelations
-          }
-        }
-      ).catch((error: any) => {
-        console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
-      });
-
-      // Optimized event dispatching
-      EventDispatcher.emit('project:members-updated', { projectId, members: updatedMembers });
-
-      return updatedMembers;
-    } catch (error) {
-      throw new DatabaseServiceError(
-        `Failed to update members for project with ID ${projectId}`,
-        'updateProjectMembers',
-        error
-      );
-    }
-  }
-
-  async addProjectMember(projectId: string, userId: string): Promise<User[]> {
-    try {
-      // Check if project exists
-      const project = await this.repository.findById(projectId);
-      if (!project) {
-        throw new Error(`Project with ID ${projectId} not found`);
-      }
-
-      // Add the member using repository
-      await this.projectRepository.addMember(projectId, userId);
-
-      // Get the updated members list
-      const updatedMembers = await this.projectRepository.getMembers(projectId);
-
-      // Use RelationshipChangeEncoder for TypeORM-native sync
-      const relationshipChange = RelationshipChangeEncoder.encodeRelationshipChange(
-        'projects',
-        projectId,
-        'members',
-        'add',
-        [userId]
-      );
-
-      // Track change for sync - NON-BLOCKING (fire and forget)
-      this.outgoingChangeService.trackEntityChange(
-        'projects',
-        'update',
-        {
-          id: projectId,
-          updatedAt: relationshipChange.updatedAt,
-          clientId: relationshipChange.clientId,
-          // TODO: Add relationship metadata support to OutgoingChangeService
-          _relationshipUpdate: {
-            relationshipUpdates: relationshipChange.relationshipUpdates,
-            entityRelations: relationshipChange.entityRelations
-          }
-        }
-      ).catch((error: any) => {
-        console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
-      });
-
-      // Optimized event dispatching
-      EventDispatcher.emit('project:members-updated', { projectId, members: updatedMembers });
-
-      return updatedMembers;
-    } catch (error: any) {
-      throw new DatabaseServiceError(
-        `Failed to add member to project with ID ${projectId}`,
-        'addProjectMember',
-        error
-      );
-    }
-  }
-
-  async removeProjectMember(projectId: string, userId: string): Promise<User[]> {
-    try {
-      // Check if project exists
-      const project = await this.repository.findById(projectId);
-      if (!project) {
-        throw new Error(`Project with ID ${projectId} not found`);
-      }
-
-      // Remove the member using repository
-      await this.projectRepository.removeMember(projectId, userId);
-
-      // Get the updated members list
-      const updatedMembers = await this.projectRepository.getMembers(projectId);
-
-      // Use RelationshipChangeEncoder for TypeORM-native sync
-      const relationshipChange = RelationshipChangeEncoder.encodeRelationshipChange(
-        'projects',
-        projectId,
-        'members',
-        'remove',
-        [userId]
-      );
-
-      // Track change for sync - NON-BLOCKING (fire and forget)
-      this.outgoingChangeService.trackEntityChange(
-        'projects',
-        'update',
-        {
-          id: projectId,
-          updatedAt: relationshipChange.updatedAt,
-          clientId: relationshipChange.clientId,
-          // TODO: Add relationship metadata support to OutgoingChangeService
-          _relationshipUpdate: {
-            relationshipUpdates: relationshipChange.relationshipUpdates,
-            entityRelations: relationshipChange.entityRelations
-          }
-        }
-      ).catch((error: any) => {
-        console.error('[ProjectService] Relationship sync tracking failed (non-blocking):', error);
-      });
-
-      // Optimized event dispatching
-      EventDispatcher.emit('project:members-updated', { projectId, members: updatedMembers });
-
-      return updatedMembers;
-    } catch (error: any) {
-      throw new DatabaseServiceError(
-        `Failed to remove member from project with ID ${projectId}`,
-        'removeProjectMember',
-        error
-      );
-    }
-  }
-
-    // Note: Live changes methods removed - now handled centrally by LiveChangesManager
-
-  // ============================================================================
-  // LIVE QUERY BUILDERS (using our existing patterns)
-  // ============================================================================
-
-  static createQueryBuilders(createQueryBuilder: Function) {
-    return {
-      all: () => {
-        return createQueryBuilder(Project, 'project')
-          // No joins for now to avoid N+1 queries
-          .orderBy('project.name', 'ASC')
-      },
-
-      byOwner: (ownerId: string) => {
-        return createQueryBuilder(Project, 'project')
-          .where('project.ownerId = :ownerId', { ownerId })
-          .orderBy('project.name', 'ASC')
-      },
-
-      detail: (id: string) => {
-        return createQueryBuilder(Project, 'project')
-          .where('project.id = :id', { id })
-      },
-    }
-  }
-
-  // ❌ DELETED: All queryOptions (~150 lines) - replaced with atomic stores
-
-  // ❌ DELETED: All deprecated queries (~30 lines) - replaced with atomic stores
-
-  // ❌ DELETED: All hooks (~380 lines) - replaced with atomic stores
-}
-
-// ============================================================================
-// ATOMIC STORE INSTANCE - Exported for Universal Entity Table v2  
-// ============================================================================
-
-// 🎯 SIMPLE: Direct export, no registry needed
-const projectAtoms = new ProjectAtomStore();
-
-// 🎯 FIX: Use lazy initialization to prevent circular dependency
-Object.defineProperty(ProjectService, 'atoms', {
-  get() {
-    return projectAtoms;
-  },
-  enumerable: true,
-  configurable: true
-});
-
-export { projectAtoms };
-
-// Factory function for this domain
-export function createProjectDomain(
-  dataSource: NewPGliteDataSource, 
-  outgoingChangeService: OutgoingChangeService
-) {
-  if (!dataSource.isInitialized) {
-    throw new Error('DataSource must be initialized before creating Project domain');
-  }
-  
-  const repository = new ProjectRepository(dataSource);
-  const service = new ProjectService(repository, outgoingChangeService);
-  
-  return { repository, service };
-}
-
-// ============================================================================
-// SINGLETON SERVICE INSTANCE - For VibeGrid Integration
-// ============================================================================
-
-let projectServiceInstance: ProjectService | null = null;
-
-export function setProjectService(service: ProjectService): void {
-  projectServiceInstance = service;
-}
-
-export async function getProjectService(): Promise<ProjectService | null> {
-  return projectServiceInstance;
-}
-
-export function hasProjectService(): boolean {
-  return projectServiceInstance !== null;
-} 
+// Re-export types for convenience
+export type { CreateProjectInput, UpdateProjectInput } from '@repo/dataforge/project-operations';

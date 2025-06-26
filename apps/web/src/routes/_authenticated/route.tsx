@@ -1,11 +1,11 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { SidebarLayoutV3 } from '@/components/layout/dual-sidebar'
+import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
 import SkipToMain from '@/components/skip-to-main'
-import { ProjectService } from '@/domain/project'
-import { TaskService } from '@/domain/task'
-import { UserService } from '@/domain/user'
+import { projectActions } from '@/domain/project'
+import { taskActions } from '@/domain/task'
+import { userActions } from '@/domain/user'
 import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
 import { Project, Task, User } from '@repo/dataforge/client-entities'
 import { getDefaultStore } from 'jotai'
@@ -153,7 +153,7 @@ function AuthenticatedContent() {
   return (
     <>
       <SkipToMain />
-      <SidebarLayoutV3 />
+      <UnifiedLayout />
     </>
   )
 }

@@ -1,19 +1,40 @@
 import { IconDownload, IconPlus } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
-import { useTasks } from '../context/tasks-context'
+import { createTaskUI } from '@/domain/task'
+import { TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
 
 export function TasksPrimaryButtons() {
-  const { setOpen } = useTasks()
+  const handleCreate = async () => {
+    // TODO: Replace with proper dialog/form
+    const title = prompt('Enter task title:')
+    if (title) {
+      try {
+        await createTaskUI({
+          title,
+          status: TaskStatus.OPEN,
+          priority: TaskPriority.MEDIUM
+        })
+      } catch (error) {
+        console.error('Failed to create task:', error)
+      }
+    }
+  }
+
+  const handleImport = () => {
+    // TODO: Replace with proper import dialog
+    alert('Import functionality - Coming soon!')
+  }
+
   return (
     <div className='flex gap-2'>
       <Button
         variant='outline'
         className='space-x-1'
-        onClick={() => setOpen('import')}
+        onClick={handleImport}
       >
         <span>Import</span> <IconDownload size={18} />
       </Button>
-      <Button className='space-x-1' onClick={() => setOpen('create')}>
+      <Button className='space-x-1' onClick={handleCreate}>
         <span>Create</span> <IconPlus size={18} />
       </Button>
     </div>

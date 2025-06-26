@@ -9,7 +9,6 @@
 
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { TableChange } from '@repo/sync-types';
-import { createAllDomains } from '../domain/lib';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -39,7 +38,6 @@ export class IncomingChangeService {
   private dataSource: NewPGliteDataSource;
   private callbacks: IncomingChangeServiceCallbacks = {};
   private isProcessing = false;
-  private domainServices: Awaited<ReturnType<typeof createAllDomains>> | null = null;
   
   // Internal queue for handling concurrent requests
   private processingQueue: Array<{
@@ -59,20 +57,6 @@ export class IncomingChangeService {
     console.log('[IncomingChangeService] Initialized with config:', config);
   }
 
-  /**
-   * Initialize domain services
-   */
-  private async initializeDomainServices(): Promise<void> {
-    if (!this.domainServices) {
-      console.log('[IncomingChangeService] Initializing domain services...');
-      
-      // For incoming sync processing, we can pass null since we don't want to track outgoing changes
-      const syncManager = null as any; // Domain services won't track outgoing changes for incoming sync
-      
-      this.domainServices = createAllDomains(this.dataSource, syncManager);
-      console.log('[IncomingChangeService] Domain services initialized');
-    }
-  }
 
   /**
    * Set callbacks for service events
@@ -140,9 +124,6 @@ export class IncomingChangeService {
 
     try {
       console.log(`[IncomingChangeService] Processing ${changes.length} incoming changes (${messageType})`);
-
-      // Initialize domain services if needed
-      await this.initializeDomainServices();
 
       const batchSize = this.config.batchSize || 50;
       
@@ -260,27 +241,6 @@ export class IncomingChangeService {
     this.callbacks = {};
   }
 
-  /**
-   * Get domain service for a table
-   */
-  private getDomainService(table: string): any {
-    if (!this.domainServices) {
-      throw new Error('Domain services not initialized');
-    }
-
-    switch (table) {
-      case 'tasks':
-        return this.domainServices.task.service;
-      case 'projects':
-        return this.domainServices.project.service;
-      case 'users':
-        return this.domainServices.user.service;
-      case 'comments':
-        return this.domainServices.comment.service;
-      default:
-        throw new Error(`No domain service found for table: ${table}`);
-    }
-  }
 
   // Private methods
 
@@ -363,68 +323,83 @@ export class IncomingChangeService {
   }
 
   /**
-   * Process bulk inserts using domain service bulk operations
+   * Process bulk inserts - currently processes individually
+   * TODO: Add bulk operations to generated CRUD functions
    */
   private async processBulkInserts(table: string, changes: TableChange[]): Promise<ProcessingResult[]> {
     const results: ProcessingResult[] = [];
     
+    console.log(`[IncomingChangeService] Processing ${changes.length} bulk inserts for ${table}`);
+    
     try {
-      const domainService = this.getDomainService(table);
+      // Extract entities data from changes
+      const entitiesData = changes.map(change => change.data);
       
-      // Check if domain service supports bulk operations
-      if (typeof domainService.bulkCreateFromSync === 'function') {
-        console.log(`[IncomingChangeService] Using bulkCreateFromSync for ${changes.length} ${table} entities`);
-        
-        // Extract data for bulk insert
-        const entities = changes.map(change => change.data);
-        const startTime = Date.now();
-        
-        // Perform bulk insert
-        await domainService.bulkCreateFromSync(entities);
-        
-        const processingTime = Date.now() - startTime;
-        const throughput = changes.length / (processingTime / 1000);
-        console.log(`[IncomingChangeService] Successfully bulk inserted ${changes.length} ${table} entities in ${processingTime}ms (${throughput.toFixed(0)} entities/sec)`);
-        
-        // Create success results for all changes
-        for (const change of changes) {
-          results.push({
-            change,
-            success: true
-          });
-        }
-      } else {
-        console.warn(`[IncomingChangeService] Domain service for ${table} doesn't support bulkCreateFromSync, falling back to individual processing`);
-        
-        // Fallback to individual processing
-        for (const change of changes) {
-          try {
-            await domainService.createFromSync(change.data);
-            results.push({
-              change,
-              success: true
-            });
-          } catch (error) {
-            console.error(`[IncomingChangeService] Individual insert failed for ${table}:${change.data.id}:`, error);
-            results.push({
-              change,
-              success: false,
-              error: error instanceof Error ? error.message : String(error)
-            });
+      // Call domain-specific bulk function
+      let insertedEntities: any[] = [];
+      
+      switch (table) {
+        case 'tasks':
+          const { bulkCreateTasksIncoming } = await import('../domain/task');
+          insertedEntities = await bulkCreateTasksIncoming(entitiesData as any);
+          break;
+          
+        case 'comments':
+          const { bulkCreateCommentsIncoming } = await import('../domain/comment');
+          insertedEntities = await bulkCreateCommentsIncoming(entitiesData as any);
+          break;
+          
+        case 'projects':
+          const { bulkCreateProjectsIncoming } = await import('../domain/project');
+          insertedEntities = await bulkCreateProjectsIncoming(entitiesData as any);
+          break;
+          
+        case 'users':
+          const { bulkCreateUsersIncoming } = await import('../domain/user');
+          insertedEntities = await bulkCreateUsersIncoming(entitiesData as any);
+          break;
+          
+        default:
+          // Fallback to individual processing for unknown tables
+          console.warn(`[IncomingChangeService] No bulk handler for ${table}, falling back to individual processing`);
+          for (const change of changes) {
+            try {
+              const result = await this.applyChangeInTransaction(change, null);
+              results.push(result);
+            } catch (error) {
+              console.error(`[IncomingChangeService] Insert failed for ${table}:${change.data.id}:`, error);
+              results.push({
+                change,
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+              });
+            }
           }
-        }
+          return results;
       }
-    } catch (error) {
-      console.error(`[IncomingChangeService] Bulk insert failed for ${table}:`, error);
       
-      // Create error results for all changes
-      for (const change of changes) {
+      // Create success results for all bulk inserted entities
+      changes.forEach((change, index) => {
+        results.push({
+          change,
+          success: true,
+          error: undefined
+        });
+      });
+      
+      console.log(`[IncomingChangeService] ✅ Bulk inserted ${insertedEntities.length} ${table} entities`);
+      
+    } catch (error) {
+      console.error(`[IncomingChangeService] ❌ Bulk insert failed for ${table}:`, error);
+      
+      // Create error results for all failed changes
+      changes.forEach(change => {
         results.push({
           change,
           success: false,
           error: error instanceof Error ? error.message : String(error)
         });
-      }
+      });
     }
     
     return results;
@@ -448,26 +423,24 @@ export class IncomingChangeService {
         };
       }
 
-      // Use domain services instead of direct repository access
-      const domainService = this.getDomainService(change.table);
-      
       console.log(`[IncomingChangeService] Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
-      switch (change.operation) {
-        case 'insert':
-          await domainService.createFromSync(change.data);
+      // Use incoming path functions for clean separation
+      switch (change.table) {
+        case 'tasks':
+          await this.applyTaskChange(change);
           break;
-        
-        case 'update':
-          await domainService.updateFromSync(change.data.id, change.data);
+        case 'projects':
+          await this.applyProjectChange(change);
           break;
-        
-        case 'delete':
-          await domainService.deleteFromSync(change.data.id);
+        case 'users':
+          await this.applyUserChange(change);
           break;
-        
+        case 'comments':
+          await this.applyCommentChange(change);
+          break;
         default:
-          throw new Error(`Unknown operation: ${change.operation}`);
+          throw new Error(`No incoming function support for table: ${change.table}`);
       }
 
       console.log(`[IncomingChangeService] Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
@@ -484,6 +457,102 @@ export class IncomingChangeService {
         success: false,
         error: error instanceof Error ? error.message : String(error)
       };
+    }
+  }
+
+  /**
+   * Apply task changes using incoming path functions
+   */
+  private async applyTaskChange(change: TableChange): Promise<void> {
+    const { createTaskIncoming, updateTaskIncoming, deleteTaskIncoming } = await import('../domain/task');
+    
+    switch (change.operation) {
+      case 'insert':
+        await createTaskIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateTaskIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteTaskIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown task operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply project changes using incoming path functions
+   */
+  private async applyProjectChange(change: TableChange): Promise<void> {
+    const { createProjectIncoming, updateProjectIncoming, deleteProjectIncoming } = await import('../domain/project');
+    
+    switch (change.operation) {
+      case 'insert':
+        await createProjectIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateProjectIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteProjectIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown project operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply user changes using incoming path functions
+   */
+  private async applyUserChange(change: TableChange): Promise<void> {
+    const { createUserIncoming, updateUserIncoming, deleteUserIncoming } = await import('../domain/user');
+    
+    switch (change.operation) {
+      case 'insert':
+        await createUserIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateUserIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteUserIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown user operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply comment changes using incoming path functions
+   */
+  private async applyCommentChange(change: TableChange): Promise<void> {
+    const { createCommentIncoming, updateCommentIncoming, deleteCommentIncoming } = await import('../domain/comment');
+    
+    switch (change.operation) {
+      case 'insert':
+        await createCommentIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateCommentIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteCommentIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown comment operation: ${change.operation}`);
     }
   }
 

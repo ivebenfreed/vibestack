@@ -1,8 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { TaskVibeGrid } from '@/components/custom/vibegridfinal/entities/TaskVibeGrid'
-import { taskActions } from '@/domain/task'
-import { projectActions } from '@/domain/project'
-import { userActions } from '@/domain/user'
+import { createOptimizedLoader } from '@/domain/ensure-loaded'
 
 function VibeGridFinalTasksPage() {
   return (
@@ -27,25 +25,6 @@ function VibeGridFinalTasksPage() {
 }
 
 export const Route = createFileRoute('/_authenticated/debug/vibegridfinal-tasks')({
-  loader: async () => {
-    console.log('[VibeGridFinal Tasks Route] Pre-populating atoms via loader...')
-    
-    try {
-      // ✅ UNIVERSAL REACTIVE DATA PATTERN: Router loaders pre-populate atoms
-      await Promise.all([
-        taskActions.ensureLoaded(),
-        projectActions.ensureLoaded(),
-        userActions.ensureLoaded()
-      ])
-      
-      console.log('[VibeGridFinal Tasks Route] ✅ Entity atoms pre-populated')
-      
-      return null // No need to return data since atoms are populated
-      
-    } catch (error) {
-      console.error('[VibeGridFinal Tasks Route] Failed to pre-populate atoms:', error)
-      return null // Let components handle empty state gracefully
-    }
-  },
+  loader: createOptimizedLoader(['tasks', 'projects', 'users']),
   component: VibeGridFinalTasksPage,
 }) 

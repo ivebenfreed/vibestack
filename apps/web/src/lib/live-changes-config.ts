@@ -42,14 +42,28 @@ const TABLE_TO_ENTITY_MAP = CLIENT_DOMAIN_TABLES.reduce((map, tableName) => {
   return map
 }, {} as Record<string, string>)
 
-// Pure XState actions for all domains - maps directly to live changes manager interface
+// Live changes actions using the new 3-path architecture
+// These call the live changes path functions which only update atoms
 const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   Task: {
     updateItem: (id: string, updates: any) => {
-      taskActions.updateTaskAtomOnly(id, updates)
+      // Use live changes path function for proper 3-path architecture
+      import('@/domain/task').then(({ updateTaskLiveChanges }) => {
+        updateTaskLiveChanges(id, updates)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import task live changes functions:', error)
+        // Fallback to direct atom update
+        taskActions.updateTaskAtomOnly(id, updates)
+      })
     },
     removeItem: (id: string) => {
-      taskActions.deleteTaskAtomOnly(id)
+      import('@/domain/task').then(({ deleteTaskLiveChanges }) => {
+        deleteTaskLiveChanges(id)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import task live changes functions:', error)
+        // Fallback to direct atom update
+        taskActions.deleteTaskAtomOnly(id)
+      })
     },
     hasItem: (id: string) => {
       // Import and check the atom directly to avoid circular dependencies
@@ -64,10 +78,22 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   Project: {
     updateItem: (id: string, updates: any) => {
-      projectActions.updateProject(id, updates)
+      import('@/domain/project').then(({ updateProjectLiveChanges }) => {
+        updateProjectLiveChanges(id, updates)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import project live changes functions:', error)
+        // Fallback to direct atom update
+        projectActions.updateProjectAtomOnly(id, updates)
+      })
     },
     removeItem: (id: string) => {
-      projectActions.deleteProject(id)
+      import('@/domain/project').then(({ deleteProjectLiveChanges }) => {
+        deleteProjectLiveChanges(id)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import project live changes functions:', error)
+        // Fallback to direct atom update
+        projectActions.deleteProjectAtomOnly(id)
+      })
     },
     hasItem: (id: string) => {
       const { projectsAtom } = require('@/domain/project')
@@ -81,10 +107,22 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   User: {
     updateItem: (id: string, updates: any) => {
-      userActions.updateUser(id, updates)
+      import('@/domain/user').then(({ updateUserLiveChanges }) => {
+        updateUserLiveChanges(id, updates)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import user live changes functions:', error)
+        // Fallback to direct atom update
+        userActions.updateUserAtomOnly(id, updates)
+      })
     },
     removeItem: (id: string) => {
-      userActions.deleteUser(id)
+      import('@/domain/user').then(({ deleteUserLiveChanges }) => {
+        deleteUserLiveChanges(id)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import user live changes functions:', error)
+        // Fallback to direct atom update
+        userActions.deleteUserAtomOnly(id)
+      })
     },
     hasItem: (id: string) => {
       const { usersAtom } = require('@/domain/user')
@@ -98,10 +136,22 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   Comment: {
     updateItem: (id: string, updates: any) => {
-      commentActions.updateComment(id, updates)
+      import('@/domain/comment').then(({ updateCommentLiveChanges }) => {
+        updateCommentLiveChanges(id, updates)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import comment live changes functions:', error)
+        // Fallback to direct atom update
+        commentActions.updateCommentAtomOnly(id, updates)
+      })
     },
     removeItem: (id: string) => {
-      commentActions.deleteComment(id)
+      import('@/domain/comment').then(({ deleteCommentLiveChanges }) => {
+        deleteCommentLiveChanges(id)
+      }).catch(error => {
+        console.error('[LiveChangesConfig] Failed to import comment live changes functions:', error)
+        // Fallback to direct atom update
+        commentActions.deleteCommentAtomOnly(id)
+      })
     },
     hasItem: (id: string) => {
       const { commentsAtom } = require('@/domain/comment')

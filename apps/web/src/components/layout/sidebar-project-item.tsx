@@ -75,9 +75,9 @@ export const SidebarProjectItem = React.memo<SidebarProjectItemProps>(({ project
           to={`/projects/${project.id}`} 
           onClick={() => setMobileSheetOpen(false)}
           preload={false} // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
-          className="flex items-center gap-2 w-full"
+          className="flex items-center gap-2 w-full min-h-[2rem]"
         >
-          <Dot className="size-4 shrink-0" />
+          <Dot className="h-4 w-4 shrink-0" />
           <span className="truncate">{project.name}</span>
         </Link>
       </SidebarMenuSubButton>

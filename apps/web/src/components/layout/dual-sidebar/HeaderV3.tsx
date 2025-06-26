@@ -18,7 +18,7 @@ import { RotateCcw, PanelLeftIcon } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDualSidebar } from './DualSidebarProvider'
 
-export const HEADER_HEIGHT = 64 // pixels
+// Header height is defined in CSS as var(--header-height)
 
 interface HeaderV3Props extends React.HTMLAttributes<HTMLElement> {
   fixed?: boolean
@@ -97,18 +97,12 @@ const RefreshButton = () => {
 const SidebarTriggerV3 = () => {
   const { toggleAppSidebar } = useDualSidebar()
   
-  if (import.meta.env.DEV) {
-    console.log('[SidebarTriggerV3] Rendering trigger button')
-  }
   
   return (
     <Button
       variant="outline"
       size="icon"
-      onClick={() => {
-        console.log('[SidebarTriggerV3] Button clicked!')
-        toggleAppSidebar()
-      }}
+      onClick={toggleAppSidebar}
       className="h-8 w-8"
     >
       <PanelLeftIcon className="h-4 w-4" />
@@ -139,15 +133,6 @@ export const HeaderV3 = ({
   // Show trigger for routes that should have sidebars (simplified logic)
   const showSidebarTrigger = shouldShowSidebarTrigger
   
-  // Debug logging
-  if (import.meta.env.DEV) {
-    console.log('[HeaderV3] Rendering header - Toggle button state:', {
-      pathname: location.pathname,
-      shouldShowSidebarTrigger,
-      appSidebarVisible,
-      showSidebarTrigger
-    })
-  }
 
   React.useEffect(() => {
     const onScroll = () => {
@@ -164,17 +149,11 @@ export const HeaderV3 = ({
   return (
     <header
       className={cn(
-        'bg-background flex items-center gap-3 p-4 sm:gap-4',
-        fixed && 'header-fixed peer/header fixed top-0 right-0 z-50',
-        fixed && 'left-0 md:left-[var(--global-sidebar-width)]',
+        'dual-sidebar-header bg-background flex items-center gap-3 p-4 sm:gap-4',
+        fixed && 'sticky top-0 z-50',
         offset > 10 && fixed ? 'shadow-sm' : 'shadow-none',
         className
       )}
-      style={fixed ? { 
-        height: 'var(--header-height)'
-      } as React.CSSProperties : {
-        height: 'var(--header-height)'
-      }}
       {...props}
     >
       {showSidebarTrigger && (

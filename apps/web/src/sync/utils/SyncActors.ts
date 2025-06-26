@@ -125,12 +125,24 @@ export const syncActors = {
       const integrityResult = await services.integrity.validateIntegrity('pre-live-sync-check');
       
       if (!integrityResult.isValid) {
-        const errorMsg = `Integrity validation failed: ${integrityResult.recommendedAction}`;
-        syncLogger.warn('validation', errorMsg, {
-          issues: integrityResult.issues?.length || 0,
-          recommendedAction: integrityResult.recommendedAction
-        });
-        throw new Error(errorMsg);
+        const issueCount = integrityResult.issues?.length || 0;
+        const action = integrityResult.recommendedAction;
+        
+        if (action === 'none') {
+          // Minor issues that don't require action - log warning but continue
+          syncLogger.warn('validation', `Integrity validation found ${issueCount} minor issues but recommends no action - continuing`, {
+            issues: issueCount,
+            recommendedAction: action
+          });
+        } else {
+          // Critical issues that require action - fail validation
+          const errorMsg = `Integrity validation failed with critical issues: ${action} recommended`;
+          syncLogger.warn('validation', errorMsg, {
+            issues: issueCount,
+            recommendedAction: action
+          });
+          throw new Error(errorMsg);
+        }
       }
       
       syncLogger.info('validation', 'Integrity validation passed');

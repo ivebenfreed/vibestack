@@ -19,9 +19,10 @@ import { Outlet, useLocation } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { DualSidebarProvider } from './DualSidebarProvider'
 import { AppSidebarV2 } from './AppSidebarV2'
-import { HeaderV3, HEADER_HEIGHT } from './HeaderV3'
+import { HeaderV3 } from './HeaderV3'
 import { useLayoutStoreV2, cleanupLegacyCookieState } from '@/stores/layoutStoreV2'
 import { GlobalSidebar } from '@/components/layout/global-sidebar'
+import { GridDebugToggle } from '@/components/debug/grid-debug-toggle'
 
 // Dual sidebar layout now uses static CSS classes in index.css (Tailwind v4 approach)
 
@@ -67,41 +68,31 @@ function SidebarLayoutV3Internal() {
   
   // No CSS variables needed - using data attributes for CSS Grid
   
-  if (import.meta.env.DEV) {
-    // Debug logging for development
-    console.log('[SidebarLayoutV3] Render state:', {
-      appSidebarVisible,
-      appSidebarExpanded,
-      isTransitioning,
-      isMobile,
-      pathname: location.pathname
-    })
-  }
   
   return (
-    <div
-      className="dual-sidebar-layout"
-      data-app-sidebar-visible={appSidebarVisible}
-      data-app-sidebar-expanded={appSidebarExpanded}
-      data-transitioning={isTransitioning}
-      data-mobile={isMobile}
-    >
-      {/* Global Sidebar - Grid column 1 */}
-      <GlobalSidebar />
-      
-      {/* App Sidebar - Grid column 2 (when visible) */}
-      <AppSidebarV2 />
-      
-      {/* Main Content - Grid column 3 */}
-      <main className="dual-sidebar-inset">
-        <HeaderV3 fixed />
-        <div 
-          className="flex-1 min-h-0 overflow-auto"
-          style={{ paddingTop: `${HEADER_HEIGHT}px` }}
-        >
-          <Outlet />
-        </div>
-      </main>
+    <div className="layout-container">
+      <div
+        className="dual-sidebar-layout"
+        data-app-sidebar-visible={appSidebarVisible}
+        data-app-sidebar-expanded={appSidebarExpanded}
+        data-transitioning={isTransitioning}
+        data-mobile={isMobile}
+      >
+        {/* Global Sidebar - Grid column 1 */}
+        <GlobalSidebar />
+        
+        {/* App Sidebar - Grid column 2 (when visible) */}
+        <AppSidebarV2 />
+        
+        {/* Main Content - Grid column 3 */}
+        <main className="dual-sidebar-inset">
+          <HeaderV3 fixed />
+          <div className="dual-sidebar-content">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+      <GridDebugToggle />
     </div>
   )
 }

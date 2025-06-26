@@ -11,7 +11,7 @@ import {
 import { Task, TaskStatus, TaskPriority, Project, User } from '@repo/dataforge/client-entities'
 import { format } from 'date-fns'
 import { EntityDataTable } from '@/components/data-table/data-table-entity'
-import { TaskService } from '@/domain/task'
+import { useTaskAtoms } from '@/domain/task'
 import { usePGliteContext } from '@/db/pglite-provider'
 
 // V2 Cell Factories for Project and User
@@ -28,15 +28,18 @@ const EditableUserCellV2 = createEditableEntityCellV2<User>({
 });
 
 export function TasksDataTableNew() {
-  // Use the new domain-based hook - much simpler!
-  const { data: tasks, isLoading, error } = TaskService.hooks.useAllTasks()
+  // Use the new XState atom-based hooks
+  const tasks = useTaskAtoms.allTasks()
+  const isLoading = false // Tasks are always loaded from atoms
+  const error = null // Error handling is done at the atom level
   const { services } = usePGliteContext()
   
-  // Create the live query builder for EntityDataTable
+  // Create the live query builder for EntityDataTable (if still needed)
   const { createQueryBuilder, isDataSourceReady } = usePGliteContext()
   const liveQueryBuilder = useMemo(() => {
     if (!isDataSourceReady || !createQueryBuilder) return null
-    return TaskService.createQueryBuilders(createQueryBuilder).all()
+    // Simple query builder for backward compatibility
+    return createQueryBuilder(Task, 'task').orderBy('task.createdAt', 'DESC')
   }, [isDataSourceReady, createQueryBuilder])
   
   const columns = useMemo<ColumnDef<Task, any>[]>(() => [

@@ -131,7 +131,8 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
         
         // Business logic: Auto-set completion date when marking as complete
         if (value === 'completed' && !task.completedAt) {
-          await taskActions.updateTask(entityId, { 
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(entityId, { 
             status: value,
             completedAt: new Date()
           })
@@ -140,7 +141,8 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
         
         // Business logic: Clear completion date when moving from completed
         if (task.status === 'completed' && value !== 'completed') {
-          await taskActions.updateTask(entityId, { 
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(entityId, { 
             status: value,
             completedAt: undefined
           })
@@ -179,8 +181,13 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
       updateData = { [columnId]: value } as Partial<Task>
     }
     
-    // Use real domain action for persistence
-    await taskActions.updateTask(entityId, updateData)
+    // Use 3-path architecture for proper sync tracking
+    try {
+      const { updateTaskUI } = await import('@/domain/task')
+      await updateTaskUI(entityId, updateData)
+    } catch (error) {
+      console.error('[TaskVibeGrid] Failed to update task:', error)
+    }
   }, []) // ✅ PERFORMANCE FIX: No dependencies = stable callback reference
 
   // ============================================================================
@@ -197,8 +204,13 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
           if (onBulkDelete) {
             await onBulkDelete(selectedIds)
           } else {
-            // Default bulk delete implementation
-            await Promise.all(selectedIds.map(id => taskActions.deleteTask(id)))
+            // Default bulk delete implementation using 3-path architecture
+            try {
+              const { deleteTaskUI } = await import('@/domain/task')
+              await Promise.all(selectedIds.map(id => deleteTaskUI(id)))
+            } catch (error) {
+              console.error('[TaskVibeGrid] Failed to bulk delete tasks:', error)
+            }
           }
           console.log(`[TaskVibeGrid] Successfully deleted ${selectedIds.length} tasks`)
           break

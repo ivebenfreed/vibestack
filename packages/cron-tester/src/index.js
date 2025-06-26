@@ -75,19 +75,18 @@ function triggerCron() {
 }
 
 // Print startup message
-console.log('[CRON-TESTER] Starting replication heartbeat service (SINGLE SOURCE)');
-console.log(`[CRON-TESTER] Will trigger every ${POLL_INTERVAL_MS/1000} seconds`);
-console.log(`[CRON-TESTER] First trigger in ${INITIAL_DELAY_MS/1000} seconds`);
-console.log('[CRON-TESTER] This prevents PostgreSQL replication slot race conditions');
+console.log('[CRON-TESTER] DISABLED - ReplicationDO now uses on-demand activation');
+console.log('[CRON-TESTER] Replication will start automatically when clients send data');
+console.log('[CRON-TESTER] This allows ReplicationDO to hibernate when no client activity');
 
-// Only start once server has likely started
-setTimeout(() => {
-  // Trigger immediately after initial delay
-  triggerCron();
-  
-  // Then trigger periodically
-  setInterval(triggerCron, POLL_INTERVAL_MS);
-}, INITIAL_DELAY_MS);
+// DISABLED: On-demand activation strategy - no periodic heartbeat needed
+// setTimeout(() => {
+//   // Trigger immediately after initial delay
+//   triggerCron();
+//   
+//   // Then trigger periodically
+//   setInterval(triggerCron, POLL_INTERVAL_MS);
+// }, INITIAL_DELAY_MS);
 
 // Keep process running
 process.on('SIGINT', () => {

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react'
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
-import { TaskService } from '@/domain/task'
-import { ProjectService } from '@/domain/project'
-import { UserService } from '@/domain/user'
-import { useAtomValue } from 'jotai'
+import { useTaskAtoms, taskAtoms } from '@/domain/task'
+import { useProjectAtoms } from '@/domain/project'
+import { useUserAtoms } from '@/domain/user'
+import { createTaskUI, updateTaskUI, deleteTaskUI } from '@/domain/task'
 import { usePGliteContext } from '@/db/pglite-provider'
 import { 
   UniversalEntityTable,
@@ -39,19 +39,19 @@ export function TasksEnhancedV2() {
 
 
 
-  // Get related entity data for relationships
+  // Get related entity data for relationships using new XState atoms
   console.log(`📊 [TasksEnhancedV2] Getting atom values - render #${currentRender}`)
   
-  console.log(`📊 [TasksEnhancedV2] Calling useAtomValue(ProjectService.atoms.allProjectsAtom) - render #${currentRender}`)
-  const allProjects = useAtomValue(ProjectService.atoms.allProjectsAtom)
+  console.log(`📊 [TasksEnhancedV2] Calling useProjectAtoms.allProjects() - render #${currentRender}`)
+  const allProjects = useProjectAtoms.allProjects()
   console.log(`📊 [TasksEnhancedV2] allProjects result:`, { 
     length: allProjects?.length, 
     hasData: !!allProjects,
     render: currentRender 
   })
   
-  console.log(`📊 [TasksEnhancedV2] Calling useAtomValue(UserService.atoms.allUsersAtom) - render #${currentRender}`)
-  const allUsers = useAtomValue(UserService.atoms.allUsersAtom)
+  console.log(`📊 [TasksEnhancedV2] Calling useUserAtoms.allUsers() - render #${currentRender}`)
+  const allUsers = useUserAtoms.allUsers()
   console.log(`📊 [TasksEnhancedV2] allUsers result:`, { 
     length: allUsers?.length, 
     hasData: !!allUsers,
@@ -258,29 +258,24 @@ export function TasksEnhancedV2() {
     console.log(`🔧 [TasksEnhancedV2] TASK_SERVICE_ADAPTER MEMO COMPUTING - render #${currentRender}`)
     const memoStartTime = performance.now()
     
-    // Create a stable reference to prevent recreations
+    // Create a stable reference to prevent recreations - using 3-path architecture
     const adapter = {
-      atoms: TaskService.atoms,
+      atoms: taskAtoms,
       create: async (data: Partial<Task>) => {
-        if (!services?.tasks) throw new Error('Task service not available')
-        return await services.tasks.createTask(data as any)
+        return await createTaskUI(data as any)
       },
       update: async (id: string, data: Partial<Task>) => {
-        if (!services?.tasks) throw new Error('Task service not available')
-        return await services.tasks.updateTask(id, data)
+        return await updateTaskUI(id, data)
       },
       delete: async (id: string) => {
-        if (!services?.tasks) throw new Error('Task service not available')
-        await services.tasks.deleteTask(id)
+        await deleteTaskUI(id)
       },
       bulkUpdate: async (ids: string[], data: Partial<Task>) => {
-        if (!services?.tasks) throw new Error('Task service not available')
-        const results = await Promise.all(ids.map(id => services.tasks.updateTask(id, data)))
+        const results = await Promise.all(ids.map(id => updateTaskUI(id, data)))
         return results
       },
       bulkDelete: async (ids: string[]) => {
-        if (!services?.tasks) throw new Error('Task service not available')
-        await Promise.all(ids.map(id => services.tasks.deleteTask(id)))
+        await Promise.all(ids.map(id => deleteTaskUI(id)))
       },
     }
     

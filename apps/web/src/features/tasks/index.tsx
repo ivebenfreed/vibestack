@@ -1,6 +1,4 @@
 import React from 'react'
-import TasksProvider from './context/tasks-context'
-import { TasksPrimaryButtons } from './components/tasks-primary-buttons'
 import { VibeGridFinal } from '@/components/custom/vibegridfinal/core/VibeGridFinal'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Task } from '@repo/dataforge/client-entities'
@@ -12,7 +10,6 @@ import {
   createDirectUsagePattern,
   validateDirectUsagePattern
 } from '@/components/custom/vibegridfinal/utils/patterns'
-import { ContentContainer } from '@/components/layout/content-container'
 import { taskActions, tasksAtom } from '@/domain/task'
 import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
@@ -73,58 +70,63 @@ const Tasks: React.FC = () => {
   // 🔥 ENFORCED PATTERNS: Business Logic Handlers (Required by DirectUsagePattern)
   // ============================================================================
   
-  // ✅ DOMAIN ACTION INTEGRATION: Required by BusinessLogicHandlers interface
+  // ✅ DIRECT FUNCTION CALLS: Simple, clear task updates
   const handleSave = React.useCallback(async (entityId: string, columnId: string, value: any) => {
-    console.log('🔥 Tasks.handleSave (Pattern Enforced):', { entityId, columnId, value })
     
-    // Task-specific business logic
-    if (columnId === 'status') {
-      const currentTasks = tasksAtom.get()
-      const task = currentTasks?.[entityId]
-      if (task) {
-        // Auto-set completion date when marking as complete
-        if (value === 'completed' && !task.completedAt) {
-          await taskActions.updateTask(entityId, { 
-            status: value,
-            completedAt: new Date()
-          })
-          return
-        }
-        
-        // Clear completion date when moving from completed
-        if (task.status === 'completed' && value !== 'completed') {
-          await taskActions.updateTask(entityId, { 
-            status: value,
-            completedAt: undefined
-          })
-          return
+    try {
+      const { updateTaskUI } = await import('@/domain/task')
+    
+      // Task-specific business logic
+      if (columnId === 'status') {
+        const currentTasks = tasksAtom.get()
+        const task = currentTasks?.[entityId]
+        if (task) {
+          // Auto-set completion date when marking as complete
+          if (value === 'completed' && !task.completedAt) {
+            await updateTaskUI(entityId, { 
+              status: value,
+              completedAt: new Date()
+            })
+            return
+          }
+          
+          // Clear completion date when moving from completed
+          if (task.status === 'completed' && value !== 'completed') {
+            await updateTaskUI(entityId, { 
+              status: value,
+              completedAt: undefined
+            })
+            return
+          }
         }
       }
+      
+      // Convert column updates to proper task updates
+      let updateData: Partial<Task> = {}
+      if (columnId === 'project') {
+        updateData = { projectId: value || null }
+      } else if (columnId === 'assignee') {
+        updateData = { assigneeId: value || null }
+      } else {
+        updateData = { [columnId]: value } as Partial<Task>
+      }
+      
+      await updateTaskUI(entityId, updateData)
+    } catch (error) {
+      console.error('[TasksIndex] Task update failed:', error)
     }
-    
-    // Convert column updates to proper task updates
-    let updateData: Partial<Task> = {}
-    if (columnId === 'project') {
-      updateData = { projectId: value }
-    } else if (columnId === 'assignee') {
-      updateData = { assigneeId: value }
-    } else {
-      updateData = { [columnId]: value } as Partial<Task>
-    }
-    
-    await taskActions.updateTask(entityId, updateData)
   }, [])
   
-  // ✅ BULK ACTION INTEGRATION: Required by BusinessLogicHandlers interface
+  // ✅ BULK ACTION INTEGRATION: Simple direct function calls
   const handleBulkAction = React.useCallback(async (selectedIds: string[], action: string) => {
-    console.log(`[Tasks] Pattern-enforced bulk ${action}:`, selectedIds)
     
     try {
       switch (action) {
         case 'delete':
           const confirmed = window.confirm(`Delete ${selectedIds.length} tasks?`)
           if (confirmed) {
-            await Promise.all(selectedIds.map(id => taskActions.deleteTask(id)))
+            const { deleteTaskUI } = await import('@/domain/task')
+            await Promise.all(selectedIds.map(id => deleteTaskUI(id)))
           }
           break
         case 'edit':
@@ -190,55 +192,43 @@ const Tasks: React.FC = () => {
     const result = validateDirectUsagePattern(usagePattern)
     if (!result.valid) {
       console.error('❌ DirectUsagePattern validation failed:', result.errors)
-    } else {
-      console.log('✅ DirectUsagePattern validation passed')
     }
     return result
   }, [usagePattern])
 
   return (
-    <ContentContainer>
-      <TasksProvider>
-        <div className="flex flex-col">
-          <div className='mb-2 flex flex-wrap items-center justify-between space-y-2 gap-x-4'>
-            <div>
-              <h2 className='text-2xl font-bold tracking-tight'>Tasks</h2>
-              <p className='text-muted-foreground'>
-                Pattern-enforced VibeGridFinal with TypeScript architectural guardrails.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <TasksPrimaryButtons />
-            </div>
-          </div>
-          
-          <div className="mt-4">
-            {/* ✅ PATTERN-ENFORCED USAGE: TypeScript ensures proper patterns */}
-            <VibeGridFinal
-              data={tasks}
-              columns={columns}
-              relationshipData={relationshipData}
-              onSave={handleSave}
-              enableSorting={true}
-              enablePagination={true}
-              enableGlobalSearch={true}
-              enableHorizontalScrolling={true}
-              enableRowSelection={true}
-              onBulkAction={handleBulkAction}
-              pageSize={10}
-              className="border border-border rounded-lg"
-              debugMode={true}
-              debugEllipsis={false}
-              debugBorders={false}
-              tableId="tasks-grid"
-              enablePersistence={true}
-              enableCrossTabSync={false}
-              __usagePattern={usagePattern}
-            />
-          </div>
-        </div>
-      </TasksProvider>
-    </ContentContainer>
+    <div className="flex flex-col h-full">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
+        <p className="text-muted-foreground">
+          Manage and track all your tasks.
+        </p>
+      </div>
+      
+      <div className="flex-1">
+        <VibeGridFinal
+          data={tasks}
+          columns={columns}
+          relationshipData={relationshipData}
+          onSave={handleSave}
+          enableSorting={true}
+          enablePagination={true}
+          enableGlobalSearch={true}
+          enableHorizontalScrolling={true}
+          enableRowSelection={true}
+          onBulkAction={handleBulkAction}
+          pageSize={10}
+          className="border border-border rounded-lg"
+          debugMode={true}
+          debugEllipsis={false}
+          debugBorders={false}
+          tableId="tasks-grid"
+          enablePersistence={true}
+          enableCrossTabSync={false}
+          __usagePattern={usagePattern}
+        />
+      </div>
+    </div>
   )
 }
 

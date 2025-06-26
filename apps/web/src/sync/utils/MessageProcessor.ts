@@ -115,7 +115,7 @@ export class MessageProcessor {
 
     console.log(`[MessageProcessor] 📥 Sending INCOMING_CHANGES event for ${changes.length} changes (${messageType})`);
     
-    // Send INCOMING_CHANGES event to state machine like V2 does
+    // Send INCOMING_CHANGES event to state machine for all change types
     sendEvent({ 
       type: 'INCOMING_CHANGES', 
       changes, 
@@ -132,6 +132,7 @@ export class MessageProcessor {
     
     // Acknowledgments will be sent by the state machine after processing completes
   }
+
 
   /**
    * Handle integrity validation responses

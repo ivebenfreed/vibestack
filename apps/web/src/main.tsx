@@ -66,10 +66,10 @@ import { ThemeProvider } from './context/theme-context'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
-// Import domain services for atomic store access
-import { TaskService } from '@/domain/task'
-import { ProjectService } from '@/domain/project'
-import { UserService } from '@/domain/user'
+// Import domain actions for atomic store access
+import { taskActions } from '@/domain/task'
+import { projectActions } from '@/domain/project'
+import { userActions } from '@/domain/user'
 
 // 🔥 ORCHESTRATOR INTEGRATION FLOW:
 // 1. main.tsx: Creates router and renders root providers
@@ -196,9 +196,9 @@ async function initializeApp() {
 // Wrapper component to provide atom setters via router context - Phase 4: Atomic Integration
 function AppWithRouterContext() {
   // Direct access to the set methods from the atomic stores
-  const setTaskAtoms = TaskService.atoms.syncBulkLoad.set
-  const setProjectAtoms = ProjectService.atoms.syncBulkLoad.set
-  const setUserAtoms = UserService.atoms.syncBulkLoad.set
+  const setTaskAtoms = taskActions.loadTasks
+  const setProjectAtoms = projectActions.loadProjects
+  const setUserAtoms = userActions.loadUsers
 
   return (
     <RouterProvider 

@@ -31,6 +31,9 @@ import { syncActors } from '../../sync/utils/SyncActors';
 // Phase 3: Streamlined service management
 import { ServiceCoordinator, Services } from '../../sync/utils/ServiceCoordinator';
 
+// Track last saved state to avoid redundant saves
+let lastSavedState: { clientId: string; currentLSN: string } | null = null;
+
 // Streamlined context for V3 - essential state only (Phase 3 optimization)
 export interface SyncMachineV3Context {
   // Core sync state
@@ -49,9 +52,6 @@ export interface SyncMachineV3Context {
   
   // Service coordination - simplified to single coordinator
   serviceCoordinator: ServiceCoordinator | null;
-  
-  // Minimal stats
-  lastSyncTime: number | null;
 }
 
 // Clean event types from Phase 2 - replaces the massive union type
@@ -64,6 +64,11 @@ let globalServicesV3: {
   outgoingChangeService: OutgoingChangeService | null;
   integrityService: IntegrityService | null;
 } | null = null;
+
+// Getter for global services (for domain service integration)
+export const getGlobalServicesV3 = () => {
+  return globalServicesV3;
+};
 
 // Clean up function for V3
 export const destroyGlobalSyncServicesV3 = () => {
@@ -158,16 +163,33 @@ export const syncMachineV3 = setup({
   actions: {
     // Same localStorage pattern as V2 (lines 730-741)
     saveOwnState: ({ context }) => {
-      const SYNC_STATE_KEY = 'sync-machine-state';
       try {
+        syncLogger.debug('machine', 'saveOwnState: starting save process', {
+          clientId: context.clientId,
+          currentLSN: context.currentLSN
+        });
+        
+        const SYNC_STATE_KEY = 'sync-machine-state';
         const stateToSave = {
           clientId: context.clientId,
           currentLSN: context.currentLSN
         };
+        
+        // Only save if state has actually changed
+        if (lastSavedState && 
+            lastSavedState.clientId === stateToSave.clientId && 
+            lastSavedState.currentLSN === stateToSave.currentLSN) {
+          syncLogger.debug('machine', 'saveOwnState: no change, skipping save');
+          return;
+        }
+        
         localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(stateToSave));
-        console.log('[SyncMachineV3] 💾 Shell saved state:', stateToSave);
+        lastSavedState = { ...stateToSave }; // Update cached state
+        syncLogger.debug('machine', 'saveOwnState: state saved successfully', stateToSave);
       } catch (error) {
-        console.warn('[SyncMachineV3] Failed to save state:', error);
+        syncLogger.error('machine', `saveOwnState: error during save: ${error}`);
+        syncLogger.serviceError('SyncMachine', error as Error, 'state-save');
+        throw error; // Re-throw to see if this is causing the action.exec error
       }
     },
     
@@ -176,8 +198,7 @@ export const syncMachineV3 = setup({
       console.log('[SyncMachineV3] 🔧 Initializing context...');
       return {
         serverUrl: getSyncWebSocketUrl(),
-        isConnected: false,
-        lastSyncTime: Date.now()
+        isConnected: false
       };
     }),
     
@@ -249,18 +270,29 @@ export const syncMachineV3 = setup({
     }),
 
     // Reusable actions to reduce repetition
-    updateLastSyncTime: assign({ lastSyncTime: () => Date.now() }),
-    
-    updateLastSyncTimeAndSave: [
-      assign({ lastSyncTime: () => Date.now() }),
-      'saveOwnState'
-    ],
     
     logProcessedChanges: ({ event }: { event: any }) => {
-      if ('results' in event) {
-        console.log(`[SyncMachineV3] ✅ Processed ${event.results.length} incoming changes`);
-      } else if ('count' in event) {
-        console.log(`[SyncMachineV3] ✅ Sent ${event.count} outgoing changes`);
+      try {
+        syncLogger.debug('machine', 'logProcessedChanges: starting', {
+          eventType: event.type,
+          hasResults: 'results' in event,
+          hasCount: 'count' in event,
+          eventKeys: Object.keys(event)
+        });
+        
+        if ('results' in event) {
+          console.log(`[SyncMachineV3] ✅ Processed ${event.results.length} incoming changes`);
+        } else if ('count' in event) {
+          const count = Array.isArray(event.count) ? event.count.length : event.count;
+          console.log(`[SyncMachineV3] ✅ Sent ${count} outgoing changes`);
+        }
+        
+        syncLogger.debug('machine', 'logProcessedChanges: completed successfully', {
+          eventType: event.type
+        });
+      } catch (error) {
+        syncLogger.error('machine', `logProcessedChanges: error during execution: ${error}`);
+        throw error; // Re-throw to see if this is causing the action.exec error
       }
     },
     
@@ -393,6 +425,11 @@ export const syncMachineV3 = setup({
         if (parsedState.clientId && parsedState.currentLSN) {
           persistedClientId = parsedState.clientId;
           persistedLSN = parsedState.currentLSN;
+          // Initialize lastSavedState to prevent redundant save on startup
+          lastSavedState = {
+            clientId: persistedClientId,
+            currentLSN: persistedLSN
+          };
           console.log('[SyncMachineV3] Loaded own persisted state:', {
             clientId: persistedClientId,
             currentLSN: persistedLSN
@@ -424,8 +461,7 @@ export const syncMachineV3 = setup({
       isConnected: false,
       error: null,
       reconnectAttempts: 0,
-      serviceCoordinator: null,
-      lastSyncTime: null
+      serviceCoordinator: null
     };
   },
   
@@ -480,6 +516,25 @@ export const syncMachineV3 = setup({
                     autonomous: true,
                     servicesCount: Object.keys(event.output.services).length
                   });
+                  
+                  // Populate global services registry for domain service access
+                  globalServicesV3 = {
+                    webSocketService: event.output.services.webSocket,
+                    incomingChangeService: event.output.services.incoming,
+                    outgoingChangeService: event.output.services.outgoing,
+                    integrityService: event.output.services.integrity
+                  };
+                  
+                  // Reinitialize domains with real sync services
+                  setTimeout(async () => {
+                    try {
+                      const { reinitializeDomainsWithSyncServices } = await import('../../domain');
+                      await reinitializeDomainsWithSyncServices();
+                    } catch (error) {
+                      console.warn('[SyncMachineV3] Failed to reinitialize domains with sync services:', error);
+                    }
+                  }, 0);
+                  
                   return {
                     serviceCoordinator: event.output.serviceCoordinator
                   };
@@ -508,8 +563,7 @@ export const syncMachineV3 = setup({
               actions: [
                 assign(({ event }) => ({
                   isConnected: true,
-                  serverLSN: event.output.serverLSN,
-                  lastSyncTime: Date.now()
+                  serverLSN: event.output.serverLSN
                 })),
                 'saveOwnState',
                 () => console.log('[SyncMachineV3] ✅ WebSocket connected - determining sync phase')
@@ -618,7 +672,7 @@ export const syncMachineV3 = setup({
         },
         
         INCOMING_CHANGES_PROCESSED: {
-          actions: 'updateLastSyncTime'
+          actions: 'logProcessedChanges'
         },
         
         INCOMING_CHANGES_ERROR: {
@@ -670,7 +724,7 @@ export const syncMachineV3 = setup({
         },
         
         INCOMING_CHANGES_PROCESSED: {
-          actions: 'updateLastSyncTime'
+          actions: 'logProcessedChanges'
         },
         
         INCOMING_CHANGES_ERROR: {
@@ -721,8 +775,7 @@ export const syncMachineV3 = setup({
           target: 'live_sync',
           actions: [
             assign({ 
-              syncPhase: 'live' as const,
-              lastSyncTime: () => Date.now()
+              syncPhase: 'live' as const
             }),
             'notifyParentLive',
             'saveOwnState',
@@ -751,8 +804,7 @@ export const syncMachineV3 = setup({
           target: 'live_sync',
           actions: [
             assign({ 
-              syncPhase: 'live' as const,
-              lastSyncTime: () => Date.now()
+              syncPhase: 'live' as const
             }),
             'notifyParentLive', // ONLY send SYNC_LIVE after successful validation
             'saveOwnState',
@@ -797,7 +849,6 @@ export const syncMachineV3 = setup({
                 state: 'live_sync',
                 phase: context.syncPhase,
                 lsn: context.currentLSN,
-                lastActivity: context.lastSyncTime,
                 servicesHealthy: !!context.serviceCoordinator
               });
             }
@@ -813,11 +864,13 @@ export const syncMachineV3 = setup({
         WS_MESSAGE: {
           actions: [
             'processWebSocketMessage', // Route message to appropriate services
-            assign({
-              lastSyncTime: () => Date.now()
-            }),
             'saveOwnState'
           ]
+        },
+        
+        // Process incoming changes (needed for live sync!)
+        INCOMING_CHANGES: {
+          actions: 'processIncomingChanges'
         },
         
         WS_DISCONNECTED: {
@@ -837,11 +890,14 @@ export const syncMachineV3 = setup({
         
         // Service processing events
         INCOMING_CHANGES_PROCESSED: {
-          actions: ['logProcessedChanges', 'updateLastSyncTimeAndSave']
+          actions: ['logProcessedChanges', 'saveOwnState']
         },
         
         OUTGOING_CHANGES_SENT: {
-          actions: ['logProcessedChanges', 'updateLastSyncTimeAndSave']
+          actions: [
+            'logProcessedChanges',
+            'saveOwnState'
+          ]
         },
         
         // Service error handling
@@ -866,32 +922,27 @@ export const syncMachineV3 = setup({
         
         OUTGOING_CHANGES_QUEUED: {
           actions: [
-            ({ event }) => console.log(`[SyncMachineV3] 📤 Queued ${event.count} outgoing changes`),
-            'updateLastSyncTimeAndSave'
+            ({ event }) => {
+              const count = Array.isArray(event.count) ? event.count.length : event.count;
+              console.log(`[SyncMachineV3] 📤 Queued ${count} outgoing changes`);
+            },
+            'saveOwnState'
           ]
         },
         
         OUTGOING_CHANGES_ACKNOWLEDGED: {
           actions: [
-            ({ event }) => console.log(`[SyncMachineV3] ✅ Server acknowledged ${event.changeIds?.length || 0} outgoing changes`),
-            'updateLastSyncTimeAndSave'
-          ]
-        },
-        
-        // LSN updates
-        LSN_UPDATE: {
-          actions: 'updateLSN'
-        },
-        
-        
-        // Service errors
-        SERVICE_ERROR: {
-          actions: [
             ({ event }) => {
-              console.error(`[SyncMachineV3] ❌ Service error in ${event.service}:`, event.error);
+              const count = Array.isArray(event.changeIds) ? event.changeIds.length : (event.changeIds || 0);
+              console.log(`[SyncMachineV3] ✅ Server acknowledged ${count} outgoing changes`);
             },
-            'recordError'
+            'saveOwnState'
           ]
+        },
+        
+        // LSN updates - CRITICAL: Must save state to persist LSN changes
+        LSN_UPDATE: {
+          actions: ['updateLSN', 'saveOwnState']
         }
       }
     },

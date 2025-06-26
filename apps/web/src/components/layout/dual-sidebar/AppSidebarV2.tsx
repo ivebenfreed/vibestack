@@ -66,15 +66,6 @@ const SidebarContentLazy = React.memo(function SidebarContentLazy({ activeSectio
   const stats = useSidebarNavigationStats(navigation)
   const navGroups = navigation.sections[activeSection] || []
   
-  // Debug logging removed - navigation is working correctly
-  if (import.meta.env.DEV && Math.random() < 0.001) {
-    console.log('[AppSidebarV2] Render cycle:', {
-      activeSection,
-      projectsCount: stats.projectsCount,
-      navGroupsCount: navGroups.length,
-      totalNavItems: stats.totalNavItems
-    })
-  }
   
   return (
     <>
@@ -113,20 +104,9 @@ function DesktopAppSidebar({ activeSection }: { activeSection: string }) {
   } = useDualSidebar()
   
   if (!appSidebarVisible) {
-    if (import.meta.env.DEV) {
-      console.log('[AppSidebarV2] Desktop sidebar hidden - not visible for section:', activeSection)
-    }
     return null // Hidden by route
   }
   
-  if (import.meta.env.DEV) {
-    console.log('[AppSidebarV2] Desktop sidebar rendering:', { 
-      activeSection, 
-      appSidebarVisible, 
-      appSidebarExpanded,
-      isTransitioning 
-    })
-  }
   
   // ⚡ PERFORMANCE: Different content strategies for different sections (copied from original)
   const shouldShowExpensiveContent = activeSection === 'projects' || activeSection === 'settings'
@@ -134,45 +114,29 @@ function DesktopAppSidebar({ activeSection }: { activeSection: string }) {
   
   return (
     <div
-      className={`
-        app-sidebar-desktop
-        h-svh 
-        flex
-        bg-sidebar text-sidebar-foreground border-r border-sidebar-border
-        flex-col hidden md:flex
-        relative
-      `}
-      style={{
-        width: appSidebarExpanded ? 'var(--app-sidebar-width)' : 'var(--app-sidebar-width-icon)',
-        gridColumn: '2'
-      }}
+      className="app-sidebar-desktop"
       data-expanded={appSidebarExpanded}
       data-transitioning={isTransitioning}
     >
       {/* Header */}
-      <div className={`flex h-14 items-center justify-center border-b border-sidebar-border ${appSidebarExpanded ? 'p-2' : 'p-1'}`}>
+      <div className={appSidebarExpanded ? 'sidebar-header-expanded' : 'sidebar-header-collapsed'}>
         <AppLogoHeader isCollapsed={!appSidebarExpanded} />
       </div>
       
       {/* Content */}
-      <div className={`flex min-h-0 flex-1 flex-col gap-2 overflow-auto ${appSidebarExpanded ? 'p-2' : 'px-1 py-2'}`}>
+      <div className={appSidebarExpanded ? 'sidebar-content-expanded' : 'sidebar-content-collapsed'}>
         {shouldShowExpensiveContent && <SidebarContentLazy activeSection={activeSection} />}
         {shouldShowDebugContent && <DebugSidebarContent />}
       </div>
       
       {/* Footer */}
-      <div className="flex flex-col gap-2 p-2">
+      <div className="sidebar-footer">
         {/* Footer content goes here */}
       </div>
       
       {/* Rail for hover expansion */}
       <button
-        className={`
-          absolute inset-y-0 -right-4 z-20 hidden w-4 -translate-x-1/2 
-          hover:after:bg-sidebar-border
-          after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] 
-          sm:flex cursor-e-resize
-        `}
+        className="sidebar-rail"
         onClick={toggleAppSidebar}
         aria-label="Toggle Sidebar"
         title="Toggle Sidebar"

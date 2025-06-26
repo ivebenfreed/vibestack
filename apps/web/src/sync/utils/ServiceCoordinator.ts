@@ -119,28 +119,25 @@ export class ServiceCoordinator {
         autoResetOnFailure: config.autoResetOnFailure ?? false
       };
 
-      // Initialize services with sync machine context only
+      // Initialize services in correct order with proper dependencies
       syncLogger.info('service', 'Creating WebSocketService...');
       this.services.webSocket = new WebSocketService(wsConfig);
       
       syncLogger.info('service', 'Creating IncomingChangeService...');
       this.services.incoming = new IncomingChangeService(incomingConfig, this.dataSource);
       
-      syncLogger.info('service', 'Creating OutgoingChangeService...');
-      this.services.outgoing = new OutgoingChangeService(outgoingConfig, this.dataSource);
+      syncLogger.info('service', 'Creating OutgoingChangeService with WebSocket message sender...');
+      this.services.outgoing = new OutgoingChangeService(outgoingConfig, this.dataSource, this.services.webSocket);
       
-      syncLogger.info('service', 'Creating IntegrityService...');
+      syncLogger.info('service', 'Creating IntegrityService with WebSocket message sender...');
       this.services.integrity = new IntegrityService(integrityConfig, this.dataSource);
+      this.services.integrity.setMessageSender(this.services.webSocket);
 
       // Validate all services created successfully
       if (!this.services.webSocket || !this.services.incoming || 
           !this.services.outgoing || !this.services.integrity) {
         throw new Error('Failed to create one or more services');
       }
-
-      // Set WebSocketService as message sender for IntegrityService (enables server validation)
-      this.services.integrity.setMessageSender(this.services.webSocket);
-      syncLogger.info('service', 'WebSocketService configured as message sender for IntegrityService');
 
       syncLogger.serviceInitialized('ServiceCoordinator', {
         webSocket: !!this.services.webSocket,
@@ -201,12 +198,15 @@ export class ServiceCoordinator {
 
     // Incoming change service callbacks
     this.services.incoming.setCallbacks({
-      onChangesProcessed: (results: any[]) => {
-        syncLogger.serviceCallback('IncomingChanges', 'changesProcessed', { count: results.length });
+      onChangesProcessed: (changes: any[], results: any[]) => {
+        syncLogger.serviceCallback('IncomingChanges', 'changesProcessed', { 
+          changeCount: changes.length,
+          resultCount: results.length 
+        });
         eventHandler({ type: 'INCOMING_CHANGES_PROCESSED', results });
       },
-      onError: (error: Error) => {
-        syncLogger.serviceError('IncomingChanges', error);
+      onError: (error: Error, context?: string) => {
+        syncLogger.serviceError('IncomingChanges', error, context);
         eventHandler({ type: 'SERVICE_ERROR', service: 'incoming', error });
       }
     });
@@ -219,6 +219,11 @@ export class ServiceCoordinator {
       },
       onChangesSent: (count: number) => {
         syncLogger.serviceCallback('OutgoingChanges', 'changesSent', { count });
+        syncLogger.debug('service', 'ServiceCoordinator sending OUTGOING_CHANGES_SENT event', {
+          eventType: 'OUTGOING_CHANGES_SENT',
+          count,
+          countType: typeof count
+        });
         eventHandler({ type: 'OUTGOING_CHANGES_SENT', count });
       },
       onChangesAcknowledged: (changeIds: string[]) => {

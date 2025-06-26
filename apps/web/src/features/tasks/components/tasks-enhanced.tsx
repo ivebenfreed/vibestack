@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
-import { TaskService } from '@/domain/task'
-import { useAtomValue } from 'jotai'
+import { useTaskAtoms } from '@/domain/task'
 import { format } from 'date-fns'
 import {
   Table,
@@ -31,7 +30,7 @@ export function TasksEnhanced() {
   const contentWidth = useContentWidth()
 
   // 🎯 PHASE 4: Use atomic store instead of React Query hooks - ATOMIC REACTIVITY
-  const tasks = useAtomValue(TaskService.atoms.allTasksAtom)
+  const tasks = useTaskAtoms.allTasks()
 
   // Table state
   const [sorting, setSorting] = React.useState<SortingState>([])

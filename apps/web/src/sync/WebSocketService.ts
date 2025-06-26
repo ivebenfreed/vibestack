@@ -7,6 +7,8 @@
  * Part of Phase 2: Pure Services Extraction
  */
 
+import { syncLogger } from './utils/SyncLogger';
+
 export interface WebSocketServiceConfig {
   serverUrl?: string;
   clientId: string;
@@ -56,7 +58,7 @@ export class WebSocketService {
     }
 
     if (this.ws?.readyState === WebSocket.CONNECTING || this.ws?.readyState === WebSocket.OPEN) {
-      console.warn('[WebSocketService] Already connected or connecting');
+      syncLogger.warn('connection', 'Already connected or connecting');
       return;
     }
 
@@ -69,11 +71,11 @@ export class WebSocketService {
       wsUrl.searchParams.set('clientId', this.config.clientId);
       wsUrl.searchParams.set('lsn', this.config.lsn);
       
-      console.log(`[WebSocketService] Connecting to ${wsUrl.toString()}`);
+      syncLogger.connectionAttempt(wsUrl.toString());
       this.ws = new WebSocket(wsUrl.toString());
 
       this.ws.onopen = () => {
-        console.log('[WebSocketService] Connected');
+        syncLogger.connectionEstablished();
         this.reconnectAttempts = 0;
         
         // Track connection recovery
@@ -95,19 +97,19 @@ export class WebSocketService {
           const message = JSON.parse(event.data);
           this.callbacks.onMessage?.(message);
         } catch (error) {
-          console.error('[WebSocketService] Error parsing message:', error);
+          syncLogger.error('message', 'Error parsing message', error);
           this.callbacks.onError?.(new Error('Failed to parse WebSocket message'));
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('[WebSocketService] WebSocket error:', error);
+        syncLogger.error('connection', 'WebSocket error', error);
         this.setStatus('error');
         this.callbacks.onError?.(new Error('WebSocket connection error'));
       };
 
       this.ws.onclose = (event) => {
-        console.log(`[WebSocketService] Disconnected: ${event.code} - ${event.reason}`);
+        syncLogger.connectionLost(`${event.code} - ${event.reason}`);
         this.lastDisconnectTime = Date.now();
         this.stopHeartbeat();
         this.setStatus('disconnected');
@@ -119,7 +121,7 @@ export class WebSocketService {
       };
 
     } catch (error) {
-      console.error('[WebSocketService] Error creating WebSocket:', error);
+      syncLogger.error('connection', 'Error creating WebSocket', error);
       this.setStatus('error');
       this.callbacks.onError?.(error as Error);
       throw error;
@@ -130,7 +132,7 @@ export class WebSocketService {
    * Disconnect from WebSocket server
    */
   disconnect(): void {
-    console.log('[WebSocketService] Disconnecting...');
+    syncLogger.info('connection', 'Disconnecting...');
     this.cleanup();
     this.setStatus('disconnected');
   }
@@ -139,7 +141,7 @@ export class WebSocketService {
    * Send message to server
    */
   send(message: any): void {
-    console.log('[WebSocketService] 🔍 DEBUG: Send called', {
+    syncLogger.debug('message', 'Send called', {
       hasWebSocket: !!this.ws,
       readyState: this.ws?.readyState,
       messageType: message?.type,
@@ -147,7 +149,7 @@ export class WebSocketService {
     });
 
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[WebSocketService] ❌ WebSocket not ready for sending:', {
+      syncLogger.error('message', 'WebSocket not ready for sending', {
         hasWebSocket: !!this.ws,
         readyState: this.ws?.readyState,
         OPEN: WebSocket.OPEN
@@ -157,11 +159,12 @@ export class WebSocketService {
 
     try {
       const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
-      console.log('[WebSocketService] ✅ Sending message:', message.type);
+      // SyncLogger filters heartbeats automatically
+      syncLogger.messageSent(message.type);
       this.ws.send(messageStr);
-      console.log('[WebSocketService] ✅ Message sent successfully');
+      // Success logging handled by SyncLogger
     } catch (error) {
-      console.error('[WebSocketService] Error sending message:', error);
+      syncLogger.error('message', 'Error sending message', error);
       this.callbacks.onError?.(new Error('Failed to send WebSocket message'));
       throw error;
     }
@@ -193,7 +196,7 @@ export class WebSocketService {
    * Clean up all resources
    */
   destroy(): void {
-    console.log('[WebSocketService] Destroying...');
+    syncLogger.info('connection', 'Destroying...');
     this.cleanup();
     this.callbacks = {};
   }
@@ -240,7 +243,7 @@ export class WebSocketService {
             timestamp: Date.now()
           });
         } catch (error) {
-          console.error('[WebSocketService] Error sending heartbeat:', error);
+          syncLogger.error('connection', 'Error sending heartbeat', error);
         }
       }
     }, interval);
@@ -259,12 +262,12 @@ export class WebSocketService {
     const delay = this.config.reconnectDelay || 3000;
     const backoffDelay = delay * Math.pow(2, this.reconnectAttempts);
     
-    console.log(`[WebSocketService] Scheduling reconnect in ${backoffDelay}ms (attempt ${this.reconnectAttempts + 1})`);
+    syncLogger.info('connection', `Scheduling reconnect in ${backoffDelay}ms (attempt ${this.reconnectAttempts + 1})`);
     
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
       this.connect().catch(error => {
-        console.error('[WebSocketService] Reconnect failed:', error);
+        syncLogger.error('connection', 'Reconnect failed', error);
       });
     }, backoffDelay);
   }

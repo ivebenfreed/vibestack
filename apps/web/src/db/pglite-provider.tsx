@@ -8,7 +8,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { initializeDatabase, getDatabase, dbMessageBus } from './db.ts';
 import { getNewPGliteDataSource, NewPGliteDataSource } from './newtypeorm/NewDataSource';
 import { EntityTarget, Repository, SelectQueryBuilder, ObjectLiteral } from 'typeorm';
-import { createAllDomains } from '../domain/lib';
+import { createAllDomains } from '../domain';
 
 // Create context with repositories and services
 interface PGliteContextValue {

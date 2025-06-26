@@ -132,6 +132,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }, MODULE_NAME);
       
       try {
+        // Ensure replication is active when clients send changes
+        await this.ensureReplicationActive();
+        
         // Get database connection
         const dbClient = getDBClient(this.getContext());
         
@@ -811,6 +814,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     clientId: string, 
     clientLSN: string
   ): Promise<{ strategy: SyncStrategy, serverLSN: string }> {
+    // Ensure replication is active when client connects
+    await this.ensureReplicationActive();
+    
     // Register the client
     await this.stateManager.registerClient(clientId);
     

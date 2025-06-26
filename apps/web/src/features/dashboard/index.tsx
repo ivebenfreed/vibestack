@@ -3,7 +3,7 @@ import { useSelector } from '@xstate/store/react'
 import { tasksAtom } from '@/domain/task'
 import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
-import { useCommentAtoms } from '@/domain/comment'
+import { commentsAtom } from '@/domain/comment'
 import { shallowEqual } from '@xstate/store'
 import { Button } from '@/components/ui/button'
 import {
@@ -66,6 +66,7 @@ export default function Dashboard() {
     shallowEqual
   )
   
+  // Get entity counts directly from atoms
   const allProjects = useSelector(
     projectsAtom,
     (projectsRecord) => Object.values(projectsRecord),
@@ -78,8 +79,11 @@ export default function Dashboard() {
     shallowEqual
   )
   
-  // Get comment stats using the comment atoms hook
-  const commentStats = useCommentAtoms.commentStats()
+  const allComments = useSelector(
+    commentsAtom,
+    (commentsRecord) => Object.values(commentsRecord),
+    shallowEqual
+  )
   
   // Calculate dashboard data from XState stores
   const dashboardData = useMemo(() => {
@@ -90,21 +94,13 @@ export default function Dashboard() {
         users: allUsers.length,
         projects: allProjects.length,
         tasks: allTasks.length,
-        comments: commentStats.total
+        comments: allComments.length
       },
       recentTasks
     }
-  }, [allTasks, allProjects, allUsers, commentStats])
+  }, [allTasks, allProjects, allUsers, allComments])
 
   // 🎯 TEMPORARILY REDUCED LOGGING to isolate double render
-  if (Math.random() < 0.1) { // Only log 10% of renders
-    console.log('[Dashboard] XState reactive data:', {
-      tasksCount: allTasks.length,
-      projectsCount: allProjects.length,
-      usersCount: allUsers.length,
-      recentTasksCount: dashboardData.recentTasks.length
-    })
-  }
 
   return (
     <ContentContainer>

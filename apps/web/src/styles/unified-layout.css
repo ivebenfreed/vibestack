@@ -1,0 +1,150 @@
+/**
+ * Unified Layout Styles - Clean, simple layout system
+ * Replaces the complex dual sidebar CSS with straightforward grid layout
+ */
+
+/* Layout Container */
+.unified-layout {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--background);
+}
+
+/* Grid Layout */
+.unified-layout-grid {
+  display: grid;
+  height: 100%;
+  transition: grid-template-columns 200ms ease-out;
+}
+
+.unified-layout-grid.sidebar-expanded {
+  grid-template-columns: 240px 1fr;
+}
+
+.unified-layout-grid.sidebar-collapsed {
+  grid-template-columns: 64px 1fr;
+}
+
+/* Sidebar */
+.unified-sidebar {
+  background: var(--sidebar);
+  border-right: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden; /* Keep this to contain the scrollable area */
+}
+
+/* Main Content */
+.unified-main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--background);
+}
+
+/* Header */
+.unified-header {
+  border-bottom: 1px solid var(--border);
+  background: hsl(var(--background) / 0.95);
+  backdrop-filter: blur(8px);
+  height: 56px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
+/* Content Area */
+.unified-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  width: 100%;
+}
+
+/* Content Container for pages */
+.unified-content-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* Full height variant for specific pages */
+.unified-content.full-height {
+  padding: 0;
+}
+
+.unified-content.full-height .unified-content-container {
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .unified-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .unified-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 200ms ease-out;
+  }
+  
+  .unified-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  
+  .unified-main {
+    grid-column: 1;
+  }
+}
+
+/* Smooth animations */
+.unified-sidebar,
+.unified-main {
+  transition: all 200ms ease-out;
+}
+
+/* Clean scrollbars for content */
+.unified-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.unified-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.unified-content::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 3px;
+}
+
+.unified-content::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+/* Sidebar scrollbar styling */
+.unified-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.unified-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.unified-sidebar::-webkit-scrollbar-thumb {
+  background: hsl(var(--sidebar-foreground) / 0.2);
+  border-radius: 3px;
+}
+
+.unified-sidebar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--sidebar-foreground) / 0.3);
+}

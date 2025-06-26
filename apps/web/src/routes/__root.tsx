@@ -60,8 +60,7 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
 // 🔥 AUTH PERSISTENCE: Load and save AuthMachine state
 const AUTH_STORAGE_KEY = 'auth-machine-state'
 
-// 🔥 SYNC PERSISTENCE: Load and save SyncMachine state  
-const SYNC_STORAGE_KEY = 'sync-machine-state'
+// 🔥 SYNC PERSISTENCE: Removed - SyncMachine handles its own persistence internally
 
 const loadPersistedAuthState = () => {
   try {
@@ -105,65 +104,10 @@ const saveAuthState = (actor: any) => {
   }
 }
 
-const loadPersistedSyncState = () => {
-  try {
-    const stored = localStorage.getItem(SYNC_STORAGE_KEY)
-    if (stored) {
-      const persistedSnapshot = JSON.parse(stored)
-      
-      // Basic validation
-      if (!persistedSnapshot || !persistedSnapshot.context) {
-        console.log('[SyncMachine] No valid persisted state found')
-        localStorage.removeItem(SYNC_STORAGE_KEY)
-        return null
-      }
-      
-      console.log('[SyncMachine] Loading persisted sync state:', {
-        clientId: persistedSnapshot.context.clientId,
-        currentLSN: persistedSnapshot.context.currentLSN
-      })
-      return persistedSnapshot
-    }
-  } catch (error) {
-    console.warn('[SyncMachine] Failed to parse persisted state:', error)
-    localStorage.removeItem(SYNC_STORAGE_KEY)
-  }
-  return null
-}
-
-const saveSyncState = (actor: any) => {
-  try {
-    const snapshot = actor.getSnapshot()
-    // Only persist essential state (avoid circular references in ServiceCoordinator)
-    const essentialState = {
-      value: snapshot.value,
-      context: {
-        clientId: snapshot.context.clientId,
-        currentLSN: snapshot.context.currentLSN,
-        serverLSN: snapshot.context.serverLSN,
-        syncPhase: snapshot.context.syncPhase,
-        isConnected: snapshot.context.isConnected,
-        error: snapshot.context.error,
-        reconnectAttempts: snapshot.context.reconnectAttempts,
-        lastSyncTime: snapshot.context.lastSyncTime
-        // Exclude serviceCoordinator and serverUrl to avoid circular references
-      }
-    }
-    
-    localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(essentialState))
-    console.log('[SyncMachine] Persisted essential sync state:', { 
-      state: snapshot.value,
-      clientId: snapshot.context.clientId,
-      currentLSN: snapshot.context.currentLSN
-    })
-  } catch (error) {
-    console.warn('[SyncMachine] Failed to persist sync state:', error)
-  }
-}
+// SyncMachine persistence is handled internally by the machine itself
 
 // XState 5: Proper snapshot persistence
 const persistedAuthSnapshot = loadPersistedAuthState()
-const persistedSyncSnapshot = loadPersistedSyncState()
 
 // Create AuthMachine actor (only if not already exists from HMR)
 let authMachineActor = (window as any).authMachineActor
@@ -220,35 +164,26 @@ if (!syncMachineActor) {
   console.log('[SyncMachine] Creating new sync machine actor')
   syncMachineActor = createActor(syncMachineV3)
   
-  // XState 5: Start with snapshot if available
-  if (persistedSyncSnapshot) {
-    console.log('[SyncMachine] Starting with persisted snapshot')
-    syncMachineActor.start(persistedSyncSnapshot)
-  } else {
-    console.log('[SyncMachine] Starting fresh')
-    syncMachineActor.start()
-  }
+  // SyncMachine handles its own persistence internally
+  console.log('[SyncMachine] Starting (state persistence handled internally)')
+  syncMachineActor.start()
   
   // Store globally
   ;(window as any).syncMachineActor = syncMachineActor
   
   // Set up subscriptions for new actor
+  let wasLiveSync = false
+  
   syncMachineActor.subscribe((snapshot) => {
-    saveSyncState(syncMachineActor)
-    
-    console.log('[SyncMachine] State changed:', { 
-      state: snapshot.value,
-      phase: snapshot.context.syncPhase,
-      lsn: snapshot.context.currentLSN 
-    })
-    
-    // Send SYNC_READY to app-init when sync machine is ready for live sync
-    if (snapshot.value === 'live_sync') {
-      console.log('[SyncMachine] ✅ Sync ready - notifying app init')
+    // Send SYNC_READY to app-init when sync machine enters live sync
+    if (snapshot.value === 'live_sync' && !wasLiveSync) {
+      wasLiveSync = true
       const currentAppInitActor = (window as any).appInitActor
       if (currentAppInitActor) {
         currentAppInitActor.send({ type: 'SYNC_LIVE' })
       }
+    } else if (snapshot.value !== 'live_sync') {
+      wasLiveSync = false
     }
   })
 } else {

@@ -6,7 +6,7 @@ import { TableChange } from '@repo/sync-types';
 
 import { SyncEventEmitter } from './SyncEventEmitter';
 import { getNewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
-import { createAllDomains } from '../domain/lib';
+import { createAllDomains } from '../domain';
 
 const INCOMING_BATCH_SIZE = 500; // 🔥 UPDATED: Match server WS_CHUNK_SIZE 
 const INITIAL_SYNC_BATCH_SIZE = 500; // 🔥 UPDATED: Match server DEFAULT_CHUNK_SIZE for consistency

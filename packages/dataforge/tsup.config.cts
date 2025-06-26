@@ -3,7 +3,13 @@ const { defineConfig } = require('tsup');
 
 /** @type {import('tsup').Options} */
 const config = {
-  entry: ['src/index.ts', 'src/generated/client-entities.ts', 'src/generated/server-entities.ts', 'src/generated/column-configurations.ts'],
+  entry: [
+    'src/index.ts', 
+    'src/generated/client-entities.ts', 
+    'src/generated/server-entities.ts', 
+    'src/generated/column-configurations.ts', 
+    'src/generated/*-operations.ts'
+  ],
   format: ['esm'],
   dts: true, // Changed from experimentalDts to generate individual .d.ts files
   clean: true,

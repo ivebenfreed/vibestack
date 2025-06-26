@@ -27,9 +27,7 @@ import { useState, useEffect } from 'react'
 import { useTasks } from '../context/tasks-context'
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useAtomValue } from 'jotai'
-import { ProjectService } from '@/domain/project'
-import { UserService } from '@/domain/user'
+import { useProjectAtoms } from '@/domain/project'
 
 interface Props {
   open: boolean
@@ -62,8 +60,9 @@ export function TasksMutateDrawer({ open, onOpenChange, currentRow }: Props) {
   
   const { createTask, updateTask } = useTasks()
   
-  // Use the new domain-based hooks
-  const { data: availableProjects, isLoading: isLoadingProjects } = ProjectService.hooks.useAllProjects()
+  // Use the new atom-based hooks
+  const availableProjects = useProjectAtoms.allProjects()
+  const isLoadingProjects = false // Projects are always loaded from atoms
 
   const form = useForm<TasksFormValues>({
     resolver: zodResolver(taskFormSchema),

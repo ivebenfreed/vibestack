@@ -60,22 +60,32 @@ export function TasksTableV3() {
     label: user.name || user.email
   }))
 
-  // ✅ BULK ACTIONS
+  // ✅ BULK ACTIONS - Using 3-path architecture
   const handleBulkDelete = async (selectedIds: string[]) => {
     console.log('🎯 [Lightweight] Bulk delete action triggered:', selectedIds)
     if (confirm(`Delete ${selectedIds.length} selected tasks?`)) {
-      const promises = selectedIds.map(id => taskActions.deleteTask(id))
-      await Promise.allSettled(promises)
+      try {
+        const { deleteTaskUI } = await import('@/domain/task')
+        const promises = selectedIds.map(id => deleteTaskUI(id))
+        await Promise.allSettled(promises)
+      } catch (error) {
+        console.error('[TasksTableV3] Failed to bulk delete tasks:', error)
+      }
     }
   }
 
   const handleBulkUpdate = async (selectedIds: string[], updates: Partial<Task>) => {
     console.log('🎯 [Lightweight] Bulk update action triggered:', { selectedIds, updates })
     if (confirm(`Update ${selectedIds.length} selected tasks?`)) {
-      const promises = selectedIds.map(id => 
-        taskActions.updateTask(id, updates)
-      )
-      await Promise.allSettled(promises)
+      try {
+        const { updateTaskUI } = await import('@/domain/task')
+        const promises = selectedIds.map(id => 
+          updateTaskUI(id, updates)
+        )
+        await Promise.allSettled(promises)
+      } catch (error) {
+        console.error('[TasksTableV3] Failed to bulk update tasks:', error)
+      }
     }
   }
 
@@ -132,7 +142,14 @@ export function TasksTableV3() {
         accessorKey: 'title',
         header: 'Title',
         entityAtom: tasksAtom,
-        updateAction: taskActions.updateTask,
+        updateAction: async (id: string, updates: Partial<Task>) => {
+          try {
+            const { updateTaskUI } = await import('@/domain/task')
+            await updateTaskUI(id, updates)
+          } catch (error) {
+            console.error('[TasksTableV3] Failed to update task title:', error)
+          }
+        },
         size: 300,
         placeholder: 'Enter task title...',
         maxLength: 100,
@@ -155,7 +172,14 @@ export function TasksTableV3() {
       accessorKey: 'description',
       header: 'Description',
       entityAtom: tasksAtom,
-      updateAction: taskActions.updateTask,
+      updateAction: async (id: string, updates: Partial<Task>) => {
+        try {
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(id, updates)
+        } catch (error) {
+          console.error('[TasksTableV3] Failed to update task description:', error)
+        }
+      },
       size: 400,
       variant: 'textarea',
       placeholder: 'Enter task description...',
@@ -168,7 +192,14 @@ export function TasksTableV3() {
         accessorKey: 'status',
         header: 'Status',
         entityAtom: tasksAtom,
-        updateAction: taskActions.updateTask,
+        updateAction: async (id: string, updates: Partial<Task>) => {
+          try {
+            const { updateTaskUI } = await import('@/domain/task')
+            await updateTaskUI(id, updates)
+          } catch (error) {
+            console.error('[TasksTableV3] Failed to update task status:', error)
+          }
+        },
         size: 140,
         options: Object.values(TaskStatus).map(status => ({
           value: status,
@@ -184,7 +215,14 @@ export function TasksTableV3() {
       accessorKey: 'priority',
       header: 'Priority',
       entityAtom: tasksAtom,
-      updateAction: taskActions.updateTask,
+      updateAction: async (id: string, updates: Partial<Task>) => {
+        try {
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(id, updates)
+        } catch (error) {
+          console.error('[TasksTableV3] Failed to update task priority:', error)
+        }
+      },
       size: 120,
       options: Object.values(TaskPriority).map(priority => ({
         value: priority,
@@ -198,7 +236,14 @@ export function TasksTableV3() {
       accessorKey: 'projectId',
       header: 'Project',
       entityAtom: tasksAtom,
-      updateAction: taskActions.updateTask,
+      updateAction: async (id: string, updates: Partial<Task>) => {
+        try {
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(id, updates)
+        } catch (error) {
+          console.error('[TasksTableV3] Failed to update task project:', error)
+        }
+      },
       size: 180,
       options: [
         { value: '', label: 'No Project' },
@@ -215,7 +260,14 @@ export function TasksTableV3() {
       accessorKey: 'assigneeId',
       header: 'Assignee',
       entityAtom: tasksAtom,
-      updateAction: taskActions.updateTask,
+      updateAction: async (id: string, updates: Partial<Task>) => {
+        try {
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(id, updates)
+        } catch (error) {
+          console.error('[TasksTableV3] Failed to update task assignee:', error)
+        }
+      },
       size: 160,
       options: [
         { value: '', label: 'Unassigned' },
@@ -232,7 +284,14 @@ export function TasksTableV3() {
       accessorKey: 'dueDate',
       header: 'Due Date',
       entityAtom: tasksAtom,
-      updateAction: taskActions.updateTask,
+      updateAction: async (id: string, updates: Partial<Task>) => {
+        try {
+          const { updateTaskUI } = await import('@/domain/task')
+          await updateTaskUI(id, updates)
+        } catch (error) {
+          console.error('[TasksTableV3] Failed to update task due date:', error)
+        }
+      },
       size: 160,
       placeholder: 'Set due date...',
       validate: (value: any) => {
@@ -306,7 +365,12 @@ export function TasksTableV3() {
               onClick={async () => {
                 console.log('🎯 [Lightweight] Delete button clicked for task:', task)
                 if (confirm(`Delete task "${task.title}"?`)) {
-                  await taskActions.deleteTask(task.id)
+                  try {
+                    const { deleteTaskUI } = await import('@/domain/task')
+                    await deleteTaskUI(task.id)
+                  } catch (error) {
+                    console.error('[TasksTableV3] Failed to delete task:', error)
+                  }
                 }
               }}
               className="px-2 py-1 text-xs rounded border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"

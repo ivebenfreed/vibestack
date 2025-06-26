@@ -22,6 +22,11 @@ import {
   CLIENT_DOMAIN_TABLES,
 } from '@repo/dataforge/client-entities';
 import { MoreThan } from 'typeorm';
+import { 
+  IntegrityDecisionEngine, 
+  integrityDecisionEngine 
+} from './IntegrityDecisionEngine';
+import { syncLogger } from '../utils/SyncLogger';
 
 // Re-export types that validator needs
 export interface TableFingerprint {
@@ -179,85 +184,206 @@ export class IntegrityValidator {
   }
 
   /**
-   * Main validation method - validates integrity with baseline approach
+   * Main validation method - uses structured decision matrix approach
    */
   async validateIntegrity(reason: string = 'routine check'): Promise<IntegrityValidationResult> {
     try {
-      console.log(`[IntegrityValidator] Starting integrity validation: ${reason}`);
+      syncLogger.info('validation', `Starting integrity validation with decision engine: ${reason}`);
       
       this.callbacks.onValidationStarted?.(reason);
 
-      // Step 1: Detect empty database conditions that cause false positives
-      const emptyDatabaseCheck = await this.checkForEmptyDatabase();
-      if (emptyDatabaseCheck.isEmpty) {
-        console.log(`[IntegrityValidator] 🔄 EMPTY DATABASE DETECTED - SKIPPING VALIDATION`);
-        console.log(`[IntegrityValidator] 🔄 Reason: ${emptyDatabaseCheck.reason}`);
-        console.log(`[IntegrityValidator] 🔄 Total records across all tables: ${emptyDatabaseCheck.totalRecords}`);
-        console.log(`[IntegrityValidator] 🔄 This prevents false positives when database is empty after reset`);
-        
-        return {
-          isValid: true,
-          issues: [],
-          recommendedAction: 'none',
-          validationType: 'skipped_empty_database',
-          resetReason: `Skipped: ${emptyDatabaseCheck.reason}`
-        };
-      }
-
-      // Step 2: Load and check if we have a valid baseline
-      const baseline = this.loadBaseline();
-      const hasValidBaseline = baseline?.lastInitialSyncCompletedAt !== null && baseline?.lastInitialSyncCompletedAt !== undefined;
-      console.log(`[IntegrityValidator] 🔍 BASELINE CHECK:`, {
-        hasValidBaseline,
-        baselineValue: baseline?.lastInitialSyncCompletedAt,
-        baselineType: typeof baseline?.lastInitialSyncCompletedAt,
-        isNull: baseline?.lastInitialSyncCompletedAt === null,
-        isUndefined: baseline?.lastInitialSyncCompletedAt === undefined,
-        shouldDoFullValidation: !hasValidBaseline
+      // Build validation context from current state
+      const context = await this.buildValidationContext(reason);
+      
+      // Process decision pipeline
+      const decision = await integrityDecisionEngine.processValidationDecision(context);
+      
+      // Log decision result
+      syncLogger.info('validation', 'Decision pipeline completed', {
+        finalAction: decision.finalAction,
+        strategy: decision.strategy,
+        reason: decision.reason,
+        pipelineSteps: decision.pipeline.length
       });
 
-      if (!hasValidBaseline) {
-        console.log('[IntegrityValidator] No baseline timestamp - performing full validation');
-        return await this.performFullValidation(`${reason} (establish baseline)`);
-      }
-
-      // Step 3: Count records changed since baseline timestamp
-      const recordCount = await this.countRecordsSinceBaseline(baseline.lastInitialSyncCompletedAt);
+      // Execute the decided action
+      const result = await this.executeDecision(decision);
       
-      // Step 4: Check against threshold
-      if (recordCount.totalChanges > baseline.maxRecordsBeforeReset) {
-        console.log(`[IntegrityValidator] 📊 Threshold exceeded: ${recordCount.totalChanges} records (max: ${baseline.maxRecordsBeforeReset})`);
-        console.log(`[IntegrityValidator] Baseline was: ${new Date(baseline.lastInitialSyncCompletedAt).toISOString()}`);
-        
-        return this.createThresholdExceededResult(recordCount, baseline);
-      }
-
-      // Step 5: Within threshold - validate using server validation or local validation
-      console.log(`[IntegrityValidator] ✅ Within threshold: ${recordCount.totalChanges} records, proceeding with validation`);
-
-      if (this.config.enableServerValidation && this.messageSender) {
-        // Server-based validation with baseline
-        console.log('[IntegrityValidator] Performing server-based baseline validation');
-        const serverResult = await this.requestBaselineServerValidation(baseline.lastInitialSyncCompletedAt, recordCount);
-        
-        console.log(`[IntegrityValidator] Baseline validation completed:`, { 
-          isValid: serverResult.isValid, 
-          issueCount: serverResult.issues.length,
-          recommendedAction: serverResult.recommendedAction
-        });
-        
-        return serverResult;
-      } else {
-        // Local validation fallback
-        console.log('[IntegrityValidator] Performing local validation (server validation disabled or no message sender)');
-        return await this.performLocalValidation();
-      }
+      // Update callback with result
+      this.callbacks.onValidationCompleted?.(result);
+      
+      return result;
 
     } catch (error) {
-      console.error('[IntegrityValidator] Validation error:', error);
+      syncLogger.error('validation', 'Validation error in decision-driven flow', error);
       this.callbacks.onValidationError?.(error as Error, reason);
       throw error;
     }
+  }
+
+  /**
+   * Build validation context from current state
+   */
+  private async buildValidationContext(reason: string) {
+    // Gather current state information
+    const emptyDatabaseCheck = await this.checkForEmptyDatabase();
+    const baseline = this.loadBaseline();
+    const hasValidBaseline = baseline?.lastInitialSyncCompletedAt !== null && baseline?.lastInitialSyncCompletedAt !== undefined;
+    
+    // Count changes since baseline if we have one
+    let changesSinceBaseline = 0;
+    let changeBreakdown: Record<string, number> = {};
+    
+    if (hasValidBaseline && baseline?.lastInitialSyncCompletedAt) {
+      const recordCount = await this.countRecordsSinceBaseline(baseline.lastInitialSyncCompletedAt);
+      changesSinceBaseline = recordCount.totalChanges;
+      changeBreakdown = recordCount.tableBreakdown;
+    }
+
+    // Build context using decision engine utility
+    return await IntegrityDecisionEngine.buildValidationContext({
+      reason,
+      clientId: this.config.clientId,
+      totalRecords: emptyDatabaseCheck.totalRecords,
+      isEmpty: emptyDatabaseCheck.isEmpty,
+      hasBaseline: hasValidBaseline,
+      baselineTimestamp: baseline?.lastInitialSyncCompletedAt || null,
+      changesSinceBaseline,
+      changeBreakdown,
+      hasIntegrityService: true, // We're in the service, so it's available
+      hasServerValidation: this.config.enableServerValidation && !!this.messageSender,
+      hasMessageSender: !!this.messageSender,
+      config: {
+        enableServerValidation: this.config.enableServerValidation,
+        autoResetOnFailure: this.config.autoResetOnFailure,
+        validationTimeoutMs: this.config.validationTimeoutMs
+      },
+      thresholds: {
+        maxRecordsBeforeReset: baseline?.maxRecordsBeforeReset || 10000,
+        quickValidationLimit: 100,
+        baselineValidationLimit: 1000,
+        maxDaysWithoutBaseline: 7,
+        staleBaselineWarningDays: 30,
+        maxValidationTimeMs: this.config.validationTimeoutMs,
+        maxFingerprintSizeMB: 10
+      }
+    });
+  }
+
+  /**
+   * Execute the action determined by the decision pipeline
+   */
+  private async executeDecision(decision: any): Promise<IntegrityValidationResult> {
+    switch (decision.finalAction) {
+      case 'SKIP':
+        return this.createSkipResult(decision);
+        
+      case 'VALIDATION':
+        return await this.executeValidationStrategy(decision);
+        
+      case 'RESET':
+        return this.createResetResult(decision);
+        
+      case 'ERROR':
+        return this.createErrorResult(decision);
+        
+      case 'RETRY':
+        // For now, treat retry as a local validation
+        return await this.performLocalValidation();
+        
+      default:
+        syncLogger.warn('validation', `Unknown decision action: ${decision.finalAction}`);
+        return await this.performLocalValidation();
+    }
+  }
+
+  /**
+   * Execute validation based on strategy
+   */
+  private async executeValidationStrategy(decision: any): Promise<IntegrityValidationResult> {
+    const strategy = decision.strategy;
+    const context = decision.context;
+    
+    switch (strategy) {
+      case 'full_validation':
+        syncLogger.info('validation', 'Executing full validation strategy');
+        return await this.performFullValidation(decision.reason);
+        
+      case 'baseline_validation':
+        syncLogger.info('validation', 'Executing baseline validation strategy');
+        if (context.hasServerValidation && context.baselineTimestamp) {
+          const recordCount = { 
+            totalChanges: context.changesSinceBaseline, 
+            tableBreakdown: context.changeBreakdown 
+          };
+          return await this.requestBaselineServerValidation(context.baselineTimestamp, recordCount);
+        } else {
+          return await this.performLocalValidation();
+        }
+        
+      case 'quick_validation':
+        syncLogger.info('validation', 'Executing quick validation strategy');
+        return await this.performLocalValidation();
+        
+      case 'server_validation':
+        syncLogger.info('validation', 'Executing server validation strategy');
+        if (context.baselineTimestamp) {
+          const recordCount = { 
+            totalChanges: context.changesSinceBaseline, 
+            tableBreakdown: context.changeBreakdown 
+          };
+          return await this.requestBaselineServerValidation(context.baselineTimestamp, recordCount);
+        } else {
+          return await this.performFullValidation(decision.reason);
+        }
+        
+      case 'local_validation':
+        syncLogger.info('validation', 'Executing local validation strategy');
+        return await this.performLocalValidation();
+        
+      default:
+        syncLogger.warn('validation', `Unknown validation strategy: ${strategy}, falling back to local validation`);
+        return await this.performLocalValidation();
+    }
+  }
+
+  /**
+   * Create result for skip action
+   */
+  private createSkipResult(decision: any): IntegrityValidationResult {
+    return {
+      isValid: true,
+      issues: [],
+      recommendedAction: 'none',
+      validationType: 'skipped_by_decision_matrix',
+      resetReason: decision.reason
+    };
+  }
+
+  /**
+   * Create result for reset action
+   */
+  private createResetResult(decision: any): IntegrityValidationResult {
+    return {
+      isValid: false,
+      issues: [{ type: 'reset_required', reason: decision.reason }],
+      recommendedAction: 'reset',
+      validationType: 'decision_matrix_reset',
+      resetReason: decision.reason
+    };
+  }
+
+  /**
+   * Create result for error action
+   */
+  private createErrorResult(decision: any): IntegrityValidationResult {
+    return {
+      isValid: false,
+      issues: [{ type: 'validation_error', reason: decision.reason }],
+      recommendedAction: 'retry',
+      validationType: 'decision_matrix_error',
+      resetReason: `Validation error: ${decision.reason}`
+    };
   }
 
   /**
