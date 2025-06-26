@@ -342,7 +342,6 @@ export async function resetLSNManual(newLSN: string = '0/0', reason: string = 'M
     
     const results = {
       syncMachineState: false,
-      orchestratorState: false,
       machineEvent: false,
       syncRestart: false
     };
@@ -365,25 +364,7 @@ export async function resetLSNManual(newLSN: string = '0/0', reason: string = 'M
       console.warn('[DEBUG] ❌ Error resetting LSN in sync machine state:', error);
     }
 
-    // Method 2: Reset in orchestrator state (if exists)
-    try {
-      const ORCHESTRATOR_STATE_KEY = 'orchestrator-state';
-      const orchestratorStored = localStorage.getItem(ORCHESTRATOR_STATE_KEY);
-      if (orchestratorStored) {
-        const orchestratorState = JSON.parse(orchestratorStored);
-        if (orchestratorState.syncState) {
-          const oldLSN = orchestratorState.syncState.currentLSN;
-          orchestratorState.syncState.currentLSN = newLSN;
-          localStorage.setItem(ORCHESTRATOR_STATE_KEY, JSON.stringify(orchestratorState));
-          console.log(`[DEBUG] ✅ LSN reset in orchestrator localStorage: ${oldLSN} → ${newLSN}`);
-          results.orchestratorState = true;
-        }
-      } else {
-        console.log('[DEBUG] ⚠️ No orchestrator state found in localStorage');
-      }
-    } catch (error) {
-      console.warn('[DEBUG] ❌ Error resetting LSN in orchestrator state:', error);
-    }
+    // Orchestrator is not used in current system - removed
 
     // Method 3: Send LSN_UPDATE event to sync machine via app init machine
     try {
@@ -572,59 +553,46 @@ export async function showIntegrityStatus(): Promise<any> {
     console.log('[DEBUG] 📊 IntegrityService Status:');
     console.log('  Ready:', status.isReady);
     
-    // Get orchestrator context
-    const orchestrator = (window as any).orchestratorActor;
-    if (orchestrator) {
-      const snapshot = orchestrator.getSnapshot();
-      const baseline = snapshot.context?.integrityBaseline;
-      status.integrityBaseline = baseline;
-      
-      console.log('  Baseline Status:');
-      console.log('    Last Initial Sync:', baseline?.lastInitialSyncCompletedAt ? 
-        new Date(baseline.lastInitialSyncCompletedAt).toISOString() : 'None');
-      console.log('    Max Records Before Reset:', baseline?.maxRecordsBeforeReset || 'None');
-      console.log('    Changes Since Baseline:', baseline?.recordChangesSinceBaseline || 0);
+    // Baseline status from sync machine (orchestrator not used)
+    const SYNC_STATE_KEY = 'sync-machine-state';
+    try {
+      const stored = localStorage.getItem(SYNC_STATE_KEY);
+      if (stored) {
+        const parsedState = JSON.parse(stored);
+        const baseline = parsedState.integrityBaseline;
+        status.integrityBaseline = baseline;
+        
+        console.log('  Baseline Status:');
+        console.log('    Last Initial Sync:', baseline?.lastInitialSyncCompletedAt ? 
+          new Date(baseline.lastInitialSyncCompletedAt).toISOString() : 'None');
+        console.log('    Max Records Before Reset:', baseline?.maxRecordsBeforeReset || 'None');
+        console.log('    Changes Since Baseline:', baseline?.recordChangesSinceBaseline || 0);
+      }
+    } catch (error) {
+      console.warn('[DEBUG] Error reading baseline from sync machine state:', error);
     }
 
-    // Get connection status from orchestrator context (most reliable)
-    const orchestratorActor = (window as any).orchestratorActor;
-    if (orchestratorActor) {
-      const orchestratorSnapshot = orchestratorActor.getSnapshot();
-      const orchestratorContext = orchestratorSnapshot.context;
+    // Get connection status from sync machine (orchestrator not used)
+    const syncActor = (window as any).syncActor;
+    if (syncActor) {
+      const syncSnapshot = syncActor.getSnapshot();
+      status.syncManagerState = syncSnapshot.value;
+      status.lsn = syncSnapshot.context?.currentLSN || 'Unknown';
       
-      // Use orchestrator's sync state which is synced from sync machine
-      status.syncManagerState = orchestratorContext.syncState?.machineState || 'Unknown';
-      status.lsn = orchestratorContext.syncState?.currentLSN || 'Unknown';
-      status.isConnected = orchestratorContext.isSyncLive || false;
+      // Determine connection status from machine state
+      const machineState = typeof syncSnapshot.value === 'string' ? 
+        syncSnapshot.value : 
+        typeof syncSnapshot.value === 'object' ? 
+          Object.keys(syncSnapshot.value)[0] : 
+          'unknown';
+          
+      // Connected states: connected, live_sync, connecting, catchup_sync, initial_sync
+      const connectedStates = ['connected', 'live_sync', 'connecting', 'catchup_sync', 'initial_sync', 'determining_sync_phase'];
+      status.isConnected = connectedStates.includes(machineState);
       
-      console.log('  Orchestrator Sync State:', orchestratorContext.syncState?.machineState);
-      console.log('  Sync Phase:', orchestratorContext.syncState?.phase);
-      console.log('  Is Sync Live:', orchestratorContext.isSyncLive);
+      console.log('  Sync Machine State:', status.syncManagerState);
       console.log('  Connected:', status.isConnected);
       console.log('  LSN:', status.lsn);
-    } else {
-      // Fallback to sync machine if orchestrator not available
-      const syncActor = (window as any).syncActor;
-      if (syncActor) {
-        const syncSnapshot = syncActor.getSnapshot();
-        status.syncManagerState = syncSnapshot.value;
-        status.lsn = syncSnapshot.context?.currentLSN || 'Unknown';
-        
-        // Determine connection status from machine state
-        const machineState = typeof syncSnapshot.value === 'string' ? 
-          syncSnapshot.value : 
-          typeof syncSnapshot.value === 'object' ? 
-            Object.keys(syncSnapshot.value)[0] : 
-            'unknown';
-            
-        // Connected states: connected, live_sync, connecting, catchup_sync, initial_sync
-        const connectedStates = ['connected', 'live_sync', 'connecting', 'catchup_sync', 'initial_sync', 'determining_sync_phase'];
-        status.isConnected = connectedStates.includes(machineState);
-        
-        console.log('  Sync Machine State (fallback):', status.syncManagerState);
-        console.log('  Connected (fallback):', status.isConnected);
-        console.log('  LSN (fallback):', status.lsn);
-      }
     }
     
     return status;

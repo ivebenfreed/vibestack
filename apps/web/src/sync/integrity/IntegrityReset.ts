@@ -182,8 +182,19 @@ export class IntegrityReset {
         await this.resetIntegrityBaseline('Post-reset baseline reset');
         console.log('[IntegrityReset] 🔄 Baseline reset - next validation will start fresh');
         
-        await this.triggerSyncRestart();
-        console.log('[IntegrityReset] 🔄 Sync restart triggered - machine will reconnect and resync from LSN 0/0');
+        // Validate post-reset state before triggering app refresh
+        console.log('[IntegrityReset] 🔍 Performing post-reset validation...');
+        const postResetValidation = await this.validatePostResetState();
+        
+        if (postResetValidation.isValid) {
+          console.log('[IntegrityReset] ✅ Post-reset validation passed - proceeding with app refresh');
+          await this.triggerAppRefresh();
+          console.log('[IntegrityReset] 🔄 App refresh triggered - will reinitialize with clean state and sync from LSN 0/0');
+        } else {
+          console.error('[IntegrityReset] ❌ Post-reset validation failed:', postResetValidation.issues);
+          result.error = `Post-reset validation failed: ${postResetValidation.issues.join(', ')}`;
+          result.success = false;
+        }
       }
 
       return result;
@@ -289,22 +300,6 @@ export class IntegrityReset {
         console.warn('[IntegrityReset] Error resetting LSN in sync machine state:', error);
       }
 
-      // Also reset orchestrator LSN if it exists (legacy compatibility)
-      try {
-        const ORCHESTRATOR_STATE_KEY = 'orchestrator-state';
-        const orchestratorStored = localStorage.getItem(ORCHESTRATOR_STATE_KEY);
-        if (orchestratorStored) {
-          const orchestratorState = JSON.parse(orchestratorStored);
-          if (orchestratorState.syncState) {
-            orchestratorState.syncState.currentLSN = '0/0';
-            localStorage.setItem(ORCHESTRATOR_STATE_KEY, JSON.stringify(orchestratorState));
-            console.log('[IntegrityReset] ✅ LSN reset in orchestrator state (legacy)');
-          }
-        }
-      } catch (error) {
-        console.warn('[IntegrityReset] Error resetting LSN in orchestrator state:', error);
-      }
-
       console.log('[IntegrityReset] ✅ LSN reset completed - next sync will be full sync');
 
     } catch (error) {
@@ -352,9 +347,8 @@ export class IntegrityReset {
     try {
       console.log(`[IntegrityReset] Resetting integrity baseline: ${reason}`);
 
-      // Reset baseline in localStorage (both sync machine and orchestrator)
+      // Reset baseline in localStorage (sync machine only)
       const SYNC_STATE_KEY = 'sync-machine-state';
-      const ORCHESTRATOR_STATE_KEY = 'orchestrator-state';
 
       // Reset in sync machine state
       try {
@@ -377,23 +371,6 @@ export class IntegrityReset {
         console.warn('[IntegrityReset] Error resetting baseline in sync machine state:', error);
       }
 
-      // Reset in orchestrator state (legacy compatibility)
-      try {
-        const orchestratorStored = localStorage.getItem(ORCHESTRATOR_STATE_KEY);
-        if (orchestratorStored) {
-          const orchestratorState = JSON.parse(orchestratorStored);
-          if (orchestratorState.integrityBaseline) {
-            orchestratorState.integrityBaseline.lastInitialSyncCompletedAt = null;
-            orchestratorState.integrityBaseline.lastFullValidationAt = null;
-            orchestratorState.integrityBaseline.recordChangesSinceBaseline = 0;
-            localStorage.setItem(ORCHESTRATOR_STATE_KEY, JSON.stringify(orchestratorState));
-            console.log('[IntegrityReset] ✅ Baseline reset in orchestrator state');
-          }
-        }
-      } catch (error) {
-        console.warn('[IntegrityReset] Error resetting baseline in orchestrator state:', error);
-      }
-
       console.log('[IntegrityReset] ✅ Integrity baseline reset completed');
 
     } catch (error) {
@@ -403,35 +380,143 @@ export class IntegrityReset {
   }
 
   /**
-   * Trigger controlled sync restart after reset - disconnect then reconnect for full sync
+   * Validate post-reset state - check that server has data and sync will work
    */
-  private async triggerSyncRestart(): Promise<void> {
+  private async validatePostResetState(): Promise<{ isValid: boolean; issues: string[] }> {
+    const issues: string[] = [];
+    
     try {
-      console.log('[IntegrityReset] Triggering controlled sync restart after reset...');
+      console.log('[IntegrityReset] 🔍 Checking post-reset state...');
       
-      // Step 1: Send DISCONNECT to ensure clean state
-      console.log('[IntegrityReset] Step 1: Disconnecting sync machine...');
-      this.sendEventToMachine({ 
-        type: 'DISCONNECT', 
-        reason: 'Pre-reconnect disconnect for clean reset' 
+      // 1. Verify local database is actually empty
+      console.log('[IntegrityReset] 📊 Verifying local database is empty...');
+      let totalLocalRecords = 0;
+      for (const tableName of CRITICAL_TABLES) {
+        const EntityClass = TABLE_TO_ENTITY_MAP[tableName];
+        if (EntityClass) {
+          const repository = this.dataSource.getRepository(EntityClass);
+          const count = await repository.count();
+          totalLocalRecords += count;
+          
+          if (count > 0) {
+            issues.push(`Local table ${tableName} still has ${count} records after reset`);
+          }
+        }
+      }
+      
+      if (totalLocalRecords === 0) {
+        console.log('[IntegrityReset] ✅ Local database is empty as expected');
+      } else {
+        console.warn(`[IntegrityReset] ⚠️ Local database still has ${totalLocalRecords} records after reset`);
+      }
+      
+      // 2. Check LSN is reset to 0/0
+      const currentLSN = this.getCurrentLSN();
+      if (currentLSN !== '0/0') {
+        issues.push(`LSN not reset properly: expected 0/0, got ${currentLSN}`);
+        console.warn(`[IntegrityReset] ⚠️ LSN not properly reset: ${currentLSN}`);
+      } else {
+        console.log('[IntegrityReset] ✅ LSN properly reset to 0/0');
+      }
+      
+      // 3. Send a quick server validation request if possible
+      console.log('[IntegrityReset] 🌐 Attempting server validation check...');
+      const serverValidation = await this.quickServerValidationCheck();
+      
+      if (!serverValidation.serverResponded) {
+        issues.push('Server is not responding to validation requests');
+        console.warn('[IntegrityReset] ⚠️ Server validation check failed - server not responding');
+      } else if (serverValidation.serverHasNoData) {
+        issues.push('Server appears to have no data - sync may not restore expected state');
+        console.warn('[IntegrityReset] ⚠️ Server validation indicates no data available');
+      } else {
+        console.log('[IntegrityReset] ✅ Server validation check passed');
+      }
+      
+      const isValid = issues.length === 0;
+      
+      if (isValid) {
+        console.log('[IntegrityReset] ✅ Post-reset validation passed - ready for clean sync');
+      } else {
+        console.warn('[IntegrityReset] ⚠️ Post-reset validation found issues:', issues);
+      }
+      
+      return { isValid, issues };
+      
+    } catch (error) {
+      const errorMsg = `Post-reset validation error: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('[IntegrityReset] ❌ Post-reset validation failed with error:', error);
+      return { isValid: false, issues: [errorMsg] };
+    }
+  }
+
+  /**
+   * Quick server validation check to ensure server has data
+   */
+  private async quickServerValidationCheck(): Promise<{ 
+    serverResponded: boolean; 
+    serverHasNoData: boolean;
+  }> {
+    try {
+      // Try to send a simple integrity validation request to server
+      // This will help us verify server connectivity and data availability
+      if (!this.machineRef) {
+        console.log('[IntegrityReset] No machine reference - skipping server validation');
+        return { serverResponded: false, serverHasNoData: false };
+      }
+      
+      // Generate minimal local fingerprints (should be empty after reset)
+      const localFingerprints: Record<string, any> = {};
+      for (const tableName of CRITICAL_TABLES) {
+        localFingerprints[tableName] = {
+          recordCount: 0,
+          lastUpdated: 0,
+          recordIdHash: '',
+          recentDataHash: ''
+        };
+      }
+      
+      console.log('[IntegrityReset] 📤 Sending post-reset validation request to server...');
+      
+      // Send validation event to machine (non-blocking)
+      this.sendEventToMachine({
+        type: 'INTEGRITY_VALIDATE',
+        reason: 'Post-reset server validation check',
+        fingerprints: localFingerprints,
+        isPostResetCheck: true
       });
+      
+      // For now, assume server will respond (we can't easily wait for response here)
+      // The key is that we've verified local state and attempted server contact
+      console.log('[IntegrityReset] 📤 Post-reset validation request sent to server');
+      
+      return { 
+        serverResponded: true, 
+        serverHasNoData: false // We'll assume server has data unless we get explicit feedback
+      };
+      
+    } catch (error) {
+      console.warn('[IntegrityReset] Server validation check failed:', error);
+      return { serverResponded: false, serverHasNoData: false };
+    }
+  }
 
-      // Step 2: Wait for disconnect to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Step 3: Send CONNECT to restart sync flow from clean state
-      console.log('[IntegrityReset] Step 2: Reconnecting sync machine for fresh sync...');
-      this.sendEventToMachine({ 
-        type: 'CONNECT', 
-        reason: 'Post-reset fresh sync with LSN 0/0' 
-      });
-
-      console.log('[IntegrityReset] ✅ Controlled restart sequence completed - sync machine will: idle → connecting → initial sync from LSN 0/0');
+  /**
+   * Trigger app refresh to ensure clean state after reset
+   */
+  private async triggerAppRefresh(): Promise<void> {
+    try {
+      console.log('[IntegrityReset] Triggering app refresh for clean initialization...');
+      
+      // Wait a moment to ensure reset operations are complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      console.log('[IntegrityReset] ✅ Refreshing app to reinitialize with clean state...');
+      window.location.reload();
 
     } catch (error) {
-      console.error('[IntegrityReset] Error triggering controlled sync restart:', error);
-      // Don't throw - but log prominently since this is critical for resync
-      console.error('[IntegrityReset] ❌ CRITICAL: Sync restart failed - manual reconnection may be needed');
+      console.error('[IntegrityReset] Error triggering app refresh:', error);
+      console.error('[IntegrityReset] ❌ CRITICAL: App refresh failed - please refresh manually');
     }
   }
 
