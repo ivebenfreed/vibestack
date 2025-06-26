@@ -228,7 +228,7 @@ export class EntityOperations {
         throw new ValidationError(`No repository found for table: ${table}`);
       }
 
-      // Clean the data - remove metadata and relationship fields
+      // Clean the data - remove metadata and relationship fields but preserve clientId
       const { 
         metadata, 
         entityRelations, 
@@ -237,6 +237,11 @@ export class EntityOperations {
         relationship_updates,
         ...insertData 
       } = data as any;
+      
+      // Ensure clientId is preserved for anti-echo filtering
+      if (data.clientId && !insertData.clientId) {
+        insertData.clientId = data.clientId;
+      }
       
       // Data is already in camelCase from client - just ensure date fields are Date objects
       const transformedData = this.ensureDateObjects(insertData);
@@ -330,6 +335,11 @@ export class EntityOperations {
         __metadata,        // Remove sync metadata
         ...updateData 
       } = data as any;
+      
+      // Ensure clientId is preserved for anti-echo filtering
+      if (data.clientId && !updateData.clientId) {
+        updateData.clientId = data.clientId;
+      }
       
       // Clean snake_case duplicates first, then ensure date objects
       const cleanedData = this.ensureDateObjects(updateData);
