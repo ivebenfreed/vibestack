@@ -1,22 +1,70 @@
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
-import { useMemo } from 'react';
 
-// Imports for 3-path architecture wrapper functions
-import { 
-  createProjectUI as generatedCreateProjectUI,
-  updateProjectUI as generatedUpdateProjectUI,
-  deleteProjectUI as generatedDeleteProjectUI,
-  createProjectIncoming as generatedCreateProjectIncoming,
-  updateProjectIncoming as generatedUpdateProjectIncoming,
-  deleteProjectIncoming as generatedDeleteProjectIncoming,
-  createProjectLiveChanges as generatedCreateProjectLiveChanges,
-  updateProjectLiveChanges as generatedUpdateProjectLiveChanges,
-  deleteProjectLiveChanges as generatedDeleteProjectLiveChanges,
+// Import DataForge operations
+import {
+  createProjectUI as _createProjectUI,
+  updateProjectUI as _updateProjectUI,
+  deleteProjectUI as _deleteProjectUI,
+  createProjectIncoming as _createProjectIncoming,
+  updateProjectIncoming as _updateProjectIncoming,
+  deleteProjectIncoming as _deleteProjectIncoming,
+  createProjectLiveChanges as _createProjectLiveChanges,
+  updateProjectLiveChanges as _updateProjectLiveChanges,
+  deleteProjectLiveChanges as _deleteProjectLiveChanges,
   type CreateProjectInput,
   type UpdateProjectInput
 } from '@repo/dataforge/project-operations';
+
+// Export types
+export type { CreateProjectInput, UpdateProjectInput };
+
+// Wrapper functions that handle dependencies internally
+export async function createProjectUI(projectData: CreateProjectInput): Promise<Project> {
+  const dependencies = await getProjectDependencies();
+  return _createProjectUI(projectData, dependencies);
+}
+
+export async function updateProjectUI(projectId: string, updates: UpdateProjectInput): Promise<Project> {
+  const dependencies = await getProjectDependencies();
+  return _updateProjectUI(projectId, updates, dependencies);
+}
+
+export async function deleteProjectUI(projectId: string): Promise<boolean> {
+  const dependencies = await getProjectDependencies();
+  return _deleteProjectUI(projectId, dependencies);
+}
+
+export async function createProjectIncoming(projectData: Project): Promise<Project> {
+  const dependencies = await getProjectDependencies();
+  return _createProjectIncoming(projectData, dependencies);
+}
+
+export async function updateProjectIncoming(projectId: string, updates: Partial<Project>): Promise<Project> {
+  const dependencies = await getProjectDependencies();
+  return _updateProjectIncoming(projectId, updates, dependencies);
+}
+
+export async function deleteProjectIncoming(projectId: string): Promise<boolean> {
+  const dependencies = await getProjectDependencies();
+  return _deleteProjectIncoming(projectId, dependencies);
+}
+
+export function createProjectLiveChanges(projectData: Project): void {
+  const dependencies = { atomActions };
+  return _createProjectLiveChanges(projectData, dependencies);
+}
+
+export function updateProjectLiveChanges(projectId: string, updates: Partial<Project>): void {
+  const dependencies = { atomActions };
+  return _updateProjectLiveChanges(projectId, updates, dependencies);
+}
+
+export function deleteProjectLiveChanges(projectId: string): void {
+  const dependencies = { atomActions };
+  return _deleteProjectLiveChanges(projectId, dependencies);
+}
 
 // ============================================================================
 // 🎯 PURE XSTATE ATOMIC STORE IMPLEMENTATION
@@ -128,57 +176,44 @@ export const useProjectAtoms = {
 };
 
 // ============================================================================
-// XState Atom Actions
+// Atom Utilities for DataForge Operations
 // ============================================================================
 
-export const projectActions = {
-  // Create new project in atom
-  createProject: (project: Project) => {
+export const atomActions = {
+  createProjectAtomOnly: (project: Project) => {
     const currentProjects = projectsAtom.get();
-    projectsAtom.set({
-      ...currentProjects,
-      [project.id]: project
-    });
+    projectsAtom.set({ ...currentProjects, [project.id]: project });
   },
-
-  // Update existing project in atom
+  
   updateProjectAtomOnly: (id: string, updates: Partial<Project>) => {
     const currentProjects = projectsAtom.get();
     const existingProject = currentProjects[id];
-    if (!existingProject) {
-      console.warn(`[ProjectActions] Project ${id} not found for update`);
-      return;
+    if (existingProject) {
+      projectsAtom.set({ ...currentProjects, [id]: { ...existingProject, ...updates } });
     }
-    
-    projectsAtom.set({
-      ...currentProjects,
-      [id]: { ...existingProject, ...updates }
-    });
   },
-
-  // Delete project from atom
+  
   deleteProjectAtomOnly: (id: string) => {
     const currentProjects = projectsAtom.get();
     const { [id]: deleted, ...remaining } = currentProjects;
     projectsAtom.set(remaining);
   },
+  
+  // Expose atom for DataForge operations
+  projectsAtom: projectsAtom
+};
 
-  // Load multiple projects (for initial load)
+export const projectUtils = {
   loadProjects: (projects: Project[]) => {
     const projectsRecord = projects.reduce((acc, project) => {
       acc[project.id] = project;
       return acc;
     }, {} as Record<string, Project>);
-    
     projectsAtom.set(projectsRecord);
   },
-
-  // Clear all projects
-  clearProjects: () => {
-    projectsAtom.set({});
-  },
-
-  // Ensure projects are loaded (high-performance direct check)
+  
+  clearProjects: () => projectsAtom.set({}),
+  
   ensureLoaded: async () => {
     if (Object.keys(projectsAtom.get()).length === 0) {
       const { getGlobalDataSource } = await import('@/db/global-datasource');
@@ -186,139 +221,27 @@ export const projectActions = {
       const projects = await dataSource.getRepository(Project).find({
         relations: ['owner', 'members']
       });
-      projectActions.loadProjects(projects);
+      projectUtils.loadProjects(projects);
     }
   }
 };
 
-// ============================================================================
-// 3-Path Architecture Wrapper Functions
-// ============================================================================
-
-/**
- * Create project from UI - thin wrapper around generated function
- */
-export async function createProjectUI(projectData: CreateProjectInput): Promise<Project> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
+// Helper to get dependencies for DataForge operations
+export async function getProjectDependencies() {
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
   
-  const dataSource = await getNewPGliteDataSource();
+  const dataSource = await getGlobalDataSource();
   const services = getGlobalServicesV3();
   
-  return generatedCreateProjectUI(projectData, {
+  return {
     dataSource,
     EntityClass: Project,
-    atomActions: projectActions,
+    atomActions,
     outgoingChangeService: services?.outgoingChangeService || null
-  });
+  };
 }
 
-/**
- * Update project from UI - thin wrapper around generated function
- */
-export async function updateProjectUI(projectId: string, updates: UpdateProjectInput): Promise<Project> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
-  
-  const dataSource = await getNewPGliteDataSource();
-  const services = getGlobalServicesV3();
-  
-  return generatedUpdateProjectUI(projectId, updates, {
-    dataSource,
-    EntityClass: Project,
-    atomActions: projectActions,
-    outgoingChangeService: services?.outgoingChangeService || null
-  });
-}
-
-/**
- * Delete project from UI - thin wrapper around generated function
- */
-export async function deleteProjectUI(projectId: string): Promise<boolean> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
-  
-  const dataSource = await getNewPGliteDataSource();
-  const services = getGlobalServicesV3();
-  
-  return generatedDeleteProjectUI(projectId, {
-    dataSource,
-    EntityClass: Project,
-    atomActions: projectActions,
-    outgoingChangeService: services?.outgoingChangeService || null
-  });
-}
-
-/**
- * Create project from incoming sync - thin wrapper around generated function
- */
-export async function createProjectIncoming(projectData: Project): Promise<Project> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const dataSource = await getNewPGliteDataSource();
-  
-  return generatedCreateProjectIncoming(projectData, {
-    dataSource,
-    EntityClass: Project
-  });
-}
-
-/**
- * Update project from incoming sync - thin wrapper around generated function
- */
-export async function updateProjectIncoming(projectId: string, updates: Partial<Project>): Promise<Project> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const dataSource = await getNewPGliteDataSource();
-  
-  return generatedUpdateProjectIncoming(projectId, updates, {
-    dataSource,
-    EntityClass: Project
-  });
-}
-
-/**
- * Delete project from incoming sync - thin wrapper around generated function
- */
-export async function deleteProjectIncoming(projectId: string): Promise<void> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const dataSource = await getNewPGliteDataSource();
-  
-  return generatedDeleteProjectIncoming(projectId, {
-    dataSource,
-    EntityClass: Project
-  });
-}
-
-/**
- * Create project from live changes - thin wrapper around generated function
- */
-export function createProjectLiveChanges(projectData: Project): void {
-  generatedCreateProjectLiveChanges(projectData, {
-    atomActions: projectActions
-  });
-}
-
-/**
- * Update project from live changes - thin wrapper around generated function
- */
-export function updateProjectLiveChanges(projectId: string, updates: Partial<Project>): void {
-  generatedUpdateProjectLiveChanges(projectId, updates, {
-    atomActions: projectActions
-  });
-}
-
-/**
- * Delete project from live changes - thin wrapper around generated function
- */
-export function deleteProjectLiveChanges(projectId: string): void {
-  generatedDeleteProjectLiveChanges(projectId, {
-    atomActions: projectActions
-  });
-}
-
-/**
- * Bulk create projects from incoming sync - optimized for chunked data
- * Used by IncomingChangeService for performance when processing chunks
- */
 export async function bulkCreateProjectsIncoming(projectsData: Project[]): Promise<Project[]> {
   if (projectsData.length === 0) return [];
   
@@ -326,14 +249,14 @@ export async function bulkCreateProjectsIncoming(projectsData: Project[]): Promi
   const startTime = Date.now();
   
   try {
-    const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-    const dataSource = await getNewPGliteDataSource();
+    const { getGlobalDataSource } = await import('@/db/global-datasource');
+    const dataSource = await getGlobalDataSource();
     
-    // Apply to database
+    // Apply to database in bulk
     const projectRepo = dataSource.getRepository(Project);
     const result = await projectRepo.insert(projectsData);
     
-    // Get the inserted projects
+    // Get the inserted projects (use original data since insert doesn't return full records)
     const insertedProjects = projectsData;
     
     // Update atoms in batch
@@ -357,6 +280,3 @@ export async function bulkCreateProjectsIncoming(projectsData: Project[]): Promi
     throw error;
   }
 }
-
-// Re-export types for convenience
-export type { CreateProjectInput, UpdateProjectInput } from '@repo/dataforge/project-operations';

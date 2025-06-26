@@ -1,8 +1,8 @@
 import { createStore } from '@xstate/store'
 import { useSelector } from '@xstate/store/react'
-import { projectsAtom, projectActions } from '@/domain/project'
-import { tasksAtom, taskActions } from '@/domain/task'
-import { usersAtom, userActions } from '@/domain/user'
+import { projectsAtom, projectUtils } from '@/domain/project'
+import { tasksAtom, taskUtils } from '@/domain/task'
+import { usersAtom, userUtils } from '@/domain/user'
 import { type NavGroup } from '@/components/layout/types'
 import { 
   generateProjectsSection, 
@@ -144,13 +144,13 @@ async function loadProjectsForSidebar() {
   try {
     // 🎯 SERIALIZED: Load atoms sequentially to avoid PGlite database contention
     console.log('[SidebarNavigation] Loading atoms sequentially to prevent database conflicts...')
-    const { projectActions } = await import('@/domain/project')
-    const { taskActions } = await import('@/domain/task')
-    const { userActions } = await import('@/domain/user')
+    const { projectUtils } = await import('@/domain/project')
+    const { taskUtils } = await import('@/domain/task')
+    const { userUtils } = await import('@/domain/user')
     
-    await projectActions.ensureLoaded()
-    await taskActions.ensureLoaded()
-    await userActions.ensureLoaded()
+    await projectUtils.ensureLoaded()
+    await taskUtils.ensureLoaded()
+    await userUtils.ensureLoaded()
     
     console.log('[SidebarNavigation] ✅ All atoms loaded successfully')
     

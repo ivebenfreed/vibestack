@@ -6,7 +6,7 @@ import {
   createEditableDateColumn
 } from '@/components/custom/universal-entity-table-v2/features/columns'
 
-import { tasksAtom, taskActions } from '@/domain/task'
+import { tasksAtom } from '@/domain/task'
 import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
 import type { Task, Project, User } from '@repo/dataforge/client-entities'

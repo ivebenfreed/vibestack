@@ -2,6 +2,70 @@ import { Comment } from '@repo/dataforge/client-entities';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
 
+// Import DataForge operations
+import {
+  createCommentUI as _createCommentUI,
+  updateCommentUI as _updateCommentUI,
+  deleteCommentUI as _deleteCommentUI,
+  createCommentIncoming as _createCommentIncoming,
+  updateCommentIncoming as _updateCommentIncoming,
+  deleteCommentIncoming as _deleteCommentIncoming,
+  createCommentLiveChanges as _createCommentLiveChanges,
+  updateCommentLiveChanges as _updateCommentLiveChanges,
+  deleteCommentLiveChanges as _deleteCommentLiveChanges,
+  type CreateCommentInput,
+  type UpdateCommentInput
+} from '@repo/dataforge/comment-operations';
+
+// Export types
+export type { CreateCommentInput, UpdateCommentInput };
+
+// Wrapper functions that handle dependencies internally
+export async function createCommentUI(commentData: CreateCommentInput): Promise<Comment> {
+  const dependencies = await getCommentDependencies();
+  return _createCommentUI(commentData, dependencies);
+}
+
+export async function updateCommentUI(commentId: string, updates: UpdateCommentInput): Promise<Comment> {
+  const dependencies = await getCommentDependencies();
+  return _updateCommentUI(commentId, updates, dependencies);
+}
+
+export async function deleteCommentUI(commentId: string): Promise<boolean> {
+  const dependencies = await getCommentDependencies();
+  return _deleteCommentUI(commentId, dependencies);
+}
+
+export async function createCommentIncoming(commentData: Comment): Promise<Comment> {
+  const dependencies = await getCommentDependencies();
+  return _createCommentIncoming(commentData, dependencies);
+}
+
+export async function updateCommentIncoming(commentId: string, updates: Partial<Comment>): Promise<Comment> {
+  const dependencies = await getCommentDependencies();
+  return _updateCommentIncoming(commentId, updates, dependencies);
+}
+
+export async function deleteCommentIncoming(commentId: string): Promise<boolean> {
+  const dependencies = await getCommentDependencies();
+  return _deleteCommentIncoming(commentId, dependencies);
+}
+
+export function createCommentLiveChanges(commentData: Comment): void {
+  const dependencies = { atomActions };
+  return _createCommentLiveChanges(commentData, dependencies);
+}
+
+export function updateCommentLiveChanges(commentId: string, updates: Partial<Comment>): void {
+  const dependencies = { atomActions };
+  return _updateCommentLiveChanges(commentId, updates, dependencies);
+}
+
+export function deleteCommentLiveChanges(commentId: string): void {
+  const dependencies = { atomActions };
+  return _deleteCommentLiveChanges(commentId, dependencies);
+}
+
 // Main comments store - holds all comments in normalized format
 export const commentsAtom = createAtom<Record<string, Comment>>({});
 
@@ -23,16 +87,16 @@ export const useCommentAtoms = {
   }
 };
 
-// Atom Actions
-export const commentActions = {
-  createComment: (comment: Comment) => {
-    const currentComments = commentsAtom.get();
-    commentsAtom.set({ ...currentComments, [comment.id]: comment });
-  },
+// ============================================================================
+// Atom Utilities for DataForge Operations
+// ============================================================================
+
+export const atomActions = {
   createCommentAtomOnly: (comment: Comment) => {
     const currentComments = commentsAtom.get();
     commentsAtom.set({ ...currentComments, [comment.id]: comment });
   },
+  
   updateCommentAtomOnly: (id: string, updates: Partial<Comment>) => {
     const currentComments = commentsAtom.get();
     const existingComment = currentComments[id];
@@ -40,11 +104,18 @@ export const commentActions = {
       commentsAtom.set({ ...currentComments, [id]: { ...existingComment, ...updates } });
     }
   },
+  
   deleteCommentAtomOnly: (id: string) => {
     const currentComments = commentsAtom.get();
     const { [id]: deleted, ...remaining } = currentComments;
     commentsAtom.set(remaining);
   },
+  
+  // Expose atom for DataForge operations
+  commentsAtom: commentsAtom
+};
+
+export const commentUtils = {
   loadComments: (comments: Comment[]) => {
     const commentsRecord = comments.reduce((acc, comment) => {
       acc[comment.id] = comment;
@@ -52,8 +123,9 @@ export const commentActions = {
     }, {} as Record<string, Comment>);
     commentsAtom.set(commentsRecord);
   },
-
-  // Ensure comments are loaded (high-performance direct check)
+  
+  clearComments: () => commentsAtom.set({}),
+  
   ensureLoaded: async () => {
     if (Object.keys(commentsAtom.get()).length === 0) {
       const { getGlobalDataSource } = await import('@/db/global-datasource');
@@ -61,94 +133,25 @@ export const commentActions = {
       const comments = await dataSource.getRepository(Comment).find({
         relations: ['author', 'task', 'project', 'parent']
       });
-      commentActions.loadComments(comments);
+      commentUtils.loadComments(comments);
     }
   }
 };
 
-// 3-Path Architecture Implementation using DataForge operations
-export async function createCommentUI(commentData: any): Promise<Comment> {
-  const { createCommentUI: createCommentOperation } = await import('@repo/dataforge/comment-operations');
+// Helper to get dependencies for DataForge operations
+export async function getCommentDependencies() {
   const { getGlobalDataSource } = await import('@/db/global-datasource');
   const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
   
   const dataSource = await getGlobalDataSource();
   const services = getGlobalServicesV3();
   
-  return createCommentOperation(commentData, {
+  return {
     dataSource,
-    atomActions: { ...commentActions, commentsAtom },
-    outgoingChangeService: services?.outgoingChangeService,
-    EntityClass: Comment
-  });
-}
-
-export async function updateCommentUI(commentId: string, updates: any): Promise<Comment> {
-  const { updateCommentUI: updateCommentOperation } = await import('@repo/dataforge/comment-operations');
-  const { getGlobalDataSource } = await import('@/db/global-datasource');
-  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
-  
-  const dataSource = await getGlobalDataSource();
-  const services = getGlobalServicesV3();
-  
-  return updateCommentOperation(commentId, updates, {
-    dataSource,
-    atomActions: { ...commentActions, commentsAtom },
-    outgoingChangeService: services?.outgoingChangeService,
-    EntityClass: Comment
-  });
-}
-
-export async function deleteCommentUI(commentId: string): Promise<boolean> {
-  const { deleteCommentUI: deleteCommentOperation } = await import('@repo/dataforge/comment-operations');
-  const { getGlobalDataSource } = await import('@/db/global-datasource');
-  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
-  
-  const dataSource = await getGlobalDataSource();
-  const services = getGlobalServicesV3();
-  
-  return deleteCommentOperation(commentId, {
-    dataSource,
-    atomActions: { ...commentActions, commentsAtom },
-    outgoingChangeService: services?.outgoingChangeService,
-    EntityClass: Comment
-  });
-}
-
-export async function createCommentIncoming(commentData: Comment): Promise<Comment> {
-  const { createCommentIncoming: createCommentOperation } = await import('@repo/dataforge/comment-operations');
-  const { getGlobalDataSource } = await import('@/db/global-datasource');
-  
-  const dataSource = await getGlobalDataSource();
-  
-  return createCommentOperation(commentData, {
-    dataSource,
-    EntityClass: Comment
-  });
-}
-
-export async function updateCommentIncoming(commentId: string, updates: Partial<Comment>): Promise<Comment> {
-  const { updateCommentIncoming: updateCommentOperation } = await import('@repo/dataforge/comment-operations');
-  const { getGlobalDataSource } = await import('@/db/global-datasource');
-  
-  const dataSource = await getGlobalDataSource();
-  
-  return updateCommentOperation(commentId, updates, {
-    dataSource,
-    EntityClass: Comment
-  });
-}
-
-export async function deleteCommentIncoming(commentId: string): Promise<void> {
-  const { deleteCommentIncoming: deleteCommentOperation } = await import('@repo/dataforge/comment-operations');
-  const { getGlobalDataSource } = await import('@/db/global-datasource');
-  
-  const dataSource = await getGlobalDataSource();
-  
-  await deleteCommentOperation(commentId, {
-    dataSource,
-    EntityClass: Comment
-  });
+    EntityClass: Comment,
+    atomActions,
+    outgoingChangeService: services?.outgoingChangeService || null
+  };
 }
 
 export async function bulkCreateCommentsIncoming(commentsData: Comment[]): Promise<Comment[]> {
@@ -190,14 +193,3 @@ export async function bulkCreateCommentsIncoming(commentsData: Comment[]): Promi
   }
 }
 
-export function createCommentLiveChanges(commentData: Comment): void {
-  commentActions.createComment(commentData);
-}
-
-export function updateCommentLiveChanges(commentId: string, updates: Partial<Comment>): void {
-  commentActions.updateCommentAtomOnly(commentId, updates);
-}
-
-export function deleteCommentLiveChanges(commentId: string): void {
-  commentActions.deleteCommentAtomOnly(commentId);
-}

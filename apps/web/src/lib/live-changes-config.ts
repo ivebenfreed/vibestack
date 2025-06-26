@@ -8,10 +8,10 @@
 
 import * as clientEntities from '@repo/dataforge/client-entities'
 import { CLIENT_DOMAIN_TABLES } from '@repo/dataforge/client-entities'
-import { taskActions } from '@/domain/task'
-import { projectActions } from '@/domain/project'
-import { userActions } from '@/domain/user'
-import { commentActions } from '@/domain/comment'
+import { atomActions as taskAtomActions, taskUtils } from '@/domain/task'
+import { atomActions as projectAtomActions, projectUtils } from '@/domain/project'
+import { atomActions as userAtomActions, userUtils } from '@/domain/user'
+import { atomActions as commentAtomActions, commentUtils } from '@/domain/comment'
 import type { EntityConfig, AtomActions } from '@/types/live-changes'
 
 // Map table names to entity names (remove quotes and convert to PascalCase)
@@ -53,7 +53,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import task live changes functions:', error)
         // Fallback to direct atom update
-        taskActions.updateTaskAtomOnly(id, updates)
+        taskAtomActions.updateTaskAtomOnly(id, updates)
       })
     },
     removeItem: (id: string) => {
@@ -62,7 +62,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import task live changes functions:', error)
         // Fallback to direct atom update
-        taskActions.deleteTaskAtomOnly(id)
+        taskAtomActions.deleteTaskAtomOnly(id)
       })
     },
     hasItem: (id: string) => {
@@ -72,7 +72,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       return id in tasksRecord
     },
     loadItems: (items: any[]) => {
-      taskActions.loadTasks(items)
+      taskUtils.loadTasks(items)
     }
   },
   
@@ -83,7 +83,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import project live changes functions:', error)
         // Fallback to direct atom update
-        projectActions.updateProjectAtomOnly(id, updates)
+        projectAtomActions.updateProjectAtomOnly(id, updates)
       })
     },
     removeItem: (id: string) => {
@@ -92,7 +92,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import project live changes functions:', error)
         // Fallback to direct atom update
-        projectActions.deleteProjectAtomOnly(id)
+        projectAtomActions.deleteProjectAtomOnly(id)
       })
     },
     hasItem: (id: string) => {
@@ -101,7 +101,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       return id in projectsRecord
     },
     loadItems: (items: any[]) => {
-      projectActions.loadProjects(items)
+      projectUtils.loadProjects(items)
     }
   },
   
@@ -112,7 +112,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import user live changes functions:', error)
         // Fallback to direct atom update
-        userActions.updateUserAtomOnly(id, updates)
+        userAtomActions.updateUserAtomOnly(id, updates)
       })
     },
     removeItem: (id: string) => {
@@ -121,7 +121,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import user live changes functions:', error)
         // Fallback to direct atom update
-        userActions.deleteUserAtomOnly(id)
+        userAtomActions.deleteUserAtomOnly(id)
       })
     },
     hasItem: (id: string) => {
@@ -130,7 +130,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       return id in usersRecord
     },
     loadItems: (items: any[]) => {
-      userActions.loadUsers(items)
+      userUtils.loadUsers(items)
     }
   },
   
@@ -141,7 +141,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import comment live changes functions:', error)
         // Fallback to direct atom update
-        commentActions.updateCommentAtomOnly(id, updates)
+        commentAtomActions.updateCommentAtomOnly(id, updates)
       })
     },
     removeItem: (id: string) => {
@@ -150,7 +150,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import comment live changes functions:', error)
         // Fallback to direct atom update
-        commentActions.deleteCommentAtomOnly(id)
+        commentAtomActions.deleteCommentAtomOnly(id)
       })
     },
     hasItem: (id: string) => {
@@ -159,7 +159,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       return id in commentsRecord
     },
     loadItems: (items: any[]) => {
-      commentActions.loadComments(items)
+      commentUtils.loadComments(items)
     }
   }
 }

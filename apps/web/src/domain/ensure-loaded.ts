@@ -7,10 +7,10 @@
 
 import { getGlobalDataSource } from '@/db/global-datasource';
 import { Task, Project, User, Comment } from '@repo/dataforge/client-entities';
-import { tasksAtom, taskActions } from './task';
-import { projectsAtom, projectActions } from './project';
-import { usersAtom, userActions } from './user';
-import { commentsAtom, commentActions } from './comment';
+import { tasksAtom, taskUtils } from './task';
+import { projectsAtom, projectUtils } from './project';
+import { usersAtom, userUtils } from './user';
+import { commentsAtom, commentUtils } from './comment';
 
 // Check functions - synchronous, zero overhead
 export const areTasksLoaded = () => Object.keys(tasksAtom.get()).length > 0;
@@ -70,7 +70,7 @@ export const ensureTasksLoaded = async () => {
     const tasks = await dataSource.getRepository(Task).find({
       relations: ['project', 'assignee']
     });
-    taskActions.loadTasks(tasks);
+    taskUtils.loadTasks(tasks);
   }
 };
 
@@ -80,7 +80,7 @@ export const ensureProjectsLoaded = async () => {
     const projects = await dataSource.getRepository(Project).find({
       relations: ['owner', 'members']
     });
-    projectActions.loadProjects(projects);
+    projectUtils.loadProjects(projects);
   }
 };
 
@@ -88,7 +88,7 @@ export const ensureUsersLoaded = async () => {
   if (Object.keys(usersAtom.get()).length === 0) {
     const dataSource = await getGlobalDataSource();
     const users = await dataSource.getRepository(User).find();
-    userActions.loadUsers(users);
+    userUtils.loadUsers(users);
   }
 };
 
@@ -98,7 +98,7 @@ export const ensureCommentsLoaded = async () => {
     const comments = await dataSource.getRepository(Comment).find({
       relations: ['author', 'task', 'project', 'parent']
     });
-    commentActions.loadComments(comments);
+    commentUtils.loadComments(comments);
   }
 };
 

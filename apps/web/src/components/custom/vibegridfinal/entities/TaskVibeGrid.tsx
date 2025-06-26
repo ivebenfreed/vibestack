@@ -18,9 +18,9 @@ import type { TaskVibeGridProps, RelationshipDataProvider } from '../types'
 import type { Task } from '@repo/dataforge/client-entities'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { taskActions, tasksAtom } from '@/domain/task'
-import { projectActions, projectsAtom } from '@/domain/project'
-import { userActions, usersAtom } from '@/domain/user'
+import { tasksAtom } from '@/domain/task'
+import { projectsAtom } from '@/domain/project'
+import { usersAtom } from '@/domain/user'
 
 // ✅ UPDATED: Generated column configurations from correct path
 import { 

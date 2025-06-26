@@ -10,7 +10,7 @@ import {
   createDirectUsagePattern,
   validateDirectUsagePattern
 } from '@/components/custom/vibegridfinal/utils/patterns'
-import { taskActions, tasksAtom } from '@/domain/task'
+import { tasksAtom } from '@/domain/task'
 import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
 import { useSelector } from '@xstate/store/react'

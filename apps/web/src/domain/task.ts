@@ -2,20 +2,69 @@ import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
 
-// Re-export DataForge operations and types directly
-export { 
-  createTaskUI,
-  updateTaskUI,
-  deleteTaskUI,
-  createTaskIncoming,
-  updateTaskIncoming,
-  deleteTaskIncoming,
-  createTaskLiveChanges,
-  updateTaskLiveChanges,
-  deleteTaskLiveChanges,
+// Import DataForge operations
+import {
+  createTaskUI as _createTaskUI,
+  updateTaskUI as _updateTaskUI,
+  deleteTaskUI as _deleteTaskUI,
+  createTaskIncoming as _createTaskIncoming,
+  updateTaskIncoming as _updateTaskIncoming,
+  deleteTaskIncoming as _deleteTaskIncoming,
+  createTaskLiveChanges as _createTaskLiveChanges,
+  updateTaskLiveChanges as _updateTaskLiveChanges,
+  deleteTaskLiveChanges as _deleteTaskLiveChanges,
   type CreateTaskInput,
   type UpdateTaskInput
 } from '@repo/dataforge/task-operations';
+
+// Export types
+export type { CreateTaskInput, UpdateTaskInput };
+
+// Wrapper functions that handle dependencies internally
+export async function createTaskUI(taskData: CreateTaskInput): Promise<Task> {
+  const dependencies = await getTaskDependencies();
+  return _createTaskUI(taskData, dependencies);
+}
+
+export async function updateTaskUI(taskId: string, updates: UpdateTaskInput): Promise<Task> {
+  const dependencies = await getTaskDependencies();
+  return _updateTaskUI(taskId, updates, dependencies);
+}
+
+export async function deleteTaskUI(taskId: string): Promise<boolean> {
+  const dependencies = await getTaskDependencies();
+  return _deleteTaskUI(taskId, dependencies);
+}
+
+export async function createTaskIncoming(taskData: Task): Promise<Task> {
+  const dependencies = await getTaskDependencies();
+  return _createTaskIncoming(taskData, dependencies);
+}
+
+export async function updateTaskIncoming(taskId: string, updates: Partial<Task>): Promise<Task> {
+  const dependencies = await getTaskDependencies();
+  return _updateTaskIncoming(taskId, updates, dependencies);
+}
+
+export async function deleteTaskIncoming(taskId: string): Promise<boolean> {
+  const dependencies = await getTaskDependencies();
+  return _deleteTaskIncoming(taskId, dependencies);
+}
+
+export function createTaskLiveChanges(taskData: Task): void {
+  const dependencies = { atomActions };
+  return _createTaskLiveChanges(taskData, dependencies);
+}
+
+export function updateTaskLiveChanges(taskId: string, updates: Partial<Task>): void {
+  const dependencies = { atomActions };
+  return _updateTaskLiveChanges(taskId, updates, dependencies);
+}
+
+export function deleteTaskLiveChanges(taskId: string): void {
+  const dependencies = { atomActions };
+  return _deleteTaskLiveChanges(taskId, dependencies);
+}
 
 // ============================================================================
 // 🎯 PURE XSTATE ATOMIC STORE IMPLEMENTATION

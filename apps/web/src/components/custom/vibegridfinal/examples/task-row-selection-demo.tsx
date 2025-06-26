@@ -8,7 +8,6 @@
 import React from 'react'
 import { TaskVibeGrid } from '../entities/TaskVibeGrid'
 import { ContentContainer } from '@/components/layout/content-container'
-import { taskActions } from '@/domain/task'
 
 export function TaskRowSelectionDemo() {
   // ============================================================================
@@ -24,7 +23,8 @@ export function TaskRowSelectionDemo() {
     
     if (confirmed) {
       try {
-        await Promise.all(taskIds.map(id => taskActions.deleteTask(id)))
+        const { deleteTaskUI } = await import('@/domain/task')
+        await Promise.all(taskIds.map(id => deleteTaskUI(id)))
         
         // Success feedback
         alert(`✅ Successfully deleted ${taskIds.length} tasks!`)
