@@ -74,6 +74,10 @@ function isValidLSN(lsn: string): boolean {
  * SyncDO is responsible for managing WebSocket connections and sync flow
  */
 export class SyncDO implements DurableObject, WebSocketHandler {
+  // Static in-memory registry shared across all SyncDO instances in this Worker
+  private static activeClients: Set<string> = new Set();
+  private static isInitialized: boolean = false;
+  
   private state: DurableObjectState;
   private env: Env;
   private ctx: DurableObjectState;
@@ -748,6 +752,11 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // Clear WebSocket reference
     this.webSocket = null;
     
+    // Remove from static in-memory registry immediately
+    if (this.clientId) {
+      SyncDO.activeClients.delete(this.clientId);
+    }
+    
     // Mark client as inactive in KV - don't wait for completion
     this.state.waitUntil(this.stateManager.cleanupConnection());
     
@@ -842,6 +851,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     
     // Register the client
     await this.stateManager.registerClient(clientId);
+    
+    // Add to static in-memory registry for fast broadcasts
+    SyncDO.activeClients.add(clientId);
     
     // Store the client's LSN
     await this.stateManager.updateClientLSN(clientId, clientLSN);
@@ -2209,8 +2221,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         originClientId
       }, MODULE_NAME);
 
-      // Get all registered clients from KV
-      const activeClients = await this.getActiveClientsFromRegistry();
+      // Get all registered clients from in-memory registry
+      const activeClients = this.getActiveClientsFromMemory();
       
       syncLogger.info('Active clients found for broadcast', {
         originClientId,
@@ -2295,8 +2307,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         conflictTables: [...new Set(conflictedChanges.map(c => c.table))]
       }, MODULE_NAME);
 
-      // Get all registered clients from KV (including originator for authoritative resolution)
-      const activeClients = await this.getActiveClientsFromRegistry();
+      // Get all registered clients from in-memory registry (including originator for authoritative resolution)
+      const activeClients = this.getActiveClientsFromMemory();
       
       if (activeClients.length === 0) {
         syncLogger.debug('No active clients for conflict resolution broadcast', { originClientId }, MODULE_NAME);
@@ -2394,11 +2406,31 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   }
 
   /**
-   * Get list of active clients from KV registry
-   * Uses "mark inactive on fail" approach instead of TTL-based expiration
+   * Get list of all active clients from in-memory registry
+   * Much faster than KV lookup - eliminates 77ms bottleneck
    */
-  private async getActiveClientsFromRegistry(): Promise<string[]> {
+  private getActiveClientsFromMemory(): string[] {
+    // Initialize from KV if this is the first access
+    if (!SyncDO.isInitialized) {
+      // Use waitUntil to initialize in background without blocking
+      this.state.waitUntil(this.initializeFromKV());
+    }
+    
+    return Array.from(SyncDO.activeClients);
+  }
+
+  /**
+   * One-time initialization from KV registry to populate static Set
+   * Called in background on first access
+   */
+  private async initializeFromKV(): Promise<void> {
+    if (SyncDO.isInitialized) {
+      return; // Already initialized by another instance
+    }
+    
     try {
+      syncLogger.info('Initializing in-memory client registry from KV', {}, MODULE_NAME);
+      
       // List all client keys from KV
       const listResult = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
       const activeClients: string[] = [];
@@ -2412,15 +2444,16 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           const clientData = await this.env.CLIENT_REGISTRY.get(key.name);
           if (clientData) {
             const data = JSON.parse(clientData);
-            // Only check active flag - no TTL-based expiration
+            // Only check active flag
             if (data.active === true) {
               activeClients.push(clientId);
+              SyncDO.activeClients.add(clientId);
             }
           }
         } catch (clientError) {
           // Mark this client as failed for cleanup
           failedClients.push(clientId);
-          syncLogger.warn('Failed to read client data during registry lookup', {
+          syncLogger.warn('Failed to read client data during KV initialization', {
             clientId,
             error: clientError instanceof Error ? clientError.message : String(clientError)
           }, MODULE_NAME);
@@ -2432,12 +2465,16 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         await this.markClientsInactive(failedClients);
       }
 
-      return activeClients;
+      SyncDO.isInitialized = true;
+      
+      syncLogger.info('In-memory client registry initialized', {
+        activeClientsFound: activeClients.length,
+        failedClientsFound: failedClients.length
+      }, MODULE_NAME);
     } catch (error) {
-      syncLogger.error('Error getting active clients from registry', {
+      syncLogger.error('Error initializing in-memory registry from KV', {
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
-      return [];
     }
   }
 
