@@ -971,9 +971,28 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       return new Response('Client ID is required', { status: 400 });
     }
 
+    // Parse request body to check for pushed changes
+    let body: any = {};
+    try {
+      const rawBody = await request.text();
+      if (rawBody) {
+        body = JSON.parse(rawBody);
+      }
+    } catch (error) {
+      syncLogger.error('Failed to parse request body', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+
+    const { lsn: lsnFromBody, changeCount, changes: pushedChanges } = body;
+
     syncLogger.info('Received new changes notification', {
       clientId,
-      lsnFromUrl
+      lsnFromUrl,
+      lsnFromBody,
+      hasPushedChanges: !!pushedChanges,
+      pushedChangeCount: pushedChanges?.length || 0
     }, MODULE_NAME);
 
     // Set the client ID if it's not already set
@@ -981,6 +1000,195 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       this.clientId = clientId;
       await this.stateManager.registerClient(clientId);
     }
+
+    // Check if client changes are being processed (for queuing logic)
+    if (this.isProcessingClientChanges) {
+      // If we have pushed changes, we need to modify the queued handler to use them
+      if (pushedChanges && Array.isArray(pushedChanges)) {
+        syncLogger.info('Client is currently processing changes, queuing live push update', {
+          clientId,
+          pushedChangeCount: pushedChanges.length
+        }, MODULE_NAME);
+        
+        // Create a promise for the response
+        const responsePromise = new Promise<Response>((resolve) => {
+          // Add to pending updates queue
+          this.pendingLiveUpdates.push(async () => {
+            try {
+              // Import and use the new push handler
+              const { handlePushedLiveChanges } = await import('./live-push');
+              
+              const result = await handlePushedLiveChanges(
+                pushedChanges,
+                lsnFromBody || '0/0',
+                clientId,
+                this
+              );
+              
+              // Update client's LSN if successful
+              if (result.success && this.clientId === clientId) {
+                await this.stateManager.updateClientLSN(clientId, result.finalLSN);
+              }
+              
+              // Resolve with success response
+              resolve(new Response(JSON.stringify({
+                success: result.success,
+                notified: true,
+                changeCount: result.changeCount,
+                lsn: result.finalLSN,
+                queued: true,
+                method: 'push'
+              }), {
+                status: result.success ? 200 : 500,
+                headers: { 'Content-Type': 'application/json' }
+              }));
+            } catch (error) {
+              // Check if this is a WebSocket unavailability error
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              const isWebSocketUnavailable = errorMessage.includes('WebSocketUnavailable') || 
+                                          errorMessage.includes('No active WebSocket connections');
+              
+              if (isWebSocketUnavailable) {
+                // Clean up client
+                await this.stateManager.cleanupConnection();
+                
+                // Resolve with WebSocket unavailable response
+                resolve(new Response(JSON.stringify({
+                  success: false,
+                  notified: false,
+                  error: 'Client has no active WebSocket connection',
+                  cleaned: true,
+                  queued: true,
+                  method: 'push'
+                }), {
+                  status: 410,
+                  headers: { 'Content-Type': 'application/json' }
+                }));
+              } else {
+                // Resolve with error response
+                resolve(new Response(JSON.stringify({
+                  success: false,
+                  error: 'Failed to process queued live push update',
+                  details: errorMessage,
+                  queued: true,
+                  method: 'push'
+                }), {
+                  status: 500,
+                  headers: { 'Content-Type': 'application/json' }
+                }));
+              }
+            }
+          });
+        });
+        
+        return responsePromise;
+      }
+      
+      // Fall through to existing queuing logic for pull-based updates
+    }
+
+    // Fast path: If changes are provided, use the new push handler
+    if (pushedChanges && Array.isArray(pushedChanges)) {
+      syncLogger.info('Using pushed changes from ReplicationDO', {
+        clientId,
+        changeCount: pushedChanges.length,
+        method: 'push'
+      }, MODULE_NAME);
+
+      try {
+        // Get all active WebSocket connections first
+        const webSockets = this.ctx.getWebSockets();
+        
+        // If there are no active WebSockets, this client is disconnected
+        if (webSockets.length === 0) {
+          syncLogger.info('Client has no active WebSocket connection, cleaning up', {
+            clientId
+          }, MODULE_NAME);
+          
+          // Clean up client registration
+          await this.stateManager.cleanupConnection();
+          
+          return new Response(JSON.stringify({
+            success: false,
+            notified: false,
+            error: 'Client has no active WebSocket connection',
+            cleaned: true,
+            method: 'push'
+          }), {
+            status: 410,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Import and use the new push handler
+        const { handlePushedLiveChanges } = await import('./live-push');
+        
+        const result = await handlePushedLiveChanges(
+          pushedChanges,
+          lsnFromBody || (await getLatestChangeHistoryLSN(this.getContext())) || '0/0',
+          clientId,
+          this
+        );
+
+        // Update client's LSN if successful
+        if (result.success && this.clientId === clientId) {
+          await this.stateManager.updateClientLSN(clientId, result.finalLSN);
+          syncLogger.debug('Updated client LSN from pushed live changes', {
+            clientId,
+            newLSN: result.finalLSN
+          }, MODULE_NAME);
+        }
+
+        return new Response(JSON.stringify({
+          success: result.success,
+          notified: true,
+          changeCount: result.changeCount,
+          lsn: result.finalLSN,
+          method: 'push'
+        }), {
+          status: result.success ? 200 : 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        // Handle WebSocket unavailable errors
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('WebSocketUnavailable')) {
+          await this.stateManager.cleanupConnection();
+          return new Response(JSON.stringify({
+            success: false,
+            notified: false,
+            error: 'Client has no active WebSocket connection',
+            cleaned: true,
+            method: 'push'
+          }), {
+            status: 410,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        syncLogger.error('Unexpected error handling pushed changes', {
+          clientId,
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        }, MODULE_NAME);
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to process pushed changes',
+          details: errorMessage,
+          method: 'push'
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Fallback: Use existing pull-based logic
+    syncLogger.info('Using pull-based notification (no changes provided)', {
+      clientId,
+      method: 'pull'
+    }, MODULE_NAME);
 
     // Get server LSN from change_history, default to '0/0'
     const ctx = this.getContext(); // Get context for DB query

@@ -436,12 +436,17 @@ export async function transformWALChanges(
           (snakeCaseData.updated_at as string) || 
           new Date().toISOString();
 
+        // Extract clientId for top-level TableChange field (for anti-echo filtering)
+        const clientId = camelCaseData.clientId as string | undefined;
+
+
         // Add to result array with proper TableChange format (camelCase)
         tableChanges.push({
           table: change.table,
           operation: change.kind,
           data: camelCaseData,
           lsn: wal.lsn,
+          clientId,  // Set top-level clientId for anti-echo filtering
           updatedAt: timestamp  // Use camelCase as per TableChange interface
         });
       } catch (error) {
@@ -753,68 +758,101 @@ export async function processChanges(
       };
     }
 
-    // Step 2: Store raw changes in history 
-    const storedSuccessfully = await storeChangesInHistory(context, tableChanges, storeBatchSize);
-    
-    if (!storedSuccessfully) {
-      replicationLogger.warn('Failed to store changes', {
-        lastLSN
-      }, MODULE_NAME);
-      
-      // Even if storage failed, update LSN to prevent reprocessing this batch
-      await stateManager.setLSN(lastLSN);
-      return { 
-        success: true, // Still success from polling perspective, but storage failed
-        storedChanges: false, 
-        changeCount: tableChanges.length,
-        filteredCount,
-        lastLSN
-      };
-    }
-
-    // Step 3: Update LSN
-    try {
-      await stateManager.setLSN(lastLSN);
-    } catch (lsnError) {
-      replicationLogger.error('LSN update failed', { lsn: lastLSN }, MODULE_NAME);
-    }
-    
-    // Step 4: Notify clients about new changes
+    // Step 2: Notify clients about new changes FIRST for lower latency
+    // We do this before storing in the database so clients get updates faster
+    let notificationResults: any = null;
     try {
       const clientIds = await getAllClientIds(env);
       
-      // Skip logging if no clients to notify
+      // Skip notification if no clients to notify, but still store in DB
       if (clientIds.length === 0) {
-        return { 
-          success: true, 
-          storedChanges: storedSuccessfully,
-          changeCount: tableChanges.length,
-          filteredCount,
-          lastLSN
-        };
+        replicationLogger.debug('No clients to notify, skipping notification step', {
+          changeCount: tableChanges.length
+        }, MODULE_NAME);
+        // Continue to database storage step
+      } else {
+      
+      // Filter changes by originating client to implement anti-echo at source
+      const changesByClient = new Map<string, TableChange[]>();
+      const debugClientIds = new Map<string, { dataClientId?: string; topLevelClientId?: string; resolved?: string }>();
+      
+      for (const change of tableChanges) {
+        const dataClientId = change.data?.clientId as string | undefined;
+        const topLevelClientId = change.clientId;
+        const originClientId = dataClientId || topLevelClientId;
+        
+        // Debug logging for client ID resolution
+        if (dataClientId || topLevelClientId) {
+          debugClientIds.set(change.data?.id as string || 'unknown', {
+            dataClientId,
+            topLevelClientId,
+            resolved: originClientId
+          });
+        }
+        
+        if (!originClientId) {
+          // Changes without clientId go to everyone
+          clientIds.forEach(id => {
+            if (!changesByClient.has(id)) {
+              changesByClient.set(id, []);
+            }
+            changesByClient.get(id)!.push(change);
+          });
+        } else {
+          // Changes with clientId go to everyone except the originator
+          clientIds.forEach(id => {
+            if (id !== originClientId) {
+              if (!changesByClient.has(id)) {
+                changesByClient.set(id, []);
+              }
+              changesByClient.get(id)!.push(change);
+            }
+          });
+        }
       }
       
-      // Capture the changes we're about to send for verification purposes
-      const changeRecordIds = tableChanges.map(change => {
-        const id = change.data?.id ? String(change.data.id).substring(0, 8) + '...' : 'unknown';
-        return `${change.table}:${change.operation}:${id}`;
-      });
+      // Log detailed client ID resolution for debugging
+      if (debugClientIds.size > 0) {
+        replicationLogger.debug('Client ID resolution details', {
+          clientIdDetails: Array.from(debugClientIds.entries())
+            .map(([entityId, details]) => ({
+              entityId,
+              ...details
+            }))
+        }, MODULE_NAME);
+      }
       
-      // Single log at start of notification with client count and change count only
-      replicationLogger.info('Notifying clients in parallel', {
-        count: clientIds.length,
-        changeCount: tableChanges.length
-      }, MODULE_NAME);
-      // Add debug log for change sample
-      replicationLogger.debug('Notifying clients change sample', {
-        changeRecordSample: changeRecordIds.length > 5 
-          ? changeRecordIds.slice(0, 5).join(', ') + ` (and ${changeRecordIds.length - 5} more)`
-          : changeRecordIds.join(', ')
+      // Log filtering summary
+      const skippedClientsCount = clientIds.filter(id => !changesByClient.has(id) || changesByClient.get(id)!.length === 0).length;
+      const originClientIds = tableChanges.map(c => c.data?.clientId || c.clientId).filter(Boolean);
+      
+      replicationLogger.info('Smart client filtering summary', {
+        totalClients: clientIds.length,
+        totalChanges: tableChanges.length,
+        clientsToNotify: clientIds.length - skippedClientsCount,
+        clientsSkipped: skippedClientsCount,
+        resolvedClientIds: debugClientIds.size,
+        allClientIds: clientIds,
+        originClientIds: originClientIds,
+        uniqueOriginClients: [...new Set(originClientIds)]
       }, MODULE_NAME);
       
-      // Process all clients in parallel
+      // Process all clients in parallel with filtered changes
       const results = await Promise.all(
         clientIds.map(async (clientId) => {
+          const clientChanges = changesByClient.get(clientId) || [];
+          
+          // Skip notification if all changes originated from this client
+          if (clientChanges.length === 0) {
+            return { 
+              clientId, 
+              success: true, 
+              skipped: true,
+              reason: 'no_relevant_changes',
+              originatedCount: tableChanges.filter(c => (c.data?.clientId || c.clientId) === clientId).length
+            };
+          }
+          
           try {
             const clientDoId = env.SYNC.idFromName(`client:${clientId}`);
             const clientDo = env.SYNC.get(clientDoId);
@@ -832,7 +870,8 @@ export async function processChanges(
                 },
                 body: JSON.stringify({ 
                   lsn: lastLSN,
-                  changeCount: tableChanges.length,
+                  changeCount: clientChanges.length,
+                  changes: clientChanges // Include pre-filtered changes
                 })
               }
             );
@@ -860,7 +899,8 @@ export async function processChanges(
               success: response.status === 200,
               error: response.status !== 200 ? `Status ${response.status}${isCleanedUp ? ' (No active WebSocket)' : ''}` : undefined,
               details: responseDetails,
-              cleanedUp
+              cleanedUp,
+              changesSent: clientChanges.length
             };
           } catch (error) {
             return { 
@@ -873,15 +913,28 @@ export async function processChanges(
       );
       
       // Process results
-      const successCount = results.filter(r => r.success).length;
-      const failureCount = results.length - successCount;
-      const failedClients = results.filter(r => !r.success).map(r => r.clientId);
+      const skippedCount = results.filter(r => r.skipped).length;
+      const sentCount = results.filter(r => !r.skipped && r.success).length;
+      const failureCount = results.filter(r => !r.skipped && !r.success).length;
+      const failedClients = results.filter(r => !r.success && !r.skipped).map(r => r.clientId);
       
       // Count cleaned up clients as a special case
       const cleanedClientCount = results.filter(r => r.cleanedUp).length;
       
+      // Log skipped clients summary if any
+      if (skippedCount > 0) {
+        const skippedDetails = results
+          .filter(r => r.skipped)
+          .map(r => ({ clientId: r.clientId, originatedCount: (r as any).originatedCount || 0 }));
+        
+        replicationLogger.info('Clients skipped due to anti-echo filtering', {
+          skippedCount,
+          clients: skippedDetails
+        }, MODULE_NAME);
+      }
+      
       // Log any failures individually
-      results.filter(r => !r.success).forEach(result => {
+      results.filter(r => !r.success && !r.skipped).forEach(result => {
         // Use different log level for cleaned-up clients vs other failures
         if (result.cleanedUp) {
           replicationLogger.info('Client cleaned up during notification', {
@@ -945,16 +998,36 @@ export async function processChanges(
       
       // Summary log
       replicationLogger.info('Client notifications completed', {
-        success: successCount,
+        total: clientIds.length,
+        sent: sentCount,
+        skipped: skippedCount,
         failed: failureCount,
         cleanedUp: cleanedClientCount,
         failedClients: failedClients.length > 0 ? failedClients : undefined,
         processingTime: Date.now() - startTime
       }, MODULE_NAME);
+      
+      } // End of else block for client notification
     } catch (notifyError) {
       replicationLogger.error('Client notification process failed', {
         error: notifyError instanceof Error ? notifyError.message : String(notifyError)
       }, MODULE_NAME);
+    }
+    
+    // Step 3: Store raw changes in history AFTER clients have been notified
+    const storedSuccessfully = await storeChangesInHistory(context, tableChanges, storeBatchSize);
+    
+    if (!storedSuccessfully) {
+      replicationLogger.warn('Failed to store changes in history (clients already notified)', {
+        lastLSN
+      }, MODULE_NAME);
+    }
+
+    // Step 4: Update LSN
+    try {
+      await stateManager.setLSN(lastLSN);
+    } catch (lsnError) {
+      replicationLogger.error('LSN update failed', { lsn: lastLSN }, MODULE_NAME);
     }
     
     return { 
