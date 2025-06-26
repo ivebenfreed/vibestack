@@ -1054,13 +1054,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         originClientId,
         changeCount: pushedChanges.length,
         isConflictResolution: !!isConflictResolution,
-        fullChangeData: pushedChanges.map((change: TableChange) => ({
-          table: change.table,
-          operation: change.operation,
-          data: change.data,
-          updatedAt: change.updatedAt,
-          clientId: change.clientId
-        }))
+        tables: [...new Set(pushedChanges.map((change: TableChange) => change.table))].join(', '),
+        operations: pushedChanges.map((change: TableChange) => `${change.table}:${change.operation}`).join(', ')
       }, MODULE_NAME);
 
       // Forward changes to connected client immediately
@@ -1095,19 +1090,10 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           targetClientId: this.clientId,
           changeCount: pushedChanges.length,
           isConflictResolution: !!isConflictResolution,
-          sentMessage: {
-            type: liveChangesMessage.type,
-            messageId: liveChangesMessage.messageId,
-            changes: liveChangesMessage.changes.map((change: TableChange) => ({
-              table: change.table,
-              operation: change.operation,
-              data: change.data,
-              updatedAt: change.updatedAt,
-              clientId: change.clientId
-            })),
-            lastLSN: liveChangesMessage.lastLSN,
-            isConflictResolution: liveChangesMessage.isConflictResolution
-          }
+          messageType: liveChangesMessage.type,
+          messageId: liveChangesMessage.messageId,
+          tables: [...new Set(pushedChanges.map((change: TableChange) => change.table))].join(', '),
+          operations: pushedChanges.map((change: TableChange) => `${change.table}:${change.operation}`).join(', ')
         }, MODULE_NAME);
       } else {
         syncLogger.debug('Cannot forward broadcast - no active WebSocket', {
@@ -2251,13 +2237,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
             originClientId,
             targetClientId,
             changeCount: changes.length,
-            originalChangeData: changes.map(change => ({
-              table: change.table,
-              operation: change.operation,
-              data: change.data,
-              updatedAt: change.updatedAt,
-              clientId: change.clientId
-            }))
+            tables: [...new Set(changes.map(change => change.table))].join(', '),
+            operations: changes.map(change => `${change.table}:${change.operation}`).join(', ')
           }, MODULE_NAME);
           
           await this.sendChangesToSyncDO(targetClientId, changes);
