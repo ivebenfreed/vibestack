@@ -84,26 +84,30 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
 
   return (
     <div className={cn(
-      'flex flex-col bg-sidebar transition-all duration-200',
-      'h-full', // Use h-full instead of h-screen for sheet compatibility
-      isCollapsed ? 'w-16 border-r border-sidebar-border' : 'w-full'
+      'flex flex-col bg-sidebar transition-all duration-200 border-r border-sidebar-border',
+      'h-screen',
+      isCollapsed ? 'w-16' : 'w-full'
     )}>
       {/* Header - only show on desktop (collapsed sidebar) */}
       {isCollapsed && (
-        <div className="flex items-center justify-center h-14 border-b border-sidebar-border flex-shrink-0">
-          <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-md">
-            <span className="text-primary-foreground font-bold text-lg">V</span>
+        <header className="border-b border-border flex-shrink-0">
+          <div className="flex h-14 items-center justify-center">
+            <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-md">
+              <span className="text-primary-foreground font-bold text-lg">V</span>
+            </div>
           </div>
-        </div>
+        </header>
       )}
       
       {/* Mobile/Expanded Header */}
       {!isCollapsed && (
-        <div className="flex items-center justify-center h-14 border-b border-sidebar-border flex-shrink-0">
-          <div className="font-semibold text-sidebar-foreground px-4">
-            VibeStack
+        <header className="border-b border-border flex-shrink-0">
+          <div className="flex h-14 items-center justify-center">
+            <div className="font-semibold text-sidebar-foreground px-4">
+              VibeStack
+            </div>
           </div>
-        </div>
+        </header>
       )}
 
       {/* Scrollable Content */}
