@@ -1042,7 +1042,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         originClientId,
         changeCount: pushedChanges.length,
         isConflictResolution: !!isConflictResolution,
-        fullChangeData: pushedChanges.map(change => ({
+        fullChangeData: pushedChanges.map((change: TableChange) => ({
           table: change.table,
           operation: change.operation,
           data: change.data,
@@ -1086,7 +1086,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           sentMessage: {
             type: liveChangesMessage.type,
             messageId: liveChangesMessage.messageId,
-            changes: liveChangesMessage.changes.map(change => ({
+            changes: liveChangesMessage.changes.map((change: TableChange) => ({
               table: change.table,
               operation: change.operation,
               data: change.data,
