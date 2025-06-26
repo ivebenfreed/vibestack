@@ -1,11 +1,18 @@
 import 'reflect-metadata';
+
+console.log('[generate-crud-operations] Starting script...');
+
 import { extractEntityMetadata, isUserEditableField, FieldMetadata, EntityMetadata } from '../utils/metadata-extraction.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+console.log('[generate-crud-operations] About to import client entities...');
+
 // Import the generated client entities (like column-configs does)
 import * as ClientEntities from '../generated/client-entities.js';
+
+console.log('[generate-crud-operations] Client entities imported successfully');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -771,13 +778,18 @@ function generateMainExportFile(entities: string[]): string {
 // Run the generator
 async function main() {
     try {
+        console.log('[main] Starting CRUD generation...');
         await generateCrudOperations();
         console.log('✅ CRUD operations generation completed successfully');
     } catch (error) {
         console.error('❌ Error generating CRUD operations:', error);
-        console.error('Stack:', error.stack);
+        console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
         process.exitCode = 1;
     }
 }
 
-main();
+console.log('[generate-crud-operations] About to call main()...');
+main().catch(err => {
+    console.error('[generate-crud-operations] Unhandled error in main:', err);
+    process.exit(1);
+});
