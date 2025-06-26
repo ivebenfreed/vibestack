@@ -152,20 +152,42 @@ export async function deleteCommentIncoming(commentId: string): Promise<void> {
 }
 
 export async function bulkCreateCommentsIncoming(commentsData: Comment[]): Promise<Comment[]> {
-  console.log(`[CommentDomain] Bulk creating ${commentsData.length} comments - processing individually`);
-  const results: Comment[] = [];
+  if (commentsData.length === 0) return [];
   
-  for (const commentData of commentsData) {
-    try {
-      const comment = await createCommentIncoming(commentData);
-      results.push(comment);
-    } catch (error) {
-      console.error(`[CommentDomain] Failed to create comment ${commentData.id}:`, error);
-      throw error; // Re-throw to trigger fallback in IncomingChangeService
-    }
+  console.log(`[CommentDomain] Bulk creating ${commentsData.length} comments from incoming sync`);
+  const startTime = Date.now();
+  
+  try {
+    const { getGlobalDataSource } = await import('@/db/global-datasource');
+    const dataSource = await getGlobalDataSource();
+    
+    // Apply to database in bulk
+    const commentRepo = dataSource.getRepository(Comment);
+    const result = await commentRepo.insert(commentsData);
+    
+    // Get the inserted comments (use original data since insert doesn't return full records)
+    const insertedComments = commentsData;
+    
+    // Update atoms in batch
+    const currentComments = commentsAtom.get();
+    const newCommentsRecord = { ...currentComments };
+    
+    insertedComments.forEach(comment => {
+      newCommentsRecord[comment.id] = comment;
+    });
+    
+    commentsAtom.set(newCommentsRecord);
+    
+    const processingTime = Date.now() - startTime;
+    const throughput = (commentsData.length / processingTime) * 1000;
+    console.log(`[CommentDomain] ✅ Bulk inserted ${commentsData.length} comments in ${processingTime}ms (${throughput.toFixed(0)} comments/sec)`);
+    
+    return insertedComments;
+    
+  } catch (error) {
+    console.error(`[CommentDomain] ❌ Bulk insert failed for ${commentsData.length} comments:`, error);
+    throw error;
   }
-  
-  return results;
 }
 
 export function createCommentLiveChanges(commentData: Comment): void {

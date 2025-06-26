@@ -151,20 +151,42 @@ export async function deleteUserIncoming(userId: string): Promise<void> {
 }
 
 export async function bulkCreateUsersIncoming(usersData: User[]): Promise<User[]> {
-  console.log(`[UserDomain] Bulk creating ${usersData.length} users - processing individually`);
-  const results: User[] = [];
+  if (usersData.length === 0) return [];
   
-  for (const userData of usersData) {
-    try {
-      const user = await createUserIncoming(userData);
-      results.push(user);
-    } catch (error) {
-      console.error(`[UserDomain] Failed to create user ${userData.id}:`, error);
-      throw error; // Re-throw to trigger fallback in IncomingChangeService
-    }
+  console.log(`[UserDomain] Bulk creating ${usersData.length} users from incoming sync`);
+  const startTime = Date.now();
+  
+  try {
+    const { getGlobalDataSource } = await import('@/db/global-datasource');
+    const dataSource = await getGlobalDataSource();
+    
+    // Apply to database in bulk
+    const userRepo = dataSource.getRepository(User);
+    const result = await userRepo.insert(usersData);
+    
+    // Get the inserted users (use original data since insert doesn't return full records)
+    const insertedUsers = usersData;
+    
+    // Update atoms in batch
+    const currentUsers = usersAtom.get();
+    const newUsersRecord = { ...currentUsers };
+    
+    insertedUsers.forEach(user => {
+      newUsersRecord[user.id] = user;
+    });
+    
+    usersAtom.set(newUsersRecord);
+    
+    const processingTime = Date.now() - startTime;
+    const throughput = (usersData.length / processingTime) * 1000;
+    console.log(`[UserDomain] ✅ Bulk inserted ${usersData.length} users in ${processingTime}ms (${throughput.toFixed(0)} users/sec)`);
+    
+    return insertedUsers;
+    
+  } catch (error) {
+    console.error(`[UserDomain] ❌ Bulk insert failed for ${usersData.length} users:`, error);
+    throw error;
   }
-  
-  return results;
 }
 
 export function createUserLiveChanges(userData: User): void {
