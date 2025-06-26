@@ -369,14 +369,6 @@ export async function transformWALChanges(
           continue;
         }
 
-        // Extract clientId early for filtering
-        const changeClientId = extractColumnValue(change, 'client_id') || undefined;
-        
-        // DUAL-PATH FILTER: Skip client-originated changes (handled by primary path)
-        if (changeClientId) {
-          addFilterReason(filteredReasons, `Client-originated change (clientId: ${changeClientId})`);
-          continue;
-        }
         
         // Track for summary stats
         if (!changesByTable[change.table]) {
@@ -776,13 +768,27 @@ export async function processChanges(
           changeCount: tableChanges.length
         }, MODULE_NAME);
       } else if (tableChanges.length > 0) {
-        const { handlePushedLiveChanges } = await import('../sync/live-push');
+        // Filter out client-originated changes - only notify system changes
+        const systemChanges = tableChanges.filter(change => {
+          const clientId = change.clientId || change.data?.clientId;
+          return !clientId; // Only include changes without clientId (system-originated)
+        });
         
-        replicationLogger.info('Pushing system changes to all clients', {
-          changeCount: tableChanges.length,
-          clientCount: clientIds.length,
-          tables: [...new Set(tableChanges.map(c => c.table))]
-        }, MODULE_NAME);
+        if (systemChanges.length === 0) {
+          replicationLogger.debug('All changes are client-originated, skipping notifications (handled by primary path)', {
+            totalChanges: tableChanges.length,
+            clientChanges: tableChanges.length - systemChanges.length
+          }, MODULE_NAME);
+        } else {
+          const { handlePushedLiveChanges } = await import('../sync/live-push');
+          
+          replicationLogger.info('Pushing system changes to all clients', {
+            totalChanges: tableChanges.length,
+            systemChanges: systemChanges.length,
+            clientChanges: tableChanges.length - systemChanges.length,
+            clientCount: clientIds.length,
+            tables: [...new Set(systemChanges.map(c => c.table))]
+          }, MODULE_NAME);
         
         // Process all clients in parallel
         const results = await Promise.all(
@@ -801,8 +807,8 @@ export async function processChanges(
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         lsn: lastLSN,
-                        changeCount: tableChanges.length,
-                        changes: tableChanges
+                        changeCount: systemChanges.length,
+                        changes: systemChanges
                       })
                     }
                   );
@@ -820,7 +826,7 @@ export async function processChanges(
               
               // Use handlePushedLiveChanges which will filter and send appropriately
               const result = await handlePushedLiveChanges(
-                tableChanges,
+                systemChanges,
                 lastLSN,
                 clientId,
                 messageHandler
@@ -848,12 +854,14 @@ export async function processChanges(
         const successCount = results.filter(r => r.success).length;
         const failureCount = results.filter(r => !r.success).length;
         
-        replicationLogger.info('System change notifications completed', {
-          total: clientIds.length,
-          successful: successCount,
-          failed: failureCount,
-          processingTime: Date.now() - startTime
-        }, MODULE_NAME);
+          replicationLogger.info('System change notifications completed', {
+            total: clientIds.length,
+            successful: successCount,
+            failed: failureCount,
+            systemChanges: systemChanges.length,
+            processingTime: Date.now() - startTime
+          }, MODULE_NAME);
+        }
       }
     } catch (notificationError) {
       replicationLogger.error('System change notification failed', {
