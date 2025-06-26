@@ -42,10 +42,6 @@ export default defineConfig({
           navigateFallbackAllowlist: [/.*/], // Allow all routes for SPA navigation
           // Fix redirect handling for direct URL navigation
           navigateFallbackDenylist: [/^\/_/, /\/[^/?]+\.[^/]+$/], // Exclude API routes and static files
-          // Handle navigation requests with proper redirect mode
-          additionalManifestEntries: [
-            { url: 'index.html', revision: null }
-          ],
           // Fix redirect handling for direct URL navigation
           runtimeCaching: [
             {
