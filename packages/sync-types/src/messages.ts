@@ -54,6 +54,7 @@ export interface ServerChangesMessage extends ServerMessage {
     chunk: number;
     total: number;
   };
+  isConflictResolution?: boolean; // Indicates CRDT conflict resolution - no anti-echo filtering
 }
 
 export interface ServerCatchupChangesMessage extends ServerChangesMessage {

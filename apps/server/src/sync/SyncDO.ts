@@ -24,6 +24,13 @@ import type { MinimalContext } from '../types/hono';
 import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
 import type { WebSocketHandler } from './types';
+
+// Type for direct broadcast messages between SyncDOs
+interface DirectBroadcastBody {
+  changes: TableChange[];
+  originClientId: string;
+  timestamp: string;
+}
 import { compareLSN, deduplicateChanges, getLatestChangeHistoryLSN } from '../lib/sync-common';
 import { getDBClient } from '../lib/db';
 import type { TableChange } from '@repo/sync-types';
@@ -135,6 +142,15 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         // Ensure replication is active when clients send changes
         await this.ensureReplicationActive();
         
+        // BROADCAST FIRST: Send changes to other SyncDOs before database write (primary path)
+        const clientChangesMessage = message as ClientChangesMessage;
+        if (clientChangesMessage.changes && clientChangesMessage.changes.length > 0) {
+          await this.broadcastChangesToOtherSyncDOs(
+            clientChangesMessage.changes, 
+            clientChangesMessage.clientId
+          );
+        }
+        
         // Get database connection
         const dbClient = getDBClient(this.getContext());
         
@@ -142,12 +158,16 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           // Connect to the database before processing
           await dbClient.connect();
           
-          // Use the new IncomingChangeProcessor
+          // Use the new IncomingChangeProcessor with conflict rebroadcast
           const processor = new IncomingChangeProcessor(
             dbClient, 
             this, // WebSocketHandler
             this.env,
-            undefined // Use default config
+            undefined, // Use default config
+            async (conflictedChanges: TableChange[], originClientId: string) => {
+              // Rebroadcast conflicts with isConflictResolution flag
+              await this.broadcastConflictResolution(conflictedChanges, originClientId);
+            }
           );
           
           await processor.processIncomingChanges(message as ClientChangesMessage);
@@ -511,6 +531,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       } else if (path === '/sync-stats' || path === '/api/sync/sync-stats') {
         // Handle sync stats messages from process-changes
         return this.handleSyncStats(request);
+      } else if (path === '/broadcast') {
+        // Handle direct SyncDO-to-SyncDO broadcast
+        return this.handleDirectBroadcast(request);
       } else {
         // No route matched
         return new Response('Not found', { status: 404 });
@@ -985,7 +1008,109 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }, MODULE_NAME);
     }
 
-    const { lsn: lsnFromBody, changeCount, changes: pushedChanges } = body;
+    syncLogger.info('Raw request body contents', {
+      clientId,
+      body: body,
+      bodyKeys: Object.keys(body),
+      bodyType: typeof body
+    }, MODULE_NAME);
+
+    let lsnFromBody, changeCount, pushedChanges, directBroadcast, originClientId, isConflictResolution;
+    try {
+      ({ lsn: lsnFromBody, changeCount, changes: pushedChanges, directBroadcast, originClientId, isConflictResolution } = body);
+    } catch (destructuringError) {
+      syncLogger.error('Failed to destructure request body', {
+        clientId,
+        body: body,
+        error: destructuringError instanceof Error ? destructuringError.message : String(destructuringError)
+      }, MODULE_NAME);
+      return new Response('Bad Request', { status: 400 });
+    }
+
+    syncLogger.info('Parsed request body for broadcast check', {
+      directBroadcast,
+      isConflictResolution,
+      hasPushedChanges: !!pushedChanges,
+      pushedChangesLength: pushedChanges?.length,
+      conditionResult: !!(directBroadcast || isConflictResolution) && !!pushedChanges
+    }, MODULE_NAME);
+
+    // Handle direct broadcast OR conflict resolution from another SyncDO
+    if ((directBroadcast || isConflictResolution) && pushedChanges) {
+      syncLogger.info(`Received ${isConflictResolution ? 'conflict resolution' : 'direct broadcast'} via new-changes route`, {
+        targetClientId: clientId,
+        originClientId,
+        changeCount: pushedChanges.length,
+        isConflictResolution: !!isConflictResolution,
+        fullChangeData: pushedChanges.map(change => ({
+          table: change.table,
+          operation: change.operation,
+          data: change.data,
+          updatedAt: change.updatedAt,
+          clientId: change.clientId
+        }))
+      }, MODULE_NAME);
+
+      // Forward changes to connected client immediately
+      // Use Cloudflare's hibernation API to get active WebSocket connections
+      const webSockets = this.ctx.getWebSockets();
+      const activeWebSocket = webSockets.length > 0 ? webSockets[0] : null;
+      
+      syncLogger.info('WebSocket forwarding check', {
+        targetClientId: clientId,
+        totalWebSockets: webSockets.length,
+        hasActiveWebSocket: !!activeWebSocket,
+        activeWebSocketState: activeWebSocket?.readyState,
+        expectedState: WS_READY_STATE.OPEN,
+        willForward: !!(activeWebSocket && activeWebSocket.readyState === WS_READY_STATE.OPEN)
+      }, MODULE_NAME);
+      
+      if (activeWebSocket && activeWebSocket.readyState === WS_READY_STATE.OPEN) {
+        const liveChangesMessage = {
+          type: 'srv_live_changes',
+          messageId: `${isConflictResolution ? 'conflict_resolution' : 'direct_broadcast'}_${Date.now()}`,
+          timestamp: Date.now(),
+          clientId: this.clientId,
+          changes: pushedChanges,
+          lastLSN: '', // LSN will be updated later via WAL if needed
+          isConflictResolution: !!isConflictResolution // Pass through the flag
+        };
+
+        activeWebSocket.send(JSON.stringify(liveChangesMessage));
+        
+        syncLogger.info(`Forwarded ${isConflictResolution ? 'conflict resolution' : 'direct broadcast'} changes to client`, {
+          originClientId,
+          targetClientId: this.clientId,
+          changeCount: pushedChanges.length,
+          isConflictResolution: !!isConflictResolution,
+          sentMessage: {
+            type: liveChangesMessage.type,
+            messageId: liveChangesMessage.messageId,
+            changes: liveChangesMessage.changes.map(change => ({
+              table: change.table,
+              operation: change.operation,
+              data: change.data,
+              updatedAt: change.updatedAt,
+              clientId: change.clientId
+            })),
+            lastLSN: liveChangesMessage.lastLSN,
+            isConflictResolution: liveChangesMessage.isConflictResolution
+          }
+        }, MODULE_NAME);
+      } else {
+        syncLogger.debug('Cannot forward broadcast - no active WebSocket', {
+          targetClientId: this.clientId,
+          totalWebSockets: webSockets.length,
+          hasActiveWebSocket: !!activeWebSocket,
+          activeWebSocketState: activeWebSocket?.readyState
+        }, MODULE_NAME);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     syncLogger.info('Received new changes notification', {
       clientId,
@@ -1738,6 +1863,74 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   }
 
   /**
+   * Handle direct broadcast from another SyncDO instance
+   * Follows the exact same pattern as new-changes handler
+   */
+  private async handleDirectBroadcast(request: Request): Promise<Response> {
+    try {
+      // Extract query parameters - following ReplicationDO pattern
+      const url = new URL(request.url);
+      const targetClientId = url.searchParams.get('clientId');
+      const originClientId = url.searchParams.get('originClientId');
+      
+      // Parse the broadcast body - following ReplicationDO pattern
+      const broadcastBody = await request.json() as DirectBroadcastBody;
+      
+      syncLogger.debug('Received direct broadcast', {
+        originClientId: originClientId || broadcastBody.originClientId,
+        targetClientId: targetClientId || this.clientId,
+        changeCount: broadcastBody.changes?.length || 0
+      }, MODULE_NAME);
+
+      // Forward changes to connected client immediately
+      if (this.webSocket && this.webSocket.readyState === WS_READY_STATE.OPEN && broadcastBody.changes) {
+        const liveChangesMessage = {
+          type: 'srv_live_changes',
+          messageId: `direct_broadcast_${Date.now()}`,
+          timestamp: Date.now(),
+          clientId: this.clientId,
+          changes: broadcastBody.changes,
+          lastLSN: '', // LSN will be updated later via WAL if needed
+          isConflictResolution: false // This is primary path
+        };
+
+        this.webSocket.send(JSON.stringify(liveChangesMessage));
+        
+        syncLogger.debug('Forwarded broadcast changes to client', {
+          originClientId: originClientId || broadcastBody.originClientId,
+          targetClientId: this.clientId,
+          changeCount: broadcastBody.changes.length
+        }, MODULE_NAME);
+      } else {
+        syncLogger.debug('Cannot forward broadcast - no active WebSocket', {
+          targetClientId: this.clientId,
+          hasWebSocket: !!this.webSocket,
+          webSocketState: this.webSocket?.readyState
+        }, MODULE_NAME);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+    } catch (error) {
+      syncLogger.error('Error handling direct broadcast', {
+        targetClientId: this.clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  /**
    * Process any pending live update functions in the queue
    */
   private async processPendingLiveUpdates(): Promise<void> {
@@ -2002,6 +2195,285 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         clientId,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * Broadcast changes directly to other SyncDO instances via KV registry
+   * Primary path for low-latency client-to-client sync
+   */
+  async broadcastChangesToOtherSyncDOs(changes: TableChange[], originClientId: string): Promise<void> {
+    try {
+      syncLogger.info('Starting SyncDO broadcast', {
+        changeCount: changes.length,
+        originClientId
+      }, MODULE_NAME);
+
+      // Get all registered clients from KV
+      const activeClients = await this.getActiveClientsFromRegistry();
+      
+      syncLogger.info('Active clients found for broadcast', {
+        originClientId,
+        activeClients,
+        totalActiveClients: activeClients.length
+      }, MODULE_NAME);
+      
+      // Filter out the originating client (anti-echo for primary path)
+      const targetClients = activeClients.filter(clientId => clientId !== originClientId);
+      
+      syncLogger.info('Target clients after filtering', {
+        originClientId,
+        targetClients,
+        filteredCount: targetClients.length
+      }, MODULE_NAME);
+      
+      if (targetClients.length === 0) {
+        syncLogger.debug('No target clients for broadcast', { originClientId }, MODULE_NAME);
+        return;
+      }
+
+      // Broadcast to each target client's SyncDO
+      const broadcastPromises = targetClients.map(async (targetClientId) => {
+        try {
+          syncLogger.info('Sending broadcast to target SyncDO', {
+            originClientId,
+            targetClientId,
+            changeCount: changes.length,
+            originalChangeData: changes.map(change => ({
+              table: change.table,
+              operation: change.operation,
+              data: change.data,
+              updatedAt: change.updatedAt,
+              clientId: change.clientId
+            }))
+          }, MODULE_NAME);
+          
+          await this.sendChangesToSyncDO(targetClientId, changes);
+          
+          syncLogger.debug('Broadcast sent successfully', {
+            originClientId,
+            targetClientId,
+            changeCount: changes.length
+          }, MODULE_NAME);
+        } catch (error) {
+          syncLogger.error('Failed to broadcast to SyncDO', {
+            originClientId,
+            targetClientId,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          }, MODULE_NAME);
+          // Continue with other broadcasts even if one fails
+        }
+      });
+
+      await Promise.allSettled(broadcastPromises);
+      
+      syncLogger.info('SyncDO broadcast completed', {
+        originClientId,
+        targetCount: targetClients.length,
+        changeCount: changes.length
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Error in SyncDO broadcast', {
+        originClientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      // Don't throw - this is a best-effort optimization
+    }
+  }
+
+  /**
+   * Broadcast CRDT conflict resolution to ALL clients (including originator)
+   * Authoritative path for conflict resolution - no anti-echo filtering
+   */
+  async broadcastConflictResolution(conflictedChanges: TableChange[], originClientId: string): Promise<void> {
+    try {
+      syncLogger.info('Starting CRDT conflict resolution broadcast', {
+        changeCount: conflictedChanges.length,
+        originClientId,
+        conflictTables: [...new Set(conflictedChanges.map(c => c.table))]
+      }, MODULE_NAME);
+
+      // Get all registered clients from KV (including originator for authoritative resolution)
+      const activeClients = await this.getActiveClientsFromRegistry();
+      
+      if (activeClients.length === 0) {
+        syncLogger.debug('No active clients for conflict resolution broadcast', { originClientId }, MODULE_NAME);
+        return;
+      }
+
+      syncLogger.info('Broadcasting conflict resolution to all clients', {
+        originClientId,
+        targetClients: activeClients,
+        clientCount: activeClients.length,
+        changeCount: conflictedChanges.length
+      }, MODULE_NAME);
+
+      // Broadcast to ALL clients (no anti-echo filtering for authoritative resolution)
+      const broadcastPromises = activeClients.map(async (targetClientId) => {
+        try {
+          await this.sendConflictResolutionToSyncDO(targetClientId, conflictedChanges, originClientId);
+          
+          syncLogger.debug('Conflict resolution broadcast sent successfully', {
+            originClientId,
+            targetClientId,
+            changeCount: conflictedChanges.length
+          }, MODULE_NAME);
+          
+        } catch (error) {
+          syncLogger.error('Failed to broadcast conflict resolution to SyncDO', {
+            originClientId,
+            targetClientId,
+            error: error instanceof Error ? error.message : String(error)
+          }, MODULE_NAME);
+          // Continue with other broadcasts even if one fails
+        }
+      });
+
+      await Promise.allSettled(broadcastPromises);
+      
+      syncLogger.info('CRDT conflict resolution broadcast completed', {
+        originClientId,
+        targetCount: activeClients.length,
+        changeCount: conflictedChanges.length
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Error in CRDT conflict resolution broadcast', {
+        originClientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      // Don't throw - this is a best-effort optimization
+    }
+  }
+
+  /**
+   * Send conflict resolution to a specific SyncDO instance with isConflictResolution flag
+   */
+  private async sendConflictResolutionToSyncDO(targetClientId: string, conflictedChanges: TableChange[], originClientId: string): Promise<void> {
+    try {
+      // Get the SyncDO instance
+      const id = this.env.SYNC.idFromName(`client:${targetClientId}`);
+      const syncDO = this.env.SYNC.get(id);
+
+      // Create the URL with required parameters
+      const url = new URL('http://internal/new-changes');
+      url.searchParams.set('clientId', targetClientId);
+      url.searchParams.set('lsn', '0/0');
+
+      // Send with conflict resolution flag
+      const response = await syncDO.fetch(url.toString(), {
+        method: 'POST',
+        body: JSON.stringify({ 
+          changes: conflictedChanges,
+          isConflictResolution: true, // This flag removes anti-echo filtering
+          originClientId,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(`Conflict resolution broadcast failed with status ${response.status}: ${responseText}`);
+      }
+
+    } catch (error) {
+      syncLogger.error('Error sending conflict resolution to SyncDO', {
+        targetClientId,
+        originClientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
+  /**
+   * Get list of active clients from KV registry
+   */
+  private async getActiveClientsFromRegistry(): Promise<string[]> {
+    try {
+      // List all client keys from KV
+      const listResult = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
+      const activeClients: string[] = [];
+
+      for (const key of listResult.keys) {
+        const clientId = key.name.replace('client:', '');
+        
+        // Get client data to check if active
+        const clientData = await this.env.CLIENT_REGISTRY.get(key.name);
+        if (clientData) {
+          const data = JSON.parse(clientData);
+          if (data.active && data.lastSeen > Date.now() - 300000) { // Active within 5 minutes
+            activeClients.push(clientId);
+          }
+        }
+      }
+
+      return activeClients;
+    } catch (error) {
+      syncLogger.error('Error getting active clients from registry', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return [];
+    }
+  }
+
+  /**
+   * Send changes to a specific SyncDO instance
+   * Follows the exact same pattern as ReplicationDO -> SyncDO communication
+   */
+  private async sendChangesToSyncDO(targetClientId: string, changes: TableChange[]): Promise<void> {
+    try {
+      // Get the SyncDO instance - EXACT SAME PATTERN as ReplicationDO
+      const id = this.env.SYNC.idFromName(`client:${targetClientId}`);
+      const syncDO = this.env.SYNC.get(id);
+
+      // Create the URL with required parameters - EXACT SAME as ReplicationDO
+      const url = new URL('http://internal/new-changes');
+      url.searchParams.set('clientId', targetClientId);
+      url.searchParams.set('lsn', '0/0'); // Matching ReplicationDO pattern
+
+      // Send via fetch - EXACT SAME PATTERN as ReplicationDO
+      syncLogger.debug('About to send fetch to target SyncDO', {
+        targetClientId,
+        url: url.toString(),
+        bodySize: JSON.stringify({ changes, originClientId: this.clientId, timestamp: new Date().toISOString() }).length
+      }, MODULE_NAME);
+      
+      const response = await syncDO.fetch(url.toString(), {
+        method: 'POST',
+        body: JSON.stringify({ 
+          changes,
+          directBroadcast: true, // Flag to identify this as direct broadcast vs ReplicationDO
+          originClientId: this.clientId
+        })
+      });
+
+      syncLogger.debug('Received response from target SyncDO', {
+        targetClientId,
+        status: response.status,
+        statusText: response.statusText
+      }, MODULE_NAME);
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(`Broadcast failed with status ${response.status}: ${responseText}`);
+      }
+
+      syncLogger.debug('Successfully sent direct broadcast', {
+        targetClientId,
+        originClientId: this.clientId,
+        changeCount: changes.length,
+        responseStatus: response.status
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Error sending changes to SyncDO', {
+        targetClientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
     }
   }
 } 

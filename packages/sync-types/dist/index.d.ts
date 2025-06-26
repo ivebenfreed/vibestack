@@ -53,6 +53,7 @@ interface ServerChangesMessage extends ServerMessage {
         chunk: number;
         total: number;
     };
+    isConflictResolution?: boolean;
 }
 interface ServerInitChangesMessage extends ServerMessage {
     type: 'srv_init_changes';

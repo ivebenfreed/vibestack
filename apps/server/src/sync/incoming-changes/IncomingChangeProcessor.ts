@@ -28,7 +28,8 @@ export class IncomingChangeProcessor {
     private client: Client,
     private messageHandler: WebSocketHandler,
     private env: { DATABASE_URL: string; NODE_ENV?: string },
-    private config: SyncConfig = DEFAULT_SYNC_CONFIG
+    private config: SyncConfig = DEFAULT_SYNC_CONFIG,
+    private broadcastConflicts?: (changes: TableChange[], originClientId: string) => Promise<void>
   ) {
     this.conflictResolver = new ConflictResolver(config);
     this.entityOperations = new EntityOperations(client, env, this.conflictResolver);
@@ -64,8 +65,8 @@ export class IncomingChangeProcessor {
       // Deduplicate changes
       const optimizedChangesResult = deduplicateChanges(changes);
       
-      // Process changes
-      const results = await this.processAllChanges(optimizedChangesResult.changes);
+      // Process changes and detect conflicts
+      const { results, conflictedChanges } = await this.processAllChanges(optimizedChangesResult.changes);
       
       // Summarize results
       const summary = this.summarizeResults(results);
@@ -85,11 +86,30 @@ export class IncomingChangeProcessor {
         }, MODULE_NAME);
       }
       
+      // Trigger rebroadcast for conflicts with isConflictResolution flag
+      if (conflictedChanges.length > 0 && this.broadcastConflicts) {
+        try {
+          await this.broadcastConflicts(conflictedChanges, clientId);
+          syncLogger.info(`Rebroadcast triggered for ${conflictedChanges.length} CRDT conflicts`, {
+            clientId,
+            conflictCount: conflictedChanges.length,
+            conflictTables: [...new Set(conflictedChanges.map(c => c.table))]
+          }, MODULE_NAME);
+        } catch (broadcastError) {
+          syncLogger.error(`Failed to rebroadcast CRDT conflicts for client ${clientId}`, {
+            clientId,
+            conflictCount: conflictedChanges.length,
+            error: broadcastError instanceof Error ? broadcastError.message : String(broadcastError)
+          }, MODULE_NAME);
+        }
+      }
+      
       // Log completion summary
       syncLogger.info(`Completed processing ${optimizedChangesResult.changes.length} changes for client ${clientId}`, {
         clientId,
         appliedCount: summary.appliedCount,
         skippedCount: summary.skippedCount,
+        conflictCount: conflictedChanges.length,
         success: summary.allSuccessful
       }, MODULE_NAME);
     } catch (error) {
@@ -114,11 +134,16 @@ export class IncomingChangeProcessor {
   
   /**
    * Process all changes using the EntityOperations module
+   * Returns both results and changes that encountered CRDT conflicts
    */
-  private async processAllChanges(changes: TableChange[]): Promise<ExecutionResult[]> {
+  private async processAllChanges(changes: TableChange[]): Promise<{
+    results: ExecutionResult[];
+    conflictedChanges: TableChange[];
+  }> {
     // Group changes by table and operation
     const groups = this.groupChangesByTableAndOperation(changes);
     const results: ExecutionResult[] = [];
+    const conflictedChanges: TableChange[] = [];
     const processingMap = new Map<string, boolean>(); // Track which changes were processed
     
     // Track all changes by ID for conflict detection
@@ -136,11 +161,27 @@ export class IncomingChangeProcessor {
           group.changes
         );
         
-        // Mark successful changes
-        for (const result of batchResults) {
+        // Mark successful changes and detect conflicts
+        for (let i = 0; i < group.changes.length; i++) {
+          const change = group.changes[i];
+          const result = batchResults[i];
+          const changeId = (change.data as any).id;
+          
           if (result && result.id) {
-            processingMap.set(result.id, true); // Mark as processed
+            processingMap.set(changeId, true); // Mark as processed
             results.push({ success: true, data: result });
+          } else if (result === null) {
+            // null result indicates CRDT conflict
+            conflictedChanges.push(change);
+            processingMap.set(changeId, true); // Mark as processed (but conflicted)
+            results.push({ success: true, data: null, skipped: true });
+            
+            syncLogger.info(`CRDT conflict detected during save`, {
+              table: change.table,
+              operation: change.operation,
+              entityId: changeId,
+              clientId: change.clientId
+            }, MODULE_NAME);
           }
         }
       } catch (error) {
@@ -174,7 +215,7 @@ export class IncomingChangeProcessor {
       }
     }
     
-    return results;
+    return { results, conflictedChanges };
   }
   
   /**
