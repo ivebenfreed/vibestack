@@ -280,9 +280,18 @@ export type ${entityName}ColumnDef = (typeof ${entityName}ColumnConfig)[${entity
         const relConfig = generateRelationshipConfigFromSchema(entity, propertyName, relation, allEntities);
         if (relConfig) {
             const cellType = getCellTypeForRelation(relation.type);
+            
+            // For many-to-one and one-to-one relationships, use the foreign key field as accessorKey
+            // For other relationship types, use the relationship property name
+            let accessorKey = propertyName;
+            if (relation.type === 'many-to-one' || relation.type === 'one-to-one') {
+                // Convert relationship property name to foreign key property name (e.g., 'project' -> 'projectId')
+                accessorKey = `${propertyName}Id`;
+            }
+            
             output += `  ${propertyName}: {\n`;
             output += `    id: '${propertyName}',\n`;
-            output += `    accessorKey: '${propertyName}' as keyof ${entityName},\n`;
+            output += `    accessorKey: '${accessorKey}' as keyof ${entityName},\n`;
             output += `    header: '${formatFieldLabel(propertyName)}',\n`;
             output += `    size: ${getColumnSize(cellType)},\n`;
             output += `    minSize: ${getMinColumnSize(cellType)},\n`;
