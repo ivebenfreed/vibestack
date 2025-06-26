@@ -261,6 +261,11 @@ export class IncomingChangeService {
             console.log(`[IncomingChangeService] Processing ${changes.length} bulk inserts for ${table}`);
             const bulkResults = await this.processBulkInserts(table, changes);
             results.push(...bulkResults);
+          } else if (operation === 'update' && changes.length > 1) {
+            // Use bulk update for multiple updates of same entity type
+            console.log(`[IncomingChangeService] Processing ${changes.length} bulk updates for ${table}`);
+            const bulkResults = await this.processBulkUpdates(table, changes);
+            results.push(...bulkResults);
           } else {
             // Process individually for other operations or single changes
             for (const change of changes) {
@@ -279,25 +284,41 @@ export class IncomingChangeService {
           }
         } catch (error) {
           console.error(`[IncomingChangeService] Error processing group ${key}:`, error);
-          // Add error results for all changes in this group
+          console.log(`[IncomingChangeService] Falling back to individual processing for ${changes.length} changes in group ${key}`);
+          
+          // Fallback to individual processing for this group
           for (const change of changes) {
-            results.push({
-              change,
-              success: false,
-              error: error instanceof Error ? error.message : String(error)
-            });
+            try {
+              const result = await this.applyChangeInTransaction(change, null);
+              results.push(result);
+            } catch (individualError) {
+              console.error(`[IncomingChangeService] Individual processing also failed for ${change.table}:${change.data.id}:`, individualError);
+              results.push({
+                change,
+                success: false,
+                error: individualError instanceof Error ? individualError.message : String(individualError)
+              });
+            }
           }
         }
       }
     } catch (error) {
       console.error('[IncomingChangeService] Error in batch processing:', error);
-      // Fallback: add error results for all changes
+      console.log(`[IncomingChangeService] Falling back to individual processing for entire batch of ${batch.length} changes`);
+      
+      // Fallback to individual processing for entire batch
       for (const change of batch) {
-        results.push({
-          change,
-          success: false,
-          error: error instanceof Error ? error.message : String(error)
-        });
+        try {
+          const result = await this.applyChangeInTransaction(change, null);
+          results.push(result);
+        } catch (individualError) {
+          console.error(`[IncomingChangeService] Individual processing also failed for ${change.table}:${change.data.id}:`, individualError);
+          results.push({
+            change,
+            success: false,
+            error: individualError instanceof Error ? individualError.message : String(individualError)
+          });
+        }
       }
     }
 
@@ -391,15 +412,72 @@ export class IncomingChangeService {
       
     } catch (error) {
       console.error(`[IncomingChangeService] ❌ Bulk insert failed for ${table}:`, error);
+      console.log(`[IncomingChangeService] Falling back to individual processing for ${changes.length} changes`);
       
-      // Create error results for all failed changes
-      changes.forEach(change => {
-        results.push({
-          change,
-          success: false,
-          error: error instanceof Error ? error.message : String(error)
-        });
-      });
+      // Fallback to individual processing when bulk insert fails
+      for (const change of changes) {
+        try {
+          const result = await this.applyChangeInTransaction(change, null);
+          results.push(result);
+        } catch (individualError) {
+          console.error(`[IncomingChangeService] Individual insert also failed for ${table}:${change.data.id}:`, individualError);
+          results.push({
+            change,
+            success: false,
+            error: individualError instanceof Error ? individualError.message : String(individualError)
+          });
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Process bulk updates with fallback to individual operations
+   */
+  private async processBulkUpdates(table: string, changes: TableChange[]): Promise<ProcessingResult[]> {
+    const results: ProcessingResult[] = [];
+    
+    console.log(`[IncomingChangeService] Processing ${changes.length} bulk updates for ${table}`);
+    
+    try {
+      // For now, fall back to individual processing since bulk update operations
+      // are not yet implemented in domain services
+      console.log(`[IncomingChangeService] No bulk update handler for ${table}, processing individually`);
+      
+      for (const change of changes) {
+        try {
+          const result = await this.applyChangeInTransaction(change, null);
+          results.push(result);
+        } catch (error) {
+          console.error(`[IncomingChangeService] Update failed for ${table}:${change.data.id}:`, error);
+          results.push({
+            change,
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
+    } catch (error) {
+      console.error(`[IncomingChangeService] ❌ Bulk update failed for ${table}:`, error);
+      console.log(`[IncomingChangeService] Falling back to individual processing for ${changes.length} changes`);
+      
+      // Fallback to individual processing when bulk update fails
+      for (const change of changes) {
+        try {
+          const result = await this.applyChangeInTransaction(change, null);
+          results.push(result);
+        } catch (individualError) {
+          console.error(`[IncomingChangeService] Individual update also failed for ${table}:${change.data.id}:`, individualError);
+          results.push({
+            change,
+            success: false,
+            error: individualError instanceof Error ? individualError.message : String(individualError)
+          });
+        }
+      }
     }
     
     return results;
