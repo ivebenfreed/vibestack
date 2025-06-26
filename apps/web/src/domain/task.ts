@@ -1,19 +1,18 @@
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
 import { createAtom, shallowEqual } from '@xstate/store';
 import { useSelector } from '@xstate/store/react';
-import { useMemo } from 'react';
 
-// Imports for 3-path architecture wrapper functions
-import { 
-  createTaskUI as generatedCreateTaskUI,
-  updateTaskUI as generatedUpdateTaskUI,
-  deleteTaskUI as generatedDeleteTaskUI,
-  createTaskIncoming as generatedCreateTaskIncoming,
-  updateTaskIncoming as generatedUpdateTaskIncoming,
-  deleteTaskIncoming as generatedDeleteTaskIncoming,
-  createTaskLiveChanges as generatedCreateTaskLiveChanges,
-  updateTaskLiveChanges as generatedUpdateTaskLiveChanges,
-  deleteTaskLiveChanges as generatedDeleteTaskLiveChanges,
+// Re-export DataForge operations and types directly
+export { 
+  createTaskUI,
+  updateTaskUI,
+  deleteTaskUI,
+  createTaskIncoming,
+  updateTaskIncoming,
+  deleteTaskIncoming,
+  createTaskLiveChanges,
+  updateTaskLiveChanges,
+  deleteTaskLiveChanges,
   type CreateTaskInput,
   type UpdateTaskInput
 } from '@repo/dataforge/task-operations';
@@ -130,57 +129,46 @@ export const useTaskAtoms = {
 };
 
 // ============================================================================
-// XState Atom Actions
+// Atom Utilities for DataForge Operations
 // ============================================================================
 
-export const taskActions = {
-  // Create new task in atom
-  createTask: (task: Task) => {
+// Simple atom manipulation functions that DataForge operations can use
+export const atomActions = {
+  createTaskAtomOnly: (task: Task) => {
     const currentTasks = tasksAtom.get();
-    tasksAtom.set({
-      ...currentTasks,
-      [task.id]: task
-    });
+    tasksAtom.set({ ...currentTasks, [task.id]: task });
   },
-
-  // Update existing task in atom
+  
   updateTaskAtomOnly: (id: string, updates: Partial<Task>) => {
     const currentTasks = tasksAtom.get();
     const existingTask = currentTasks[id];
-    if (!existingTask) {
-      console.warn(`[TaskActions] Task ${id} not found for update`);
-      return;
+    if (existingTask) {
+      tasksAtom.set({ ...currentTasks, [id]: { ...existingTask, ...updates } });
     }
-    
-    tasksAtom.set({
-      ...currentTasks,
-      [id]: { ...existingTask, ...updates }
-    });
   },
-
-  // Delete task from atom
+  
   deleteTaskAtomOnly: (id: string) => {
     const currentTasks = tasksAtom.get();
     const { [id]: deleted, ...remaining } = currentTasks;
     tasksAtom.set(remaining);
   },
+  
+  // Expose atom for DataForge operations  
+  tasksAtom: tasksAtom
+};
 
-  // Load multiple tasks (for initial load)
+// Utility functions for loading data
+export const taskUtils = {
   loadTasks: (tasks: Task[]) => {
     const tasksRecord = tasks.reduce((acc, task) => {
       acc[task.id] = task;
       return acc;
     }, {} as Record<string, Task>);
-    
     tasksAtom.set(tasksRecord);
   },
-
-  // Clear all tasks
-  clearTasks: () => {
-    tasksAtom.set({});
-  },
-
-  // Ensure tasks are loaded (high-performance direct check)
+  
+  clearTasks: () => tasksAtom.set({}),
+  
   ensureLoaded: async () => {
     if (Object.keys(tasksAtom.get()).length === 0) {
       const { getGlobalDataSource } = await import('@/db/global-datasource');
@@ -188,139 +176,32 @@ export const taskActions = {
       const tasks = await dataSource.getRepository(Task).find({
         relations: ['project', 'assignee']
       });
-      taskActions.loadTasks(tasks);
+      taskUtils.loadTasks(tasks);
     }
   }
 };
 
 // ============================================================================
-// 3-Path Architecture Wrapper Functions
+// DataForge Operation Dependencies
 // ============================================================================
 
-/**
- * Create task from UI - thin wrapper around generated function
- */
-export async function createTaskUI(taskData: CreateTaskInput): Promise<Task> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
+// Helper to get dependencies for DataForge operations
+export async function getTaskDependencies() {
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
   
-  const dataSource = await getNewPGliteDataSource();
+  const dataSource = await getGlobalDataSource();
   const services = getGlobalServicesV3();
   
-  return generatedCreateTaskUI(taskData, {
+  return {
     dataSource,
     EntityClass: Task,
-    atomActions: taskActions,
+    atomActions,
     outgoingChangeService: services?.outgoingChangeService || null
-  });
+  };
 }
 
-/**
- * Update task from UI - thin wrapper around generated function
- */
-export async function updateTaskUI(taskId: string, updates: UpdateTaskInput): Promise<Task> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
-  
-  const dataSource = await getNewPGliteDataSource();
-  const services = getGlobalServicesV3();
-  
-  return generatedUpdateTaskUI(taskId, updates, {
-    dataSource,
-    EntityClass: Task,
-    atomActions: taskActions,
-    outgoingChangeService: services?.outgoingChangeService || null
-  });
-}
-
-/**
- * Delete task from UI - thin wrapper around generated function
- */
-export async function deleteTaskUI(taskId: string): Promise<boolean> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const { getGlobalServicesV3 } = await import('../state-machines/machines/sync-machine-v3');
-  
-  const dataSource = await getNewPGliteDataSource();
-  const services = getGlobalServicesV3();
-  
-  return generatedDeleteTaskUI(taskId, {
-    dataSource,
-    EntityClass: Task,
-    atomActions: taskActions,
-    outgoingChangeService: services?.outgoingChangeService || null
-  });
-}
-
-/**
- * Create task from incoming sync - thin wrapper around generated function
- */
-export async function createTaskIncoming(taskData: Task): Promise<Task> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const dataSource = await getNewPGliteDataSource();
-  
-  return generatedCreateTaskIncoming(taskData, {
-    dataSource,
-    EntityClass: Task
-  });
-}
-
-/**
- * Update task from incoming sync - thin wrapper around generated function
- */
-export async function updateTaskIncoming(taskId: string, updates: Partial<Task>): Promise<Task> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const dataSource = await getNewPGliteDataSource();
-  
-  return generatedUpdateTaskIncoming(taskId, updates, {
-    dataSource,
-    EntityClass: Task
-  });
-}
-
-/**
- * Delete task from incoming sync - thin wrapper around generated function
- */
-export async function deleteTaskIncoming(taskId: string): Promise<void> {
-  const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-  const dataSource = await getNewPGliteDataSource();
-  
-  return generatedDeleteTaskIncoming(taskId, {
-    dataSource,
-    EntityClass: Task
-  });
-}
-
-/**
- * Create task from live changes - thin wrapper around generated function
- */
-export function createTaskLiveChanges(taskData: Task): void {
-  generatedCreateTaskLiveChanges(taskData, {
-    atomActions: taskActions
-  });
-}
-
-/**
- * Update task from live changes - thin wrapper around generated function
- */
-export function updateTaskLiveChanges(taskId: string, updates: Partial<Task>): void {
-  generatedUpdateTaskLiveChanges(taskId, updates, {
-    atomActions: taskActions
-  });
-}
-
-/**
- * Delete task from live changes - thin wrapper around generated function
- */
-export function deleteTaskLiveChanges(taskId: string): void {
-  generatedDeleteTaskLiveChanges(taskId, {
-    atomActions: taskActions
-  });
-}
-
-/**
- * Bulk create tasks from incoming sync - optimized for chunked data
- * Used by IncomingChangeService for performance when processing chunks
- */
+// Bulk operations (kept for IncomingChangeService)
 export async function bulkCreateTasksIncoming(tasksData: Task[]): Promise<Task[]> {
   if (tasksData.length === 0) return [];
   
@@ -328,21 +209,18 @@ export async function bulkCreateTasksIncoming(tasksData: Task[]): Promise<Task[]
   const startTime = Date.now();
   
   try {
-    const { getNewPGliteDataSource } = await import('../db/newtypeorm/NewDataSource');
-    const dataSource = await getNewPGliteDataSource();
+    const { getGlobalDataSource } = await import('@/db/global-datasource');
+    const dataSource = await getGlobalDataSource();
     
     // Apply to database
     const taskRepo = dataSource.getRepository(Task);
     const result = await taskRepo.insert(tasksData);
     
-    // Get the inserted tasks
-    const insertedTasks = tasksData;
-    
     // Update atoms in batch
     const currentTasks = tasksAtom.get();
     const newTasksRecord = { ...currentTasks };
     
-    insertedTasks.forEach(task => {
+    tasksData.forEach(task => {
       newTasksRecord[task.id] = task;
     });
     
@@ -352,13 +230,10 @@ export async function bulkCreateTasksIncoming(tasksData: Task[]): Promise<Task[]
     const throughput = (tasksData.length / processingTime) * 1000;
     console.log(`[TaskDomain] ✅ Bulk inserted ${tasksData.length} tasks in ${processingTime}ms (${throughput.toFixed(0)} tasks/sec)`);
     
-    return insertedTasks;
+    return tasksData;
     
   } catch (error) {
     console.error(`[TaskDomain] ❌ Bulk insert failed for ${tasksData.length} tasks:`, error);
     throw error;
   }
 }
-
-// Re-export types for convenience
-export type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
