@@ -29,6 +29,10 @@ export const commentActions = {
     const currentComments = commentsAtom.get();
     commentsAtom.set({ ...currentComments, [comment.id]: comment });
   },
+  createCommentAtomOnly: (comment: Comment) => {
+    const currentComments = commentsAtom.get();
+    commentsAtom.set({ ...currentComments, [comment.id]: comment });
+  },
   updateCommentAtomOnly: (id: string, updates: Partial<Comment>) => {
     const currentComments = commentsAtom.get();
     const existingComment = currentComments[id];
@@ -62,29 +66,106 @@ export const commentActions = {
   }
 };
 
-// 3-Path Architecture Wrapper Functions (stubs for now)
+// 3-Path Architecture Implementation using DataForge operations
 export async function createCommentUI(commentData: any): Promise<Comment> {
-  throw new Error('createCommentUI not implemented yet - use comment operations from @repo/dataforge');
+  const { createCommentUI: createCommentOperation } = await import('@repo/dataforge/comment-operations');
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
+  
+  const dataSource = await getGlobalDataSource();
+  const services = getGlobalServicesV3();
+  
+  return createCommentOperation(commentData, {
+    dataSource,
+    atomActions: { ...commentActions, commentsAtom },
+    outgoingChangeService: services?.outgoingChangeService,
+    EntityClass: Comment
+  });
 }
 
 export async function updateCommentUI(commentId: string, updates: any): Promise<Comment> {
-  throw new Error('updateCommentUI not implemented yet - use comment operations from @repo/dataforge');
+  const { updateCommentUI: updateCommentOperation } = await import('@repo/dataforge/comment-operations');
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
+  
+  const dataSource = await getGlobalDataSource();
+  const services = getGlobalServicesV3();
+  
+  return updateCommentOperation(commentId, updates, {
+    dataSource,
+    atomActions: { ...commentActions, commentsAtom },
+    outgoingChangeService: services?.outgoingChangeService,
+    EntityClass: Comment
+  });
 }
 
 export async function deleteCommentUI(commentId: string): Promise<boolean> {
-  throw new Error('deleteCommentUI not implemented yet - use comment operations from @repo/dataforge');
+  const { deleteCommentUI: deleteCommentOperation } = await import('@repo/dataforge/comment-operations');
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
+  
+  const dataSource = await getGlobalDataSource();
+  const services = getGlobalServicesV3();
+  
+  return deleteCommentOperation(commentId, {
+    dataSource,
+    atomActions: { ...commentActions, commentsAtom },
+    outgoingChangeService: services?.outgoingChangeService,
+    EntityClass: Comment
+  });
 }
 
 export async function createCommentIncoming(commentData: Comment): Promise<Comment> {
-  throw new Error('createCommentIncoming not implemented yet - use comment operations from @repo/dataforge');
+  const { createCommentIncoming: createCommentOperation } = await import('@repo/dataforge/comment-operations');
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  
+  const dataSource = await getGlobalDataSource();
+  
+  return createCommentOperation(commentData, {
+    dataSource,
+    EntityClass: Comment
+  });
 }
 
 export async function updateCommentIncoming(commentId: string, updates: Partial<Comment>): Promise<Comment> {
-  throw new Error('updateCommentIncoming not implemented yet - use comment operations from @repo/dataforge');
+  const { updateCommentIncoming: updateCommentOperation } = await import('@repo/dataforge/comment-operations');
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  
+  const dataSource = await getGlobalDataSource();
+  
+  return updateCommentOperation(commentId, updates, {
+    dataSource,
+    EntityClass: Comment
+  });
 }
 
 export async function deleteCommentIncoming(commentId: string): Promise<void> {
-  throw new Error('deleteCommentIncoming not implemented yet - use comment operations from @repo/dataforge');
+  const { deleteCommentIncoming: deleteCommentOperation } = await import('@repo/dataforge/comment-operations');
+  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  
+  const dataSource = await getGlobalDataSource();
+  
+  await deleteCommentOperation(commentId, {
+    dataSource,
+    EntityClass: Comment
+  });
+}
+
+export async function bulkCreateCommentsIncoming(commentsData: Comment[]): Promise<Comment[]> {
+  console.log(`[CommentDomain] Bulk creating ${commentsData.length} comments - processing individually`);
+  const results: Comment[] = [];
+  
+  for (const commentData of commentsData) {
+    try {
+      const comment = await createCommentIncoming(commentData);
+      results.push(comment);
+    } catch (error) {
+      console.error(`[CommentDomain] Failed to create comment ${commentData.id}:`, error);
+      throw error; // Re-throw to trigger fallback in IncomingChangeService
+    }
+  }
+  
+  return results;
 }
 
 export function createCommentLiveChanges(commentData: Comment): void {
