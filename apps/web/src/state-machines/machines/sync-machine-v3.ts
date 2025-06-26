@@ -525,15 +525,8 @@ export const syncMachineV3 = setup({
                     integrityService: event.output.services.integrity
                   };
                   
-                  // Reinitialize domains with real sync services
-                  setTimeout(async () => {
-                    try {
-                      const { reinitializeDomainsWithSyncServices } = await import('../../domain');
-                      await reinitializeDomainsWithSyncServices();
-                    } catch (error) {
-                      console.warn('[SyncMachineV3] Failed to reinitialize domains with sync services:', error);
-                    }
-                  }, 0);
+                  // Domain services are deprecated - services are now available globally
+                  // No need to reinitialize domains as they use the 3-path architecture
                   
                   return {
                     serviceCoordinator: event.output.serviceCoordinator
