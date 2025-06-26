@@ -130,7 +130,23 @@ export class MessageProcessor {
       sendEvent({ type: 'LSN_UPDATE', lsn: message.lastLSN, source: messageType });
     }
     
-    // Acknowledgments will be sent by the state machine after processing completes
+    // CRITICAL: Send immediate chunk acknowledgment for catchup changes
+    // Server expects individual chunk ACKs during catchup sync flow control
+    if (messageType === 'srv_catchup_changes' && message.sequence) {
+      const ackMessage = {
+        type: 'clt_catchup_received',
+        messageId: `catchup_chunk_ack_${Date.now()}`,
+        timestamp: Date.now(),
+        clientId: context.clientId,
+        chunk: message.sequence.chunk,
+        lsn: context.currentLSN
+      };
+      
+      services.webSocket.send(ackMessage);
+      console.log(`[MessageProcessor] 📤 Sent catchup chunk acknowledgment: chunk ${message.sequence.chunk}/${message.sequence.total}`);
+    }
+    
+    // Other acknowledgments will be sent by the state machine after processing completes
   }
 
 
