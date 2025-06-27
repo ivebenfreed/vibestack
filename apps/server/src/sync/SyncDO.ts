@@ -250,6 +250,35 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }, MODULE_NAME);
       
       try {
+        // Update client's active status and lastSeen in KV registry
+        const clientId = heartbeatMessage.clientId || this.clientId;
+        if (clientId) {
+          const key = `client:${clientId}`;
+          const existingData = await this.env.CLIENT_REGISTRY.get(key);
+          
+          if (existingData) {
+            const data = JSON.parse(existingData);
+            await this.env.CLIENT_REGISTRY.put(
+              key,
+              JSON.stringify({
+                ...data,
+                active: true,
+                lastSeen: Date.now()
+              }),
+              {
+                // Refresh TTL on heartbeat - 2 hours
+                expirationTtl: 2 * 60 * 60
+              }
+            );
+            
+            syncLogger.debug('Updated client active status on heartbeat', {
+              clientId,
+              active: true,
+              lastSeen: new Date().toISOString()
+            }, MODULE_NAME);
+          }
+        }
+        
         // Get current server LSN for comparison using existing function
         const context = this.getContext();
         const serverLSN = (await getLatestChangeHistoryLSN(context)) || '0/0';

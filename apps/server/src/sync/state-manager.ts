@@ -136,7 +136,12 @@ export class SyncStateManager implements StateManager {
         
         await this.context.env.CLIENT_REGISTRY.put(
           key,
-          JSON.stringify(clientData)
+          JSON.stringify(clientData),
+          {
+            // Set TTL to 2 hours - clients should heartbeat every 30s
+            // This prevents accumulation of stale entries
+            expirationTtl: 2 * 60 * 60 // 2 hours in seconds
+          }
         );
         
         // Verify registration
@@ -203,7 +208,11 @@ export class SyncStateManager implements StateManager {
             active: false,
             lastSeen: Date.now(),
             disconnectedAt: Date.now()
-          })
+          }),
+          {
+            // Shorter TTL for inactive clients - expire in 1 hour
+            expirationTtl: 60 * 60
+          }
         );
         
         syncLogger.debug('Client marked inactive', { 
