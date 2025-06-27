@@ -149,15 +149,20 @@ Each entity has its own domain module containing repository and service layers:
 - `apps/web/src/domain/user.ts` - User domain
 - `apps/web/src/domain/index.ts` - Domain factory for centralized creation
 
-### Database & Live Query Architecture
-Three live query strategies based on dataset size:
-1. **Traditional Live Query** (`useLiveEntity`) - Small datasets (<100 records)
-2. **Incremental Live Query** (`useLiveEntityIncremental`) - Medium datasets (100-1000 records)
-3. **Live Changes API** (`useLiveChanges`) - Large datasets (1000+ records)
+### Database & Data Display Architecture
+**Current Standard: XState Atoms + VibeGridFinal**
+- **XState Atomic Stores**: All data managed via XState atoms (`tasksAtom`, `projectsAtom`, etc.)
+- **Surgical Selectors**: Use `useSelector` with `shallowEqual` for precise updates
+- **VibeGridFinal**: High-performance data grid for all tabular data (45ms cell rendering)
+- **DirectUsagePattern**: Enforced architectural pattern for table components
+
+**Legacy (Disabled in Debug Only):**
+- Live query hooks (`useLiveEntity`, `useLiveEntityIncremental`, `useLiveChanges`) 
+- Only used in debug components for testing, disabled by default
 
 Key directories:
 - `apps/web/src/db/` - Database initialization and configuration
-- `apps/web/src/db/hooks/` - Live query hooks for reactive data
+- `apps/web/src/domain/` - XState atoms and business logic (3-layer architecture)
 - `apps/web/src/sync/` - Sync services and state management
 
 ### Universal Reactive Data Pattern (XState Edition)
@@ -178,8 +183,9 @@ Uses XState atomic stores for surgical precision updates:
 ### Performance Optimization
 - Use single-query updates in repositories to reduce database round-trips
 - Implement batch operations for bulk changes
-- Choose appropriate live query strategy based on dataset size
+- **Use XState atoms with surgical selectors** instead of live query hooks
 - Use atomic state for shared, frequently-updated data
+- **Use VibeGridFinal for all tabular data** (high-performance 45ms cell rendering)
 - Use direct database queries for analytics and one-time operations
 
 ### Code Quality Requirements
@@ -240,17 +246,54 @@ The project includes comprehensive sync functionality tests:
 4. **Apply Migration**: Run `pnpm forge:migrate:run` or use full deploy workflow
 5. **Create Domain Module**: Add repository + service in `apps/web/src/domain/`
 6. **Add to Domain Factory**: Include in `apps/web/src/domain/index.ts`
-7. **Choose Live Query Strategy**: Based on expected dataset size and usage patterns
-8. **Add XState Atoms**: If real-time collaboration needed
+7. **Use XState Atoms**: All entities automatically get atoms in domain layer
+8. **Use VibeGridFinal**: For tabular data display with DirectUsagePattern
 
 ### Adding New Features
 1. Follow domain-driven design principles with DataForge entities as foundation
-2. Use appropriate live query strategy for data size
+2. **Use XState atoms for all data management** - no live query hooks
 3. Import entity types from `@repo/dataforge/client-entities` or `@repo/dataforge/server-entities`
 4. Use `@repo/sync-types` for any sync-related messaging
 5. Implement proper error handling and logging
 6. Add sync tracking for data changes
 7. Write tests for critical functionality
+
+### VibeGridFinal - Standard Data Table Component
+**Location**: `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.tsx`
+
+**Key Features:**
+- **High Performance**: 45ms universal cell renderer
+- **DirectUsagePattern**: Enforced architectural pattern with TypeScript validation
+- **XState Integration**: Built-in persistence and state management
+- **Auto-Generated Columns**: Uses DataForge column configurations
+- **Relationship Support**: Built-in handling for foreign key relationships
+
+**Usage Pattern:**
+```typescript
+// 1. Import generated columns and create usage pattern
+import { TaskColumns } from '@repo/dataforge/column-configurations'
+import { createDirectUsagePattern } from '@/components/custom/vibegridfinal/utils/patterns'
+
+// 2. Use XState selectors for data
+const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
+
+// 3. Create DirectUsagePattern with handlers
+const usagePattern = createDirectUsagePattern<Task>({
+  useBalancedSelector: () => tasks,
+  handleSave: async (id, column, value) => { /* update logic */ },
+  columns: TaskColumns,
+  relationshipData: { /* foreign key data */ }
+})
+
+// 4. Render VibeGridFinal
+<VibeGridFinal
+  data={tasks}
+  columns={columns}
+  relationshipData={relationshipData}
+  onSave={handleSave}
+  __usagePattern={usagePattern}
+/>
+```
 
 ### DataForge Workflow
 1. **Entity Changes**: Modify entities in `packages/dataforge/src/entities/`

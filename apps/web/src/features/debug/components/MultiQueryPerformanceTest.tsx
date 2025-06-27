@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { usePGliteContext } from '@/db/pglite-provider';
 import { Task, Project, User, Comment } from '@repo/dataforge/client-entities';
-import { useLiveEntity } from '@/db/hooks/useLiveEntity';
-import { useLiveEntityIncremental } from '@/db/hooks/useLiveEntityIncremental';
+// DISABLED: Legacy hooks - use XState atoms instead
+// import { useLiveEntity } from '@/db/hooks/useLiveEntity';
+// import { useLiveEntityIncremental } from '@/db/hooks/useLiveEntityIncremental';
 import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource';
 import { SelectQueryBuilder } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';

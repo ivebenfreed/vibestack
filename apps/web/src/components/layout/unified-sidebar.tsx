@@ -19,7 +19,6 @@ import {
   Home, 
   FolderKanban, 
   CheckSquare, 
-  Users, 
   Settings, 
   Bug,
   Plus,
@@ -61,7 +60,6 @@ const mainNavigation: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
   { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/projects' },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare, href: '/tasks' },
-  { id: 'users', label: 'Users', icon: Users, href: '/users' },
   { id: 'apps', label: 'Apps', icon: Package, href: '/apps' },
   { id: 'chats', label: 'Chats', icon: MessageSquare, href: '/chats', badge: '3' },
 ]

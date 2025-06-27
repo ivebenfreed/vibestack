@@ -124,7 +124,6 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
     if (location.pathname === '/') return 'Dashboard'
     if (location.pathname.startsWith('/projects')) return 'Projects'
     if (location.pathname.startsWith('/tasks')) return 'Tasks'
-    if (location.pathname.startsWith('/users')) return 'Users'
     if (location.pathname.startsWith('/apps')) return 'Apps'
     if (location.pathname.startsWith('/chats')) return 'Chats'
     if (location.pathname.startsWith('/help-center')) return 'Help Center'

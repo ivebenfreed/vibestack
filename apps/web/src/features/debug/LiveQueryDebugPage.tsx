@@ -9,9 +9,10 @@ import { AlertCircle, Activity, Zap, BarChart3, RefreshCw, Eye, TestTube } from 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { usePGliteContext } from '@/db/pglite-provider';
-import { useLiveEntity } from '@/db/hooks/useLiveEntity';
-import { useLiveEntityIncremental } from '@/db/hooks/useLiveEntityIncremental';
-import { useLiveChanges, EntityChange } from '@/db/hooks/useLiveChanges';
+// DISABLED: Legacy hooks - use XState atoms instead
+// import { useLiveEntity } from '@/db/hooks/useLiveEntity';
+// import { useLiveEntityIncremental } from '@/db/hooks/useLiveEntityIncremental';
+// import { useLiveChanges, EntityChange } from '@/db/hooks/useLiveChanges';
 import { Task } from '@repo/dataforge/client-entities';
 import { getDatabase } from '@/db/db';
 

@@ -6,7 +6,8 @@ import { Task, User, Project, TaskStatus, TaskPriority, UserRole, ProjectStatus 
 import { DataSource, EntityManager, SelectQueryBuilder, QueryBuilder, In, Between, IsNull, FindOperator, SaveOptions, DeepPartial } from 'typeorm';
 import { clientEntities } from '@repo/dataforge/client-entities';
 import { NewPGliteQueryRunner } from '@/db/newtypeorm/NewPGliteQueryRunner';
-import { useLiveEntity } from '@/db/hooks/useLiveEntity';
+// DISABLED: Legacy hook - use XState atoms instead
+// import { useLiveEntity } from '@/db/hooks/useLiveEntity';
 import { v4 as uuidv4 } from 'uuid';
 import { Repository } from 'typeorm';
 import { TableChange } from '@repo/sync-types';
@@ -23,15 +24,15 @@ export function TypeORMTest() {
   const [isLoading, setIsLoading] = useState(false);
   const [dataSource, setDataSource] = useState<NewPGliteDataSource | null>(null);
 
-  // Add state for live query test
-  const [liveQueryBuilder, setLiveQueryBuilder] = useState<SelectQueryBuilder<Task> | null>(null);
-  const { data: liveTasks } = useLiveEntity<Task>(
-    liveQueryBuilder as any,
-    { 
-      enabled: !!liveQueryBuilder,
-      // key: 'id' // Keep commented out due to ErrnoError: 44
-    }
-  );
+  // DISABLED: Legacy live query test - use XState atoms instead
+  // const [liveQueryBuilder, setLiveQueryBuilder] = useState<SelectQueryBuilder<Task> | null>(null);
+  // const { data: liveTasks } = useLiveEntity<Task>(
+  //   liveQueryBuilder as any,
+  //   { 
+  //     enabled: !!liveQueryBuilder,
+  //     // key: 'id' // Keep commented out due to ErrnoError: 44
+  //   }
+  // );
 
   // Initialize TypeORM on component mount
   useEffect(() => {
