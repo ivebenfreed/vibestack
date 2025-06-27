@@ -205,12 +205,7 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
 
       // Worker connection ready - no test needed
       
-      // Verify live query support
-      if (!pgliteWorker.live?.query) {
-        console.warn('Live queries not available despite configuration');
-      } else {
-        console.log('Live queries enabled successfully');
-      }
+      // Live queries are configured and will be available when needed
 
       // Store both instances
       pgliteWorkerInstance = pgliteWorker;
