@@ -237,11 +237,20 @@ export class WebSocketService {
     const interval = this.config.heartbeatInterval || 30000; // 30 seconds default
     syncLogger.info('connection', `Setting up heartbeat timer with ${interval}ms interval`);
     
+    // Test if timer is working immediately
+    setTimeout(() => {
+      syncLogger.info('connection', 'Test timer fired - setInterval should work');
+    }, 1000);
+    
     this.heartbeatTimer = setInterval(() => {
-      syncLogger.debug('connection', 'Heartbeat timer fired', {
+      // Use info level instead of debug to ensure visibility
+      syncLogger.info('connection', 'Heartbeat timer fired', {
         isConnected: this.isConnected(),
         clientId: this.config.clientId,
-        lsn: this.config.lsn
+        lsn: this.config.lsn,
+        timestamp: new Date().toISOString(),
+        documentHidden: document.hidden,
+        visibilityState: document.visibilityState
       });
       
       if (this.isConnected()) {
@@ -253,7 +262,7 @@ export class WebSocketService {
             messageId: `heartbeat_${Date.now()}`,
             timestamp: Date.now()
           });
-          syncLogger.debug('connection', 'Heartbeat sent successfully');
+          syncLogger.info('connection', 'Heartbeat sent successfully');
         } catch (error) {
           syncLogger.error('connection', 'Error sending heartbeat', error);
         }
@@ -263,6 +272,22 @@ export class WebSocketService {
     }, interval);
     
     syncLogger.info('connection', `Heartbeat timer started with ID: ${this.heartbeatTimer}`);
+    
+    // Add visibility change listener to detect if tab becomes hidden
+    const handleVisibilityChange = () => {
+      syncLogger.info('connection', 'Page visibility changed', {
+        hidden: document.hidden,
+        visibilityState: document.visibilityState,
+        hasHeartbeatTimer: !!this.heartbeatTimer
+      });
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Store cleanup function
+    (this as any).cleanupVisibilityListener = () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }
 
   private stopHeartbeat(): void {
@@ -270,6 +295,12 @@ export class WebSocketService {
       syncLogger.info('connection', `Stopping heartbeat timer: ${this.heartbeatTimer}`);
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+    
+    // Clean up visibility listener if exists
+    if ((this as any).cleanupVisibilityListener) {
+      (this as any).cleanupVisibilityListener();
+      (this as any).cleanupVisibilityListener = null;
     }
   }
 
