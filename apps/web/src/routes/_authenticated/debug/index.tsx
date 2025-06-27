@@ -12,33 +12,33 @@ function DebugIndexPage() {
       title: '🚀 Sync System',
       description: 'Enhanced debug panel for sync architecture. Debug sync-machine-v2, monitor WebSocket connections, and inspect service states.',
       path: '/debug/sync',
-      color: 'border-green-200 hover:border-green-300 bg-green-50',
+      color: 'border-green-500/20 hover:border-green-500/30 bg-green-500/5 dark:border-green-400/20 dark:hover:border-green-400/30 dark:bg-green-400/5',
       badge: 'SYNC DEBUG'
     },
     {
       title: '🧪 Sync Test',
       description: 'Comprehensive sync functionality testing framework. CRUD operations, offline sync, batch operations, and relationship testing.',
       path: '/debug/sync-test',
-      color: 'border-emerald-200 hover:border-emerald-300 bg-emerald-50',
+      color: 'border-emerald-500/20 hover:border-emerald-500/30 bg-emerald-500/5 dark:border-emerald-400/20 dark:hover:border-emerald-400/30 dark:bg-emerald-400/5',
       badge: 'SYNC TEST'
     },
     {
       title: 'Database Tests',
       description: 'Database connection and operation testing',
       path: '/debug/database',
-      color: 'border-blue-200 hover:border-blue-300'
+      color: 'border-blue-500/20 hover:border-blue-500/30 bg-blue-500/5 dark:border-blue-400/20 dark:hover:border-blue-400/30 dark:bg-blue-400/5'
     },
     {
       title: 'Integrity Management',
       description: 'Test integrity validation, resets, and sync recovery',
       path: '/debug/integrity',
-      color: 'border-red-200 hover:border-red-300'
+      color: 'border-red-500/20 hover:border-red-500/30 bg-red-500/5 dark:border-red-400/20 dark:hover:border-red-400/30 dark:bg-red-400/5'
     },
     {
       title: '🧩 VibeGridFinal Tasks',
       description: 'Production VibeGridFinal implementation with DirectUsagePattern architecture. High-performance 45ms cell rendering with XState integration.',
       path: '/debug/vibegridfinal-tasks',
-      color: 'border-indigo-200 hover:border-indigo-300 bg-indigo-50',
+      color: 'border-indigo-500/20 hover:border-indigo-500/30 bg-indigo-500/5 dark:border-indigo-400/20 dark:hover:border-indigo-400/30 dark:bg-indigo-400/5',
       badge: 'TABLE SYSTEM'
     }
   ]
@@ -50,9 +50,9 @@ function DebugIndexPage() {
         <p className="text-muted-foreground">
           Development and testing utilities for debugging the application
         </p>
-        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h3 className="font-semibold text-green-900">🧹 Debug Environment Cleaned!</h3>
-          <p className="text-green-800 text-sm mt-1">
+        <div className="mt-4 p-4 bg-green-500/5 border border-green-500/20 rounded-lg dark:bg-green-400/5 dark:border-green-400/20">
+          <h3 className="font-semibold text-green-900 dark:text-green-100">🧹 Debug Environment Cleaned!</h3>
+          <p className="text-green-800 dark:text-green-200 text-sm mt-1">
             Essential debug tools only. All legacy patterns removed, focusing on current architecture: 
             <strong>XState Atoms + VibeGridFinal + 3-Layer Architecture</strong>.
           </p>
@@ -65,12 +65,12 @@ function DebugIndexPage() {
             {page.badge && (
               <div className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full ${
                 page.badge === 'SYNC DEBUG' 
-                  ? 'bg-green-100 text-green-800' 
+                  ? 'bg-green-500/10 text-green-700 dark:bg-green-400/10 dark:text-green-300 border border-green-500/20' 
                   : page.badge === 'SYNC TEST'
-                  ? 'bg-emerald-100 text-emerald-800'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 border border-emerald-500/20'
                   : page.badge === 'TABLE SYSTEM'
-                  ? 'bg-indigo-100 text-indigo-800'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
+                  : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
               </div>
@@ -95,12 +95,12 @@ function DebugIndexPage() {
         ))}
       </div>
       
-      <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="font-semibold text-blue-900 mb-2">🧪 Current Architecture Testing</h3>
-        <p className="text-blue-800 text-sm mb-3">
+      <div className="mt-8 p-6 bg-blue-500/5 border border-blue-500/20 rounded-lg dark:bg-blue-400/5 dark:border-blue-400/20">
+        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🧪 Current Architecture Testing</h3>
+        <p className="text-blue-800 dark:text-blue-200 text-sm mb-3">
           Essential debug tools for the production architecture:
         </p>
-        <ul className="text-blue-800 text-sm space-y-1">
+        <ul className="text-blue-800 dark:text-blue-200 text-sm space-y-1">
           <li>• <strong>Sync System</strong> - WebSocket sync, state transitions, and service testing</li>
           <li>• <strong>Database Operations</strong> - Connection testing and query performance</li>
           <li>• <strong>Data Integrity</strong> - Validation, recovery, and consistency checks</li>

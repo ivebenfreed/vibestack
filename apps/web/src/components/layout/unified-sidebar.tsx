@@ -461,32 +461,19 @@ function SettingsNavigation({ isCollapsed }: { isCollapsed: boolean }) {
 function DebugNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   const location = useLocation()
   const [systemExpanded, setSystemExpanded] = React.useState(true)
-  const [uiExpanded, setUiExpanded] = React.useState(false)
   const [errorExpanded, setErrorExpanded] = React.useState(false)
   
   const debugSections = [
     {
-      title: 'System Debug',
+      title: 'Core Debug Tools',
       expanded: systemExpanded,
       setExpanded: setSystemExpanded,
       items: [
+        { label: 'Sync System', href: '/debug/sync' },
+        { label: 'Sync Test', href: '/debug/sync-test' },
         { label: 'Database', href: '/debug/database' },
-        { label: 'Sync', href: '/debug/sync' },
-        { label: 'Live Query', href: '/debug/live-query' },
-        { label: 'Performance', href: '/debug/performance' },
-        { label: 'Multi-Query Test', href: '/debug/multi-query' },
-        { label: 'TypeORM Test', href: '/debug/typeorm-test' },
         { label: 'Integrity', href: '/debug/integrity' },
-      ]
-    },
-    {
-      title: 'UI Debug',
-      expanded: uiExpanded,
-      setExpanded: setUiExpanded,
-      items: [
-        { label: 'Tasks New Pattern', href: '/debug/tasks-new-pattern' },
-        { label: 'VibeGrid Native', href: '/debug/vibegrid-native' },
-        { label: 'VibeGridFinal Tasks', href: '/debug/vibegridfinal-tasks' },
+        { label: 'VibeGridFinal', href: '/debug/vibegridfinal-tasks' },
       ]
     },
     {
