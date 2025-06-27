@@ -264,27 +264,55 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         
         if (clientId) {
           const key = `client:${clientId}`;
-          const existingData = await this.env.CLIENT_REGISTRY.get(key);
           
-          if (existingData) {
-            const data = JSON.parse(existingData);
-            await this.env.CLIENT_REGISTRY.put(
-              key,
-              JSON.stringify({
-                ...data,
-                active: true,
-                lastSeen: Date.now()
-              }),
-              {
-                // Refresh TTL on heartbeat - 2 hours
-                expirationTtl: 2 * 60 * 60
-              }
-            );
+          try {
+            const existingData = await this.env.CLIENT_REGISTRY.get(key);
             
-            syncLogger.debug('Updated client active status on heartbeat', {
+            if (existingData) {
+              const data = JSON.parse(existingData);
+              await this.env.CLIENT_REGISTRY.put(
+                key,
+                JSON.stringify({
+                  ...data,
+                  active: true,
+                  lastSeen: Date.now()
+                }),
+                {
+                  // Refresh TTL on heartbeat - 2 hours
+                  expirationTtl: 2 * 60 * 60
+                }
+              );
+              
+              syncLogger.info('Updated client active status on heartbeat', {
+                clientId,
+                active: true,
+                lastSeen: new Date().toISOString()
+              }, MODULE_NAME);
+            } else {
+              syncLogger.warn('Client not found in registry during heartbeat - creating new entry', {
+                clientId
+              }, MODULE_NAME);
+              
+              // Create new entry if client doesn't exist
+              await this.env.CLIENT_REGISTRY.put(
+                key,
+                JSON.stringify({
+                  active: true,
+                  lastSeen: Date.now()
+                }),
+                {
+                  expirationTtl: 2 * 60 * 60
+                }
+              );
+              
+              syncLogger.info('Created new client registry entry on heartbeat', {
+                clientId
+              }, MODULE_NAME);
+            }
+          } catch (kvError) {
+            syncLogger.error('Failed to update client registry on heartbeat', {
               clientId,
-              active: true,
-              lastSeen: new Date().toISOString()
+              error: kvError instanceof Error ? kvError.message : String(kvError)
             }, MODULE_NAME);
           }
         }
