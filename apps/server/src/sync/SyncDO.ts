@@ -115,9 +115,6 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     
     // We no longer register handlers in the constructor
     // to prevent duplicate registrations when DO wakes from hibernation
-    
-    // Schedule cleanup alarm if not already set
-    this.checkAndSetCleanupAlarm();
   }
 
   /**
@@ -1975,52 +1972,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     await this.processPendingLiveUpdates();
   }
 
-  /**
-   * Set up a periodic cleanup alarm if one doesn't exist
-   */
-  private async checkAndSetCleanupAlarm(): Promise<void> {
-    try {
-      const hasAlarm = await this.state.storage.getAlarm();
-      if (!hasAlarm) {
-        // Schedule cleanup in 1 hour
-        const ONE_HOUR = 60 * 60 * 1000;
-        this.state.storage.setAlarm(Date.now() + ONE_HOUR);
-        syncLogger.info('Scheduled cleanup alarm', {}, MODULE_NAME);
-      }
-    } catch (error) {
-      syncLogger.error('Failed to set cleanup alarm', {
-        error: error instanceof Error ? error.message : String(error)
-      }, MODULE_NAME);
-    }
-  }
   
-  /**
-   * Alarm handler - called by Cloudflare runtime when an alarm fires
-   * Used for regular cleanup of expired clients
-   */
-  async alarm(): Promise<void> {
-    syncLogger.info('Cleanup alarm fired', {}, MODULE_NAME);
-    
-    try {
-      // NOTE: Removed cleanupConnection() call that was incorrectly marking active clients as inactive
-      // Cleanup happens automatically when WebSocket connections close
-      // Individual SyncDO instances should not clean up themselves via alarm
-      
-      // Reschedule the next cleanup
-      const ONE_HOUR = 60 * 60 * 1000;
-      this.state.storage.setAlarm(Date.now() + ONE_HOUR);
-      
-      syncLogger.info('Cleanup alarm rescheduled (no cleanup needed)', {}, MODULE_NAME);
-    } catch (error) {
-      syncLogger.error('Error during scheduled alarm', {
-        error: error instanceof Error ? error.message : String(error)
-      }, MODULE_NAME);
-      
-      // Even if rescheduling fails, try again
-      const ONE_HOUR = 60 * 60 * 1000;
-      this.state.storage.setAlarm(Date.now() + ONE_HOUR);
-    }
-  }
 
   /**
    * Ensure replication is active by calling the replication init endpoint
