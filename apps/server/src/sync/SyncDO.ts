@@ -2002,20 +2002,21 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     syncLogger.info('Cleanup alarm fired', {}, MODULE_NAME);
     
     try {
-      // Perform cleanup of inactive clients
-      await this.stateManager.cleanupConnection();
+      // NOTE: Removed cleanupConnection() call that was incorrectly marking active clients as inactive
+      // Cleanup happens automatically when WebSocket connections close
+      // Individual SyncDO instances should not clean up themselves via alarm
       
       // Reschedule the next cleanup
       const ONE_HOUR = 60 * 60 * 1000;
       this.state.storage.setAlarm(Date.now() + ONE_HOUR);
       
-      syncLogger.info('Cleanup completed and rescheduled', {}, MODULE_NAME);
+      syncLogger.info('Cleanup alarm rescheduled (no cleanup needed)', {}, MODULE_NAME);
     } catch (error) {
-      syncLogger.error('Error during scheduled cleanup', {
+      syncLogger.error('Error during scheduled alarm', {
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
       
-      // Even if cleanup fails, reschedule the alarm
+      // Even if rescheduling fails, try again
       const ONE_HOUR = 60 * 60 * 1000;
       this.state.storage.setAlarm(Date.now() + ONE_HOUR);
     }
