@@ -260,6 +260,22 @@ export class SyncDO implements DurableObject, WebSocketHandler {
           syncLogger.info('Restored clientId from heartbeat message after hibernation', {
             clientId: heartbeatMessage.clientId
           }, MODULE_NAME);
+          
+          // Check if user context is available after hibernation
+          const userContext = await this.stateManager.getUserContext();
+          if (userContext) {
+            syncLogger.info('User context available after hibernation', {
+              clientId: this.clientId,
+              userId: userContext.userId,
+              userRole: userContext.userRole,
+              userEmail: userContext.userEmail,
+              userName: userContext.userName
+            }, MODULE_NAME);
+          } else {
+            syncLogger.warn('No user context found after hibernation', {
+              clientId: this.clientId
+            }, MODULE_NAME);
+          }
         }
         
         if (clientId) {

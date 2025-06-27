@@ -147,6 +147,8 @@ const worker = {
       // --- END CORS CHECK ---
 
       // --- BEGIN AUTH CHECK for /api/sync ---
+      let authenticatedUser: any = null; // Declare outside try block
+      
       try {
         const auth = initializeAuth(env); // Initialize auth using env
         
@@ -186,8 +188,11 @@ const worker = {
         }
         
         // Session is valid, proceed with WebSocket logic
-        // Optionally: log user ID or other details from sessionData.user
-        console.log(`[${requestId}] [Sync Auth] User ${(sessionData.user as { id?: any })?.id ?? 'ID_UNKNOWN'} authenticated for sync.`);
+        const user = sessionData.user as any;
+        console.log(`[${requestId}] [Sync Auth] User ${user?.id ?? 'ID_UNKNOWN'} authenticated for sync.`);
+        
+        // Store user info for later use after clientId extraction
+        authenticatedUser = user;
       } catch (error) {
         console.error(`[${requestId}] [Sync Auth] Error during session check:`, error);
         return new Response('Internal Server Error during authentication.', { status: 500 });
@@ -204,6 +209,27 @@ const worker = {
       const clientId = url.searchParams.get('clientId');
       if (!clientId) {
         return new Response('Client ID is required', { status: 400 });
+      }
+      
+      // Store user context in KV for SyncDO to retrieve (now that we have clientId)
+      const userContext = {
+        userId: authenticatedUser?.id,
+        userRole: authenticatedUser?.role,
+        userEmail: authenticatedUser?.email,
+        userName: authenticatedUser?.name,
+        timestamp: Date.now()
+      };
+      
+      try {
+        await env.CLIENT_REGISTRY.put(
+          `auth:${clientId}`,
+          JSON.stringify(userContext),
+          { expirationTtl: 300 } // 5 minutes TTL
+        );
+        console.log(`[${requestId}] [Sync Auth] Stored user context for client ${clientId}`);
+      } catch (authStoreError) {
+        console.error(`[${requestId}] [Sync Auth] Failed to store user context:`, authStoreError);
+        // Continue anyway - this is not critical for WebSocket functionality
       }
       
       // Create unique SyncDO instance for this client

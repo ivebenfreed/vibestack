@@ -18,6 +18,14 @@ interface SyncMetrics {
   lastWakeTime?: number;
 }
 
+export interface UserContext {
+  userId: string;
+  userRole: string;
+  userEmail?: string;
+  userName?: string;
+  timestamp: number;
+}
+
 export interface StateManager {
   registerClient(clientId: string): Promise<void>;
   updateClientLSN(clientId: string, lsn: string): Promise<void>;
@@ -33,10 +41,16 @@ export interface StateManager {
   saveInitialSyncProgress(clientId: string, state: InitialSyncState): Promise<void>;
   getInitialSyncProgress(clientId: string): Promise<InitialSyncState | null>;
   getServerLSN(): Promise<string>;
+  
+  // User context methods
+  getUserContext(): Promise<UserContext | null>;
+  getUserRole(): Promise<string | null>;
+  getUserId(): Promise<string | null>;
 }
 
 export class SyncStateManager implements StateManager {
   protected clientId: string | null = null;
+  private userContext: UserContext | null = null;
   private metrics: SyncMetrics = {
     messagesReceived: 0,
     messagesSent: 0,
@@ -75,7 +89,7 @@ export class SyncStateManager implements StateManager {
   }
 
   /**
-   * Restore client ID from storage when DO wakes from hibernation
+   * Restore client ID and user context from storage when DO wakes from hibernation
    */
   private async restoreClientId(): Promise<void> {
     try {
@@ -87,8 +101,21 @@ export class SyncStateManager implements StateManager {
           clientId: storedClientId
         }, MODULE_NAME);
       }
+      
+      // Also restore user context
+      const storedUserContext = await this.durableObjectState.storage.get<UserContext>('user_context');
+      if (storedUserContext) {
+        this.userContext = storedUserContext;
+        syncLogger.info('Restored user context from storage', {
+          clientId: this.clientId,
+          userId: this.userContext.userId,
+          userRole: this.userContext.userRole,
+          userEmail: this.userContext.userEmail,
+          userName: this.userContext.userName
+        }, MODULE_NAME);
+      }
     } catch (error) {
-      syncLogger.error('Failed to restore client ID from storage', {
+      syncLogger.error('Failed to restore client ID and user context from storage', {
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
     }
@@ -239,6 +266,32 @@ export class SyncStateManager implements StateManager {
       // Store the client ID in the Durable Object's storage for persistence
       // This helps validate that the right client is connecting to the right DO
       await this.durableObjectState.storage.put('current_client_id', clientId);
+      
+      // Retrieve user context from auth KV storage
+      try {
+        const authKey = `auth:${clientId}`;
+        const authData = await this.context.env.CLIENT_REGISTRY.get(authKey);
+        if (authData) {
+          this.userContext = JSON.parse(authData) as UserContext;
+          syncLogger.info('Retrieved user context for client', {
+            clientId,
+            userId: this.userContext.userId,
+            userRole: this.userContext.userRole,
+            userEmail: this.userContext.userEmail,
+            userName: this.userContext.userName
+          }, MODULE_NAME);
+          
+          // Store user context in DO storage for persistence across hibernation
+          await this.durableObjectState.storage.put('user_context', this.userContext);
+        } else {
+          syncLogger.warn('No user context found for client', { clientId }, MODULE_NAME);
+        }
+      } catch (authError) {
+        syncLogger.error('Failed to retrieve user context', {
+          clientId,
+          error: authError instanceof Error ? authError.message : String(authError)
+        }, MODULE_NAME);
+      }
       
       // Register client in KV registry
       const clientData = { 
@@ -460,5 +513,26 @@ export class SyncStateManager implements StateManager {
       }, MODULE_NAME);
       return null;
     }
+  }
+
+  /**
+   * Get user context
+   */
+  async getUserContext(): Promise<UserContext | null> {
+    return this.userContext;
+  }
+
+  /**
+   * Get user role
+   */
+  async getUserRole(): Promise<string | null> {
+    return this.userContext?.userRole || null;
+  }
+
+  /**
+   * Get user ID
+   */
+  async getUserId(): Promise<string | null> {
+    return this.userContext?.userId || null;
   }
 } 
