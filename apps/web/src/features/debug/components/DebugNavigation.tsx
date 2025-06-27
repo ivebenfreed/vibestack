@@ -4,7 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function DebugNavigation() {
   const debugRoutes = [
-    { path: '/debug/sync', label: 'Sync & Test' },
+    { path: '/debug/sync', label: 'Sync' },
+    { path: '/debug/sync-test', label: 'Sync Test' },
     { path: '/debug/database', label: 'Database' },
     { path: '/debug/integrity', label: 'Integrity' },
     { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal' },

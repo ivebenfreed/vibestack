@@ -9,11 +9,18 @@ export const Route = createFileRoute('/_authenticated/debug/')({
 function DebugIndexPage() {
   const debugPages = [
     {
-      title: '🚀 Sync System & Testing',
-      description: 'Complete sync debug panel with testing capabilities. Debug sync-machine-v2, test WebSocket connections, and validate sync functionality with real-time monitoring.',
+      title: '🚀 Sync System',
+      description: 'Enhanced debug panel for sync architecture. Debug sync-machine-v2, monitor WebSocket connections, and inspect service states.',
       path: '/debug/sync',
       color: 'border-green-200 hover:border-green-300 bg-green-50',
-      badge: 'SYNC & TEST'
+      badge: 'SYNC DEBUG'
+    },
+    {
+      title: '🧪 Sync Test',
+      description: 'Comprehensive sync functionality testing framework. CRUD operations, offline sync, batch operations, and relationship testing.',
+      path: '/debug/sync-test',
+      color: 'border-emerald-200 hover:border-emerald-300 bg-emerald-50',
+      badge: 'SYNC TEST'
     },
     {
       title: 'Database Tests',
@@ -57,8 +64,10 @@ function DebugIndexPage() {
           <Card key={page.path} className={`transition-colors ${page.color} relative`}>
             {page.badge && (
               <div className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full ${
-                page.badge === 'SYNC & TEST' 
+                page.badge === 'SYNC DEBUG' 
                   ? 'bg-green-100 text-green-800' 
+                  : page.badge === 'SYNC TEST'
+                  ? 'bg-emerald-100 text-emerald-800'
                   : page.badge === 'TABLE SYSTEM'
                   ? 'bg-indigo-100 text-indigo-800'
                   : 'bg-gray-100 text-gray-600'
@@ -75,7 +84,8 @@ function DebugIndexPage() {
               </p>
               <Link to={page.path}>
                 <Button variant="outline" className="w-full">
-                  {page.badge === 'SYNC & TEST' ? '🚀 Open Sync Panel' 
+                  {page.badge === 'SYNC DEBUG' ? '🚀 Open Sync Panel' 
+                   : page.badge === 'SYNC TEST' ? '🧪 Open Test Framework'
                    : page.badge === 'TABLE SYSTEM' ? '🧩 Open Table Demo'
                    : 'Open Tool'}
                 </Button>
