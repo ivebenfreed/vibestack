@@ -43,26 +43,8 @@ import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_a
 
 // Create Virtual Routes
 
-const AuthenticatedDebugVibegridNativeLazyImport = createFileRoute(
-  '/_authenticated/debug/vibegrid-native',
-)()
-const AuthenticatedDebugTypeormTestLazyImport = createFileRoute(
-  '/_authenticated/debug/typeorm-test',
-)()
-const AuthenticatedDebugTasksNewPatternLazyImport = createFileRoute(
-  '/_authenticated/debug/tasks-new-pattern',
-)()
 const AuthenticatedDebugSyncLazyImport = createFileRoute(
   '/_authenticated/debug/sync',
-)()
-const AuthenticatedDebugPerformanceLazyImport = createFileRoute(
-  '/_authenticated/debug/performance',
-)()
-const AuthenticatedDebugMultiQueryLazyImport = createFileRoute(
-  '/_authenticated/debug/multi-query',
-)()
-const AuthenticatedDebugLiveQueryLazyImport = createFileRoute(
-  '/_authenticated/debug/live-query',
 )()
 const AuthenticatedDebugIntegrityLazyImport = createFileRoute(
   '/_authenticated/debug/integrity',
@@ -205,39 +187,6 @@ const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexImport.update({
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
-const AuthenticatedDebugVibegridNativeLazyRoute =
-  AuthenticatedDebugVibegridNativeLazyImport.update({
-    id: '/vibegrid-native',
-    path: '/vibegrid-native',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/vibegrid-native.lazy').then(
-      (d) => d.Route,
-    ),
-  )
-
-const AuthenticatedDebugTypeormTestLazyRoute =
-  AuthenticatedDebugTypeormTestLazyImport.update({
-    id: '/typeorm-test',
-    path: '/typeorm-test',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/typeorm-test.lazy').then(
-      (d) => d.Route,
-    ),
-  )
-
-const AuthenticatedDebugTasksNewPatternLazyRoute =
-  AuthenticatedDebugTasksNewPatternLazyImport.update({
-    id: '/tasks-new-pattern',
-    path: '/tasks-new-pattern',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/tasks-new-pattern.lazy').then(
-      (d) => d.Route,
-    ),
-  )
-
 const AuthenticatedDebugSyncLazyRoute = AuthenticatedDebugSyncLazyImport.update(
   {
     id: '/sync',
@@ -247,39 +196,6 @@ const AuthenticatedDebugSyncLazyRoute = AuthenticatedDebugSyncLazyImport.update(
 ).lazy(() =>
   import('./routes/_authenticated/debug/sync.lazy').then((d) => d.Route),
 )
-
-const AuthenticatedDebugPerformanceLazyRoute =
-  AuthenticatedDebugPerformanceLazyImport.update({
-    id: '/performance',
-    path: '/performance',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/performance.lazy').then(
-      (d) => d.Route,
-    ),
-  )
-
-const AuthenticatedDebugMultiQueryLazyRoute =
-  AuthenticatedDebugMultiQueryLazyImport.update({
-    id: '/multi-query',
-    path: '/multi-query',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/multi-query.lazy').then(
-      (d) => d.Route,
-    ),
-  )
-
-const AuthenticatedDebugLiveQueryLazyRoute =
-  AuthenticatedDebugLiveQueryLazyImport.update({
-    id: '/live-query',
-    path: '/live-query',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/live-query.lazy').then(
-      (d) => d.Route,
-    ),
-  )
 
 const AuthenticatedDebugIntegrityLazyRoute =
   AuthenticatedDebugIntegrityLazyImport.update({
@@ -499,53 +415,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugIntegrityLazyImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
-    '/_authenticated/debug/live-query': {
-      id: '/_authenticated/debug/live-query'
-      path: '/live-query'
-      fullPath: '/debug/live-query'
-      preLoaderRoute: typeof AuthenticatedDebugLiveQueryLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/multi-query': {
-      id: '/_authenticated/debug/multi-query'
-      path: '/multi-query'
-      fullPath: '/debug/multi-query'
-      preLoaderRoute: typeof AuthenticatedDebugMultiQueryLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/performance': {
-      id: '/_authenticated/debug/performance'
-      path: '/performance'
-      fullPath: '/debug/performance'
-      preLoaderRoute: typeof AuthenticatedDebugPerformanceLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
     '/_authenticated/debug/sync': {
       id: '/_authenticated/debug/sync'
       path: '/sync'
       fullPath: '/debug/sync'
       preLoaderRoute: typeof AuthenticatedDebugSyncLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/tasks-new-pattern': {
-      id: '/_authenticated/debug/tasks-new-pattern'
-      path: '/tasks-new-pattern'
-      fullPath: '/debug/tasks-new-pattern'
-      preLoaderRoute: typeof AuthenticatedDebugTasksNewPatternLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/typeorm-test': {
-      id: '/_authenticated/debug/typeorm-test'
-      path: '/typeorm-test'
-      fullPath: '/debug/typeorm-test'
-      preLoaderRoute: typeof AuthenticatedDebugTypeormTestLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/vibegrid-native': {
-      id: '/_authenticated/debug/vibegrid-native'
-      path: '/vibegrid-native'
-      fullPath: '/debug/vibegrid-native'
-      preLoaderRoute: typeof AuthenticatedDebugVibegridNativeLazyImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/apps/': {
@@ -606,13 +480,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
-  AuthenticatedDebugLiveQueryLazyRoute: typeof AuthenticatedDebugLiveQueryLazyRoute
-  AuthenticatedDebugMultiQueryLazyRoute: typeof AuthenticatedDebugMultiQueryLazyRoute
-  AuthenticatedDebugPerformanceLazyRoute: typeof AuthenticatedDebugPerformanceLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
-  AuthenticatedDebugTasksNewPatternLazyRoute: typeof AuthenticatedDebugTasksNewPatternLazyRoute
-  AuthenticatedDebugTypeormTestLazyRoute: typeof AuthenticatedDebugTypeormTestLazyRoute
-  AuthenticatedDebugVibegridNativeLazyRoute: typeof AuthenticatedDebugVibegridNativeLazyRoute
   AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
 }
 
@@ -622,18 +490,7 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugVibegridfinalTasksRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
-    AuthenticatedDebugLiveQueryLazyRoute: AuthenticatedDebugLiveQueryLazyRoute,
-    AuthenticatedDebugMultiQueryLazyRoute:
-      AuthenticatedDebugMultiQueryLazyRoute,
-    AuthenticatedDebugPerformanceLazyRoute:
-      AuthenticatedDebugPerformanceLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
-    AuthenticatedDebugTasksNewPatternLazyRoute:
-      AuthenticatedDebugTasksNewPatternLazyRoute,
-    AuthenticatedDebugTypeormTestLazyRoute:
-      AuthenticatedDebugTypeormTestLazyRoute,
-    AuthenticatedDebugVibegridNativeLazyRoute:
-      AuthenticatedDebugVibegridNativeLazyRoute,
     AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
   }
 
@@ -715,13 +572,7 @@ export interface FileRoutesByFullPath {
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
-  '/debug/live-query': typeof AuthenticatedDebugLiveQueryLazyRoute
-  '/debug/multi-query': typeof AuthenticatedDebugMultiQueryLazyRoute
-  '/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
-  '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
-  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
-  '/debug/vibegrid-native': typeof AuthenticatedDebugVibegridNativeLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug/': typeof AuthenticatedDebugIndexRoute
@@ -751,13 +602,7 @@ export interface FileRoutesByTo {
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
-  '/debug/live-query': typeof AuthenticatedDebugLiveQueryLazyRoute
-  '/debug/multi-query': typeof AuthenticatedDebugMultiQueryLazyRoute
-  '/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
-  '/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
-  '/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
-  '/debug/vibegrid-native': typeof AuthenticatedDebugVibegridNativeLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug': typeof AuthenticatedDebugIndexRoute
@@ -791,13 +636,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/_authenticated/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
-  '/_authenticated/debug/live-query': typeof AuthenticatedDebugLiveQueryLazyRoute
-  '/_authenticated/debug/multi-query': typeof AuthenticatedDebugMultiQueryLazyRoute
-  '/_authenticated/debug/performance': typeof AuthenticatedDebugPerformanceLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
-  '/_authenticated/debug/tasks-new-pattern': typeof AuthenticatedDebugTasksNewPatternLazyRoute
-  '/_authenticated/debug/typeorm-test': typeof AuthenticatedDebugTypeormTestLazyRoute
-  '/_authenticated/debug/vibegrid-native': typeof AuthenticatedDebugVibegridNativeLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
@@ -832,13 +671,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/debug/database'
     | '/debug/integrity'
-    | '/debug/live-query'
-    | '/debug/multi-query'
-    | '/debug/performance'
     | '/debug/sync'
-    | '/debug/tasks-new-pattern'
-    | '/debug/typeorm-test'
-    | '/debug/vibegrid-native'
     | '/apps'
     | '/chats'
     | '/debug/'
@@ -867,13 +700,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/debug/database'
     | '/debug/integrity'
-    | '/debug/live-query'
-    | '/debug/multi-query'
-    | '/debug/performance'
     | '/debug/sync'
-    | '/debug/tasks-new-pattern'
-    | '/debug/typeorm-test'
-    | '/debug/vibegrid-native'
     | '/apps'
     | '/chats'
     | '/debug'
@@ -905,13 +732,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/notifications'
     | '/_authenticated/debug/database'
     | '/_authenticated/debug/integrity'
-    | '/_authenticated/debug/live-query'
-    | '/_authenticated/debug/multi-query'
-    | '/_authenticated/debug/performance'
     | '/_authenticated/debug/sync'
-    | '/_authenticated/debug/tasks-new-pattern'
-    | '/_authenticated/debug/typeorm-test'
-    | '/_authenticated/debug/vibegrid-native'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/debug/'
@@ -994,13 +815,7 @@ export const routeTree = rootRoute
         "/_authenticated/debug/vibegridfinal-tasks",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
-        "/_authenticated/debug/live-query",
-        "/_authenticated/debug/multi-query",
-        "/_authenticated/debug/performance",
         "/_authenticated/debug/sync",
-        "/_authenticated/debug/tasks-new-pattern",
-        "/_authenticated/debug/typeorm-test",
-        "/_authenticated/debug/vibegrid-native",
         "/_authenticated/debug/"
       ]
     },
@@ -1081,32 +896,8 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/integrity.lazy.tsx",
       "parent": "/_authenticated/debug"
     },
-    "/_authenticated/debug/live-query": {
-      "filePath": "_authenticated/debug/live-query.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/multi-query": {
-      "filePath": "_authenticated/debug/multi-query.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/performance": {
-      "filePath": "_authenticated/debug/performance.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
     "/_authenticated/debug/sync": {
       "filePath": "_authenticated/debug/sync.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/tasks-new-pattern": {
-      "filePath": "_authenticated/debug/tasks-new-pattern.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/typeorm-test": {
-      "filePath": "_authenticated/debug/typeorm-test.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/vibegrid-native": {
-      "filePath": "_authenticated/debug/vibegrid-native.lazy.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/apps/": {

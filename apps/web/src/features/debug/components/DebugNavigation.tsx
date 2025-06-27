@@ -4,15 +4,10 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function DebugNavigation() {
   const debugRoutes = [
+    { path: '/debug/sync', label: 'Sync & Test' },
     { path: '/debug/database', label: 'Database' },
-    { path: '/debug/sync', label: 'Sync' },
-    { path: '/debug/live-query', label: 'Live Query' },
-    { path: '/debug/performance', label: 'Live Query Performance' },
-    { path: '/debug/multi-query', label: 'Multi-Query Test' },
-    { path: '/debug/vibegrid-native', label: 'VibeGrid Native' },
-    { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal Tasks' },
-    { path: '/debug/typeorm-test', label: 'TypeORM Test' },
-    { path: '/debug/tasks-new-pattern', label: 'Tasks New Pattern' },
+    { path: '/debug/integrity', label: 'Integrity' },
+    { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal' },
   ];
   
   return (
