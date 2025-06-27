@@ -251,7 +251,17 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       
       try {
         // Update client's active status and lastSeen in KV registry
+        // Use clientId from message if SyncDO's clientId is empty (hibernation recovery)
         const clientId = heartbeatMessage.clientId || this.clientId;
+        
+        // If SyncDO's clientId is empty but message has one, restore it
+        if (!this.clientId && heartbeatMessage.clientId) {
+          this.clientId = heartbeatMessage.clientId;
+          syncLogger.info('Restored clientId from heartbeat message after hibernation', {
+            clientId: heartbeatMessage.clientId
+          }, MODULE_NAME);
+        }
+        
         if (clientId) {
           const key = `client:${clientId}`;
           const existingData = await this.env.CLIENT_REGISTRY.get(key);
