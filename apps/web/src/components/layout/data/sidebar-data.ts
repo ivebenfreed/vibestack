@@ -151,6 +151,11 @@ export function generateProjectsSection(projects: Project[] = []): GlobalSidebar
             url: '/tasks',
             icon: IconChecklist,
           },
+          {
+            title: 'Tasks Kanban',
+            url: '/tasks/kanban',
+            icon: IconChecklist,
+          },
         ],
       },
     ],
@@ -175,6 +180,11 @@ export const globalSidebarData: GlobalSidebarSection[] = [
           {
             title: 'Tasks',
             url: '/tasks',
+            icon: IconChecklist,
+          },
+          {
+            title: 'Tasks Kanban',
+            url: '/tasks/kanban',
             icon: IconChecklist,
           },
           {
@@ -340,6 +350,11 @@ export const globalSidebarData: GlobalSidebarSection[] = [
           {
             title: 'VibeGridFinal Tasks',
             url: '/debug/vibegridfinal-tasks',
+            icon: IconChecklist,
+          },
+          {
+            title: 'Kanban Debug',
+            url: '/debug/kanban',
             icon: IconChecklist,
           },
         ],

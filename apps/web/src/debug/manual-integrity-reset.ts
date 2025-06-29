@@ -117,17 +117,16 @@ export async function getIntegrityService(): Promise<any> {
     }
 
 
-    // Method 2: Fallback to V2 system
+    // Method 2: Try direct import from sync directory
     try {
-      const { getGlobalServices } = await import('../state-machines/machines/sync-machine-v2');
-      const globalServices = getGlobalServices();
-      
-      if (globalServices?.integrityService) {
-        console.log('[DEBUG] ✅ Found IntegrityService via V2 globalServices (fallback)');
-        return globalServices.integrityService;
-      }
-    } catch (v2Error) {
-      console.log('[DEBUG] ⚠️ V2 fallback also failed:', v2Error instanceof Error ? v2Error.message : String(v2Error));
+      const { IntegrityService } = await import('../sync/IntegrityService');
+      console.log('[DEBUG] ✅ Found IntegrityService via direct import');
+      // Note: This would need proper initialization with dependencies
+      // For debug purposes, we'll indicate it's available but not fully initialized
+      console.log('[DEBUG] ⚠️ IntegrityService found but may need proper initialization');
+      return null; // Return null since we can't properly initialize without context
+    } catch (directImportError) {
+      console.log('[DEBUG] ⚠️ Direct import also failed:', directImportError instanceof Error ? directImportError.message : String(directImportError));
     }
 
     console.warn('[DEBUG] ⚠️ IntegrityService not found - system may not be fully initialized');

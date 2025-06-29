@@ -15,6 +15,9 @@ import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
+import { Button } from '@/components/ui/button'
+import { Kanban, Calendar } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 
 // ✅ Generated column configurations
 import { TaskColumns } from '@repo/dataforge/column-configurations'
@@ -199,10 +202,30 @@ const Tasks: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-        <p className="text-muted-foreground">
-          Manage and track all your tasks.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
+            <p className="text-muted-foreground">
+              Manage and track all your tasks.
+            </p>
+          </div>
+          
+          {/* View Toggle */}
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/tasks/kanban">
+                <Kanban className="h-4 w-4 mr-2" />
+                Kanban View
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/tasks/timeline">
+                <Calendar className="h-4 w-4 mr-2" />
+                Timeline View
+              </Link>
+            </Button>
+          </div>
+        </div>
       </div>
       
       <div className="flex-1">

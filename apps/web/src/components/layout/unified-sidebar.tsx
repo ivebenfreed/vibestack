@@ -207,6 +207,8 @@ function ContextualNavigation({ location, isCollapsed }: {
   
   if (location.startsWith('/projects')) {
     expandedContent = <ProjectNavigation isCollapsed={false} />
+  } else if (location.startsWith('/tasks')) {
+    expandedContent = <TasksNavigation isCollapsed={false} />
   } else if (location.startsWith('/settings')) {
     expandedContent = <SettingsNavigation isCollapsed={false} />
   } else if (location.startsWith('/debug')) {
@@ -419,6 +421,40 @@ function ProjectNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   )
 }
 
+function TasksNavigation({ isCollapsed }: { isCollapsed: boolean }) {
+  const location = useLocation()
+  
+  const taskItems = [
+    { label: 'All Tasks', href: '/tasks' },
+    { label: 'Kanban View', href: '/tasks/kanban' },
+  ]
+  
+  return (
+    <div className="mt-4 space-y-1">
+      <div className="px-3 py-2">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Task Views
+        </span>
+      </div>
+      {taskItems.map((item) => (
+        <Link
+          key={item.href}
+          to={item.href}
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            location.pathname === item.href
+              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              : "text-sidebar-foreground"
+          )}
+        >
+          <span className="truncate">{item.label}</span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 function SettingsNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   const location = useLocation()
   const settingsItems = [
@@ -474,6 +510,8 @@ function DebugNavigation({ isCollapsed }: { isCollapsed: boolean }) {
         { label: 'Database', href: '/debug/database' },
         { label: 'Integrity', href: '/debug/integrity' },
         { label: 'VibeGridFinal', href: '/debug/vibegridfinal-tasks' },
+        { label: 'Kanban Debug', href: '/debug/kanban' },
+        { label: 'React Flow Positioning', href: '/debug/reactflow-positioning' },
       ]
     },
     {

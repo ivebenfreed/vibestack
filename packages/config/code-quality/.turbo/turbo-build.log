@@ -1,4 +1,4 @@
 
-> @repo/code-quality@0.0.0 build /home/benfreed/dev/tinytest/vibestack/packages/config/code-quality
+> @repo/code-quality@0.0.0 build /home/benfreed/vibestack/packages/config/code-quality
 > tsc
 

@@ -12,10 +12,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm format` - Format code with Prettier
 - `pnpm quality` - Run code quality checks (must pass before build)
 
+### CLI Tools
+- `pnpm cli` - Interactive CLI tool for development tasks
+  - `create-super-admin` - Creates super admin user with auto-login
+  - `seed-users` - Seeds database with batch users
+  - `init-dataforge` - Complete DataForge initialization workflow
+  - `logout` - Logs out super admin session
+
 ### Application-Specific Commands
 - `pnpm dev:web` - Start only the web application
 - `pnpm dev:debug` - Start development servers with debug logging
 - `pnpm dev:info` - Start development servers with info logging
+- `pnpm dev:pwa-test` - Build and test PWA functionality
 
 ### DataForge Commands (Entity & Schema Management)
 - `pnpm forge:build` - Generate entities and compile (from monorepo root)
@@ -26,11 +34,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Testing
 - `pnpm --filter @repo/sync-test test` - Run sync functionality tests
 - `pnpm --filter vibestack-web test:sync-isolation` - Run web sync isolation tests
+- `pnpm test:sync-isolation` - Enhanced sync operation tests with framework
 
 ### Deployment
 - `pnpm deploy` - Deploy both server and web applications
 - `pnpm deploy:server` - Deploy server worker to Cloudflare
 - `pnpm deploy:web` - Deploy web application to Cloudflare Pages
+
+#### Production Deployment
+- `pnpm deploy:production` - Deploy both server and web to production
+- `pnpm deploy:server:production` - Deploy server to production environment
+- `pnpm deploy:web:production` - Deploy web to production environment
+
+#### Cloudflare-Specific Commands
+- `pnpm cf:dev` - Run with Cloudflare wrangler locally
+- `pnpm cf:build` - Build for Cloudflare deployment
+- `pnpm cf:preview` - Preview Cloudflare deployment locally
+- `pnpm cf:deploy` - Deploy to Cloudflare (default environment)
+- `pnpm cf:deploy:staging` - Deploy web app to Cloudflare staging
+- `pnpm cf:deploy:production` - Deploy web app to Cloudflare production
+- `pnpm pages:deploy:production` - Deploy to Cloudflare Pages production
 
 ## Architecture Overview
 
@@ -58,6 +81,29 @@ VibeStack is a full-stack, local-first framework with bi-directional sync capabi
 - **Runtime**: Cloudflare Workers (server) + Vite (client)
 
 ## Core Workspace Packages
+
+### @repo/cli - Interactive Development CLI
+Interactive CLI tool for various monorepo utilities and development tasks:
+- User management (create super admin, seed users)
+- DataForge initialization workflows
+- Session management (logout functionality)
+- Development utility commands
+
+### @repo/code-quality - Code Quality & Type Safety
+Centralized code quality enforcement package:
+- TypeScript strict mode validation
+- Used by `pnpm quality` as prebuild requirement
+- Cross-package type safety checks
+- Enforced before all builds and deployments
+
+### @repo/better-auth-cli - Authentication Management
+CLI tools for Better Auth integration:
+- Migration management for auth schema
+- User management utilities
+- Session handling tools
+
+### @repo/cron-tester - Cron Job Testing
+Utilities for testing scheduled tasks and cron jobs in the application.
 
 ### @repo/dataforge - Entity & Schema Management
 DataForge is the central hub for entity definitions, migrations, and code generation:
@@ -178,6 +224,20 @@ Uses XState atomic stores for surgical precision updates:
 - Backend worker remains internal (not exposed to public internet)
 - Simplified cookie management with `SameSite=Lax`
 
+### Derived Atoms Pattern
+Reactive computed values using XState atoms for performance optimization:
+- **Location**: `apps/web/src/domain/derived-atoms.ts`
+- **Examples**: `entityCountsAtom`, `taskStatsAtom`, `projectStatsAtom`, `commentStatsAtom`
+- **Benefits**: Automatically updates when underlying atoms change, provides aggregated data
+- **Usage**: `const stats = useSelector(taskStatsAtom, (stats) => stats, shallowEqual)`
+
+### VibeKan - Kanban Component System
+New kanban board implementation for task visualization:
+- **Location**: `apps/web/src/components/custom/vibekan/`
+- **Components**: `VibeKan.tsx`, `KanbanColumn.tsx`, `KanbanCard.tsx`
+- **Integration**: Works with XState atoms and task management
+- **Features**: Drag-and-drop support, real-time updates, customizable columns
+
 ## Development Guidelines
 
 ### Performance Optimization
@@ -210,7 +270,11 @@ Uses XState atomic stores for surgical precision updates:
 
 ### Sync System Testing
 The project includes comprehensive sync functionality tests:
-- Isolation tests for sync components
+- **Enhanced Sync Operation Tests**: `apps/web/src/sync/testing/`
+  - `SyncTestFramework` class for structured testing
+  - `SyncOperationTests` class with detailed test results
+  - Progress reporting and comprehensive validation
+- **Legacy Tests**: Isolation tests for sync components (still available)
 - Integration tests for real-time data synchronization
 - Performance tests for large dataset handling
 
@@ -258,7 +322,9 @@ The project includes comprehensive sync functionality tests:
 6. Add sync tracking for data changes
 7. Write tests for critical functionality
 
-### VibeGridFinal - Standard Data Table Component
+### Data Visualization Components
+
+#### VibeGridFinal - Standard Data Table Component
 **Location**: `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.tsx`
 
 **Key Features:**
@@ -295,6 +361,18 @@ const usagePattern = createDirectUsagePattern<Task>({
 />
 ```
 
+#### New Task Visualization Components
+**Kanban View**: `apps/web/src/features/tasks/TasksKanban.tsx`
+- Drag-and-drop task management
+- Status-based columns with real-time updates
+- Integration with VibeKan component system
+
+
+**Enhanced Task Cards**: `apps/web/src/features/tasks/TaskCard.tsx`
+- Reusable task display component
+- Rich metadata display and quick actions
+- Optimized for both kanban and list views
+
 ### DataForge Workflow
 1. **Entity Changes**: Modify entities in `packages/dataforge/src/entities/`
 2. **Build**: Run `pnpm forge:build` to regenerate all exports
@@ -309,3 +387,43 @@ const usagePattern = createDirectUsagePattern<Task>({
 - Use database query logs for optimization
 - Test with realistic data volumes
 - Monitor DataForge build times and generated code size
+
+## Key Dependencies & Technologies
+
+### State Management & UI
+- **XState**: Primary state management with atomic stores
+- **Jotai**: Secondary atomic state management option
+- **Zustand**: Additional state management for specific use cases
+- **@dnd-kit/core, @dnd-kit/sortable**: Drag and drop functionality for kanban boards
+
+### Data Visualization
+- **TanStack Table**: Foundation for all data grid components
+- **rich-textarea**: Enhanced text editing capabilities
+
+### Development & Quality
+- **Model Context Protocol (MCP)**: 
+  - `@modelcontextprotocol/server-brave-search` - Web search integration
+  - `@modelcontextprotocol/server-postgres` - Database integration
+- **position-observer**: Position tracking utilities for UI components
+
+## Important Architectural Patterns
+
+### VibeGridNative Usage (Alternative to VibeGridFinal)
+- **Performance**: 42.54ms universal cell renderer
+- **Generated Columns**: Auto-generated from DataForge entities
+- **Usage**: Import from `@repo/dataforge/column-configurations`
+- **Selection Pattern**: Define `SELECTED_COLUMNS` array for column ordering
+- **Benefits**: Full business logic, complete enums, relationship support
+
+### Domain Service Architecture
+- **3-Layer Pattern**: Repository → Service → Controller
+- **Base Classes**: `BaseRepository` and `BaseService` for consistency
+- **Performance**: Single-query updates, batch operations
+- **Error Handling**: Custom error types and transaction safety
+- **Integration**: Non-blocking sync tracking and event emission
+
+### Task Feature Patterns
+- **Live Queries**: Use `useLiveEntity` for real-time data updates
+- **Service Methods**: All data modifications through service layer
+- **Auto-Updates**: No manual event handling needed - live queries handle updates
+- **ID Handling**: Be aware of entity ID field naming conventions

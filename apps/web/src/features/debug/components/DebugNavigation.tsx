@@ -9,6 +9,7 @@ export function DebugNavigation() {
     { path: '/debug/database', label: 'Database' },
     { path: '/debug/integrity', label: 'Integrity' },
     { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal' },
+    { path: '/debug/reactflow-positioning', label: 'React Flow Positioning' },
   ];
   
   return (
