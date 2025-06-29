@@ -20,10 +20,10 @@ function TaskNode({ data }: { data: { title: string } }) {
   )
 }
 
-// Memoize nodeTypes to prevent React Flow warning
-const nodeTypes = React.useMemo(() => ({
+// Simple object - no need for useMemo outside component
+const nodeTypes = {
   task: TaskNode,
-}), [])
+}
 
 function ReactFlowPositioningDebug() {
   const reactFlow = useReactFlow()
