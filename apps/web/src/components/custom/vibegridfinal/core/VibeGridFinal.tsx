@@ -627,13 +627,8 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
       
              // Apply tighter sizing for date columns
        const cellType = column.meta?.cellType
-       const isDateColumn = cellType === 'date' || 
-                           (typeof column.header === 'string' && 
-                            (column.header.toLowerCase().includes('date') || 
-                             column.header.toLowerCase().includes('created') ||
-                             column.header.toLowerCase().includes('updated') ||
-                             column.header.toLowerCase().includes('due') ||
-                             column.header.toLowerCase().includes('start')))
+       // ⚡ PERFORMANCE: Simplified date detection - only check cellType
+       const isDateColumn = cellType === 'date'
       
              if (isDateColumn) {
          return {
