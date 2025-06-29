@@ -435,8 +435,8 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
   // State Management (Pure TanStack) - ✅ OPTIMIZED: Synchronous preference loading
   // ============================================================================
   
-  // ✅ PERFORMANCE FIX: Load preferences synchronously to prevent double renders
-  const getInitialState = React.useCallback(() => {
+  // ⚡ PERFORMANCE: Removed useCallback - localStorage is cheap and stable
+  const getInitialState = () => {
     if (!enablePersistence) {
       return {
         sorting: [],
@@ -466,11 +466,7 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
           rowSelection: parsed.rowSelection || {}
         }
         
-        console.log('🔧 [VibeGridFinal] Loaded preferences from localStorage:', {
-          tableId,
-          pageIndex: loadedState.pagination.pageIndex,
-          pageSize: loadedState.pagination.pageSize
-        })
+        // ⚡ PERFORMANCE: Debug logging disabled
         
         return loadedState
       }
@@ -486,9 +482,9 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
       columnVisibility: {},
       rowSelection: {}
     }
-  }, [enablePersistence, tableId, pageSize])
+  }
   
-  const initialState = React.useMemo(() => getInitialState(), [getInitialState])
+  const initialState = React.useMemo(() => getInitialState(), [enablePersistence, tableId, pageSize])
   
   const [internalSorting, setInternalSorting] = React.useState<SortingState>(initialState.sorting)
   const [internalPagination, setInternalPagination] = React.useState<PaginationState>(initialState.pagination)
@@ -523,13 +519,7 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
   React.useEffect(() => {
     if (!enablePersistence) return
     
-    if (debugMode) {
-      console.log('🔧 [VibeGridFinal] Persistence effect triggered:', {
-        pageIndex: paginationState.pageIndex,
-        pageSize: paginationState.pageSize,
-        tableId
-      })
-    }
+    // ⚡ PERFORMANCE: Debug logging disabled
     
     const timeoutId = setTimeout(() => {
       try {
@@ -547,16 +537,14 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
         }
         localStorage.setItem(key, JSON.stringify(preferences))
         
-        if (debugMode) {
-          console.log('[VibeGridFinal] 💾 Preferences saved:', preferences)
-        }
+        // ⚡ PERFORMANCE: Debug logging disabled
       } catch (error) {
         console.warn('Failed to save table preferences:', error)
       }
     }, 500) // 500ms debounce
     
     return () => clearTimeout(timeoutId)
-  }, [enablePersistence, tableId, sortingState, paginationState.pageIndex, paginationState.pageSize, columnFiltersState, globalFilterState, columnVisibilityState, rowSelectionState, debugMode])
+  }, [enablePersistence, tableId, sortingState, paginationState.pageIndex, paginationState.pageSize, columnFiltersState, globalFilterState, columnVisibilityState, internalRowSelection])
   
   // ============================================================================
   // Persistence: Save State (Debounced, Non-Blocking)
@@ -615,14 +603,14 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
   // Enhanced Columns (Performance Critical - Keep Memoized)
   // ============================================================================
   
-  // ✅ PERFORMANCE FIX: Create stable cell renderer outside useMemo
-  const defaultCellRenderer = React.useCallback((props: any) => (
+  // ⚡ PERFORMANCE: Removed useCallback - causing re-renders due to unstable deps
+  const defaultCellRenderer = (props: any) => (
     <UniversalCellRenderer
       {...props}
       relationshipData={relationshipData}
       onSave={onSave}
     />
-  ), [relationshipData, onSave])
+  )
   
   // ✅ MICRO-OPTIMIZATION: Skip enhanced columns processing for max performance
   // Only add defaultCellRenderer to columns that don't have one, apply tighter sizing for date columns
@@ -734,17 +722,7 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
     
     // State handlers (always provided for simplicity)
     onSortingChange,
-    onPaginationChange: React.useCallback((updater: any) => {
-      if (debugMode) {
-        const newPagination = typeof updater === 'function' ? updater(paginationState) : updater
-        console.log('🔄 [VibeGridFinal] Pagination changing:', {
-          from: paginationState,
-          to: newPagination,
-          reason: 'USER_ACTION_OR_TABLE_RESET'
-        })
-      }
-      onPaginationChange(updater)
-    }, [onPaginationChange, paginationState, debugMode]),
+    onPaginationChange: onPaginationChange,
     onColumnFiltersChange,
     onGlobalFilterChange: onGlobalFilterChangeHandler,
     onColumnVisibilityChange,
@@ -764,37 +742,9 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
   // Performance Tracking & Debug Logging (Only when needed)
   // ============================================================================
   
-  // ✅ MICRO-OPTIMIZATION: Only create debug effect when actually debugging
-  if (debugMode) {
-    React.useEffect(() => {
-      const renderTime = performance.now() - startTime
-      console.log(`[VibeGridFinal] Modular Architecture with XState Persistence: ${renderTime.toFixed(2)}ms`)
-      
-      // Column sizing debug info
-      const columnSizes = table.getVisibleLeafColumns().map(col => `${col.id}:${col.getSize()}px`).join(', ')
-      console.log(`[VibeGridFinal] 📏 Column Sizes: ${columnSizes}`)
-      
-      // Performance debug info
-      console.log(`[VibeGridFinal] 📊 Performance Analysis:`)
-      console.log(`  - Total data: ${data.length} rows`)
-      console.log(`  - Rendered rows: ${table.getRowModel().rows.length}`)
-      console.log(`  - Columns: ${columns.length}`)
-      console.log(`  - Total cells: ${table.getRowModel().rows.length * columns.length}`)
-      console.log(`  - Render time: ${renderTime.toFixed(2)}ms`)
-      console.log(`  - Time per cell: ${(renderTime / (table.getRowModel().rows.length * columns.length)).toFixed(2)}ms`)
-      
-      // Cell types debug info
-      const cellTypes = Array.from(new Set(columns.map(col => col.meta?.cellType || 'text'))).join(', ')
-      console.log(`[VibeGridFinal] Cell Types: ${cellTypes}`)
-      
-      // 🔥 NEW: Persistence debug info
-      console.log(`[VibeGridFinal] 💾 Persistence Status:`)
-      console.log(`  - Persistence enabled: ${enablePersistence}`)
-      console.log(`  - Cross-tab sync: ${enableCrossTabSync}`)
-      console.log(`  - Preferences loaded: true (synchronous)`)
-      console.log(`  - Table ID: vibegrid-${tableId}`)
-    })
-  }
+  // ⚡ PERFORMANCE: Debug logging disabled - major performance bottleneck removed
+  // Previous debug useEffect was running on every render without dependencies
+  // This was causing massive performance degradation
   
   // ============================================================================
   // Render JSX (Modular Architecture)
