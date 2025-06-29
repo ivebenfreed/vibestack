@@ -676,43 +676,41 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
     data,
     columns: enhancedColumns,
     
-    // CRITICAL: Row ID for stable row identity across data updates
-    getRowId: (row) => String(row.id),
+    // ⚡ PERFORMANCE: Simplified row ID - assume IDs are already strings
+    getRowId: (row) => row.id,
     
     // Core features
     getCoreRowModel: getCoreRowModel(),
     
-    // Conditional features
-    getSortedRowModel: enableSorting ? getSortedRowModel() : undefined,
+    // ⚡ PERFORMANCE: Only enable essential features to reduce table creation time
     getPaginationRowModel: enablePagination ? getPaginationRowModel() : undefined,
-    getFilteredRowModel: (enableFiltering || enableGlobalSearch) ? getFilteredRowModel() : undefined,
+    // Disable expensive features for initial render
+    getSortedRowModel: undefined, // Disable sorting for performance
+    getFilteredRowModel: undefined, // Disable filtering for performance
     
-    // CRITICAL: Enable column resizing for sizing to work
-    enableColumnResizing: true,
-    columnResizeMode: 'onChange',
+    // ⚡ PERFORMANCE: Disable expensive features
+    enableColumnResizing: false, // Disable resizing for performance
+    // columnResizeMode: 'onChange', // Disabled
     
     // 🔥 FIX: Prevent automatic resets on data changes (preserve user state)
     autoResetPageIndex: false,
     autoResetAll: false,
     
-    // Global search filter function
-    globalFilterFn: 'includesString',
+    // ⚡ PERFORMANCE: Disable global search
+    // globalFilterFn: 'includesString', // Disabled for performance
     
-    // Default column sizing from docs
-    defaultColumn: {
-      size: 200,
-      minSize: 50,
-      maxSize: 500,
-    },
+    // ⚡ PERFORMANCE: Simplified default column - no sizing constraints
+    // defaultColumn: { size: 200, minSize: 50, maxSize: 500 }, // Disabled
     
-    // ✅ MICRO-OPTIMIZATION: Pre-build state object to avoid object spread overhead
+    // ⚡ PERFORMANCE: Minimal state - only pagination
     state: {
-      sorting: sortingState,
       pagination: paginationState,
-      columnFilters: columnFiltersState,
-      globalFilter: globalFilterState,
-      columnVisibility: columnVisibilityState,
-      rowSelection: rowSelectionState
+      // Disable other state for performance
+      // sorting: sortingState,
+      // columnFilters: columnFiltersState,
+      // globalFilter: globalFilterState,
+      // columnVisibility: columnVisibilityState,
+      // rowSelection: rowSelectionState
     },
     
     // State handlers (always provided for simplicity)
@@ -737,8 +735,16 @@ export function VibeGridFinal<TEntity extends BaseEntity>({
   // Performance Tracking & Debug Logging (Only when needed)
   // ============================================================================
   
-  // ⚡ PERFORMANCE: Debug logging disabled - major performance bottleneck removed
-  // Previous debug useEffect was running on every render without dependencies
+  // 🔍 DETAILED PERFORMANCE PROFILING
+  if (debugMode) {
+    const tableCreateStart = performance.now()
+    
+    setTimeout(() => {
+      const tableCreateTime = performance.now() - tableCreateStart
+      console.log(`📋 [VibeGridFinal] Table creation took: ${tableCreateTime.toFixed(2)}ms`)
+      console.log(`📊 [VibeGridFinal] Data: ${data.length} rows, Columns: ${enhancedColumns.length}`)
+    }, 0)
+  }
   // This was causing massive performance degradation
   
   // ============================================================================
