@@ -38,15 +38,10 @@ function VibeGridFinalTasksPage() {
     }
   }
 
-  // Basic columns
+  // ⚡ PERFORMANCE: Test with minimal columns to isolate column processing overhead
   const columns = [
     TaskColumns.title,
     TaskColumns.status,
-    TaskColumns.priority,
-    TaskColumns.assignee,
-    TaskColumns.project,
-    TaskColumns.dueDate,
-    TaskColumns.description,
     TaskColumns.id,
   ]
 
