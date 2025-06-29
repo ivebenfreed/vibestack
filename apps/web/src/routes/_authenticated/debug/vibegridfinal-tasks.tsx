@@ -10,10 +10,10 @@ import { TaskColumns } from '@repo/dataforge/column-configurations'
 import type { Task } from '@repo/dataforge/client-entities'
 
 function VibeGridFinalTasksPage() {
-  // ⚡ PERFORMANCE: Direct data access - no wrapper component overhead
+  // ⚡ PERFORMANCE: Limit data to first 20 tasks to reduce table processing overhead
   const tasks = useSelector(tasksAtom, (tasksRecord) => {
     if (!tasksRecord || typeof tasksRecord !== 'object') return []
-    return Object.values(tasksRecord)
+    return Object.values(tasksRecord).slice(0, 20) // Only process 20 tasks instead of 85
   }, shallowEqual)
 
   const projects = useSelector(projectsAtom, (projectsRecord) => {
