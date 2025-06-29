@@ -201,63 +201,9 @@ const createUniversalAutoFocus = (
 }
 
 // ============================================================================
-// Consolidated Cell State Management Hooks
+// Removed: Complex state management hooks for performance
+// Now using simple React.useState directly in component
 // ============================================================================
-
-// Simple optimistic value management - no complex clearing needed
-const useOptimisticValue = (atomValue: any) => {
-  const [optimistic, setOptimistic] = React.useState<any>(null)
-  const [hasOptimistic, setHasOptimistic] = React.useState(false)
-  
-  return {
-    value: hasOptimistic ? optimistic : atomValue,
-    setOptimistic: (val: any) => {
-      setOptimistic(val)
-      setHasOptimistic(true)
-    },
-    clearOptimistic: () => setHasOptimistic(false)
-  }
-}
-
-// Simple editing state management
-const useEditingState = (displayValue: any, cellType: string) => {
-  // Helper to format value for editing
-  const formatForEdit = React.useCallback((val: any) => {
-    if (cellType === 'relationship-single') {
-      return val?.id || ''
-    }
-    if (cellType === 'boolean') {
-      return Boolean(val)
-    }
-    if (cellType === 'text' || cellType === 'uuid' || cellType === 'json') {
-      return String(val || '')
-    }
-    return val || ''
-  }, [cellType])
-  
-  const [isEditing, setIsEditing] = React.useState(false)
-  // ✅ FIXED: Initialize editValue with current displayValue instead of empty string
-  const [editValue, setEditValue] = React.useState(() => formatForEdit(displayValue))
-  
-  // Keep editValue in sync with displayValue when not editing
-  React.useEffect(() => {
-    if (!isEditing) {
-      setEditValue(formatForEdit(displayValue))
-    }
-  }, [displayValue, isEditing, formatForEdit])
-  
-  return { 
-    isEditing, 
-    editValue, 
-    setIsEditing, 
-    setEditValue,
-    startEdit: () => {
-      const formattedValue = formatForEdit(displayValue)
-      setEditValue(formattedValue)
-      setIsEditing(true)
-    }
-  }
-}
 
 
 
@@ -594,215 +540,65 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   const isSystemField = meta?.systemField || false
   const columnId = column.columnDef.id as string
   
-  // 🔍 DEBUG: Log cell type detection for relationship columns (disabled to prevent spam)
-  if (false && (columnId === 'project' || columnId === 'assignee')) {
-    console.log(`🔍 Cell Debug [${columnId}]:`, {
-      columnId,
-      cellType,
-      meta,
-      atomValue,
-      valueType: typeof atomValue
-    })
-  }
+  // ⚡ PERFORMANCE: Minimal state - no useEffect sync overhead
+  const [isEditing, setIsEditing] = React.useState(false)
+  // Use atomValue directly when not editing, editValue only when editing
+  const [editValue, setEditValue] = React.useState('')
   
-  // Generate the simple cell class name based on type  
-  const getCellClassName = (type: string) => {
-    return `vibe-cell vibe-cell--${type}`
-  }
-  
-  // Consolidated state management
-  const optimistic = useOptimisticValue(atomValue)
-  const editing = useEditingState(optimistic.value, cellType)
-
-  // 🔍 DEBUG: DOM INSPECTION - Let's see what's actually in the DOM
-  React.useEffect(() => {
-    if (false && (columnId === 'project' || columnId === 'assignee') && cellType === 'relationship-single') {
-      const timer = setTimeout(() => {
-        // Find the cell in the DOM
-        const cells = document.querySelectorAll(`.vibe-cell--${cellType}`)
-        cells.forEach((cell, index) => {
-          if (cell.textContent?.includes('Test User') || cell.textContent?.includes('Test Project')) {
-            console.log(`🔍 DOM INSPECTION [${columnId}] Cell ${index}:`)
-            console.log('📍 Cell element:', cell)
-            console.log('📍 Cell innerHTML:', cell.innerHTML)
-            console.log('📍 Cell classes:', cell.className)
-            
-            // 📏 WIDTH MEASUREMENTS
-            const cellRect = cell.getBoundingClientRect()
-            const tableCellParent = cell.closest('td')
-            const tableCellRect = tableCellParent?.getBoundingClientRect()
-            console.log('📏 WIDTH MEASUREMENTS:', {
-              cellWidth: cellRect.width,
-              cellHeight: cellRect.height,
-              tableCellWidth: tableCellRect?.width,
-              tableCellHeight: tableCellRect?.height,
-              screenWidth: window.innerWidth,
-              availableSpace: tableCellRect?.width || 0
-            })
-            
-            // Check for relationship content
-            const relationshipContent = cell.querySelector('.relationship-content')
-            if (relationshipContent) {
-              console.log('📍 Relationship content:', relationshipContent)
-              console.log('📍 Relationship content classes:', relationshipContent.className)
-              
-              // 📏 RELATIONSHIP CONTENT WIDTH MEASUREMENTS
-              const contentRect = relationshipContent.getBoundingClientRect()
-              console.log('📏 RELATIONSHIP CONTENT WIDTH:', {
-                actualWidth: contentRect.width,
-                actualHeight: contentRect.height,
-                computedWidth: getComputedStyle(relationshipContent).width,
-                computedMinWidth: getComputedStyle(relationshipContent).minWidth,
-                computedMaxWidth: getComputedStyle(relationshipContent).maxWidth
-              })
-              
-              console.log('📍 Relationship content computed styles:', {
-                display: getComputedStyle(relationshipContent).display,
-                flexDirection: getComputedStyle(relationshipContent).flexDirection,
-                alignItems: getComputedStyle(relationshipContent).alignItems,
-                gap: getComputedStyle(relationshipContent).gap,
-                width: getComputedStyle(relationshipContent).width,
-                minWidth: getComputedStyle(relationshipContent).minWidth,
-                overflow: getComputedStyle(relationshipContent).overflow
-              })
-              
-              // Check relationship text
-              const relationshipText = relationshipContent.querySelector('.relationship-text')
-              if (relationshipText) {
-                console.log('📍 Relationship text:', relationshipText)
-                console.log('📍 Relationship text classes:', relationshipText.className)
-                
-                // 📏 RELATIONSHIP TEXT WIDTH MEASUREMENTS
-                const textRect = relationshipText.getBoundingClientRect()
-                const textContent = relationshipText.textContent || ''
-                console.log('📏 RELATIONSHIP TEXT WIDTH:', {
-                  actualWidth: textRect.width,
-                  actualHeight: textRect.height,
-                  textLength: textContent.length,
-                  textContent: textContent,
-                  computedWidth: getComputedStyle(relationshipText).width,
-                  computedMinWidth: getComputedStyle(relationshipText).minWidth,
-                  computedMaxWidth: getComputedStyle(relationshipText).maxWidth,
-                  isOverflowing: textRect.width < relationshipText.scrollWidth,
-                  scrollWidth: relationshipText.scrollWidth,
-                  clientWidth: relationshipText.clientWidth
-                })
-                
-                console.log('📍 Relationship text computed styles:', {
-                  flex: getComputedStyle(relationshipText).flex,
-                  minWidth: getComputedStyle(relationshipText).minWidth,
-                  overflow: getComputedStyle(relationshipText).overflow,
-                  textOverflow: getComputedStyle(relationshipText).textOverflow,
-                  whiteSpace: getComputedStyle(relationshipText).whiteSpace,
-                  wordBreak: getComputedStyle(relationshipText).wordBreak,
-                  wordWrap: getComputedStyle(relationshipText).wordWrap,
-                  width: getComputedStyle(relationshipText).width,
-                  maxWidth: getComputedStyle(relationshipText).maxWidth
-                })
-              }
-            }
-          }
-        })
-      }, 100) // Small delay to ensure DOM is updated
-      
-      return () => clearTimeout(timer)
-    }
-  }, [columnId, cellType, optimistic.value])
-  
-  // Unified save handler - works with atoms automatically
-  const handleSave = React.useCallback(async (newValue: any) => {
-    // 1. ALWAYS do optimistic update for instant feedback (UI concern)
-    optimistic.setOptimistic(newValue)
-    editing.setIsEditing(false)
+  // ⚡ PERFORMANCE: Simplified save handler - no callbacks or complex logic
+  const handleSave = async (newValue: any) => {
+    setIsEditing(false)
     
-    // 2. Check if actual save is needed (separate business logic concern)
-    const currentAtomValue = atomValue
+    // Check if save needed
     const normalizedNew = String(newValue || '')
-    const normalizedCurrent = String(currentAtomValue || '')
+    const normalizedCurrent = String(atomValue || '')
     
     if (normalizedNew === normalizedCurrent) {
-      // No actual change - skip save operation but keep optimistic UI
       return
     }
     
     try {
-      // 3. Trigger actual save - atom will update automatically when complete
       if (onSave) {
         await onSave(row.original.id, columnId, newValue)
       } else if (meta?.onSave) {
         await meta.onSave(newValue, row.original)
       }
-      // No manual clearing needed - atom update will make optimistic.value use real value
     } catch (error) {
       console.error('Save failed:', error)
-      // On error, clear optimistic to show real atom value
-      optimistic.clearOptimistic()
-    }
-  }, [optimistic, editing, onSave, meta?.onSave, row.original.id, columnId, atomValue])
-  
-  const handleStartEdit = React.useCallback(() => {
-    if (isSystemField || config.editable === false) return
-    editing.startEdit()
-  }, [isSystemField, config.editable, editing])
-  
-  const handleCancel = React.useCallback(() => {
-    editing.setIsEditing(false)
-  }, [editing])
-  
-  // Helper to get display text for tooltip
-  const getDisplayText = (value: any, cellType: string) => {
-    if (!value && value !== 0) return ''
-    
-    switch (cellType) {
-      case 'boolean':
-        return value ? 'Yes' : 'No'
-      case 'enum':
-        return config.enumValues?.[value] || value
-      case 'date':
-        if (!value) return ''
-        const date = new Date(value)
-        return config.showTime ? date.toLocaleString() : date.toLocaleDateString()
-      case 'uuid':
-        return String(value)
-      case 'json':
-        return JSON.stringify(value)
-      case 'relationship-single':
-        const displayField = relationshipData[columnId]?.displayField || 'name'
-        return value?.[displayField] || value?.name || value?.id || ''
-      case 'relationship-multi':
-        if (!Array.isArray(value) || value.length === 0) return ''
-        const multiDisplayField = relationshipData[columnId]?.displayField || 'name'
-        return value.map(item => item[multiDisplayField] || item.name || item.id).join(', ')
-      case 'text':
-      case 'number':
-      default:
-        return String(value)
     }
   }
   
-  const displayText = getDisplayText(optimistic.value, cellType)
+  // ⚡ PERFORMANCE: Simplified start edit - set edit value on start
+  const handleStartEdit = () => {
+    if (isSystemField || config.editable === false) return
+    setEditValue(atomValue) // Set edit value from current atom value
+    setIsEditing(true)
+  }
+  
+  // ⚡ PERFORMANCE: Simplified cancel - no callbacks
+  const handleCancel = () => {
+    setIsEditing(false)
+  }
+  
+  // ⚡ PERFORMANCE: Removed complex tooltip generation - major performance bottleneck removed
   
   // Determine which cell types need overlays vs content replacement
   const needsOverlay = ['enum', 'relationship-single', 'relationship-multi', 'boolean', 'date'].includes(cellType)
   
-  // Generate cursor class based on actual cell behavior
-  const getCursorClass = () => {
-    if (isSystemField || config.editable === false) {
-      return 'cursor-default'
-    }
-    // Overlay editing cells (dropdowns, pickers) use pointer cursor
-    return needsOverlay ? 'cursor-pointer' : 'cursor-text'
-  }
+  // ⚡ PERFORMANCE: Simplified cursor class - no function call overhead
+  const cursorClass = isSystemField || config.editable === false 
+    ? 'cursor-default' 
+    : needsOverlay ? 'cursor-pointer' : 'cursor-text'
   
   // For text-like types: replace content entirely when editing  
-  if (editing.isEditing && config.editable !== false && !isSystemField && !needsOverlay) {
+  if (isEditing && config.editable !== false && !isSystemField && !needsOverlay) {
     return (
-      <div className={`${getCellClassName(cellType)} ${getCursorClass()}`}>
+      <div className={`vibe-grid-cell ${cursorClass}`}>
         <UniversalInput
           cellType={cellType}
           config={config}
-          value={editing.editValue}
-          onChange={editing.setEditValue}
+          value={isEditing ? editValue : atomValue}
+          onChange={setEditValue}
           onSave={handleSave}
           onCancel={handleCancel}
           relationshipData={relationshipData}
@@ -815,21 +611,13 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   // Render display UI (always visible)
   return (
     <div 
-      className={`${getCellClassName(cellType)} ${getCursorClass()}`}
+      className={`vibe-grid-cell ${cursorClass}`}
       onClick={handleStartEdit}
-      title={
-        displayText
-          ? `${displayText}${(config.editable !== false && !isSystemField) ? ' (Click to edit)' : isSystemField ? ' (System field - read-only)' : ' (Read-only)'}`
-          : (config.editable !== false && !isSystemField) 
-            ? "Click to edit" 
-            : isSystemField 
-              ? "System field (read-only)" 
-              : "Read-only field"
-      }
+      title={isSystemField ? "System field (read-only)" : config.editable === false ? "Read-only field" : "Click to edit"}
     >
       {/* Always show display content */}
       <CellDisplay
-        value={optimistic.value}
+        value={atomValue}
         cellType={cellType}
         config={config}
         relationshipData={relationshipData}
@@ -837,7 +625,7 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
       />
       
       {/* For overlay types: show edit component over display content */}
-      {editing.isEditing && config.editable !== false && !isSystemField && needsOverlay && (
+      {isEditing && config.editable !== false && !isSystemField && needsOverlay && (
         <div style={{ 
           position: 'absolute', 
           top: 0, 
@@ -851,8 +639,8 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
           <UniversalInput
             cellType={cellType}
             config={config}
-            value={editing.editValue}
-            onChange={editing.setEditValue}
+            value={isEditing ? editValue : atomValue}
+            onChange={setEditValue}
             onSave={handleSave}
             onCancel={handleCancel}
             relationshipData={relationshipData}
