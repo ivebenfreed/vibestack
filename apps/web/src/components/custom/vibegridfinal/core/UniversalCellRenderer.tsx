@@ -425,30 +425,34 @@ const CellDisplay = ({ value, cellType, config, relationshipData = {}, columnId 
         )
       }
       
-      const date = new Date(value)
-      if (isNaN(date.getTime())) {
+      // ⚡ PERFORMANCE: Simplified date display - avoid expensive formatting
+      try {
+        const date = new Date(value)
+        if (isNaN(date.getTime())) {
+          return (
+            <div className="flex items-center justify-center">
+              <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+            </div>
+          )
+        }
+        
+        // ⚡ PERFORMANCE: Use simple toLocaleDateString instead of date-fns format
+        const displayText = date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: date.getFullYear() === new Date().getFullYear() ? undefined : '2-digit'
+        })
+        
+        return (
+          <span className="text-sm">{displayText}</span>
+        )
+      } catch {
         return (
           <div className="flex items-center justify-center">
             <CalendarIcon className="h-3 w-3 text-muted-foreground" />
           </div>
         )
       }
-      
-      const currentYear = new Date().getFullYear()
-      const dateYear = date.getFullYear()
-      
-      let displayText: string
-      if (dateYear === currentYear) {
-        // Current year: "Jun 17" format (3-letter month + day)
-        displayText = format(date, 'MMM d')
-      } else {
-        // Previous years: "dd/mm/yy" format
-        displayText = format(date, 'dd/MM/yy')
-      }
-      
-      return (
-        <span className="text-sm">{displayText}</span>
-      )
 
     case 'uuid':
       return (
@@ -459,9 +463,15 @@ const CellDisplay = ({ value, cellType, config, relationshipData = {}, columnId 
 
     case 'json':
       if (!value) return <span className="display-text">-</span>
+      // ⚡ PERFORMANCE: Simplified JSON display to avoid expensive stringify on large objects
+      const jsonDisplay = typeof value === 'object' 
+        ? Array.isArray(value) 
+          ? `[${value.length} items]`
+          : `{${Object.keys(value).length} props}`
+        : String(value)
       return (
         <span className="display-text">
-          {JSON.stringify(value)}
+          {jsonDisplay}
         </span>
       )
 
@@ -540,22 +550,31 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
   const isSystemField = meta?.systemField || false
   const columnId = column.columnDef.id as string
   
-  // ⚡ PERFORMANCE: Minimal state - no useEffect sync overhead
+  // ⚡ PERFORMANCE: Minimal state - only for editing
   const [isEditing, setIsEditing] = React.useState(false)
-  // Use atomValue directly when not editing, editValue only when editing
   const [editValue, setEditValue] = React.useState('')
   
-  // ⚡ PERFORMANCE: Simplified save handler - no callbacks or complex logic
+  // ⚡ PERFORMANCE: For read-only display, skip all event handler creation
+  if (isSystemField || config.editable === false) {
+    return (
+      <div className="vibe-grid-cell cursor-default" title="Read-only field">
+        <CellDisplay
+          value={atomValue}
+          cellType={cellType}
+          config={config}
+          relationshipData={relationshipData}
+          columnId={columnId}
+        />
+      </div>
+    )
+  }
+  
+  // Only create handlers for editable cells
   const handleSave = async (newValue: any) => {
     setIsEditing(false)
-    
-    // Check if save needed
     const normalizedNew = String(newValue || '')
     const normalizedCurrent = String(atomValue || '')
-    
-    if (normalizedNew === normalizedCurrent) {
-      return
-    }
+    if (normalizedNew === normalizedCurrent) return
     
     try {
       if (onSave) {
@@ -568,27 +587,18 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
     }
   }
   
-  // ⚡ PERFORMANCE: Simplified start edit - set edit value on start
   const handleStartEdit = () => {
-    if (isSystemField || config.editable === false) return
-    setEditValue(atomValue) // Set edit value from current atom value
+    setEditValue(atomValue)
     setIsEditing(true)
   }
   
-  // ⚡ PERFORMANCE: Simplified cancel - no callbacks
   const handleCancel = () => {
     setIsEditing(false)
   }
   
-  // ⚡ PERFORMANCE: Removed complex tooltip generation - major performance bottleneck removed
-  
-  // Determine which cell types need overlays vs content replacement
+  // ⚡ PERFORMANCE: Simplified overlay detection and cursor class
   const needsOverlay = ['enum', 'relationship-single', 'relationship-multi', 'boolean', 'date'].includes(cellType)
-  
-  // ⚡ PERFORMANCE: Simplified cursor class - no function call overhead
-  const cursorClass = isSystemField || config.editable === false 
-    ? 'cursor-default' 
-    : needsOverlay ? 'cursor-pointer' : 'cursor-text'
+  const cursorClass = needsOverlay ? 'cursor-pointer' : 'cursor-text'
   
   // For text-like types: replace content entirely when editing  
   if (isEditing && config.editable !== false && !isSystemField && !needsOverlay) {
@@ -613,7 +623,7 @@ export const UniversalCellRenderer = <TEntity extends BaseEntity>({
     <div 
       className={`vibe-grid-cell ${cursorClass}`}
       onClick={handleStartEdit}
-      title={isSystemField ? "System field (read-only)" : config.editable === false ? "Read-only field" : "Click to edit"}
+      title="Click to edit"
     >
       {/* Always show display content */}
       <CellDisplay

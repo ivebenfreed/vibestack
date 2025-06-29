@@ -69,29 +69,22 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
   // ✅ UNIVERSAL REACTIVE DATA PATTERN: Route loader pre-populates atoms
   // Component just reads from XState stores - no loading logic needed
 
-  // ✅ FIXED: Balanced surgical selector - detects both structural AND content changes
+  // ⚡ PERFORMANCE: Optimized selector - simple array conversion without expensive sorting
   const tasks = useSelector(tasksAtom, (tasksRecord) => {
     if (!tasksRecord || typeof tasksRecord !== 'object') return []
-    
-    // Return tasks array sorted by updated timestamp (most recent first)
-    // This will change when tasks are added/removed OR when individual fields update
-    const tasksArray = Object.values(tasksRecord)
-    return tasksArray.sort((a, b) => {
-      const aTime = new Date(a.updatedAt || a.createdAt).getTime()
-      const bTime = new Date(b.updatedAt || b.createdAt).getTime()
-      return bTime - aTime // Latest first
-    })
-  }, shallowEqual) // shallowEqual will properly detect array content changes
+    // Remove expensive sorting - let TanStack Table handle sorting
+    return Object.values(tasksRecord)
+  }, shallowEqual)
 
-  // Get relationship data for dropdowns - ✅ FIXED: Use balanced selectors
+  // ⚡ PERFORMANCE: Optimized selector - remove expensive sorting
   const projects = useSelector(projectsAtom, (projectsRecord) => {
     if (!projectsRecord || typeof projectsRecord !== 'object') return []
-    return Object.values(projectsRecord).sort((a, b) => a.name.localeCompare(b.name))
+    return Object.values(projectsRecord) // Remove sorting - users can sort dropdown if needed
   }, shallowEqual)
 
   const users = useSelector(usersAtom, (usersRecord) => {
     if (!usersRecord || typeof usersRecord !== 'object') return []
-    return Object.values(usersRecord).sort((a, b) => a.name.localeCompare(b.name))
+    return Object.values(usersRecord) // Remove sorting - users can sort dropdown if needed
   }, shallowEqual)
 
   // ============================================================================
