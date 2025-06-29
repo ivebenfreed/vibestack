@@ -12,11 +12,17 @@ import { projectsAtom, projectUtils } from './project';
 import { usersAtom, userUtils } from './user';
 import { commentsAtom, commentUtils } from './comment';
 
-// Check functions - synchronous, zero overhead
-export const areTasksLoaded = () => Object.keys(tasksAtom.get()).length > 0;
-export const areProjectsLoaded = () => Object.keys(projectsAtom.get()).length > 0;
-export const areUsersLoaded = () => Object.keys(usersAtom.get()).length > 0;
-export const areCommentsLoaded = () => Object.keys(commentsAtom.get()).length > 0;
+// ⚡ PERFORMANCE: Cached loaded state to avoid expensive atom reads
+let _tasksLoaded = false;
+let _projectsLoaded = false;
+let _usersLoaded = false;
+let _commentsLoaded = false;
+
+// Check functions - truly zero overhead with caching
+export const areTasksLoaded = () => _tasksLoaded || (_tasksLoaded = Object.keys(tasksAtom.get()).length > 0);
+export const areProjectsLoaded = () => _projectsLoaded || (_projectsLoaded = Object.keys(projectsAtom.get()).length > 0);
+export const areUsersLoaded = () => _usersLoaded || (_usersLoaded = Object.keys(usersAtom.get()).length > 0);
+export const areCommentsLoaded = () => _commentsLoaded || (_commentsLoaded = Object.keys(commentsAtom.get()).length > 0);
 
 export const areAllDomainsLoaded = () => 
   areTasksLoaded() && areProjectsLoaded() && areUsersLoaded() && areCommentsLoaded();
@@ -65,40 +71,44 @@ export function createOptimizedLoader(domains: Array<'tasks' | 'projects' | 'use
 
 // Direct ensureLoaded functions for each domain - minimal overhead
 export const ensureTasksLoaded = async () => {
-  if (Object.keys(tasksAtom.get()).length === 0) {
+  if (!_tasksLoaded && Object.keys(tasksAtom.get()).length === 0) {
     const dataSource = await getGlobalDataSource();
     const tasks = await dataSource.getRepository(Task).find({
       relations: ['project', 'assignee']
     });
     taskUtils.loadTasks(tasks);
+    _tasksLoaded = true;
   }
 };
 
 export const ensureProjectsLoaded = async () => {
-  if (Object.keys(projectsAtom.get()).length === 0) {
+  if (!_projectsLoaded && Object.keys(projectsAtom.get()).length === 0) {
     const dataSource = await getGlobalDataSource();
     const projects = await dataSource.getRepository(Project).find({
       relations: ['owner', 'members']
     });
     projectUtils.loadProjects(projects);
+    _projectsLoaded = true;
   }
 };
 
 export const ensureUsersLoaded = async () => {
-  if (Object.keys(usersAtom.get()).length === 0) {
+  if (!_usersLoaded && Object.keys(usersAtom.get()).length === 0) {
     const dataSource = await getGlobalDataSource();
     const users = await dataSource.getRepository(User).find();
     userUtils.loadUsers(users);
+    _usersLoaded = true;
   }
 };
 
 export const ensureCommentsLoaded = async () => {
-  if (Object.keys(commentsAtom.get()).length === 0) {
+  if (!_commentsLoaded && Object.keys(commentsAtom.get()).length === 0) {
     const dataSource = await getGlobalDataSource();
     const comments = await dataSource.getRepository(Comment).find({
       relations: ['author', 'task', 'project', 'parent']
     });
     commentUtils.loadComments(comments);
+    _commentsLoaded = true;
   }
 };
 
