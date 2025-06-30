@@ -372,6 +372,134 @@ function generateBusinessLogicFunctions(entityMetadata: EntityMetadata): string 
 }
 
 /**
+ * Generate many-to-many relationship handling code
+ */
+function generateManyToManyHandling(entityMetadata: EntityMetadata): string {
+    const { name: entityName, fields } = entityMetadata;
+    const lowerEntityName = entityName.toLowerCase();
+    
+    // Debug: Log all fields to understand the structure
+    console.log(`\n=== DEBUG: ${entityName} Fields ===`);
+    fields.forEach(field => {
+        console.log(`Field: ${field.name}`);
+        console.log(`  Category: ${field.category}`);
+        console.log(`  Type: ${field.type}`);
+        console.log(`  Business Logic:`, field.businessLogic);
+        if (field.type.includes('[]')) {
+            console.log(`  *** ARRAY TYPE DETECTED ***`);
+        }
+    });
+    console.log(`=== END DEBUG ===\n`);
+    
+    // Find many-to-many relationship fields
+    const manyToManyFields = fields.filter(field => 
+        field.category === 'relationship-entity' && 
+        field.isArray === true &&
+        field.businessLogic.some(rule => rule.type === 'foreignKey' && rule.config?.relationshipType === 'many-to-many')
+    );
+    
+    console.log(`Found ${manyToManyFields.length} many-to-many fields:`, manyToManyFields.map(f => f.name));
+    
+    if (manyToManyFields.length === 0) {
+        return `// Update all fields using regular update
+    await ${lowerEntityName}Repo.update(${lowerEntityName}Id, updates);`;
+    }
+    
+    const manyToManyFieldNames = manyToManyFields.map(f => f.name);
+    
+    // Handle variable name conflicts with function parameters (like 'dependencies')
+    const destructureFields = manyToManyFieldNames.map(fieldName => {
+        // Rename 'dependencies' to avoid conflict with function parameter
+        if (fieldName === 'dependencies') {
+            return `dependencies: ${fieldName}Field`;
+        }
+        return fieldName;
+    }).join(', ');
+    
+    return `// Separate many-to-many relationships from regular fields
+    const { ${destructureFields}, ...regularUpdates } = updates as any;
+    
+    // Update regular fields if any
+    if (Object.keys(regularUpdates).length > 0) {
+      await ${lowerEntityName}Repo.update(${lowerEntityName}Id, regularUpdates);
+    }
+    
+    // Handle many-to-many relationships using direct junction table manipulation
+    ${manyToManyFields.map(field => {
+        const variableName = field.name === 'dependencies' ? `${field.name}Field` : field.name;
+        
+        // Hardcoded junction table details for known relationships
+        let junctionTable, entityColumn, relatedColumn;
+        if (entityName === 'Project' && field.name === 'members') {
+          junctionTable = 'project_members';
+          entityColumn = 'project_id';
+          relatedColumn = 'user_id';
+        } else if (entityName === 'User' && field.name === 'memberProjects') {
+          junctionTable = 'project_members';
+          entityColumn = 'user_id';
+          relatedColumn = 'project_id';
+        } else if (entityName === 'Task' && field.name === 'dependencies') {
+          junctionTable = 'task_dependencies';
+          entityColumn = 'task_id';
+          relatedColumn = 'dependency_id';
+        } else {
+          // Default naming convention
+          junctionTable = `${entityMetadata.tableName}_${field.name}`;
+          entityColumn = `${lowerEntityName}_id`;
+          relatedColumn = `${field.name}_id`;
+        }
+        
+        return `
+    if (${variableName} !== undefined) {
+      // Clear existing relations first
+      await ${lowerEntityName}Repo
+        .createQueryBuilder()
+        .delete()
+        .from('${junctionTable}')
+        .where('${entityColumn} = :${lowerEntityName}Id', { ${lowerEntityName}Id })
+        .execute();
+      
+      // Add new relations if any
+      if (${variableName} && ${variableName}.length > 0) {
+        const relatedIds = ${variableName}.map((item: any) => 
+          typeof item === 'string' ? item : item.id
+        );
+        
+        // Insert new relations directly
+        const values = relatedIds.map((relatedId: string) => ({ 
+          ${entityColumn}: ${lowerEntityName}Id, 
+          ${relatedColumn}: relatedId 
+        }));
+        await ${lowerEntityName}Repo
+          .createQueryBuilder()
+          .insert()
+          .into('${junctionTable}')
+          .values(values)
+          .execute();
+      }
+    }`;
+    }).join('')}`;
+}
+
+/**
+ * Generate relations loading for findOne queries
+ */
+function generateRelationsLoad(entityMetadata: EntityMetadata): string {
+    const { fields } = entityMetadata;
+    
+    // Find all relationship fields
+    const relationshipFields = fields.filter(field => field.category === 'relationship-entity');
+    
+    if (relationshipFields.length === 0) {
+        return '';
+    }
+    
+    const relationNames = relationshipFields.map(f => `'${f.name}'`).join(', ');
+    return `,
+      relations: [${relationNames}]`;
+}
+
+/**
  * Generate enhanced UI operations that use validation and business logic
  */
 function generateEnhancedUIOperations(entityMetadata: EntityMetadata): string {
@@ -493,11 +621,13 @@ export async function update${entityName}UI(
     // 2. DATABASE: Update database in background
     const ${lowerEntityName}Repo = dependencies.dataSource.getRepository(dependencies.EntityClass);
     
-    // Only update user-editable fields (exclude TypeORM-managed fields)
-    const dbUpdateData = { ...updates };
+    // Separate many-to-many relationships from regular fields
+    ${generateManyToManyHandling(entityMetadata)}
     
-    await ${lowerEntityName}Repo.update(${lowerEntityName}Id, dbUpdateData);
-    const updated${entityName} = await ${lowerEntityName}Repo.findOne({ where: { id: ${lowerEntityName}Id } });
+    // Load the updated entity without problematic relations to avoid createQueryBuilder issues
+    const updated${entityName} = await ${lowerEntityName}Repo.findOne({ 
+      where: { id: ${lowerEntityName}Id }
+    });
     
     if (!updated${entityName}) {
       throw new Error(\`${entityName} \${${lowerEntityName}Id} not found after database update\`);
