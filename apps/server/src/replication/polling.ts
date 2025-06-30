@@ -58,7 +58,7 @@ export class PollingManager {
       }
       
       this.pollCounter = 0;
-      replicationLogger.info('Starting polling process', {}, MODULE_NAME);
+      replicationLogger.debug('Starting polling process', {}, MODULE_NAME);
       
       this.startContinuousPolling();
       this.hasCompletedFirstPoll = true; // Set flag after polling actually starts
@@ -90,7 +90,7 @@ export class PollingManager {
       }
       
       this.pollCounter = 0;
-      replicationLogger.info('Starting polling process with first poll results', {}, MODULE_NAME);
+      replicationLogger.debug('Starting polling process with first poll results', {}, MODULE_NAME);
       
       // Perform the first poll immediately and capture results
       const firstPollResults = await this.performFirstPollAndGetResults();
@@ -126,7 +126,7 @@ export class PollingManager {
   }> {
     // Use the same polling lock as continuous polling to prevent conflicts
     if (this.isPolling) {
-      replicationLogger.debug('First poll skipped - polling already in progress', {}, MODULE_NAME);
+      replicationLogger.info('First poll skipped - polling already in progress', {}, MODULE_NAME);
       return {
         success: true,
         changesFound: false,
@@ -139,9 +139,20 @@ export class PollingManager {
     this.isPolling = true;
     
     try {
+      const currentLSN = await this.stateManager.getLSN();
+      replicationLogger.info('First poll starting with LSN details', {
+        currentStoredLSN: currentLSN,
+        slot: this.config.slot,
+        batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
+      }, MODULE_NAME);
+      
       const changes = await this.pollForChanges();
       
       if (!changes || changes.length === 0) {
+        replicationLogger.info('First poll completed - no changes found', {
+          currentStoredLSN: currentLSN,
+          slot: this.config.slot
+        }, MODULE_NAME);
         return {
           success: true,
           changesFound: false,
@@ -187,7 +198,7 @@ export class PollingManager {
       this.pollingInterval = null;
       this.pollCounter = 0;
       this.hasCompletedFirstPoll = false;
-      replicationLogger.info('Polling stopped', {}, MODULE_NAME);
+      replicationLogger.debug('Polling stopped', {}, MODULE_NAME);
     }
   }
 
@@ -241,7 +252,7 @@ export class PollingManager {
           
           // Remove redundant parsing - this is already done in processChanges
           // Let processChanges handle the actual parsing and counting
-          replicationLogger.info('WAL changes found', {
+          replicationLogger.debug('WAL changes found', {
             walEntries: changes.length,
             lsnRange: {
               first: firstLSN,
