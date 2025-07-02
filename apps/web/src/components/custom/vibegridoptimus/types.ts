@@ -1,5 +1,6 @@
 import type { ColumnDef } from '@tanstack/react-table'
 import type { Column as RDGColumn, SortColumn, CellSelectArgs } from 'react-data-grid'
+import type { EntityName } from './core/EntityRegistry'
 
 // Import actual DataForge entities to derive base type
 import type { Project, Task, User, Comment } from '@repo/dataforge/client-entities'
@@ -11,50 +12,35 @@ type BaseEntityKeys = keyof Project & keyof Task & keyof User & keyof Comment
 export type BaseEntity = Pick<DataForgeEntity, BaseEntityKeys>
 
 /**
- * VibeGridOptimus component props - leverages DataForge generated types
+ * VibeGridOptimus component props - Clean declarative API
+ * Maximum 9 props for simplicity
  */
-export interface VibeGridOptimusProps<TEntity extends BaseEntity> {
-  // Data - uses DataForge entities and columns
-  data: TEntity[]
-  columns: Record<keyof TEntity, ColumnDef<TEntity>>
+export interface VibeGridOptimusProps {
+  /** Entity name for automatic configuration */
+  entityName: EntityName
   
-  // Event handlers
-  onUpdate?: (id: string, updates: Partial<TEntity>) => Promise<void>
-  onBatchUpdate?: (batchUpdates: Array<{ id: string; updates: Partial<TEntity> }>) => Promise<void>
-  onDelete?: (id: string) => Promise<void>
-  onRowClick?: (row: TEntity) => void
+  /** Entity data array */
+  data: any[]
   
-  // Grid configuration
-  sortColumns?: readonly SortColumn[]
-  onSortColumnsChange?: (sortColumns: readonly SortColumn[]) => void
-  selectedRows?: Set<string>
-  onSelectedRowsChange?: (selectedRows: Set<string>) => void
-  selectedCells?: readonly [number, number] | null
-  onSelectedCellsChange?: (args: CellSelectArgs<TEntity>) => void
+  /** Save handler for cell edits */
+  onSave?: (id: string, column: string, value: any) => Promise<void>
   
-  // UI configuration
-  height?: number | string
+  /** Optional height override */
+  height?: string | number
+  
+  /** Theme support */
   theme?: 'light' | 'dark'
-  enableVirtualization?: boolean
-  enableRowSelection?: boolean
-  enableSorting?: boolean
-  enableFiltering?: boolean
   
-  // Customization
-  hiddenColumns?: (keyof TEntity)[]
-  columnOrder?: (keyof TEntity)[]
+  /** Additional CSS classes */
+  className?: string
   
-  // Loading states
+  /** Loading state */
   isLoading?: boolean
+  
+  /** Error state */
   error?: string | null
   
-  // Additional features
-  toolbar?: React.ReactNode
-  footer?: React.ReactNode
-  emptyState?: React.ReactNode
-  
-  // CSS classes
-  className?: string
+  /** Optional style overrides */
   style?: React.CSSProperties
 }
 

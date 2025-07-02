@@ -56,7 +56,12 @@ export function NumberEditor<TEntity extends BaseEntity>({
       min={config.numberMin}
       max={config.numberMax}
       step={config.step || 'any'}
-      className="w-full h-full border-0 outline-0 px-2 bg-transparent text-foreground focus:bg-background"
+      className="w-full h-full border-0 outline-0 bg-transparent text-foreground focus:bg-background text-sm"
+      style={{ 
+        padding: '0',
+        margin: '0',
+        lineHeight: '1.4'
+      }}
       autoFocus
     />
   )
