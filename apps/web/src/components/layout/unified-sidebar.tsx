@@ -427,6 +427,8 @@ function TasksNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   const taskItems = [
     { label: 'All Tasks', href: '/tasks' },
     { label: 'Kanban View', href: '/tasks/kanban' },
+    { label: 'Timeline View', href: '/tasks/timeline' },
+    { label: 'VibeGrid2 Demo', href: '/tasks/vibegrid2-demo' },
   ]
   
   return (
@@ -509,7 +511,10 @@ function DebugNavigation({ isCollapsed }: { isCollapsed: boolean }) {
         { label: 'Sync Test', href: '/debug/sync-test' },
         { label: 'Database', href: '/debug/database' },
         { label: 'Integrity', href: '/debug/integrity' },
-        { label: 'VibeGridFinal', href: '/debug/vibegridfinal-tasks' },
+        { label: 'VibeGridFinal Demo', href: '/debug/vibegridfinal-demo' },
+        { label: 'VibeGridFinal Test', href: '/debug/vibegridfinal-test' },
+        { label: 'VibeGrid2 Features Test', href: '/debug/grid-pure-projects' },
+        { label: 'VibeGridOptimus Test', href: '/debug/grid-optimus-projects' },
         { label: 'Kanban Debug', href: '/debug/kanban' },
         { label: 'React Flow Positioning', href: '/debug/reactflow-positioning' },
       ]
