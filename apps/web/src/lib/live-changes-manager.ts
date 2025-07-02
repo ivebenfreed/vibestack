@@ -358,20 +358,22 @@ class LiveChangesManager {
 
   /**
    * Get relations to include when fetching entity data
-   * TODO: This could be made configurable per entity
+   * Uses the same relations as initial loading for consistency
    */
   private getEntityRelations(entity: any): string[] {
-    // For now, include common relations
-    // This could be made configurable in EntityConfig in the future
     const entityName = entity.name?.toLowerCase()
     
+    // Use the same relations as initial loading in ensure-loaded.ts
+    // This ensures live changes and initial loading are consistent
     switch (entityName) {
       case 'task':
-        return ['project', 'assignee']
+        return ['project', 'assignee'] // Matches ensureTasksLoaded
       case 'project':
-        return ['owner']
+        return ['owner', 'members'] // Matches ensureProjectsLoaded - FIXED: was missing 'members'
       case 'comment':
-        return ['author', 'task', 'project']
+        return ['author', 'task', 'project'] // Matches ensureCommentsLoaded
+      case 'user':
+        return [] // Matches ensureUsersLoaded (no relations)
       default:
         return []
     }
