@@ -9,7 +9,7 @@ interface EnumEditorProps<TEntity extends BaseEntity> {
   column: OptimusColumn<TEntity>
   onRowChange: (row: TEntity) => void
   onClose: (commitChanges?: boolean) => void
-  onUpdate?: (id: string, changes: Record<string, any>) => Promise<void>
+  onUpdate?: (id: string, column: string, value: any) => Promise<void>
 }
 
 /**
@@ -65,7 +65,7 @@ export function EnumEditor<TEntity extends BaseEntity>({
     
     onRowChange(updatedRow)
     // Use centralized immediate commit with new value
-    behavior.handleImmediateCommit(newValue)
+    behavior.handleCommitWithSave(newValue)
   }
   
   // Get available options from enum values

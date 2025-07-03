@@ -9,7 +9,7 @@ interface SingleRelationshipEditorProps<TEntity extends BaseEntity> {
   column: OptimusColumn<TEntity>
   onRowChange: (row: TEntity) => void
   onClose: (commitChanges?: boolean) => void
-  onUpdate?: (id: string, changes: Record<string, any>) => Promise<void>
+  onUpdate?: (id: string, column: string, value: any) => Promise<void>
 }
 
 /**
@@ -63,7 +63,7 @@ export function SingleRelationshipEditor<TEntity extends BaseEntity>({
     
     // For immediate commit mode, let persistence handle the update
     // Don't call onRowChange as it can conflict with atom-based state
-    behavior.handleImmediateCommit(newValue)
+    behavior.handleCommitWithSave(newValue)
   }
   
   // Get appropriate placeholder

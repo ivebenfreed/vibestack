@@ -8,6 +8,7 @@ interface TextEditorProps<TEntity extends BaseEntity> {
   column: OptimusColumn<TEntity>
   onRowChange: (row: TEntity) => void
   onClose: (commitChanges?: boolean) => void
+  onUpdate?: (id: string, column: string, value: any) => Promise<void>
 }
 
 /**
@@ -18,8 +19,10 @@ export function TextEditor<TEntity extends BaseEntity>({
   row,
   column,
   onRowChange,
-  onClose
+  onClose,
+  onUpdate
 }: TextEditorProps<TEntity>) {
+  console.log('[TextEditor] Editor created with initial value:', row[column.key])
   const initialValue = row[column.key] || ''
   const [currentValue, setCurrentValue] = React.useState(String(initialValue))
   const config = column.config || {}
@@ -27,26 +30,49 @@ export function TextEditor<TEntity extends BaseEntity>({
   // Use centralized editor behavior
   const behavior = useEditorBehavior({
     config: EDITOR_BEHAVIORS.text,
-    onCommit: () => {
+    onCommit: (value?: any) => {
+      const valueToCommit = value !== undefined ? value : currentValue
+      console.log('[TextEditor] 💾 Committing value:', valueToCommit)
       // Apply changes and close
-      onRowChange({
+      const updatedRow = {
         ...row,
-        [column.key]: currentValue
-      } as TEntity)
+        [column.key]: valueToCommit
+      } as TEntity
+      onRowChange(updatedRow)
       onClose(true)
     },
-    onCancel: () => onClose(false),
+    onCancel: () => {
+      console.log('[TextEditor] ❌ Cancelling edit')
+      onClose(false)
+    },
+    onUpdate,
+    rowId: row.id as string,
+    fieldKey: column.key as string,
     initialValue,
     currentValue
   })
   
   const handleChange = (newValue: string) => {
     setCurrentValue(newValue)
-    // For text inputs, we update the row immediately for live feedback
-    onRowChange({
-      ...row,
-      [column.key]: newValue
-    } as TEntity)
+    // Don't update row on every keystroke - only on commit
+    // This prevents excessive re-renders
+  }
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle Enter key specifically for immediate commit
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Trigger immediate commit if onUpdate is available
+      if (onUpdate) {
+        behavior.handleCommitWithSave(currentValue)
+      } else {
+        behavior.handleKeyDown(e)
+      }
+      return
+    }
+    
+    // Handle other keys with centralized behavior
+    behavior.handleKeyDown(e)
   }
   
   return (
@@ -54,8 +80,15 @@ export function TextEditor<TEntity extends BaseEntity>({
       type={config.inputType || 'text'}
       value={currentValue}
       onChange={(e) => handleChange(e.target.value)}
-      onBlur={behavior.handleBlur}
-      onKeyDown={behavior.handleKeyDown}
+      onBlur={() => {
+        console.log('[TextEditor] 🔄 onBlur triggered with value:', currentValue)
+        if (onUpdate) {
+          behavior.handleCommitWithSave(currentValue)
+        } else {
+          behavior.handleBlur()
+        }
+      }}
+      onKeyDown={handleKeyDown}
       placeholder={config.placeholder || 'Enter text...'}
       maxLength={config.maxLength}
       className="w-full h-full border-0 outline-0 bg-transparent text-foreground focus:bg-background text-sm"

@@ -9,7 +9,7 @@ interface UseEditorBehaviorProps {
   config: EditorBehaviorConfig
   onCommit: (value?: any) => void
   onCancel: () => void
-  onUpdate?: (id: string, changes: Record<string, any>) => Promise<void>
+  onUpdate?: (id: string, column: string, value: any) => Promise<void>
   rowId?: string
   fieldKey?: string
   initialValue?: any
@@ -121,13 +121,14 @@ export function useEditorBehavior({
     executeAction('commit', immediateValue)
   }, [executeAction])
   
-  // Handle immediate commit for immediate mode editors
-  const handleImmediateCommit = React.useCallback(async (value: any) => {
-    // For immediate mode, trigger persistence directly
-    if (config.commitMode === 'immediate' && onUpdate && rowId && fieldKey) {
+  // Handle commit with save - triggers save handler regardless of commit mode
+  const handleCommitWithSave = React.useCallback(async (value: any) => {
+    // When explicitly called, trigger persistence directly regardless of commit mode
+    if (onUpdate && rowId && fieldKey) {
       try {
         console.log('[useEditorBehavior] 🚀 Triggering direct update:', { rowId, fieldKey, value })
-        await onUpdate(rowId, { [fieldKey]: value })
+        // Call onUpdate with correct signature: (id, column, value)
+        await onUpdate(rowId, fieldKey, value)
         console.log('[useEditorBehavior] ✅ Direct update successful')
       } catch (error) {
         console.error('[useEditorBehavior] ❌ Direct update failed:', error)
@@ -136,7 +137,7 @@ export function useEditorBehavior({
     
     // Always call the commit callback for UI updates
     onCommit(value)
-  }, [config.commitMode, onUpdate, rowId, fieldKey, onCommit])
+  }, [onUpdate, rowId, fieldKey, onCommit])
   
   // Handle cancel action
   const handleCancel = React.useCallback(() => {
@@ -158,7 +159,7 @@ export function useEditorBehavior({
     resetChanges,
     handleKeyDown,
     handleCommit,
-    handleImmediateCommit,
+    handleCommitWithSave,
     handleCancel,
     handleBlur,
     shouldPreventClose

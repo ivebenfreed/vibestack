@@ -108,7 +108,7 @@ export interface EditorBehaviorHook {
   resetChanges: () => void
   handleKeyDown: (e: React.KeyboardEvent) => void
   handleCommit: (immediateValue?: any) => void
-  handleImmediateCommit: (value: any) => void
+  handleCommitWithSave: (value: any) => void
   handleCancel: () => void
   handleBlur: () => void
   shouldPreventClose: boolean

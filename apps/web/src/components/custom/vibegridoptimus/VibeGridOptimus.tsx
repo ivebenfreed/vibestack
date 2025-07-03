@@ -44,8 +44,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Grid ref for advanced operations
   const gridRef = React.useRef<DataGridHandle>(null)
   
-  // Auto-resolve entity configuration
-  const { columns: enhancedColumns, relationshipData, configError } = useEntityConfig(entityName)
+  // Auto-resolve entity configuration including save handler
+  const { columns: enhancedColumns, relationshipData, saveHandler, configError } = useEntityConfig(entityName)
   
   // Convert enhanced columns to react-data-grid format
   const baseColumns = useColumnAdapter(enhancedColumns as any, {})
@@ -54,19 +54,22 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   const [sortColumns, setSortColumns] = React.useState<readonly import('react-data-grid').SortColumn[]>([])
   const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
   
-  // Initialize batch operations
-  const { processBatchUpdates, createBatchUpdate } = useBatchOperations({
-    onUpdate: onSave ? async (id, updates) => {
-      // Convert updates to individual column saves
-      for (const [column, value] of Object.entries(updates)) {
-        await onSave(id, column, value)
-      }
-    } : undefined,
-    onBatchUpdate: undefined
-  })
+  // Use provided onSave or automatic save handler
+  const finalSaveHandler = onSave || saveHandler
+  
+  // Initialize enhanced batch operations
+  const { processBatch, pendingUpdates, clearBatch } = useBatchOperations(finalSaveHandler)
   
   // Initialize clipboard operations
   const { copiedCell, handleCellCopy, handleCellPaste } = useClipboardOps()
+  
+  // Direct save handler for individual editor commits (bypasses batching)
+  const stableOnUpdate = React.useCallback(async (id: string, column: string, value: any) => {
+    console.log('[VibeGridOptimus] 🔄 Direct save called:', { id, column, value })
+    if (finalSaveHandler) {
+      await finalSaveHandler(id, column, value)
+    }
+  }, [finalSaveHandler])
   
   // Sort data based on current sort columns
   const sortedData = React.useMemo(() => {
@@ -156,12 +159,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
             column={column}
             onRowChange={editProps.onRowChange}
             onClose={editProps.onClose}
-            onUpdate={onSave ? async (id, updates) => {
-              // Convert batch updates to individual column saves
-              for (const [col, value] of Object.entries(updates)) {
-                await onSave(id, col, value)
-              }
-            } : undefined}
+            onUpdate={finalSaveHandler ? stableOnUpdate : undefined}
           />
         ),
         editorOptions: {
@@ -171,7 +169,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
         }
       })
     }))
-  }, [baseColumns, handleContentClick, onSave])
+  }, [baseColumns, handleContentClick, stableOnUpdate])
   
   // Debug the final columns before passing to DataGrid
   console.log('[VibeGridOptimus] Final optimusColumns for DataGrid:', optimusColumns)
@@ -269,46 +267,41 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return { ...targetRow, [columnKey]: sourceValue }
   }, [optimusColumns])
 
-  // Handle rows change for batch operations
+  // Handle rows change for enhanced batch operations
   const handleRowsChange = React.useCallback((rows: any[], { indexes }: { indexes: number[] }) => {
     if (!onSave || indexes.length === 0) return
     
-    console.log('[VibeGridOptimus] Processing', indexes.length, 'row changes')
+    console.log('[VibeGridOptimus] Processing', indexes.length, 'row changes with enhanced batching')
     
-    // Collect all changes for batch processing
-    const batchUpdates = indexes
-      .map(index => {
-        const changedRow = rows[index]
-        const originalRow = sortedData[index]
-        
-        if (!changedRow || !originalRow || changedRow === originalRow) {
-          return null
+    // Process each row change through intelligent batching
+    indexes.forEach(index => {
+      const changedRow = rows[index]
+      const originalRow = sortedData[index]
+      
+      if (!changedRow || !originalRow || changedRow === originalRow) {
+        return
+      }
+      
+      // Find what changed and batch each column update
+      Object.keys(changedRow).forEach(column => {
+        if (changedRow[column] !== originalRow[column]) {
+          processBatch(changedRow.id, column, changedRow[column]).catch(error => {
+            console.error('[VibeGridOptimus] Batch column update failed:', error)
+          })
         }
-        
-        // Find what changed
-        const changes: Record<string, any> = {}
-        Object.keys(changedRow).forEach(key => {
-          if (changedRow[key] !== originalRow[key]) {
-            changes[key] = changedRow[key]
-          }
-        })
-        
-        return Object.keys(changes).length > 0 
-          ? { id: changedRow.id, changes }
-          : null
       })
-      .filter(Boolean)
-    
-    // Process batch updates
-    if (batchUpdates.length > 0) {
-      processBatchUpdates(batchUpdates as any).catch(error => {
-        console.error('[VibeGridOptimus] Batch update failed:', error)
-      })
-    }
-  }, [sortedData, onSave, processBatchUpdates])
+    })
+  }, [sortedData, onSave, processBatch])
 
   return (
-    <div className={`${CSS_CLASSES.container} theme-${theme} ${className}`} style={style}>
+    <div className={`${CSS_CLASSES.container} theme-${theme} ${className} relative`} style={style}>
+      {/* Enhanced batch operations feedback */}
+      {pendingUpdates > 0 && (
+        <div className="absolute top-2 right-2 z-10 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+          {pendingUpdates} pending update{pendingUpdates > 1 ? 's' : ''}
+        </div>
+      )}
+      
       <div className="flex-1 border border-border rounded-lg overflow-hidden" style={{ height }}>
         <DataGrid
           ref={gridRef}
@@ -325,7 +318,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           onCellPaste={handleCellPaste}
           onRowsChange={handleRowsChange}
           className={`${theme === 'dark' ? 'rdg-dark' : 'rdg-light'} rdg-spreadsheet`}
-          style={{ height: '100%' }}
+          style={{ height }}
         />
       </div>
     </div>
