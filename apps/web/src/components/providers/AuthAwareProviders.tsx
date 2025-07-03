@@ -4,7 +4,7 @@ import { VibestackPGliteProvider } from '../../db/pglite-provider'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 // 🔥 UPDATED: Use V2 orchestrator hooks
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth } from '@/state-machines'
 
 // Auth-aware wrapper component for database and sync services
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {

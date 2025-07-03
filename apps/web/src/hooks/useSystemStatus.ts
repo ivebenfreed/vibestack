@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2'
+import { useAppInit, useSystem } from '@/state-machines'
 
 export type SystemMode = 'online' | 'offline' | 'degraded'
 

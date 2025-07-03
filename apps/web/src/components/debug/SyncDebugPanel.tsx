@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth, useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth, useAppInit, useSystem } from '@/state-machines';
 
 export function SyncDebugPanel() {
   const { isAuthenticated, user } = useAuth();

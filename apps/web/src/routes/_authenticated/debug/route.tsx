@@ -1,6 +1,6 @@
 // In apps/web/src/routes/_authenticated/debug/route.tsx
 import { createFileRoute, Outlet } from '@tanstack/react-router';
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth } from '@/state-machines';
 import { useEffect, useState, useRef } from 'react';
 
 export const Route = createFileRoute('/_authenticated/debug')({

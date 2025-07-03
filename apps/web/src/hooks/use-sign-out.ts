@@ -1,4 +1,4 @@
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth } from '@/state-machines';
 
 /**
  * Simple sign-out hook that leverages the auth machine.

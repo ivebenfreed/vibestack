@@ -2,13 +2,13 @@
 export { authMachine } from './machines/auth-machine';
 export { appInitMachine } from './machines/app-init-machine';
 
-// 🔥 NEW: Direct machine hooks (no orchestrator needed)
+// Direct machine hooks
 export { 
   useAuth, 
   useAppInit,
   useSystem,
   useSync
-} from './orchestrator-hooks-v2';
+} from './hooks';
 
 // 🔴 LEGACY: Old orchestrator (DELETED - replaced by orchestrator-v2)
 

@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth } from '@/state-machines'
 import { Route } from '../../sign-in'
 
 type UserAuthFormProps = HTMLAttributes<HTMLFormElement>

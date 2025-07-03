@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useAuth, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth, useSystem } from '@/state-machines';
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen';
 
 interface SystemReadyGuardProps {

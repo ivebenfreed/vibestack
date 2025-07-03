@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2'; // Orchestrator V2 hooks
+import { useAppInit, useSystem } from '@/state-machines'; // Orchestrator V2 hooks
 // Removed unused imports: SyncState, Badge, icons, formatDateTime, getSyncStatusVisuals
 import { Skeleton } from '@/components/ui/skeleton';
 

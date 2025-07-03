@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth, useSystem, useAppInit } from '@/state-machines/orchestrator-hooks-v2';
+import { useAuth, useSystem, useAppInit } from '@/state-machines';
 import { Loader2, Database, Shield, Wifi, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface UnifiedLoadingScreenProps {

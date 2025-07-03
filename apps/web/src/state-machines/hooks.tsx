@@ -98,52 +98,45 @@ export function useAuth() {
       authActor.send({ type: 'SIGN_OUT' });
     } else {
       console.error('[useAuth] AuthMachine actor not available');
+      // Fallback navigation
+      navigate({ to: '/sign-in', replace: true });
     }
   }, [authActor, navigate]);
 
   const refreshAuth = useMemo(() => () => {
     if (authActor) {
-      // Check if actor is still active before sending events
-      const snapshot = authActor.getSnapshot();
-      if (snapshot.status === 'stopped') {
-        console.log('[useAuth] Auth actor is stopped, skipping CHECK_AUTH event');
-        return;
-      }
-      
-      console.log('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
-      authActor.send({ type: 'CHECK_AUTH' });
+      console.log('[useAuth] Sending REFRESH_AUTH directly to AuthMachine');
+      authActor.send({ type: 'REFRESH_AUTH' });
     } else {
       console.error('[useAuth] AuthMachine actor not available');
     }
   }, [authActor]);
 
-  // Computed display properties - React Compiler will optimize these
-  const displayName = !user ? 'User' : (user.name || user.email?.split('@')[0] || 'User');
-  const initials = !user ? 'U' : (user.name || user.email?.split('@')[0] || 'User').slice(0, 2).toUpperCase();
-
+  // Computed values for display and role checking
   const userRole = user?.role || null;
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSuperAdmin = userRole === 'super_admin';
+  const canAccessDebugFeatures = isAdmin;
+  const displayName = user?.name || user?.displayName || 'User';
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
   return {
-    // State
+    // User data
     user,
     authError,
     lastActivity,
     
-    // Status
+    // State flags
     isAuthenticated,
     isSigningIn,
     isSigningOut,
     isCheckingAuth,
     
-    // User role info
+    // Role data
     userRole,
     isAdmin,
     isSuperAdmin,
-    canAccessDebugFeatures: isAdmin,
-    
-    // User display info
+    canAccessDebugFeatures,
     displayName,
     initials,
     
@@ -198,28 +191,36 @@ export function useAppInit() {
   const isStartingSync = appInitState === 'sync';
   const isStartingLiveChanges = appInitState === 'live_changes';
   const isReady = appInitState === 'ready';
-  const hasError = appInitState === 'error';
+  const hasError = !!(databaseError || syncError);
 
   const retryInit = useMemo(() => () => {
-    actor.send({ type: 'RETRY_INIT' });
+    if (actor) {
+      console.log('[useAppInit] Sending RETRY to AppInitMachine');
+      actor.send({ type: 'RETRY' });
+    } else {
+      console.error('[useAppInit] AppInitMachine actor not available');
+    }
   }, [actor]);
 
   const restartSync = useMemo(() => () => {
-    actor.send({ type: 'RESTART_SYNC' });
+    if (actor) {
+      console.log('[useAppInit] Sending RESTART_SYNC to AppInitMachine');
+      actor.send({ type: 'RESTART_SYNC' });
+    } else {
+      console.error('[useAppInit] AppInitMachine actor not available');
+    }
   }, [actor]);
 
   return {
-    // Database state
+    // Core states
     isDatabaseInitialized,
     databaseError,
-    
-    // Sync state
     isSyncReady,
     syncError,
     connectionStatus,
     liveChangesStatus,
     
-    // Status
+    // UI state flags
     isCheckingRequirements,
     isInitializingDatabase,
     isStartingSync,
@@ -233,71 +234,30 @@ export function useAppInit() {
   };
 }
 
-// System hook - app initialization state directly from app init machine
+// System hook - simple readiness check
 export function useSystem() {
-  // Get app init machine directly from window
-  const appInitMachine = useMemo(() => {
-    return (window as any).appInitActor;
-  }, []);
-
-  // Safety check: only proceed if app init machine exists
-  if (!appInitMachine) {
-    return {
-      isSystemReady: false,
-      isInitializing: false,
-      hasAnyError: false,
-      errors: [],
-    };
-  }
+  // AppInit machine includes system readiness
+  const { isReady } = useAppInit();
   
-  // Subscribe directly to app init machine state changes
-  const appInitSnapshot = useSelector(appInitMachine, (state) => state);
-  
-  const isSystemReady = appInitSnapshot?.value === 'ready' || false;
-  const isInitializing = appInitSnapshot?.value && !['idle', 'ready', 'error'].includes(appInitSnapshot.value as string) || false;
-  
-  if (import.meta.env.MODE === 'development') {
-    console.log('[useSystem] isSystemReady selector:', { 
-      isReady: isSystemReady, 
-      appInitState: appInitSnapshot?.value, 
-      timestamp: Date.now() 
-    });
-  }
-  
-  // Get error states from app init machine
-  const databaseError = appInitSnapshot?.context?.databaseError || null;
-  const syncError = appInitSnapshot?.context?.syncError || null;
-  
-  const hasAnyError = !!(databaseError || syncError);
-
-  // Get all errors in one place
-  const errors: string[] = [];
-  if (databaseError) errors.push(databaseError);
-  if (syncError) errors.push(syncError);
-
   return {
-    // High-level status
-    isSystemReady,
-    isInitializing,
-    hasAnyError,
-    
-    // Error aggregation
-    errors,
+    isSystemReady: isReady,
+    isSystemError: false, // AppInit handles errors
+    systemError: null, // AppInit handles errors
   };
 }
 
-// Direct sync machine hook - accesses sync machine state directly
+// Sync hook - directly from SyncMachine
 export function useSync() {
-  // Get sync machine from global actor (no longer a child of app-init)
+  // Get sync machine from global actor
   const syncMachine = useMemo(() => {
     return (window as any).syncMachineActor || null;
   }, []);
 
-  // Safety check: return default state if sync machine not available
+  // Safety check: only proceed if syncMachine exists
   if (!syncMachine) {
     return {
-      clientId: null,
-      currentLSN: null,
+      clientId: '',
+      currentLSN: '0/0',
       syncPhase: null,
       isConnected: false,
       error: null,
@@ -310,7 +270,7 @@ export function useSync() {
       machineState: 'idle',
       syncPhaseProgress: null,
       isActive: false,
-      statusText: 'Idle'
+      statusText: 'Disconnected'
     };
   }
 
@@ -320,7 +280,7 @@ export function useSync() {
   const context = syncSnapshot?.context || {};
   const state = syncSnapshot?.value || 'idle';
   
-  // Check if state is a string or object with nested states
+  // Convert complex state object to string for easier checking
   const stateString = typeof state === 'string' ? state : JSON.stringify(state);
   
   // Determine connection status based on actual sync machine states
@@ -330,44 +290,48 @@ export function useSync() {
                      stateString.includes('determining_sync_phase') ||
                      stateString.includes('services_ready');
   
+  const isError = stateString.includes('error') || !!context.error;
+  const isConnecting = stateString.includes('connecting') || stateString.includes('initialization');
+  const isIdle = stateString === 'idle' || stateString.includes('disconnected');
+  
+  // Determine sync phases
+  const isInitialSync = context.syncPhase === 'initial' || stateString.includes('initial_sync');
+  const isCatchupSync = context.syncPhase === 'catchup' || stateString.includes('catchup_sync');
+  const isLiveSync = context.syncPhase === 'live' || stateString.includes('live_sync');
+  
+  const isActive = isConnected && !isError;
+  
+  // Generate human-readable status text
+  const statusText = isError ? 'Error' :
+                    isConnecting ? 'Connecting...' :
+                    isInitialSync ? 'Initial Sync' :
+                    isCatchupSync ? 'Catchup Sync' :
+                    isLiveSync ? 'Live' :
+                    isIdle ? 'Disconnected' :
+                    'Unknown';
+
   return {
     // Core sync state
-    clientId: context.clientId,
-    currentLSN: context.currentLSN,
-    syncPhase: context.syncPhase,
+    clientId: context.clientId || '',
+    currentLSN: context.currentLSN || '0/0',
+    syncPhase: context.syncPhase || null,
     
     // Connection status
     isConnected,
-    error: context.error,
+    error: context.error || null,
     
     // State booleans
-    isInitialSync: context.syncPhase === 'initial' || state === 'initial_sync',
-    isCatchupSync: context.syncPhase === 'catchup' || state === 'catchup_sync',
-    isLiveSync: context.syncPhase === 'live' || state === 'live_sync',
-    isError: state === 'error' || !!context.error,
-    isConnecting: state === 'connecting' || stateString.includes('connecting'),
-    isIdle: state === 'idle',
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    isConnecting,
+    isIdle,
     
-    // Machine state
-    machineState: typeof state === 'string' ? state : Object.keys(state)[0],
-    
-    // Detailed progress (if available)
-    syncPhaseProgress: context.phaseProgress,
-    
-    // Convenience getters
-    isActive: ['connecting', 'initial_sync', 'catchup_sync', 'live_sync', 'determining_sync_phase'].some(s => 
-      stateString.includes(s)
-    ),
-    
-    statusText: context.error ? 'Error' :
-                state === 'connecting' ? 'Connecting...' :
-                state === 'initial_sync' || context.syncPhase === 'initial' ? 'Initial Sync' :
-                state === 'catchup_sync' || context.syncPhase === 'catchup' ? 'Catchup Sync' :
-                state === 'live_sync' || context.syncPhase === 'live' ? 'Live' :
-                state === 'idle' ? 'Idle' :
-                'Syncing'
+    // State information
+    machineState: stateString,
+    syncPhaseProgress: context.syncPhaseProgress || null,
+    isActive,
+    statusText
   };
 }
-
-
-// No longer exporting context - using direct actor access pattern

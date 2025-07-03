@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 // Remove authClient.useSession() import to stop duplicate HTTP requests
 // import { authClient } from '@/lib/auth' 
-import { useAuth as useOrchestratorAuth } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth as useOrchestratorAuth } from '@/state-machines'
 import type { UserInfo } from '@/state-machines/types'
 
 export function useAuth() {

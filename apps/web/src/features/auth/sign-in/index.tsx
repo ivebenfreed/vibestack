@@ -9,7 +9,7 @@ import {
 import AuthLayout from '../auth-layout'
 import { UserAuthForm } from './components/user-auth-form'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth } from '@/state-machines'
 import { useEffect } from 'react'
 
 export default function SignIn() {

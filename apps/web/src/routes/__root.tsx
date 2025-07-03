@@ -18,7 +18,7 @@ import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
 import { appInitMachine } from '@/state-machines/machines/app-init-machine'
 import { syncMachineV3 } from '@/state-machines/machines/sync-machine-v3'
-import { useAuth, useSystem } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth, useSystem } from '@/state-machines'
 import React from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 
