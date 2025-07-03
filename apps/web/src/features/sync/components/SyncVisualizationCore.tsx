@@ -1,18 +1,25 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useSyncVisualizationState } from '../hooks/useSyncVisualizationState';
+import { useAppInit } from '@/state-machines/orchestrator-hooks-v2';
 
 interface SyncVisualizationCoreProps {
   className?: string; // Allow className for the container
 }
 
 export function SyncVisualizationCore({ className }: SyncVisualizationCoreProps) {
-  // Get state from the custom hook
-  const { 
-    currentConnectionState, 
-    outgoingStatus, 
-    incomingStatus 
-  } = useSyncVisualizationState();
+  // Get state from orchestrator hooks
+  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  
+  // Map v2 data to visualization states
+  const currentConnectionState = syncError ? 'error' :
+    connectionStatus === 'disconnected' ? 'disconnected' :
+    connectionStatus === 'connecting' ? 'connecting' :
+    isSyncReady && liveChangesStatus === 'connected' ? 'live' :
+    'connecting';
+    
+  // Simplified status tracking (since we don't have the detailed hook anymore)
+  const outgoingStatus = 'idle';
+  const incomingStatus = 'idle';
 
   // Enhanced connection line animations with more visual interest
   const connectionVariants = {

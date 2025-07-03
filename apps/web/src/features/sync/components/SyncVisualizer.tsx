@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSyncVisualizationState } from '../hooks/useSyncVisualizationState';
 import { SyncVisualizationCore } from './SyncVisualizationCore';
 
 interface SyncVisualizerProps {
@@ -27,7 +26,7 @@ export function SyncVisualizer({ className }: SyncVisualizerProps) {
                     isConnecting ? 'Connecting...' :
                     'Disconnected';
   
-  const { errorInfo } = useSyncVisualizationState();
+  const errorInfo = syncError;
 
   // Format sync status display
   const getSyncStatusDisplay = () => {
