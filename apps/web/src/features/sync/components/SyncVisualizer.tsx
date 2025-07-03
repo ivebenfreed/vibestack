@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { useSync } from '@/state-machines';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SyncVisualizationCore } from './SyncVisualizationCore';
 
@@ -8,25 +8,27 @@ interface SyncVisualizerProps {
 }
 
 export function SyncVisualizer({ className }: SyncVisualizerProps) {
-  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
-  const { isSystemReady } = useSystem();
+  const {
+    clientId,
+    currentLSN,
+    syncPhase,
+    isConnected,
+    error,
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    isConnecting,
+    isIdle,
+    machineState,
+    syncPhaseProgress,
+    statusText
+  } = useSync();
   
-  // Map v2 data to legacy sync machine structure
-  const isOnline = connectionStatus === 'connected';
-  const syncPhase = isSyncReady ? 'live' : 'connecting';
-  const syncProgress = 0; // Not available in v2
-  const syncPhaseProgress = null; // Not available in v2
-  const isLiveSync = isSyncReady && liveChangesStatus === 'connected';
-  const currentLSN = '0/0'; // Not available in v2
-  const isInitialSync = connectionStatus === 'connecting' && !isSyncReady;
-  const isCatchupSync = false; // Not available in v2
-  const machineState = connectionStatus;
-  const isConnecting = connectionStatus === 'connecting';
-  const statusText = isLiveSync ? 'Live' :
-                    isConnecting ? 'Connecting...' :
-                    'Disconnected';
-  
-  const errorInfo = syncError;
+  // Map sync machine data to component state
+  const isOnline = isConnected;
+  const syncProgress = 0; // TODO: Extract from syncPhaseProgress if needed
+  const errorInfo = error;
 
   // Format sync status display
   const getSyncStatusDisplay = () => {

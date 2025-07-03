@@ -1,23 +1,34 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useAppInit } from '@/state-machines/orchestrator-hooks-v2';
+import { useSync } from '@/state-machines';
 
 interface SyncVisualizationCoreProps {
   className?: string; // Allow className for the container
 }
 
 export function SyncVisualizationCore({ className }: SyncVisualizationCoreProps) {
-  // Get state from orchestrator hooks
-  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  // Get state from sync machine
+  const {
+    isConnected,
+    error,
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    isConnecting,
+    isIdle
+  } = useSync();
   
-  // Map v2 data to visualization states
-  const currentConnectionState = syncError ? 'error' :
-    connectionStatus === 'disconnected' ? 'disconnected' :
-    connectionStatus === 'connecting' ? 'connecting' :
-    isSyncReady && liveChangesStatus === 'connected' ? 'live' :
+  // Map sync machine state to visualization states
+  const currentConnectionState = isError ? 'error' :
+    isIdle ? 'disconnected' :
+    isConnecting ? 'connecting' :
+    isInitialSync ? 'initial' :
+    isCatchupSync ? 'catchup' :
+    isLiveSync ? 'live' :
     'connecting';
     
-  // Simplified status tracking (since we don't have the detailed hook anymore)
+  // TODO: Could be enhanced with actual message flow tracking
   const outgoingStatus = 'idle';
   const incomingStatus = 'idle';
 
