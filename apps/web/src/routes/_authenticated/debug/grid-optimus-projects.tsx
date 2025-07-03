@@ -5,6 +5,7 @@ import { useSelector } from '@xstate/store/react'
 import { projectsAtom, updateProjectUI } from '@/domain/project'
 import { shallowEqual } from '@xstate/store'
 import { useTheme } from '@/context/theme-context'
+import { useStableEntityArray } from '@/hooks/useStableEntityArray'
 
 export const Route = createFileRoute('/_authenticated/debug/grid-optimus-projects')({
   component: GridOptimusProjectsPage,
@@ -20,8 +21,8 @@ function GridOptimusProjectsPage() {
     return theme
   }, [theme])
 
-  // Use XState atoms for data
-  const projects = useSelector(projectsAtom, (projectsRecord) => Object.values(projectsRecord), shallowEqual)
+  // Use XState atoms for data with stable array
+  const projects = useStableEntityArray(projectsAtom)
   
   // State management
   const [isLoading, setIsLoading] = React.useState(false)

@@ -5,6 +5,7 @@ import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
 import { commentsAtom } from '@/domain/comment'
 import { shallowEqual } from '@xstate/store'
+import { useStableEntityArray, useStableEntityArraySorted } from '@/hooks/useStableEntityArray'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -52,38 +53,13 @@ const topNav = [
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   
-  // 🎯 XSTATE REACTIVITY: Read directly from XState atoms with useSelector
-  const allTasks = useSelector(
-    tasksAtom,
-    (tasksRecord) => {
-      const tasks = Object.values(tasksRecord);
-      return tasks.sort((a, b) => {
-        const aTime = new Date(a.updatedAt || a.createdAt).getTime();
-        const bTime = new Date(b.updatedAt || b.createdAt).getTime();
-        return bTime - aTime; // Latest first
-      });
-    },
-    shallowEqual
-  )
+  // 🎯 XSTATE REACTIVITY: Stable sorted array that only changes when data changes
+  const allTasks = useStableEntityArraySorted(tasksAtom, 'updatedAt', 'desc')
   
-  // Get entity counts directly from atoms
-  const allProjects = useSelector(
-    projectsAtom,
-    (projectsRecord) => Object.values(projectsRecord),
-    shallowEqual
-  )
-  
-  const allUsers = useSelector(
-    usersAtom,
-    (usersRecord) => Object.values(usersRecord),
-    shallowEqual
-  )
-  
-  const allComments = useSelector(
-    commentsAtom,
-    (commentsRecord) => Object.values(commentsRecord),
-    shallowEqual
-  )
+  // Get entity counts directly from atoms using stable arrays
+  const allProjects = useStableEntityArray(projectsAtom)
+  const allUsers = useStableEntityArray(usersAtom)
+  const allComments = useStableEntityArray(commentsAtom)
   
   // Calculate dashboard data from XState stores
   const dashboardData = useMemo(() => {

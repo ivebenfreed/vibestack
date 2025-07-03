@@ -11,13 +11,14 @@ import { shallowEqual } from '@xstate/store'
 import type { EntityName } from '../core/EntityRegistry'
 import type { OptimusColumn } from '../types'
 
-// Import all column configurations from DataForge
+// Import RDG column configurations from DataForge
 import { 
-  ProjectColumns, 
-  TaskColumns, 
-  UserColumns, 
-  CommentColumns 
-} from '@repo/dataforge/column-configurations'
+  ProjectRDGColumns, 
+  TaskRDGColumns, 
+  UserRDGColumns, 
+  CommentRDGColumns,
+  type RDGColumn 
+} from '@repo/dataforge/rdg-column-configurations'
 
 // Import XState atoms for relationship data
 import { projectsAtom } from '@/domain/project'
@@ -26,13 +27,13 @@ import { usersAtom } from '@/domain/user'
 // Note: commentsAtom might not exist yet, using empty array as fallback
 
 /**
- * Entity column configuration mapping
+ * Entity RDG column configuration mapping
  */
-const ENTITY_COLUMNS = {
-  Project: ProjectColumns,
-  Task: TaskColumns,
-  User: UserColumns,
-  Comment: CommentColumns
+const ENTITY_RDG_COLUMNS = {
+  Project: ProjectRDGColumns,
+  Task: TaskRDGColumns,
+  User: UserRDGColumns,
+  Comment: CommentRDGColumns
 } as const
 
 /**
@@ -44,7 +45,7 @@ type EntitySaveHandler = (id: string, column: string, value: any) => Promise<voi
  * Hook return type
  */
 interface UseEntityConfigReturn {
-  columns: OptimusColumn<any>[]
+  columns: RDGColumn<any>[]
   relationshipData: Record<string, Array<{ value: string; label: string }>>
   saveHandler: EntitySaveHandler
   isConfigLoading: boolean
@@ -55,33 +56,22 @@ interface UseEntityConfigReturn {
  * Resolve entity configuration from entity name
  */
 export function useEntityConfig(entityName: EntityName): UseEntityConfigReturn {
-  // Get relationship data from XState atoms (memoized to prevent re-renders)
-  const projects = useMemo(() => {
-    const projectsRecord = projectsAtom.get()
-    return Object.values(projectsRecord)
-  }, [])
-  
-  const users = useMemo(() => {
-    const usersRecord = usersAtom.get()
-    return Object.values(usersRecord)
-  }, [])
-  
-  const tasks = useMemo(() => {
-    const tasksRecord = tasksAtom.get()
-    return Object.values(tasksRecord)
-  }, [])
+  // Get relationship data from XState atoms using proper selectors to maintain stable references
+  const projects = useSelector(projectsAtom, (projectsRecord) => Object.values(projectsRecord), shallowEqual)
+  const users = useSelector(usersAtom, (usersRecord) => Object.values(usersRecord), shallowEqual)
+  const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
   
   // Comments atom might not exist yet
   const comments: any[] = []
 
-  // Get base columns for entity
-  const baseColumns = useMemo(() => {
-    const entityColumns = ENTITY_COLUMNS[entityName]
+  // Get RDG columns for entity
+  const rdgColumns = useMemo(() => {
+    const entityColumns = ENTITY_RDG_COLUMNS[entityName]
     if (!entityColumns) {
-      console.error(`No columns found for entity: ${entityName}`)
-      return {}
+      console.error(`No RDG columns found for entity: ${entityName}`)
+      return []
     }
-    console.log(`[useEntityConfig] Raw columns for ${entityName}:`, entityColumns)
+    console.log(`[useEntityConfig] Raw RDG columns for ${entityName}:`, entityColumns)
     return entityColumns
   }, [entityName])
 
@@ -107,86 +97,52 @@ export function useEntityConfig(entityName: EntityName): UseEntityConfigReturn {
     }
   }, [projects, users, tasks, comments])
 
-  // Enhance columns with relationship options
+  // Enhance RDG columns with relationship options
   const enhancedColumns = useMemo(() => {
-    const columnsArray = Object.entries(baseColumns)
-    
-    // Filter and order columns based on entity
-    let orderedKeys: string[] = []
-    
-    switch (entityName) {
-      case 'Project':
-        // Remove ID columns, keep relationship columns
-        orderedKeys = ['name', 'description', 'status', 'priority', 'owner', 'members', 'startDate', 'endDate', 'createdAt', 'updatedAt']
-        break
-      case 'Task':
-        orderedKeys = ['title', 'description', 'status', 'priority', 'assignee', 'project', 'dueDate', 'startDate', 'completedAt', 'createdAt', 'updatedAt']
-        break
-      case 'User':
-        orderedKeys = ['name', 'email', 'role', 'createdAt', 'updatedAt']
-        break
-      case 'Comment':
-        orderedKeys = ['content', 'author', 'task', 'project', 'createdAt', 'updatedAt']
-        break
-    }
-
-    // Build enhanced columns with relationship data
-    return orderedKeys
-      .map(key => {
-        const column = baseColumns[key]
-        if (!column) return null
-
-        const meta = column.meta || {}
-        const cellType = meta.cellType || 'text'
-        const config = meta.config || {}
+    return rdgColumns.map(column => {
+      const rdgConfig = column.rdgConfig || {}
+      const cellType = rdgConfig.cellType || 'text'
+      
+      // Enhance relationship columns with options
+      if (cellType?.startsWith('relationship')) {
+        const key = column.key as string
+        let targetEntity: string | undefined
         
-        // Enhance relationship columns with options
-        let enhancedConfig = { ...config }
-        
-        if (cellType.includes('relationship')) {
-          // Determine target entity from column key or metadata
-          let targetEntity: string | undefined
-          
+        // First try to get from the config
+        if (rdgConfig.config?.targetEntity) {
+          targetEntity = rdgConfig.config.targetEntity.toLowerCase()
+        } else {
+          // Fallback to key-based mapping
           if (key === 'owner' || key === 'assignee' || key === 'author' || key === 'members') {
             targetEntity = 'user'
           } else if (key === 'project' || key === 'projectId') {
             targetEntity = 'project'
           } else if (key === 'task' || key === 'taskId') {
             targetEntity = 'task'
-          } else if (meta.businessLogic?.targetEntity) {
-            targetEntity = meta.businessLogic.targetEntity.toLowerCase()
-          }
-
-          if (targetEntity && relationshipData[targetEntity]) {
-            enhancedConfig.options = relationshipData[targetEntity]
+          } else if (key === 'parent') {
+            targetEntity = 'comment'
           }
         }
 
-        // Return enhanced column
-        return {
-          ...column,
-          meta: {
-            ...meta,
-            config: enhancedConfig
+        if (targetEntity && relationshipData[targetEntity]) {
+          return {
+            ...column,
+            rdgConfig: {
+              ...rdgConfig,
+              config: {
+                ...rdgConfig.config,
+                options: relationshipData[targetEntity]
+              }
+            }
           }
+        } else {
+          console.warn(`[useEntityConfig] No relationship data found for ${key}, targetEntity: ${targetEntity}`)
         }
-      })
-      .filter(Boolean) // Remove null entries
-  }, [baseColumns, entityName, relationshipData])
-
-  // Convert to the format expected by useColumnAdapter
-  const columnsAsRecord = useMemo(() => {
-    const record: Record<string, any> = {}
-    enhancedColumns.forEach((column: any) => {
-      if (column && column.id) {
-        record[column.id] = column
-      } else if (column && column.accessorKey) {
-        record[column.accessorKey] = column
       }
+
+      return column
     })
-    console.log('[useEntityConfig] Converted columns to record:', record)
-    return record
-  }, [enhancedColumns])
+  }, [rdgColumns, relationshipData])
 
   // Create entity-specific save handler
   const saveHandler = useMemo((): EntitySaveHandler => {
@@ -281,11 +237,11 @@ export function useEntityConfig(entityName: EntityName): UseEntityConfigReturn {
     }
   }, [entityName])
 
-  return React.useMemo(() => ({
-    columns: columnsAsRecord,
+  return {
+    columns: enhancedColumns,
     relationshipData,
     saveHandler,
     isConfigLoading: false,
     configError: null
-  }), [columnsAsRecord, relationshipData, saveHandler])
+  }
 }

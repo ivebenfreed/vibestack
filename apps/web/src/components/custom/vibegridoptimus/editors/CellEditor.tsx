@@ -1,7 +1,6 @@
 import React from 'react'
 import type { BaseEntity, OptimusColumn } from '../types'
 import { 
-  TextEditor,
   NumberEditor,
   EnumEditor,
   BooleanEditor,
@@ -11,6 +10,7 @@ import {
   MultiRelationshipEditor,
   CollectionRelationshipEditor
 } from './index'
+import { SimpleTextEditor } from './SimpleTextEditor'
 
 interface CellEditorProps<TEntity extends BaseEntity> {
   row: TEntity
@@ -43,7 +43,7 @@ export function CellEditor<TEntity extends BaseEntity>(
   // Switch based on cell type for business data
   switch (cellType) {
     case 'text':
-      return <TextEditor {...props} />
+      return <SimpleTextEditor {...props} />
       
     case 'number':
       return <NumberEditor {...props} />
@@ -78,6 +78,6 @@ export function CellEditor<TEntity extends BaseEntity>(
     default:
       // Fallback to text editor for unknown types
       console.warn('[CellEditor] Unknown cellType:', cellType, 'falling back to text editor')
-      return <TextEditor {...props} />
+      return <SimpleTextEditor {...props} />
   }
 }

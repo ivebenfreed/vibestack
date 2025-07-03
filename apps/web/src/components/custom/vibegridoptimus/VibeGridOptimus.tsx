@@ -2,7 +2,6 @@ import React from 'react'
 import { DataGrid, type DataGridHandle } from 'react-data-grid'
 import type { VibeGridOptimusProps } from './types'
 import { useEntityConfig } from './hooks/useEntityConfig'
-import { useColumnAdapter } from './hooks/useColumnAdapter'
 import { useBatchOperations } from './hooks/useBatchOperations'
 import { useClipboardOps } from './hooks/useClipboardOps'
 import { CellRenderer } from './renderers/CellRenderer'
@@ -35,20 +34,12 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     error = null
   } = props
   
-  console.log('[VibeGridOptimus] Declarative mode:', {
-    entityName,
-    dataLength: data?.length || 0,
-    theme
-  })
   
   // Grid ref for advanced operations
   const gridRef = React.useRef<DataGridHandle>(null)
   
   // Auto-resolve entity configuration including save handler
-  const { columns: enhancedColumns, relationshipData, saveHandler, configError } = useEntityConfig(entityName)
-  
-  // Convert enhanced columns to react-data-grid format
-  const baseColumns = useColumnAdapter(enhancedColumns as any, {})
+  const { columns: rdgColumns, relationshipData, saveHandler, configError } = useEntityConfig(entityName)
   
   // State management
   const [sortColumns, setSortColumns] = React.useState<readonly import('react-data-grid').SortColumn[]>([])
@@ -65,7 +56,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   
   // Direct save handler for individual editor commits (bypasses batching)
   const stableOnUpdate = React.useCallback(async (id: string, column: string, value: any) => {
-    console.log('[VibeGridOptimus] 🔄 Direct save called:', { id, column, value })
     if (finalSaveHandler) {
       await finalSaveHandler(id, column, value)
     }
@@ -77,7 +67,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     
     return [...data].sort((a, b) => {
       for (const sort of sortColumns) {
-        const column = baseColumns.find(col => String(col.key) === sort.columnKey)
+        const column = rdgColumns.find(col => String(col.key) === sort.columnKey)
         if (!column) continue
         
         const aVal = a[column.key]
@@ -88,9 +78,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
         if (aVal == null) return -1
         if (bVal == null) return 1
         
-        // Type-specific comparisons
+        // Type-specific comparisons based on RDG metadata
         let result = 0
-        switch (column.cellType) {
+        const cellType = column.rdgConfig?.cellType || 'text'
+        switch (cellType) {
           case 'number':
             result = Number(aVal) - Number(bVal)
             break
@@ -110,7 +101,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       }
       return 0
     })
-  }, [data, sortColumns, baseColumns])
+  }, [data, sortColumns, rdgColumns])
   
   
   // Handle content click for single-click editing (triggered from renderer components)
@@ -119,63 +110,64 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     event.stopPropagation()
     
     // Find the column configuration
-    const optimusColumn = baseColumns.find(col => col.key === columnKey)
+    const rdgColumn = rdgColumns.find(col => col.key === columnKey)
     
     // If column is editable, enter edit mode using the correct react-data-grid API
-    if (optimusColumn?.config?.editable && gridRef.current) {
-      console.log('[VibeGridOptimus] 🎯 Entering edit mode for content click:', {
-        rowIdx,
-        columnKey,
-        idx: optimusColumn.idx
-      })
+    if (rdgColumn?.editable && gridRef.current) {
       
       // Use selectCell with enableEditor option to enter edit mode
-      gridRef.current.selectCell({ rowIdx, idx: optimusColumn.idx || 0 }, { enableEditor: true })
+      const columnIdx = rdgColumns.findIndex(col => col.key === columnKey)
+      gridRef.current.selectCell({ rowIdx, idx: columnIdx }, { enableEditor: true })
     }
-  }, [baseColumns])
+  }, [rdgColumns])
 
-  // Add renderers to columns - React Compiler will optimize this automatically
-  const optimusColumns = baseColumns.map((column) => ({
-    ...column,
-    // React-data-grid requires this property for edit functionality
-    editable: column.config?.editable || false,
-    renderCell: (cellProps: any) => (
-      <CellRenderer
-        row={cellProps.row}
-        column={column}
-        value={cellProps.row[column.key]}
-        rowIndex={cellProps.rowIdx}
-        onContentClick={handleContentClick}
-      />
-    ),
-    // Rich editor for editable cells
-    ...(column.config?.editable && {
-      renderEditCell: (editProps: any) => (
-        <CellEditor
-          row={editProps.row}
-          column={column}
-          onRowChange={editProps.onRowChange}
-          onClose={editProps.onClose}
-          onUpdate={finalSaveHandler ? stableOnUpdate : undefined}
-        />
-      ),
-      editorOptions: {
-        // Only keep background content visible for non-text editors (enums, relationships)
-        // Text editors need clean input fields without background content
-        displayCellContent: column.cellType !== 'text' && column.cellType !== 'number'
+  // Add renderers to columns - must memoize to prevent column identity changes
+  const optimusColumns = React.useMemo(() => {
+    return rdgColumns.map((column) => {
+      // Map RDG column structure to what renderers expect
+      const mappedColumn = {
+        ...column,
+        // Extract metadata from rdgConfig for compatibility with existing renderers
+        cellType: column.rdgConfig?.cellType || 'text',
+        config: column.rdgConfig?.config || {},
+        systemField: column.rdgConfig?.businessLogic?.systemField || false,
+        businessLogic: column.rdgConfig?.businessLogic || {},
+      }
+
+      return {
+        ...column,
+        // React-data-grid requires this property for edit functionality
+        editable: column.editable || false,
+        renderCell: (cellProps: any) => (
+          <CellRenderer
+            row={cellProps.row}
+            column={mappedColumn}
+            value={cellProps.row[column.key]}
+            rowIndex={cellProps.rowIdx}
+            onContentClick={handleContentClick}
+          />
+        ),
+        // Rich editor for editable cells
+        ...(column.editable && {
+          renderEditCell: (editProps: any) => (
+            <CellEditor
+              row={editProps.row}
+              column={mappedColumn}
+              onRowChange={editProps.onRowChange}
+              onClose={editProps.onClose}
+              onUpdate={finalSaveHandler ? stableOnUpdate : undefined}
+            />
+          ),
+          editorOptions: {
+            // Only keep background content visible for non-text editors (enums, relationships)
+            // Text editors need clean input fields without background content
+            displayCellContent: mappedColumn.cellType !== 'text' && mappedColumn.cellType !== 'number'
+          }
+        })
       }
     })
-  }))
+  }, [rdgColumns])
   
-  // Debug the final columns before passing to DataGrid
-  console.log('[VibeGridOptimus] Processing columns:', baseColumns.length)
-  console.log('[VibeGridOptimus] Final optimusColumns for DataGrid:', optimusColumns)
-  console.log('[VibeGridOptimus] optimusColumns is Array?', Array.isArray(optimusColumns))
-  console.log('[VibeGridOptimus] optimusColumns type:', typeof optimusColumns)
-  
-  if (optimusColumns && Array.isArray(optimusColumns) && optimusColumns.length > 0) {
-    console.log('[VibeGridOptimus] Sample column structure:', optimusColumns[0])
-  }
   
   // Handle errors
   if (configError) {

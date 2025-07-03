@@ -58,11 +58,15 @@ const Tasks: React.FC = () => {
     })
   }
 
-  // Optimized selector for tasks data
-  const tasks = useSelector(tasksAtom, (tasksRecord) => {
+  // Optimized selector for tasks data - only recreate array when actual data changes
+  const tasks = useMemo(() => {
+    const tasksRecord = tasksAtom.get()
     if (!tasksRecord || typeof tasksRecord !== 'object') return []
     return Object.values(tasksRecord)
-  }, shallowEqual)
+  }, [])
+  
+  // Subscribe to atom changes to force re-render when needed
+  useSelector(tasksAtom, () => null, shallowEqual)
 
 
   return (

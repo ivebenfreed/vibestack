@@ -7,6 +7,7 @@ import React from 'react'
 import { useSelector } from '@xstate/store/react'
 import { tasksAtom } from '@/domain/task'
 import { shallowEqual } from '@xstate/store'
+import { useStableEntityArray } from '@/hooks/useStableEntityArray'
 import { Task, TaskStatus } from '@repo/dataforge/client-entities'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { VibeKan, createVibeKanConfig } from '@/components/custom/vibekan'
@@ -63,8 +64,8 @@ const taskKanbanConfig = createVibeKanConfig<Task, TaskStatus>({
 })
 
 export default function TasksKanbanV2() {
-  // Get tasks from XState atom
-  const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
+  // Get tasks from XState atom using stable array
+  const tasks = useStableEntityArray(tasksAtom)
 
   return (
     <div className="flex flex-col h-full">

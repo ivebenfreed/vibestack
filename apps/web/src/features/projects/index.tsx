@@ -11,8 +11,8 @@ import { usersAtom } from '@/domain/user';
 import { shallowEqual } from '@xstate/store';
 import { useLoaderData } from '@tanstack/react-router';
 import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus';
-import { ProjectColumns } from '@repo/dataforge/column-configurations';
 import { useTheme } from '@/context/theme-context';
+import { useStableEntityArray } from '@/hooks/useStableEntityArray';
 
 /**
  * Main Projects Feature Component
@@ -26,15 +26,11 @@ const Projects: React.FC = () => {
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : theme
 
-  // 🎯 XSTATE REACTIVITY: Direct connection to XState store with stable reference
-  const projects = useSelector(
-    projectsAtom,
-    (projectsRecord) => Object.values(projectsRecord),
-    shallowEqual
-  )
+  // 🎯 XSTATE REACTIVITY: Stable array that only changes when data actually changes
+  const projects = useStableEntityArray(projectsAtom)
 
-  // Get users for relationship data
-  const users = useSelector(usersAtom, (usersRecord) => Object.values(usersRecord), shallowEqual)
+  // Get users for relationship data - using stable array
+  const users = useStableEntityArray(usersAtom)
 
   // No default sorting - let VibeGridOptimus handle all sorting internally
   const [sortColumns, setSortColumns] = useState<readonly import('react-data-grid').SortColumn[]>([])
@@ -63,56 +59,7 @@ const Projects: React.FC = () => {
     console.log('🔍 Project clicked:', project)
   }, [])
 
-  // Enhanced columns with relationship data
-  const enhancedColumns = useMemo(() => {
-    const { createdAt, updatedAt, clientId, ownerId, ...editableColumns } = ProjectColumns
-    
-    // Use relationship columns instead of ID columns, and add relationship options
-    const columnsWithData = {
-      ...editableColumns,
-      createdAt, // Keep createdAt for reference
-      updatedAt, // Keep updatedAt for reference
-    }
-    
-    // Enhance owner column with user options
-    if (columnsWithData.owner && users.length > 0) {
-      columnsWithData.owner = {
-        ...columnsWithData.owner,
-        meta: {
-          ...columnsWithData.owner.meta,
-          config: {
-            ...columnsWithData.owner.meta?.config,
-            options: users.map(user => ({
-              value: user.id,
-              label: user.name || user.email || `User ${user.id.slice(0, 8)}`
-            }))
-          }
-        }
-      }
-    }
-    
-    // Enhance members column with user options for multi-select
-    if (columnsWithData.members && users.length > 0) {
-      const membersOptions = users.map(user => ({
-        value: user.id,
-        label: user.name || user.email || `User ${user.id.slice(0, 8)}`
-      }))
-      
-      columnsWithData.members = {
-        ...columnsWithData.members,
-        meta: {
-          ...columnsWithData.members.meta,
-          config: {
-            ...columnsWithData.members.meta?.config,
-            options: membersOptions
-          }
-        }
-      }
-      
-    }
-    
-    return columnsWithData
-  }, [users])
+  // No need for manual column configuration - VibeGridOptimus handles this automatically!
 
 
   // Custom toolbar for VibeGridOptimus
