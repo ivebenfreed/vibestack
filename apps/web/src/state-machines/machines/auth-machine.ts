@@ -124,6 +124,7 @@ export const authMachine = setup({
           },
           {
             target: 'unauthenticated',
+            guard: ({ event }) => event.output?.shouldSignOut === true,
             actions: [
               'clearAuth',
               { 
@@ -131,18 +132,54 @@ export const authMachine = setup({
                 params: { authenticated: false, reason: 'check-failed' }
               },
             ]
+          },
+          {
+            // Network/server errors - stay in checking state if we have persisted auth data
+            target: 'authenticated',
+            guard: ({ event, context }) => {
+              // Only stay authenticated if we have valid persisted data AND it's a network error
+              return event.output?.shouldSignOut === false && 
+                     !!context.user && 
+                     !!context.authToken &&
+                     event.output?.errorType === 'network';
+            },
+            actions: [
+              assign({
+                authError: ({ event }) => `Connection issue: ${event.output?.error || 'Network error'}`,
+                lastActivity: () => Date.now(),
+              }),
+              { 
+                type: 'dispatchAuthStateChange',
+                params: { authenticated: true, reason: 'persisted-during-network-error' }
+              },
+            ]
+          },
+          {
+            // Unknown errors or no persisted data - sign out to be safe
+            target: 'unauthenticated',
+            actions: [
+              'clearAuth',
+              assign({
+                authError: ({ event }) => event.output?.error || 'Auth check failed',
+              }),
+              { 
+                type: 'dispatchAuthStateChange',
+                params: { authenticated: false, reason: 'check-failed-unknown' }
+              },
+            ]
           }
         ],
         onError: {
+          // onError handles unexpected errors (not the ones we catch in the actor)
           target: 'unauthenticated',
           actions: [
             'clearAuth',
             assign({
-              authError: ({ event }) => (event.error as Error)?.message || 'Auth check failed',
+              authError: ({ event }) => (event.error as Error)?.message || 'Unexpected auth check error',
             }),
             { 
               type: 'dispatchAuthStateChange',
-              params: { authenticated: false, reason: 'check-error' }
+              params: { authenticated: false, reason: 'check-unexpected-error' }
             },
           ]
         }

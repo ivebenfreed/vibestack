@@ -2,7 +2,7 @@ import { fromPromise } from 'xstate';
 import { authClient } from '@/lib/auth'; // User's existing auth client
 import type { UserInfo } from './types';
 
-// Actor for checking auth - pure authClient, no separate guard
+// Actor for checking auth - handles network errors gracefully
 export const checkAuthActor = fromPromise(async () => {
   try {
     console.log('[checkAuthActor] Checking authentication...');
@@ -38,15 +38,66 @@ export const checkAuthActor = fromPromise(async () => {
       return {
         authenticated: true,
         user,
-        token: session.data.session?.token || 'authenticated',
+        authToken: session.data.session?.token || 'authenticated',
         sessionExpiry, // Include session expiry
       };
     }
     
-    return { authenticated: false };
+    // No user in session - this is a legitimate auth failure
+    console.log('[checkAuthActor] No user found in session');
+    return { authenticated: false, shouldSignOut: true };
+    
   } catch (error) {
     console.error('[checkAuthActor] Auth check failed:', error);
-    return { authenticated: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    
+    // Analyze the error to determine if it's a network issue or auth failure
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isNetworkError = errorMessage.includes('fetch') || 
+                          errorMessage.includes('network') || 
+                          errorMessage.includes('timeout') ||
+                          errorMessage.includes('ECONNREFUSED') ||
+                          errorMessage.includes('ENOTFOUND') ||
+                          errorMessage.includes('Failed to fetch');
+    
+    // Check if it's an HTTP error with status
+    const isServerError = errorMessage.includes('500') || 
+                         errorMessage.includes('502') || 
+                         errorMessage.includes('503') || 
+                         errorMessage.includes('504');
+    
+    const isAuthError = errorMessage.includes('401') || 
+                       errorMessage.includes('403') || 
+                       errorMessage.includes('Unauthorized') ||
+                       errorMessage.includes('Forbidden');
+    
+    if (isNetworkError || isServerError) {
+      // Network/server errors - don't sign out, keep trying
+      console.log('[checkAuthActor] Network/server error detected, not signing out user');
+      return { 
+        authenticated: false, 
+        shouldSignOut: false, 
+        errorType: 'network',
+        error: errorMessage 
+      };
+    } else if (isAuthError) {
+      // Actual auth errors - sign out
+      console.log('[checkAuthActor] Authentication error detected, will sign out');
+      return { 
+        authenticated: false, 
+        shouldSignOut: true, 
+        errorType: 'auth',
+        error: errorMessage 
+      };
+    } else {
+      // Unknown errors - be conservative, don't sign out immediately
+      console.log('[checkAuthActor] Unknown error, not signing out to be safe');
+      return { 
+        authenticated: false, 
+        shouldSignOut: false, 
+        errorType: 'unknown',
+        error: errorMessage 
+      };
+    }
   }
 });
 
