@@ -77,6 +77,13 @@ export function VibeKan<TEntity extends WithId, TStatus = string>({
   
   // Initialize and sync entity positions with persistence
   React.useEffect(() => {
+    console.log('🔄 [VibeKan] Entity positions effect triggered', {
+      entitiesCount: entities.length,
+      entityIds: entities.map(e => e.id),
+      enablePersistence,
+      kanbanId
+    })
+    
     const persistedOrder = getInitialEntityOrder()
     
     // Build a map of existing positions by entity ID
@@ -95,9 +102,11 @@ export function VibeKan<TEntity extends WithId, TStatus = string>({
         columnOrder.forEach(entityId => {
           const entity = entities.find(e => e.id === entityId)
           if (entity) {
+            // Always use current entity status to determine column
+            const currentColumnId = config.getColumnId(entity)
             newPositions.push({
               entity,
-              columnId: column.id
+              columnId: currentColumnId
             })
           }
         })
@@ -114,30 +123,25 @@ export function VibeKan<TEntity extends WithId, TStatus = string>({
       })
     } else {
       // No persisted order, use current entity positions or create new ones
-      // First, update existing positions with fresh entity data
-      entityPositions.forEach(pos => {
-        const currentEntity = entities.find(e => e.id === pos.entity.id)
-        if (currentEntity) {
-          newPositions.push({
-            entity: currentEntity,
-            columnId: pos.columnId
-          })
-        }
-      })
-      
-      // Then, add new entities that aren't tracked yet
+      // Always use current entity status to determine column
       entities.forEach(entity => {
-        if (!positionMap.has(entity.id)) {
-          newPositions.push({
-            entity,
-            columnId: config.getColumnId(entity)
-          })
-        }
+        newPositions.push({
+          entity,
+          columnId: config.getColumnId(entity)
+        })
       })
     }
     
+    console.log('✅ [VibeKan] Setting new entity positions', {
+      positionsCount: newPositions.length,
+      positionsByColumn: newPositions.reduce((acc, pos) => {
+        acc[pos.columnId] = (acc[pos.columnId] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+    })
+    
     setEntityPositions(newPositions)
-  }, [entities, getInitialEntityOrder])
+  }, [entities, getInitialEntityOrder, config])
 
   // ============================================================================
   // Persistence: Save State Changes (Debounced)
@@ -343,6 +347,7 @@ export function VibeKan<TEntity extends WithId, TStatus = string>({
   }
 
   // Group entities by column while maintaining order
+  // Keep useMemo for drag-and-drop stability - object reference must be stable
   const entitiesByColumn = useMemo(() => {
     const grouped: Record<string, TEntity[]> = {}
     
@@ -369,7 +374,7 @@ export function VibeKan<TEntity extends WithId, TStatus = string>({
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      <div className={cn('flex overflow-x-auto', columnGap, className)}>
+      <div className={cn('flex overflow-x-auto overflow-y-hidden h-full pb-4', columnGap, className)} style={{ scrollBehavior: 'smooth' }}>
         {config.columns.map(column => (
           <KanbanColumn 
             key={column.id} 

@@ -239,6 +239,7 @@ function CollapsedContextualNav({ location, children }: {
 }) {
   if (!children) return null
   
+  const [isOpen, setIsOpen] = React.useState(false)
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
   
   // Handle wheel events to prevent them from bubbling to the page
@@ -260,7 +261,7 @@ function CollapsedContextualNav({ location, children }: {
   }, [])
   
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -282,14 +283,19 @@ function CollapsedContextualNav({ location, children }: {
           className="overflow-y-auto flex-1 p-3"
           onWheel={handleWheel}
         >
-          {children}
+          {React.cloneElement(children as React.ReactElement, { 
+            onNavigate: () => setIsOpen(false)
+          })}
         </div>
       </PopoverContent>
     </Popover>
   )
 }
 
-function ProjectNavigation({ isCollapsed }: { isCollapsed: boolean }) {
+function ProjectNavigation({ isCollapsed, onNavigate }: { 
+  isCollapsed: boolean
+  onNavigate?: () => void 
+}) {
   const location = useLocation()
   
   // 🎯 SURGICAL SELECTORS: Individual selectors for each status to avoid object creation
@@ -389,6 +395,7 @@ function ProjectNavigation({ isCollapsed }: { isCollapsed: boolean }) {
                     <Link
                       key={project.id}
                       to={`/projects/${project.id}`}
+                      onClick={onNavigate}
                       className={cn(
                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -421,14 +428,16 @@ function ProjectNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   )
 }
 
-function TasksNavigation({ isCollapsed }: { isCollapsed: boolean }) {
+function TasksNavigation({ isCollapsed, onNavigate }: { 
+  isCollapsed: boolean
+  onNavigate?: () => void 
+}) {
   const location = useLocation()
   
   const taskItems = [
-    { label: 'All Tasks', href: '/tasks' },
-    { label: 'Kanban View', href: '/tasks/kanban' },
-    { label: 'Timeline View', href: '/tasks/timeline' },
-    { label: 'VibeGrid2 Demo', href: '/tasks/vibegrid2-demo' },
+    { label: 'Table View', href: '/tasks?view=table' },
+    { label: 'Kanban View', href: '/tasks?view=kanban' },
+    { label: 'Timeline View', href: '/tasks?view=timeline' },
   ]
   
   return (
@@ -442,6 +451,7 @@ function TasksNavigation({ isCollapsed }: { isCollapsed: boolean }) {
         <Link
           key={item.href}
           to={item.href}
+          onClick={onNavigate}
           className={cn(
             "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
             "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -457,7 +467,10 @@ function TasksNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   )
 }
 
-function SettingsNavigation({ isCollapsed }: { isCollapsed: boolean }) {
+function SettingsNavigation({ isCollapsed, onNavigate }: { 
+  isCollapsed: boolean
+  onNavigate?: () => void 
+}) {
   const location = useLocation()
   const settingsItems = [
     { label: 'Profile', href: '/settings' },
@@ -480,6 +493,7 @@ function SettingsNavigation({ isCollapsed }: { isCollapsed: boolean }) {
           <Link
             key={item.href}
             to={item.href}
+            onClick={onNavigate}
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
               "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -496,7 +510,10 @@ function SettingsNavigation({ isCollapsed }: { isCollapsed: boolean }) {
   )
 }
 
-function DebugNavigation({ isCollapsed }: { isCollapsed: boolean }) {
+function DebugNavigation({ isCollapsed, onNavigate }: { 
+  isCollapsed: boolean
+  onNavigate?: () => void 
+}) {
   const location = useLocation()
   const [systemExpanded, setSystemExpanded] = React.useState(true)
   const [errorExpanded, setErrorExpanded] = React.useState(false)
@@ -511,10 +528,7 @@ function DebugNavigation({ isCollapsed }: { isCollapsed: boolean }) {
         { label: 'Sync Test', href: '/debug/sync-test' },
         { label: 'Database', href: '/debug/database' },
         { label: 'Integrity', href: '/debug/integrity' },
-        { label: 'VibeGridFinal Demo', href: '/debug/vibegridfinal-demo' },
-        { label: 'VibeGridFinal Test', href: '/debug/vibegridfinal-test' },
-        { label: 'VibeGrid2 Features Test', href: '/debug/grid-pure-projects' },
-        { label: 'VibeGridOptimus Test', href: '/debug/grid-optimus-projects' },
+        { label: 'VibeGridOptimus Demo', href: '/debug/grid-optimus-projects' },
         { label: 'Kanban Debug', href: '/debug/kanban' },
         { label: 'React Flow Positioning', href: '/debug/reactflow-positioning' },
       ]

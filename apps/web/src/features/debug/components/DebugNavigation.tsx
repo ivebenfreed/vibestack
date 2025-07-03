@@ -8,7 +8,7 @@ export function DebugNavigation() {
     { path: '/debug/sync-test', label: 'Sync Test' },
     { path: '/debug/database', label: 'Database' },
     { path: '/debug/integrity', label: 'Integrity' },
-    { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal' },
+    { path: '/debug/grid-optimus-projects', label: 'VibeGridOptimus Demo' },
     { path: '/debug/reactflow-positioning', label: 'React Flow Positioning' },
   ];
   

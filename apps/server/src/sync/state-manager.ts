@@ -78,7 +78,7 @@ export class SyncStateManager implements StateManager {
     
     if (lastWake) {
       const sleepDuration = now - lastWake;
-      syncLogger.info('SyncDO wakeup', {
+      syncLogger.debug('SyncDO wakeup', {
         sleepMs: sleepDuration,
         sleepSec: Math.round(sleepDuration / 1000)
       }, MODULE_NAME);
@@ -97,7 +97,7 @@ export class SyncStateManager implements StateManager {
       
       if (storedClientId) {
         this.clientId = storedClientId;
-        syncLogger.info('Restored client ID from storage', {
+        syncLogger.debug('Restored client ID from storage', {
           clientId: storedClientId
         }, MODULE_NAME);
       }
@@ -106,7 +106,7 @@ export class SyncStateManager implements StateManager {
       const storedUserContext = await this.durableObjectState.storage.get<UserContext>('user_context');
       if (storedUserContext) {
         this.userContext = storedUserContext;
-        syncLogger.info('Restored user context from storage', {
+        syncLogger.debug('Restored user context from storage', {
           clientId: this.clientId,
           userId: this.userContext.userId,
           userRole: this.userContext.userRole,
@@ -144,7 +144,7 @@ export class SyncStateManager implements StateManager {
    * Initialize connection and register client
    */
   async initializeConnection(): Promise<void> {
-    syncLogger.info('Connection initializing', {
+    syncLogger.debug('Connection initializing', {
       clientId: this.clientId
     }, MODULE_NAME);
     
@@ -258,7 +258,7 @@ export class SyncStateManager implements StateManager {
    * Register a new client
    */
   async registerClient(clientId: string): Promise<void> {
-    syncLogger.info('Registering client', { clientId }, MODULE_NAME);
+    syncLogger.debug('Registering client', { clientId }, MODULE_NAME);
     
     try {
       this.clientId = clientId;
@@ -273,7 +273,7 @@ export class SyncStateManager implements StateManager {
         const authData = await this.context.env.CLIENT_REGISTRY.get(authKey);
         if (authData) {
           this.userContext = JSON.parse(authData) as UserContext;
-          syncLogger.info('Retrieved user context for client', {
+          syncLogger.debug('Retrieved user context for client', {
             clientId,
             userId: this.userContext.userId,
             userRole: this.userContext.userRole,

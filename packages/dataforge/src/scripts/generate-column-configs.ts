@@ -59,18 +59,15 @@ async function generateColumnConfigurationFile() {
 function generateColumnConfigurations(entitySchemas: any[], entityClasses: Function[], filter: MetadataFilter): string {
     const storage = getMetadataArgsStorage();
     
+    // Generate dynamic imports based on available entity classes
+    const entityImports = entityClasses.map(entityClass => entityClass.name).sort().join(',\n  ');
+    
     let output = `// Generated TanStack column definitions - DO NOT EDIT
 // Generated from client entities and TypeORM metadata
 
 import type { ColumnDef } from '@tanstack/react-table';
 import type {
-  ClientMigrationStatus,
-  Comment,
-  LocalChanges,
-  Project,
-  SyncMetadata,
-  Task,
-  User,
+  ${entityImports},
 } from './client-entities.js';
 
 // ============================================================================
@@ -363,7 +360,6 @@ function generateColumnConfigFromSchema(entity: Function, propertyName: string, 
             if (propertyName === 'status') {
                 if (entity.name === 'Task') enumType = 'TaskStatus';
                 else if (entity.name === 'Project') enumType = 'ProjectStatus';
-                else if (entity.name === 'ClientMigrationStatus') enumType = 'MigrationStatus';
             } else if (propertyName === 'priority') {
                 enumType = 'TaskPriority';
             } else if (propertyName === 'role') {
@@ -572,7 +568,9 @@ function getColumnSize(cellType: string, maxLength?: number): number {
             }
             return 250;
         case 'relationship-single':
+            return 180;
         case 'relationship-multi':
+            return 240;  // Increased width to accommodate 2 member badges + "⋯ +X more" badge
         case 'relationship-collection':
             return 180;
         case 'json':

@@ -14,6 +14,11 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  useDroppable,
+  pointerWithin,
+  rectIntersection,
+  getFirstCollision,
+  CollisionDetection,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -98,8 +103,16 @@ function TaskCard({ task, overlay = false }: { task: Task; overlay?: boolean }) 
 
 // Column component
 function KanbanColumn({ column, tasks, children }: { column: Column; tasks: Task[]; children: React.ReactNode }) {
-  const { setNodeRef } = useSortable({
+  const { setNodeRef: setSortableRef } = useSortable({
     id: column.id,
+    data: {
+      type: 'Column',
+      column,
+    },
+  })
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `${column.id}-droppable`,
     data: {
       type: 'Column',
       column,
@@ -108,9 +121,17 @@ function KanbanColumn({ column, tasks, children }: { column: Column; tasks: Task
 
   const taskIds = tasks.map(task => task.id)
 
+  // Combine refs
+  const setNodeRef = (node: HTMLElement | null) => {
+    setSortableRef(node)
+    setDroppableRef(node)
+  }
+
   return (
     <div ref={setNodeRef} className="w-80">
-      <div className="bg-muted/50 rounded-lg p-4">
+      <div className={`bg-muted/50 rounded-lg p-4 transition-colors ${
+        isOver ? 'bg-blue-100 border-2 border-blue-300 border-dashed' : ''
+      }`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">{column.title}</h3>
           <Badge variant="secondary">{tasks.length}</Badge>
@@ -126,30 +147,49 @@ function KanbanColumn({ column, tasks, children }: { column: Column; tasks: Task
   )
 }
 
+// Custom collision detection for kanban
+const customCollisionDetection: CollisionDetection = (args) => {
+  // First try to find collisions with sortable items (for reordering within columns)
+  const rectCollisions = rectIntersection(args)
+  
+  if (rectCollisions.length > 0) {
+    return rectCollisions
+  }
+  
+  // If no sortable items found, look for droppable column zones
+  return pointerWithin(args)
+}
+
 // Main component
 export default function TasksKanban() {
-  // Get tasks from XState atom
-  const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
+  // ✅ SIMPLE SELECTOR: Back to basics
+  const tasks = useSelector(tasksAtom, (tasksRecord) => {
+    if (!tasksRecord || Object.keys(tasksRecord).length === 0) return []
+    return Object.values(tasksRecord)
+  }, shallowEqual)
   
-  // Local state for ordered tasks
-  const [orderedTasks, setOrderedTasks] = useState<Task[]>([])
+  // ✅ ORDERING STATE: Separate from sync, only for user drag ordering
+  const [taskOrder, setTaskOrder] = useState<string[]>([]) // Just store IDs in order
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   
-  // Initialize ordered tasks from atom data
+  // ✅ OPTIMIZED SYNC: React Compiler will optimize this array operation
+  const taskIds = tasks.map(t => t.id).sort()
+  const taskIdsString = taskIds.join(',')
+  
   React.useEffect(() => {
-    // Preserve existing order where possible
-    const existingIds = new Set(orderedTasks.map(t => t.id))
-    const newTasks = tasks.filter(t => !existingIds.has(t.id))
-    const updatedTasks = orderedTasks.filter(t => tasks.some(task => task.id === t.id))
+    const currentTaskIds = new Set(taskOrder)
+    const newTaskIds = taskIds.filter(id => !currentTaskIds.has(id))
+    const hasDeletedTasks = taskOrder.some(id => !taskIds.includes(id))
     
-    // Update with current task data while preserving order
-    const mergedTasks = updatedTasks.map(orderedTask => {
-      const currentTask = tasks.find(t => t.id === orderedTask.id)
-      return currentTask || orderedTask
-    })
-    
-    setOrderedTasks([...mergedTasks, ...newTasks])
-  }, [tasks])
+    // Only update if there are actual structural changes
+    if (newTaskIds.length > 0 || hasDeletedTasks) {
+      setTaskOrder(prev => {
+        // Remove deleted tasks and add new tasks
+        const filtered = prev.filter(id => taskIds.includes(id))
+        return [...filtered, ...newTaskIds]
+      })
+    }
+  }, [taskIdsString]) // Only when task IDs change
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -159,90 +199,80 @@ export default function TasksKanban() {
     })
   )
 
-  const onDragStart = (event: DragStartEvent) => {
+  const onDragStart = React.useCallback((event: DragStartEvent) => {
     const { active } = event
     console.log('🚀 Drag start:', active.id, active.data.current)
     
+    // ✅ MINIMAL STATE UPDATES: Only set active task for overlay
     if (active.data.current?.type === 'Task') {
       setActiveTask(active.data.current.task)
     }
-  }
+  }, [])
 
-  const onDragOver = (event: DragOverEvent) => {
+  // ✅ LIVE REORDERING: Update visual order during drag for better UX
+  const onDragOver = React.useCallback((event: DragOverEvent) => {
     const { active, over } = event
+    
     if (!over) return
-
-    const activeId = active.id
-    const overId = over.id
-
-    console.log('🔄 Drag over:', { activeId, overId })
-
-    const activeData = active.data.current
-    const overData = over.data.current
-
-    if (!activeData || activeData.type !== 'Task') return
-
-    const isOverATask = overData?.type === 'Task'
-    const isOverAColumn = overData?.type === 'Column'
-
-    setOrderedTasks((tasks) => {
-      const activeIndex = tasks.findIndex((t) => t.id === activeId)
-      if (activeIndex === -1) return tasks
-
-      const activeTask = tasks[activeIndex]
-
-      // Task over task
-      if (isOverATask) {
-        const overIndex = tasks.findIndex((t) => t.id === overId)
-        if (overIndex === -1) return tasks
-
-        const overTask = tasks[overIndex]
-        let newTasks = [...tasks]
-
-        // Update status if different column
-        if (activeTask.status !== overTask.status) {
-          newTasks[activeIndex] = { ...activeTask, status: overTask.status }
-          console.log(`✅ Task ${activeId} moved to status ${overTask.status}`)
-        }
-
-        // Reorder
-        return arrayMove(newTasks, activeIndex, overIndex)
-      }
-
-      // Task over column
-      if (isOverAColumn) {
-        const newStatus = overData.column.status
-        if (activeTask.status !== newStatus) {
-          const newTasks = [...tasks]
-          newTasks[activeIndex] = { ...activeTask, status: newStatus }
-          console.log(`✅ Task ${activeId} moved to status ${newStatus}`)
-          return newTasks
+    
+    const activeId = active.id as string
+    const overId = over.id as string
+    
+    // Only handle task-to-task reordering within the same column
+    if (active.data.current?.type === 'Task' && over.data.current?.type === 'Task') {
+      const activeTask = tasks.find(t => t.id === activeId)
+      const overTask = tasks.find(t => t.id === overId)
+      
+      // Only reorder if both tasks are in the same status/column
+      if (activeTask && overTask && activeTask.status === overTask.status) {
+        const currentOrder = [...taskOrder]
+        const activeIndex = currentOrder.indexOf(activeId)
+        const overIndex = currentOrder.indexOf(overId)
+        
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          const newOrder = arrayMove(currentOrder, activeIndex, overIndex)
+          setTaskOrder(newOrder)
         }
       }
-
-      return tasks
-    })
-  }
+    }
+  }, [tasks, taskOrder])
 
   const onDragEnd = async (event: DragEndEvent) => {
     console.log('🏁 Drag end')
     setActiveTask(null)
 
-    // Find the task that was moved
-    const activeId = event.active.id
-    const movedTask = orderedTasks.find(t => t.id === activeId)
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = active.id as string
+    const overData = over.data.current
+    const originalTask = tasks.find(t => t.id === activeId)
     
-    if (movedTask) {
-      // Get original task to check if status changed
-      const originalTask = tasks.find(t => t.id === activeId)
-      if (originalTask && originalTask.status !== movedTask.status) {
-        const { updateTaskUI } = await import('@/domain/task')
-        await updateTaskUI(movedTask.id, { status: movedTask.status })
+    if (!originalTask) return
+
+    let newStatus: TaskStatus | null = null
+
+    // Determine new status based on drop target
+    if (overData?.type === 'Column') {
+      newStatus = overData.column.status
+    } else if (overData?.type === 'Task') {
+      const overTask = tasks.find(t => t.id === over.id)
+      if (overTask) {
+        newStatus = overTask.status
       }
+    }
+
+    // ✅ CHANGE DETECTION: Only update if status actually changed
+    if (newStatus && originalTask.status !== newStatus) {
+      console.log(`🔄 Status change: ${originalTask.status} → ${newStatus}`)
+      const { updateTaskUI } = await import('@/domain/task')
+      await updateTaskUI(activeId, { status: newStatus })
+    } else {
+      console.log('🚫 No status change needed - skipping update')
     }
   }
 
-  // Group tasks by status while maintaining order
+  // ✅ SIMPLE GROUPING: Keep useMemo for drag-and-drop stability
   const tasksByColumn = useMemo(() => {
     const grouped: Record<ColumnId, Task[]> = {
       open: [],
@@ -250,13 +280,18 @@ export default function TasksKanban() {
       completed: []
     }
     
-    orderedTasks.forEach(task => {
-      const columnId = getColumnId(task.status)
-      grouped[columnId].push(task)
-    })
+    const tasksMap = new Map(tasks.map(t => [t.id, t]))
+    
+    for (const taskId of taskOrder) {
+      const task = tasksMap.get(taskId)
+      if (task) {
+        const columnId = getColumnId(task.status)
+        grouped[columnId].push(task)
+      }
+    }
     
     return grouped
-  }, [orderedTasks])
+  }, [tasks, taskOrder])
 
   return (
     <div className="p-6">
@@ -264,7 +299,7 @@ export default function TasksKanban() {
       
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={customCollisionDetection}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}

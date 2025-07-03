@@ -924,7 +924,7 @@ export async function sendLiveChanges(
       return { success: false, lsn: '0/0' };
     }
     
-    syncLogger.info('Live changes sent successfully', {
+    syncLogger.debug('Live changes sent successfully', {
       clientId,
       lsn: lastSentLSN,
       changeCount: orderedChanges.length,

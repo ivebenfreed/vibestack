@@ -35,11 +35,11 @@ function DebugIndexPage() {
       color: 'border-red-500/20 hover:border-red-500/30 bg-red-500/5 dark:border-red-400/20 dark:hover:border-red-400/30 dark:bg-red-400/5'
     },
     {
-      title: '🧩 VibeGridFinal Tasks',
-      description: 'Production VibeGridFinal implementation with DirectUsagePattern architecture. High-performance 45ms cell rendering with XState integration.',
-      path: '/debug/vibegridfinal-tasks',
-      color: 'border-indigo-500/20 hover:border-indigo-500/30 bg-indigo-500/5 dark:border-indigo-400/20 dark:hover:border-indigo-400/30 dark:bg-indigo-400/5',
-      badge: 'TABLE SYSTEM'
+      title: '⚡ VibeGridOptimus Demo',
+      description: 'Production-ready declarative data grid with enhanced batch operations. Test all entities, themes, and editor types with intelligent batching.',
+      path: '/debug/grid-optimus-projects',
+      color: 'border-violet-500/20 hover:border-violet-500/30 bg-violet-500/5 dark:border-violet-400/20 dark:hover:border-violet-400/30 dark:bg-violet-400/5',
+      badge: 'PRODUCTION GRID'
     }
   ]
 
@@ -54,7 +54,7 @@ function DebugIndexPage() {
           <h3 className="font-semibold text-green-900 dark:text-green-100">🧹 Debug Environment Cleaned!</h3>
           <p className="text-green-800 dark:text-green-200 text-sm mt-1">
             Essential debug tools only. All legacy patterns removed, focusing on current architecture: 
-            <strong>XState Atoms + VibeGridFinal + 3-Layer Architecture</strong>.
+            <strong>XState Atoms + VibeGridOptimus + 3-Layer Architecture</strong>.
           </p>
         </div>
       </div>
@@ -68,8 +68,8 @@ function DebugIndexPage() {
                   ? 'bg-green-500/10 text-green-700 dark:bg-green-400/10 dark:text-green-300 border border-green-500/20' 
                   : page.badge === 'SYNC TEST'
                   ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 border border-emerald-500/20'
-                  : page.badge === 'TABLE SYSTEM'
-                  ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
+                  : page.badge === 'PRODUCTION GRID'
+                  ? 'bg-violet-500/10 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 border border-violet-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -86,7 +86,7 @@ function DebugIndexPage() {
                 <Button variant="outline" className="w-full">
                   {page.badge === 'SYNC DEBUG' ? '🚀 Open Sync Panel' 
                    : page.badge === 'SYNC TEST' ? '🧪 Open Test Framework'
-                   : page.badge === 'TABLE SYSTEM' ? '🧩 Open Table Demo'
+                   : page.badge === 'PRODUCTION GRID' ? '⚡ Open Grid Demo'
                    : 'Open Tool'}
                 </Button>
               </Link>
@@ -104,7 +104,7 @@ function DebugIndexPage() {
           <li>• <strong>Sync System</strong> - WebSocket sync, state transitions, and service testing</li>
           <li>• <strong>Database Operations</strong> - Connection testing and query performance</li>
           <li>• <strong>Data Integrity</strong> - Validation, recovery, and consistency checks</li>
-          <li>• <strong>VibeGridFinal</strong> - Table performance and DirectUsagePattern validation</li>
+          <li>• <strong>VibeGridOptimus</strong> - Production table with enhanced batch operations and declarative API</li>
         </ul>
       </div>
     </div>

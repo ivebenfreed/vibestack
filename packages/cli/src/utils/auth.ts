@@ -3,13 +3,22 @@ import * as fs from 'fs/promises';
 import path from 'path';
 import inquirer from 'inquirer';
 import fetch from 'node-fetch'; // Or your preferred fetch polyfill for Node
+import { getCurrentEnvironment, getAuthTokenFileName } from './environment.js';
 
 // Token storage location: project-local file
 // Using the same ESM path resolution approach as in cli.ts
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const TOKEN_FILE_PATH = path.resolve(__dirname, '../../.auth-token.json');
+
+/**
+ * Get the token file path for the current environment
+ */
+function getTokenFilePath(): string {
+  const currentEnv = getCurrentEnvironment();
+  const tokenFileName = getAuthTokenFileName(currentEnv);
+  return path.resolve(__dirname, '../../', tokenFileName);
+}
 
 /**
  * Saves an authentication token to the local storage file
@@ -17,11 +26,13 @@ const TOKEN_FILE_PATH = path.resolve(__dirname, '../../.auth-token.json');
  */
 export async function saveToken(token: string): Promise<void> {
   try {
+    const tokenFilePath = getTokenFilePath();
+    const currentEnv = getCurrentEnvironment();
     // Ensure the directory exists
-    await fs.mkdir(path.dirname(TOKEN_FILE_PATH), { recursive: true });
+    await fs.mkdir(path.dirname(tokenFilePath), { recursive: true });
     // Write the token to the file
-    await fs.writeFile(TOKEN_FILE_PATH, JSON.stringify({ token }), 'utf-8');
-    console.log('Authentication token saved successfully.');
+    await fs.writeFile(tokenFilePath, JSON.stringify({ token, environment: currentEnv }), 'utf-8');
+    console.log(`Authentication token saved successfully for ${currentEnv} environment.`);
   } catch (error) {
     console.error('Error saving authentication token:', error);
     throw new Error(`Failed to save authentication token: ${error instanceof Error ? error.message : String(error)}`);
@@ -34,9 +45,18 @@ export async function saveToken(token: string): Promise<void> {
  */
 export async function loadToken(): Promise<string | null> {
   try {
-    const data = await fs.readFile(TOKEN_FILE_PATH, 'utf-8');
-    const { token } = JSON.parse(data);
-    return token || null;
+    const tokenFilePath = getTokenFilePath();
+    const currentEnv = getCurrentEnvironment();
+    const data = await fs.readFile(tokenFilePath, 'utf-8');
+    const parsed = JSON.parse(data);
+    
+    // Verify the token is for the current environment
+    if (parsed.environment && parsed.environment !== currentEnv) {
+      console.log(`Token found for ${parsed.environment} environment, but current environment is ${currentEnv}. Token will be ignored.`);
+      return null;
+    }
+    
+    return parsed.token || null;
   } catch (error) {
     // File not found or other error - token doesn't exist
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -52,8 +72,10 @@ export async function loadToken(): Promise<string | null> {
  */
 export async function clearToken(): Promise<void> {
   try {
-    await fs.unlink(TOKEN_FILE_PATH);
-    console.log('Authentication token cleared successfully.');
+    const tokenFilePath = getTokenFilePath();
+    const currentEnv = getCurrentEnvironment();
+    await fs.unlink(tokenFilePath);
+    console.log(`Authentication token cleared successfully for ${currentEnv} environment.`);
   } catch (error) {
     // If file doesn't exist, consider this a success
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

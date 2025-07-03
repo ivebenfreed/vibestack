@@ -67,16 +67,21 @@ export default function TasksKanbanV2() {
   const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Tasks Kanban</h1>
-      <VibeKan 
-        entities={tasks} 
-        config={taskKanbanConfig}
-        enablePersistence={true}
-        kanbanId="tasks-main"
-        enableCrossTabSync={true}
-        debugMode={false}
-      />
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 p-6 pb-4">
+        <h1 className="text-2xl font-bold">Tasks Kanban</h1>
+      </div>
+      <div className="flex-1 overflow-hidden px-6 pb-6">
+        <VibeKan 
+          entities={tasks} 
+          config={taskKanbanConfig}
+          enablePersistence={true}
+          kanbanId="tasks-main"
+          enableCrossTabSync={true}
+          debugMode={false}
+          className="h-full"
+        />
+      </div>
     </div>
   )
 }

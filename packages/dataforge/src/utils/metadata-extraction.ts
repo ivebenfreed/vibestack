@@ -345,13 +345,40 @@ export function extractEntityMetadata(entityName: string, entitySchema: any, ent
   // Extract relationship metadata
   if (entitySchema.relations) {
     for (const [relationName, relationDef] of Object.entries(entitySchema.relations)) {
+      const relationInfo = relationDef as any;
+      
       relationships.push({
         name: relationName,
-        type: (relationDef as any).type,
-        targetEntity: (relationDef as any).target,
-        foreignKey: (relationDef as any).joinColumn?.name,
-        joinTable: (relationDef as any).joinTable?.name,
-        nullable: (relationDef as any).nullable ?? true
+        type: relationInfo.type,
+        targetEntity: relationInfo.target,
+        foreignKey: relationInfo.joinColumn?.name,
+        joinTable: relationInfo.joinTable?.name,
+        nullable: relationInfo.nullable ?? true
+      });
+      
+      // Also add relationship entities to fields array for CRUD operations
+      const isArray = relationInfo.type === 'one-to-many' || relationInfo.type === 'many-to-many';
+      const targetEntityName = typeof relationInfo.target === 'function' ? relationInfo.target.name : relationInfo.target;
+      const fieldType = isArray ? `${targetEntityName}[]` : targetEntityName;
+      
+      // Create business logic for relationship
+      const relationshipBusinessLogic: BusinessRule[] = [{
+        type: 'foreignKey',
+        config: {
+          relationshipType: relationInfo.type,
+          targetEntity: targetEntityName,
+          required: !relationInfo.nullable
+        }
+      }];
+      
+      fields.push({
+        name: relationName,
+        type: fieldType,
+        nullable: relationInfo.nullable ?? true,
+        validation: [],
+        businessLogic: relationshipBusinessLogic,
+        category: 'relationship-entity',
+        isArray
       });
     }
   }

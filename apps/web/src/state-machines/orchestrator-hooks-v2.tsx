@@ -117,17 +117,9 @@ export function useAuth() {
     }
   }, [authActor]);
 
-  // Computed display properties for backward compatibility
-  const displayName = useMemo(() => {
-    if (!user) return 'User';
-    return user.name || user.email?.split('@')[0] || 'User';
-  }, [user]);
-
-  const initials = useMemo(() => {
-    if (!user) return 'U';
-    const name = user.name || user.email?.split('@')[0] || 'User';
-    return name.slice(0, 2).toUpperCase();
-  }, [user]);
+  // Computed display properties - React Compiler will optimize these
+  const displayName = !user ? 'User' : (user.name || user.email?.split('@')[0] || 'User');
+  const initials = !user ? 'U' : (user.name || user.email?.split('@')[0] || 'User').slice(0, 2).toUpperCase();
 
   const userRole = user?.role || null;
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';

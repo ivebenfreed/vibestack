@@ -438,6 +438,16 @@ export class EntityOperations {
         }
       }
 
+      // Log what data is being sent to the repository
+      syncLogger.info(`About to call repository.update with data`, {
+        table,
+        id,
+        dataKeys: Object.keys(cleanedData),
+        hasClientId: !!cleanedData.clientId,
+        clientIdValue: cleanedData.clientId,
+        updatedAtValue: cleanedData.updatedAt
+      }, MODULE_NAME);
+
       // Try direct update first (preferred for explicit update operations)
       const result = await repository.update(id, cleanedData);
       
@@ -448,8 +458,20 @@ export class EntityOperations {
         resultType: typeof result
       }, MODULE_NAME);
       
+      // Log successful direct update
+      if (result) {
+        syncLogger.info(`Update operation succeeded: ${table}:${id}`, {
+          table,
+          id,
+          operation: 'update',
+          success: true
+        }, MODULE_NAME);
+        
+        return result;
+      }
+      
       // Enhanced: If entity doesn't exist, fall back to upsert for better CRDT handling
-      if (!result) {
+      else {
         syncLogger.warn(`Update operation failed - entity not found: ${table}:${id}. Attempting upsert fallback.`, {
           table,
           id,

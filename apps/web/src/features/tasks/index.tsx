@@ -1,256 +1,122 @@
-import React from 'react'
-import { VibeGridFinal } from '@/components/custom/vibegridfinal/core/VibeGridFinal'
-import type { ColumnDef } from '@tanstack/react-table'
+import React, { Suspense, useMemo } from 'react'
+import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import type { Task } from '@repo/dataforge/client-entities'
-import type { 
-  RelationshipDataProvider, 
-  DirectUsagePattern
-} from '@/components/custom/vibegridfinal/types'
-import { 
-  createDirectUsagePattern,
-  validateDirectUsagePattern
-} from '@/components/custom/vibegridfinal/utils/patterns'
 import { tasksAtom } from '@/domain/task'
-import { projectsAtom } from '@/domain/project'
-import { usersAtom } from '@/domain/user'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { Button } from '@/components/ui/button'
-import { Kanban, Calendar } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { Grid3X3, Kanban, Calendar } from 'lucide-react'
+import { useTheme } from '@/context/theme-context'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 
-// ✅ Generated column configurations
-import { TaskColumns } from '@repo/dataforge/column-configurations'
+// Lazy load heavy components for performance - using V2 with proper drag feedback
+const LazyKanbanView = React.lazy(() => 
+  import('./TasksKanbanV2').then(module => ({ default: module.default }))
+)
 
-// Default columns to display
-const DEFAULT_TASK_COLUMNS: (keyof Task)[] = [
-  'title', 'status', 'priority', 'assignee', 'project', 
-  'dueDate', 'startDate', 'description', 'createdAt', 'updatedAt'
-]
+const LazyTimelineView = React.lazy(() => 
+  import('./timeline/TasksTimeline').then(module => ({ default: module.TasksTimeline }))
+)
+
+// Loading component for tab content
+function TaskViewLoader({ view }: { view: string }) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+        <p className="text-sm text-muted-foreground">Loading {view} view...</p>
+      </div>
+    </div>
+  )
+}
 
 /**
- * Main Tasks Feature Component
+ * Main Tasks Feature Component with Tabbed Interface
  * 
- * ✅ PATTERN-ENFORCED ARCHITECTURE: Using DirectUsagePattern interface
- * - TypeScript enforces balanced selectors and proper handlers
- * - Validates architectural patterns at compile time
- * - Prevents performance anti-patterns and wrapper overhead
- * - ~50% performance improvement with architectural guardrails
+ * Features:
+ * - Performant tab switching with lazy loading
+ * - Automatic component unmounting for memory efficiency  
+ * - Three views: Table (VibeGridOptimus), Kanban, Timeline
+ * - Shared state management via XState atoms
  */
 const Tasks: React.FC = () => {
-  
-  // ============================================================================
-  // 🔥 ENFORCED PATTERNS: Balanced Selectors (Required by DirectUsagePattern)
-  // ============================================================================
-  
-  // ✅ FIXED: Balanced surgical selector - detects both structural AND content changes
+  // Get theme and resolve 'system' to actual theme - React Compiler will optimize this
+  const { theme } = useTheme()
+  const effectiveTheme = theme === 'system' 
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : theme
+
+  // Search param support for unified navigation
+  const navigate = useNavigate()
+  const searchParams = useSearch({ from: '/_authenticated/tasks/' }) as { view?: string }
+  const currentView = searchParams.view || 'table'
+
+  const handleTabChange = (value: string) => {
+    navigate({ 
+      to: '/tasks',
+      search: { view: value }
+    })
+  }
+
+  // Optimized selector for tasks data
   const tasks = useSelector(tasksAtom, (tasksRecord) => {
     if (!tasksRecord || typeof tasksRecord !== 'object') return []
-    
-    // Return tasks array without forced sorting - let table handle sorting
     return Object.values(tasksRecord)
   }, shallowEqual)
 
-  // ✅ RELATIONSHIP SELECTORS: Using same balanced pattern
-  const useRelationshipSelectors = React.useCallback(() => {
-    const projects = useSelector(projectsAtom, (projectsRecord) => {
-      if (!projectsRecord || typeof projectsRecord !== 'object') return []
-      return Object.values(projectsRecord).sort((a, b) => a.name.localeCompare(b.name))
-    }, shallowEqual)
-
-    const users = useSelector(usersAtom, (usersRecord) => {
-      if (!usersRecord || typeof usersRecord !== 'object') return []
-      return Object.values(usersRecord).sort((a, b) => a.name.localeCompare(b.name))
-    }, shallowEqual)
-
-    return { projects, users }
-  }, [])
-
-  // Execute selectors
-  const { projects, users } = useRelationshipSelectors()
-
-  // ============================================================================
-  // 🔥 ENFORCED PATTERNS: Business Logic Handlers (Required by DirectUsagePattern)
-  // ============================================================================
-  
-  // ✅ DIRECT FUNCTION CALLS: Simple, clear task updates
-  const handleSave = React.useCallback(async (entityId: string, columnId: string, value: any) => {
-    
-    try {
-      const { updateTaskUI } = await import('@/domain/task')
-    
-      // Task-specific business logic
-      if (columnId === 'status') {
-        const currentTasks = tasksAtom.get()
-        const task = currentTasks?.[entityId]
-        if (task) {
-          // Auto-set completion date when marking as complete
-          if (value === 'completed' && !task.completedAt) {
-            await updateTaskUI(entityId, { 
-              status: value,
-              completedAt: new Date()
-            })
-            return
-          }
-          
-          // Clear completion date when moving from completed
-          if (task.status === 'completed' && value !== 'completed') {
-            await updateTaskUI(entityId, { 
-              status: value,
-              completedAt: undefined
-            })
-            return
-          }
-        }
-      }
-      
-      // Convert column updates to proper task updates
-      let updateData: Partial<Task> = {}
-      if (columnId === 'project') {
-        updateData = { projectId: value || null }
-      } else if (columnId === 'assignee') {
-        updateData = { assigneeId: value || null }
-      } else {
-        updateData = { [columnId]: value } as Partial<Task>
-      }
-      
-      await updateTaskUI(entityId, updateData)
-    } catch (error) {
-      console.error('[TasksIndex] Task update failed:', error)
-    }
-  }, [])
-  
-  // ✅ BULK ACTION INTEGRATION: Simple direct function calls
-  const handleBulkAction = React.useCallback(async (selectedIds: string[], action: string) => {
-    
-    try {
-      switch (action) {
-        case 'delete':
-          const confirmed = window.confirm(`Delete ${selectedIds.length} tasks?`)
-          if (confirmed) {
-            const { deleteTaskUI } = await import('@/domain/task')
-            await Promise.all(selectedIds.map(id => deleteTaskUI(id)))
-          }
-          break
-        case 'edit':
-          alert(`Bulk edit ${selectedIds.length} tasks - Coming soon!`)
-          break
-        case 'archive':
-          alert(`Bulk archive ${selectedIds.length} tasks - Coming soon!`)
-          break
-        default:
-          console.warn(`Unknown bulk action: ${action}`)
-      }
-    } catch (error) {
-      console.error(`Bulk ${action} failed:`, error)
-    }
-  }, [])
-
-  // ============================================================================
-  // 🔥 ENFORCED PATTERNS: Column Configuration (Required by DirectUsagePattern)
-  // ============================================================================
-  
-  // ✅ GENERATED COLUMNS: Required by ColumnConfigurationPattern interface
-  const columns: ColumnDef<Task>[] = React.useMemo(() => {
-    return DEFAULT_TASK_COLUMNS.map(columnKey => {
-      const column = TaskColumns[columnKey as keyof typeof TaskColumns]
-      if (!column) {
-        throw new Error(`Column ${columnKey} not found in TaskColumns`)
-      }
-      return column
-    })
-  }, [])
-
-  // ✅ RELATIONSHIP DATA PROVIDER: Required by ColumnConfigurationPattern interface
-  const relationshipData: RelationshipDataProvider = React.useMemo(() => ({
-    project: {
-      data: projects,
-      displayField: 'name'
-    },
-    assignee: {
-      data: users,
-      displayField: 'name'
-    }
-  }), [projects, users])
-
-  // ============================================================================
-  // 🔥 PATTERN VALIDATION: Create and validate DirectUsagePattern
-  // ============================================================================
-  
-  const usagePattern: DirectUsagePattern<Task> = React.useMemo(() => {
-    return createDirectUsagePattern<Task>({
-      useBalancedSelector: () => tasks,
-      useRelationshipSelectors,
-      handleSave,
-      handleBulkAction,
-      columns,
-      relationshipData,
-      tableId: 'tasks-grid',
-      enablePersistence: true
-    })
-  }, [tasks, useRelationshipSelectors, handleSave, handleBulkAction, columns, relationshipData])
-
-  // ✅ COMPILE-TIME VALIDATION: Ensure patterns are followed
-  const validation = React.useMemo(() => {
-    const result = validateDirectUsagePattern(usagePattern)
-    if (!result.valid) {
-      console.error('❌ DirectUsagePattern validation failed:', result.errors)
-    }
-    return result
-  }, [usagePattern])
 
   return (
     <div className="flex flex-col h-full">
+      {/* Page Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-            <p className="text-muted-foreground">
-              Manage and track all your tasks.
-            </p>
-          </div>
-          
-          {/* View Toggle */}
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link to="/tasks/kanban">
-                <Kanban className="h-4 w-4 mr-2" />
-                Kanban View
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/tasks/timeline">
-                <Calendar className="h-4 w-4 mr-2" />
-                Timeline View
-              </Link>
-            </Button>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2">Tasks</h1>
+        <p className="text-muted-foreground">
+          Manage and track all your tasks across different views.
+        </p>
       </div>
       
-      <div className="flex-1">
-        <VibeGridFinal
-          data={tasks}
-          columns={columns}
-          relationshipData={relationshipData}
-          onSave={handleSave}
-          enableSorting={true}
-          enablePagination={true}
-          enableGlobalSearch={true}
-          enableHorizontalScrolling={true}
-          enableRowSelection={true}
-          onBulkAction={handleBulkAction}
-          pageSize={10}
-          className="border border-border rounded-lg"
-          debugMode={true}
-          debugEllipsis={false}
-          debugBorders={false}
-          tableId="tasks-grid"
-          enablePersistence={true}
-          enableCrossTabSync={false}
-          __usagePattern={usagePattern}
-        />
-      </div>
+      {/* Tabbed Interface with search param support */}
+      <Tabs value={currentView} onValueChange={handleTabChange} className="flex flex-col flex-1">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsTrigger value="table" className="flex items-center gap-2">
+            <Grid3X3 className="h-4 w-4" />
+            Table View
+          </TabsTrigger>
+          <TabsTrigger value="kanban" className="flex items-center gap-2">
+            <Kanban className="h-4 w-4" />
+            Kanban Board
+          </TabsTrigger>
+          <TabsTrigger value="timeline" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Timeline
+          </TabsTrigger>
+        </TabsList>
+        
+        {/* Table View */}
+        <TabsContent value="table" className="flex-1">
+          <VibeGridOptimus
+            entityName="Task"
+            data={tasks}
+            height={600}
+            theme={effectiveTheme}
+            className="border border-border rounded-lg"
+          />
+        </TabsContent>
+        
+        {/* Kanban View */}
+        <TabsContent value="kanban" className="flex-1">
+          <Suspense fallback={<TaskViewLoader view="Kanban" />}>
+            <LazyKanbanView />
+          </Suspense>
+        </TabsContent>
+        
+        {/* Timeline View */}
+        <TabsContent value="timeline" className="flex-1">
+          <Suspense fallback={<TaskViewLoader view="Timeline" />}>
+            <LazyTimelineView />
+          </Suspense>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

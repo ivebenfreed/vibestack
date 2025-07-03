@@ -5,14 +5,12 @@ import { BaseDomainEntity } from '../entities/BaseDomainEntity.js';
 import { BaseSystemEntity } from '../entities/BaseSystemEntity.js';
 
 // Enum Imports (dynamically generated)
-import { MigrationState, MigrationType } from '../entities/ClientMigration.js';
 import { ProjectStatus } from '../entities/Project.js';
 import { TaskPriority, TaskStatus } from '../entities/Task.js';
 import { UserRole } from '../entities/User.js';
 
 
 // Enum Exports
-export { MigrationState, MigrationType } from '../entities/ClientMigration.js';
 export { ProjectStatus } from '../entities/Project.js';
 export { TaskPriority, TaskStatus } from '../entities/Task.js';
 export { UserRole } from '../entities/User.js';
@@ -64,12 +62,6 @@ export class ClientMigration extends BaseSystemEntity {
 
   schemaVersion!: string;
 
-  dependencies!: string[];
-
-  migrationType!: MigrationType;
-
-  state!: MigrationState;
-
   upQueries!: string[];
 
   downQueries!: string[];
@@ -98,13 +90,6 @@ export class Comment extends BaseDomainEntity {
   task?: Task;
 
   project?: Project;
-
-}
-
-export class JWKS extends BaseSystemEntity {
-  publicKey!: string;
-
-  privateKey!: string;
 
 }
 
@@ -335,23 +320,6 @@ export const ClientMigrationSchema = new EntitySchema<ClientMigration>({
             name: 'schema_version', // Explicit DB Name
             type: 'text', // Use helper
         },
-        'dependencies': {
-            name: 'dependencies', // Explicit DB Name
-            type: 'text', // Use helper
-            default: [],
-            array: true
-        },
-        'migrationType': {
-            name: 'migration_type', // Explicit DB Name
-            type: 'enum', // Use helper
-            enum: MigrationType, // Use name from decorator
-        },
-        'state': {
-            name: 'state', // Explicit DB Name
-            type: 'enum', // Use helper
-            default: "pending",
-            enum: MigrationState, // Use name from decorator
-        },
         'upQueries': {
             name: 'up_queries', // Explicit DB Name
             type: 'text', // Use helper
@@ -436,27 +404,6 @@ export const CommentSchema = new EntitySchema<Comment>({
             joinColumn: { name: 'project_id' },
             nullable: true
         }
-    },
-});
-
-// Schema for JWKS
-export const JWKSSchema = new EntitySchema<JWKS>({
-    target: JWKS, // Link to generated class
-    name: 'JWKS', 
-    tableName: 'jwks',
-    columns: {
-        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
-        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
-        'publicKey': {
-            name: 'publicKey', // Explicit DB Name
-            type: 'text', // Use helper
-        },
-        'privateKey': {
-            name: 'privateKey', // Explicit DB Name
-            type: 'text', // Use helper
-        }
-    },
-    relations: {
     },
 });
 
@@ -777,7 +724,6 @@ export const serverEntities = [
   ChangeHistorySchema,
   ClientMigrationSchema,
   CommentSchema,
-  JWKSSchema,
   ProjectSchema,
   SessionSchema,
   TaskSchema,
@@ -811,7 +757,6 @@ export const SERVER_SYSTEM_TABLES = [
   '"accounts"',
   '"change_history"',
   '"client_migration"',
-  '"jwks"',
   '"sessions"',
   '"verifications"',
 ];

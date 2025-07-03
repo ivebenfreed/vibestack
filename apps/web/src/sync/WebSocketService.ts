@@ -243,11 +243,28 @@ export class WebSocketService {
     }, 1000);
     
     this.heartbeatTimer = setInterval(() => {
+      // CRITICAL FIX: Get current LSN from sync machine state instead of stale config
+      let currentLSN = this.config.lsn;
+      
+      // Try to get the current LSN from the global sync state
+      try {
+        const stored = localStorage.getItem('sync-machine-state');
+        if (stored) {
+          const parsedState = JSON.parse(stored);
+          if (parsedState.currentLSN) {
+            currentLSN = parsedState.currentLSN;
+          }
+        }
+      } catch (error) {
+        syncLogger.warn('connection', 'Failed to get current LSN from sync state, using config value', error);
+      }
+      
       // Use info level instead of debug to ensure visibility
       syncLogger.info('connection', 'Heartbeat timer fired', {
         isConnected: this.isConnected(),
         clientId: this.config.clientId,
-        lsn: this.config.lsn,
+        configLSN: this.config.lsn,
+        currentLSN: currentLSN,
         timestamp: new Date().toISOString(),
         documentHidden: document.hidden,
         visibilityState: document.visibilityState
@@ -258,11 +275,11 @@ export class WebSocketService {
           this.send({
             type: 'clt_heartbeat',
             clientId: this.config.clientId,
-            lsn: this.config.lsn,
+            lsn: currentLSN, // Use the current LSN instead of stale config
             messageId: `heartbeat_${Date.now()}`,
             timestamp: Date.now()
           });
-          syncLogger.info('connection', 'Heartbeat sent successfully');
+          syncLogger.info('connection', `Heartbeat sent successfully with LSN: ${currentLSN}`);
         } catch (error) {
           syncLogger.error('connection', 'Error sending heartbeat', error);
         }

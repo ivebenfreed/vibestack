@@ -134,44 +134,41 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     }
   }, [baseColumns])
 
-  // Add renderers to columns
-  const optimusColumns = React.useMemo(() => {
-    console.log('[VibeGridOptimus] Processing columns:', baseColumns.length)
-    
-    return baseColumns.map((column) => ({
-      ...column,
-      // React-data-grid requires this property for edit functionality
-      editable: column.config?.editable || false,
-      renderCell: (cellProps: any) => (
-        <CellRenderer
-          row={cellProps.row}
+  // Add renderers to columns - React Compiler will optimize this automatically
+  const optimusColumns = baseColumns.map((column) => ({
+    ...column,
+    // React-data-grid requires this property for edit functionality
+    editable: column.config?.editable || false,
+    renderCell: (cellProps: any) => (
+      <CellRenderer
+        row={cellProps.row}
+        column={column}
+        value={cellProps.row[column.key]}
+        rowIndex={cellProps.rowIdx}
+        onContentClick={handleContentClick}
+      />
+    ),
+    // Rich editor for editable cells
+    ...(column.config?.editable && {
+      renderEditCell: (editProps: any) => (
+        <CellEditor
+          row={editProps.row}
           column={column}
-          value={cellProps.row[column.key]}
-          rowIndex={cellProps.rowIdx}
-          onContentClick={handleContentClick}
+          onRowChange={editProps.onRowChange}
+          onClose={editProps.onClose}
+          onUpdate={finalSaveHandler ? stableOnUpdate : undefined}
         />
       ),
-      // Rich editor for editable cells
-      ...(column.config?.editable && {
-        renderEditCell: (editProps: any) => (
-          <CellEditor
-            row={editProps.row}
-            column={column}
-            onRowChange={editProps.onRowChange}
-            onClose={editProps.onClose}
-            onUpdate={finalSaveHandler ? stableOnUpdate : undefined}
-          />
-        ),
-        editorOptions: {
-          // Only keep background content visible for non-text editors (enums, relationships)
-          // Text editors need clean input fields without background content
-          displayCellContent: column.cellType !== 'text' && column.cellType !== 'number'
-        }
-      })
-    }))
-  }, [baseColumns, handleContentClick, stableOnUpdate])
+      editorOptions: {
+        // Only keep background content visible for non-text editors (enums, relationships)
+        // Text editors need clean input fields without background content
+        displayCellContent: column.cellType !== 'text' && column.cellType !== 'number'
+      }
+    })
+  }))
   
   // Debug the final columns before passing to DataGrid
+  console.log('[VibeGridOptimus] Processing columns:', baseColumns.length)
   console.log('[VibeGridOptimus] Final optimusColumns for DataGrid:', optimusColumns)
   console.log('[VibeGridOptimus] optimusColumns is Array?', Array.isArray(optimusColumns))
   console.log('[VibeGridOptimus] optimusColumns type:', typeof optimusColumns)

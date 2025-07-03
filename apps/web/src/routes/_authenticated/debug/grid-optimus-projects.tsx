@@ -30,19 +30,10 @@ function GridOptimusProjectsPage() {
   // Debug logging
   console.log('[GridOptimus] Projects:', projects.length)
   
-  // Handle project saves with new API
-  const handleProjectSave = React.useCallback(async (id: string, column: string, value: any) => {
-    try {
-      setError(null)
-      
-      // Convert single column save to project update
-      const updates = { [column]: value }
-      await updateProjectUI(id, updates)
-      console.log('✅ Project updated successfully:', { id, column, value })
-    } catch (err) {
-      console.error('❌ Failed to update project:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update project')
-    }
+  // Error handling for automatic save
+  const handleSaveError = React.useCallback((error: Error) => {
+    console.error('❌ Failed to update project:', error)
+    setError(error.message)
   }, [])
 
   
@@ -111,7 +102,6 @@ function GridOptimusProjectsPage() {
         <VibeGridOptimus
           entityName="Project"
           data={projects}
-          onSave={handleProjectSave}
           height="calc(100vh - 400px)"
           theme={effectiveTheme}
           isLoading={isLoading}

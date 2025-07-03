@@ -6,12 +6,6 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  
-  /* Set react-data-grid CSS variables with hardcoded colors for testing */
-  --rdg-selection-color: #3b82f6;
-  --rdg-color: #000;
-  --rdg-background-color: #fff;
-  --rdg-border-color: #e5e7eb;
 }
 
 /* Anti-jump: Consistent padding for normal and edit cells (matches VibeGrid2) */
@@ -131,17 +125,19 @@
   to { transform: rotate(360deg); }
 }
 
-/* Theme support */
-.vibegridoptimus-container.theme-light {
-  --vibegrid-bg: hsl(var(--background));
-  --vibegrid-fg: hsl(var(--foreground));
-  --vibegrid-border: hsl(var(--border));
-  --vibegrid-muted: hsl(var(--muted));
-}
-
-.vibegridoptimus-container.theme-dark {
-  --vibegrid-bg: hsl(var(--background));
-  --vibegrid-fg: hsl(var(--foreground));
-  --vibegrid-border: hsl(var(--border));
-  --vibegrid-muted: hsl(var(--muted));
+/* Theme support - Override react-data-grid variables with app theme */
+.vibegridoptimus-container .rdg-light,
+.vibegridoptimus-container .rdg-dark {
+  /* Use app theme variables - these automatically change when :root or .dark changes */
+  --rdg-color: oklch(var(--foreground));
+  --rdg-border-color: oklch(var(--border));
+  --rdg-summary-border-color: oklch(var(--border));
+  --rdg-background-color: oklch(var(--background));
+  --rdg-header-background-color: oklch(var(--muted));
+  --rdg-header-draggable-background-color: oklch(var(--muted));
+  --rdg-row-hover-background-color: oklch(var(--accent));
+  --rdg-row-selected-background-color: oklch(var(--accent));
+  --rdg-row-selected-hover-background-color: oklch(var(--accent));
+  --rdg-checkbox-focus-color: oklch(var(--ring));
+  --rdg-selection-color: oklch(var(--primary));
 }

@@ -210,13 +210,17 @@ export const syncMachineV3 = setup({
         // Critical: Update WebSocketService for heartbeat consistency
         const services = context.serviceCoordinator?.getServices();
         if (services?.webSocket && context.clientId) {
+          console.log(`[SyncMachineV3] 🔄 Updating WebSocketService connection params with new LSN: ${event.lsn}`);
           services.webSocket.updateConnectionParams(context.clientId, event.lsn);
+        } else {
+          console.warn(`[SyncMachineV3] ⚠️ Cannot update WebSocketService - missing service or clientId`);
         }
         
         return {
           currentLSN: event.lsn
         };
       }
+      console.log(`[SyncMachineV3] 🔍 updateLSN called with non-LSN_UPDATE event: ${event.type}`);
       return {};
     }),
     
@@ -381,7 +385,8 @@ export const syncMachineV3 = setup({
           // Send acknowledgment after processing like V2
           const ackMessage = MessageProcessor.createAckMessage(event.messageType, { 
             sequence: event.sequence,
-            changes: event.changes 
+            changes: event.changes,
+            lastLSN: event.lastLSN // Include the LSN from the original message
           }, context);
           if (ackMessage && services.webSocket) {
             services.webSocket.send(ackMessage);

@@ -55,7 +55,7 @@ export class ClientManager {
     try {
       const { keys } = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
       
-      replicationLogger.info('Client registry cleanup started', { 
+      replicationLogger.debug('Client registry cleanup started', { 
         clientCount: keys.length 
       }, MODULE_NAME);
       
@@ -95,7 +95,7 @@ export class ClientManager {
         }
       }
       
-      replicationLogger.info('Cleanup completed', { 
+      replicationLogger.debug('Cleanup completed', { 
         removedCount,
         totalClients: keys.length
       }, MODULE_NAME);
@@ -155,7 +155,7 @@ export class ClientManager {
       }
       
       if (!hasActive) {
-        replicationLogger.info('No active clients', {}, MODULE_NAME);
+        replicationLogger.debug('No active clients', {}, MODULE_NAME);
       }
       
       return hasActive;
@@ -172,7 +172,7 @@ export class ClientManager {
    */
   async broadcastChanges(changes: TableChange[]): Promise<void> {
     try {
-      replicationLogger.info('Broadcasting', {
+      replicationLogger.debug('Broadcasting', {
         count: changes.length,
         tables: Object.keys(
           changes.reduce((acc: Record<string, boolean>, c) => {
@@ -230,7 +230,7 @@ export class ClientManager {
         const syncDO = this.env.SYNC.get(id);
         
         // Send changes to the client
-        replicationLogger.info('Sending changes', { 
+        replicationLogger.debug('Sending changes', { 
           clientId, 
           count: changes.length 
         }, MODULE_NAME);

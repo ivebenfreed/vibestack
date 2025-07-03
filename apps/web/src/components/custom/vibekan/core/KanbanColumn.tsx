@@ -32,7 +32,7 @@ export function KanbanColumn<TStatus = string>({
   })
 
   return (
-    <div ref={setNodeRef} className={width}>
+    <div ref={setNodeRef} className={`${width} flex-shrink-0`}>
       <div className="bg-muted/50 rounded-lg p-4">
         {renderHeader ? (
           renderHeader(column, entityIds.length)
@@ -44,7 +44,7 @@ export function KanbanColumn<TStatus = string>({
         )}
         
         <SortableContext items={entityIds} strategy={verticalListSortingStrategy}>
-          <div className="space-y-3 min-h-[200px]">
+          <div className="space-y-3 min-h-[200px] max-h-[calc(100vh-200px)] overflow-y-auto pr-1">
             {children}
           </div>
         </SortableContext>

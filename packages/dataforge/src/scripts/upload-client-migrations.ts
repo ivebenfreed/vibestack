@@ -4,7 +4,7 @@ const { glob } = pkg;
 import path from 'path';
 import { fileURLToPath } from 'url';
 import serverDataSource from '../datasources/server.js';
-import { ClientMigration, MigrationType, MigrationState } from '../entities/ClientMigration.js';
+import { ClientMigration } from '../entities/ClientMigration.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -117,9 +117,6 @@ async function uploadClientMigrations() {
       const clientMigration = new ClientMigration();
       clientMigration.migrationName = instance.name;
       clientMigration.schemaVersion = nextVersionNumber.toString();
-      clientMigration.dependencies = [];
-      clientMigration.migrationType = MigrationType.SCHEMA;
-      clientMigration.state = MigrationState.PENDING;
       clientMigration.upQueries = up;
       clientMigration.downQueries = down;
       clientMigration.timestamp = timestamp;
@@ -132,8 +129,7 @@ async function uploadClientMigrations() {
           .set({
             schemaVersion: nextVersionNumber.toString(),
             upQueries: up,
-            downQueries: down,
-            state: MigrationState.PENDING // Reset state for re-application
+            downQueries: down
           })
           .where("migration_name = :name", { name: instance.name })
           .execute();

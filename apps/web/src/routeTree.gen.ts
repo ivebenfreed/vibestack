@@ -34,16 +34,14 @@ import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authentic
 import { Route as AuthenticatedDebugIndexImport } from './routes/_authenticated/debug/index'
 import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
-import { Route as AuthenticatedTasksTimelineImport } from './routes/_authenticated/tasks/timeline'
-import { Route as AuthenticatedTasksKanbanImport } from './routes/_authenticated/tasks/kanban'
 import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
-import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_authenticated/debug/vibegridfinal-tasks'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
+import { Route as AuthenticatedDebugGridOptimusProjectsImport } from './routes/_authenticated/debug/grid-optimus-projects'
 
 // Create Virtual Routes
 
@@ -231,20 +229,6 @@ const AuthenticatedDebugDatabaseLazyRoute =
     import('./routes/_authenticated/debug/database.lazy').then((d) => d.Route),
   )
 
-const AuthenticatedTasksTimelineRoute = AuthenticatedTasksTimelineImport.update(
-  {
-    id: '/tasks/timeline',
-    path: '/tasks/timeline',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-)
-
-const AuthenticatedTasksKanbanRoute = AuthenticatedTasksKanbanImport.update({
-  id: '/tasks/kanban',
-  path: '/tasks/kanban',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsImport.update({
     id: '/notifications',
@@ -280,13 +264,6 @@ const AuthenticatedProjectsProjectIdRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
-const AuthenticatedDebugVibegridfinalTasksRoute =
-  AuthenticatedDebugVibegridfinalTasksImport.update({
-    id: '/vibegridfinal-tasks',
-    path: '/vibegridfinal-tasks',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
 const AuthenticatedDebugReactflowPositioningRoute =
   AuthenticatedDebugReactflowPositioningImport.update({
     id: '/reactflow-positioning',
@@ -299,6 +276,13 @@ const AuthenticatedDebugKanbanRoute = AuthenticatedDebugKanbanImport.update({
   path: '/kanban',
   getParentRoute: () => AuthenticatedDebugRouteRoute,
 } as any)
+
+const AuthenticatedDebugGridOptimusProjectsRoute =
+  AuthenticatedDebugGridOptimusProjectsImport.update({
+    id: '/grid-optimus-projects',
+    path: '/grid-optimus-projects',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 
 // Populate the FileRoutesByPath interface
 
@@ -402,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/debug/grid-optimus-projects': {
+      id: '/_authenticated/debug/grid-optimus-projects'
+      path: '/grid-optimus-projects'
+      fullPath: '/debug/grid-optimus-projects'
+      preLoaderRoute: typeof AuthenticatedDebugGridOptimusProjectsImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/kanban': {
       id: '/_authenticated/debug/kanban'
       path: '/kanban'
@@ -414,13 +405,6 @@ declare module '@tanstack/react-router' {
       path: '/reactflow-positioning'
       fullPath: '/debug/reactflow-positioning'
       preLoaderRoute: typeof AuthenticatedDebugReactflowPositioningImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/vibegridfinal-tasks': {
-      id: '/_authenticated/debug/vibegridfinal-tasks'
-      path: '/vibegridfinal-tasks'
-      fullPath: '/debug/vibegridfinal-tasks'
-      preLoaderRoute: typeof AuthenticatedDebugVibegridfinalTasksImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/projects/$projectId': {
@@ -457,20 +441,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/notifications'
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsImport
       parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-    '/_authenticated/tasks/kanban': {
-      id: '/_authenticated/tasks/kanban'
-      path: '/tasks/kanban'
-      fullPath: '/tasks/kanban'
-      preLoaderRoute: typeof AuthenticatedTasksKanbanImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/tasks/timeline': {
-      id: '/_authenticated/tasks/timeline'
-      path: '/tasks/timeline'
-      fullPath: '/tasks/timeline'
-      preLoaderRoute: typeof AuthenticatedTasksTimelineImport
-      parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/debug/database': {
       id: '/_authenticated/debug/database'
@@ -555,9 +525,9 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugGridOptimusProjectsRoute: typeof AuthenticatedDebugGridOptimusProjectsRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
-  AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -567,11 +537,11 @@ interface AuthenticatedDebugRouteRouteChildren {
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
+    AuthenticatedDebugGridOptimusProjectsRoute:
+      AuthenticatedDebugGridOptimusProjectsRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
-    AuthenticatedDebugVibegridfinalTasksRoute:
-      AuthenticatedDebugVibegridfinalTasksRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
@@ -612,8 +582,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
-  AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
-  AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
@@ -626,8 +594,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
-  AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
-  AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
@@ -653,16 +619,14 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
-  '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
-  '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
-  '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -688,16 +652,14 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
-  '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
-  '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
-  '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -727,16 +689,14 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
-  '/_authenticated/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
-  '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
-  '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/_authenticated/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -767,16 +727,14 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/debug/grid-optimus-projects'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
-    | '/debug/vibegridfinal-tasks'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
-    | '/tasks/kanban'
-    | '/tasks/timeline'
     | '/debug/database'
     | '/debug/integrity'
     | '/debug/sync'
@@ -801,16 +759,14 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/debug/grid-optimus-projects'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
-    | '/debug/vibegridfinal-tasks'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
-    | '/tasks/kanban'
-    | '/tasks/timeline'
     | '/debug/database'
     | '/debug/integrity'
     | '/debug/sync'
@@ -838,16 +794,14 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
+    | '/_authenticated/debug/grid-optimus-projects'
     | '/_authenticated/debug/kanban'
     | '/_authenticated/debug/reactflow-positioning'
-    | '/_authenticated/debug/vibegridfinal-tasks'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
-    | '/_authenticated/tasks/kanban'
-    | '/_authenticated/tasks/timeline'
     | '/_authenticated/debug/database'
     | '/_authenticated/debug/integrity'
     | '/_authenticated/debug/sync'
@@ -920,8 +874,6 @@ export const routeTree = rootRoute
         "/_authenticated/settings",
         "/_authenticated/",
         "/_authenticated/projects/$projectId",
-        "/_authenticated/tasks/kanban",
-        "/_authenticated/tasks/timeline",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
         "/_authenticated/help-center/",
@@ -933,9 +885,9 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/route.tsx",
       "parent": "/_authenticated",
       "children": [
+        "/_authenticated/debug/grid-optimus-projects",
         "/_authenticated/debug/kanban",
         "/_authenticated/debug/reactflow-positioning",
-        "/_authenticated/debug/vibegridfinal-tasks",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
@@ -988,16 +940,16 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/index.tsx",
       "parent": "/_authenticated"
     },
+    "/_authenticated/debug/grid-optimus-projects": {
+      "filePath": "_authenticated/debug/grid-optimus-projects.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/debug/kanban": {
       "filePath": "_authenticated/debug/kanban.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/debug/reactflow-positioning": {
       "filePath": "_authenticated/debug/reactflow-positioning.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/vibegridfinal-tasks": {
-      "filePath": "_authenticated/debug/vibegridfinal-tasks.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/projects/$projectId": {
@@ -1019,14 +971,6 @@ export const routeTree = rootRoute
     "/_authenticated/settings/notifications": {
       "filePath": "_authenticated/settings/notifications.tsx",
       "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/tasks/kanban": {
-      "filePath": "_authenticated/tasks/kanban.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/tasks/timeline": {
-      "filePath": "_authenticated/tasks/timeline.tsx",
-      "parent": "/_authenticated"
     },
     "/_authenticated/debug/database": {
       "filePath": "_authenticated/debug/database.lazy.tsx",

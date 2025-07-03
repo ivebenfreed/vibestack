@@ -120,14 +120,28 @@ export class MessageProcessor {
       type: 'INCOMING_CHANGES', 
       changes, 
       messageType,
-      sequence: message.sequence 
+      sequence: message.sequence,
+      lastLSN: message.lastLSN // Pass through the LSN for acknowledgments
     });
     
     // Update LSN from lastLSN in change messages (for catchup and live changes)
-    if ((messageType === 'srv_catchup_changes' || messageType === 'srv_live_changes') && 
-        message.lastLSN && message.lastLSN !== context.currentLSN) {
-      console.log(`[MessageProcessor] 📊 LSN update from ${messageType}: ${context.currentLSN} → ${message.lastLSN}`);
-      sendEvent({ type: 'LSN_UPDATE', lsn: message.lastLSN, source: messageType });
+    if ((messageType === 'srv_catchup_changes' || messageType === 'srv_live_changes')) {
+      console.log(`[MessageProcessor] 🔍 LSN check for ${messageType}:`, {
+        hasLastLSN: !!message.lastLSN,
+        lastLSN: message.lastLSN,
+        currentLSN: context.currentLSN,
+        different: message.lastLSN !== context.currentLSN,
+        messageKeys: Object.keys(message)
+      });
+      
+      if (message.lastLSN && message.lastLSN !== context.currentLSN) {
+        console.log(`[MessageProcessor] 📊 LSN update from ${messageType}: ${context.currentLSN} → ${message.lastLSN}`);
+        sendEvent({ type: 'LSN_UPDATE', lsn: message.lastLSN, source: messageType });
+      } else if (!message.lastLSN) {
+        console.warn(`[MessageProcessor] ⚠️ ${messageType} message missing lastLSN field!`);
+      } else {
+        console.log(`[MessageProcessor] ✅ LSN already current for ${messageType}: ${message.lastLSN}`);
+      }
     }
     
     // CRITICAL: Send immediate chunk acknowledgment for catchup changes
@@ -394,7 +408,7 @@ export class MessageProcessor {
         return {
           ...baseAck,
           type: 'clt_changes_received',
-          lsn: context.currentLSN,
+          lsn: message.lastLSN || context.currentLSN, // Use the updated LSN from the message
           lastProcessedLSN: message.lastLSN
         };
         

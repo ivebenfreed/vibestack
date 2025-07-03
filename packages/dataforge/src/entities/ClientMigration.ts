@@ -1,21 +1,7 @@
 import { Entity, Column, PrimaryColumn, CreateDateColumn, Index } from 'typeorm';
-import { IsString, IsArray, IsNumber, IsOptional, IsEnum, Matches } from 'class-validator';
+import { IsString, IsArray, IsNumber, IsOptional, Matches } from 'class-validator';
 import { ServerOnly, TableCategory } from '../utils/context.js';
-import { EnumTypeName } from '../utils/decorators.js';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
-
-export enum MigrationType {
-  SCHEMA = 'schema',    // Changes to table structure
-  DATA = 'data',        // Changes to data only
-  MIXED = 'mixed'       // Both schema and data changes
-}
-
-export enum MigrationState {
-  PENDING = 'pending',          // Created but not yet available to clients
-  AVAILABLE = 'available',      // Ready for clients to apply
-  DEPRECATED = 'deprecated',    // Superseded by newer migration
-  REQUIRED = 'required'         // Must be applied by all clients
-}
 
 /**
  * This entity tracks migrations that need to be applied on the client side.
@@ -37,20 +23,6 @@ export class ClientMigration extends BaseSystemEntity {
   @Matches(/^\d+$/)
   @Index()
   schemaVersion!: string;  // Sequential integer version
-
-  @Column({ type: 'text', array: true, default: [] })
-  @IsString({ each: true })
-  dependencies!: string[];  // Names of migrations this depends on
-
-  @Column({ type: 'enum', enum: MigrationType, name: 'migration_type' })
-  @IsEnum(MigrationType)
-  @EnumTypeName({ name: 'MigrationType', sourcePath: './ClientMigration' })
-  migrationType!: MigrationType;
-
-  @Column({ type: 'enum', enum: MigrationState, default: MigrationState.PENDING })
-  @IsEnum(MigrationState)
-  @EnumTypeName({ name: 'MigrationState', sourcePath: './ClientMigration' })
-  state!: MigrationState;
 
   @Column({ type: 'text', array: true, name: 'up_queries' })
   @IsArray()
