@@ -73,10 +73,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
         const aVal = a[column.key]
         const bVal = b[column.key]
         
-        // Handle null/undefined values
+        // Handle null/undefined values based on sort direction
         if (aVal == null && bVal == null) return 0
-        if (aVal == null) return -1
-        if (bVal == null) return 1
+        if (aVal == null) return sort.direction === 'ASC' ? 1 : -1  // ASC: nulls last, DESC: nulls first
+        if (bVal == null) return sort.direction === 'ASC' ? -1 : 1  // ASC: non-nulls first, DESC: non-nulls last
         
         // Type-specific comparisons based on RDG metadata
         let result = 0

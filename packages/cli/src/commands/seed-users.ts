@@ -6,7 +6,7 @@ import { loadToken, performLoginAndStoreToken } from '../utils/auth.js';
 // --- API Response Type Definitions ---
 interface ApiResponse {
   message?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   [key: string]: any; // Allow other properties
 }
 

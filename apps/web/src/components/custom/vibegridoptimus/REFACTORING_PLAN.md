@@ -34,10 +34,10 @@ vibegridoptimus/
 │   ├── SelectEditor.tsx        # Dropdown for enums/relationships
 │   └── MultiSelectEditor.tsx   # Multi-select for many-to-many
 ├── hooks/
-│   ├── useVibeGridOptimus.ts   # Main grid state and handlers
 │   ├── useBatchOperations.ts   # Batch update processing
 │   ├── useClipboardOps.ts      # Copy/paste logic
-│   └── useColumnAdapter.ts     # DataForge column conversion
+│   ├── useEntityConfig.ts      # Entity configuration and save handlers
+│   └── useEditorBehavior.ts    # Centralized editor behavior patterns
 └── utils/
     ├── columnTransformers.ts   # DataForge to RDG conversion
     ├── dataTransformers.ts     # Data manipulation utilities
@@ -52,15 +52,15 @@ vibegridoptimus/
    - Minimal props interface leveraging DataForge types
    - No inline handlers or complex logic
 
-2. **State Management Hook** (`useVibeGridOptimus.ts`)
-   - Centralized state management
-   - Stable callback references
-   - Memoized derived state
+2. **Entity Configuration** (`useEntityConfig.ts`)
+   - Automatic column resolution from DataForge
+   - Save handler integration
+   - Relationship data management
 
-3. **Column Adapter** (`useColumnAdapter.ts`)
-   - DataForge column to react-data-grid conversion
-   - Automatic cell type detection
-   - Renderer/editor assignment
+3. **Editor Behavior** (`useEditorBehavior.ts`)
+   - Centralized editor patterns
+   - Keyboard navigation handling
+   - Consistent commit/cancel logic
 
 ### Phase 2: Renderer System
 1. **Pure Display Renderers**

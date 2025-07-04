@@ -12,6 +12,7 @@ import { shallowEqual } from '@xstate/store';
 import { useLoaderData } from '@tanstack/react-router';
 import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus';
 import { useTheme } from '@/context/theme-context';
+import { createVibeGrid } from '@/components/custom/vibegridoptimus/hooks/useValidatedVibeGrid';
 import { useStableEntityArray } from '@/hooks/useStableEntityArray';
 
 /**
@@ -26,8 +27,17 @@ const Projects: React.FC = () => {
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : theme
 
-  // 🎯 XSTATE REACTIVITY: Stable array that only changes when data actually changes
-  const projects = useStableEntityArray(projectsAtom)
+  // ✅ TYPE-SAFE VIBEGRID: Enforces entity validation, data source, and column config
+  const projectGridProps = createVibeGrid({
+    entityName: "Project",
+    atom: projectsAtom,
+    onSave: async (id, column, value) => {
+      await handleProjectUpdate(id, { [column]: value });
+    }
+  })
+
+  // Extract projects data for display purposes
+  const projects = projectGridProps.data
 
   // Get users for relationship data - using stable array
   const users = useStableEntityArray(usersAtom)
@@ -111,13 +121,10 @@ const Projects: React.FC = () => {
       <ContentContainer>
         <div className="h-full flex flex-col">
           <VibeGridOptimus
-            entityName="Project"
-            data={projects}
-            onSave={async (id, column, value) => {
-              await handleProjectUpdate(id, { [column]: value });
-            }}
+            {...projectGridProps}
             height="calc(100vh - 200px)"
             className="flex-1"
+            theme={effectiveTheme}
           />
         </div>
       </ContentContainer>

@@ -1,10 +1,9 @@
-import React, { Suspense, useMemo } from 'react'
+import React, { Suspense } from 'react'
 import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import type { Task } from '@repo/dataforge/client-entities'
 import { tasksAtom } from '@/domain/task'
-import { useSelector } from '@xstate/store/react'
-import { shallowEqual } from '@xstate/store'
+import { createVibeGrid } from '@/components/custom/vibegridoptimus/hooks/useValidatedVibeGrid'
 import { Grid3X3, Kanban, Calendar } from 'lucide-react'
 import { useTheme } from '@/context/theme-context'
 import { useNavigate, useSearch } from '@tanstack/react-router'
@@ -58,15 +57,11 @@ const Tasks: React.FC = () => {
     })
   }
 
-  // Optimized selector for tasks data - only recreate array when actual data changes
-  const tasks = useMemo(() => {
-    const tasksRecord = tasksAtom.get()
-    if (!tasksRecord || typeof tasksRecord !== 'object') return []
-    return Object.values(tasksRecord)
-  }, [])
-  
-  // Subscribe to atom changes to force re-render when needed
-  useSelector(tasksAtom, () => null, shallowEqual)
+  // ✅ TYPE-SAFE VIBEGRID: Enforces entity validation, data source, and column config
+  const taskGridProps = createVibeGrid({
+    entityName: "Task",
+    atom: tasksAtom
+  })
 
 
   return (
@@ -99,8 +94,7 @@ const Tasks: React.FC = () => {
         {/* Table View */}
         <TabsContent value="table" className="flex-1">
           <VibeGridOptimus
-            entityName="Task"
-            data={tasks}
+            {...taskGridProps}
             height={600}
             theme={effectiveTheme}
             className="border border-border rounded-lg"

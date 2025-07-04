@@ -14,6 +14,8 @@ export type BaseEntity = Pick<DataForgeEntity, BaseEntityKeys>
 /**
  * VibeGridOptimus component props - Clean declarative API
  * Maximum 9 props for simplicity
+ * 
+ * @deprecated Use ValidatedVibeGridOptimusProps with createVibeGrid helper for type safety
  */
 export interface VibeGridOptimusProps {
   /** Entity name for automatic configuration */
@@ -24,6 +26,53 @@ export interface VibeGridOptimusProps {
   
   /** Save handler for cell edits */
   onSave?: (id: string, column: string, value: any) => Promise<void>
+  
+  /** Optional height override */
+  height?: string | number
+  
+  /** Theme support */
+  theme?: 'light' | 'dark'
+  
+  /** Additional CSS classes */
+  className?: string
+  
+  /** Loading state */
+  isLoading?: boolean
+  
+  /** Error state */
+  error?: string | null
+  
+  /** Optional style overrides */
+  style?: React.CSSProperties
+}
+
+/**
+ * Type-safe VibeGridOptimus props with compile-time validation
+ * 
+ * Enforces:
+ * 1. ✅ Entity validation - entityName must be valid DataForge entity
+ * 2. ✅ Data validation - data must come from useValidatedEntityArray 
+ * 3. ✅ Column validation - columns must match entity type
+ * 
+ * @example
+ * ```typescript
+ * // Use createVibeGrid helper for automatic validation
+ * const gridProps = createVibeGrid({
+ *   entityName: "Task",
+ *   atom: tasksAtom
+ * })
+ * <VibeGridOptimus {...gridProps} />
+ * ```
+ */
+export interface ValidatedVibeGridOptimusProps<T extends EntityName> {
+  /** Entity name - validated at compile time */
+  entityName: T
+  
+  /** Entity data array - must come from useValidatedEntityArray */
+  data: EntityType<T>[] & { readonly __brand: `GridData_${T}` }
+  
+  /** Type-safe save handler with entity field validation */
+  onSave?: (id: string, column: keyof EntityType<T>, value: any) => Promise<void>
   
   /** Optional height override */
   height?: string | number
