@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { getAuth, AuthType } from "../lib/auth";
 import { dbLogger } from "../middleware/logger";
+import { NeonService } from "../lib/neon-orm/neon-service";
+import { UserRepository } from "../domains/users";
 
 const authRouter = new Hono<AuthType>();
 
@@ -165,7 +167,7 @@ authRouter.put("/admin/users/:id", adminAuthMiddleware, async (c) => {
   }
 });
 
-// Delete user (admin only) - using universal entity deleter
+// Delete user (admin only) - using UserRepository with automatic relationship cleanup
 authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
   try {
     const userId = c.req.param('id');
@@ -196,11 +198,12 @@ authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
       .selectAll()
       .executeTakeFirst();
 
-    // Import and use the universal entity deleter
-    const { deleteUserWithRelationships } = await import('../lib/universal-entity-deleter');
+    // Use UserRepository for domain relationship cleanup
+    const neonService = new NeonService(c);
+    const userRepo = new UserRepository(neonService);
     
     // First, do a dry run to check for blockers
-    const dryRunResult = await deleteUserWithRelationships(db, userId, {
+    const dryRunResult = await userRepo.deleteWithRelationships(userId, {
       transferProjectsTo: adminForTransfer?.id,
       dryRun: true
     });
@@ -214,29 +217,42 @@ authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
       }, 400);
     }
 
-    // Execute the actual deletion
-    const deletionResult = await deleteUserWithRelationships(db, userId, {
-      transferProjectsTo: adminForTransfer?.id,
-      dryRun: false
-    });
-
-    // Also handle auth-specific data that's not in the domain model
-    await db.transaction().execute(async (trx) => {
+    // STEP 1: Clean up Better Auth tables FIRST (before domain deletion)
+    // These tables have foreign key constraints to users table
+    try {
+      dbLogger.debug('Starting Better Auth table cleanup', { userId });
+      
       // Delete auth-related data that's not tracked by DataForge
-      await trx
+      await db
         .deleteFrom('sessions')
         .where('user_id', '=', userId)
         .execute();
 
-      await trx
+      await db
         .deleteFrom('accounts')
         .where('user_id', '=', userId)
         .execute();
 
-      await trx
+      await db
         .deleteFrom('verifications')
         .where('identifier', '=', user.email)
         .execute();
+        
+      dbLogger.debug('Better Auth table cleanup completed successfully', { userId });
+    } catch (authCleanupError) {
+      dbLogger.error('Better Auth cleanup failed, aborting user deletion', {
+        userId,
+        error: authCleanupError instanceof Error ? authCleanupError.message : 'Unknown error'
+      });
+      return c.json({ 
+        error: "Failed to clean up authentication data. User deletion aborted." 
+      }, 500);
+    }
+
+    // STEP 2: Execute domain deletion (now that auth constraints are removed)
+    const deletionResult = await userRepo.deleteWithRelationships(userId, {
+      transferProjectsTo: adminForTransfer?.id,
+      dryRun: false
     });
 
     dbLogger.info('Admin deleted user with automatic relationship cleanup', { 
@@ -324,9 +340,13 @@ authRouter.post("/admin/users/:id/reset-password", adminAuthMiddleware, async (c
 
 // Invite user (admin only) - Better Auth recommended pattern
 authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
+  let email: string | undefined;
+  
   try {
     const body = await c.req.json();
-    const { email, name, role } = body;
+    const extractedData = body;
+    email = extractedData.email;
+    const { name, role } = extractedData;
 
     if (!email || !name || !role) {
       return c.json({ error: "Missing required fields (email, name, role)." }, 400);
@@ -365,16 +385,58 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
         ? "https://dev.codevibesmatter.com" 
         : "https://app.codevibesmatter.com";
 
-    const resetResult = await authInstance.api.forgetPassword({
-      body: {
-        email: email,
-        redirectTo: `${baseUrl}/complete-registration`
-      }
-    });
+    let resetResult;
+    try {
+      resetResult = await authInstance.api.forgetPassword({
+        body: {
+          email: email,
+          redirectTo: `${baseUrl}/complete-registration`
+        }
+      });
 
-    if (!resetResult || !resetResult.status) {
-      dbLogger.error('Failed to send invitation email');
-      return c.json({ error: "User created but failed to send invitation email" }, 500);
+      if (!resetResult || !resetResult.status) {
+        throw new Error('Failed to send invitation email - no result or invalid status');
+      }
+    } catch (emailError) {
+      // Email sending failed - rollback user creation
+      dbLogger.error('Invitation email failed, rolling back user creation', {
+        email,
+        userId: createUserResult.user?.id,
+        error: emailError instanceof Error ? emailError.message : 'Unknown error'
+      });
+
+      try {
+        // Clean up Better Auth tables first, then delete user
+        const db = authInstance.options.database.db;
+        const userId = createUserResult.user?.id;
+        
+        // Step 1: Clean up auth-related tables first
+        await db.deleteFrom('sessions').where('user_id', '=', userId).execute();
+        await db.deleteFrom('accounts').where('user_id', '=', userId).execute();
+        await db.deleteFrom('verifications').where('identifier', '=', email).execute();
+        
+        // Step 2: Now delete the user
+        await db
+          .deleteFrom('users')
+          .where('id', '=', userId)
+          .execute();
+
+        dbLogger.info('Successfully rolled back user creation after email failure', {
+          email,
+          userId
+        });
+      } catch (rollbackError) {
+        dbLogger.error('Failed to rollback user creation after email failure', {
+          email,
+          userId: createUserResult.user?.id,
+          rollbackError: rollbackError instanceof Error ? rollbackError.message : 'Unknown rollback error'
+        });
+      }
+
+      // Return error to user
+      return c.json({ 
+        error: "Failed to send invitation email. User account was not created." 
+      }, 500);
     }
 
     dbLogger.info('Admin invited new user', { 
@@ -397,6 +459,47 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
 
   } catch (error) {
     dbLogger.error('Error in admin user invitation', error);
+    
+    // If we have a partially created user, attempt cleanup
+    // This catches errors that happen before the email rollback logic
+    try {
+      const authInstance = getAuth(c);
+      const db = authInstance.options.database.db;
+      
+      // Try to clean up any user that might have been created with this email
+      if (email) {
+        // Clean up auth tables first
+        await db.deleteFrom('sessions').where('user_id', 'in', 
+          db.selectFrom('users').select('id').where('email', '=', email)
+        ).execute();
+        await db.deleteFrom('accounts').where('user_id', 'in',
+          db.selectFrom('users').select('id').where('email', '=', email)
+        ).execute();
+        await db.deleteFrom('verifications').where('identifier', '=', email).execute();
+        
+        // Then delete the user
+        const cleanupResult = await db
+          .deleteFrom('users')
+          .where('email', '=', email)
+          .execute();
+        
+        // Kysely delete returns an array of DeleteResult objects
+        // For simple deletes, we just check if any results were returned
+        if (cleanupResult && Array.isArray(cleanupResult) && cleanupResult.length > 0) {
+          dbLogger.info('Cleaned up partially created user after general error', {
+            email,
+            operationsCompleted: cleanupResult.length
+          });
+        } else {
+          dbLogger.debug('No users found to clean up', { email });
+        }
+      }
+    } catch (cleanupError) {
+      dbLogger.warn('Could not perform cleanup after invitation error', {
+        cleanupError: cleanupError instanceof Error ? cleanupError.message : 'Unknown cleanup error'
+      });
+    }
+
     return c.json({ error: "Failed to process user invitation." }, 500);
   }
 });

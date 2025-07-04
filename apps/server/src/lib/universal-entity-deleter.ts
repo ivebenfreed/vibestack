@@ -6,7 +6,9 @@ import {
   CLIENT_JUNCTION_TABLE_MAPPING,
   type RelationshipConfig
 } from '@repo/dataforge/client-entities';
-import type { Kysely } from 'kysely';
+import { NeonService } from './neon-orm/neon-service';
+import type { Context } from 'hono';
+import type { AppBindings } from '../types/hono';
 
 export interface DeletionStrategy {
   /** Strategy for handling foreign key references */
@@ -52,7 +54,7 @@ export class UniversalEntityDeleter {
     junctionStrategy: 'CASCADE'
   };
 
-  constructor(private db: Kysely<any>) {}
+  constructor(private neonService: NeonService) {}
 
   /**
    * Deletes an entity and handles all its relationships automatically
@@ -74,12 +76,15 @@ export class UniversalEntityDeleter {
       throw new Error(`Cannot delete ${entityName}. Blockers: ${plan.blockers.map(b => `${b.entity}.${b.field}: ${b.reason}`).join(', ')}`);
     }
 
-    // Execute operations in transaction
-    await this.db.transaction().execute(async (trx) => {
+    // Execute operations (Neon HTTP doesn't support transactions, so execute sequentially)
+    try {
       for (const operation of plan.operations) {
-        await this.executeOperation(trx, operation);
+        await this.executeOperation(operation);
       }
-    });
+    } catch (error) {
+      console.error('[UniversalEntityDeleter] Error during deletion operations:', error);
+      throw new Error(`Deletion failed during operation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 
     return plan;
   }
@@ -102,6 +107,22 @@ export class UniversalEntityDeleter {
     const sortedEntities = this.sortEntitiesByHierarchy(referencingEntities);
 
     for (const referencingEntity of sortedEntities) {
+      // Handle special junction table entries
+      if (referencingEntity.startsWith('junction:')) {
+        const junctionTableName = referencingEntity.replace('junction:', '');
+        
+        // Create operation to clean up junction table
+        const columnName = `${entityName.toLowerCase().slice(0, -1)}_id`; // e.g., "user_id"
+        operations.push({
+          type: 'DELETE',
+          entity: 'junction',
+          table: junctionTableName,
+          condition: `${columnName} = '${entityId}'`,
+          action: `DELETE FROM ${junctionTableName} WHERE ${columnName} = '${entityId}'`
+        });
+        continue;
+      }
+
       const strategy = this.getStrategyForEntity(referencingEntity, options);
       const relationships = getEntityRelationships(referencingEntity);
 
@@ -157,12 +178,14 @@ export class UniversalEntityDeleter {
 
   /**
    * Finds all entities that have relationships pointing to the target entity
+   * Also finds junction tables where the target entity participates
    */
   private findReferencingEntities(targetEntityName: string): string[] {
     const referencingEntities: string[] = [];
+    const junctionTablesToClean: string[] = [];
 
     for (const [entityName, config] of Object.entries(CLIENT_RELATIONSHIP_CONFIGS)) {
-      // Check required references
+      // Check required references (direct foreign keys)
       if (config.requiredReferences) {
         for (const ref of config.requiredReferences) {
           if (this.getTargetEntityName(ref.targetEntity) === targetEntityName) {
@@ -172,12 +195,35 @@ export class UniversalEntityDeleter {
         }
       }
 
-      // Check junction relationships
+      // Check junction relationships where target entity is referenced
       if (config.junctionRelationships) {
         for (const junction of config.junctionRelationships) {
           if (junction.targetEntity === targetEntityName) {
             referencingEntities.push(entityName);
+            // Also track the junction table for direct cleanup
+            junctionTablesToClean.push(junction.junctionTable);
             break;
+          }
+        }
+      }
+    }
+
+    // Add special handling for junction tables where target entity is the source
+    // This handles the reverse case: when deleting a user, we need to clean up
+    // project_members entries where user_id = target_user_id
+    for (const [entityName, config] of Object.entries(CLIENT_RELATIONSHIP_CONFIGS)) {
+      if (config.junctionRelationships) {
+        for (const junction of config.junctionRelationships) {
+          // If this junction table connects TO the target entity via sourceColumn,
+          // we need to clean it up when deleting the target entity
+          if (junction.targetEntity !== targetEntityName) {
+            // Check if we need reverse cleanup by looking at junction table naming
+            // For project_members: when deleting user, clean where user_id = userId
+            if (junction.junctionTable.includes(targetEntityName.toLowerCase().slice(0, -1)) || // e.g., "project_members" contains "user"
+                junction.sourceColumn === `${targetEntityName.toLowerCase().slice(0, -1)}_id`) { // e.g., "user_id"
+              
+              referencingEntities.push(`junction:${junction.junctionTable}`);
+            }
           }
         }
       }
@@ -276,19 +322,17 @@ export class UniversalEntityDeleter {
 
       case 'RESTRICT':
         // Check if there are any records that would block deletion
-        const count = await this.db
-          .selectFrom(tableName as any)
-          .select(this.db.fn.count('id').as('count'))
-          .where(columnName, '=', targetEntityId)
-          .executeTakeFirst();
+        const countQuery = `SELECT COUNT(*) as count FROM ${tableName} WHERE ${columnName} = $1`;
+        const countResult = await this.neonService.query(countQuery, [targetEntityId]);
+        const count = countResult[0]?.count || 0;
 
-        if (count && Number(count.count) > 0) {
+        if (Number(count) > 0) {
           return {
             type: 'blocker',
             blocker: {
               entity: referencingEntity,
               field: reference.field,
-              reason: `${count.count} records exist with this reference (RESTRICT strategy)`
+              reason: `${count} records exist with this reference (RESTRICT strategy)`
             }
           };
         }
@@ -334,38 +378,37 @@ export class UniversalEntityDeleter {
   }
 
   /**
-   * Executes a single deletion operation
+   * Executes a single deletion operation using NeonService
    */
-  private async executeOperation(trx: Kysely<any>, operation: DeletionOperation): Promise<void> {
+  private async executeOperation(operation: DeletionOperation): Promise<void> {
     if (!operation) return;
 
     console.log(`[UniversalEntityDeleter] Executing: ${operation.action}`);
     
-    // Execute based on operation type using Kysely query builder instead of raw SQL
+    // Execute based on operation type using NeonService raw query
     switch (operation.type) {
       case 'UPDATE':
-        // Parse the UPDATE statement and execute with query builder
+      case 'TRANSFER':
+        // Both UPDATE and TRANSFER operations are SQL UPDATE statements
         if (operation.action.includes('SET') && operation.action.includes('WHERE')) {
           const matches = operation.action.match(/UPDATE (\w+) SET (\w+) = (.+) WHERE (\w+) = '(.+)'/);
           if (matches) {
             const [, table, column, value, whereColumn, whereValue] = matches;
-            await trx.updateTable(table as any)
-              .set({ [column]: value === 'NULL' ? null : value.replace(/'/g, '') })
-              .where(whereColumn, '=', whereValue)
-              .execute();
+            const sql = `UPDATE ${table} SET ${column} = $1 WHERE ${whereColumn} = $2`;
+            const paramValue = value === 'NULL' ? null : value.replace(/'/g, '');
+            await this.neonService.query(sql, [paramValue, whereValue]);
           }
         }
         break;
         
       case 'DELETE':
-        // Parse DELETE statement
+        // Parse DELETE statement and execute with parameterized query
         if (operation.action.includes('WHERE')) {
           const matches = operation.action.match(/DELETE FROM (\w+) WHERE (\w+) = '(.+)'/);
           if (matches) {
             const [, table, whereColumn, whereValue] = matches;
-            await trx.deleteFrom(table as any)
-              .where(whereColumn, '=', whereValue)
-              .execute();
+            const sql = `DELETE FROM ${table} WHERE ${whereColumn} = $1`;
+            await this.neonService.query(sql, [whereValue]);
           }
         }
         break;
@@ -408,45 +451,5 @@ export class UniversalEntityDeleter {
   }
 }
 
-/**
- * Convenience function for deleting users with sensible defaults
- */
-export async function deleteUserWithRelationships(
-  db: Kysely<any>,
-  userId: string,
-  options: {
-    transferProjectsTo?: string;
-    dryRun?: boolean;
-  } = {}
-): Promise<DeletionPlan> {
-  const deleter = new UniversalEntityDeleter(db);
-
-  const deletionOptions: DeletionOptions = {
-    dryRun: options.dryRun,
-    entityStrategies: {
-      // Tasks: unassign (set assignee to null)
-      tasks: {
-        foreignKeyStrategy: 'SET_NULL',
-        junctionStrategy: 'CASCADE'
-      },
-      
-      // Projects: transfer ownership if target provided, otherwise restrict
-      projects: options.transferProjectsTo ? {
-        foreignKeyStrategy: 'TRANSFER_OWNERSHIP',
-        junctionStrategy: 'CASCADE',
-        transferTarget: options.transferProjectsTo
-      } : {
-        foreignKeyStrategy: 'RESTRICT',
-        junctionStrategy: 'CASCADE'
-      },
-      
-      // Comments: anonymize by setting author to null
-      comments: {
-        foreignKeyStrategy: 'SET_NULL',
-        junctionStrategy: 'CASCADE'
-      }
-    }
-  };
-
-  return await deleter.deleteEntity('users', userId, deletionOptions);
-}
+// Note: deleteUserWithRelationships function has been moved to UserRepository.deleteWithRelationships()
+// This maintains better separation of concerns between the universal deleter and domain-specific logic

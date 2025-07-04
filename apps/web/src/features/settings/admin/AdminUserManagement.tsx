@@ -244,34 +244,20 @@ This action cannot be undone.`
     }
 
     try {
-      const result = await authClient.admin.removeUser({
-        userId: userId
+      const response = await fetch(`/api/auth/admin/users/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include'
       })
 
-      if (result.error) {
-        throw new Error(result.error.message)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete user')
       }
 
       toast.success('User deleted successfully')
       fetchUsers()
     } catch (err) {
-      // Fallback to direct API call if Better Auth admin API fails
-      try {
-        const response = await fetch(`/api/auth/admin/users/${userId}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to delete user')
-        }
-
-        toast.success('User deleted successfully')
-        fetchUsers()
-      } catch (fallbackErr) {
-        toast.error(fallbackErr instanceof Error ? fallbackErr.message : 'Failed to delete user')
-      }
+      toast.error(err instanceof Error ? err.message : 'Failed to delete user')
     }
   }
 

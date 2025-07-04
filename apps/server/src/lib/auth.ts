@@ -48,7 +48,17 @@ export const auth = betterAuth({
     } : undefined,
     secret: secretForCli,
     baseUrl: baseUrlForCli,
-    emailAndPassword: { enabled: true },
+    emailAndPassword: { 
+      enabled: true,
+      sendResetPassword: async (data: any, request?: any) => {
+        // CLI environment - skip email sending
+        if (typeof process !== 'undefined') {
+          console.log('Password reset email would be sent to:', data.user.email);
+          console.log('Reset URL:', data.url);
+          return;
+        }
+      }
+    },
     // socialProviders: {
     //   google: {
     //     clientId: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_ID : undefined) || '',
@@ -62,17 +72,6 @@ export const auth = betterAuth({
         if (typeof process !== 'undefined') {
           console.log('Email verification would be sent to:', data.user.email);
           console.log('Verification URL:', data.url);
-          return;
-        }
-        // Runtime email sending handled in runtime config
-      }
-    },
-    forgetPassword: {
-      sendResetPasswordEmail: async (data: any, request?: any) => {
-        // CLI environment - skip email sending
-        if (typeof process !== 'undefined') {
-          console.log('Password reset email would be sent to:', data.user.email);
-          console.log('Reset URL:', data.url);
           return;
         }
         // Runtime email sending handled in runtime config
@@ -150,51 +149,16 @@ export function initializeAuth(env: Env) {
     ] as string[],
     emailAndPassword: {
       enabled: true,
-    },
-    // socialProviders: {
-    //   google: {
-    //     clientId: env.GOOGLE_CLIENT_ID,
-    //     clientSecret: env.GOOGLE_CLIENT_SECRET,
-    //     redirectURI: `${env.ENVIRONMENT === "development" 
-    //       ? "http://localhost:5173"  
-    //       : env.ENVIRONMENT === "staging" 
-    //         ? "https://dev.codevibesmatter.com" 
-    //         : "https://app.codevibesmatter.com"}/api/auth/callback/google`,
-    //   },
-    // },
-    emailVerification: {
-      sendOnSignUp: true,
-      sendVerificationEmail: async (data: any, request?: any) => {
-        const resend = new Resend(env.RESEND_API_KEY);
-        
-        try {
-          await resend.emails.send({
-            from: 'VibeStack <noreply@codevibesmatter.com>',
-            to: data.user.email,
-            subject: 'Verify your email address',
-            html: `
-              <h1>Welcome to VibeStack!</h1>
-              <p>Please verify your email address by clicking the link below:</p>
-              <a href="${data.url}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                Verify Email
-              </a>
-              <p>If you didn't create an account, you can safely ignore this email.</p>
-            `
-          });
-          dbLogger.info('Verification email sent', { 
-            email: data.user.email,
-            verificationUrl: data.url 
+      sendResetPassword: async (data: any, request?: any) => {
+        if (!env.RESEND_API_KEY) {
+          dbLogger.error('RESEND_API_KEY environment variable is not set', {
+            allEnvKeys: Object.keys(env),
+            envResendKey: env.RESEND_API_KEY,
+            environment: env.ENVIRONMENT
           }, 'auth');
-        } catch (error) {
-          dbLogger.error('Failed to send verification email', error, { 
-            email: data.user.email 
-          }, 'auth');
-          throw error;
+          throw new Error('RESEND_API_KEY environment variable is required for sending emails');
         }
-      }
-    },
-    forgetPassword: {
-      sendResetPasswordEmail: async (data: any, request?: any) => {
+        
         const resend = new Resend(env.RESEND_API_KEY);
         
         // Detect if this is an invitation based on the redirect URL
@@ -250,7 +214,50 @@ export function initializeAuth(env: Env) {
             }, 'auth');
           }
         } catch (error) {
-          dbLogger.error(`Failed to send ${isInvitation ? 'invitation' : 'password reset'} email`, error, { 
+          dbLogger.error('Failed to send reset/invitation email', error, { 
+            email: data.user.email,
+            isInvitation 
+          }, 'auth');
+          throw error;
+        }
+      }
+    },
+    // socialProviders: {
+    //   google: {
+    //     clientId: env.GOOGLE_CLIENT_ID,
+    //     clientSecret: env.GOOGLE_CLIENT_SECRET,
+    //     redirectURI: `${env.ENVIRONMENT === "development" 
+    //       ? "http://localhost:5173"  
+    //       : env.ENVIRONMENT === "staging" 
+    //         ? "https://dev.codevibesmatter.com" 
+    //         : "https://app.codevibesmatter.com"}/api/auth/callback/google`,
+    //   },
+    // },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendVerificationEmail: async (data: any, request?: any) => {
+        const resend = new Resend(env.RESEND_API_KEY);
+        
+        try {
+          await resend.emails.send({
+            from: 'VibeStack <noreply@codevibesmatter.com>',
+            to: data.user.email,
+            subject: 'Verify your email address',
+            html: `
+              <h1>Welcome to VibeStack!</h1>
+              <p>Please verify your email address by clicking the link below:</p>
+              <a href="${data.url}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                Verify Email
+              </a>
+              <p>If you didn't create an account, you can safely ignore this email.</p>
+            `
+          });
+          dbLogger.info('Verification email sent', { 
+            email: data.user.email,
+            verificationUrl: data.url 
+          }, 'auth');
+        } catch (error) {
+          dbLogger.error('Failed to send verification email', error, { 
             email: data.user.email 
           }, 'auth');
           throw error;

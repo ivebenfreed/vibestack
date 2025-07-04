@@ -6,6 +6,8 @@ import { NeonService } from '../lib/neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 import { BaseServerRepository } from './BaseServerRepository';
+import { UniversalEntityDeleter, type DeletionPlan, type DeletionOptions } from '../lib/universal-entity-deleter';
+import { getDeletionStrategy } from '../config/deletion-strategies';
 
 // Re-export enums for convenience
 export { UserRole };
@@ -80,6 +82,40 @@ export class UserRepository extends BaseServerRepository<User> {
     
     // Then delete the user using parent class method
     return await super.delete(id);
+  }
+
+  /**
+   * Delete user with automatic relationship cleanup using UniversalEntityDeleter
+   * This handles all domain relationships automatically via DataForge metadata
+   */
+  async deleteWithRelationships(
+    userId: string,
+    options: {
+      transferProjectsTo?: string;
+      dryRun?: boolean;
+    } = {}
+  ): Promise<DeletionPlan> {
+    const deleter = new UniversalEntityDeleter(this.neonService);
+
+    // Get base deletion strategies for users
+    const baseStrategies = getDeletionStrategy('users');
+    
+    // Apply transfer ownership logic if target is provided
+    const customStrategies: Record<string, any> = {};
+    if (options.transferProjectsTo) {
+      // Override projects strategy to include transfer target
+      customStrategies.projects = {
+        ...baseStrategies.projects,
+        transferTarget: options.transferProjectsTo
+      };
+    }
+
+    const deletionOptions: DeletionOptions = {
+      dryRun: options.dryRun,
+      entityStrategies: { ...baseStrategies, ...customStrategies }
+    };
+
+    return await deleter.deleteEntity('users', userId, deletionOptions);
   }
 }
 
