@@ -1,4 +1,6 @@
 import { betterAuth } from "better-auth";
+// import { google } from "better-auth/providers";
+import { admin } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { NeonHTTPDialect } from "kysely-neon";
 import { Hono, Context } from "hono";
@@ -6,6 +8,7 @@ import type { Env } from "../types/env";
 import type { Dialect } from 'kysely';
 import { Kysely, PostgresDialect } from 'kysely';
 import { dbLogger } from '../middleware/logger';
+import { Resend } from 'resend';
 
 // Type for Hono context including Auth variables
 export type AuthType = {
@@ -46,6 +49,38 @@ export const auth = betterAuth({
     secret: secretForCli,
     baseUrl: baseUrlForCli,
     emailAndPassword: { enabled: true },
+    // socialProviders: {
+    //   google: {
+    //     clientId: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_ID : undefined) || '',
+    //     clientSecret: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_SECRET : undefined) || '',
+    //   },
+    // },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendVerificationEmail: async (data: any, request?: any) => {
+        // CLI environment - skip email sending
+        if (typeof process !== 'undefined') {
+          console.log('Email verification would be sent to:', data.user.email);
+          console.log('Verification URL:', data.url);
+          return;
+        }
+        // Runtime email sending handled in runtime config
+      }
+    },
+    forgetPassword: {
+      sendResetPasswordEmail: async (data: any, request?: any) => {
+        // CLI environment - skip email sending
+        if (typeof process !== 'undefined') {
+          console.log('Password reset email would be sent to:', data.user.email);
+          console.log('Reset URL:', data.url);
+          return;
+        }
+        // Runtime email sending handled in runtime config
+      }
+    },
+    plugins: [
+      admin(),
+    ],
 });
 
 
@@ -116,6 +151,112 @@ export function initializeAuth(env: Env) {
     emailAndPassword: {
       enabled: true,
     },
+    // socialProviders: {
+    //   google: {
+    //     clientId: env.GOOGLE_CLIENT_ID,
+    //     clientSecret: env.GOOGLE_CLIENT_SECRET,
+    //     redirectURI: `${env.ENVIRONMENT === "development" 
+    //       ? "http://localhost:5173"  
+    //       : env.ENVIRONMENT === "staging" 
+    //         ? "https://dev.codevibesmatter.com" 
+    //         : "https://app.codevibesmatter.com"}/api/auth/callback/google`,
+    //   },
+    // },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendVerificationEmail: async (data: any, request?: any) => {
+        const resend = new Resend(env.RESEND_API_KEY);
+        
+        try {
+          await resend.emails.send({
+            from: 'VibeStack <noreply@codevibesmatter.com>',
+            to: data.user.email,
+            subject: 'Verify your email address',
+            html: `
+              <h1>Welcome to VibeStack!</h1>
+              <p>Please verify your email address by clicking the link below:</p>
+              <a href="${data.url}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                Verify Email
+              </a>
+              <p>If you didn't create an account, you can safely ignore this email.</p>
+            `
+          });
+          dbLogger.info('Verification email sent', { 
+            email: data.user.email,
+            verificationUrl: data.url 
+          }, 'auth');
+        } catch (error) {
+          dbLogger.error('Failed to send verification email', error, { 
+            email: data.user.email 
+          }, 'auth');
+          throw error;
+        }
+      }
+    },
+    forgetPassword: {
+      sendResetPasswordEmail: async (data: any, request?: any) => {
+        const resend = new Resend(env.RESEND_API_KEY);
+        
+        // Detect if this is an invitation based on the redirect URL
+        const isInvitation = data.url.includes('/complete-registration');
+        
+        try {
+          if (isInvitation) {
+            // Send invitation email
+            await resend.emails.send({
+              from: 'VibeStack <noreply@codevibesmatter.com>',
+              to: data.user.email,
+              subject: 'Welcome to VibeStack - Complete Your Account Setup',
+              html: `
+                <h1>Welcome to VibeStack!</h1>
+                <p>You've been invited to join VibeStack. To complete your account setup and choose your password, click the link below:</p>
+                <a href="${data.url}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 16px 0;">
+                  Complete Account Setup
+                </a>
+                <p><strong>What's next?</strong></p>
+                <ul>
+                  <li>Click the link above to access the setup page</li>
+                  <li>Choose a secure password for your account</li>
+                  <li>Start using VibeStack right away</li>
+                </ul>
+                <p style="color: #666; font-size: 14px;">This invitation link will expire in 24 hours for security. If you have any questions, please contact your administrator.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                <p style="color: #999; font-size: 12px;">If you didn't expect this invitation, you can safely ignore this email.</p>
+              `
+            });
+            dbLogger.info('User invitation email sent', { 
+              email: data.user.email,
+              invitationUrl: data.url 
+            }, 'auth');
+          } else {
+            // Send password reset email
+            await resend.emails.send({
+              from: 'VibeStack <noreply@codevibesmatter.com>',
+              to: data.user.email,
+              subject: 'Reset your password',
+              html: `
+                <h1>Reset Your Password</h1>
+                <p>You requested to reset your password. Click the link below to set a new password:</p>
+                <a href="${data.url}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                  Reset Password
+                </a>
+                <p>If you didn't request a password reset, you can safely ignore this email.</p>
+                <p>This link will expire in 15 minutes.</p>
+              `
+            });
+            dbLogger.info('Password reset email sent', { 
+              email: data.user.email,
+              resetUrl: data.url 
+            }, 'auth');
+          }
+        } catch (error) {
+          dbLogger.error(`Failed to send ${isInvitation ? 'invitation' : 'password reset'} email`, error, { 
+            email: data.user.email 
+          }, 'auth');
+          throw error;
+        }
+      }
+    },
     databaseHooks: {
       user: {
         create: {
@@ -134,8 +275,9 @@ export function initializeAuth(env: Env) {
         },
       },
     },
-    // Add JWT plugin properly
+    // Add plugins
     plugins: [
+      admin(),
       // jwt({ // JWT plugin removed
       //   jwt: {
       //     issuer: 'vibestack',

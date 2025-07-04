@@ -123,32 +123,103 @@ vibestack/
    pnpm dev
    ```
 
-## Debug Features (OpenAuth)
+## Authentication System (Better Auth)
 
-**⚠️ WARNING: These features are intended for development and debugging ONLY. They provide direct access to manipulate authentication data and should NEVER be exposed in production.**
+VibeStack uses **Better Auth** for a complete, secure authentication system with advanced features:
 
-The OpenAuth worker (`apps/openauth`) includes a set of internal debug routes accessible under the `/internal` path prefix. These routes provide a simple web interface for inspecting and managing user authentication data stored in the Cloudflare KV namespace (`AUTH_STORE`).
+### Core Authentication Features
 
-### Accessing the Debug UI
+- **Email/Password Authentication** - Traditional email and password sign-in ✅
+- **Google OAuth** - One-click sign-in with Google accounts 🚧 (Temporarily disabled)
+- **Email Verification** - Secure email verification flow for new accounts ✅
+- **Password Reset** - Self-service password reset via email ✅
+- **User Invitation System** - Admin-initiated user invitations with email setup links ✅
+- **Role-Based Access Control** - Multiple user roles (viewer, member, admin, super_admin) ✅
+- **Session Management** - Secure session handling with proper cookie configuration ✅
+- **Same-Origin Pattern** - Simplified authentication without CORS complexity ✅
 
-1.  Navigate to `/internal/list-auth-users` in your browser when the worker is running.
-2.  **Challenge Required:** For security, access is protected by a simple challenge-response mechanism.
-    *   On the first visit, the UI will prompt you for a challenge code.
-    *   Check the **worker console logs**. A message like `[OpenAuth] DEBUG CHALLENGE: To access admin UI, use challenge code: <CODE>` will be printed.
-    *   Copy the `<code>`.
-    *   Append `?challenge=<code>` to the URL (e.g., `/internal/list-auth-users?challenge=ABCDEF`) and refresh the page.
+### Admin User Management
 
-### Features
+**⚠️ Admin Features:** These features are restricted to admin and super_admin users only.
 
-*   **List Users:** Displays a list of users based on the presence of `email\u001f<email>\u001fsubject` keys found in the KV store.
-*   **Delete User Data:** Provides a button next to each listed user to delete all associated authentication data (password hash, email-subject mapping, and any associated refresh tokens). **This action is irreversible.**
-*   **Clear All Auth Data:** Provides a button to delete **ALL** authentication data stored in the KV namespace managed by OpenAuth (keys starting with `email\u001f` and `oauth:refresh\u001f`). **This action is extremely destructive and irreversible.** Use with extreme caution.
+Admin users can access advanced user management features at `/settings/admin/users`:
 
-### Implementation Details
+- **User Management Dashboard** - View, create, edit, and delete users ✅
+- **User Invitation System** - Send invitation emails with account setup links ✅
+- **Role Management** - Assign and modify user roles and permissions ✅
+- **Password Reset** - Admin-initiated password resets via email ✅
+- **Email Verification Control** - Manage user email verification status ✅
+- **User CRUD Operations** - Complete user lifecycle management ✅
 
-*   All debug route handlers are defined in `apps/openauth/src/debug.ts`.
-*   The main worker entry point (`apps/openauth/src/index.ts`) mounts these routes under the `/internal` path.
-*   The challenge code is generated randomly per worker instance and reset after successful validation.
+#### User Invitation Flow
+1. Admin clicks "Invite User" and fills out email, name, and role
+2. System creates user account with temporary credentials
+3. Invitation email sent with secure setup link (`/complete-registration`)
+4. User clicks link and sets their own password
+5. User can immediately sign in with new credentials
+
+### Authentication Configuration
+
+The authentication system requires several environment variables:
+
+#### Server Configuration (`apps/server/.env.example`)
+```bash
+# Better Auth
+BETTER_AUTH_SECRET=your_super_secret_auth_key_at_least_32_characters_long
+BETTER_AUTH_URL=http://localhost:5173
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+
+# Email Service (Resend)
+RESEND_API_KEY=re_your_resend_api_key
+```
+
+#### Client Configuration (`apps/web/.env.example`)
+```bash
+# API Connection
+VITE_API_URL=http://127.0.0.1:8787
+VITE_AUTH_ISSUER_URL=http://127.0.0.1:8788
+VITE_AUTH_CLIENT_ID=vibestack-web
+```
+
+### Setting Up OAuth Providers
+
+#### Google OAuth Setup (Currently Disabled)
+⚠️ Google OAuth is temporarily disabled during authentication system stabilization.
+
+To re-enable Google OAuth:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable Google+ API
+4. Create OAuth 2.0 Client IDs in Credentials
+5. Set Authorized redirect URIs:
+   - `http://localhost:5173/api/auth/callback/google` (development)
+   - `https://dev.codevibesmatter.com/api/auth/callback/google` (staging)
+   - `https://app.codevibesmatter.com/api/auth/callback/google` (production)
+6. Uncomment Google provider configuration in `apps/server/src/lib/auth.ts`
+
+#### Email Service Setup (Resend)
+1. Sign up at [Resend](https://resend.com/)
+2. Get your API key from [API Keys](https://resend.com/api-keys)
+3. Configure your domain at [Domains](https://resend.com/domains)
+4. Verify your domain for email sending
+
+### Authentication CLI Tools
+
+Use the CLI for user management:
+
+```bash
+# Create super admin user
+pnpm cli create-super-admin
+
+# Seed test users
+pnpm cli seed-users
+
+# Logout current session
+pnpm cli logout
+```
 
 ## Development
 
@@ -161,12 +232,135 @@ The OpenAuth worker (`apps/openauth`) includes a set of internal debug routes ac
 
 ## Testing
 
-The project includes a comprehensive test suite for the sync functionality:
+### Automated Testing
 
+The project includes comprehensive test suites for critical functionality:
+
+#### Sync System Tests
 ```bash
-# Run sync tests
+# Run all sync functionality tests
 pnpm --filter @repo/sync-test test
+
+# Run enhanced sync operation tests with detailed reporting
+pnpm test:sync-isolation
+
+# Run web sync isolation tests
+pnpm --filter vibestack-web test:sync-isolation
 ```
+
+#### Build and Quality Tests
+```bash
+# Run full build pipeline (required before deployment)
+pnpm build
+
+# Run code quality checks (TypeScript + ESLint)
+pnpm quality
+
+# Run linting with auto-fix
+pnpm lint:fix
+
+# Run TypeScript type checking
+pnpm type-check
+```
+
+### Manual Testing Workflows
+
+#### Authentication System Testing
+
+**Prerequisites:**
+1. Set up Resend API key for email testing
+2. Create super admin user: `pnpm cli create-super-admin`
+3. Start dev servers: `pnpm dev`
+
+**Test Email/Password Authentication:**
+1. Navigate to `/sign-up`
+2. Create account with valid email
+3. Check email for verification link
+4. Click verification link
+5. Sign in at `/sign-in`
+6. Verify dashboard access
+
+**Test User Invitation System:**
+1. Sign in as admin user
+2. Navigate to `/settings/admin/users`
+3. Click "Invite User" button
+4. Fill out invitation form (email, name, role)
+5. Check recipient email for invitation
+6. Click invitation link to access `/complete-registration`
+7. Set password and complete setup
+8. Verify new user can sign in
+
+**Test Password Reset Flow:**
+1. Go to `/sign-in`
+2. Click "Forgot Password?"
+3. Enter email address
+4. Check email for reset link
+5. Click reset link
+6. Set new password
+7. Sign in with new credentials
+
+**Test Admin User Management:**
+1. Sign in as admin
+2. Navigate to `/settings/admin/users`
+3. Test user creation, editing, role changes
+4. Test password reset for other users
+5. Test user deletion (non-self)
+
+#### Sync System Testing
+
+**Basic Sync Testing:**
+1. Open application in two browser tabs
+2. Create/modify data in one tab
+3. Verify changes appear in other tab within 1-2 seconds
+4. Test offline scenarios by disconnecting network
+5. Make changes offline, reconnect, verify sync
+
+**Performance Testing:**
+1. Use VibeGridFinal with large datasets (1000+ rows)
+2. Verify cell rendering stays under 50ms
+3. Test bulk operations and sync performance
+4. Monitor WebSocket connection stability
+
+### Testing Infrastructure
+
+#### Development Environment Testing
+```bash
+# Start with debug logging
+pnpm dev:debug
+
+# Start with info logging
+pnpm dev:info
+
+# Test PWA functionality
+pnpm dev:pwa-test
+```
+
+#### Database Testing
+```bash
+# Generate and run migrations
+pnpm forge:migrate:generate TestMigration
+pnpm forge:migrate:run
+
+# Full DataForge workflow test
+pnpm forge:deploy TestDeployment
+
+# Initialize DataForge from scratch
+pnpm cli init-dataforge
+```
+
+### Known Testing Issues
+
+- **Sync Test Package**: Currently has TypeScript compilation errors (sync-test package)
+- **Google OAuth**: Disabled during development - requires provider setup
+- **Password Hashing**: Temporary implementation in admin password reset
+- **KV Namespace**: Deployment requires Cloudflare KV configuration
+
+### Performance Benchmarks
+
+- **VibeGridFinal Cell Rendering**: ~45ms universal cell renderer
+- **WebSocket Sync Latency**: <2 seconds for typical changes
+- **Database Query Performance**: Optimized with single-query updates
+- **Bundle Size**: Monitored for optimal loading times
 
 ## Acknowledgments
 

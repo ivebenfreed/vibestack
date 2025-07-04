@@ -20,11 +20,14 @@ import { Route as errors500Import } from './routes/(errors)/500'
 import { Route as errors404Import } from './routes/(errors)/404'
 import { Route as errors403Import } from './routes/(errors)/403'
 import { Route as errors401Import } from './routes/(errors)/401'
+import { Route as authVerifyEmailImport } from './routes/(auth)/verify-email'
 import { Route as authSignUpImport } from './routes/(auth)/sign-up'
 import { Route as authSignIn2Import } from './routes/(auth)/sign-in-2'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
+import { Route as authResetPasswordImport } from './routes/(auth)/reset-password'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as authForgotPasswordImport } from './routes/(auth)/forgot-password'
+import { Route as authCompleteRegistrationImport } from './routes/(auth)/complete-registration'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedDebugRouteImport } from './routes/_authenticated/debug/route'
 import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/tasks/index'
@@ -42,6 +45,7 @@ import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authent
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugGridOptimusProjectsImport } from './routes/_authenticated/debug/grid-optimus-projects'
+import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authenticated/settings/admin.users'
 
 // Create Virtual Routes
 
@@ -101,6 +105,12 @@ const errors401Route = errors401Import.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const authVerifyEmailRoute = authVerifyEmailImport.update({
+  id: '/(auth)/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const authSignUpRoute = authSignUpImport.update({
   id: '/(auth)/sign-up',
   path: '/sign-up',
@@ -119,6 +129,12 @@ const authSignInRoute = authSignInImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const authResetPasswordRoute = authResetPasswordImport.update({
+  id: '/(auth)/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const authOtpRoute = authOtpImport.update({
   id: '/(auth)/otp',
   path: '/otp',
@@ -128,6 +144,12 @@ const authOtpRoute = authOtpImport.update({
 const authForgotPasswordRoute = authForgotPasswordImport.update({
   id: '/(auth)/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const authCompleteRegistrationRoute = authCompleteRegistrationImport.update({
+  id: '/(auth)/complete-registration',
+  path: '/complete-registration',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -284,6 +306,13 @@ const AuthenticatedDebugGridOptimusProjectsRoute =
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
+const AuthenticatedSettingsAdminUsersRoute =
+  AuthenticatedSettingsAdminUsersImport.update({
+    id: '/admin/users',
+    path: '/admin/users',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -309,6 +338,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/(auth)/complete-registration': {
+      id: '/(auth)/complete-registration'
+      path: '/complete-registration'
+      fullPath: '/complete-registration'
+      preLoaderRoute: typeof authCompleteRegistrationImport
+      parentRoute: typeof rootRoute
+    }
     '/(auth)/forgot-password': {
       id: '/(auth)/forgot-password'
       path: '/forgot-password'
@@ -321,6 +357,13 @@ declare module '@tanstack/react-router' {
       path: '/otp'
       fullPath: '/otp'
       preLoaderRoute: typeof authOtpImport
+      parentRoute: typeof rootRoute
+    }
+    '/(auth)/reset-password': {
+      id: '/(auth)/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof authResetPasswordImport
       parentRoute: typeof rootRoute
     }
     '/(auth)/sign-in': {
@@ -342,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-up'
       fullPath: '/sign-up'
       preLoaderRoute: typeof authSignUpImport
+      parentRoute: typeof rootRoute
+    }
+    '/(auth)/verify-email': {
+      id: '/(auth)/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof authVerifyEmailImport
       parentRoute: typeof rootRoute
     }
     '/(errors)/401': {
@@ -519,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTasksIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/settings/admin/users': {
+      id: '/_authenticated/settings/admin/users'
+      path: '/admin/users'
+      fullPath: '/settings/admin/users'
+      preLoaderRoute: typeof AuthenticatedSettingsAdminUsersImport
+      parentRoute: typeof AuthenticatedSettingsRouteImport
+    }
   }
 }
 
@@ -560,6 +617,7 @@ interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
+  AuthenticatedSettingsAdminUsersRoute: typeof AuthenticatedSettingsAdminUsersRoute
 }
 
 const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
@@ -570,6 +628,7 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
     AuthenticatedSettingsNotificationsRoute:
       AuthenticatedSettingsNotificationsRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
+    AuthenticatedSettingsAdminUsersRoute: AuthenticatedSettingsAdminUsersRoute,
   }
 
 const AuthenticatedSettingsRouteRouteWithChildren =
@@ -608,11 +667,14 @@ export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteRouteWithChildren
   '/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
+  '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-in-2': typeof authSignIn2Route
   '/sign-up': typeof authSignUpRoute
+  '/verify-email': typeof authVerifyEmailRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -638,14 +700,18 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthenticatedProjectsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
 
 export interface FileRoutesByTo {
+  '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
+  '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-in-2': typeof authSignIn2Route
   '/sign-up': typeof authSignUpRoute
+  '/verify-email': typeof authVerifyEmailRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -671,6 +737,7 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthenticatedProjectsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
 
 export interface FileRoutesById {
@@ -678,11 +745,14 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_authenticated/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/(auth)/complete-registration': typeof authCompleteRegistrationRoute
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/otp': typeof authOtpRoute
+  '/(auth)/reset-password': typeof authResetPasswordRoute
   '/(auth)/sign-in': typeof authSignInRoute
   '/(auth)/sign-in-2': typeof authSignIn2Route
   '/(auth)/sign-up': typeof authSignUpRoute
+  '/(auth)/verify-email': typeof authVerifyEmailRoute
   '/(errors)/401': typeof errors401Route
   '/(errors)/403': typeof errors403Route
   '/(errors)/404': typeof errors404Route
@@ -708,6 +778,7 @@ export interface FileRoutesById {
   '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/_authenticated/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
 
 export interface FileRouteTypes {
@@ -716,11 +787,14 @@ export interface FileRouteTypes {
     | ''
     | '/debug'
     | '/settings'
+    | '/complete-registration'
     | '/forgot-password'
     | '/otp'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-in-2'
     | '/sign-up'
+    | '/verify-email'
     | '/401'
     | '/403'
     | '/404'
@@ -746,13 +820,17 @@ export interface FileRouteTypes {
     | '/projects'
     | '/settings/'
     | '/tasks'
+    | '/settings/admin/users'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/complete-registration'
     | '/forgot-password'
     | '/otp'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-in-2'
     | '/sign-up'
+    | '/verify-email'
     | '/401'
     | '/403'
     | '/404'
@@ -778,16 +856,20 @@ export interface FileRouteTypes {
     | '/projects'
     | '/settings'
     | '/tasks'
+    | '/settings/admin/users'
   id:
     | '__root__'
     | '/_authenticated'
     | '/_authenticated/debug'
     | '/_authenticated/settings'
+    | '/(auth)/complete-registration'
     | '/(auth)/forgot-password'
     | '/(auth)/otp'
+    | '/(auth)/reset-password'
     | '/(auth)/sign-in'
     | '/(auth)/sign-in-2'
     | '/(auth)/sign-up'
+    | '/(auth)/verify-email'
     | '/(errors)/401'
     | '/(errors)/403'
     | '/(errors)/404'
@@ -813,16 +895,20 @@ export interface FileRouteTypes {
     | '/_authenticated/projects/'
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
+    | '/_authenticated/settings/admin/users'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  authCompleteRegistrationRoute: typeof authCompleteRegistrationRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authOtpRoute: typeof authOtpRoute
+  authResetPasswordRoute: typeof authResetPasswordRoute
   authSignInRoute: typeof authSignInRoute
   authSignIn2Route: typeof authSignIn2Route
   authSignUpRoute: typeof authSignUpRoute
+  authVerifyEmailRoute: typeof authVerifyEmailRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
@@ -832,11 +918,14 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  authCompleteRegistrationRoute: authCompleteRegistrationRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
   authOtpRoute: authOtpRoute,
+  authResetPasswordRoute: authResetPasswordRoute,
   authSignInRoute: authSignInRoute,
   authSignIn2Route: authSignIn2Route,
   authSignUpRoute: authSignUpRoute,
+  authVerifyEmailRoute: authVerifyEmailRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,
@@ -855,11 +944,14 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/_authenticated",
+        "/(auth)/complete-registration",
         "/(auth)/forgot-password",
         "/(auth)/otp",
+        "/(auth)/reset-password",
         "/(auth)/sign-in",
         "/(auth)/sign-in-2",
         "/(auth)/sign-up",
+        "/(auth)/verify-email",
         "/(errors)/401",
         "/(errors)/403",
         "/(errors)/404",
@@ -903,14 +995,21 @@ export const routeTree = rootRoute
         "/_authenticated/settings/appearance",
         "/_authenticated/settings/display",
         "/_authenticated/settings/notifications",
-        "/_authenticated/settings/"
+        "/_authenticated/settings/",
+        "/_authenticated/settings/admin/users"
       ]
+    },
+    "/(auth)/complete-registration": {
+      "filePath": "(auth)/complete-registration.tsx"
     },
     "/(auth)/forgot-password": {
       "filePath": "(auth)/forgot-password.tsx"
     },
     "/(auth)/otp": {
       "filePath": "(auth)/otp.tsx"
+    },
+    "/(auth)/reset-password": {
+      "filePath": "(auth)/reset-password.tsx"
     },
     "/(auth)/sign-in": {
       "filePath": "(auth)/sign-in.tsx"
@@ -920,6 +1019,9 @@ export const routeTree = rootRoute
     },
     "/(auth)/sign-up": {
       "filePath": "(auth)/sign-up.tsx"
+    },
+    "/(auth)/verify-email": {
+      "filePath": "(auth)/verify-email.tsx"
     },
     "/(errors)/401": {
       "filePath": "(errors)/401.tsx"
@@ -1015,6 +1117,10 @@ export const routeTree = rootRoute
     "/_authenticated/tasks/": {
       "filePath": "_authenticated/tasks/index.tsx",
       "parent": "/_authenticated"
+    },
+    "/_authenticated/settings/admin/users": {
+      "filePath": "_authenticated/settings/admin.users.tsx",
+      "parent": "/_authenticated/settings"
     }
   }
 }

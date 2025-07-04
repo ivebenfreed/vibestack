@@ -1,7 +1,8 @@
 import { Separator } from '@/components/ui/separator'
 import { ContentContainer } from '@/components/layout/content-container'
 import SidebarNav from './components/sidebar-nav'
-import { User, Settings as SettingsIcon, Palette, Bell, Monitor } from 'lucide-react'
+import { User, Settings as SettingsIcon, Palette, Bell, Monitor, Shield } from 'lucide-react'
+import { useAuth } from '@/hooks/useSimpleAuth'
 
 const sidebarNavItems = [
   {
@@ -32,6 +33,18 @@ const sidebarNavItems = [
 ]
 
 export default function Settings() {
+  const { user, isAdmin } = useAuth();
+
+  // Add admin items if user is admin
+  const allSidebarNavItems = [
+    ...sidebarNavItems,
+    ...(isAdmin ? [{
+      title: 'User Management',
+      href: '/settings/admin/users',
+      icon: <Shield className="w-4 h-4" />,
+    }] : [])
+  ];
+
   return (
     <ContentContainer>
       <div className='space-y-6'>
@@ -44,7 +57,7 @@ export default function Settings() {
         <Separator />
         <div className='grid gap-6 lg:grid-cols-[200px_1fr]'>
           <aside>
-            <SidebarNav items={sidebarNavItems} />
+            <SidebarNav items={allSidebarNavItems} />
           </aside>
           <div className='min-w-0 max-w-2xl'>
             <div className='space-y-6'>

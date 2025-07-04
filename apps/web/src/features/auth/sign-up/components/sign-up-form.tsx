@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
+import { IconBrandGoogle } from '@tabler/icons-react'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -97,6 +97,30 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
     }
   }
 
+  // Handle Google OAuth sign-up
+  const handleGoogleSignUp = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Redirect to Google OAuth
+      const result = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: `${window.location.origin}/api/auth/callback/google`
+      })
+      
+      if (result.error) {
+        throw new Error(result.error.message)
+      }
+      
+      // The redirect will happen automatically via Better Auth
+      
+    } catch (error: any) {
+      console.error('[AUTH] Google Sign Up Error:', error)
+      toast.error(error?.message || 'Failed to sign up with Google')
+      setIsLoading(false)
+    }
+  }
+
   return (
     <Form {...form}>
       <form
@@ -172,24 +196,16 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
           </div>
         </div>
 
-        <div className='grid grid-cols-2 gap-2'>
-          <Button
-            variant='outline'
-            className='w-full'
-            type='button'
-            disabled={isLoading}
-          >
-            <IconBrandGithub className='h-4 w-4' /> GitHub
-          </Button>
-          <Button
-            variant='outline'
-            className='w-full'
-            type='button'
-            disabled={isLoading}
-          >
-            <IconBrandFacebook className='h-4 w-4' /> Facebook
-          </Button>
-        </div>
+        <Button 
+          variant='outline' 
+          type='button' 
+          disabled={isLoading}
+          onClick={handleGoogleSignUp}
+          className='w-full'
+        >
+          <IconBrandGoogle className='h-4 w-4 mr-2' /> 
+          Continue with Google
+        </Button>
       </form>
     </Form>
   )

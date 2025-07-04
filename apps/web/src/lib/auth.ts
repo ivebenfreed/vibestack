@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react"; // Use React client
+import { adminClient } from "better-auth/client/plugins";
 
 // Define the base URL for the Better Auth server
 // Using same-origin architecture - everything from same domain
@@ -27,6 +28,9 @@ export const authClient = createAuthClient({
     'Content-Type': 'application/json',
   },
   mode: 'cors',
+  plugins: [
+    adminClient()
+  ],
   fetchOptions: {
     // Add timeout for requests
     timeout: 10000, // 10 seconds
