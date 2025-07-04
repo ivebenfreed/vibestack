@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useAuth } from '@/hooks/useSimpleAuth'
 import {
   CommandDialog,
   CommandEmpty,
@@ -38,6 +39,7 @@ const navigationItems = [
 
 export function CommandMenu() {
   const navigate = useNavigate()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -57,6 +59,15 @@ export function CommandMenu() {
     command()
   }
 
+  // Filter navigation items based on user permissions
+  const filteredNavigationItems = navigationItems.filter(item => {
+    if (item.id.startsWith('debug')) {
+      // Only show debug items to admins and super admins
+      return isAdmin || isSuperAdmin
+    }
+    return true
+  })
+
   return (
     <CommandDialog modal open={open} onOpenChange={setOpen}>
       <CommandInput placeholder='Type a command or search...' />
@@ -64,7 +75,7 @@ export function CommandMenu() {
         <ScrollArea type='hover' className='h-72 pr-1'>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Navigation">
-            {navigationItems.map((item) => (
+            {filteredNavigationItems.map((item) => (
               <CommandItem
                 key={item.id}
                 value={item.label}

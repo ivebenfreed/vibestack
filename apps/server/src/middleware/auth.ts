@@ -21,7 +21,14 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
         // No session found, explicitly set to null
         c.set('user', null);
         c.set('session', null);
-        console.log('[Auth Middleware] ❌ No valid session for:', c.req.path);
+        
+        // Only log missing session for protected routes, not public auth routes
+        const publicPaths = ['/api/auth/sign-in', '/api/auth/sign-up', '/api/auth/reset-password', '/api/auth/verify-email', '/api/auth/get-session'];
+        const isPublicPath = publicPaths.some(path => c.req.path.startsWith(path));
+        
+        if (!isPublicPath) {
+          console.log('[Auth Middleware] ❌ No valid session for:', c.req.path);
+        }
       }
     } catch (error) {
       console.error('[Auth Middleware] Error getting session:', error);

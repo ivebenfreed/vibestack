@@ -25,12 +25,26 @@ function VerifyEmailPage() {
   const [isResending, setIsResending] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  // If we have a token, verify it automatically
+  // Redirect to OTP verification if we have an email but no token
+  // This handles the new OTP-based verification flow
   useEffect(() => {
+    if (email && !token) {
+      // Redirect to OTP verification page
+      navigate({ 
+        to: '/otp-verify', 
+        search: { 
+          email: email, 
+          type: 'email-verification' 
+        } 
+      })
+      return
+    }
+    
+    // Legacy: If we have a token, try to verify it automatically
     if (token) {
       verifyEmail(token)
     }
-  }, [token])
+  }, [token, email, navigate])
 
   const verifyEmail = async (verificationToken: string) => {
     try {
@@ -68,19 +82,20 @@ function VerifyEmailPage() {
     try {
       setIsResending(true)
       
-      const result = await authClient.emailVerification.sendVerificationEmail({
-        email: email
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: email,
+        type: 'email-verification'
       })
 
       if (result.error) {
         throw new Error(result.error.message)
       }
 
-      toast.success('Verification email sent! Please check your inbox.')
+      toast.success('Verification code sent! Please check your inbox.')
 
     } catch (error: any) {
-      console.error('Failed to resend verification email:', error)
-      toast.error(error?.message || 'Failed to resend verification email')
+      console.error('Failed to resend verification code:', error)
+      toast.error(error?.message || 'Failed to resend verification code')
     } finally {
       setIsResending(false)
     }
@@ -150,7 +165,7 @@ function VerifyEmailPage() {
             <Mail className="h-8 w-8 text-blue-600 mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Check your email</h2>
             <p className="text-muted-foreground mb-4">
-              We've sent a verification link to your email address. Please check your inbox and click the link to verify your account.
+              We've sent a 6-digit verification code to your email address. Please check your inbox and enter the code to verify your account.
             </p>
             {email && (
               <div className="space-y-2">
@@ -158,7 +173,7 @@ function VerifyEmailPage() {
                   Sent to: <span className="font-medium">{email}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Didn't receive the email?
+                  Didn't receive the code?
                 </p>
                 <Button 
                   variant="outline" 
@@ -166,7 +181,7 @@ function VerifyEmailPage() {
                   disabled={isResending}
                 >
                   {isResending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Resend verification email
+                  Resend verification code
                 </Button>
               </div>
             )}

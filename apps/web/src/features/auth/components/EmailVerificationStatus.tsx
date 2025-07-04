@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -10,31 +11,71 @@ import { toast } from 'sonner'
 
 export function EmailVerificationStatus() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [isResending, setIsResending] = useState(false)
+  const [localVerificationStatus, setLocalVerificationStatus] = useState<boolean | null>(null)
 
   if (!user) {
     return null
   }
 
-  const isVerified = user.emailVerified
+  // Use local verification status if available, otherwise use user.emailVerified
+  const isVerified = localVerificationStatus !== null ? localVerificationStatus : user.emailVerified
+
+  // Check for updated verification status when the component mounts or user changes
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      try {
+        const session = await authClient.getSession()
+        if (session.data?.user?.emailVerified !== user.emailVerified) {
+          setLocalVerificationStatus(session.data.user.emailVerified)
+        }
+      } catch (error) {
+        console.warn('Failed to refresh session for verification status:', error)
+      }
+    }
+
+    // Check immediately
+    checkVerificationStatus()
+
+    // Also check when the window gains focus (user returns from verification)
+    const handleFocus = () => {
+      checkVerificationStatus()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [user.emailVerified])
 
   const resendVerificationEmail = async () => {
     try {
       setIsResending(true)
       
-      const result = await authClient.emailVerification.sendVerificationEmail({
-        email: user.email
+      const result = await authClient.emailOtp.sendVerificationOtp({
+        email: user.email,
+        type: 'email-verification'
       })
 
       if (result.error) {
         throw new Error(result.error.message)
       }
 
-      toast.success('Verification email sent! Please check your inbox.')
+      toast.success('Verification code sent! Redirecting to verification page...')
+      
+      // Redirect to OTP verification page
+      setTimeout(() => {
+        navigate({ 
+          to: '/otp-verify', 
+          search: { 
+            email: user.email, 
+            type: 'email-verification' 
+          } 
+        })
+      }, 1500)
 
     } catch (error: any) {
-      console.error('Failed to resend verification email:', error)
-      toast.error(error?.message || 'Failed to resend verification email')
+      console.error('Failed to resend verification code:', error)
+      toast.error(error?.message || 'Failed to resend verification code')
     } finally {
       setIsResending(false)
     }
@@ -94,7 +135,7 @@ export function EmailVerificationStatus() {
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Click the button below to send a new verification email to your inbox.
+              Click the button below to send a 6-digit verification code to your inbox.
             </p>
             <Button 
               variant="outline" 
@@ -102,7 +143,7 @@ export function EmailVerificationStatus() {
               disabled={isResending}
             >
               {isResending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send verification email
+              Send verification code
             </Button>
           </div>
         )}

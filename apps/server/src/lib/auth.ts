@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 // import { google } from "better-auth/providers";
-import { admin } from "better-auth/plugins";
+import { admin, emailOTP } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { NeonHTTPDialect } from "kysely-neon";
 import { Hono, Context } from "hono";
@@ -79,6 +79,22 @@ export const auth = betterAuth({
     },
     plugins: [
       admin(),
+      emailOTP({
+        sendVerificationOTP: async (data: any, request?: any) => {
+          // CLI environment - skip email sending
+          if (typeof process !== 'undefined') {
+            console.log('OTP would be sent to:', data.email);
+            console.log('OTP code:', data.otp);
+            console.log('Type:', data.type);
+            return;
+          }
+          // Runtime email sending handled in runtime config
+        },
+        otpLength: 6,
+        expiresIn: 300, // 5 minutes
+        sendVerificationOnSignUp: true,
+        allowedAttempts: 3
+      }),
     ],
 });
 
@@ -164,6 +180,16 @@ export function initializeAuth(env: Env) {
         // Detect if this is an invitation based on the redirect URL
         const isInvitation = data.url.includes('/complete-registration');
         
+        // Get the base URL for the current environment
+        const baseUrl = env.ENVIRONMENT === "development" 
+          ? "http://localhost:5173"  
+          : env.ENVIRONMENT === "staging" 
+            ? "https://dev.codevibesmatter.com" 
+            : "https://app.codevibesmatter.com";
+        
+        // Ensure we have a full URL - if data.url is relative, make it absolute
+        const fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
+        
         try {
           if (isInvitation) {
             // Send invitation email
@@ -174,7 +200,7 @@ export function initializeAuth(env: Env) {
               html: `
                 <h1>Welcome to VibeStack!</h1>
                 <p>You've been invited to join VibeStack. To complete your account setup and choose your password, click the link below:</p>
-                <a href="${data.url}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 16px 0;">
+                <a href="${fullUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 16px 0;">
                   Complete Account Setup
                 </a>
                 <p><strong>What's next?</strong></p>
@@ -201,7 +227,7 @@ export function initializeAuth(env: Env) {
               html: `
                 <h1>Reset Your Password</h1>
                 <p>You requested to reset your password. Click the link below to set a new password:</p>
-                <a href="${data.url}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                <a href="${fullUrl}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
                   Reset Password
                 </a>
                 <p>If you didn't request a password reset, you can safely ignore this email.</p>
@@ -238,6 +264,16 @@ export function initializeAuth(env: Env) {
       sendVerificationEmail: async (data: any, request?: any) => {
         const resend = new Resend(env.RESEND_API_KEY);
         
+        // Get the base URL for the current environment
+        const baseUrl = env.ENVIRONMENT === "development" 
+          ? "http://localhost:5173"  
+          : env.ENVIRONMENT === "staging" 
+            ? "https://dev.codevibesmatter.com" 
+            : "https://app.codevibesmatter.com";
+        
+        // Ensure we have a full URL - if data.url is relative, make it absolute
+        const fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
+        
         try {
           await resend.emails.send({
             from: 'VibeStack <noreply@codevibesmatter.com>',
@@ -246,7 +282,7 @@ export function initializeAuth(env: Env) {
             html: `
               <h1>Welcome to VibeStack!</h1>
               <p>Please verify your email address by clicking the link below:</p>
-              <a href="${data.url}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+              <a href="${fullUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
                 Verify Email
               </a>
               <p>If you didn't create an account, you can safely ignore this email.</p>
@@ -285,6 +321,105 @@ export function initializeAuth(env: Env) {
     // Add plugins
     plugins: [
       admin(),
+      emailOTP({
+        sendVerificationOTP: async (data: any, request?: any) => {
+          if (!env.RESEND_API_KEY) {
+            dbLogger.error('RESEND_API_KEY environment variable is not set for OTP', {
+              allEnvKeys: Object.keys(env),
+              envResendKey: env.RESEND_API_KEY,
+              environment: env.ENVIRONMENT
+            }, 'auth');
+            throw new Error('RESEND_API_KEY environment variable is required for sending OTP emails');
+          }
+          
+          const resend = new Resend(env.RESEND_API_KEY);
+          
+          // Get the base URL for the current environment
+          const baseUrl = env.ENVIRONMENT === "development" 
+            ? "http://localhost:5173"  
+            : env.ENVIRONMENT === "staging" 
+              ? "https://dev.codevibesmatter.com" 
+              : "https://app.codevibesmatter.com";
+          
+          try {
+            let subject = '';
+            let content = '';
+            
+            switch (data.type) {
+              case 'email-verification':
+                subject = 'Verify your email - VibeStack';
+                content = `
+                  <h1>Verify Your Email</h1>
+                  <p>Welcome to VibeStack! Please enter this verification code to complete your account setup:</p>
+                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
+                  </div>
+                  <p><strong>This code will expire in 5 minutes.</strong></p>
+                  <p>If you didn't create an account with VibeStack, you can safely ignore this email.</p>
+                `;
+                break;
+              case 'sign-in':
+                subject = 'Sign in to VibeStack';
+                content = `
+                  <h1>Sign In to VibeStack</h1>
+                  <p>Use this code to sign in to your VibeStack account:</p>
+                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
+                  </div>
+                  <p><strong>This code will expire in 5 minutes.</strong></p>
+                  <p>If you didn't request this sign-in code, please ignore this email and consider changing your password.</p>
+                `;
+                break;
+              case 'forget-password':
+                subject = 'Reset your password - VibeStack';
+                content = `
+                  <h1>Reset Your Password</h1>
+                  <p>You requested to reset your password. Use this code to continue:</p>
+                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
+                  </div>
+                  <p><strong>This code will expire in 5 minutes.</strong></p>
+                  <p>If you didn't request a password reset, you can safely ignore this email.</p>
+                `;
+                break;
+              default:
+                subject = 'Your verification code - VibeStack';
+                content = `
+                  <h1>Your Verification Code</h1>
+                  <p>Here's your verification code:</p>
+                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
+                  </div>
+                  <p><strong>This code will expire in 5 minutes.</strong></p>
+                `;
+            }
+            
+            await resend.emails.send({
+              from: 'VibeStack <noreply@codevibesmatter.com>',
+              to: data.email,
+              subject: subject,
+              html: content
+            });
+            
+            dbLogger.info('OTP email sent', { 
+              email: data.email,
+              type: data.type,
+              otpLength: data.otp.length
+            }, 'auth');
+            
+          } catch (error) {
+            dbLogger.error('Failed to send OTP email', error, { 
+              email: data.email,
+              type: data.type
+            }, 'auth');
+            throw error;
+          }
+        },
+        otpLength: 6,
+        expiresIn: 300, // 5 minutes
+        sendVerificationOnSignUp: true,
+        allowedAttempts: 3
+      }),
       // jwt({ // JWT plugin removed
       //   jwt: {
       //     issuer: 'vibestack',

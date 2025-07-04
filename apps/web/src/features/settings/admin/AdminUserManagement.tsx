@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Trash2, Edit, Plus, RotateCcw } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useAuth } from '@/hooks/useSimpleAuth'
 import { authClient } from '@/lib/auth'
 import { toast } from 'sonner'
@@ -27,21 +28,25 @@ interface CreateUserForm {
   password: string
   name: string
   role: string
+  skipEmailVerification: boolean
 }
 
 interface InviteUserForm {
   email: string
   name: string
   role: string
+  skipEmailVerification: boolean
 }
 
 interface EditUserForm {
   name: string
+  email: string
   role: string
   emailVerified: boolean
 }
 
 interface ResetPasswordForm {
+  method: 'direct' | 'email'
   newPassword: string
 }
 
@@ -63,19 +68,23 @@ export default function AdminUserManagement() {
     email: '',
     password: '',
     name: '',
-    role: 'member'
+    role: 'member',
+    skipEmailVerification: false
   })
   const [inviteForm, setInviteForm] = useState<InviteUserForm>({
     email: '',
     name: '',
-    role: 'member'
+    role: 'member',
+    skipEmailVerification: false
   })
   const [editForm, setEditForm] = useState<EditUserForm>({
     name: '',
+    email: '',
     role: 'member',
     emailVerified: false
   })
   const [resetPasswordForm, setResetPasswordForm] = useState<ResetPasswordForm>({
+    method: 'email',
     newPassword: ''
   })
 
@@ -128,7 +137,7 @@ export default function AdminUserManagement() {
         name: createForm.name,
         role: createForm.role,
         data: {
-          emailVerified: true // Admin-created users are pre-verified
+          emailVerified: createForm.skipEmailVerification // Admin can control email verification
         }
       })
 
@@ -138,7 +147,7 @@ export default function AdminUserManagement() {
 
       toast.success('User created successfully')
       setCreateDialogOpen(false)
-      setCreateForm({ email: '', password: '', name: '', role: 'member' })
+      setCreateForm({ email: '', password: '', name: '', role: 'member', skipEmailVerification: false })
       fetchUsers()
     } catch (err) {
       // Fallback to direct API call if Better Auth admin API fails
@@ -159,7 +168,7 @@ export default function AdminUserManagement() {
 
         toast.success('User created successfully')
         setCreateDialogOpen(false)
-        setCreateForm({ email: '', password: '', name: '', role: 'member' })
+        setCreateForm({ email: '', password: '', name: '', role: 'member', skipEmailVerification: false })
         fetchUsers()
       } catch (fallbackErr) {
         toast.error(fallbackErr instanceof Error ? fallbackErr.message : 'Failed to create user')
@@ -186,7 +195,7 @@ export default function AdminUserManagement() {
 
       toast.success('User invitation sent successfully')
       setInviteDialogOpen(false)
-      setInviteForm({ email: '', name: '', role: 'member' })
+      setInviteForm({ email: '', name: '', role: 'member', skipEmailVerification: false })
       fetchUsers()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send invitation')
@@ -266,24 +275,44 @@ This action cannot be undone.`
     if (!selectedUser) return
 
     try {
-      const response = await fetch(`/api/auth/admin/users/${selectedUser.id}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(resetPasswordForm)
-      })
+      if (resetPasswordForm.method === 'email') {
+        // Send password reset email
+        const response = await fetch(`/api/auth/admin/users/${selectedUser.id}/send-reset-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to reset password')
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to send reset email')
+        }
+
+        toast.success(`Password reset email sent to ${selectedUser.email}`)
+      } else {
+        // Set password directly
+        const response = await fetch(`/api/auth/admin/users/${selectedUser.id}/reset-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ newPassword: resetPasswordForm.newPassword })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to reset password')
+        }
+
+        toast.success('Password reset successfully')
       }
 
-      toast.success('Password reset successfully')
       setResetPasswordDialogOpen(false)
       setSelectedUser(null)
-      setResetPasswordForm({ newPassword: '' })
+      setResetPasswordForm({ method: 'email', newPassword: '' })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to reset password')
     }
@@ -293,6 +322,7 @@ This action cannot be undone.`
     setSelectedUser(userToEdit)
     setEditForm({
       name: userToEdit.name,
+      email: userToEdit.email,
       role: userToEdit.role,
       emailVerified: userToEdit.email_verified
     })
@@ -301,7 +331,7 @@ This action cannot be undone.`
 
   const openResetPasswordDialog = (userToReset: User) => {
     setSelectedUser(userToReset)
-    setResetPasswordForm({ newPassword: '' })
+    setResetPasswordForm({ method: 'email', newPassword: '' })
     setResetPasswordDialogOpen(true)
   }
 
@@ -383,9 +413,23 @@ This action cannot be undone.`
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="inviteSkipEmailVerification"
+                    checked={inviteForm.skipEmailVerification}
+                    onCheckedChange={(checked) => 
+                      setInviteForm({ ...inviteForm, skipEmailVerification: !!checked })
+                    }
+                  />
+                  <Label htmlFor="inviteSkipEmailVerification" className="text-sm font-normal">
+                    Skip email verification for invited user
+                  </Label>
+                </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> The user will receive an email invitation with instructions to complete their account setup and choose their own password.
+                    <strong>Invitation:</strong> {inviteForm.skipEmailVerification 
+                      ? 'User will receive invitation and be marked as verified immediately upon password setup.' 
+                      : 'User will receive invitation and must verify email with 6-digit code after password setup.'}
                   </p>
                 </div>
                 <div className="flex justify-end space-x-2">
@@ -457,6 +501,25 @@ This action cannot be undone.`
                     )}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="skipEmailVerification"
+                  checked={createForm.skipEmailVerification}
+                  onCheckedChange={(checked) => 
+                    setCreateForm({ ...createForm, skipEmailVerification: !!checked })
+                  }
+                />
+                <Label htmlFor="skipEmailVerification" className="text-sm font-normal">
+                  Skip email verification (mark as verified immediately)
+                </Label>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">
+                  <strong>Email Verification:</strong> {createForm.skipEmailVerification 
+                    ? 'User will be created with verified email - suitable for testing or trusted users.' 
+                    : 'User will need to verify their email with a 6-digit code before full access.'}
+                </p>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -544,6 +607,15 @@ This action cannot be undone.`
                 />
               </div>
               <div>
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                />
+              </div>
+              <div>
                 <Label htmlFor="edit-role">Role</Label>
                 <Select value={editForm.role} onValueChange={(value) => setEditForm({ ...editForm, role: value })}>
                   <SelectTrigger>
@@ -585,25 +657,61 @@ This action cannot be undone.`
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
-              Set a new password for {selectedUser?.name}.
+              Choose how to reset the password for {selectedUser?.name}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={resetPasswordForm.newPassword}
-                onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, newPassword: e.target.value })}
-                placeholder="New password"
-              />
+              <Label>Reset Method</Label>
+              <Select 
+                value={resetPasswordForm.method} 
+                onValueChange={(value: 'direct' | 'email') => setResetPasswordForm({ ...resetPasswordForm, method: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">Send reset email to user</SelectItem>
+                  <SelectItem value="direct">Set password directly</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            
+            {resetPasswordForm.method === 'email' ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Recommended:</strong> A password reset email will be sent to <strong>{selectedUser?.email}</strong>. 
+                  The user will be able to choose their own secure password.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={resetPasswordForm.newPassword}
+                  onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, newPassword: e.target.value })}
+                  placeholder="Enter new password"
+                />
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                  <p className="text-sm text-amber-800">
+                    <strong>Note:</strong> You'll need to securely share this password with the user.
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setResetPasswordDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleResetPassword}>Reset Password</Button>
+              <Button 
+                onClick={handleResetPassword}
+                disabled={resetPasswordForm.method === 'direct' && !resetPasswordForm.newPassword}
+              >
+                {resetPasswordForm.method === 'email' ? 'Send Reset Email' : 'Set Password'}
+              </Button>
             </div>
           </div>
         </DialogContent>

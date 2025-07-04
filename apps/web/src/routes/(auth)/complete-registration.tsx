@@ -35,7 +35,20 @@ export const Route = createFileRoute('/(auth)/complete-registration')({
 
 function CompleteRegistrationPage() {
   const navigate = useNavigate()
-  const { token } = Route.useSearch()
+  const searchParams = Route.useSearch()
+  
+  // Get token from either search params or URL path
+  // Better Auth sends URLs like /reset-password/TOKEN_HERE?callbackURL=/complete-registration
+  const urlParams = new URLSearchParams(window.location.search)
+  const callbackUrl = urlParams.get('callbackURL') || window.location.pathname
+  
+  // Extract token from the callback URL or current path
+  let token = searchParams.token
+  if (!token && callbackUrl) {
+    const callbackPath = callbackUrl.split('?')[0] // Remove query params
+    token = callbackPath.split('/reset-password/')[1] || urlParams.get('token')
+  }
+  
   const [isLoading, setIsLoading] = useState(false)
   const [registrationStatus, setRegistrationStatus] = useState<'pending' | 'success' | 'error'>('pending')
   const [errorMessage, setErrorMessage] = useState('')
@@ -80,7 +93,7 @@ function CompleteRegistrationPage() {
       // Use the reset password endpoint with the invitation token
       const result = await authClient.resetPassword({
         token: token,
-        password: data.password
+        newPassword: data.password
       })
 
       if (result.error) {

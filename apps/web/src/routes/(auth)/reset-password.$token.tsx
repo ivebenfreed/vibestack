@@ -28,14 +28,16 @@ const formSchema = z
     path: ['confirmPassword'],
   })
 
-export const Route = createFileRoute('/(auth)/reset-password')({
+export const Route = createFileRoute('/(auth)/reset-password/$token')({
   component: ResetPasswordPage,
   validateSearch: resetPasswordSearchSchema,
 })
 
 function ResetPasswordPage() {
   const navigate = useNavigate()
-  const { token } = Route.useSearch()
+  const { token } = Route.useParams() // Get token from URL params
+  const searchParams = Route.useSearch()
+  
   const [isLoading, setIsLoading] = useState(false)
   const [resetStatus, setResetStatus] = useState<'pending' | 'success' | 'error'>('pending')
   const [errorMessage, setErrorMessage] = useState('')
@@ -79,7 +81,7 @@ function ResetPasswordPage() {
     try {
       const result = await authClient.resetPassword({
         token: token,
-        password: data.password
+        newPassword: data.password
       })
 
       if (result.error) {

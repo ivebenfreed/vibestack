@@ -5,6 +5,7 @@
 
 import * as React from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
+import { useAuth } from '@/hooks/useSimpleAuth'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -72,6 +73,7 @@ const bottomNavigation: NavItem[] = [
 
 export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation()
+  const { isAdmin, isSuperAdmin } = useAuth()
   
   const isActive = (href: string) => {
     if (href === '/') {
@@ -79,6 +81,15 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
     }
     return location.pathname.startsWith(href)
   }
+
+  // Filter navigation items based on user permissions
+  const filteredBottomNavigation = bottomNavigation.filter(item => {
+    if (item.id === 'debug') {
+      // Only show debug link to admins and super admins
+      return isAdmin || isSuperAdmin
+    }
+    return true
+  })
 
   return (
     <div className={cn(
@@ -134,7 +145,7 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
 
           {/* Bottom Navigation */}
           <div className="space-y-1">
-            {bottomNavigation.map((item) => (
+            {filteredBottomNavigation.map((item) => (
               <NavItem
                 key={item.id}
                 item={item}

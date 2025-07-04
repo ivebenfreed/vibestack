@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react"; // Use React client
-import { adminClient } from "better-auth/client/plugins";
+import { adminClient, emailOTPClient } from "better-auth/client/plugins";
 
 // Define the base URL for the Better Auth server
 // Using same-origin architecture - everything from same domain
@@ -29,7 +29,8 @@ export const authClient = createAuthClient({
   },
   mode: 'cors',
   plugins: [
-    adminClient()
+    adminClient(),
+    emailOTPClient()
   ],
   fetchOptions: {
     // Add timeout for requests

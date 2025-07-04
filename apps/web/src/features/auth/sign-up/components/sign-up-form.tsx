@@ -75,11 +75,17 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
       console.log("[AUTH] Sign Up Result:", result);
 
       if ('data' in result && result.data?.user) {
-        console.log("[AUTH] Sign-up successful, redirecting to:", redirectTo);
-        toast.success("Account created successfully!");
+        console.log("[AUTH] Sign-up successful, user needs email verification");
+        toast.success("Account created! Please check your email for a verification code.");
         
-        // Smart redirect back to where user wanted to go
-        navigate({ to: redirectTo, replace: true });
+        // Redirect to OTP verification page
+        navigate({ 
+          to: '/otp-verify', 
+          search: { 
+            email: data.email, 
+            type: 'email-verification' 
+          } 
+        });
       } else if ('error' in result) {
         console.error("[AUTH] Sign Up Error:", result.error);
         const errorMessage = result.error?.message || "Sign up failed. Please try again.";

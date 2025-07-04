@@ -348,7 +348,10 @@ function AppWithInitialization() {
       console.log('[Root] Auth state changed:', { authenticated, reason })
       
       // Note: Immediate navigation now handled in useAuth.signOut() to prevent component re-rendering
-      if (!authenticated && reason === 'unauthenticated' && !window.location.pathname.startsWith('/sign-')) {
+      const publicPaths = ['/sign-', '/reset-password', '/complete-registration', '/forgot-password', '/verify-email', '/otp-verify']
+      const isPublicPath = publicPaths.some(path => window.location.pathname.startsWith(path))
+      
+      if (!authenticated && reason === 'unauthenticated' && !isPublicPath) {
         // Handle edge cases where auth check fails (not from sign-out)
         console.log('[Root] Unauthenticated state detected, redirecting to sign-in')
         navigate({ to: '/sign-in', replace: true })
