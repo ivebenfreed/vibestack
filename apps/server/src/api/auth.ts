@@ -165,7 +165,7 @@ authRouter.put("/admin/users/:id", adminAuthMiddleware, async (c) => {
   }
 });
 
-// Delete user (admin only)
+// Delete user (admin only) - using universal entity deleter
 authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
   try {
     const userId = c.req.param('id');
@@ -177,28 +177,95 @@ authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
       return c.json({ error: "Cannot delete your own account." }, 400);
     }
 
-    // Delete user and related data
-    const result = await db
-      .deleteFrom('users')
+    // Check if user exists first
+    const user = await db
+      .selectFrom('users')
       .where('id', '=', userId)
-      .returningAll()
+      .selectAll()
       .executeTakeFirst();
 
-    if (!result) {
+    if (!user) {
       return c.json({ error: "User not found." }, 404);
     }
 
-    dbLogger.info('Admin deleted user', { 
-      userId, 
-      deletedUser: result.email,
-      deletedBy: c.var.user?.email 
+    // Find admin to transfer ownership to (if needed)
+    const adminForTransfer = await db
+      .selectFrom('users')
+      .where('role', 'in', ['admin', 'super_admin'])
+      .where('id', '!=', userId)
+      .selectAll()
+      .executeTakeFirst();
+
+    // Import and use the universal entity deleter
+    const { deleteUserWithRelationships } = await import('../lib/universal-entity-deleter');
+    
+    // First, do a dry run to check for blockers
+    const dryRunResult = await deleteUserWithRelationships(db, userId, {
+      transferProjectsTo: adminForTransfer?.id,
+      dryRun: true
     });
 
-    return c.json({ message: "User deleted successfully." });
+    if (dryRunResult.blockers.length > 0) {
+      const blockerMessages = dryRunResult.blockers.map(b => 
+        `${b.entity}.${b.field}: ${b.reason}`
+      );
+      return c.json({ 
+        error: "Cannot delete user due to dependencies: " + blockerMessages.join('; ')
+      }, 400);
+    }
+
+    // Execute the actual deletion
+    const deletionResult = await deleteUserWithRelationships(db, userId, {
+      transferProjectsTo: adminForTransfer?.id,
+      dryRun: false
+    });
+
+    // Also handle auth-specific data that's not in the domain model
+    await db.transaction().execute(async (trx) => {
+      // Delete auth-related data that's not tracked by DataForge
+      await trx
+        .deleteFrom('sessions')
+        .where('user_id', '=', userId)
+        .execute();
+
+      await trx
+        .deleteFrom('accounts')
+        .where('user_id', '=', userId)
+        .execute();
+
+      await trx
+        .deleteFrom('verifications')
+        .where('identifier', '=', user.email)
+        .execute();
+    });
+
+    dbLogger.info('Admin deleted user with automatic relationship cleanup', { 
+      userId, 
+      deletedUser: user.email,
+      deletedBy: c.var.user?.email,
+      operationsExecuted: deletionResult.operations.length,
+      transferredTo: adminForTransfer?.id
+    });
+
+    return c.json({ 
+      message: "User deleted successfully with automatic relationship cleanup.",
+      details: {
+        operationsExecuted: deletionResult.operations.length,
+        projectsTransferred: !!adminForTransfer,
+        transferredTo: adminForTransfer?.email,
+        operations: deletionResult.operations.map(op => ({
+          type: op.type,
+          entity: op.entity,
+          action: op.action
+        }))
+      }
+    });
 
   } catch (error) {
     dbLogger.error('Error in admin user deletion', error);
-    return c.json({ error: "Failed to delete user." }, 500);
+    return c.json({ 
+      error: error instanceof Error ? error.message : "Failed to delete user." 
+    }, 500);
   }
 });
 

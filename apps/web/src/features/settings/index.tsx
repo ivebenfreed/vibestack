@@ -3,6 +3,7 @@ import { ContentContainer } from '@/components/layout/content-container'
 import SidebarNav from './components/sidebar-nav'
 import { User, Settings as SettingsIcon, Palette, Bell, Monitor, Shield } from 'lucide-react'
 import { useAuth } from '@/hooks/useSimpleAuth'
+import { Outlet } from '@tanstack/react-router'
 
 const sidebarNavItems = [
   {
@@ -60,11 +61,7 @@ export default function Settings() {
             <SidebarNav items={allSidebarNavItems} />
           </aside>
           <div className='min-w-0 max-w-2xl'>
-            <div className='space-y-6'>
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">Settings forms coming soon...</p>
-              </div>
-            </div>
+            <Outlet />
           </div>
         </div>
       </div>

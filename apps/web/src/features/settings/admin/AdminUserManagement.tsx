@@ -223,7 +223,23 @@ export default function AdminUserManagement() {
 
   // Delete user using Better Auth admin API
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    const userToDelete = users.find(u => u.id === userId)
+    if (!userToDelete) return
+    
+    const confirmMessage = `Are you sure you want to delete ${userToDelete.name} (${userToDelete.email})?
+
+This will automatically:
+• Unassign all tasks currently assigned to this user
+• Transfer project ownership to another admin (if projects exist)
+• Remove user from all project memberships
+• Anonymize all comments authored by this user
+• Delete all authentication sessions and data
+
+The system will automatically discover and handle ALL relationships to this user.
+
+This action cannot be undone.`
+    
+    if (!confirm(confirmMessage)) {
       return
     }
 
