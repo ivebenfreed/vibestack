@@ -178,30 +178,68 @@ export function useGridMachine(options: UseGridMachineOptions): GridMachineAPI {
   const registerCell = startCellEdit
   const unregisterCell = endCellEdit
   
-  // DISABLED: Event-based preference saving with debouncing
-  // const debouncedSaveRef = React.useRef<NodeJS.Timeout | null>(null)
+  // Event-based preference saving with debouncing
+  const debouncedSaveRef = React.useRef<NodeJS.Timeout | null>(null)
   
-  // const debouncedSavePreferences = React.useCallback(() => {
-  //   console.log('[useGridMachine] 🚫 DISABLED: Persistence disabled for performance testing')
-  // }, [])
+  const debouncedSavePreferences = React.useCallback(() => {
+    if (debouncedSaveRef.current) {
+      clearTimeout(debouncedSaveRef.current)
+    }
+    
+    debouncedSaveRef.current = setTimeout(() => {
+      const preferences = {
+        sortColumns: state.context.sortColumns,
+        filterState: state.context.filterState,
+        pageSize: state.context.pageSize
+      }
+      
+      try {
+        localStorage.setItem(persistenceKey, JSON.stringify(preferences))
+        console.log('[useGridMachine] 💾 Grid preferences saved:', preferences)
+      } catch (error) {
+        console.warn('[useGridMachine] ⚠️ Failed to save preferences:', error)
+      }
+    }, 1000) // 1 second debounce
+  }, [persistenceKey, state.context.sortColumns, state.context.filterState, state.context.pageSize])
   
-  // DISABLED: Cleanup on unmount
-  // React.useEffect(() => {
-  //   return () => {
-  //     if (debouncedSaveRef.current) {
-  //       clearTimeout(debouncedSaveRef.current)
-  //     }
-  //   }
-  // }, [])
+  // Load preferences on mount and cleanup on unmount
+  React.useEffect(() => {
+    // Load preferences directly here to avoid circular dependency
+    try {
+      const saved = localStorage.getItem(persistenceKey)
+      if (saved) {
+        const preferences = JSON.parse(saved)
+        console.log('[useGridMachine] 📂 Loading preferences on mount:', preferences)
+        
+        if (preferences.sortColumns) {
+          send({ type: 'SORT_CHANGE', sortColumns: preferences.sortColumns })
+        }
+        if (preferences.filterState) {
+          send({ type: 'FILTER_CHANGE', filterState: preferences.filterState })
+        }
+        if (preferences.pageSize) {
+          send({ type: 'SET_PAGE_SIZE', pageSize: preferences.pageSize })
+        }
+      }
+    } catch (error) {
+      console.warn('[useGridMachine] ⚠️ Failed to load preferences on mount:', error)
+    }
+    
+    return () => {
+      if (debouncedSaveRef.current) {
+        clearTimeout(debouncedSaveRef.current)
+      }
+    }
+  }, [persistenceKey, send])
   
   // Grid State Management
   const setSortColumns = React.useCallback((columns: SortColumn[]) => {
     // Direct dispatch
     send({ type: 'SORT_CHANGE', sortColumns: columns })
     
-    // DISABLED: Debounced save for performance testing
-    // console.log('[useGridMachine] 🚫 DISABLED: Sort persistence disabled')
-  }, [send])
+    // Save preferences after sort change
+    debouncedSavePreferences()
+  }, [send, debouncedSavePreferences])
   
   const setFilterState = React.useCallback((filterState: FilterState) => {
     // Direct dispatch
@@ -237,18 +275,41 @@ export function useGridMachine(options: UseGridMachineOptions): GridMachineAPI {
     send({ type: 'SET_PAGE_SIZE', pageSize: size })
   }, [send])
   
-  // DISABLED: Persistence
+  // Persistence management
   const savePreferences = React.useCallback(() => {
-    console.log('[useGridMachine] 🚫 DISABLED: savePreferences disabled for performance testing')
-  }, [])
+    debouncedSavePreferences()
+  }, [debouncedSavePreferences])
   
   const loadPreferences = React.useCallback(() => {
-    console.log('[useGridMachine] 🚫 DISABLED: loadPreferences disabled for performance testing')
-  }, [])
+    try {
+      const saved = localStorage.getItem(persistenceKey)
+      if (saved) {
+        const preferences = JSON.parse(saved)
+        console.log('[useGridMachine] 📂 Loading preferences:', preferences)
+        
+        if (preferences.sortColumns) {
+          send({ type: 'SORT_CHANGE', sortColumns: preferences.sortColumns })
+        }
+        if (preferences.filterState) {
+          send({ type: 'FILTER_CHANGE', filterState: preferences.filterState })
+        }
+        if (preferences.pageSize) {
+          send({ type: 'SET_PAGE_SIZE', pageSize: preferences.pageSize })
+        }
+      }
+    } catch (error) {
+      console.warn('[useGridMachine] ⚠️ Failed to load preferences:', error)
+    }
+  }, [persistenceKey, send])
   
   const resetPreferences = React.useCallback(() => {
-    console.log('[useGridMachine] 🚫 DISABLED: resetPreferences disabled for performance testing')
-  }, [])
+    try {
+      localStorage.removeItem(persistenceKey)
+      console.log('[useGridMachine] 🗑️ Preferences reset')
+    } catch (error) {
+      console.warn('[useGridMachine] ⚠️ Failed to reset preferences:', error)
+    }
+  }, [persistenceKey])
   
   // Performance
   const setVirtualizedRange = React.useCallback((range: VirtualizedRange) => {

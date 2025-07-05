@@ -208,8 +208,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Initialize clipboard operations
   const { copiedCell, handleCellCopy, handleCellPaste } = useClipboardOps()
   
-  // State management for selection and sorting
-  const [sortColumns, setSortColumns] = React.useState<readonly import('react-data-grid').SortColumn[]>([])
+  // State management for selection - use grid machine for persistent sort state
   const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
   
   // Simple optimistic state to prevent flashing
@@ -266,9 +265,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Let individual CellRenderers handle their own registration
   // This avoids duplicate registration and infinite loops
   
-  // Sort data based on sort columns state - React Compiler handles memoization
+  // Sort data based on grid machine sort state - React Compiler handles memoization
   const sortedData = React.useMemo(() => {
     const sortStart = performance.now()
+    const sortColumns = gridMachine.sortColumns
     if (sortColumns.length === 0) {
       console.log(`[Sort] No sorting needed for ${data.length} items`)
       return data
@@ -317,7 +317,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       console.warn(`[Sort] 🐌 SLOW SORT: ${sortTime.toFixed(2)}ms for ${data.length} items`)
     }
     return result
-  }, [data, sortColumns, rdgColumns])
+  }, [data, gridMachine.sortColumns, rdgColumns])
   
   
 
@@ -811,8 +811,14 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           ref={gridRef}
           columns={optimusColumns}
           rows={sortedData}
-          sortColumns={sortColumns}
-          onSortColumnsChange={setSortColumns}
+          sortColumns={gridMachine.sortColumns.map(sc => ({ columnKey: sc.columnKey, direction: sc.direction }))}
+          onSortColumnsChange={(columns) => {
+            const sortColumns = columns.map(col => ({
+              columnKey: col.columnKey,
+              direction: col.direction as 'ASC' | 'DESC'
+            }))
+            gridMachine.setSortColumns(sortColumns)
+          }}
           selectedPosition={selectedPosition}
           onSelectedCellChange={setSelectedPosition}
           cellNavigationMode="CHANGE_ROW"
