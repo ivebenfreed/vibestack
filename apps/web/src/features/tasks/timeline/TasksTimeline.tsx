@@ -55,6 +55,21 @@ function TasksTimelineInner() {
       .slice(0, 10) // First 10 tasks
   }, shallowEqual)
 
+  // MOVED: Early return check to prevent hooks violation
+  if (tasks.length === 0) {
+    return (
+      <div className="w-full h-[800px] border rounded-lg bg-background overflow-hidden flex items-center justify-center">
+        <div className="text-center p-8">
+          <h3 className="text-lg font-semibold mb-2">No Tasks to Display</h3>
+          <p className="text-muted-foreground">
+            No tasks with both start and due dates were found. 
+            Create or update tasks with date ranges to see them in the timeline view.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   // Get users for assignee names
   const users = useSelector(usersAtom, (usersRecord) => {
     if (!usersRecord || typeof usersRecord !== 'object') return {}
@@ -416,21 +431,6 @@ function TasksTimelineInner() {
 
 
   const proOptions = useMemo(() => ({ hideAttribution: true }), [])
-
-  // Show message if no tasks with dates
-  if (tasks.length === 0) {
-    return (
-      <div className="w-full h-[800px] border rounded-lg bg-background overflow-hidden flex items-center justify-center">
-        <div className="text-center p-8">
-          <h3 className="text-lg font-semibold mb-2">No Tasks to Display</h3>
-          <p className="text-muted-foreground">
-            No tasks with both start and due dates were found. 
-            Create or update tasks with date ranges to see them in the timeline view.
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="w-full h-[800px] border rounded-lg bg-background overflow-hidden">

@@ -8,6 +8,24 @@ import { Grid3X3, Kanban, Calendar } from 'lucide-react'
 import { useTheme } from '@/context/theme-context'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 
+// Separate component for table view to isolate hooks
+const TaskTableView: React.FC<{ theme: string }> = ({ theme }) => {
+  // ✅ TYPE-SAFE VIBEGRID: Hooks only called when component is rendered
+  const taskGridProps = createVibeGrid({
+    entityName: "Task",
+    atom: tasksAtom
+  })
+
+  return (
+    <VibeGridOptimus
+      {...taskGridProps}
+      height={600}
+      theme={theme}
+      className="border border-border rounded-lg"
+    />
+  )
+}
+
 // Lazy load heavy components for performance - using V2 with proper drag feedback
 const LazyKanbanView = React.lazy(() => 
   import('./TasksKanbanV2').then(module => ({ default: module.default }))
@@ -57,11 +75,6 @@ const Tasks: React.FC = () => {
     })
   }
 
-  // ✅ TYPE-SAFE VIBEGRID: Enforces entity validation, data source, and column config
-  const taskGridProps = createVibeGrid({
-    entityName: "Task",
-    atom: tasksAtom
-  })
 
 
   return (
@@ -93,12 +106,7 @@ const Tasks: React.FC = () => {
         
         {/* Table View */}
         <TabsContent value="table" className="flex-1">
-          <VibeGridOptimus
-            {...taskGridProps}
-            height={600}
-            theme={effectiveTheme}
-            className="border border-border rounded-lg"
-          />
+          <TaskTableView theme={effectiveTheme} />
         </TabsContent>
         
         {/* Kanban View */}
