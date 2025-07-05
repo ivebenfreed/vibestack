@@ -6,6 +6,17 @@ import { useEffect, useState, useRef } from 'react';
 export const Route = createFileRoute('/_authenticated/debug')({
   // Remove redundant auth check - _authenticated layout handles auth protection
   component: DebugLayoutComponent,
+  notFoundComponent: () => (
+    <div className="flex flex-col items-center justify-center h-64 p-4 text-center">
+      <h2 className="text-xl font-semibold text-destructive mb-2">Debug Page Not Found</h2>
+      <p className="text-muted-foreground">
+        The requested debug page could not be found.
+      </p>
+      <p className="text-sm text-muted-foreground mt-2">
+        Check the URL or navigate back to the debug index.
+      </p>
+    </div>
+  ),
 });
 
 // Debug layout component with permission check using orchestrator state

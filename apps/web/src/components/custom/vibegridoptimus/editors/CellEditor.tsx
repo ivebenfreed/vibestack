@@ -1,5 +1,6 @@
 import React from 'react'
 import type { BaseEntity, OptimusColumn } from '../types'
+import type { GridMachineAPI } from '../types/gridTypes'
 import { 
   NumberEditor,
   EnumEditor,
@@ -18,6 +19,7 @@ interface CellEditorProps<TEntity extends BaseEntity> {
   onRowChange: (row: TEntity) => void
   onClose: (commitChanges?: boolean) => void
   onUpdate?: (id: string, column: string, value: any) => Promise<void>
+  gridMachine?: GridMachineAPI
 }
 
 /**

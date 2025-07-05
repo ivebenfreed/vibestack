@@ -55,7 +55,8 @@ export function useEditorBehavior({
   
   // Update hasChanges when currentValue differs from initialValue
   React.useEffect(() => {
-    const valueChanged = JSON.stringify(currentValue) !== JSON.stringify(initialValue)
+    // Use simple equality for performance instead of JSON.stringify
+    const valueChanged = currentValue !== initialValue
     setHasChanges(valueChanged)
   }, [currentValue, initialValue])
   

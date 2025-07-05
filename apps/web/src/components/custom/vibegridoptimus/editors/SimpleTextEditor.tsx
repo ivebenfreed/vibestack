@@ -1,5 +1,6 @@
 import React from 'react'
 import type { BaseEntity, OptimusColumn } from '../types'
+import type { GridMachineAPI } from '../types/gridTypes'
 
 interface SimpleTextEditorProps<TEntity extends BaseEntity> {
   row: TEntity
@@ -7,49 +8,80 @@ interface SimpleTextEditorProps<TEntity extends BaseEntity> {
   onRowChange: (row: TEntity) => void
   onClose: (commitChanges?: boolean) => void
   onUpdate?: (id: string, column: string, value: any) => Promise<void>
+  gridMachine?: GridMachineAPI
 }
 
 /**
- * Dead simple text editor - no complex hooks, just basic input behavior
+ * Grid machine-aware text editor with optimistic updates
  */
 export function SimpleTextEditor<TEntity extends BaseEntity>({
   row,
   column,
   onRowChange,
   onClose,
-  onUpdate
+  onUpdate,
+  gridMachine
 }: SimpleTextEditorProps<TEntity>) {
-  const initialValue = String(row[column.key] || '')
-  const [value, setValue] = React.useState(initialValue)
+  const cellId = String(row.id)
+  const columnKey = String(column.key)
   const config = column.config || {}
   
-  // Update row data on every change to keep RDG in sync
+  // Get cell state from grid machine
+  const cellState = gridMachine?.getCellState(cellId, columnKey)
+  
+  // Use grid machine state or fallback to row value
+  const initialValue = cellState?.displayValue ?? String(row[column.key] || '')
+  const [value, setValue] = React.useState(initialValue)
+  
+  // Update local state during typing and notify grid machine
   const handleChange = React.useCallback((newValue: string) => {
     setValue(newValue)
     
-    // Update the row data immediately (like enum editor does)
+    // Notify grid machine of value change
+    if (cellState?.actions) {
+      cellState.actions.changeValue(newValue)
+    }
+  }, [cellState])
+  
+  // Grid machine-aware commit
+  const handleCommit = React.useCallback(async () => {
+    console.log('[SimpleTextEditor] 🚀 Committing:', value)
+    
+    // Update grid immediately for react-data-grid
     const updatedRow = {
       ...row,
-      [column.key]: newValue
+      [column.key]: value
     } as TEntity
     onRowChange(updatedRow)
-  }, [row, column.key, onRowChange])
-  
-  const commitAndClose = React.useCallback(async () => {
-    console.log('[SimpleTextEditor] Committing and closing with value:', value)
     
-    // Trigger save handler if available
-    if (onUpdate) {
-      await onUpdate(row.id as string, column.key as string, value)
+    // Commit through grid machine if available
+    if (cellState?.actions) {
+      cellState.actions.commitEdit(value)
+    } else if (onUpdate) {
+      // Fallback to direct save
+      try {
+        await onUpdate(row.id as string, column.key as string, value)
+        console.log('[SimpleTextEditor] ✅ Save successful')
+      } catch (error) {
+        console.error('[SimpleTextEditor] ❌ Save failed:', error)
+      }
     }
     
-    // Close the editor with commit
+    // Close editor
     onClose(true)
-  }, [value, row, column.key, onUpdate, onClose])
+  }, [value, row, column.key, onRowChange, onUpdate, onClose, cellState])
   
-  const cancel = React.useCallback(() => {
+  const handleCancel = React.useCallback(() => {
+    console.log('[SimpleTextEditor] ❌ Cancelling')
+    
+    // Cancel through grid machine if available
+    if (cellState?.actions) {
+      cellState.actions.cancelEdit()
+    }
+    
     onClose(false)
-  }, [onClose])
+  }, [onClose, cellState])
+  
 
   return (
     <input
@@ -57,14 +89,18 @@ export function SimpleTextEditor<TEntity extends BaseEntity>({
       value={value}
       onChange={(e) => handleChange(e.target.value)}
       onBlur={() => {
-        console.log('[SimpleTextEditor] BLUR event triggered!')
-        commitAndClose()
+        console.log('[SimpleTextEditor] 🔥 BLUR event triggered with value:', value)
+        handleCommit()
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
-          commitAndClose()
+          e.preventDefault()
+          console.log('[SimpleTextEditor] ⚡ ENTER pressed with value:', value)
+          handleCommit()
         } else if (e.key === 'Escape') {
-          cancel()
+          e.preventDefault()
+          console.log('[SimpleTextEditor] ❌ ESCAPE pressed')
+          handleCancel()
         }
       }}
       placeholder={config.placeholder || 'Enter text...'}

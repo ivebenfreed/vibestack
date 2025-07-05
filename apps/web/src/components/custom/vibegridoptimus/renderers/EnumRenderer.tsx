@@ -15,15 +15,11 @@ interface EnumRendererProps {
  * Shows enum values as styled badges with proper colors
  */
 export function EnumRenderer({ value, config, onContentClick }: EnumRendererProps): React.ReactNode {
-  // Show icon for null/empty enum values
+  // PERFORMANCE: Simplified empty state
   if (!value) {
     return (
       <div className={CSS_CLASSES.emptyState} onClick={onContentClick}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 12l2 2 4-4"></path>
-          <circle cx="12" cy="12" r="9"></circle>
-        </svg>
-        <span className="text-xs">Select option</span>
+        <span className="text-xs text-muted-foreground">—</span>
       </div>
     )
   }

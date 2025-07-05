@@ -125,6 +125,12 @@
   to { transform: rotate(360deg); }
 }
 
+/* Fill grid class for proper virtualization (from million-row example) */
+.fill-grid {
+  block-size: 100%;
+  inline-size: 100%;
+}
+
 /* Theme support - Override react-data-grid variables with app theme */
 .vibegridoptimus-container .rdg-light,
 .vibegridoptimus-container .rdg-dark {

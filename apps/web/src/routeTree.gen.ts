@@ -42,9 +42,12 @@ import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
+import { Route as AuthenticatedDebugOptimisticTestImport } from './routes/_authenticated/debug/optimistic-test'
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugGridOptimusProjectsImport } from './routes/_authenticated/debug/grid-optimus-projects'
+import { Route as AuthenticatedDebugGridMachineTestImport } from './routes/_authenticated/debug/grid-machine-test'
 import { Route as authResetPasswordTokenImport } from './routes/(auth)/reset-password.$token'
 import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authenticated/settings/admin.users'
 
@@ -287,10 +290,24 @@ const AuthenticatedProjectsProjectIdRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
+const AuthenticatedDebugStateMachineTestRoute =
+  AuthenticatedDebugStateMachineTestImport.update({
+    id: '/state-machine-test',
+    path: '/state-machine-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 const AuthenticatedDebugReactflowPositioningRoute =
   AuthenticatedDebugReactflowPositioningImport.update({
     id: '/reactflow-positioning',
     path: '/reactflow-positioning',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
+const AuthenticatedDebugOptimisticTestRoute =
+  AuthenticatedDebugOptimisticTestImport.update({
+    id: '/optimistic-test',
+    path: '/optimistic-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
@@ -304,6 +321,13 @@ const AuthenticatedDebugGridOptimusProjectsRoute =
   AuthenticatedDebugGridOptimusProjectsImport.update({
     id: '/grid-optimus-projects',
     path: '/grid-optimus-projects',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
+const AuthenticatedDebugGridMachineTestRoute =
+  AuthenticatedDebugGridMachineTestImport.update({
+    id: '/grid-machine-test',
+    path: '/grid-machine-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
@@ -450,6 +474,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authResetPasswordTokenImport
       parentRoute: typeof rootRoute
     }
+    '/_authenticated/debug/grid-machine-test': {
+      id: '/_authenticated/debug/grid-machine-test'
+      path: '/grid-machine-test'
+      fullPath: '/debug/grid-machine-test'
+      preLoaderRoute: typeof AuthenticatedDebugGridMachineTestImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/grid-optimus-projects': {
       id: '/_authenticated/debug/grid-optimus-projects'
       path: '/grid-optimus-projects'
@@ -464,11 +495,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugKanbanImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/optimistic-test': {
+      id: '/_authenticated/debug/optimistic-test'
+      path: '/optimistic-test'
+      fullPath: '/debug/optimistic-test'
+      preLoaderRoute: typeof AuthenticatedDebugOptimisticTestImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/reactflow-positioning': {
       id: '/_authenticated/debug/reactflow-positioning'
       path: '/reactflow-positioning'
       fullPath: '/debug/reactflow-positioning'
       preLoaderRoute: typeof AuthenticatedDebugReactflowPositioningImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/state-machine-test': {
+      id: '/_authenticated/debug/state-machine-test'
+      path: '/state-machine-test'
+      fullPath: '/debug/state-machine-test'
+      preLoaderRoute: typeof AuthenticatedDebugStateMachineTestImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/projects/$projectId': {
@@ -596,9 +641,12 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugGridMachineTestRoute: typeof AuthenticatedDebugGridMachineTestRoute
   AuthenticatedDebugGridOptimusProjectsRoute: typeof AuthenticatedDebugGridOptimusProjectsRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
+  AuthenticatedDebugOptimisticTestRoute: typeof AuthenticatedDebugOptimisticTestRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
+  AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -608,11 +656,17 @@ interface AuthenticatedDebugRouteRouteChildren {
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
+    AuthenticatedDebugGridMachineTestRoute:
+      AuthenticatedDebugGridMachineTestRoute,
     AuthenticatedDebugGridOptimusProjectsRoute:
       AuthenticatedDebugGridOptimusProjectsRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
+    AuthenticatedDebugOptimisticTestRoute:
+      AuthenticatedDebugOptimisticTestRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
+    AuthenticatedDebugStateMachineTestRoute:
+      AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
@@ -696,9 +750,12 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/reset-password/$token': typeof authResetPasswordTokenRoute
+  '/debug/grid-machine-test': typeof AuthenticatedDebugGridMachineTestRoute
   '/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/debug/optimistic-test': typeof AuthenticatedDebugOptimisticTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
+  '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -734,9 +791,12 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/reset-password/$token': typeof authResetPasswordTokenRoute
+  '/debug/grid-machine-test': typeof AuthenticatedDebugGridMachineTestRoute
   '/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/debug/optimistic-test': typeof AuthenticatedDebugOptimisticTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
+  '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -776,9 +836,12 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/(auth)/reset-password/$token': typeof authResetPasswordTokenRoute
+  '/_authenticated/debug/grid-machine-test': typeof AuthenticatedDebugGridMachineTestRoute
   '/_authenticated/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/_authenticated/debug/optimistic-test': typeof AuthenticatedDebugOptimisticTestRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
+  '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -819,9 +882,12 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/reset-password/$token'
+    | '/debug/grid-machine-test'
     | '/debug/grid-optimus-projects'
     | '/debug/kanban'
+    | '/debug/optimistic-test'
     | '/debug/reactflow-positioning'
+    | '/debug/state-machine-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -856,9 +922,12 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/reset-password/$token'
+    | '/debug/grid-machine-test'
     | '/debug/grid-optimus-projects'
     | '/debug/kanban'
+    | '/debug/optimistic-test'
     | '/debug/reactflow-positioning'
+    | '/debug/state-machine-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -896,9 +965,12 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/(auth)/reset-password/$token'
+    | '/_authenticated/debug/grid-machine-test'
     | '/_authenticated/debug/grid-optimus-projects'
     | '/_authenticated/debug/kanban'
+    | '/_authenticated/debug/optimistic-test'
     | '/_authenticated/debug/reactflow-positioning'
+    | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -1000,9 +1072,12 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/route.tsx",
       "parent": "/_authenticated",
       "children": [
+        "/_authenticated/debug/grid-machine-test",
         "/_authenticated/debug/grid-optimus-projects",
         "/_authenticated/debug/kanban",
+        "/_authenticated/debug/optimistic-test",
         "/_authenticated/debug/reactflow-positioning",
+        "/_authenticated/debug/state-machine-test",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
@@ -1068,6 +1143,10 @@ export const routeTree = rootRoute
     "/(auth)/reset-password/$token": {
       "filePath": "(auth)/reset-password.$token.tsx"
     },
+    "/_authenticated/debug/grid-machine-test": {
+      "filePath": "_authenticated/debug/grid-machine-test.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/debug/grid-optimus-projects": {
       "filePath": "_authenticated/debug/grid-optimus-projects.tsx",
       "parent": "/_authenticated/debug"
@@ -1076,8 +1155,16 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/kanban.tsx",
       "parent": "/_authenticated/debug"
     },
+    "/_authenticated/debug/optimistic-test": {
+      "filePath": "_authenticated/debug/optimistic-test.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/debug/reactflow-positioning": {
       "filePath": "_authenticated/debug/reactflow-positioning.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/state-machine-test": {
+      "filePath": "_authenticated/debug/state-machine-test.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/projects/$projectId": {

@@ -190,7 +190,7 @@ authRouter.put("/admin/users/:id", adminAuthMiddleware, async (c) => {
     if (email !== undefined && email !== result?.email) {
       try {
         // Send OTP verification to new email address
-        await authInstance.api.sendVerificationOtp({
+        await authInstance.api.sendVerificationOTP({
           body: {
             email: email,
             type: 'email-verification'
@@ -719,7 +719,7 @@ authRouter.post("/verify-email-change", async (c) => {
     const authInstance = getAuth(c);
     
     // Verify the OTP
-    const verifyResult = await authInstance.api.verifyEmailOtp({
+    const verifyResult = await authInstance.api.verifyEmailOTP({
       body: {
         email: email,
         otp: otp

@@ -545,13 +545,9 @@ export async function create${entityName}UI(
     };
   }
   
-  // 1. OPTIMISTIC: Add to atom immediately with optimistic data
-  const optimistic${entityName} = {
-    ...${lowerEntityName}WithDefaults,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  } as ${entityName};
-  dependencies.atomActions.create${entityName}AtomOnly(optimistic${entityName});
+  // 1. OPTIMISTIC: Skip atom update - let live changes handle it
+  // Optimistic updates will be handled by components using local state
+  // Live changes will reconcile atom when database create completes
   
   try {
     // 2. DATABASE: Create in database in background
@@ -569,8 +565,7 @@ export async function create${entityName}UI(
     return created${entityName};
     
   } catch (error) {
-    // Revert optimistic update on failure
-    dependencies.atomActions.delete${entityName}AtomOnly(optimistic${entityName}.id);
+    // No optimistic update to revert - live changes will handle atom state
     throw error;
   }
 }
@@ -609,13 +604,9 @@ export async function update${entityName}UI(
     throw new Error(\`${entityName} \${${lowerEntityName}Id} not found for UI update\`);
   }
   
-  // 1. OPTIMISTIC: Update atom immediately with optimistic data
-  const optimistic${entityName} = { 
-    ...current${entityName}, 
-    ...updates,
-    updatedAt: new Date()
-  };
-  dependencies.atomActions.update${entityName}AtomOnly(${lowerEntityName}Id, optimistic${entityName});
+  // 1. OPTIMISTIC: Skip atom update - let live changes handle it
+  // Optimistic updates will be handled by components using local state
+  // Live changes will reconcile atom when database update completes
   
   try {
     // 2. DATABASE: Update database in background
@@ -644,8 +635,7 @@ export async function update${entityName}UI(
     return updated${entityName};
     
   } catch (error) {
-    // Revert optimistic update on failure
-    dependencies.atomActions.update${entityName}AtomOnly(${lowerEntityName}Id, current${entityName});
+    // No optimistic update to revert - live changes will handle atom state
     throw error;
   }
 }
@@ -673,8 +663,9 @@ export async function delete${entityName}UI(
     throw new Error(\`${entityName} \${${lowerEntityName}Id} not found for UI delete\`);
   }
   
-  // 1. OPTIMISTIC: Remove from atom immediately
-  dependencies.atomActions.delete${entityName}AtomOnly(${lowerEntityName}Id);
+  // 1. OPTIMISTIC: Skip atom update - let live changes handle it
+  // Optimistic updates will be handled by components using local state
+  // Live changes will reconcile atom when database delete completes
   
   try {
     // 2. DATABASE: Delete from database
@@ -697,8 +688,7 @@ export async function delete${entityName}UI(
     return true;
     
   } catch (error) {
-    // Restore ${lowerEntityName} on failure
-    dependencies.atomActions.create${entityName}AtomOnly(${lowerEntityName}ToDelete);
+    // No optimistic update to revert - live changes will handle atom state
     throw error;
   }
 }

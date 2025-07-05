@@ -35,82 +35,15 @@ export function useStableEntityArray<TEntity extends BaseEntity>(
   atom: Atom<Record<string, TEntity>>,
   sortFn?: (a: TEntity, b: TEntity) => number
 ): TEntity[] {
-  // Track the last known entity timestamps for change detection
-  const lastTimestampsRef = useRef<Record<string, string>>({})
-  
-  // Subscribe to atom changes
-  const entitiesRecord = useSelector(atom, (record) => record, shallowEqual)
-  
-  return useMemo(() => {
-    if (!entitiesRecord || typeof entitiesRecord !== 'object') {
+  // Direct selector without complex caching - let XState handle reactivity
+  return useSelector(atom, (record) => {
+    if (!record || typeof record !== 'object') {
       return []
     }
     
-    // Check if we have a cached array for this record reference
-    const cachedArray = arrayCache.get(entitiesRecord)
-    if (cachedArray) {
-      return cachedArray
-    }
-    
-    // Detect if any entities have actually changed
-    const currentTimestamps: Record<string, string> = {}
-    let hasChanges = false
-    
-    for (const [id, entity] of Object.entries(entitiesRecord)) {
-      const timestamp = entity.updatedAt instanceof Date 
-        ? entity.updatedAt.toISOString() 
-        : String(entity.updatedAt)
-      
-      currentTimestamps[id] = timestamp
-      
-      // Check if this entity is new or has changed
-      if (lastTimestampsRef.current[id] !== timestamp) {
-        hasChanges = true
-      }
-    }
-    
-    // Check if any entities were deleted
-    for (const id in lastTimestampsRef.current) {
-      if (!(id in currentTimestamps)) {
-        hasChanges = true
-        break
-      }
-    }
-    
-    // If no changes detected and we have a previous array, return it
-    if (!hasChanges && Object.keys(lastTimestampsRef.current).length > 0) {
-      // This shouldn't happen due to WeakMap caching, but safety fallback
-      const values = Object.values(entitiesRecord)
-      const stableArray = sortFn ? values.sort(sortFn) : values
-      arrayCache.set(entitiesRecord, stableArray)
-      return stableArray
-    }
-    
-    // Update timestamp tracking
-    lastTimestampsRef.current = currentTimestamps
-    
-    // Create stable entity references
-    const stableEntities: TEntity[] = []
-    for (const entity of Object.values(entitiesRecord)) {
-      // Check if we have a cached stable reference for this entity
-      const cachedEntity = entityCache.get(entity)
-      if (cachedEntity && cachedEntity.updatedAt === entity.updatedAt) {
-        stableEntities.push(cachedEntity)
-      } else {
-        // Create new stable reference and cache it
-        entityCache.set(entity, entity)
-        stableEntities.push(entity)
-      }
-    }
-    
-    // Apply sorting if provided
-    const finalArray = sortFn ? stableEntities.sort(sortFn) : stableEntities
-    
-    // Cache the array for this record reference
-    arrayCache.set(entitiesRecord, finalArray)
-    
-    return finalArray
-  }, [entitiesRecord, sortFn])
+    const values = Object.values(record)
+    return sortFn ? [...values].sort(sortFn) : values
+  }, shallowEqual)
 }
 
 /**
