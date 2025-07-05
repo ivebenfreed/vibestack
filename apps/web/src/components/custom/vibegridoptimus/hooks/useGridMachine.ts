@@ -187,6 +187,7 @@ export function useGridMachine(options: UseGridMachineOptions): GridMachineAPI {
     }
     
     debouncedSaveRef.current = setTimeout(() => {
+      console.log('[useGridMachine] 🔍 About to save - current state.context.sortColumns:', state.context.sortColumns)
       const preferences = {
         sortColumns: state.context.sortColumns,
         filterState: state.context.filterState,
@@ -202,44 +203,32 @@ export function useGridMachine(options: UseGridMachineOptions): GridMachineAPI {
     }, 1000) // 1 second debounce
   }, [persistenceKey, state.context.sortColumns, state.context.filterState, state.context.pageSize])
   
-  // Load preferences on mount and cleanup on unmount
+  // Track if preferences have been loaded to prevent re-loading on re-renders
+  const preferencesLoadedRef = React.useRef(false)
+  
+  // DISABLED: Auto-loading preferences (causes re-render loops)
+  // Manual testing: let's just test saving first, then worry about loading
   React.useEffect(() => {
-    // Load preferences directly here to avoid circular dependency
-    try {
-      const saved = localStorage.getItem(persistenceKey)
-      if (saved) {
-        const preferences = JSON.parse(saved)
-        console.log('[useGridMachine] 📂 Loading preferences on mount:', preferences)
-        
-        if (preferences.sortColumns) {
-          send({ type: 'SORT_CHANGE', sortColumns: preferences.sortColumns })
-        }
-        if (preferences.filterState) {
-          send({ type: 'FILTER_CHANGE', filterState: preferences.filterState })
-        }
-        if (preferences.pageSize) {
-          send({ type: 'SET_PAGE_SIZE', pageSize: preferences.pageSize })
-        }
-      }
-    } catch (error) {
-      console.warn('[useGridMachine] ⚠️ Failed to load preferences on mount:', error)
-    }
-    
     return () => {
       if (debouncedSaveRef.current) {
         clearTimeout(debouncedSaveRef.current)
       }
     }
-  }, [persistenceKey, send])
+  }, [])
   
   // Grid State Management
   const setSortColumns = React.useCallback((columns: SortColumn[]) => {
+    console.log('[useGridMachine] 🔄 setSortColumns called:', columns)
     // Direct dispatch
     send({ type: 'SORT_CHANGE', sortColumns: columns })
     
+    // Check if state was updated immediately (it probably won't be due to async state)
+    console.log('[useGridMachine] 🔍 Current state.context.sortColumns after send:', state.context.sortColumns)
+    
     // Save preferences after sort change
+    console.log('[useGridMachine] 💾 Triggering debouncedSavePreferences')
     debouncedSavePreferences()
-  }, [send, debouncedSavePreferences])
+  }, [send, debouncedSavePreferences, state.context.sortColumns])
   
   const setFilterState = React.useCallback((filterState: FilterState) => {
     // Direct dispatch

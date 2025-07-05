@@ -116,7 +116,24 @@ const DeferredDataGrid = React.memo(({
  */
 export function VibeGridOptimus(props: VibeGridOptimusProps) {
   const componentStart = performance.now()
-  console.log(`[VibeGridOptimus] 🚀 ROUTE LOAD: Starting component for ${props.entityName} with ${props.data.length} items`)
+  console.log(`[VibeGridOptimus] 🚀 COMPONENT RENDER: Starting component for ${props.entityName} with ${props.data.length} items`)
+  
+  // Debug what's causing re-renders
+  const prevPropsRef = React.useRef<VibeGridOptimusProps>()
+  React.useEffect(() => {
+    if (prevPropsRef.current) {
+      const changes = []
+      if (prevPropsRef.current.data !== props.data) changes.push('data')
+      if (prevPropsRef.current.onSave !== props.onSave) changes.push('onSave')
+      if (prevPropsRef.current.theme !== props.theme) changes.push('theme')
+      if (prevPropsRef.current.entityName !== props.entityName) changes.push('entityName')
+      
+      if (changes.length > 0) {
+        console.log(`[VibeGridOptimus] 🔄 Props changed, causing re-render:`, changes)
+      }
+    }
+    prevPropsRef.current = props
+  })
   
   const {
     entityName,
@@ -208,8 +225,24 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Initialize clipboard operations
   const { copiedCell, handleCellCopy, handleCellPaste } = useClipboardOps()
   
-  // State management for selection - use grid machine for persistent sort state
-  const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
+  // Simple React state for sort persistence - survives re-renders
+  const [sortColumns, setSortColumns] = React.useState<readonly import('react-data-grid').SortColumn[]>(() => {
+    // Load from localStorage on initial render
+    try {
+      const saved = localStorage.getItem(`vibeGrid-${entityName}-sort`)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        console.log('[VibeGridOptimus] 📂 Loaded sort preferences:', parsed)
+        return parsed
+      }
+    } catch (error) {
+      console.warn('[VibeGridOptimus] ⚠️ Failed to load sort preferences:', error)
+    }
+    return []
+  })
+  
+  // Use ref instead of state to avoid re-renders on selection
+  const selectedPositionRef = React.useRef<{ row: number; idx: number } | null>(null)
   
   // Simple optimistic state to prevent flashing
   const [optimisticValues, setOptimisticValues] = React.useState<Record<string, any>>({})
@@ -265,10 +298,9 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Let individual CellRenderers handle their own registration
   // This avoids duplicate registration and infinite loops
   
-  // Sort data based on grid machine sort state - React Compiler handles memoization
+  // Sort data based on React state - persists through re-renders
   const sortedData = React.useMemo(() => {
     const sortStart = performance.now()
-    const sortColumns = gridMachine.sortColumns
     if (sortColumns.length === 0) {
       console.log(`[Sort] No sorting needed for ${data.length} items`)
       return data
@@ -317,7 +349,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       console.warn(`[Sort] 🐌 SLOW SORT: ${sortTime.toFixed(2)}ms for ${data.length} items`)
     }
     return result
-  }, [data, gridMachine.sortColumns, rdgColumns])
+  }, [data, sortColumns, rdgColumns])
   
   
 
@@ -811,16 +843,26 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           ref={gridRef}
           columns={optimusColumns}
           rows={sortedData}
-          sortColumns={gridMachine.sortColumns.map(sc => ({ columnKey: sc.columnKey, direction: sc.direction }))}
+          sortColumns={sortColumns}
           onSortColumnsChange={(columns) => {
-            const sortColumns = columns.map(col => ({
-              columnKey: col.columnKey,
-              direction: col.direction as 'ASC' | 'DESC'
-            }))
-            gridMachine.setSortColumns(sortColumns)
+            console.log('[VibeGridOptimus] 📊 Sort change:', columns)
+            setSortColumns(columns)
+            
+            // Save to localStorage with debouncing
+            setTimeout(() => {
+              try {
+                localStorage.setItem(`vibeGrid-${entityName}-sort`, JSON.stringify(columns))
+                console.log('[VibeGridOptimus] 💾 Sort preferences saved:', columns)
+              } catch (error) {
+                console.warn('[VibeGridOptimus] ⚠️ Failed to save sort preferences:', error)
+              }
+            }, 100)
           }}
-          selectedPosition={selectedPosition}
-          onSelectedCellChange={setSelectedPosition}
+          selectedPosition={selectedPositionRef.current}
+          onSelectedCellChange={(position) => {
+            console.log('[VibeGridOptimus] 🎯 Cell selection changed (no re-render):', position)
+            selectedPositionRef.current = position
+          }}
           cellNavigationMode="CHANGE_ROW"
           enableVirtualization={true}
           onFill={handleFill}
