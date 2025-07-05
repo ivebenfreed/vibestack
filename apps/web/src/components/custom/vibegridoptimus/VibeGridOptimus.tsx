@@ -541,20 +541,14 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           switch (mappedColumn.cellType) {
             case 'relationship-single': {
               if (!value) {
-                return React.createElement('div', { 
-                  className: `cursor-pointer px-2 hover:bg-muted rounded text-sm flex items-center gap-2 text-muted-foreground transition-colors`,
-                  ...clickHandler
-                }, [
-                  React.createElement('svg', {
-                    key: 'icon',
-                    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 
-                    stroke: 'currentColor', strokeWidth: 2
-                  }, [
-                    React.createElement('path', { key: 'path', d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }),
-                    React.createElement('rect', { key: 'rect', x: 8, y: 2, width: 8, height: 4, rx: 1, ry: 1 })
-                  ]),
-                  React.createElement('span', { key: 'text', className: 'text-xs' }, 'Select item')
-                ])
+                return (
+                  <div 
+                    className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
+                    {...clickHandler}
+                  >
+                    —
+                  </div>
+                )
               }
               
               // Use the configured displayField from DataForge
@@ -567,21 +561,19 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                 displayValue = String(value)
               }
               
-              return React.createElement('div', { 
-                className: 'px-2 flex items-center', 
-                ...clickHandler 
-              }, [
-                React.createElement('span', { 
-                  key: 'badge', 
-                  className: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity}` 
-                }, displayValue)
-              ])
+              return (
+                <div className="px-2 flex items-center" {...clickHandler}>
+                  <span className={`badge badge-primary ${CSS_CLASSES.cellHoverOpacity}`}>
+                    {displayValue}
+                  </span>
+                </div>
+              )
             }
             
             case 'relationship-multi':
             case 'relationship-collection': {
               if (!value) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return <span className="empty-state">—</span>
               }
               
               // Use the configured displayField from DataForge
@@ -594,41 +586,38 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                 displayValue = String(value)
               }
               
-              return React.createElement('span', { 
-                className: 'badge badge-muted cursor-pointer hover:opacity-80',
-                ...clickHandler
-              }, displayValue)
+              return (
+                <span 
+                  className="badge badge-muted cursor-pointer hover:opacity-80"
+                  {...clickHandler}
+                >
+                  {displayValue}
+                </span>
+              )
             }
             
             case 'enum': {
               if (!value) {
-                return React.createElement('div', { 
-                  className: `cursor-pointer px-2 hover:bg-muted rounded text-sm flex items-center gap-2 text-muted-foreground transition-colors`,
-                  ...clickHandler
-                }, [
-                  React.createElement('svg', {
-                    key: 'icon',
-                    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 
-                    stroke: 'currentColor', strokeWidth: 2
-                  }, [
-                    React.createElement('path', { key: 'path', d: 'M9 12l2 2 4-4' }),
-                    React.createElement('circle', { key: 'circle', cx: 12, cy: 12, r: 9 })
-                  ]),
-                  React.createElement('span', { key: 'text', className: 'text-xs' }, 'Select option')
-                ])
+                return (
+                  <div 
+                    className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
+                    {...clickHandler}
+                  >
+                    —
+                  </div>
+                )
               }
               const badgeClass = `${getBadgeClass(value, column.key)} ${CSS_CLASSES.cellHoverOpacity}`
-              return React.createElement('div', { 
-                className: 'px-2 flex items-center', 
-                ...clickHandler 
-              }, [
-                React.createElement('span', { key: 'badge', className: badgeClass }, value)
-              ])
+              return (
+                <div className="px-2 flex items-center" {...clickHandler}>
+                  <span className={badgeClass}>{value}</span>
+                </div>
+              )
             }
             
             case 'date': {
               if (!value) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return <span className="empty-state">—</span>
               }
               
               const date = new Date(value)
@@ -644,69 +633,80 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                     month: 'short', day: 'numeric', year: 'numeric'
                   })
               
-              return React.createElement('div', { 
-                className: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors`,
-                ...clickHandler
-              }, displayValue)
+              return (
+                <div 
+                  className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
+                  {...clickHandler}
+                >
+                  {displayValue}
+                </div>
+              )
             }
             
             case 'boolean': {
-              return React.createElement('div', { 
-                className: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} ${value ? 'text-green-600 font-bold' : 'text-muted-foreground'}`,
-                ...clickHandler
-              }, value ? '✓' : '✗')
+              return (
+                <div 
+                  className={`${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} ${value ? 'text-green-600 font-bold' : 'text-muted-foreground'}`}
+                  {...clickHandler}
+                >
+                  {value ? '✓' : '✗'}
+                </div>
+              )
             }
             
             case 'uuid': {
               if (!value) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return <span className="empty-state">—</span>
               }
               const truncated = String(value).slice(0, 8) + '...'
-              return React.createElement('div', { 
-                className: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`,
-                title: String(value),
-                ...clickHandler
-              }, truncated)
+              return (
+                <div 
+                  className={`${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`}
+                  title={String(value)}
+                  {...clickHandler}
+                >
+                  {truncated}
+                </div>
+              )
             }
             
             case 'number': {
               if (value == null) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return <span className="empty-state">—</span>
               }
-              return React.createElement('div', { 
-                className: `${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`,
-                ...clickHandler
-              }, String(value))
+              return (
+                <div 
+                  className={`${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`}
+                  {...clickHandler}
+                >
+                  {String(value)}
+                </div>
+              )
             }
             
             case 'text':
             default: {
               if (!value) {
-                return React.createElement('div', { 
-                  className: `cursor-pointer px-2 hover:bg-muted rounded text-sm flex items-center gap-2 text-muted-foreground transition-colors`,
-                  ...clickHandler
-                }, [
-                  React.createElement('svg', {
-                    key: 'icon',
-                    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 
-                    stroke: 'currentColor', strokeWidth: 2
-                  }, [
-                    React.createElement('path', { key: 'path1', d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
-                    React.createElement('polyline', { key: 'path2', points: '14,2 14,8 20,8' }),
-                    React.createElement('line', { key: 'path3', x1: 16, y1: 13, x2: 8, y2: 13 }),
-                    React.createElement('line', { key: 'path4', x1: 16, y1: 17, x2: 8, y2: 17 }),
-                    React.createElement('polyline', { key: 'path5', points: '10,9 9,9 8,9' })
-                  ]),
-                  React.createElement('span', { key: 'text', className: 'text-xs' }, 'Add text')
-                ])
+                return (
+                  <div 
+                    className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
+                    {...clickHandler}
+                  >
+                    —
+                  </div>
+                )
               }
               
               const displayValue = String(value)
-              return React.createElement('div', { 
-                className: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`,
-                title: displayValue,
-                ...clickHandler
-              }, displayValue)
+              return (
+                <div 
+                  className={`cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`}
+                  title={displayValue}
+                  {...clickHandler}
+                >
+                  {displayValue}
+                </div>
+              )
             }
           }
         }

@@ -1,62 +1,14 @@
 import React, { Suspense } from 'react'
-import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import type { Task } from '@repo/dataforge/client-entities'
-import { tasksAtom, getTaskDependencies } from '@/domain/task'
-import { createVibeGrid } from '@/components/custom/vibegridoptimus/hooks/useValidatedVibeGrid'
 import { Grid3X3, Kanban, Calendar } from 'lucide-react'
 import { useTheme } from '@/context/theme-context'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { useSelector } from '@xstate/store/react'
-import { shallowEqual } from '@xstate/store'
-import { updateTaskUI } from '@repo/dataforge/task-operations'
+import TasksTableView from './TasksTableView'
 
 // Separate component for table view to isolate hooks
 const TaskTableView: React.FC<{ theme: string }> = ({ theme }) => {
-  const tableViewStart = performance.now()
-  console.log('[TaskTableView] 🚀 Starting TaskTableView render')
-  
-  // Create save handler that uses DataForge operations directly
-  const handleTaskSave = React.useCallback(async (id: string, column: string, value: any) => {
-    console.log('[TaskTableView] 🚀 Save handler called:', { id, column, value })
-    try {
-      // Get dependencies and call DataForge operation directly
-      const dependencies = await getTaskDependencies()
-      await updateTaskUI(id, { [column]: value }, dependencies)
-      console.log('[TaskTableView] ✅ Task updated successfully')
-    } catch (error) {
-      console.error('[TaskTableView] ❌ Task update failed:', error)
-      throw error
-    }
-  }, [])
-  
-  // ✅ TYPE-SAFE VIBEGRID: Hooks only called when component is rendered
-  const taskGridProps = createVibeGrid({
-    entityName: "Task",
-    atom: tasksAtom,
-    onSave: handleTaskSave
-  })
-
-  // Debug: Compare direct atom vs component data
-  const directAtomData = useSelector(tasksAtom, (record) => Object.values(record), shallowEqual)
-  const testTaskDirect = directAtomData.find(t => t.id === '2f0b48f6-2e54-49e2-a1f0-986eb1ed8c1b')
-  const testTaskComponent = taskGridProps.data.find(t => t.id === '2f0b48f6-2e54-49e2-a1f0-986eb1ed8c1b')
-  
-  console.log('TaskTableView - DIRECT ATOM priority:', testTaskDirect?.priority)
-  console.log('TaskTableView - COMPONENT priority:', testTaskComponent?.priority)
-  
-  React.useEffect(() => {
-    const renderTime = performance.now() - tableViewStart
-    console.log(`[TaskTableView] ✅ Render completed in ${renderTime.toFixed(2)}ms`)
-  })
-
   return (
-    <VibeGridOptimus
-      {...taskGridProps}
-      height={600}
-      theme={theme}
-      className="border border-border rounded-lg"
-    />
+    <TasksTableView />
   )
 }
 
@@ -91,19 +43,6 @@ function TaskViewLoader({ view }: { view: string }) {
  * - Shared state management via XState atoms
  */
 const Tasks: React.FC = () => {
-  const tasksComponentStart = performance.now()
-  console.log('[Tasks] 🚀 Starting Tasks component render')
-  
-  // Check if we're measuring route click time
-  if ((window as any).__routeClickStart) {
-    const clickToRenderTime = performance.now() - (window as any).__routeClickStart
-    console.log(`[ROUTE CLICK] ⏱️ Click to render: ${clickToRenderTime.toFixed(2)}ms`)
-    if (clickToRenderTime > 150) {
-      console.warn(`[ROUTE CLICK] 🚨 VIOLATION: ${clickToRenderTime.toFixed(2)}ms exceeds 150ms threshold`)
-    }
-    delete (window as any).__routeClickStart
-  }
-  
   // Get theme and resolve 'system' to actual theme - React Compiler will optimize this
   const { theme } = useTheme()
   const effectiveTheme = theme === 'system' 
@@ -116,70 +55,11 @@ const Tasks: React.FC = () => {
   const currentView = searchParams.view || 'table'
 
   const handleTabChange = (value: string) => {
-    const changeStart = performance.now()
-    console.log(`[Tasks] 📍 Tab change to ${value} initiated`)
-    
-    // Wrap in performance measurement
-    const measurePerformance = () => {
-      const elapsed = performance.now() - changeStart
-      console.log(`[Tasks] ⏱️ Tab change took ${elapsed.toFixed(2)}ms so far`)
-      
-      if (elapsed > 100) {
-        console.warn(`[Tasks] 🚨 SLOW TAB CHANGE: ${elapsed.toFixed(2)}ms - this might be the violation source`)
-      }
-    }
-    
-    // Measure at different points
-    measurePerformance()
-    
     navigate({ 
       to: '/tasks',
       search: { view: value }
     })
-    
-    measurePerformance()
-    
-    // Check after next tick
-    setTimeout(measurePerformance, 0)
-    
-    // Check after animation frame
-    requestAnimationFrame(measurePerformance)
   }
-  
-  React.useEffect(() => {
-    const renderTime = performance.now() - tasksComponentStart
-    console.log(`[Tasks] ✅ Render completed in ${renderTime.toFixed(2)}ms`)
-    
-    // Track what happens AFTER React finishes
-    setTimeout(() => {
-      const postRenderTime = performance.now() - tasksComponentStart
-      console.log(`[Tasks] 📊 Post-render (next tick) at ${postRenderTime.toFixed(2)}ms`)
-    }, 0)
-    
-    // Track layout completion
-    requestAnimationFrame(() => {
-      const rafTime = performance.now() - tasksComponentStart
-      console.log(`[Tasks] 🎨 RAF (layout/paint) at ${rafTime.toFixed(2)}ms`)
-      
-      // Check one more frame for any async work
-      requestAnimationFrame(() => {
-        const raf2Time = performance.now() - tasksComponentStart
-        console.log(`[Tasks] 🎯 RAF2 (post-paint) at ${raf2Time.toFixed(2)}ms`)
-      })
-    })
-    
-    // Add temporary click timing listener
-    const clickHandler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest('[href*="/tasks"]') || target.closest('[role="tab"]')) {
-        window.__routeClickStart = performance.now()
-        console.log('[ROUTE CLICK] 🖱️ Navigation click detected')
-      }
-    }
-    
-    document.addEventListener('click', clickHandler, true)
-    return () => document.removeEventListener('click', clickHandler, true)
-  })
 
 
 
