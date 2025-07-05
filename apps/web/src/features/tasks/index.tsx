@@ -2,23 +2,39 @@ import React, { Suspense } from 'react'
 import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import type { Task } from '@repo/dataforge/client-entities'
-import { tasksAtom } from '@/domain/task'
+import { tasksAtom, getTaskDependencies } from '@/domain/task'
 import { createVibeGrid } from '@/components/custom/vibegridoptimus/hooks/useValidatedVibeGrid'
 import { Grid3X3, Kanban, Calendar } from 'lucide-react'
 import { useTheme } from '@/context/theme-context'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
+import { updateTaskUI } from '@repo/dataforge/task-operations'
 
 // Separate component for table view to isolate hooks
 const TaskTableView: React.FC<{ theme: string }> = ({ theme }) => {
   const tableViewStart = performance.now()
   console.log('[TaskTableView] 🚀 Starting TaskTableView render')
   
+  // Create save handler that uses DataForge operations directly
+  const handleTaskSave = React.useCallback(async (id: string, column: string, value: any) => {
+    console.log('[TaskTableView] 🚀 Save handler called:', { id, column, value })
+    try {
+      // Get dependencies and call DataForge operation directly
+      const dependencies = await getTaskDependencies()
+      await updateTaskUI(id, { [column]: value }, dependencies)
+      console.log('[TaskTableView] ✅ Task updated successfully')
+    } catch (error) {
+      console.error('[TaskTableView] ❌ Task update failed:', error)
+      throw error
+    }
+  }, [])
+  
   // ✅ TYPE-SAFE VIBEGRID: Hooks only called when component is rendered
   const taskGridProps = createVibeGrid({
     entityName: "Task",
-    atom: tasksAtom
+    atom: tasksAtom,
+    onSave: handleTaskSave
   })
 
   // Debug: Compare direct atom vs component data

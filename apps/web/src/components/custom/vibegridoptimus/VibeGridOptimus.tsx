@@ -173,6 +173,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   
   // Use provided onSave handler directly
   const finalSaveHandler = onSave
+  console.log('[VibeGridOptimus] 🔧 Final save handler:', { 
+    hasOnSave: !!onSave, 
+    hasFinalSaveHandler: !!finalSaveHandler 
+  })
   
   // Get relationship data from domain atoms for editing dropdowns
   const projects = useSelector(projectsAtom, (projectsRecord) => Object.values(projectsRecord), shallowEqual)
@@ -208,11 +212,37 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   const [sortColumns, setSortColumns] = React.useState<readonly import('react-data-grid').SortColumn[]>([])
   const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
   
-  // Grid machine-aware save handler - React Compiler handles memoization
+  // Simple optimistic state to prevent flashing
+  const [optimisticValues, setOptimisticValues] = React.useState<Record<string, any>>({})
+  
+  // Simple optimistic save to prevent flashing
   const gridMachineOnUpdate = async (id: string, column: string, value: any) => {
-    console.log('[VibeGridOptimus] 🚀 Grid machine save handler called:', { id, column, value })
+    console.log('[VibeGridOptimus] 🚀 Save with simple optimistic:', { id, column, value })
+    
+    const cellKey = `${id}:${column}`
+    
+    // Set optimistic value immediately
+    setOptimisticValues(prev => ({ ...prev, [cellKey]: value }))
+    
     if (finalSaveHandler) {
-      await finalSaveHandler(id, column, value)
+      try {
+        console.log('[VibeGridOptimus] 📞 Calling finalSaveHandler')
+        await finalSaveHandler(id, column, value)
+        
+        // Clear optimistic value after successful save - atom will take over
+        setOptimisticValues(prev => {
+          const updated = { ...prev }
+          delete updated[cellKey]
+          return updated
+        })
+        console.log('[VibeGridOptimus] ✅ Save completed, optimistic cleared')
+      } catch (error) {
+        // Keep optimistic value on error
+        console.error('[VibeGridOptimus] ❌ Save failed, keeping optimistic:', error)
+        throw error
+      }
+    } else {
+      console.log('[VibeGridOptimus] ❌ No save handler available')
     }
   }
   
@@ -456,7 +486,19 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
         cellClass: cellClasses,
         // PERFORMANCE: Lightweight React elements using perfect DataForge configuration
         renderCell: (props: any) => {
-          const value = props.row[mappedColumn.key]
+          const cellKey = `${props.row.id}:${mappedColumn.key}`
+          
+          // Use optimistic value if available, otherwise use atom value
+          const value = optimisticValues[cellKey] ?? props.row[mappedColumn.key]
+          
+          // Debug optimistic state
+          if (optimisticValues[cellKey] !== undefined) {
+            console.log('[RenderCell] 🎨 Using optimistic value:', { 
+              cellKey, 
+              optimistic: optimisticValues[cellKey], 
+              atom: props.row[mappedColumn.key] 
+            })
+          }
           
           // PERFORMANCE: Use pre-created click handlers to avoid function creation in render
           const clickHandler = columnClickHandlers[column.key as string] ? {
