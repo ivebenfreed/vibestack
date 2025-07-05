@@ -204,6 +204,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Initialize clipboard operations
   const { copiedCell, handleCellCopy, handleCellPaste } = useClipboardOps()
   
+  // State management for selection and sorting
+  const [sortColumns, setSortColumns] = React.useState<readonly import('react-data-grid').SortColumn[]>([])
+  const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
+  
   // Grid machine-aware save handler - React Compiler handles memoization
   const gridMachineOnUpdate = async (id: string, column: string, value: any) => {
     console.log('[VibeGridOptimus] 🚀 Grid machine save handler called:', { id, column, value })
@@ -212,13 +216,29 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     }
   }
   
+  // Handle content click for single-click editing
+  const handleContentClick = React.useCallback((rowIdx: number, columnKey: string, event: React.MouseEvent) => {
+    // Stop propagation to prevent normal cell selection
+    event.stopPropagation()
+    
+    // Find the column configuration
+    const rdgColumn = rdgColumns.find(col => col.key === columnKey)
+    
+    // If column is editable, enter edit mode using the correct react-data-grid API
+    if (rdgColumn?.editable && gridRef.current) {
+      
+      // Use selectCell with enableEditor option to enter edit mode
+      const columnIdx = rdgColumns.findIndex(col => col.key === columnKey)
+      gridRef.current.selectCell({ rowIdx, idx: columnIdx }, { enableEditor: true })
+    }
+  }, [rdgColumns])
+  
   // Let individual CellRenderers handle their own registration
   // This avoids duplicate registration and infinite loops
   
-  // Sort data based on grid machine sort columns - React Compiler handles memoization
-  const sortedData = (() => {
+  // Sort data based on sort columns state - React Compiler handles memoization
+  const sortedData = React.useMemo(() => {
     const sortStart = performance.now()
-    const { sortColumns } = gridMachine
     if (sortColumns.length === 0) {
       console.log(`[Sort] No sorting needed for ${data.length} items`)
       return data
@@ -267,25 +287,35 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       console.warn(`[Sort] 🐌 SLOW SORT: ${sortTime.toFixed(2)}ms for ${data.length} items`)
     }
     return result
-  })()
+  }, [data, sortColumns, rdgColumns])
   
   
-  // Handle content click for single-click editing - React Compiler handles memoization
-  const handleContentClick = (rowIdx: number, columnKey: string, event: React.MouseEvent) => {
-    // Stop propagation to prevent normal cell selection
-    event.stopPropagation()
+
+  // Handle rows change for enhanced batch operations
+  const handleRowsChange = React.useCallback((rows: any[], { indexes }: { indexes: number[] }) => {
+    if (!finalSaveHandler || indexes.length === 0) return
     
-    // Find the column configuration
-    const rdgColumn = rdgColumns.find(col => col.key === columnKey)
+    console.log('[VibeGridOptimus] Processing', indexes.length, 'row changes with enhanced batching')
     
-    // If column is editable, enter edit mode using the correct react-data-grid API
-    if (rdgColumn?.editable && gridRef.current) {
+    // Process each row change through intelligent batching
+    indexes.forEach(index => {
+      const changedRow = rows[index]
+      const originalRow = sortedData[index]
       
-      // Use selectCell with enableEditor option to enter edit mode
-      const columnIdx = rdgColumns.findIndex(col => col.key === columnKey)
-      gridRef.current.selectCell({ rowIdx, idx: columnIdx }, { enableEditor: true })
-    }
-  }
+      if (!changedRow || !originalRow || changedRow === originalRow) {
+        return
+      }
+      
+      // Find what changed and batch each column update
+      Object.keys(changedRow).forEach(column => {
+        if (changedRow[column] !== originalRow[column]) {
+          processBatch(changedRow.id, column, changedRow[column]).catch(error => {
+            console.error('[VibeGridOptimus] Batch column update failed:', error)
+          })
+        }
+      })
+    })
+  }, [sortedData, finalSaveHandler, processBatch])
 
   // Create stable renderer functions to avoid recreating on every render
   const cellRendererProps = React.useMemo(() => ({
@@ -345,6 +375,22 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return `${baseClasses} badge-primary`
   }, [])
 
+  // Pre-create click handlers outside render loop for performance
+  const columnClickHandlers = React.useMemo(() => {
+    const handlers: Record<string, (event: React.MouseEvent, rowIdx: number) => void> = {}
+    
+    rdgColumns.forEach(column => {
+      if (column.editable) {
+        handlers[column.key as string] = (event: React.MouseEvent, rowIdx: number) => {
+          event.stopPropagation()
+          handleContentClick(rowIdx, String(column.key), event)
+        }
+      }
+    })
+    
+    return handlers
+  }, [rdgColumns, handleContentClick])
+
   // Enhanced columns with grid machine integration - uses pre-generated config
   const optimusColumns = React.useMemo(() => {
     const enhancementStart = performance.now()
@@ -388,9 +434,9 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               options: relationshipData[targetEntity]
             }
           }
-          console.log(`[VibeGridOptimus] Enhanced ${key} with ${relationshipData[targetEntity].length} ${targetEntity} options`)
+          // console.log(`[VibeGridOptimus] Enhanced ${key} with ${relationshipData[targetEntity].length} ${targetEntity} options`)
         } else {
-          console.warn(`[VibeGridOptimus] No relationship data found for ${key}, targetEntity: ${targetEntity}`)
+          // console.warn(`[VibeGridOptimus] No relationship data found for ${key}, targetEntity: ${targetEntity}`)
         }
       }
 
@@ -412,11 +458,29 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
         renderCell: (props: any) => {
           const value = props.row[mappedColumn.key]
           
+          // PERFORMANCE: Use pre-created click handlers to avoid function creation in render
+          const clickHandler = columnClickHandlers[column.key as string] ? {
+            onClick: (event: React.MouseEvent) => columnClickHandlers[column.key as string](event, props.rowIdx)
+          } : {}
+          
           // Use DataForge configuration for precise rendering
           switch (mappedColumn.cellType) {
             case 'relationship-single': {
               if (!value) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return React.createElement('div', { 
+                  className: `cursor-pointer px-2 hover:bg-muted rounded text-sm flex items-center gap-2 text-muted-foreground transition-colors`,
+                  ...clickHandler
+                }, [
+                  React.createElement('svg', {
+                    key: 'icon',
+                    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 
+                    stroke: 'currentColor', strokeWidth: 2
+                  }, [
+                    React.createElement('path', { key: 'path', d: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' }),
+                    React.createElement('rect', { key: 'rect', x: 8, y: 2, width: 8, height: 4, rx: 1, ry: 1 })
+                  ]),
+                  React.createElement('span', { key: 'text', className: 'text-xs' }, 'Select item')
+                ])
               }
               
               // Use the configured displayField from DataForge
@@ -429,9 +493,15 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                 displayValue = String(value)
               }
               
-              return React.createElement('span', { 
-                className: 'badge badge-primary cursor-pointer hover:opacity-80' 
-              }, displayValue)
+              return React.createElement('div', { 
+                className: 'px-2 flex items-center', 
+                ...clickHandler 
+              }, [
+                React.createElement('span', { 
+                  key: 'badge', 
+                  className: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity}` 
+                }, displayValue)
+              ])
             }
             
             case 'relationship-multi':
@@ -451,16 +521,35 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               }
               
               return React.createElement('span', { 
-                className: 'badge badge-muted cursor-pointer hover:opacity-80' 
+                className: 'badge badge-muted cursor-pointer hover:opacity-80',
+                ...clickHandler
               }, displayValue)
             }
             
             case 'enum': {
               if (!value) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return React.createElement('div', { 
+                  className: `cursor-pointer px-2 hover:bg-muted rounded text-sm flex items-center gap-2 text-muted-foreground transition-colors`,
+                  ...clickHandler
+                }, [
+                  React.createElement('svg', {
+                    key: 'icon',
+                    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 
+                    stroke: 'currentColor', strokeWidth: 2
+                  }, [
+                    React.createElement('path', { key: 'path', d: 'M9 12l2 2 4-4' }),
+                    React.createElement('circle', { key: 'circle', cx: 12, cy: 12, r: 9 })
+                  ]),
+                  React.createElement('span', { key: 'text', className: 'text-xs' }, 'Select option')
+                ])
               }
-              const badgeClass = getBadgeClass(value, column.key)
-              return React.createElement('span', { className: badgeClass }, value)
+              const badgeClass = `${getBadgeClass(value, column.key)} ${CSS_CLASSES.cellHoverOpacity}`
+              return React.createElement('div', { 
+                className: 'px-2 flex items-center', 
+                ...clickHandler 
+              }, [
+                React.createElement('span', { key: 'badge', className: badgeClass }, value)
+              ])
             }
             
             case 'date': {
@@ -481,14 +570,16 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                     month: 'short', day: 'numeric', year: 'numeric'
                   })
               
-              return React.createElement('span', { 
-                className: 'text-sm text-muted-foreground' 
+              return React.createElement('div', { 
+                className: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors`,
+                ...clickHandler
               }, displayValue)
             }
             
             case 'boolean': {
-              return React.createElement('span', { 
-                className: value ? 'text-green-600 font-bold' : 'text-muted-foreground' 
+              return React.createElement('div', { 
+                className: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} ${value ? 'text-green-600 font-bold' : 'text-muted-foreground'}`,
+                ...clickHandler
               }, value ? '✓' : '✗')
             }
             
@@ -497,9 +588,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                 return React.createElement('span', { className: 'empty-state' }, '—')
               }
               const truncated = String(value).slice(0, 8) + '...'
-              return React.createElement('span', { 
-                className: 'text-xs font-mono text-muted-foreground text-overflow-ellipsis',
-                title: String(value)
+              return React.createElement('div', { 
+                className: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`,
+                title: String(value),
+                ...clickHandler
               }, truncated)
             }
             
@@ -507,19 +599,40 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               if (value == null) {
                 return React.createElement('span', { className: 'empty-state' }, '—')
               }
-              return React.createElement('span', { 
-                className: 'text-sm text-foreground font-mono text-right' 
+              return React.createElement('div', { 
+                className: `${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`,
+                ...clickHandler
               }, String(value))
             }
             
             case 'text':
             default: {
               if (!value) {
-                return React.createElement('span', { className: 'empty-state' }, '—')
+                return React.createElement('div', { 
+                  className: `cursor-pointer px-2 hover:bg-muted rounded text-sm flex items-center gap-2 text-muted-foreground transition-colors`,
+                  ...clickHandler
+                }, [
+                  React.createElement('svg', {
+                    key: 'icon',
+                    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 
+                    stroke: 'currentColor', strokeWidth: 2
+                  }, [
+                    React.createElement('path', { key: 'path1', d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
+                    React.createElement('polyline', { key: 'path2', points: '14,2 14,8 20,8' }),
+                    React.createElement('line', { key: 'path3', x1: 16, y1: 13, x2: 8, y2: 13 }),
+                    React.createElement('line', { key: 'path4', x1: 16, y1: 17, x2: 8, y2: 17 }),
+                    React.createElement('polyline', { key: 'path5', points: '10,9 9,9 8,9' })
+                  ]),
+                  React.createElement('span', { key: 'text', className: 'text-xs' }, 'Add text')
+                ])
               }
-              return React.createElement('span', { 
-                className: 'text-sm text-foreground' 
-              }, String(value))
+              
+              const displayValue = String(value)
+              return React.createElement('div', { 
+                className: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`,
+                title: displayValue,
+                ...clickHandler
+              }, displayValue)
             }
           }
         }
@@ -553,8 +666,28 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       console.warn(`[VibeGridOptimus] 🐌 SLOW ENHANCEMENT: ${enhancementTime.toFixed(2)}ms`)
     }
     return result
-  }, [rdgColumns, relationshipData, handleContentClick, gridMachineOnUpdate, gridMachine])
+  }, [rdgColumns, relationshipData, columnClickHandlers, gridMachineOnUpdate, gridMachine])
   
+  // Handle fill operations for drag-to-fill functionality (using optimusColumns)
+  const handleFill = React.useCallback((event: import('react-data-grid').FillEvent<any>): any => {
+    const { columnKey, sourceRow, targetRow } = event
+    const column = optimusColumns.find(col => col.key === columnKey)
+    
+    // Don't allow filling system fields or non-editable fields
+    if (column?.systemField || !column?.editable) {
+      return targetRow
+    }
+    
+    // For relationship fields, copy the ID value correctly
+    if (column?.cellType?.startsWith('relationship') && column.accessorKey) {
+      const sourceValue = sourceRow[column.accessorKey]
+      return { ...targetRow, [column.accessorKey]: sourceValue }
+    }
+    
+    // Copy the source value to target
+    const sourceValue = sourceRow[columnKey]
+    return { ...targetRow, [columnKey]: sourceValue }
+  }, [optimusColumns])
   
   // No configuration errors with pre-generated columns
   
@@ -608,52 +741,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     )
   }
   
-  // Handle fill operations
-  const handleFill = React.useCallback((event: import('react-data-grid').FillEvent<any>): any => {
-    const { columnKey, sourceRow, targetRow } = event
-    const column = optimusColumns.find(col => col.key === columnKey)
-    
-    // Don't allow filling system fields or non-editable fields
-    if (column?.systemField || !column?.config?.editable) {
-      return targetRow
-    }
-    
-    // For relationship fields, copy the ID value correctly
-    if (column?.cellType?.startsWith('relationship') && column.accessorKey) {
-      const sourceValue = sourceRow[column.accessorKey]
-      return { ...targetRow, [column.accessorKey]: sourceValue }
-    }
-    
-    // Copy the source value to target
-    const sourceValue = sourceRow[columnKey]
-    return { ...targetRow, [columnKey]: sourceValue }
-  }, [optimusColumns])
-
-  // Handle rows change for enhanced batch operations
-  const handleRowsChange = React.useCallback((rows: any[], { indexes }: { indexes: number[] }) => {
-    if (!onSave || indexes.length === 0) return
-    
-    console.log('[VibeGridOptimus] Processing', indexes.length, 'row changes with enhanced batching')
-    
-    // Process each row change through intelligent batching
-    indexes.forEach(index => {
-      const changedRow = rows[index]
-      const originalRow = sortedData[index]
-      
-      if (!changedRow || !originalRow || changedRow === originalRow) {
-        return
-      }
-      
-      // Find what changed and batch each column update
-      Object.keys(changedRow).forEach(column => {
-        if (changedRow[column] !== originalRow[column]) {
-          processBatch(changedRow.id, column, changedRow[column]).catch(error => {
-            console.error('[VibeGridOptimus] Batch column update failed:', error)
-          })
-        }
-      })
-    })
-  }, [sortedData, onSave, processBatch])
 
   return (
     <div className={`${CSS_CLASSES.container} theme-${theme} ${className} relative`} style={style}>
@@ -682,8 +769,18 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           ref={gridRef}
           columns={optimusColumns}
           rows={sortedData}
+          sortColumns={sortColumns}
+          onSortColumnsChange={setSortColumns}
+          selectedPosition={selectedPosition}
+          onSelectedCellChange={setSelectedPosition}
+          cellNavigationMode="CHANGE_ROW"
+          enableVirtualization={true}
+          onFill={handleFill}
+          onCellCopy={handleCellCopy}
+          onCellPaste={handleCellPaste}
+          onRowsChange={handleRowsChange}
           rowHeight={35}
-          className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'}`}
+          className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}
           style={{ height: typeof height === 'number' ? height : 600 }}
         />
       </div>
