@@ -115,6 +115,7 @@ const DeferredDataGrid = React.memo(({
  * - Local persistence and performance optimization
  */
 export function VibeGridOptimus(props: VibeGridOptimusProps) {
+  performance.mark('vibegrid-render-start')
   const componentStart = performance.now()
   console.log(`[VibeGridOptimus] 🚀 COMPONENT RENDER: Starting component for ${props.entityName} with ${props.data.length} items`)
   
@@ -195,27 +196,56 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     hasFinalSaveHandler: !!finalSaveHandler 
   })
   
-  // Get relationship data from domain atoms for editing dropdowns
-  const projects = useSelector(projectsAtom, (projectsRecord) => Object.values(projectsRecord), shallowEqual)
-  const users = useSelector(usersAtom, (usersRecord) => Object.values(usersRecord), shallowEqual)
-  const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
+  // PERFORMANCE: Only get relationship records (not arrays) and resolve on-demand
+  const projectsRecord = useSelector(projectsAtom, (record) => record, shallowEqual)
+  const usersRecord = useSelector(usersAtom, (record) => record, shallowEqual)
+  const tasksRecord = useSelector(tasksAtom, (record) => record, shallowEqual)
   
-  // Build relationship data for dropdowns
-  const relationshipData = React.useMemo(() => ({
-    project: projects.map(p => ({ 
+  // Lightweight relationship resolver - no expensive mapping until needed
+  const relationshipResolver = React.useMemo(() => ({
+    getProject: (id: string) => {
+      const project = projectsRecord[id]
+      return project ? { 
+        value: project.id, 
+        label: project.name || `Project ${project.id.slice(0, 8)}` 
+      } : null
+    },
+    getUser: (id: string) => {
+      const user = usersRecord[id]
+      return user ? { 
+        value: user.id, 
+        label: user.name || user.email || `User ${user.id.slice(0, 8)}` 
+      } : null
+    },
+    getTask: (id: string) => {
+      const task = tasksRecord[id]
+      return task ? { 
+        value: task.id, 
+        label: task.title || `Task ${task.id.slice(0, 8)}` 
+      } : null
+    },
+    // Lazy dropdown options - only build when actually needed for editing
+    getProjectOptions: () => Object.values(projectsRecord).map(p => ({ 
       value: p.id, 
       label: p.name || `Project ${p.id.slice(0, 8)}` 
     })),
-    user: users.map(u => ({ 
+    getUserOptions: () => Object.values(usersRecord).map(u => ({ 
       value: u.id, 
       label: u.name || u.email || `User ${u.id.slice(0, 8)}` 
     })),
-    task: tasks.map(t => ({ 
+    getTaskOptions: () => Object.values(tasksRecord).map(t => ({ 
       value: t.id, 
       label: t.title || `Task ${t.id.slice(0, 8)}` 
-    })),
-    comment: [] // Empty until comment domain is implemented
-  }), [projects, users, tasks])
+    }))
+  }), [projectsRecord, usersRecord, tasksRecord])
+  
+  // PERFORMANCE: Empty relationship data for display, resolve lazily for editing
+  const relationshipData = React.useMemo(() => ({
+    project: [], // Don't build dropdown options until editing
+    user: [],
+    task: [],
+    comment: []
+  }), [])
   
   // No more configError - pre-generated columns eliminate config issues
   
@@ -453,8 +483,27 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return handlers
   }, [rdgColumns, handleContentClick])
 
+  // Pre-compute CSS classes to avoid template literal concatenation in render
+  const precomputedClasses = React.useMemo(() => ({
+    booleanTrue: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-green-600 font-bold`,
+    booleanFalse: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-muted-foreground`,
+    uuid: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`,
+    number: `${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`,
+    textWithOverflow: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`,
+    emptyState: "cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors",
+    badgePrimary: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity}`,
+    relationshipContainer: "px-2 flex items-center"
+  }), [])
+
+  // Pre-extract click handlers to avoid object lookups in render
+  const getClickHandler = React.useCallback((columnKey: string, rowIdx: number) => {
+    const handler = columnClickHandlers[columnKey]
+    return handler ? { onClick: (event: React.MouseEvent) => handler(event, rowIdx) } : {}
+  }, [columnClickHandlers])
+
   // Enhanced columns with grid machine integration - uses pre-generated config
   const optimusColumns = React.useMemo(() => {
+    performance.mark('column-enhancement-start')
     const enhancementStart = performance.now()
     const result = rdgColumns.map((column) => {
       // Pre-generated columns already have enhanced metadata
@@ -488,17 +537,25 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           }
         }
 
-        if (targetEntity && relationshipData[targetEntity]) {
+        if (targetEntity) {
+          // Build options only for editing (not for display rendering)
+          let options: Array<{ value: string; label: string }> = []
+          if (targetEntity === 'project') {
+            options = relationshipResolver.getProjectOptions()
+          } else if (targetEntity === 'user') {
+            options = relationshipResolver.getUserOptions()
+          } else if (targetEntity === 'task') {
+            options = relationshipResolver.getTaskOptions()
+          }
+          
           mappedColumn = {
             ...mappedColumn,
             config: {
               ...mappedColumn.config,
-              options: relationshipData[targetEntity]
+              targetEntity: targetEntity,
+              options: options
             }
           }
-          // console.log(`[VibeGridOptimus] Enhanced ${key} with ${relationshipData[targetEntity].length} ${targetEntity} options`)
-        } else {
-          // console.warn(`[VibeGridOptimus] No relationship data found for ${key}, targetEntity: ${targetEntity}`)
         }
       }
 
@@ -532,38 +589,49 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
             })
           }
           
-          // PERFORMANCE: Use pre-created click handlers to avoid function creation in render
-          const clickHandler = columnClickHandlers[column.key as string] ? {
-            onClick: (event: React.MouseEvent) => columnClickHandlers[column.key as string](event, props.rowIdx)
-          } : {}
+          // PERFORMANCE: Use pre-extracted click handlers to avoid lookups and function creation
+          const clickHandler = getClickHandler(column.key as string, props.rowIdx)
           
           // Use DataForge configuration for precise rendering
           switch (mappedColumn.cellType) {
             case 'relationship-single': {
               if (!value) {
                 return (
-                  <div 
-                    className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
-                    {...clickHandler}
-                  >
+                  <div className={precomputedClasses.emptyState} {...clickHandler}>
                     —
                   </div>
                 )
               }
               
-              // Use the configured displayField from DataForge
-              const displayField = mappedColumn.config?.displayField || 'name'
+              // PERFORMANCE: Use relationship resolver for efficient lookup
               let displayValue
               
               if (typeof value === 'object' && value !== null) {
+                // Object relationship - extract display field
+                const displayField = mappedColumn.config?.displayField || 'name'
                 displayValue = value[displayField] || value.name || value.title || value.id || '[No Display]'
+              } else if (value && typeof value === 'string') {
+                // ID reference - resolve via relationship resolver
+                const targetEntity = mappedColumn.config?.targetEntity?.toLowerCase()
+                if (targetEntity === 'project') {
+                  const resolved = relationshipResolver.getProject(value)
+                  displayValue = resolved?.label || `Project ${value.slice(0, 8)}`
+                } else if (targetEntity === 'user') {
+                  const resolved = relationshipResolver.getUser(value)
+                  displayValue = resolved?.label || `User ${value.slice(0, 8)}`
+                } else if (targetEntity === 'task') {
+                  const resolved = relationshipResolver.getTask(value)
+                  displayValue = resolved?.label || `Task ${value.slice(0, 8)}`
+                } else {
+                  displayValue = String(value)
+                }
               } else {
                 displayValue = String(value)
               }
               
               return (
-                <div className="px-2 flex items-center" {...clickHandler}>
-                  <span className={`badge badge-primary ${CSS_CLASSES.cellHoverOpacity}`}>
+                <div className={precomputedClasses.relationshipContainer} {...clickHandler}>
+                  <span className={precomputedClasses.badgePrimary}>
                     {displayValue}
                   </span>
                 </div>
@@ -576,12 +644,28 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                 return <span className="empty-state">—</span>
               }
               
-              // Use the configured displayField from DataForge
-              const displayField = mappedColumn.config?.displayField || 'name'
+              // PERFORMANCE: Use relationship resolver for efficient lookup
               let displayValue
               
               if (typeof value === 'object' && value !== null) {
+                // Object relationship - extract display field
+                const displayField = mappedColumn.config?.displayField || 'name'
                 displayValue = value[displayField] || value.name || value.title || value.id || '[No Display]'
+              } else if (value && typeof value === 'string') {
+                // ID reference - resolve via relationship resolver  
+                const targetEntity = mappedColumn.config?.targetEntity?.toLowerCase()
+                if (targetEntity === 'project') {
+                  const resolved = relationshipResolver.getProject(value)
+                  displayValue = resolved?.label || `Project ${value.slice(0, 8)}`
+                } else if (targetEntity === 'user') {
+                  const resolved = relationshipResolver.getUser(value)
+                  displayValue = resolved?.label || `User ${value.slice(0, 8)}`
+                } else if (targetEntity === 'task') {
+                  const resolved = relationshipResolver.getTask(value)
+                  displayValue = resolved?.label || `Task ${value.slice(0, 8)}`
+                } else {
+                  displayValue = String(value)
+                }
               } else {
                 displayValue = String(value)
               }
@@ -599,17 +683,14 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
             case 'enum': {
               if (!value) {
                 return (
-                  <div 
-                    className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
-                    {...clickHandler}
-                  >
+                  <div className={precomputedClasses.emptyState} {...clickHandler}>
                     —
                   </div>
                 )
               }
-              const badgeClass = `${getBadgeClass(value, column.key)} ${CSS_CLASSES.cellHoverOpacity}`
+              const badgeClass = getBadgeClass(value, column.key) + ' ' + CSS_CLASSES.cellHoverOpacity
               return (
-                <div className="px-2 flex items-center" {...clickHandler}>
+                <div className={precomputedClasses.relationshipContainer} {...clickHandler}>
                   <span className={badgeClass}>{value}</span>
                 </div>
               )
@@ -646,7 +727,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
             case 'boolean': {
               return (
                 <div 
-                  className={`${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} ${value ? 'text-green-600 font-bold' : 'text-muted-foreground'}`}
+                  className={value ? precomputedClasses.booleanTrue : precomputedClasses.booleanFalse}
                   {...clickHandler}
                 >
                   {value ? '✓' : '✗'}
@@ -661,7 +742,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               const truncated = String(value).slice(0, 8) + '...'
               return (
                 <div 
-                  className={`${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`}
+                  className={precomputedClasses.uuid}
                   title={String(value)}
                   {...clickHandler}
                 >
@@ -676,7 +757,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               }
               return (
                 <div 
-                  className={`${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`}
+                  className={precomputedClasses.number}
                   {...clickHandler}
                 >
                   {String(value)}
@@ -688,10 +769,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
             default: {
               if (!value) {
                 return (
-                  <div 
-                    className="cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors"
-                    {...clickHandler}
-                  >
+                  <div className={precomputedClasses.emptyState} {...clickHandler}>
                     —
                   </div>
                 )
@@ -700,7 +778,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               const displayValue = String(value)
               return (
                 <div 
-                  className={`cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`}
+                  className={precomputedClasses.textWithOverflow}
                   title={displayValue}
                   {...clickHandler}
                 >
@@ -734,6 +812,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
 
       return result
     })
+    performance.mark('column-enhancement-end')
+    performance.measure('column-enhancement-duration', 'column-enhancement-start', 'column-enhancement-end')
     const enhancementTime = performance.now() - enhancementStart
     console.log(`[VibeGridOptimus] 🔧 Column enhancement in ${enhancementTime.toFixed(2)}ms for ${rdgColumns.length} columns`)
     if (enhancementTime > 10) {
@@ -839,51 +919,76 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       )}
       
       <div className="flex-1 border border-border rounded-lg overflow-hidden" style={{ height }}>
-        <DataGrid
-          ref={gridRef}
-          columns={optimusColumns}
-          rows={sortedData}
-          sortColumns={sortColumns}
-          onSortColumnsChange={(columns) => {
-            console.log('[VibeGridOptimus] 📊 Sort change:', columns)
-            setSortColumns(columns)
-            
-            // Save to localStorage with debouncing
-            setTimeout(() => {
-              try {
-                localStorage.setItem(`vibeGrid-${entityName}-sort`, JSON.stringify(columns))
-                console.log('[VibeGridOptimus] 💾 Sort preferences saved:', columns)
-              } catch (error) {
-                console.warn('[VibeGridOptimus] ⚠️ Failed to save sort preferences:', error)
-              }
-            }, 100)
-          }}
-          selectedPosition={selectedPositionRef.current}
-          onSelectedCellChange={(position) => {
-            console.log('[VibeGridOptimus] 🎯 Cell selection changed (no re-render):', position)
-            selectedPositionRef.current = position
-          }}
-          cellNavigationMode="CHANGE_ROW"
-          enableVirtualization={true}
-          onFill={handleFill}
-          onCellCopy={handleCellCopy}
-          onCellPaste={handleCellPaste}
-          onRowsChange={handleRowsChange}
-          rowHeight={35}
-          className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}
-          style={{ height: typeof height === 'number' ? height : 600 }}
-        />
+        {(() => {
+          performance.mark('datagrid-render-start')
+          const result = (
+            <DataGrid
+              ref={gridRef}
+              columns={optimusColumns}
+              rows={sortedData}
+              sortColumns={sortColumns}
+              onSortColumnsChange={(columns) => {
+                performance.mark('sort-change-start')
+                console.log('[VibeGridOptimus] 📊 Sort change:', columns)
+                setSortColumns(columns)
+                
+                // Save to localStorage with debouncing
+                setTimeout(() => {
+                  try {
+                    localStorage.setItem(`vibeGrid-${entityName}-sort`, JSON.stringify(columns))
+                    console.log('[VibeGridOptimus] 💾 Sort preferences saved:', columns)
+                  } catch (error) {
+                    console.warn('[VibeGridOptimus] ⚠️ Failed to save sort preferences:', error)
+                  }
+                  performance.mark('sort-change-end')
+                  performance.measure('sort-change-duration', 'sort-change-start', 'sort-change-end')
+                }, 100)
+              }}
+              selectedPosition={selectedPositionRef.current}
+              onSelectedCellChange={(position) => {
+                console.log('[VibeGridOptimus] 🎯 Cell selection changed (no re-render):', position)
+                selectedPositionRef.current = position
+              }}
+              cellNavigationMode="CHANGE_ROW"
+              enableVirtualization={true}
+              onFill={handleFill}
+              onCellCopy={handleCellCopy}
+              onCellPaste={handleCellPaste}
+              onRowsChange={handleRowsChange}
+              rowHeight={35}
+              className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}
+              style={{ height: typeof height === 'number' ? height : 600 }}
+            />
+          )
+          performance.mark('datagrid-render-end')
+          performance.measure('datagrid-render-duration', 'datagrid-render-start', 'datagrid-render-end')
+          return result
+        })()}
       </div>
     </div>
   )
   
   // Log component render time using useLayoutEffect to measure synchronous work
   React.useLayoutEffect(() => {
+    performance.mark('vibegrid-render-end')
+    performance.measure('vibegrid-total-render', 'vibegrid-render-start', 'vibegrid-render-end')
+    
     const totalTime = performance.now() - componentStart
-    console.log(`[VibeGridOptimus] ✅ Layout effects completed in ${totalTime.toFixed(2)}ms`)
+    const measure = performance.getEntriesByName('vibegrid-total-render')[0]
+    
+    console.log(`[VibeGridOptimus] ✅ Render completed in ${totalTime.toFixed(2)}ms (measured: ${measure.duration.toFixed(2)}ms)`)
     if (totalTime > 50) {
-      console.warn(`[VibeGridOptimus] 🐌 SLOW LAYOUT: ${totalTime.toFixed(2)}ms`)
+      console.warn(`[VibeGridOptimus] 🐌 SLOW RENDER: ${totalTime.toFixed(2)}ms`)
     }
+    
+    // Log all performance measures
+    const measures = performance.getEntriesByType('measure').filter(m => 
+      m.name.includes('vibegrid') || m.name.includes('column-enhancement')
+    )
+    console.table(measures.map(m => ({ 
+      name: m.name, 
+      duration: `${m.duration.toFixed(2)}ms` 
+    })))
   })
   
   // Check what happens after render

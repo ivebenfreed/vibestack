@@ -43,6 +43,8 @@ function TaskViewLoader({ view }: { view: string }) {
  * - Shared state management via XState atoms
  */
 const Tasks: React.FC = () => {
+  performance.mark('tasks-component-start')
+  console.log('[Performance] Tasks component render started')
   // Get theme and resolve 'system' to actual theme - React Compiler will optimize this
   const { theme } = useTheme()
   const effectiveTheme = theme === 'system' 
@@ -55,10 +57,24 @@ const Tasks: React.FC = () => {
   const currentView = searchParams.view || 'table'
 
   const handleTabChange = (value: string) => {
+    performance.mark('tab-change-start')
+    console.log('[Performance] Tab change started')
+    
+    performance.mark('navigate-start')
     navigate({ 
       to: '/tasks',
       search: { view: value }
     })
+    performance.mark('navigate-end')
+    performance.measure('navigate-duration', 'navigate-start', 'navigate-end')
+    
+    // Measure total tab change after next tick
+    setTimeout(() => {
+      performance.mark('tab-change-end')
+      performance.measure('tab-change-total', 'tab-change-start', 'tab-change-end')
+      const measure = performance.getEntriesByName('tab-change-total')[0]
+      console.log(`[Performance] Tab change took ${measure.duration.toFixed(2)}ms`)
+    }, 0)
   }
 
 
