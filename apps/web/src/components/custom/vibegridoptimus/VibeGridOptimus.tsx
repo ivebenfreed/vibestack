@@ -636,42 +636,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [entityName, columnWidths])
 
-  // Add debugging for column drag and drop
-  React.useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-          const target = mutation.target as HTMLElement
-          if (target.classList.contains('rdg-header-cell')) {
-            const columnKey = target.textContent?.trim()
-            const classList = Array.from(target.classList)
-            console.log('[VibeGridOptimus] 🎯 Header cell class change:', {
-              columnKey,
-              classList,
-              isDragging: classList.includes('rdg-cell-dragging'),
-              isDragOver: classList.includes('rdg-cell-drag-over'),
-              isDraggable: classList.includes('rdg-cell-draggable')
-            })
-          }
-        }
-      })
-    })
-
-    // Start observing class changes on the container
-    const container = document.querySelector('.vibegridoptimus-container')
-    if (container) {
-      observer.observe(container, {
-        attributes: true,
-        attributeFilter: ['class'],
-        subtree: true
-      })
-      console.log('[VibeGridOptimus] 🔍 Started observing class changes for drag debugging')
-    }
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [])
 
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 

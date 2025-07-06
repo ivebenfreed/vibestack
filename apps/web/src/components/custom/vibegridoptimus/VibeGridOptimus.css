@@ -198,68 +198,34 @@
   position: relative;
 }
 
-/* Debug styling to see what's happening */
-.vibegridoptimus-container .rdg-cell-draggable {
-  border: 1px dashed rgba(0, 255, 0, 0.3) !important;
-}
-
+/* Column drag states - polished styling */
 .vibegridoptimus-container .rdg-cell-dragging {
-  border: 2px solid rgba(255, 0, 0, 0.7) !important;
-  background-color: rgba(255, 0, 0, 0.1) !important;
+  opacity: 0.6;
+  transform: rotate(1deg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
 }
 
-/* Match react-data-grid's rdg-cell-drag-over styling with visual drop indicator */
+/* Drop target styling with insertion indicator */
 .vibegridoptimus-container .rdg-cell-drag-over {
   background-color: var(--rdg-header-draggable-background-color) !important;
-  border: 2px solid rgba(0, 0, 255, 0.7) !important;
+  position: relative;
 }
 
-/* Add a visible drop line indicator for the drop target */
+/* Blue insertion line on the left side of drop target */
 .vibegridoptimus-container .rdg-cell-drag-over::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -3px;
-  width: 4px;
+  left: -2px;
+  width: 3px;
   background-color: hsl(var(--primary));
   z-index: 1000;
-  box-shadow: 0 0 6px hsl(var(--primary));
-  animation: dropIndicator 0.5s infinite alternate;
+  box-shadow: 0 0 4px hsl(var(--primary));
+  border-radius: 2px;
 }
 
-@keyframes dropIndicator {
-  from { opacity: 0.6; }
-  to { opacity: 1; }
-}
-
-/* Also try right side indicator */
-.vibegridoptimus-container .rdg-cell-drag-over::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: -3px;
-  width: 4px;
-  background-color: hsl(var(--secondary));
-  z-index: 1000;
-  box-shadow: 0 0 6px hsl(var(--secondary));
-  animation: dropIndicator 0.5s infinite alternate;
-}
-
-/* Dragging column visual feedback */
-.vibegridoptimus-container .rdg-header-cell.rdg-cell-dragging {
-  opacity: 0.5;
-  transform: rotate(2deg);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-}
-
-/* Drag ghost/preview styling */
-.vibegridoptimus-container .rdg-header-cell.rdg-cell-drag-over {
-  background-color: hsl(var(--primary) / 0.1);
-  border-left: 3px solid hsl(var(--primary));
-}
 
 /* Theme support - Override react-data-grid variables with app theme */
 .vibegridoptimus-container .rdg-light,
