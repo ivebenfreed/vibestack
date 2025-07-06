@@ -291,10 +291,6 @@ import {
     resizable: true,
     sortable: true,`;
 
-      if (propertyName === 'id') {
-        output += `
-    frozen: true,`;
-      }
 
       if (!editable) {
         output += `

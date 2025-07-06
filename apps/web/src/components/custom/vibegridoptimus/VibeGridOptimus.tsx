@@ -507,9 +507,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     // System fields (id, createdAt, updatedAt) - always required
     if (column.rdgConfig?.businessLogic?.systemField) return true
     
-    // Frozen columns (typically id) - always required  
-    if (column.frozen) return true
-    
     // Primary business identifiers - entity-specific required fields
     const businessIdentifiers = ['name', 'title', 'email']
     if (businessIdentifiers.includes(column.key as string)) return true
