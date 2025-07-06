@@ -7,7 +7,7 @@ import { useClipboardOps } from './hooks/useClipboardOps'
 import { useGridMachine } from './hooks/useGridMachine'
 import { CellRenderer } from './renderers/CellRenderer'
 import { CellEditor } from './editors/CellEditor'
-import { ColumnVisibilityDropdown } from './ColumnVisibilityDropdown'
+import { VibeGridHeader } from './VibeGridHeader'
 import { GRID_DEFAULTS, CSS_CLASSES } from './utils/constants'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
@@ -686,38 +686,24 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   
 
   return (
-    <div className={`${CSS_CLASSES.container} theme-${theme} ${className} relative`} style={style}>
-      {/* Column visibility dropdown */}
-      <div className="absolute top-2 left-2 z-10">
-        <ColumnVisibilityDropdown
-          columns={rdgColumns}
-          hiddenColumns={hiddenColumns}
-          onToggleColumn={toggleColumnVisibility}
-          isRequiredField={isRequiredField}
-        />
-      </div>
+    <div 
+      className={`${CSS_CLASSES.container} theme-${theme} ${className} flex flex-col`} 
+      style={{ ...style, height }}
+    >
+      {/* Table Header */}
+      <VibeGridHeader
+        columns={rdgColumns}
+        hiddenColumns={hiddenColumns}
+        onToggleColumn={toggleColumnVisibility}
+        isRequiredField={isRequiredField}
+        pendingUpdates={pendingUpdates}
+        gridMachinePendingSaves={gridMachine.pendingSavesCount}
+        isEditing={gridMachine.isEditing}
+        errors={gridMachine.errors}
+      />
       
-      {/* Enhanced state feedback */}
-      {(pendingUpdates > 0 || gridMachine.pendingSavesCount > 0) && (
-        <div className="absolute top-2 right-2 z-10 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
-          {pendingUpdates + gridMachine.pendingSavesCount} pending update{(pendingUpdates + gridMachine.pendingSavesCount) > 1 ? 's' : ''}
-        </div>
-      )}
-      
-      {/* Grid machine status indicators */}
-      {gridMachine.isEditing && (
-        <div className="absolute top-12 left-2 z-10 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
-          ✏️ Editing
-        </div>
-      )}
-      
-      {gridMachine.errors.length > 0 && (
-        <div className="absolute top-12 right-2 z-10 bg-red-500 text-white px-2 py-1 rounded text-xs font-medium">
-          ❌ {gridMachine.errors.length} error{gridMachine.errors.length > 1 ? 's' : ''}
-        </div>
-      )}
-      
-      <div className="flex-1 border border-border rounded-lg overflow-hidden" style={{ height }}>
+      {/* Table Content */}
+      <div className="flex-1 border-l border-r border-b border-border rounded-b-lg overflow-hidden">
         {(() => {
           performance.mark('datagrid-render-start')
           const result = (
@@ -753,7 +739,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               onRowsChange={handleRowsChange}
               rowHeight={35}
               className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}
-              style={{ height: typeof height === 'number' ? height : 600 }}
+              style={{ height: '100%' }}
             />
           )
           performance.mark('datagrid-render-end')

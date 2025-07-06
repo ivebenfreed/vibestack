@@ -8,6 +8,13 @@
   height: 100%;
 }
 
+/* Header styling */
+.vibegrid-header {
+  flex-shrink: 0; /* Prevent header from shrinking */
+  min-height: 40px; /* Ensure minimum header height */
+  background-color: hsl(var(--background));
+}
+
 /* Anti-jump: Consistent padding for normal and edit cells (matches VibeGrid2) */
 .vibegridoptimus-container .rdg-cell,
 .vibegridoptimus-container .rdg-cell[aria-selected="true"] {
@@ -166,33 +173,15 @@
   inline-size: 100%;
 }
 
-/* Column visibility dropdown styling */
-.vibegridoptimus-container .column-visibility-dropdown {
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.375rem;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-}
-
-.vibegridoptimus-container .column-visibility-item {
-  display: flex;
+/* Header status indicators styling */
+.vibegrid-header .status-indicator {
+  display: inline-flex;
   align-items: center;
-  padding: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.vibegridoptimus-container .column-visibility-item:hover {
-  background-color: hsl(var(--muted));
-}
-
-.vibegridoptimus-container .column-visibility-item.disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.vibegridoptimus-container .column-visibility-item.disabled:hover {
-  background-color: transparent;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Theme support - Override react-data-grid variables with app theme */
