@@ -33,6 +33,14 @@
   white-space: nowrap !important;
 }
 
+/* Badge with ellipsis - special handling for flex containers */
+.vibegridoptimus-container .badge.text-overflow-ellipsis {
+  min-width: 0; /* Allow flex item to shrink below content size */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Editable cell styling */
 .vibegridoptimus-cell-editable {
   cursor: pointer;
@@ -57,6 +65,8 @@
   font-size: 0.75rem;
   font-weight: 500;
   border: 1px solid;
+  min-width: 0; /* Allow badges to shrink */
+  max-width: 100%; /* Constrain to container */
 }
 
 .vibegridoptimus-container .badge-primary {

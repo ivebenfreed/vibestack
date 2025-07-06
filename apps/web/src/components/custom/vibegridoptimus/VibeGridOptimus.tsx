@@ -504,8 +504,9 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     number: `${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`,
     textWithOverflow: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`,
     emptyState: "cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors",
-    badgePrimary: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity}`,
-    relationshipContainer: "px-2 flex items-center"
+    badgePrimary: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity} ${CSS_CLASSES.textOverflow}`,
+    badgeMuted: `badge badge-muted ${CSS_CLASSES.cellHoverOpacity} ${CSS_CLASSES.textOverflow}`,
+    relationshipContainer: "px-2 flex items-center min-w-0"
   }
 
   // Pre-extract click handlers to avoid object lookups in render
@@ -715,7 +716,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               
               return (
                 <span 
-                  className="badge badge-muted cursor-pointer hover:opacity-80"
+                  className={precomputedClasses.badgeMuted}
                   {...clickHandler}
                 >
                   {displayValue}
@@ -735,7 +736,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                   </div>
                 )
               }
-              const badgeClass = getBadgeClass(value, column.key) + ' ' + CSS_CLASSES.cellHoverOpacity
+              const badgeClass = getBadgeClass(value, column.key) + ' ' + CSS_CLASSES.cellHoverOpacity + ' ' + CSS_CLASSES.textOverflow
               return (
                 <div className={precomputedClasses.relationshipContainer} {...clickHandler}>
                   <span className={badgeClass}>{value}</span>
