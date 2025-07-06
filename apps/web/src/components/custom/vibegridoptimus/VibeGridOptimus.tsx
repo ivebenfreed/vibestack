@@ -314,22 +314,22 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     // Stop propagation to prevent normal cell selection
     event.stopPropagation()
     
-    // Find the column configuration in the enhanced columns (optimusColumns)
-    const optimusColumn = optimusColumns.find(col => col.key === columnKey)
+    // Find the column configuration in the base RDG columns
+    const rdgColumn = rdgColumns.find(col => col.key === columnKey)
     
     // If column is editable, enter edit mode using the correct react-data-grid API
-    if (optimusColumn?.editable && gridRef.current) {
+    if (rdgColumn?.editable && gridRef.current) {
       console.log('[VibeGridOptimus] 🎯 Entering edit mode for content click:', {
         rowIdx,
         columnKey,
-        columnIdx: optimusColumns.findIndex(col => col.key === columnKey)
+        columnIdx: rdgColumns.findIndex(col => col.key === columnKey)
       })
       
       // Use selectCell with enableEditor option to enter edit mode
-      const columnIdx = optimusColumns.findIndex(col => col.key === columnKey)
+      const columnIdx = rdgColumns.findIndex(col => col.key === columnKey)
       gridRef.current.selectCell({ rowIdx, idx: columnIdx }, { enableEditor: true })
     }
-  }, [optimusColumns])
+  }, [rdgColumns])
   
   // Let individual CellRenderers handle their own registration
   // This avoids duplicate registration and infinite loops
