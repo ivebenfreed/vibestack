@@ -127,18 +127,100 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
      */
     async query(query: string, parameters?: any[], useStructuredResult = false): Promise<any> {
         if (!this.driver || !this.driver.connection) {
-            throw new Error("PGlite connection is not available in the driver.");
+            throw new Error("PGLite connection is not available in the driver.");
         }
 
         const databaseConnection = await this.connect(); // Ensure connection from driver
 
+        // Process the query to convert named parameters to positional parameters
+        let processedQuery = query;
+        let processedParameters = parameters || [];
+        
+        // Check if query contains named parameters (e.g., :orm_param_1)
+        if (query.includes(':')) {
+            // TypeORM issue: Sometimes generates queries with named parameters
+            // We need to convert them to positional parameters for PGLite
+            
+            // First check if this is the specific problematic UPDATE query pattern
+            if (query.includes('UPDATE') && query.includes(':orm_param_') && query.includes('IN ($')) {
+                // This is likely the broken TypeORM update query
+                // The pattern is: UPDATE table SET column = :orm_param_X WHERE id IN ($Y)
+                // But TypeORM only provides the ID parameter, not the value parameter
+                
+                console.warn('[QueryRunner] Detected problematic TypeORM UPDATE query pattern:', {
+                    query,
+                    parameters
+                });
+                
+                // For now, just convert the named parameters to positional
+                // Replace :orm_param_N with $N
+                processedQuery = query.replace(/:orm_param_(\d+)/g, '$$1');
+                
+                // Adjust existing positional parameters
+                // Find all $N in the processed query and renumber them sequentially
+                let paramCounter = 1;
+                const usedParams = new Map<string, string>();
+                
+                processedQuery = processedQuery.replace(/\$(\d+)/g, (match) => {
+                    if (!usedParams.has(match)) {
+                        usedParams.set(match, `$${paramCounter}`);
+                        paramCounter++;
+                    }
+                    return usedParams.get(match)!;
+                });
+                
+                processedParameters = parameters || [];
+            } else {
+                // General case: convert all named parameters to positional
+                const parameterMap = new Map<string, any>();
+                const namedParamRegex = /:(\w+)/g;
+                let match;
+                let paramIndex = 0;
+                
+                // Extract named parameters and map them to values
+                while ((match = namedParamRegex.exec(query)) !== null) {
+                    const paramName = match[1];
+                    if (!parameterMap.has(paramName) && parameters && paramIndex < parameters.length) {
+                        parameterMap.set(paramName, parameters[paramIndex]);
+                        paramIndex++;
+                    }
+                }
+                
+                // Replace named parameters with positional ones
+                let counter = 1;
+                processedQuery = query;
+                parameterMap.forEach((value, name) => {
+                    processedQuery = processedQuery.replace(new RegExp(`:${name}\\b`, 'g'), `$${counter}`);
+                    counter++;
+                });
+                
+                // Extract the values in order
+                processedParameters = Array.from(parameterMap.values());
+                
+                // Handle any remaining parameters that might be for existing positional params
+                if (parameters && paramIndex < parameters.length) {
+                    processedParameters.push(...parameters.slice(paramIndex));
+                }
+            }
+            
+            // Debug logging
+            if (query !== processedQuery) {
+                console.log('[QueryRunner] Converted query with named parameters:', {
+                    original: query,
+                    processed: processedQuery,
+                    originalParams: parameters,
+                    processedParams: processedParameters
+                });
+            }
+        }
+
         // TypeORM logger (comment out the raw query logging in development)
-        // this.driver.connection.logger.logQuery(query, parameters, this as any);
+        // this.driver.connection.logger.logQuery(processedQuery, processedParameters, this as any);
 
         // Concise query logging for debugging
-        const queryType = query.trim().split(' ')[0].toUpperCase();
+        const queryType = processedQuery.trim().split(' ')[0].toUpperCase();
         const isSelect = queryType === 'SELECT';
-        const paramCount = parameters?.length || 0;
+        const paramCount = processedParameters?.length || 0;
         
         // Only log non-SELECT queries and queries with errors in development
         if (!isSelect || paramCount > 0) {
@@ -156,8 +238,8 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
             
             while (attempts < maxAttempts) {
                 try {
-                    // Pass parameters directly to PGLite, just like PostgreSQL QueryRunner does
-                    result = await databaseConnection.query(query, parameters);
+                    // Pass processed parameters to PGLite
+                    result = await databaseConnection.query(processedQuery, processedParameters);
                     break; // Success, exit retry loop
                 } catch (error) {
                     attempts++;
