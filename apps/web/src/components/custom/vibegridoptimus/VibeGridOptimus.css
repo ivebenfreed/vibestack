@@ -193,25 +193,27 @@
   cursor: grabbing;
 }
 
-/* Drop zone indicator for column reordering */
-.vibegridoptimus-container .rdg-header-cell.drop-target-left::before,
-.vibegridoptimus-container .rdg-header-cell.drop-target-right::after {
+/* Drop zone indicator for column reordering - match react-data-grid behavior */
+.vibegridoptimus-container .rdg-header-cell {
+  position: relative;
+}
+
+/* Match react-data-grid's rdg-cell-drag-over styling with visual drop indicator */
+.vibegridoptimus-container .rdg-cell-drag-over {
+  background-color: var(--rdg-header-draggable-background-color) !important;
+}
+
+/* Add a visible drop line indicator */
+.vibegridoptimus-container .rdg-cell-drag-over::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
+  left: -2px;
   width: 3px;
   background-color: hsl(var(--primary));
   z-index: 1000;
   box-shadow: 0 0 4px hsl(var(--primary));
-}
-
-.vibegridoptimus-container .rdg-header-cell.drop-target-left::before {
-  left: -2px;
-}
-
-.vibegridoptimus-container .rdg-header-cell.drop-target-right::after {
-  right: -2px;
 }
 
 /* Dragging column visual feedback */

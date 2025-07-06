@@ -636,6 +636,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [entityName, columnWidths])
 
+
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
   // Filter columns based on visibility settings, protecting required fields
