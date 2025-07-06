@@ -1,6 +1,5 @@
 import React from 'react'
 import type { BaseEntity, CellRendererProps } from '../types'
-import type { GridMachineAPI } from '../types/gridTypes'
 import { TextRenderer } from './TextRenderer'
 import { NumberRenderer } from './NumberRenderer'
 import { EnumRenderer } from './EnumRenderer'
@@ -9,37 +8,18 @@ import { DateRenderer } from './DateRenderer'
 import { BooleanRenderer } from './BooleanRenderer'
 import { CSS_CLASSES } from '../utils/constants'
 
-interface GridCellRendererProps<TEntity extends BaseEntity> extends CellRendererProps<TEntity> {
-  gridMachine?: GridMachineAPI
-}
-
 /**
- * Universal cell renderer with grid machine integration
- * Provides optimistic updates and comprehensive state management
+ * Universal cell renderer that switches based on DataForge cellType
+ * Pure display component - no editing state management
  */
 export function CellRenderer<TEntity extends BaseEntity>(
-  props: GridCellRendererProps<TEntity>
+  props: CellRendererProps<TEntity>
 ): React.ReactNode {
-  const { row, column, value: atomValue, rowIndex, onContentClick, onUpdate, gridMachine } = props
+  const { row, column, value: atomValue, rowIndex, onContentClick, onUpdate } = props
   const { cellType, config, systemField } = column
   
-  // Cell identification - optimize string conversion
-  const cellId = row.id
-  const columnKey = column.key
-  
-  // PERFORMANCE OPTIMIZATION: Only check cell state if grid machine exists and has active states
-  // Most cells are not in edit state, so avoid expensive getCellState calls
-  const hasActiveCellStates = gridMachine?.activeCellCount > 0
-  const cellState = hasActiveCellStates ? gridMachine?.getCellState(cellId, columnKey) : null
-  
-  // Use override value if available, otherwise use atom value naturally
-  const displayValue = cellState?.displayValue ?? atomValue
-  const isEditing = cellState?.isEditing ?? false
-  const hasError = cellState?.hasError ?? false
-  const error = cellState?.error ?? null
-  
-  // No automatic registration - let's simplify and avoid the actor complexity for now
-  // The grid machine will handle state coordination without individual cell actors
+  // Use the provided value directly
+  const displayValue = atomValue
   
   // System fields are read-only
   if (systemField) {
@@ -50,109 +30,43 @@ export function CellRenderer<TEntity extends BaseEntity>(
     )
   }
 
-  // No loading indicators needed - display overrides handle temporary states
-  
-  // Show error state if save failed
-  if (hasError && error) {
-    return (
-      <div className={`${CSS_CLASSES.cell} border-red-200 bg-red-50`} title={`Save failed: ${error}`}>
-        <span className="text-red-600 text-xs">
-          ❌ {renderCellValue(displayValue, cellType, config)}
-        </span>
-      </div>
-    )
-  }
-
-  // PERFORMANCE: Only create click handler if cell is actually editable
-  const handleContentClick = column.config?.editable ? React.useCallback((event: React.MouseEvent) => {
-    if (onContentClick) {
-      // Start cell editing with grid machine - creates simple display override
-      if (gridMachine && onUpdate) {
-        gridMachine.startCellEdit(cellId, columnKey, atomValue, onUpdate)
-      }
-      
+  // Create content click handler - pass through directly to onContentClick
+  const handleContentClick = React.useCallback((event: React.MouseEvent) => {
+    if (onContentClick && column.config?.editable) {
       onContentClick(rowIndex, String(column.key), event)
     }
-  }, [onContentClick, rowIndex, column.key, gridMachine, cellId, columnKey, atomValue, onUpdate]) : undefined
-
-  // Show editing state only
-  const cellClassName = `${isEditing ? 'ring-2 ring-blue-300' : ''}`
+  }, [onContentClick, rowIndex, column.key, column.config?.editable])
 
   // Switch based on cell type for business data
   switch (cellType) {
     case 'text':
-      return (
-        <div className={cellClassName}>
-          <TextRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return <TextRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
       
     case 'number':
-      return (
-        <div className={cellClassName}>
-          <NumberRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return <NumberRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
       
     case 'enum':
-      return (
-        <div className={cellClassName}>
-          <EnumRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return <EnumRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
       
     case 'relationship-single':
     case 'relationship-multi':
     case 'relationship-collection':
-      return (
-        <div className={cellClassName}>
-          <RelationshipRenderer value={displayValue} config={config} cellType={cellType} onContentClick={handleContentClick} />
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return <RelationshipRenderer value={displayValue} config={config} cellType={cellType} onContentClick={handleContentClick} />
       
     case 'boolean':
-      return (
-        <div className={cellClassName}>
-          <BooleanRenderer value={displayValue} onContentClick={handleContentClick} />
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return <BooleanRenderer value={displayValue} onContentClick={handleContentClick} />
       
     case 'date':
-      return (
-        <div className={cellClassName}>
-          <DateRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return <DateRenderer value={displayValue} config={config} onContentClick={handleContentClick} />
       
     case 'uuid':
-      return (
-        <div className={cellClassName}>
-          {renderUUID(displayValue)}
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return renderUUID(displayValue)
       
     case 'json':
-      return (
-        <div className={cellClassName}>
-          {renderJSON(displayValue)}
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return renderJSON(displayValue)
       
     default:
-      return (
-        <div className={cellClassName}>
-          {renderDefault(displayValue)}
-          {/* No loading indicators needed */}
-        </div>
-      )
+      return renderDefault(displayValue)
   }
 }
 

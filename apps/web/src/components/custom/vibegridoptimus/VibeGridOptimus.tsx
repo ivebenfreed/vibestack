@@ -271,8 +271,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return []
   })
   
-  // Use ref instead of state to avoid re-renders on selection
-  const selectedPositionRef = React.useRef<{ row: number; idx: number } | null>(null)
+  // State management for selection (needed for proper edit mode)
+  const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
   
   // Simple optimistic state to prevent flashing
   const [optimisticValues, setOptimisticValues] = React.useState<Record<string, any>>({})
@@ -487,175 +487,50 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
 
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
-  // Enhanced columns with grid machine integration - React Compiler handles optimization
-  const optimusColumns = (() => {
-    performance.mark('column-enhancement-start')
-    const enhancementStart = performance.now()
-    const result = rdgColumns.map((column) => {
-      // Pre-generated columns already have enhanced metadata
-      let mappedColumn = {
-        ...column,
-        // Extract metadata from rdgConfig (already optimized in DataForge)
-        cellType: column.rdgConfig?.cellType || 'text',
-        config: column.rdgConfig?.config || {},
-        systemField: column.rdgConfig?.businessLogic?.systemField || false,
-        businessLogic: column.rdgConfig?.businessLogic || {},
-      }
+  // Add renderers to columns - simple structure like working version
+  const optimusColumns = rdgColumns.map((column) => {
+    // Map RDG column structure to what renderers expect
+    const mappedColumn = {
+      ...column,
+      // Extract metadata from rdgConfig for compatibility with existing renderers
+      cellType: column.rdgConfig?.cellType || 'text',
+      config: column.rdgConfig?.config || {},
+      systemField: column.rdgConfig?.businessLogic?.systemField || false,
+      businessLogic: column.rdgConfig?.businessLogic || {},
+    }
 
-      // Enhance relationship columns with options from relationshipData
-      if (mappedColumn.cellType?.startsWith('relationship')) {
-        const key = column.key as string
-        let targetEntity: string | undefined
-        
-        // First try to get from the DataForge config
-        if (mappedColumn.config?.targetEntity) {
-          targetEntity = mappedColumn.config.targetEntity.toLowerCase()
-        } else {
-          // Fallback to key-based mapping
-          if (key === 'owner' || key === 'assignee' || key === 'author' || key === 'members') {
-            targetEntity = 'user'
-          } else if (key === 'project' || key === 'projectId') {
-            targetEntity = 'project'
-          } else if (key === 'task' || key === 'taskId') {
-            targetEntity = 'task'
-          } else if (key === 'parent') {
-            targetEntity = 'comment'
-          }
-        }
-
-        if (targetEntity) {
-          // Build options only for editing (not for display rendering)
-          let options: Array<{ value: string; label: string }> = []
-          if (targetEntity === 'project') {
-            options = relationshipResolver.getProjectOptions()
-          } else if (targetEntity === 'user') {
-            options = relationshipResolver.getUserOptions()
-          } else if (targetEntity === 'task') {
-            options = relationshipResolver.getTaskOptions()
-          }
-          
-          mappedColumn = {
-            ...mappedColumn,
-            config: {
-              ...mappedColumn.config,
-              targetEntity: targetEntity,
-              options: options
-            }
-          }
-        }
-      }
-
-      // Determine cell classes based on column properties
-      const cellClasses = [
-        'vibegridoptimus-cell',
-        mappedColumn.systemField 
-          ? 'vibegridoptimus-cell-system' 
-          : (column.editable ? 'vibegridoptimus-cell-editable' : '')
-      ].filter(Boolean).join(' ')
-
-      const result = {
-        ...column,
-        // React-data-grid requires this property for edit functionality
-        editable: column.editable || false,
-        // Apply CSS classes to the column for proper cell styling
-        cellClass: cellClasses,
-        // Use dedicated CellRenderer with optimistic value handling
-        renderCell: (props: any) => {
-          const cellKey = `${props.row.id}:${mappedColumn.key}`
-          
-          // PERFORMANCE: Always get fresh atom value to avoid stale data
-          // Use optimistic value if available, otherwise get latest from atom records
-          const value = optimisticValues[cellKey] ?? (() => {
-            // Get the latest value directly from atom records instead of stale props.row
-            if (entityName === 'Task') {
-              const task = tasksRecord[props.row.id]
-              return task?.[mappedColumn.key] ?? props.row[mappedColumn.key]
-            } else if (entityName === 'Project') {
-              const project = projectsRecord[props.row.id]
-              return project?.[mappedColumn.key] ?? props.row[mappedColumn.key]
-            } else if (entityName === 'User') {
-              const user = usersRecord[props.row.id]
-              return user?.[mappedColumn.key] ?? props.row[mappedColumn.key]
-            }
-            return props.row[mappedColumn.key]
-          })()
-          
-          // Debug optimistic state
-          if (optimisticValues[cellKey] !== undefined) {
-            console.log('[RenderCell] 🎨 Using optimistic value:', { 
-              cellKey, 
-              optimistic: optimisticValues[cellKey], 
-              atom: props.row[mappedColumn.key] 
-            })
-          }
-          
-          // Use the proper handleContentClick for click-to-edit functionality
-          const onContentClick = column.editable ? (event: React.MouseEvent) => {
-            handleContentClick(props.rowIdx, String(mappedColumn.key), event)
-          } : undefined
-          
-          // Use dedicated CellRenderer with all the proper multi-badge logic
-          return (
-            <CellRenderer
-              row={props.row}
-              column={{
-                key: mappedColumn.key,
-                cellType: mappedColumn.cellType,
-                config: {
-                  ...mappedColumn.config,
-                  editable: column.editable,
-                  // Add relationship resolver options for proper display
-                  options: (() => {
-                    const targetEntity = mappedColumn.config?.targetEntity?.toLowerCase()
-                    if (targetEntity === 'user') return relationshipResolver.getUserOptions()
-                    if (targetEntity === 'project') return relationshipResolver.getProjectOptions()
-                    if (targetEntity === 'task') return relationshipResolver.getTaskOptions()
-                    return mappedColumn.config?.options || []
-                  })()
-                },
-                systemField: mappedColumn.systemField
-              }}
-              value={value}
-              rowIndex={props.rowIdx}
-              onContentClick={onContentClick}
-              onUpdate={gridMachineOnUpdate}
-              gridMachine={gridMachine}
-            />
-          )
-        }
-      }
-
-      // Add editor for editable cells
-      if (column.editable) {
-        result.renderEditCell = (editProps: any) => (
+    return {
+      ...column,
+      // React-data-grid requires this property for edit functionality
+      editable: column.editable || false,
+      renderCell: (cellProps: any) => (
+        <CellRenderer
+          row={cellProps.row}
+          column={mappedColumn}
+          value={cellProps.row[column.key]}
+          rowIndex={cellProps.rowIdx}
+          onContentClick={handleContentClick}
+        />
+      ),
+      // Rich editor for editable cells
+      ...(column.editable && {
+        renderEditCell: (editProps: any) => (
           <CellEditor
             row={editProps.row}
             column={mappedColumn}
             onRowChange={editProps.onRowChange}
             onClose={editProps.onClose}
-            onUpdate={gridMachineOnUpdate}
-            gridMachine={gridMachine}
-            relationshipData={relationshipData}
+            onUpdate={finalSaveHandler ? gridMachineOnUpdate : undefined}
           />
-        )
-        result.editorOptions = {
+        ),
+        editorOptions: {
           // Only keep background content visible for non-text editors (enums, relationships)
           // Text editors need clean input fields without background content
           displayCellContent: mappedColumn.cellType !== 'text' && mappedColumn.cellType !== 'number'
         }
-      }
-
-      return result
-    })
-    performance.mark('column-enhancement-end')
-    performance.measure('column-enhancement-duration', 'column-enhancement-start', 'column-enhancement-end')
-    const enhancementTime = performance.now() - enhancementStart
-    console.log(`[VibeGridOptimus] 🔧 Column enhancement in ${enhancementTime.toFixed(2)}ms for ${rdgColumns.length} columns`)
-    if (enhancementTime > 10) {
-      console.warn(`[VibeGridOptimus] 🐌 SLOW ENHANCEMENT: ${enhancementTime.toFixed(2)}ms`)
+      })
     }
-    return result
-  })()
+  })
   
   // Handle fill operations for drag-to-fill functionality (using optimusColumns)
   const handleFill = React.useCallback((event: import('react-data-grid').FillEvent<any>): any => {
@@ -779,11 +654,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                   performance.measure('sort-change-duration', 'sort-change-start', 'sort-change-end')
                 }, 100)
               }}
-              selectedPosition={selectedPositionRef.current}
-              onSelectedCellChange={(position) => {
-                console.log('[VibeGridOptimus] 🎯 Cell selection changed (no re-render):', position)
-                selectedPositionRef.current = position
-              }}
+              selectedPosition={selectedPosition}
+              onSelectedCellChange={setSelectedPosition}
               cellNavigationMode="CHANGE_ROW"
               enableVirtualization={true}
               onFill={handleFill}
