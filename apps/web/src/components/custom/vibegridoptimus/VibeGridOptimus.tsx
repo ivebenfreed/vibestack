@@ -201,8 +201,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   const usersRecord = useSelector(usersAtom, (record) => record, shallowEqual)
   const tasksRecord = useSelector(tasksAtom, (record) => record, shallowEqual)
   
-  // Lightweight relationship resolver - no expensive mapping until needed
-  const relationshipResolver = React.useMemo(() => ({
+  // Lightweight relationship resolver - React Compiler handles memoization
+  const relationshipResolver = {
     getProject: (id: string) => {
       const project = projectsRecord[id]
       return project ? { 
@@ -237,15 +237,15 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       value: t.id, 
       label: t.title || `Task ${t.id.slice(0, 8)}` 
     }))
-  }), [projectsRecord, usersRecord, tasksRecord])
+  }
   
   // PERFORMANCE: Empty relationship data for display, resolve lazily for editing
-  const relationshipData = React.useMemo(() => ({
+  const relationshipData = {
     project: [], // Don't build dropdown options until editing
     user: [],
     task: [],
     comment: []
-  }), [])
+  }
   
   // No more configError - pre-generated columns eliminate config issues
   
@@ -298,6 +298,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
           return updated
         })
         console.log('[VibeGridOptimus] ✅ Save completed, optimistic cleared')
+        
       } catch (error) {
         // Keep optimistic value on error
         console.error('[VibeGridOptimus] ❌ Save failed, keeping optimistic:', error)
@@ -328,15 +329,27 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Let individual CellRenderers handle their own registration
   // This avoids duplicate registration and infinite loops
   
-  // Sort data based on React state - persists through re-renders
-  const sortedData = React.useMemo(() => {
+  // Get fresh data from atom records for sorting consistency with cell rendering
+  const freshData = (() => {
+    if (entityName === 'Task') {
+      return Object.values(tasksRecord)
+    } else if (entityName === 'Project') {
+      return Object.values(projectsRecord)
+    } else if (entityName === 'User') {
+      return Object.values(usersRecord)
+    }
+    return data // Fallback to prop data
+  })()
+
+  // Sort data based on React state - React Compiler handles memoization
+  const sortedData = (() => {
     const sortStart = performance.now()
     if (sortColumns.length === 0) {
-      console.log(`[Sort] No sorting needed for ${data.length} items`)
-      return data
+      console.log(`[Sort] No sorting needed for ${freshData.length} items`)
+      return freshData
     }
     
-    const result = [...data].sort((a, b) => {
+    const result = [...freshData].sort((a, b) => {
       for (const sort of sortColumns) {
         const column = rdgColumns.find(col => String(col.key) === sort.columnKey)
         if (!column) continue
@@ -374,12 +387,12 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     })
     
     const sortTime = performance.now() - sortStart
-    console.log(`[Sort] Sorted ${data.length} items in ${sortTime.toFixed(2)}ms`)
+    console.log(`[Sort] Sorted ${freshData.length} items in ${sortTime.toFixed(2)}ms`)
     if (sortTime > 10) {
-      console.warn(`[Sort] 🐌 SLOW SORT: ${sortTime.toFixed(2)}ms for ${data.length} items`)
+      console.warn(`[Sort] 🐌 SLOW SORT: ${sortTime.toFixed(2)}ms for ${freshData.length} items`)
     }
     return result
-  }, [data, sortColumns, rdgColumns])
+  })()
   
   
 
@@ -409,17 +422,17 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     })
   }, [sortedData, finalSaveHandler, processBatch])
 
-  // Create stable renderer functions to avoid recreating on every render
-  const cellRendererProps = React.useMemo(() => ({
+  // Create stable renderer functions - React Compiler handles optimization
+  const cellRendererProps = {
     onContentClick: handleContentClick,
     onUpdate: gridMachineOnUpdate,
     gridMachine: gridMachine
-  }), [handleContentClick, gridMachineOnUpdate, gridMachine])
+  }
   
-  const cellEditorProps = React.useMemo(() => ({
+  const cellEditorProps = {
     onUpdate: gridMachineOnUpdate,
     gridMachine: gridMachine
-  }), [gridMachineOnUpdate, gridMachine])
+  }
 
   // Helper function to get badge CSS classes for enum values
   const getBadgeClass = React.useCallback((value: string, columnKey: string): string => {
@@ -468,7 +481,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   }, [])
 
   // Pre-create click handlers outside render loop for performance
-  const columnClickHandlers = React.useMemo(() => {
+  const columnClickHandlers = (() => {
     const handlers: Record<string, (event: React.MouseEvent, rowIdx: number) => void> = {}
     
     rdgColumns.forEach(column => {
@@ -481,10 +494,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     })
     
     return handlers
-  }, [rdgColumns, handleContentClick])
+  })()
 
   // Pre-compute CSS classes to avoid template literal concatenation in render
-  const precomputedClasses = React.useMemo(() => ({
+  const precomputedClasses = {
     booleanTrue: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-green-600 font-bold`,
     booleanFalse: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-muted-foreground`,
     uuid: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`,
@@ -493,7 +506,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     emptyState: "cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors",
     badgePrimary: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity}`,
     relationshipContainer: "px-2 flex items-center"
-  }), [])
+  }
 
   // Pre-extract click handlers to avoid object lookups in render
   const getClickHandler = React.useCallback((columnKey: string, rowIdx: number) => {
@@ -501,8 +514,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return handler ? { onClick: (event: React.MouseEvent) => handler(event, rowIdx) } : {}
   }, [columnClickHandlers])
 
-  // Enhanced columns with grid machine integration - uses pre-generated config
-  const optimusColumns = React.useMemo(() => {
+  // Enhanced columns with grid machine integration - React Compiler handles optimization
+  const optimusColumns = (() => {
     performance.mark('column-enhancement-start')
     const enhancementStart = performance.now()
     const result = rdgColumns.map((column) => {
@@ -577,8 +590,22 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
         renderCell: (props: any) => {
           const cellKey = `${props.row.id}:${mappedColumn.key}`
           
-          // Use optimistic value if available, otherwise use atom value
-          const value = optimisticValues[cellKey] ?? props.row[mappedColumn.key]
+          // PERFORMANCE: Always get fresh atom value to avoid stale data
+          // Use optimistic value if available, otherwise get latest from atom records
+          const value = optimisticValues[cellKey] ?? (() => {
+            // Get the latest value directly from atom records instead of stale props.row
+            if (entityName === 'Task') {
+              const task = tasksRecord[props.row.id]
+              return task?.[mappedColumn.key] ?? props.row[mappedColumn.key]
+            } else if (entityName === 'Project') {
+              const project = projectsRecord[props.row.id]
+              return project?.[mappedColumn.key] ?? props.row[mappedColumn.key]
+            } else if (entityName === 'User') {
+              const user = usersRecord[props.row.id]
+              return user?.[mappedColumn.key] ?? props.row[mappedColumn.key]
+            }
+            return props.row[mappedColumn.key]
+          })()
           
           // Debug optimistic state
           if (optimisticValues[cellKey] !== undefined) {
@@ -867,7 +894,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       console.warn(`[VibeGridOptimus] 🐌 SLOW ENHANCEMENT: ${enhancementTime.toFixed(2)}ms`)
     }
     return result
-  }, [rdgColumns, relationshipData, columnClickHandlers, gridMachineOnUpdate, gridMachine])
+  })()
   
   // Handle fill operations for drag-to-fill functionality (using optimusColumns)
   const handleFill = React.useCallback((event: import('react-data-grid').FillEvent<any>): any => {
