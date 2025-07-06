@@ -206,10 +206,10 @@
   z-index: 1000;
 }
 
-/* Drop target styling with clean insertion indicator */
+/* Drop target styling with clean insertion indicator - use exact same technique as debug */
 .vibegridoptimus-container .rdg-cell-drag-over {
-  background-color: hsl(var(--primary) / 0.1);
-  border-left: 3px solid hsl(var(--primary)) !important;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6 !important;
   position: relative;
   transition: all 0.2s ease;
 }
