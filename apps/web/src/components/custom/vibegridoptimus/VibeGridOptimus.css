@@ -206,24 +206,12 @@
   z-index: 1000;
 }
 
-/* Drop target styling with insertion indicator */
+/* Drop target styling with clean insertion indicator */
 .vibegridoptimus-container .rdg-cell-drag-over {
-  background-color: hsl(var(--muted) / 0.3);
+  background-color: hsl(var(--primary) / 0.1);
+  border-left: 3px solid hsl(var(--primary)) !important;
   position: relative;
-}
-
-/* Blue insertion line on the left edge (insertion point) */
-.vibegridoptimus-container .rdg-cell-drag-over::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 3px;
-  background-color: hsl(var(--primary));
-  z-index: 1000;
-  box-shadow: 0 0 6px hsl(var(--primary));
-  pointer-events: none;
+  transition: all 0.2s ease;
 }
 
 
