@@ -16,6 +16,31 @@
   transform: none !important;
 }
 
+/* Anti-shift: Make edit inputs match display text exactly */
+.vibegridoptimus-container .rdg-cell input[type="text"],
+.vibegridoptimus-container .rdg-cell input[type="number"],
+.vibegridoptimus-container .rdg-cell textarea {
+  /* Remove all default styling that could cause shifts */
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  
+  /* Match the display text styling exactly */
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: 1.4 !important;
+  color: inherit !important;
+  
+  /* Fill the entire cell */
+  width: 100% !important;
+  height: 100% !important;
+  
+  /* Prevent any box model differences */
+  box-sizing: border-box !important;
+}
+
 /* Ensure drag handle is always visible and functional */
 .vibegridoptimus-container .rdg-cell {
   /* Use flexbox for consistent alignment */

@@ -503,15 +503,22 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       ...column,
       // React-data-grid requires this property for edit functionality
       editable: column.editable || false,
-      renderCell: (cellProps: any) => (
-        <CellRenderer
-          row={cellProps.row}
-          column={mappedColumn}
-          value={cellProps.row[column.key]}
-          rowIndex={cellProps.rowIdx}
-          onContentClick={handleContentClick}
-        />
-      ),
+      renderCell: (cellProps: any) => {
+        const cellKey = `${cellProps.row.id}:${column.key}`
+        
+        // Use optimistic value if available, otherwise use row value
+        const value = optimisticValues[cellKey] ?? cellProps.row[column.key]
+        
+        return (
+          <CellRenderer
+            row={cellProps.row}
+            column={mappedColumn}
+            value={value}
+            rowIndex={cellProps.rowIdx}
+            onContentClick={handleContentClick}
+          />
+        )
+      },
       // Rich editor for editable cells
       ...(column.editable && {
         renderEditCell: (editProps: any) => (
