@@ -166,6 +166,35 @@
   inline-size: 100%;
 }
 
+/* Column visibility dropdown styling */
+.vibegridoptimus-container .column-visibility-dropdown {
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.vibegridoptimus-container .column-visibility-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.vibegridoptimus-container .column-visibility-item:hover {
+  background-color: hsl(var(--muted));
+}
+
+.vibegridoptimus-container .column-visibility-item.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vibegridoptimus-container .column-visibility-item.disabled:hover {
+  background-color: transparent;
+}
+
 /* Theme support - Override react-data-grid variables with app theme */
 .vibegridoptimus-container .rdg-light,
 .vibegridoptimus-container .rdg-dark {

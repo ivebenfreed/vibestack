@@ -7,6 +7,7 @@ import { useClipboardOps } from './hooks/useClipboardOps'
 import { useGridMachine } from './hooks/useGridMachine'
 import { CellRenderer } from './renderers/CellRenderer'
 import { CellEditor } from './editors/CellEditor'
+import { ColumnVisibilityDropdown } from './ColumnVisibilityDropdown'
 import { GRID_DEFAULTS, CSS_CLASSES } from './utils/constants'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
@@ -277,6 +278,22 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   // Simple optimistic state to prevent flashing
   const [optimisticValues, setOptimisticValues] = React.useState<Record<string, any>>({})
   
+  // Column visibility state with persistence
+  const [hiddenColumns, setHiddenColumns] = React.useState<Set<string>>(() => {
+    // Load from localStorage on initial render
+    try {
+      const saved = localStorage.getItem(`vibeGrid-${entityName}-hiddenColumns`)
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[]
+        console.log('[VibeGridOptimus] 📂 Loaded hidden columns:', parsed)
+        return new Set(parsed)
+      }
+    } catch (error) {
+      console.warn('[VibeGridOptimus] ⚠️ Failed to load hidden columns:', error)
+    }
+    return new Set<string>()
+  })
+  
   // Simple optimistic save to prevent flashing
   const gridMachineOnUpdate = async (id: string, column: string, value: any) => {
     console.log('[VibeGridOptimus] 🚀 Save with simple optimistic:', { id, column, value })
@@ -485,10 +502,71 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return `${baseClasses} badge-primary`
   }, [])
 
+  // Helper function to determine if a column is required and cannot be hidden
+  const isRequiredField = React.useCallback((column: any) => {
+    // System fields (id, createdAt, updatedAt) - always required
+    if (column.rdgConfig?.businessLogic?.systemField) return true
+    
+    // Frozen columns (typically id) - always required  
+    if (column.frozen) return true
+    
+    // Primary business identifiers - entity-specific required fields
+    const businessIdentifiers = ['name', 'title', 'email']
+    if (businessIdentifiers.includes(column.key as string)) return true
+    
+    return false
+  }, [])
+
+  // Function to toggle column visibility with persistence
+  const toggleColumnVisibility = React.useCallback((columnKey: string) => {
+    const column = rdgColumns.find(col => col.key === columnKey)
+    if (!column) return
+    
+    // Prevent hiding required fields
+    if (isRequiredField(column)) {
+      console.warn('[VibeGridOptimus] ⚠️ Cannot hide required field:', columnKey)
+      return
+    }
+    
+    setHiddenColumns(prev => {
+      const newHiddenColumns = new Set(prev)
+      
+      if (newHiddenColumns.has(columnKey)) {
+        newHiddenColumns.delete(columnKey)
+      } else {
+        newHiddenColumns.add(columnKey)
+      }
+      
+      // Save to localStorage (filter out any required fields for safety)
+      const saveableHiddenColumns = Array.from(newHiddenColumns).filter(key => {
+        const col = rdgColumns.find(c => c.key === key)
+        return col && !isRequiredField(col)
+      })
+      
+      try {
+        localStorage.setItem(`vibeGrid-${entityName}-hiddenColumns`, JSON.stringify(saveableHiddenColumns))
+        console.log('[VibeGridOptimus] 💾 Saved hidden columns:', saveableHiddenColumns)
+      } catch (error) {
+        console.warn('[VibeGridOptimus] ⚠️ Failed to save hidden columns:', error)
+      }
+      
+      return newHiddenColumns
+    })
+  }, [rdgColumns, isRequiredField, entityName])
+
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
+  // Filter columns based on visibility settings, protecting required fields
+  const visibleColumns = rdgColumns.filter(column => {
+    // Always show required fields, even if in hiddenColumns
+    if (isRequiredField(column)) return true
+    
+    // Hide optional columns that are in hiddenColumns
+    return !hiddenColumns.has(column.key)
+  })
+
   // Add renderers to columns - simple structure like working version
-  const optimusColumns = rdgColumns.map((column) => {
+  const optimusColumns = visibleColumns.map((column) => {
     // Map RDG column structure to what renderers expect
     const mappedColumn = {
       ...column,
@@ -615,6 +693,16 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
 
   return (
     <div className={`${CSS_CLASSES.container} theme-${theme} ${className} relative`} style={style}>
+      {/* Column visibility dropdown */}
+      <div className="absolute top-2 left-2 z-10">
+        <ColumnVisibilityDropdown
+          columns={rdgColumns}
+          hiddenColumns={hiddenColumns}
+          onToggleColumn={toggleColumnVisibility}
+          isRequiredField={isRequiredField}
+        />
+      </div>
+      
       {/* Enhanced state feedback */}
       {(pendingUpdates > 0 || gridMachine.pendingSavesCount > 0) && (
         <div className="absolute top-2 right-2 z-10 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
@@ -624,7 +712,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       
       {/* Grid machine status indicators */}
       {gridMachine.isEditing && (
-        <div className="absolute top-2 left-2 z-10 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
+        <div className="absolute top-12 left-2 z-10 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
           ✏️ Editing
         </div>
       )}
