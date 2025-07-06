@@ -309,22 +309,27 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     }
   }
   
-  // Handle content click for single-click editing
+  // Handle content click for single-click editing (triggered from CellRenderer components)
   const handleContentClick = React.useCallback((rowIdx: number, columnKey: string, event: React.MouseEvent) => {
     // Stop propagation to prevent normal cell selection
     event.stopPropagation()
     
-    // Find the column configuration
-    const rdgColumn = rdgColumns.find(col => col.key === columnKey)
+    // Find the column configuration in the enhanced columns (optimusColumns)
+    const optimusColumn = optimusColumns.find(col => col.key === columnKey)
     
     // If column is editable, enter edit mode using the correct react-data-grid API
-    if (rdgColumn?.editable && gridRef.current) {
+    if (optimusColumn?.editable && gridRef.current) {
+      console.log('[VibeGridOptimus] 🎯 Entering edit mode for content click:', {
+        rowIdx,
+        columnKey,
+        columnIdx: optimusColumns.findIndex(col => col.key === columnKey)
+      })
       
       // Use selectCell with enableEditor option to enter edit mode
-      const columnIdx = rdgColumns.findIndex(col => col.key === columnKey)
+      const columnIdx = optimusColumns.findIndex(col => col.key === columnKey)
       gridRef.current.selectCell({ rowIdx, idx: columnIdx }, { enableEditor: true })
     }
-  }, [rdgColumns])
+  }, [optimusColumns])
   
   // Let individual CellRenderers handle their own registration
   // This avoids duplicate registration and infinite loops
@@ -480,40 +485,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return `${baseClasses} badge-primary`
   }, [])
 
-  // Pre-create click handlers outside render loop for performance
-  const columnClickHandlers = (() => {
-    const handlers: Record<string, (event: React.MouseEvent, rowIdx: number) => void> = {}
-    
-    rdgColumns.forEach(column => {
-      if (column.editable) {
-        handlers[column.key as string] = (event: React.MouseEvent, rowIdx: number) => {
-          event.stopPropagation()
-          handleContentClick(rowIdx, String(column.key), event)
-        }
-      }
-    })
-    
-    return handlers
-  })()
-
-  // Pre-compute CSS classes to avoid template literal concatenation in render
-  const precomputedClasses = {
-    booleanTrue: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-green-600 font-bold`,
-    booleanFalse: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-muted-foreground`,
-    uuid: `${CSS_CLASSES.cellDisplay} ${CSS_CLASSES.cellHover} text-xs font-mono text-muted-foreground ${CSS_CLASSES.textOverflow}`,
-    number: `${CSS_CLASSES.cellDisplayRight} ${CSS_CLASSES.cellHover} text-foreground font-mono`,
-    textWithOverflow: `cursor-pointer px-2 hover:bg-muted rounded text-sm text-foreground transition-colors ${CSS_CLASSES.textOverflow}`,
-    emptyState: "cursor-pointer px-2 hover:bg-muted rounded text-sm text-muted-foreground transition-colors",
-    badgePrimary: `badge badge-primary ${CSS_CLASSES.cellHoverOpacity} ${CSS_CLASSES.textOverflow}`,
-    badgeMuted: `badge badge-muted ${CSS_CLASSES.cellHoverOpacity} ${CSS_CLASSES.textOverflow}`,
-    relationshipContainer: "px-2 flex items-center min-w-0"
-  }
-
-  // Pre-extract click handlers to avoid object lookups in render
-  const getClickHandler = React.useCallback((columnKey: string, rowIdx: number) => {
-    const handler = columnClickHandlers[columnKey]
-    return handler ? { onClick: (event: React.MouseEvent) => handler(event, rowIdx) } : {}
-  }, [columnClickHandlers])
+  // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
   // Enhanced columns with grid machine integration - React Compiler handles optimization
   const optimusColumns = (() => {
@@ -617,9 +589,10 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
             })
           }
           
-          // PERFORMANCE: Use pre-extracted click handlers to avoid lookups and function creation
-          const clickHandler = getClickHandler(column.key as string, props.rowIdx)
-          const onContentClick = clickHandler.onClick ? (event: React.MouseEvent) => clickHandler.onClick!(event) : undefined
+          // Use the proper handleContentClick for click-to-edit functionality
+          const onContentClick = column.editable ? (event: React.MouseEvent) => {
+            handleContentClick(props.rowIdx, String(mappedColumn.key), event)
+          } : undefined
           
           // Use dedicated CellRenderer with all the proper multi-badge logic
           return (
