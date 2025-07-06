@@ -595,19 +595,21 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   }, [rdgColumns, isRequiredField, entityName, sortColumns, setSortColumns])
 
   // Handle column resizing with persistence
-  const handleColumnResize = React.useCallback((columnKey: string, width: number) => {
+  const handleColumnResize = React.useCallback((column: any, width: number) => {
+    const columnKey = column.key
+    console.log('[VibeGridOptimus] 🔧 Column resize event:', { column, columnKey, width })
+    
     setColumnWidths(prev => {
       const newWidths = { ...prev, [columnKey]: width }
+      console.log('[VibeGridOptimus] 📏 Updated column widths:', newWidths)
       
-      // Save to localStorage with debouncing
-      setTimeout(() => {
-        try {
-          localStorage.setItem(`vibeGrid-${entityName}-columnWidths`, JSON.stringify(newWidths))
-          console.log('[VibeGridOptimus] 💾 Saved column widths:', newWidths)
-        } catch (error) {
-          console.warn('[VibeGridOptimus] ⚠️ Failed to save column widths:', error)
-        }
-      }, 300) // Debounce resize events
+      // Save to localStorage immediately for testing
+      try {
+        localStorage.setItem(`vibeGrid-${entityName}-columnWidths`, JSON.stringify(newWidths))
+        console.log('[VibeGridOptimus] 💾 Saved column widths to localStorage:', newWidths)
+      } catch (error) {
+        console.warn('[VibeGridOptimus] ⚠️ Failed to save column widths:', error)
+      }
       
       return newWidths
     })
@@ -626,22 +628,30 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
 
   // Handle column reordering with persistence
   const handleColumnsReorder = React.useCallback((sourceKey: string, targetKey: string) => {
+    console.log('[VibeGridOptimus] 🔄 Column reorder event:', { sourceKey, targetKey })
+    
     const visibleColumnKeys = visibleColumns.map(col => col.key)
     const sourceIndex = visibleColumnKeys.indexOf(sourceKey)
     const targetIndex = visibleColumnKeys.indexOf(targetKey)
     
-    if (sourceIndex === -1 || targetIndex === -1) return
+    console.log('[VibeGridOptimus] 📍 Reorder indices:', { sourceIndex, targetIndex, visibleColumnKeys })
+    
+    if (sourceIndex === -1 || targetIndex === -1) {
+      console.warn('[VibeGridOptimus] ⚠️ Invalid reorder indices')
+      return
+    }
     
     const newOrder = [...visibleColumnKeys]
     const [removed] = newOrder.splice(sourceIndex, 1)
     newOrder.splice(targetIndex, 0, removed)
     
+    console.log('[VibeGridOptimus] 📋 New column order:', newOrder)
     setColumnOrder(newOrder)
     
     // Save to localStorage
     try {
       localStorage.setItem(`vibeGrid-${entityName}-columnOrder`, JSON.stringify(newOrder))
-      console.log('[VibeGridOptimus] 💾 Saved column order:', newOrder)
+      console.log('[VibeGridOptimus] 💾 Saved column order to localStorage:', newOrder)
     } catch (error) {
       console.warn('[VibeGridOptimus] ⚠️ Failed to save column order:', error)
     }
@@ -691,6 +701,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       width: columnWidths[column.key] || column.width,
       // React-data-grid requires this property for edit functionality
       editable: column.editable || false,
+      // Enable column reordering
+      draggable: true,
       renderCell: (cellProps: any) => {
         const cellKey = `${cellProps.row.id}:${column.key}`
         
@@ -853,13 +865,13 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               onCellCopy={handleCellCopy}
               onCellPaste={handleCellPaste}
               onRowsChange={handleRowsChange}
-              // Column resizing support
+              // Column resizing and reordering support
               onColumnsReorder={handleColumnsReorder}
-              onColumnResize={(columnIdx, width) => {
-                const column = optimusColumns[columnIdx]
-                if (column) {
-                  handleColumnResize(column.key, width)
-                }
+              onColumnResize={handleColumnResize}
+              defaultColumnOptions={{
+                resizable: true,
+                sortable: true,
+                draggable: true
               }}
               rowHeight={35}
               className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}
