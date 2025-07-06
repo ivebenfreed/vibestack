@@ -294,6 +294,36 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return new Set<string>()
   })
   
+  // Column widths state with persistence
+  const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(`vibeGrid-${entityName}-columnWidths`)
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, number>
+        console.log('[VibeGridOptimus] 📂 Loaded column widths:', parsed)
+        return parsed
+      }
+    } catch (error) {
+      console.warn('[VibeGridOptimus] ⚠️ Failed to load column widths:', error)
+    }
+    return {}
+  })
+  
+  // Column order state with persistence
+  const [columnOrder, setColumnOrder] = React.useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(`vibeGrid-${entityName}-columnOrder`)
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[]
+        console.log('[VibeGridOptimus] 📂 Loaded column order:', parsed)
+        return parsed
+      }
+    } catch (error) {
+      console.warn('[VibeGridOptimus] ⚠️ Failed to load column order:', error)
+    }
+    return []
+  })
+  
   // Simple optimistic save to prevent flashing
   const gridMachineOnUpdate = async (id: string, column: string, value: any) => {
     console.log('[VibeGridOptimus] 🚀 Save with simple optimistic:', { id, column, value })
@@ -564,6 +594,25 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     })
   }, [rdgColumns, isRequiredField, entityName, sortColumns, setSortColumns])
 
+  // Handle column resizing with persistence
+  const handleColumnResize = React.useCallback((columnKey: string, width: number) => {
+    setColumnWidths(prev => {
+      const newWidths = { ...prev, [columnKey]: width }
+      
+      // Save to localStorage with debouncing
+      setTimeout(() => {
+        try {
+          localStorage.setItem(`vibeGrid-${entityName}-columnWidths`, JSON.stringify(newWidths))
+          console.log('[VibeGridOptimus] 💾 Saved column widths:', newWidths)
+        } catch (error) {
+          console.warn('[VibeGridOptimus] ⚠️ Failed to save column widths:', error)
+        }
+      }, 300) // Debounce resize events
+      
+      return newWidths
+    })
+  }, [entityName])
+
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
   // Filter columns based on visibility settings, protecting required fields
@@ -575,8 +624,57 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return !hiddenColumns.has(column.key)
   })
 
+  // Handle column reordering with persistence
+  const handleColumnsReorder = React.useCallback((sourceKey: string, targetKey: string) => {
+    const visibleColumnKeys = visibleColumns.map(col => col.key)
+    const sourceIndex = visibleColumnKeys.indexOf(sourceKey)
+    const targetIndex = visibleColumnKeys.indexOf(targetKey)
+    
+    if (sourceIndex === -1 || targetIndex === -1) return
+    
+    const newOrder = [...visibleColumnKeys]
+    const [removed] = newOrder.splice(sourceIndex, 1)
+    newOrder.splice(targetIndex, 0, removed)
+    
+    setColumnOrder(newOrder)
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem(`vibeGrid-${entityName}-columnOrder`, JSON.stringify(newOrder))
+      console.log('[VibeGridOptimus] 💾 Saved column order:', newOrder)
+    } catch (error) {
+      console.warn('[VibeGridOptimus] ⚠️ Failed to save column order:', error)
+    }
+  }, [visibleColumns, entityName])
+
+  // Apply column ordering based on saved preferences
+  const orderedColumns = React.useMemo(() => {
+    if (columnOrder.length === 0) {
+      // No saved order, use default order
+      return visibleColumns
+    }
+    
+    // Sort columns based on saved order, keeping any new columns at the end
+    const columnMap = new Map(visibleColumns.map(col => [col.key, col]))
+    const ordered: any[] = []
+    
+    // Add columns in saved order
+    columnOrder.forEach(key => {
+      const column = columnMap.get(key)
+      if (column) {
+        ordered.push(column)
+        columnMap.delete(key)
+      }
+    })
+    
+    // Add any remaining columns (new columns not in saved order)
+    ordered.push(...Array.from(columnMap.values()))
+    
+    return ordered
+  }, [visibleColumns, columnOrder])
+
   // Add renderers to columns - simple structure like working version
-  const optimusColumns = visibleColumns.map((column) => {
+  const optimusColumns = orderedColumns.map((column) => {
     // Map RDG column structure to what renderers expect
     const mappedColumn = {
       ...column,
@@ -589,6 +687,8 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
 
     return {
       ...column,
+      // Apply custom width if available, otherwise use default
+      width: columnWidths[column.key] || column.width,
       // React-data-grid requires this property for edit functionality
       editable: column.editable || false,
       renderCell: (cellProps: any) => {
@@ -753,6 +853,14 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
               onCellCopy={handleCellCopy}
               onCellPaste={handleCellPaste}
               onRowsChange={handleRowsChange}
+              // Column resizing support
+              onColumnsReorder={handleColumnsReorder}
+              onColumnResize={(columnIdx, width) => {
+                const column = optimusColumns[columnIdx]
+                if (column) {
+                  handleColumnResize(column.key, width)
+                }
+              }}
               rowHeight={35}
               className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}
               style={{ height: '100%' }}
