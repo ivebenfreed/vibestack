@@ -451,8 +451,15 @@ import {
         // Set max width based on relationship type
         const maxWidth = relation.type === 'many-to-many' ? 500 : relationWidth * 2;
 
+        // For many-to-one relationships, use the foreign key field name instead of relationship name
+        let columnKey = propertyName;
+        if (relation.type === 'many-to-one') {
+          // Convert relationship name to foreign key field name (e.g., 'project' -> 'projectId')
+          columnKey = `${propertyName}Id`;
+        }
+
         output += `  {
-    key: '${propertyName}',
+    key: '${columnKey}',
     name: '${pascalToWords(propertyName)}',
     width: ${relationWidth},
     minWidth: ${relationMinWidth},

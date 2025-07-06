@@ -27,6 +27,14 @@ export async function createTaskUI(taskData: CreateTaskInput): Promise<Task> {
 }
 
 export async function updateTaskUI(taskId: string, updates: UpdateTaskInput): Promise<Task> {
+  console.log('[TaskDomain] 🎯 updateTaskUI called with:', { 
+    taskId: taskId.slice(-8), 
+    updates,
+    updatesType: typeof updates,
+    updatesKeys: Object.keys(updates),
+    updatesJSON: JSON.stringify(updates)
+  });
+  
   const dependencies = await getTaskDependencies();
   return _updateTaskUI(taskId, updates, dependencies);
 }

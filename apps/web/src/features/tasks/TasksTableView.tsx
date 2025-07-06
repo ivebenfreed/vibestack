@@ -1,9 +1,8 @@
 import React from 'react'
 import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus'
 import { createVibeGrid } from '@/components/custom/vibegridoptimus/hooks/useValidatedVibeGrid'
-import { tasksAtom, getTaskDependencies } from '@/domain/task'
+import { tasksAtom, updateTaskUI } from '@/domain/task'
 import { useTheme } from '@/context/theme-context'
-import { updateTaskUI } from '@repo/dataforge/task-operations'
 
 /**
  * TasksTableView - Separated table view component to isolate createVibeGrid hook
@@ -16,15 +15,20 @@ export default function TasksTableView() {
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : theme
 
-  // Create save handler that uses DataForge operations directly
+  // Create save handler that uses domain wrapper (handles dependencies automatically)
   const handleTaskSave = React.useCallback(async (id: string, column: string, value: any) => {
     console.log('[TasksTableView] 🚀 Save handler called:', { id, column, value })
-    console.log('[TasksTableView] 📍 Checkpoint 1: About to get dependencies')
+    
+    // Build the updates object
+    const updates = { [column]: value }
+    console.log('[TasksTableView] 🔧 Constructed updates object:', updates)
+    console.log('[TasksTableView] 🔧 Updates object type:', typeof updates)
+    console.log('[TasksTableView] 🔧 Updates object keys:', Object.keys(updates))
+    console.log('[TasksTableView] 🔧 Updates object JSON:', JSON.stringify(updates))
+    
     try {
-      // Get dependencies and call DataForge operation directly
-      const dependencies = await getTaskDependencies()
-      console.log('[TasksTableView] 📍 Checkpoint 2: Got dependencies, calling updateTaskUI')
-      await updateTaskUI(id, { [column]: value }, dependencies)
+      // Use domain wrapper that handles dependencies internally
+      await updateTaskUI(id, updates)
       console.log('[TasksTableView] ✅ Task updated successfully')
     } catch (error) {
       console.error('[TasksTableView] ❌ Task update failed:', error)
