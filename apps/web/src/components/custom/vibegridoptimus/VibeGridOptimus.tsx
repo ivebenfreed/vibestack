@@ -594,26 +594,47 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     })
   }, [rdgColumns, isRequiredField, entityName, sortColumns, setSortColumns])
 
-  // Handle column resizing with persistence
+  // Track pending resize to save on mouse up
+  const pendingResizeRef = React.useRef<{ columnKey: string; width: number } | null>(null)
+  
+  // Handle column resizing with mouse-up persistence
   const handleColumnResize = React.useCallback((column: any, width: number) => {
     const columnKey = column.key
     console.log('[VibeGridOptimus] 🔧 Column resize event:', { column, columnKey, width })
     
+    // Update state immediately for visual feedback
     setColumnWidths(prev => {
       const newWidths = { ...prev, [columnKey]: width }
       console.log('[VibeGridOptimus] 📏 Updated column widths:', newWidths)
       
-      // Save to localStorage immediately for testing
-      try {
-        localStorage.setItem(`vibeGrid-${entityName}-columnWidths`, JSON.stringify(newWidths))
-        console.log('[VibeGridOptimus] 💾 Saved column widths to localStorage:', newWidths)
-      } catch (error) {
-        console.warn('[VibeGridOptimus] ⚠️ Failed to save column widths:', error)
-      }
+      // Store pending resize for mouse up save
+      pendingResizeRef.current = { columnKey, width }
       
       return newWidths
     })
-  }, [entityName])
+  }, [])
+  
+  // Save column widths on mouse up
+  React.useEffect(() => {
+    const handleMouseUp = () => {
+      if (pendingResizeRef.current) {
+        const { columnKey, width } = pendingResizeRef.current
+        const currentWidths = { ...columnWidths, [columnKey]: width }
+        
+        try {
+          localStorage.setItem(`vibeGrid-${entityName}-columnWidths`, JSON.stringify(currentWidths))
+          console.log('[VibeGridOptimus] 💾 Saved column widths on mouse up:', currentWidths)
+        } catch (error) {
+          console.warn('[VibeGridOptimus] ⚠️ Failed to save column widths:', error)
+        }
+        
+        pendingResizeRef.current = null
+      }
+    }
+    
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => document.removeEventListener('mouseup', handleMouseUp)
+  }, [entityName, columnWidths])
 
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
