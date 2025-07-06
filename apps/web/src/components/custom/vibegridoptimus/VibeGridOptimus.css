@@ -198,22 +198,53 @@
   position: relative;
 }
 
+/* Debug styling to see what's happening */
+.vibegridoptimus-container .rdg-cell-draggable {
+  border: 1px dashed rgba(0, 255, 0, 0.3) !important;
+}
+
+.vibegridoptimus-container .rdg-cell-dragging {
+  border: 2px solid rgba(255, 0, 0, 0.7) !important;
+  background-color: rgba(255, 0, 0, 0.1) !important;
+}
+
 /* Match react-data-grid's rdg-cell-drag-over styling with visual drop indicator */
 .vibegridoptimus-container .rdg-cell-drag-over {
   background-color: var(--rdg-header-draggable-background-color) !important;
+  border: 2px solid rgba(0, 0, 255, 0.7) !important;
 }
 
-/* Add a visible drop line indicator */
+/* Add a visible drop line indicator for the drop target */
 .vibegridoptimus-container .rdg-cell-drag-over::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -2px;
-  width: 3px;
+  left: -3px;
+  width: 4px;
   background-color: hsl(var(--primary));
   z-index: 1000;
-  box-shadow: 0 0 4px hsl(var(--primary));
+  box-shadow: 0 0 6px hsl(var(--primary));
+  animation: dropIndicator 0.5s infinite alternate;
+}
+
+@keyframes dropIndicator {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+/* Also try right side indicator */
+.vibegridoptimus-container .rdg-cell-drag-over::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 4px;
+  background-color: hsl(var(--secondary));
+  z-index: 1000;
+  box-shadow: 0 0 6px hsl(var(--secondary));
+  animation: dropIndicator 0.5s infinite alternate;
 }
 
 /* Dragging column visual feedback */
