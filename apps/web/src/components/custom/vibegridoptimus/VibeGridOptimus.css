@@ -184,6 +184,50 @@
   white-space: nowrap;
 }
 
+/* Column reordering visual feedback */
+.vibegridoptimus-container .rdg-header-cell[draggable="true"] {
+  cursor: grab;
+}
+
+.vibegridoptimus-container .rdg-header-cell[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Drop zone indicator for column reordering */
+.vibegridoptimus-container .rdg-header-cell.drop-target-left::before,
+.vibegridoptimus-container .rdg-header-cell.drop-target-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: hsl(var(--primary));
+  z-index: 1000;
+  box-shadow: 0 0 4px hsl(var(--primary));
+}
+
+.vibegridoptimus-container .rdg-header-cell.drop-target-left::before {
+  left: -2px;
+}
+
+.vibegridoptimus-container .rdg-header-cell.drop-target-right::after {
+  right: -2px;
+}
+
+/* Dragging column visual feedback */
+.vibegridoptimus-container .rdg-header-cell.rdg-cell-dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+/* Drag ghost/preview styling */
+.vibegridoptimus-container .rdg-header-cell.rdg-cell-drag-over {
+  background-color: hsl(var(--primary) / 0.1);
+  border-left: 3px solid hsl(var(--primary));
+}
+
 /* Theme support - Override react-data-grid variables with app theme */
 .vibegridoptimus-container .rdg-light,
 .vibegridoptimus-container .rdg-dark {
@@ -199,4 +243,9 @@
   --rdg-row-selected-hover-background-color: oklch(var(--accent));
   --rdg-checkbox-focus-color: oklch(var(--ring));
   --rdg-selection-color: oklch(var(--primary));
+  
+  /* Column drag and drop visual feedback */
+  --rdg-drag-handle-color: hsl(var(--primary));
+  --rdg-drag-preview-background: hsl(var(--background));
+  --rdg-drag-preview-border: hsl(var(--border));
 }
