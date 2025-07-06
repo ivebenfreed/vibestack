@@ -524,11 +524,27 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     
     setHiddenColumns(prev => {
       const newHiddenColumns = new Set(prev)
+      const isHiding = !newHiddenColumns.has(columnKey)
       
       if (newHiddenColumns.has(columnKey)) {
         newHiddenColumns.delete(columnKey)
       } else {
         newHiddenColumns.add(columnKey)
+        
+        // Clear sort if hiding a column that's currently being sorted
+        if (isHiding && sortColumns.some(sort => sort.columnKey === columnKey)) {
+          console.log('[VibeGridOptimus] 🔄 Clearing sort for hidden column:', columnKey)
+          setSortColumns(prev => prev.filter(sort => sort.columnKey !== columnKey))
+          
+          // Save updated sort preferences to localStorage
+          const updatedSortColumns = sortColumns.filter(sort => sort.columnKey !== columnKey)
+          try {
+            localStorage.setItem(`vibeGrid-${entityName}-sort`, JSON.stringify(updatedSortColumns))
+            console.log('[VibeGridOptimus] 💾 Updated sort preferences after hiding column')
+          } catch (error) {
+            console.warn('[VibeGridOptimus] ⚠️ Failed to save updated sort preferences:', error)
+          }
+        }
       }
       
       // Save to localStorage (filter out any required fields for safety)
@@ -546,7 +562,7 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       
       return newHiddenColumns
     })
-  }, [rdgColumns, isRequiredField, entityName])
+  }, [rdgColumns, isRequiredField, entityName, sortColumns, setSortColumns])
 
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
