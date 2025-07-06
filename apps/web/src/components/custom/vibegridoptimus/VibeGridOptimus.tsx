@@ -504,9 +504,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
 
   // Helper function to determine if a column is required and cannot be hidden
   const isRequiredField = React.useCallback((column: any) => {
-    // System fields (id, createdAt, updatedAt) - always required
-    if (column.rdgConfig?.businessLogic?.systemField) return true
-    
     // Primary business identifiers - entity-specific required fields
     const businessIdentifiers = ['name', 'title', 'email']
     if (businessIdentifiers.includes(column.key as string)) return true
