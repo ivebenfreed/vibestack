@@ -7,7 +7,6 @@ import { useClipboardOps } from './hooks/useClipboardOps'
 import { useGridMachine } from './hooks/useGridMachine'
 import { CellRenderer } from './renderers/CellRenderer'
 import { CellEditor } from './editors/CellEditor'
-import { VibeGridHeader } from './VibeGridHeader'
 import { GRID_DEFAULTS, CSS_CLASSES } from './utils/constants'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
@@ -17,91 +16,6 @@ import { tasksAtom } from '@/domain/task'
 import 'react-data-grid/lib/styles.css'
 import './VibeGridOptimus.css'
 
-// Deferred DataGrid component to avoid blocking route navigation
-const DeferredDataGrid = React.memo(({ 
-  gridRef, 
-  optimusColumns, 
-  sortedData, 
-  gridMachine, 
-  handleFill, 
-  handleCellCopy, 
-  handleCellPaste, 
-  handleRowsChange, 
-  theme, 
-  height 
-}: {
-  gridRef: React.RefObject<DataGridHandle>
-  optimusColumns: any[]
-  sortedData: any[]
-  gridMachine: any
-  handleFill: any
-  handleCellCopy: any
-  handleCellPaste: any
-  handleRowsChange: any
-  theme: string
-  height: string | number
-}) => {
-  const [showDataGrid, setShowDataGrid] = React.useState(false)
-  
-  React.useEffect(() => {
-    // Defer the heavy DataGrid render to next tick
-    const timer = setTimeout(() => {
-      console.log('[DeferredDataGrid] 🚀 Starting deferred DataGrid render')
-      setShowDataGrid(true)
-    }, 0)
-    
-    return () => clearTimeout(timer)
-  }, [])
-  
-  if (!showDataGrid) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    )
-  }
-  
-  // Log render time when DataGrid actually renders
-  React.useEffect(() => {
-    console.log('[DeferredDataGrid] ✅ DataGrid is now visible')
-  }, [showDataGrid])
-  
-  return (
-    <DataGrid
-      ref={gridRef}
-      columns={optimusColumns}
-      rows={sortedData}
-      sortColumns={gridMachine.sortColumns.map(sc => ({ columnKey: sc.columnKey, direction: sc.direction }))}
-      onSortColumnsChange={(columns) => {
-        const sortColumns = columns.map(col => ({
-          columnKey: col.columnKey,
-          direction: col.direction as 'ASC' | 'DESC'
-        }))
-        gridMachine.setSortColumns(sortColumns)
-      }}
-      selectedPosition={null} // Grid machine handles selection
-      onSelectedCellChange={(position) => {
-        if (position) {
-          const column = optimusColumns[position.idx]
-          if (column) {
-            const row = sortedData[position.rowIdx]
-            if (row) {
-              gridMachine.selectCell(`${row.id}:${column.key}`)
-            }
-          }
-        }
-      }}
-      cellNavigationMode="CHANGE_ROW"
-      enableVirtualization={true}
-      onFill={handleFill}
-      onCellCopy={handleCellCopy}
-      onCellPaste={handleCellPaste}
-      onRowsChange={handleRowsChange}
-      className={`${theme === 'dark' ? 'rdg-dark' : 'rdg-light'} rdg-spreadsheet`}
-      style={{ height }}
-    />
-  )
-})
 
 /**
  * VibeGridOptimus - Clean declarative data grid with comprehensive XState management
@@ -241,12 +155,12 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
   }
   
   // PERFORMANCE: Empty relationship data for display, resolve lazily for editing
-  const relationshipData = {
+  const relationshipData = React.useMemo(() => ({
     project: [], // Don't build dropdown options until editing
     user: [],
     task: [],
     comment: []
-  }
+  }), [])
   
   // No more configError - pre-generated columns eliminate config issues
   
@@ -272,57 +186,12 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return []
   })
   
-  // State management for selection (needed for proper edit mode)
-  const [selectedPosition, setSelectedPosition] = React.useState<{ row: number; idx: number } | null>(null)
+  // Use ref instead of state to avoid re-renders on selection
+  const selectedPositionRef = React.useRef<{ row: number; idx: number } | null>(null)
   
   // Simple optimistic state to prevent flashing
   const [optimisticValues, setOptimisticValues] = React.useState<Record<string, any>>({})
   
-  // Column visibility state with persistence
-  const [hiddenColumns, setHiddenColumns] = React.useState<Set<string>>(() => {
-    // Load from localStorage on initial render
-    try {
-      const saved = localStorage.getItem(`vibeGrid-${entityName}-hiddenColumns`)
-      if (saved) {
-        const parsed = JSON.parse(saved) as string[]
-        console.log('[VibeGridOptimus] 📂 Loaded hidden columns:', parsed)
-        return new Set(parsed)
-      }
-    } catch (error) {
-      console.warn('[VibeGridOptimus] ⚠️ Failed to load hidden columns:', error)
-    }
-    return new Set<string>()
-  })
-  
-  // Column widths state with persistence
-  const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>(() => {
-    try {
-      const saved = localStorage.getItem(`vibeGrid-${entityName}-columnWidths`)
-      if (saved) {
-        const parsed = JSON.parse(saved) as Record<string, number>
-        console.log('[VibeGridOptimus] 📂 Loaded column widths:', parsed)
-        return parsed
-      }
-    } catch (error) {
-      console.warn('[VibeGridOptimus] ⚠️ Failed to load column widths:', error)
-    }
-    return {}
-  })
-  
-  // Column order state with persistence
-  const [columnOrder, setColumnOrder] = React.useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`vibeGrid-${entityName}-columnOrder`)
-      if (saved) {
-        const parsed = JSON.parse(saved) as string[]
-        console.log('[VibeGridOptimus] 📂 Loaded column order:', parsed)
-        return parsed
-      }
-    } catch (error) {
-      console.warn('[VibeGridOptimus] ⚠️ Failed to load column order:', error)
-    }
-    return []
-  })
   
   // Simple optimistic save to prevent flashing
   const gridMachineOnUpdate = async (id: string, column: string, value: any) => {
@@ -474,17 +343,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     })
   }, [sortedData, finalSaveHandler, processBatch])
 
-  // Create stable renderer functions - React Compiler handles optimization
-  const cellRendererProps = {
-    onContentClick: handleContentClick,
-    onUpdate: gridMachineOnUpdate,
-    gridMachine: gridMachine
-  }
-  
-  const cellEditorProps = {
-    onUpdate: gridMachineOnUpdate,
-    gridMachine: gridMachine
-  }
 
   // Helper function to get badge CSS classes for enum values
   const getBadgeClass = React.useCallback((value: string, columnKey: string): string => {
@@ -532,212 +390,99 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     return `${baseClasses} badge-primary`
   }, [])
 
-  // Helper function to determine if a column is required and cannot be hidden
-  const isRequiredField = React.useCallback((column: any) => {
-    // Primary business identifiers - entity-specific required fields
-    const businessIdentifiers = ['name', 'title', 'email']
-    if (businessIdentifiers.includes(column.key as string)) return true
-    
-    return false
-  }, [])
-
-  // Function to toggle column visibility with persistence
-  const toggleColumnVisibility = React.useCallback((columnKey: string) => {
-    const column = rdgColumns.find(col => col.key === columnKey)
-    if (!column) return
-    
-    // Prevent hiding required fields
-    if (isRequiredField(column)) {
-      console.warn('[VibeGridOptimus] ⚠️ Cannot hide required field:', columnKey)
-      return
-    }
-    
-    setHiddenColumns(prev => {
-      const newHiddenColumns = new Set(prev)
-      const isHiding = !newHiddenColumns.has(columnKey)
-      
-      if (newHiddenColumns.has(columnKey)) {
-        newHiddenColumns.delete(columnKey)
-      } else {
-        newHiddenColumns.add(columnKey)
-        
-        // Clear sort if hiding a column that's currently being sorted
-        if (isHiding && sortColumns.some(sort => sort.columnKey === columnKey)) {
-          console.log('[VibeGridOptimus] 🔄 Clearing sort for hidden column:', columnKey)
-          setSortColumns(prev => prev.filter(sort => sort.columnKey !== columnKey))
-          
-          // Save updated sort preferences to localStorage
-          const updatedSortColumns = sortColumns.filter(sort => sort.columnKey !== columnKey)
-          try {
-            localStorage.setItem(`vibeGrid-${entityName}-sort`, JSON.stringify(updatedSortColumns))
-            console.log('[VibeGridOptimus] 💾 Updated sort preferences after hiding column')
-          } catch (error) {
-            console.warn('[VibeGridOptimus] ⚠️ Failed to save updated sort preferences:', error)
-          }
-        }
-      }
-      
-      // Save to localStorage (filter out any required fields for safety)
-      const saveableHiddenColumns = Array.from(newHiddenColumns).filter(key => {
-        const col = rdgColumns.find(c => c.key === key)
-        return col && !isRequiredField(col)
-      })
-      
-      try {
-        localStorage.setItem(`vibeGrid-${entityName}-hiddenColumns`, JSON.stringify(saveableHiddenColumns))
-        console.log('[VibeGridOptimus] 💾 Saved hidden columns:', saveableHiddenColumns)
-      } catch (error) {
-        console.warn('[VibeGridOptimus] ⚠️ Failed to save hidden columns:', error)
-      }
-      
-      return newHiddenColumns
-    })
-  }, [rdgColumns, isRequiredField, entityName, sortColumns, setSortColumns])
-
-  // Track pending resize to save on mouse up
-  const pendingResizeRef = React.useRef<{ columnKey: string; width: number } | null>(null)
-  
-  // Handle column resizing with mouse-up persistence
-  const handleColumnResize = React.useCallback((column: any, width: number) => {
-    const columnKey = column.key
-    console.log('[VibeGridOptimus] 🔧 Column resize event:', { column, columnKey, width })
-    
-    // Update state immediately for visual feedback
-    setColumnWidths(prev => {
-      const newWidths = { ...prev, [columnKey]: width }
-      console.log('[VibeGridOptimus] 📏 Updated column widths:', newWidths)
-      
-      // Store pending resize for mouse up save
-      pendingResizeRef.current = { columnKey, width }
-      
-      return newWidths
-    })
-  }, [])
-  
-  // Save column widths on mouse up
-  React.useEffect(() => {
-    const handleMouseUp = () => {
-      if (pendingResizeRef.current) {
-        const { columnKey, width } = pendingResizeRef.current
-        const currentWidths = { ...columnWidths, [columnKey]: width }
-        
-        try {
-          localStorage.setItem(`vibeGrid-${entityName}-columnWidths`, JSON.stringify(currentWidths))
-          console.log('[VibeGridOptimus] 💾 Saved column widths on mouse up:', currentWidths)
-        } catch (error) {
-          console.warn('[VibeGridOptimus] ⚠️ Failed to save column widths:', error)
-        }
-        
-        pendingResizeRef.current = null
-      }
-    }
-    
-    document.addEventListener('mouseup', handleMouseUp)
-    return () => document.removeEventListener('mouseup', handleMouseUp)
-  }, [entityName, columnWidths])
 
 
   // Note: Click handling is now done through the proper handleContentClick passed to CellRenderer
 
-  // Filter columns based on visibility settings, protecting required fields
-  const visibleColumns = rdgColumns.filter(column => {
-    // Always show required fields, even if in hiddenColumns
-    if (isRequiredField(column)) return true
+  // Pre-create click handlers outside render loop for performance
+  const columnClickHandlers = React.useMemo(() => {
+    const handlers: Record<string, (event: React.MouseEvent, rowIdx: number) => void> = {}
     
-    // Hide optional columns that are in hiddenColumns
-    return !hiddenColumns.has(column.key)
-  })
-
-  // Handle column reordering with persistence
-  const handleColumnsReorder = React.useCallback((sourceKey: string, targetKey: string) => {
-    console.log('[VibeGridOptimus] 🔄 Column reorder event:', { sourceKey, targetKey })
-    
-    const visibleColumnKeys = visibleColumns.map(col => col.key)
-    const sourceIndex = visibleColumnKeys.indexOf(sourceKey)
-    const targetIndex = visibleColumnKeys.indexOf(targetKey)
-    
-    console.log('[VibeGridOptimus] 📍 Reorder indices:', { sourceIndex, targetIndex, visibleColumnKeys })
-    
-    if (sourceIndex === -1 || targetIndex === -1) {
-      console.warn('[VibeGridOptimus] ⚠️ Invalid reorder indices')
-      return
-    }
-    
-    const newOrder = [...visibleColumnKeys]
-    const [removed] = newOrder.splice(sourceIndex, 1)
-    newOrder.splice(targetIndex, 0, removed)
-    
-    console.log('[VibeGridOptimus] 📋 New column order:', newOrder)
-    setColumnOrder(newOrder)
-    
-    // Save to localStorage
-    try {
-      localStorage.setItem(`vibeGrid-${entityName}-columnOrder`, JSON.stringify(newOrder))
-      console.log('[VibeGridOptimus] 💾 Saved column order to localStorage:', newOrder)
-    } catch (error) {
-      console.warn('[VibeGridOptimus] ⚠️ Failed to save column order:', error)
-    }
-  }, [visibleColumns, entityName])
-
-  // Apply column ordering based on saved preferences
-  const orderedColumns = React.useMemo(() => {
-    if (columnOrder.length === 0) {
-      // No saved order, use default order
-      return visibleColumns
-    }
-    
-    // Sort columns based on saved order, keeping any new columns at the end
-    const columnMap = new Map(visibleColumns.map(col => [col.key, col]))
-    const ordered: any[] = []
-    
-    // Add columns in saved order
-    columnOrder.forEach(key => {
-      const column = columnMap.get(key)
-      if (column) {
-        ordered.push(column)
-        columnMap.delete(key)
+    rdgColumns.forEach(column => {
+      if (column.editable) {
+        handlers[column.key as string] = (event: React.MouseEvent, rowIdx: number) => {
+          event.stopPropagation()
+          handleContentClick(rowIdx, String(column.key), event)
+        }
       }
     })
     
-    // Add any remaining columns (new columns not in saved order)
-    ordered.push(...Array.from(columnMap.values()))
-    
-    return ordered
-  }, [visibleColumns, columnOrder])
+    return handlers
+  }, [rdgColumns, handleContentClick])
 
-  // Add renderers to columns - simple structure like working version
-  const optimusColumns = orderedColumns.map((column) => {
-    // Map RDG column structure to what renderers expect
-    const mappedColumn = {
+  // Add renderers to columns with proper relationship resolution
+  const optimusColumns = React.useMemo(() => {
+    return rdgColumns.map((column) => {
+    // Pre-generated columns already have enhanced metadata
+    let mappedColumn = {
       ...column,
-      // Extract metadata from rdgConfig for compatibility with existing renderers
+      // Extract metadata from rdgConfig (already optimized in DataForge)
       cellType: column.rdgConfig?.cellType || 'text',
       config: column.rdgConfig?.config || {},
       systemField: column.rdgConfig?.businessLogic?.systemField || false,
       businessLogic: column.rdgConfig?.businessLogic || {},
     }
 
+    // Enhance relationship columns with options from relationshipResolver
+    if (mappedColumn.cellType?.startsWith('relationship')) {
+      const key = column.key as string
+      let targetEntity: string | undefined
+      
+      // First try to get from the DataForge config
+      if (mappedColumn.config?.targetEntity) {
+        targetEntity = mappedColumn.config.targetEntity.toLowerCase()
+      } else {
+        // Fallback to key-based mapping
+        if (key === 'owner' || key === 'assignee' || key === 'author' || key === 'members') {
+          targetEntity = 'user'
+        } else if (key === 'project' || key === 'projectId') {
+          targetEntity = 'project'
+        } else if (key === 'task' || key === 'taskId') {
+          targetEntity = 'task'
+        } else if (key === 'parent') {
+          targetEntity = 'comment'
+        }
+      }
+
+      if (targetEntity) {
+        // Don't build options here - keep empty for lazy loading
+        mappedColumn = {
+          ...mappedColumn,
+          config: {
+            ...mappedColumn.config,
+            targetEntity: targetEntity
+          }
+        }
+      }
+    }
+
     return {
       ...column,
-      // Apply custom width if available, otherwise use default
-      width: columnWidths[column.key] || column.width,
       // React-data-grid requires this property for edit functionality
       editable: column.editable || false,
-      // Enable column reordering
-      draggable: true,
-      renderCell: (cellProps: any) => {
-        const cellKey = `${cellProps.row.id}:${column.key}`
+      // Use dedicated CellRenderer with optimistic value handling
+      renderCell: (props: any) => {
+        const cellKey = `${props.row.id}:${mappedColumn.key}`
         
         // Use optimistic value if available, otherwise use row value
-        const value = optimisticValues[cellKey] ?? cellProps.row[column.key]
+        const value = optimisticValues[cellKey] ?? props.row[column.key]
         
         return (
           <CellRenderer
-            row={cellProps.row}
-            column={mappedColumn}
+            row={props.row}
+            column={{
+              key: mappedColumn.key,
+              cellType: mappedColumn.cellType,
+              config: {
+                ...mappedColumn.config,
+                editable: column.editable
+              },
+              systemField: mappedColumn.systemField
+            }}
             value={value}
-            rowIndex={cellProps.rowIdx}
+            rowIndex={props.rowIdx}
             onContentClick={handleContentClick}
+            relationshipResolver={relationshipResolver}
           />
         )
       },
@@ -760,6 +505,19 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       })
     }
   })
+  }, [rdgColumns, relationshipResolver, columnClickHandlers, gridMachineOnUpdate, finalSaveHandler, optimisticValues, handleContentClick])
+
+  // Create stable renderer functions to avoid recreating on every render
+  const cellRendererProps = React.useMemo(() => ({
+    onContentClick: handleContentClick,
+    onUpdate: gridMachineOnUpdate,
+    gridMachine: gridMachine
+  }), [handleContentClick, gridMachineOnUpdate, gridMachine])
+  
+  const cellEditorProps = React.useMemo(() => ({
+    onUpdate: gridMachineOnUpdate,
+    gridMachine: gridMachine
+  }), [gridMachineOnUpdate, gridMachine])
   
   // Handle fill operations for drag-to-fill functionality (using optimusColumns)
   const handleFill = React.useCallback((event: import('react-data-grid').FillEvent<any>): any => {
@@ -840,17 +598,6 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
       className={`${CSS_CLASSES.container} theme-${theme} ${className} flex flex-col`} 
       style={{ ...style, height }}
     >
-      {/* Table Header */}
-      <VibeGridHeader
-        columns={rdgColumns}
-        hiddenColumns={hiddenColumns}
-        onToggleColumn={toggleColumnVisibility}
-        isRequiredField={isRequiredField}
-        pendingUpdates={pendingUpdates}
-        gridMachinePendingSaves={gridMachine.pendingSavesCount}
-        isEditing={gridMachine.isEditing}
-        errors={gridMachine.errors}
-      />
       
       {/* Table Content */}
       <div className="flex-1 border-l border-r border-b border-border rounded-b-lg overflow-hidden">
@@ -879,21 +626,19 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
                   performance.measure('sort-change-duration', 'sort-change-start', 'sort-change-end')
                 }, 100)
               }}
-              selectedPosition={selectedPosition}
-              onSelectedCellChange={setSelectedPosition}
+              selectedPosition={selectedPositionRef.current}
+              onSelectedCellChange={(position) => {
+                console.log('[VibeGridOptimus] 🎯 Cell selection changed (no re-render):', position)
+                selectedPositionRef.current = position
+              }}
               cellNavigationMode="CHANGE_ROW"
               enableVirtualization={true}
               onFill={handleFill}
               onCellCopy={handleCellCopy}
               onCellPaste={handleCellPaste}
               onRowsChange={handleRowsChange}
-              // Column resizing and reordering support
-              onColumnsReorder={handleColumnsReorder}
-              onColumnResize={handleColumnResize}
               defaultColumnOptions={{
-                resizable: true,
-                sortable: true,
-                draggable: true
+                sortable: true
               }}
               rowHeight={35}
               className={`fill-grid rdg-${effectiveTheme === 'dark' ? 'dark' : 'light'} rdg-spreadsheet`}

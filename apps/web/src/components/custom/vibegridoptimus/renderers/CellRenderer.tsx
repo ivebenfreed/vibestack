@@ -15,7 +15,7 @@ import { CSS_CLASSES } from '../utils/constants'
 export function CellRenderer<TEntity extends BaseEntity>(
   props: CellRendererProps<TEntity>
 ): React.ReactNode {
-  const { row, column, value: atomValue, rowIndex, onContentClick, onUpdate } = props
+  const { row, column, value: atomValue, rowIndex, onContentClick, onUpdate, relationshipResolver } = props
   const { cellType, config, systemField } = column
   
   // Use the provided value directly
@@ -51,7 +51,7 @@ export function CellRenderer<TEntity extends BaseEntity>(
     case 'relationship-single':
     case 'relationship-multi':
     case 'relationship-collection':
-      return <RelationshipRenderer value={displayValue} config={config} cellType={cellType} onContentClick={handleContentClick} />
+      return <RelationshipRenderer value={displayValue} config={config} cellType={cellType} onContentClick={handleContentClick} relationshipResolver={relationshipResolver} column={column} />
       
     case 'boolean':
       return <BooleanRenderer value={displayValue} onContentClick={handleContentClick} />

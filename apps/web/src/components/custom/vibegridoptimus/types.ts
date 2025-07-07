@@ -117,6 +117,7 @@ export interface CellRendererProps<TEntity extends BaseEntity> {
   rowIndex: number
   onContentClick?: (rowIndex: number, columnKey: string, event: React.MouseEvent) => void  // Content-specific click for edit mode
   onUpdate?: (id: string, updates: Partial<TEntity>) => Promise<void>  // For direct updates (legacy)
+  relationshipResolver?: any  // Resolver functions for foreign key relationships
 }
 
 /**

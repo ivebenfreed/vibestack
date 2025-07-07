@@ -72,17 +72,29 @@ function renderSingleRelationship(
     )
   }
   
-  // Badge display with options
-  if (config?.options) {
-    const compareValue = typeof value === 'object' && value?.id ? value.id : value
-    const selectedOption = config.options.find((opt: any) => opt.value === compareValue)
-    if (selectedOption) {
+  // PERFORMANCE: Use relationship resolver for efficient single-value lookup
+  if (relationshipResolver && value && typeof value === 'string') {
+    const targetEntity = config?.targetEntity?.toLowerCase() || 
+      (column?.key === 'owner' || column?.key === 'assignee' || column?.key === 'author' ? 'user' :
+       column?.key === 'project' || column?.key === 'projectId' ? 'project' :
+       column?.key === 'task' || column?.key === 'taskId' ? 'task' : null)
+    
+    let resolved = null
+    if (targetEntity === 'project') {
+      resolved = relationshipResolver.getProject(value)
+    } else if (targetEntity === 'user') {
+      resolved = relationshipResolver.getUser(value)
+    } else if (targetEntity === 'task') {
+      resolved = relationshipResolver.getTask(value)
+    }
+    
+    if (resolved) {
       return (
         <span 
           className={`${CSS_CLASSES.badge} ${CSS_CLASSES.primaryBadge} ${onContentClick ? CSS_CLASSES.cellHoverOpacity : ''}`}
           onClick={onContentClick}
         >
-          {selectedOption.label}
+          {resolved.label}
         </span>
       )
     }
