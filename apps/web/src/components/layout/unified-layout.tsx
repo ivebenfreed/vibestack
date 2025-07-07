@@ -61,16 +61,16 @@ const RefreshButton = () => {
         )
       }
       
-      // Use soft reload instead of hard reload to preserve routing state
+      // Navigate to root after refresh to avoid service worker redirect issues
       setTimeout(() => {
-        // Soft reload - preserves current route
-        window.location.reload()
+        // Navigate to root instead of reloading current route to avoid SW redirect errors
+        window.location.href = '/'
       }, 300)
       
     } catch (error) {
       console.error('Failed to refresh:', error)
-      // Fallback to simple reload
-      window.location.reload()
+      // Fallback to navigate to root
+      window.location.href = '/'
     }
   }
   
