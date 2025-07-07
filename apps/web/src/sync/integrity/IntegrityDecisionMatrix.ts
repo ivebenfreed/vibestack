@@ -362,6 +362,78 @@ export const VALIDATION_STRATEGY_MATRIX: DecisionMatrix = {
 };
 
 // ============================================================================
+// Rollback Action Matrix
+// ============================================================================
+
+export const ROLLBACK_ACTION_MATRIX: DecisionMatrix = {
+  id: 'rollback_action',
+  description: 'Handle server validation responses with rollback recommendations',
+  
+  conditions: [
+    {
+      id: 'validation_recommends_reset',
+      description: 'Server validation recommends full reset',
+      evaluate: 'context.validationResult?.recommendedAction === "reset"',
+      priority: 100
+    },
+    {
+      id: 'validation_recommends_catchup_with_rollback',
+      description: 'Server validation recommends catchup with LSN rollback',
+      evaluate: 'context.validationResult?.recommendedAction === "catchup" && context.validationResult?.rollbackToLSN',
+      priority: 90
+    },
+    {
+      id: 'validation_recommends_catchup_no_rollback',
+      description: 'Server validation recommends catchup without rollback',
+      evaluate: 'context.validationResult?.recommendedAction === "catchup" && !context.validationResult?.rollbackToLSN',
+      priority: 80
+    },
+    {
+      id: 'validation_successful',
+      description: 'Validation passed successfully',
+      evaluate: 'context.validationResult?.isValid === true',
+      priority: 70
+    }
+  ],
+  
+  actions: {
+    'EXECUTE_RESET': {
+      id: 'EXECUTE_RESET',
+      type: 'RESET',
+      reason: 'Server validation recommends full reset - executing reset',
+      metadata: { resetType: 'full_reset', cause: 'server_validation_recommendation' }
+    },
+    'EXECUTE_ROLLBACK_CATCHUP': {
+      id: 'EXECUTE_ROLLBACK_CATCHUP',
+      type: 'VALIDATION',
+      strategy: 'rollback_catchup',
+      reason: 'Server recommends rollback and catchup - executing partial rollback',
+      metadata: { 
+        requiresRollback: true,
+        syncType: 'catchup_with_rollback'
+      }
+    },
+    'EXECUTE_STANDARD_CATCHUP': {
+      id: 'EXECUTE_STANDARD_CATCHUP',
+      type: 'VALIDATION',
+      strategy: 'standard_catchup',
+      reason: 'Server recommends catchup - executing standard catchup sync',
+      metadata: { 
+        syncType: 'standard_catchup'
+      }
+    },
+    'VALIDATION_PASSED': {
+      id: 'VALIDATION_PASSED',
+      type: 'SKIP',
+      reason: 'Validation passed - no action required',
+      metadata: { validationSuccessful: true }
+    }
+  },
+  
+  defaultAction: 'VALIDATION_PASSED'
+};
+
+// ============================================================================
 // Complete Decision Pipeline
 // ============================================================================
 
@@ -370,6 +442,11 @@ export const INTEGRITY_DECISION_PIPELINE = [
   BASELINE_ASSESSMENT_MATRIX,
   CHANGE_VOLUME_MATRIX,
   VALIDATION_STRATEGY_MATRIX
+] as const;
+
+// Extended pipeline for handling validation responses
+export const INTEGRITY_RESPONSE_PIPELINE = [
+  ROLLBACK_ACTION_MATRIX
 ] as const;
 
 // ============================================================================

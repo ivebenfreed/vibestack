@@ -157,6 +157,8 @@ export interface ServerIntegrityValidationResponseMessage extends ServerMessage 
   recommendedAction: 'none' | 'catchup' | 'reset';
   serverFingerprints: Record<string, any>;
   validationTimestamp: number;
+  rollbackToLSN?: string; // LSN to roll back to before starting catchup
+  rollbackReason?: string; // Explanation for the rollback recommendation
 }
 
 /**

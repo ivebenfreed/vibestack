@@ -49,10 +49,12 @@ export interface IntegrityValidationRequest {
 export interface IntegrityValidationResult {
   isValid: boolean;
   issues: any[];
-  recommendedAction: 'none' | 'retry' | 'reset';
+  recommendedAction: 'none' | 'retry' | 'reset' | 'catchup';
   validationType?: string;
   resetReason?: string;
   serverResponse?: any;
+  rollbackToLSN?: string; // LSN to roll back to for catchup
+  rollbackReason?: string; // Explanation for the rollback
 }
 
 export interface IntegrityResetResult {
@@ -183,35 +185,47 @@ export class IntegrityService {
         recommendedAction: result.recommendedAction
       });
 
-      // Auto-execute reset if recommended by validator
-      if (result.recommendedAction === 'reset' && this.config.autoResetOnFailure) {
-        console.log(`[IntegrityService] Auto-executing reset due to validation recommendation: ${result.resetReason}`);
-        
-        try {
-          const resetResult = await this.reset.executeReset(
-            result.resetReason || `Validation failure: ${reason}`,
-            'full_reset'
-          );
+      // Auto-execute actions based on validation recommendations
+      if (this.config.autoResetOnFailure) {
+        if (result.recommendedAction === 'reset') {
+          console.log(`[IntegrityService] Auto-executing reset due to validation recommendation: ${result.resetReason}`);
           
-          if (resetResult.success) {
-            console.log(`[IntegrityService] ✅ Auto-reset completed successfully`);
-            // Return a successful validation result after reset
-            return {
-              isValid: true,
-              issues: [],
-              recommendedAction: 'none',
-              validationType: 'auto_reset_completed',
-              resetReason: `Auto-reset completed: ${result.resetReason}`
-            };
-          } else {
-            console.error(`[IntegrityService] ❌ Auto-reset failed:`, resetResult.error);
-            // Return the original validation failure if reset failed
-            return result;
+          try {
+            const resetResult = await this.reset.executeReset(
+              result.resetReason || `Validation failure: ${reason}`,
+              'full_reset'
+            );
+            
+            if (resetResult.success) {
+              console.log(`[IntegrityService] ✅ Auto-reset completed successfully`);
+            }
+          } catch (resetError) {
+            console.error('[IntegrityService] Auto-reset failed:', resetError);
           }
-        } catch (resetError) {
-          console.error(`[IntegrityService] ❌ Auto-reset threw error:`, resetError);
-          // Return the original validation failure if reset threw
-          return result;
+        } else if (result.recommendedAction === 'catchup' && result.rollbackToLSN) {
+          console.log(`[IntegrityService] Auto-executing rollback catchup: ${result.rollbackReason}`);
+          
+          try {
+            const rollbackResult = await this.reset.rollbackToLSN(
+              result.rollbackToLSN,
+              result.rollbackReason || `Rollback for catchup: ${reason}`
+            );
+            
+            if (rollbackResult.success) {
+              console.log(`[IntegrityService] ✅ Auto-rollback completed successfully to LSN ${result.rollbackToLSN}`);
+              
+              // Notify machine about rollback completion - it can then trigger catchup sync
+              if (this.machineRef) {
+                this.machineRef.send({
+                  type: 'INTEGRITY_ROLLBACK_COMPLETED',
+                  rollbackToLSN: result.rollbackToLSN,
+                  rollbackReason: result.rollbackReason
+                });
+              }
+            }
+          } catch (rollbackError) {
+            console.error('[IntegrityService] Auto-rollback failed:', rollbackError);
+          }
         }
       }
 
@@ -302,6 +316,14 @@ export class IntegrityService {
   async resetIntegrityBaseline(reason: string = 'Manual baseline reset'): Promise<void> {
     console.log(`[IntegrityService] Coordinator delegating baseline reset to IntegrityReset: ${reason}`);
     await this.reset.resetIntegrityBaseline(reason);
+  }
+
+  /**
+   * Perform partial LSN rollback - delegates to IntegrityReset
+   */
+  async rollbackToLSN(targetLSN: string, reason: string): Promise<IntegrityResetResult> {
+    console.log(`[IntegrityService] Coordinator delegating LSN rollback to IntegrityReset: ${targetLSN} - ${reason}`);
+    return await this.reset.rollbackToLSN(targetLSN, reason);
   }
 
   /**

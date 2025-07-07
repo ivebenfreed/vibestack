@@ -277,28 +277,74 @@ export class IntegrityReset {
    * Reset LSN to trigger full sync from server
    */
   private resetLSN(): void {
+    this.setLSN('0/0');
+  }
+
+  /**
+   * Set LSN to a specific value (supports partial rollback)
+   */
+  setLSN(targetLSN: string): void {
     try {
-      console.log('[IntegrityReset] Resetting LSN to 0/0...');
+      console.log(`[IntegrityReset] Setting LSN to ${targetLSN}...`);
       
-      // Reset in localStorage (sync machine's own state)
+      // Set in localStorage (sync machine's own state)
       const SYNC_STATE_KEY = 'sync-machine-state';
       try {
         const stored = localStorage.getItem(SYNC_STATE_KEY);
         if (stored) {
           const parsedState = JSON.parse(stored);
-          parsedState.currentLSN = '0/0';
+          parsedState.currentLSN = targetLSN;
           localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(parsedState));
-          console.log('[IntegrityReset] ✅ LSN reset in sync machine state');
+          console.log(`[IntegrityReset] ✅ LSN set to ${targetLSN} in sync machine state`);
         }
       } catch (error) {
-        console.warn('[IntegrityReset] Error resetting LSN in sync machine state:', error);
+        console.warn('[IntegrityReset] Error setting LSN in sync machine state:', error);
       }
 
-      console.log('[IntegrityReset] ✅ LSN reset completed - next sync will be full sync');
+      const syncType = targetLSN === '0/0' ? 'full sync' : 'catchup sync';
+      console.log(`[IntegrityReset] ✅ LSN set completed - next sync will be ${syncType} from ${targetLSN}`);
 
     } catch (error) {
-      console.error('[IntegrityReset] Error resetting LSN:', error);
+      console.error(`[IntegrityReset] Error setting LSN to ${targetLSN}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Perform partial LSN rollback for catchup scenarios
+   */
+  async rollbackToLSN(targetLSN: string, reason: string): Promise<IntegrityResetResult> {
+    try {
+      console.log(`[IntegrityReset] Starting partial LSN rollback to ${targetLSN}: ${reason}`);
+      
+      this.callbacks.onResetStarted?.(reason, 'partial_rollback');
+
+      // Set LSN to the rollback target
+      this.setLSN(targetLSN);
+
+      const result: IntegrityResetResult = {
+        success: true,
+        tablesCleared: [], // No table clearing for partial rollback
+        lsnReset: true
+      };
+
+      console.log(`[IntegrityReset] ✅ Partial rollback completed to ${targetLSN}`);
+
+      this.callbacks.onResetCompleted?.(result);
+      return result;
+
+    } catch (error) {
+      console.error(`[IntegrityReset] Partial rollback to ${targetLSN} failed:`, error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      
+      this.callbacks.onResetError?.(errorObj, reason);
+      
+      return {
+        success: false,
+        tablesCleared: [],
+        lsnReset: false,
+        error: errorObj.message
+      };
     }
   }
 

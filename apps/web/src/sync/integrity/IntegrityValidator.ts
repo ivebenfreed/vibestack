@@ -50,10 +50,12 @@ export interface IntegrityValidationRequest {
 export interface IntegrityValidationResult {
   isValid: boolean;
   issues: any[];
-  recommendedAction: 'none' | 'retry' | 'reset';
+  recommendedAction: 'none' | 'retry' | 'reset' | 'catchup';
   validationType?: string;
   resetReason?: string;
   serverResponse?: any;
+  rollbackToLSN?: string; // LSN to roll back to for catchup
+  rollbackReason?: string; // Explanation for the rollback
 }
 
 export interface IntegrityValidationConfig {
@@ -807,15 +809,24 @@ export class IntegrityValidator {
       isValid: message.isValid,
       issues: message.issues || [],
       recommendedAction: this.mapRecommendedAction(message.recommendedAction),
-      serverResponse: message
+      serverResponse: message,
+      rollbackToLSN: message.rollbackToLSN,
+      rollbackReason: message.rollbackReason
     };
     
-    // Log validation result analysis
+    // Log validation result analysis including rollback info
     console.log('[IntegrityValidator] 🔍 Validation result analysis:', {
       isValid: result.isValid,
       issueCount: result.issues.length,
-      recommendedAction: result.recommendedAction
+      recommendedAction: result.recommendedAction,
+      rollbackToLSN: result.rollbackToLSN,
+      rollbackReason: result.rollbackReason
     });
+
+    // If catchup is recommended with rollback LSN, notify about the rollback strategy
+    if (result.recommendedAction === 'catchup' && result.rollbackToLSN) {
+      console.log(`[IntegrityValidator] 🔄 Server recommends catchup with rollback to LSN ${result.rollbackToLSN}: ${result.rollbackReason}`);
+    }
     
     // Resolve any pending validation promises
     for (const [key, pending] of this.pendingValidations) {
@@ -828,8 +839,13 @@ export class IntegrityValidator {
     // Trigger callback
     this.callbacks.onValidationCompleted?.(result);
     
-    // Send event to machine if available
-    this.sendEventToMachine({ type: 'INTEGRITY_VALIDATION_COMPLETED', result });
+    // Send event to machine if available with rollback info
+    this.sendEventToMachine({ 
+      type: 'INTEGRITY_VALIDATION_COMPLETED', 
+      result,
+      rollbackToLSN: result.rollbackToLSN,
+      rollbackReason: result.rollbackReason
+    });
     
     console.log('[IntegrityValidator] Validation response processed');
     return result;
