@@ -313,23 +313,6 @@ function RootComponentInternal() {
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
   
-  // Handle redirect after refresh
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const redirectPath = urlParams.get('redirectAfterRefresh')
-    
-    if (redirectPath) {
-      console.log('[ROOT] Redirecting after refresh to:', redirectPath)
-      // Clean up the URL and redirect
-      const cleanUrl = window.location.pathname
-      window.history.replaceState({}, '', cleanUrl)
-      
-      // Small delay to ensure app is fully loaded
-      setTimeout(() => {
-        navigate({ to: redirectPath as any, replace: true })
-      }, 100)
-    }
-  }, [navigate])
   
   // Simple online/offline detection 
   const [isOnline, setIsOnline] = useState(navigator.onLine)
