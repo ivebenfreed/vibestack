@@ -5,18 +5,39 @@ import { BaseDomainEntity } from '../entities/BaseDomainEntity.js';
 import { BaseSystemEntity } from '../entities/BaseSystemEntity.js';
 
 // Enum Imports (dynamically generated)
+import { MigrationStatus } from '../entities/ClientMigrationStatus.js';
 import { ProjectStatus } from '../entities/Project.js';
 import { TaskPriority, TaskStatus } from '../entities/Task.js';
 import { UserRole } from '../entities/User.js';
 
 
 // Enum Exports
+export { MigrationStatus } from '../entities/ClientMigrationStatus.js';
 export { ProjectStatus } from '../entities/Project.js';
 export { TaskPriority, TaskStatus } from '../entities/Task.js';
 export { UserRole } from '../entities/User.js';
 
 
 // Generated Classes (for type checking and validation)
+export class ClientMigrationStatus extends BaseSystemEntity {
+  migrationName!: string;
+
+  schemaVersion!: string;
+
+  status!: MigrationStatus;
+
+  startedAt?: Date;
+
+  completedAt?: Date;
+
+  errorMessage?: string;
+
+  attempts!: number;
+
+  timestamp!: number;
+
+}
+
 export class Comment extends BaseDomainEntity {
   content!: string;
 
@@ -67,6 +88,19 @@ export class Project extends BaseDomainEntity {
   members!: User[];
 
   tasks!: Task[];
+
+}
+
+export class SyncMetadata extends BaseSystemEntity {
+  clientId!: string;
+
+  currentLsn!: string;
+
+  syncState!: string;
+
+  lastSyncTime?: Date;
+
+  pendingChangesCount!: number;
 
 }
 
@@ -126,6 +160,56 @@ export class User extends BaseDomainEntity {
 
 
 // Entity Schemas (for TypeORM metadata)
+// Schema for ClientMigrationStatus
+export const ClientMigrationStatusSchema = new EntitySchema<ClientMigrationStatus>({
+    target: ClientMigrationStatus, // Link to generated class
+    name: 'ClientMigrationStatus', 
+    tableName: 'client_migration_status',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        'migrationName': {
+            name: 'migration_name', // Explicit DB Name
+            type: 'text', // Use helper
+        },
+        'schemaVersion': {
+            name: 'schema_version', // Explicit DB Name
+            type: 'text', // Use helper
+        },
+        'status': {
+            name: 'status', // Explicit DB Name
+            type: 'enum', // Use helper
+            enum: MigrationStatus, // Use name from decorator
+        },
+        'startedAt': {
+            name: 'started_at', // Explicit DB Name
+            type: 'timestamptz', // Use helper
+            nullable: true
+        },
+        'completedAt': {
+            name: 'completed_at', // Explicit DB Name
+            type: 'timestamptz', // Use helper
+            nullable: true
+        },
+        'errorMessage': {
+            name: 'error_message', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
+        },
+        'attempts': {
+            name: 'attempts', // Explicit DB Name
+            type: 'integer', // Use helper
+            default: 0
+        },
+        'timestamp': {
+            name: 'timestamp', // Explicit DB Name
+            type: 'bigint', // Use helper
+        }
+    },
+    relations: {
+    },
+});
+
 // Schema for Comment
 export const CommentSchema = new EntitySchema<Comment>({
     target: Comment, // Link to generated class
@@ -283,6 +367,43 @@ export const ProjectSchema = new EntitySchema<Project>({
             type: 'one-to-many',
             inverseSide: 'project'
         }
+    },
+});
+
+// Schema for SyncMetadata
+export const SyncMetadataSchema = new EntitySchema<SyncMetadata>({
+    target: SyncMetadata, // Link to generated class
+    name: 'SyncMetadata', 
+    tableName: 'sync_metadata',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        'clientId': {
+            name: 'client_id', // Explicit DB Name
+            type: 'text', // Use helper
+        },
+        'currentLsn': {
+            name: 'current_lsn', // Explicit DB Name
+            type: 'text', // Use helper
+            default: "0/0"
+        },
+        'syncState': {
+            name: 'sync_state', // Explicit DB Name
+            type: 'text', // Use helper
+            default: "disconnected"
+        },
+        'lastSyncTime': {
+            name: 'last_sync_time', // Explicit DB Name
+            type: 'timestamptz', // Use helper
+            nullable: true
+        },
+        'pendingChangesCount': {
+            name: 'pending_changes_count', // Explicit DB Name
+            type: 'integer', // Use helper
+            default: 0
+        }
+    },
+    relations: {
     },
 });
 
@@ -455,9 +576,11 @@ export const UserSchema = new EntitySchema<User>({
 // Exports
 // Export entity class array for TypeORM
 export const clientEntities = [
+  ClientMigrationStatusSchema,
   CommentSchema,
   LocalChangesSchema,
   ProjectSchema,
+  SyncMetadataSchema,
   TaskSchema,
   UserSchema,
 ];
@@ -485,7 +608,9 @@ export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
 
 // system tables for client context
 export const CLIENT_SYSTEM_TABLES = [
+  '"client_migration_status"',
   '"local_changes"',
+  '"sync_metadata"',
 ];
 
 // utility tables for client context

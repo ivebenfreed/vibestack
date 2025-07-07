@@ -93,6 +93,13 @@ export class Comment extends BaseDomainEntity {
 
 }
 
+export class JWKS extends BaseSystemEntity {
+  publicKey!: string;
+
+  privateKey!: string;
+
+}
+
 export class Project extends BaseDomainEntity {
   name!: string;
 
@@ -404,6 +411,27 @@ export const CommentSchema = new EntitySchema<Comment>({
             joinColumn: { name: 'project_id' },
             nullable: true
         }
+    },
+});
+
+// Schema for JWKS
+export const JWKSSchema = new EntitySchema<JWKS>({
+    target: JWKS, // Link to generated class
+    name: 'JWKS', 
+    tableName: 'jwks',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        'publicKey': {
+            name: 'publicKey', // Explicit DB Name
+            type: 'text', // Use helper
+        },
+        'privateKey': {
+            name: 'privateKey', // Explicit DB Name
+            type: 'text', // Use helper
+        }
+    },
+    relations: {
     },
 });
 
@@ -724,6 +752,7 @@ export const serverEntities = [
   ChangeHistorySchema,
   ClientMigrationSchema,
   CommentSchema,
+  JWKSSchema,
   ProjectSchema,
   SessionSchema,
   TaskSchema,
@@ -757,6 +786,7 @@ export const SERVER_SYSTEM_TABLES = [
   '"accounts"',
   '"change_history"',
   '"client_migration"',
+  '"jwks"',
   '"sessions"',
   '"verifications"',
 ];

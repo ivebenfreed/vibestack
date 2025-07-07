@@ -137,6 +137,8 @@ interface ServerIntegrityValidationResponseMessage extends ServerMessage {
     recommendedAction: 'none' | 'catchup' | 'reset';
     serverFingerprints: Record<string, any>;
     validationTimestamp: number;
+    rollbackToLSN?: string;
+    rollbackReason?: string;
 }
 /**
  * Message sent when a client connects and is already up-to-date,

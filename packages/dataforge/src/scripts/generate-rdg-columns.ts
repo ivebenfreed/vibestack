@@ -6,6 +6,8 @@ import fs from 'fs/promises';
 
 // Import the generated client entities
 import * as ClientEntities from '../generated/client-entities.js';
+// Import metadata extraction utilities
+import { extractEnumMetadata } from '../utils/metadata-extraction.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -182,15 +184,37 @@ import type {
 
 `;
 
-  // Import enum options from column configurations
-  const enumImports = ['ProjectStatusOptions', 'TaskStatusOptions', 'TaskPriorityOptions', 'UserRoleOptions'];
+  // Only process CLIENT_DOMAIN_TABLES entities
+  const domainEntityNames = (ClientEntities as any).CLIENT_DOMAIN_TABLES
+    .map((table: string) => {
+      // Convert table name to entity name: "tasks" -> "Task"
+      const tableName = table.replace(/"/g, '');
+      return tableName.charAt(0).toUpperCase() + tableName.slice(1, -1);
+    });
+
+  // Dynamically detect and import enums from ClientEntities
+  const enumExports: Record<string, any> = {};
   
-  output += `// Import enum options from column configurations
+  for (const [key, value] of Object.entries(ClientEntities)) {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && typeof value.constructor === 'function') {
+      // Check if it's an enum
+      const enumValues = Object.values(value);
+      if (enumValues.length > 0 && enumValues.every(v => typeof v === 'string')) {
+        enumExports[key] = value;
+      }
+    }
+  }
+
+  // Generate import statement for detected enums
+  const enumNames = Object.keys(enumExports);
+  if (enumNames.length > 0) {
+    output += `// Import enums dynamically detected from client entities
 import {
-  ${enumImports.join(',\n  ')}
-} from './column-configurations.js';
+  ${enumNames.sort().join(',\n  ')}
+} from './client-entities.js';
 
 `;
+  }
 
   // Helper function to find schema for entity
   function findSchemaForEntity(entityName: string): any {
@@ -202,8 +226,12 @@ import {
     return null;
   }
 
-  // Generate column configurations for each entity
-  entityClasses.forEach(entity => {
+  // Generate column configurations for domain entities only
+  const domainEntities = entityClasses.filter(entity => 
+    domainEntityNames.includes(entity.name)
+  );
+  
+  domainEntities.forEach(entity => {
     const entityName = entity.name;
     const entitySchema = findSchemaForEntity(entityName);
     
@@ -307,9 +335,12 @@ import {
 
       // Add config based on cell type with full editing capabilities
       if (cellType === 'enum' && columnDef.enum) {
-        const enumName = `${entityName}${pascalToWords(propertyName).replace(/\s+/g, '')}Options`;
+        // Use proper enum metadata extraction
+        const enumMeta = extractEnumMetadata(entity, propertyName, columnDef);
+        const enumName = enumMeta.typeName || `${entityName}${pascalToWords(propertyName).replace(/\s+/g, '')}Options`;
+        
         output += `
-      enumOptions: Object.entries(${enumName}).map(([value, label]) => ({ value, label })),`;
+      enumOptions: Object.entries(${enumName}).map(([value, label]) => ({ value, label: typeof label === 'string' ? label : String(label) })),`;
         
         output += `
       config: {
@@ -495,7 +526,7 @@ export function getRDGColumns(entityName: string): RDGColumn<any>[] {
   const columnsMap: Record<string, RDGColumn<any>[]> = {
 `;
 
-  entityClasses.forEach(entity => {
+  domainEntities.forEach(entity => {
     const entityName = entity.name;
     output += `    ${entityName}: ${entityName}RDGColumns,\n`;
   });
@@ -509,7 +540,7 @@ export function getRDGColumns(entityName: string): RDGColumn<any>[] {
 export const RDGColumnConfigurations = {
 `;
 
-  entityClasses.forEach(entity => {
+  domainEntities.forEach(entity => {
     const entityName = entity.name;
     output += `  ${entityName}: ${entityName}RDGColumns,\n`;
   });
