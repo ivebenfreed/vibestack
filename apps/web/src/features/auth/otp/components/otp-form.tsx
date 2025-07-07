@@ -49,20 +49,31 @@ export function OtpForm({ className, email, type, onSuccess, ...props }: OtpForm
     try {
       let result;
       
+      // Ensure OTP is clean (no spaces)
+      const cleanOtp = data.otp.trim();
+      console.log('[AUTH] Submitting OTP:', { 
+        email, 
+        type, 
+        otpLength: cleanOtp.length,
+        otp: cleanOtp // Log for debugging (remove in production)
+      });
+      
       switch (type) {
         case 'email-verification':
-          // Use Better Auth emailOtp verification endpoint
+          // Use the correct method for email verification
           result = await authClient.emailOtp.verifyEmail({
             email: email,
-            otp: data.otp
+            otp: cleanOtp
           })
+          
+          console.log('[AUTH] Email verification result:', result)
           break;
           
         case 'sign-in':
           // Use Better Auth emailOtp sign in endpoint
           result = await authClient.signIn.emailOtp({
             email: email,
-            otp: data.otp
+            otp: cleanOtp
           })
           break;
           
@@ -70,7 +81,7 @@ export function OtpForm({ className, email, type, onSuccess, ...props }: OtpForm
           // Use Better Auth emailOtp password reset endpoint
           result = await authClient.emailOtp.resetPassword({
             email: email,
-            otp: data.otp,
+            otp: cleanOtp,
             password: 'temp-password' // This should be handled by a separate form
           })
           break;
@@ -80,21 +91,29 @@ export function OtpForm({ className, email, type, onSuccess, ...props }: OtpForm
       }
 
       if (result.error) {
-        throw new Error(result.error.message)
+        console.error('[AUTH] OTP verification error details:', {
+          error: result.error,
+          type: type,
+          email: email,
+          otpLength: data.otp.length
+        })
+        throw new Error(result.error.message || 'OTP verification failed')
       }
 
-      toast.success('Verification successful!')
-      
-      // Refresh the user session to get updated emailVerified status
-      try {
-        await authClient.getSession()
-      } catch (sessionError) {
-        console.warn('Failed to refresh session after verification:', sessionError)
+      // Show appropriate success message
+      if (type === 'email-verification') {
+        toast.success('Email verified! Please sign in with your password.')
+      } else {
+        toast.success('Verification successful!')
       }
+      
+      // For email verification with auto-sign in, no need to refresh session
+      // Better Auth handles it automatically
       
       if (onSuccess) {
         onSuccess()
       } else {
+        // Navigate to home page - user should be signed in automatically
         navigate({ to: '/' })
       }
       
@@ -120,34 +139,38 @@ export function OtpForm({ className, email, type, onSuccess, ...props }: OtpForm
             <FormItem>
               <FormLabel className='sr-only'>One-Time Password</FormLabel>
               <FormControl>
-                <InputOTP
-                  maxLength={6}
-                  {...field}
-                  containerClassName='justify-between sm:[&>[data-slot="input-otp-group"]>div]:w-12'
-                >
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup>
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup>
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    {...field}
+                    containerClassName='gap-2'
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                    </InputOTPGroup>
+                    <InputOTPSeparator />
+                    <InputOTPGroup>
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                    </InputOTPGroup>
+                    <InputOTPSeparator />
+                    <InputOTPGroup>
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button className='mt-2' disabled={otp.length < 6 || isLoading}>
-          Verify
-        </Button>
+        <div className="flex justify-center mt-4">
+          <Button className='w-full max-w-sm' disabled={otp.length < 6 || isLoading}>
+            Verify
+          </Button>
+        </div>
       </form>
     </Form>
   )

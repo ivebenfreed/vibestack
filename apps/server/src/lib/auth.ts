@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 // import { google } from "better-auth/providers";
-import { admin, emailOTP } from "better-auth/plugins";
+import { admin, emailOTP, oneTimeToken } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { NeonHTTPDialect } from "kysely-neon";
 import { Hono, Context } from "hono";
@@ -66,15 +66,14 @@ export const auth = betterAuth({
     //   },
     // },
     emailVerification: {
-      sendOnSignUp: true,
+      enabled: false, // Completely disable link-based email verification
+      sendOnSignUp: false, // Disabled - we use OTP instead
       sendVerificationEmail: async (data: any, request?: any) => {
-        // CLI environment - skip email sending
+        // DISABLED - We use OTP verification instead
         if (typeof process !== 'undefined') {
-          console.log('Email verification would be sent to:', data.user.email);
-          console.log('Verification URL:', data.url);
-          return;
+          console.log('Link-based email verification disabled - using OTP instead');
         }
-        // Runtime email sending handled in runtime config
+        return; // Don't send link-based verification emails
       }
     },
     plugins: [
@@ -93,7 +92,10 @@ export const auth = betterAuth({
         otpLength: 6,
         expiresIn: 300, // 5 minutes
         sendVerificationOnSignUp: true,
-        allowedAttempts: 3
+        allowedAttempts: 5
+      }),
+      oneTimeToken({
+        expiresIn: 60 * 24, // 24 hours in minutes
       }),
     ],
 });
@@ -165,6 +167,7 @@ export function initializeAuth(env: Env) {
     ] as string[],
     emailAndPassword: {
       enabled: true,
+      requireEmailVerification: true,
       sendResetPassword: async (data: any, request?: any) => {
         if (!env.RESEND_API_KEY) {
           dbLogger.error('RESEND_API_KEY environment variable is not set', {
@@ -178,7 +181,7 @@ export function initializeAuth(env: Env) {
         const resend = new Resend(env.RESEND_API_KEY);
         
         // Detect if this is an invitation based on the redirect URL
-        const isInvitation = data.url.includes('/complete-registration');
+        const isInvitation = data.url.includes('/set-password');
         
         // Get the base URL for the current environment
         const baseUrl = env.ENVIRONMENT === "development" 
@@ -196,18 +199,18 @@ export function initializeAuth(env: Env) {
             await resend.emails.send({
               from: 'VibeStack <noreply@codevibesmatter.com>',
               to: data.user.email,
-              subject: 'Welcome to VibeStack - Complete Your Account Setup',
+              subject: 'Welcome to VibeStack - Set Your Password',
               html: `
                 <h1>Welcome to VibeStack!</h1>
-                <p>You've been invited to join VibeStack. To complete your account setup and choose your password, click the link below:</p>
+                <p>You've been invited to join VibeStack. To set your password and activate your account, click the link below:</p>
                 <a href="${fullUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 16px 0;">
-                  Complete Account Setup
+                  Set Your Password
                 </a>
                 <p><strong>What's next?</strong></p>
                 <ul>
-                  <li>Click the link above to access the setup page</li>
-                  <li>Choose a secure password for your account</li>
-                  <li>Start using VibeStack right away</li>
+                  <li>Click the link above to set your password</li>
+                  <li>Verify your email address</li>
+                  <li>Start using VibeStack!</li>
                 </ul>
                 <p style="color: #666; font-size: 14px;">This invitation link will expire in 24 hours for security. If you have any questions, please contact your administrator.</p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
@@ -260,44 +263,16 @@ export function initializeAuth(env: Env) {
     //   },
     // },
     emailVerification: {
-      sendOnSignUp: true,
+      enabled: false, // Completely disable link-based email verification
+      sendOnSignUp: false, // Disabled - we use OTP instead
+      autoSignInAfterVerification: true,
+      expiresIn: 3600, // 1 hour
       sendVerificationEmail: async (data: any, request?: any) => {
-        const resend = new Resend(env.RESEND_API_KEY);
-        
-        // Get the base URL for the current environment
-        const baseUrl = env.ENVIRONMENT === "development" 
-          ? "http://localhost:5173"  
-          : env.ENVIRONMENT === "staging" 
-            ? "https://dev.codevibesmatter.com" 
-            : "https://app.codevibesmatter.com";
-        
-        // Ensure we have a full URL - if data.url is relative, make it absolute
-        const fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
-        
-        try {
-          await resend.emails.send({
-            from: 'VibeStack <noreply@codevibesmatter.com>',
-            to: data.user.email,
-            subject: 'Verify your email address',
-            html: `
-              <h1>Welcome to VibeStack!</h1>
-              <p>Please verify your email address by clicking the link below:</p>
-              <a href="${fullUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                Verify Email
-              </a>
-              <p>If you didn't create an account, you can safely ignore this email.</p>
-            `
-          });
-          dbLogger.info('Verification email sent', { 
-            email: data.user.email,
-            verificationUrl: data.url 
-          }, 'auth');
-        } catch (error) {
-          dbLogger.error('Failed to send verification email', error, { 
-            email: data.user.email 
-          }, 'auth');
-          throw error;
-        }
+        // DISABLED - We use OTP verification instead
+        dbLogger.info('Link-based email verification disabled - using OTP instead', { 
+          email: data.user?.email 
+        }, 'auth');
+        return; // Don't send link-based verification emails
       }
     },
     databaseHooks: {
@@ -305,14 +280,33 @@ export function initializeAuth(env: Env) {
         create: {
           before: async (userData: any, hookContext: any) => {
             dbLogger.debug('Auth Hook - user.create.before', {
-              userData: JSON.stringify(userData, null, 2)
+              userData: JSON.stringify(userData, null, 2),
+              originalRole: userData.role
             }, 'auth');
-            dbLogger.debug('User data in hook after type change', {
+            
+            // Ensure role is valid - map Better Auth defaults to our enum
+            if (!userData.role || userData.role === 'user') {
+              userData.role = 'member'; // Map Better Auth's default 'user' to our 'member'
+              dbLogger.debug('Auth Hook - role mapped from user to member', {
+                newRole: userData.role
+              }, 'auth');
+            }
+            
+            // Validate role is one of our allowed values
+            const validRoles = ['admin', 'member', 'viewer', 'super_admin'];
+            if (!validRoles.includes(userData.role)) {
+              dbLogger.warn('Auth Hook - invalid role detected, defaulting to member', {
+                invalidRole: userData.role,
+                validRoles
+              }, 'auth');
+              userData.role = 'member';
+            }
+            
+            dbLogger.debug('Auth Hook - final user data', {
+              finalRole: userData.role,
               userData: JSON.stringify(userData)
             }, 'auth');
-            // Simply pass through userData, respecting any role set by calling code
-            // If userData.role is set, it will be used
-            // If userData.role is not set, the DB default ('member') will apply
+            
             return { data: userData };
           },
         },
@@ -418,7 +412,10 @@ export function initializeAuth(env: Env) {
         otpLength: 6,
         expiresIn: 300, // 5 minutes
         sendVerificationOnSignUp: true,
-        allowedAttempts: 3
+        allowedAttempts: 5
+      }),
+      oneTimeToken({
+        expiresIn: 60 * 24, // 24 hours in minutes
       }),
       // jwt({ // JWT plugin removed
       //   jwt: {

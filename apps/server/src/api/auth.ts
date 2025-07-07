@@ -3,6 +3,7 @@ import { getAuth, AuthType } from "../lib/auth";
 import { dbLogger } from "../middleware/logger";
 import { NeonService } from "../lib/neon-orm/neon-service";
 import { UserRepository } from "../domains/users";
+import { Resend } from 'resend';
 
 // Utility to sanitize auth request logging - removes sensitive fields
 const sanitizeAuthRequest = (path: string, bodyText: string) => {
@@ -458,15 +459,11 @@ authRouter.post("/admin/users/:id/reset-password", adminAuthMiddleware, async (c
   }
 });
 
-// Invite user (admin only) - Better Auth recommended pattern
+// Invite user (admin only) - Clean one-time token approach
 authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
-  let email: string | undefined;
-  
   try {
     const body = await c.req.json();
-    const extractedData = body;
-    email = extractedData.email;
-    const { name, role, skipEmailVerification = false } = extractedData;
+    const { email, name, role } = body;
 
     if (!email || !name || !role) {
       return c.json({ error: "Missing required fields (email, name, role)." }, 400);
@@ -479,180 +476,115 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
 
     const authInstance = getAuth(c);
     
-    // Generate random password for initial user creation
-    const randomPassword = crypto.randomUUID();
+    // Check if user already exists
+    const db = authInstance.options.database.db;
+    const existingUser = await db
+      .selectFrom('users')
+      .where('email', '=', email)
+      .selectAll()
+      .executeTakeFirst();
     
-    // Step 1: Create user using Better Auth admin plugin
-    const createUserResult = await authInstance.api.createUser({
-      body: {
-        email,
-        name,
-        password: randomPassword,
-        role,
-        // Note: emailVerified not supported in createUser body
-      }
-    });
-
-    if (!createUserResult || !createUserResult.user) {
-      dbLogger.error('Failed to create user via Better Auth admin');
-      return c.json({ error: "Failed to create user" }, 400);
+    if (existingUser) {
+      return c.json({ error: "User with this email already exists." }, 400);
     }
 
-    // Step 2: Send "password reset" email that's actually an invitation
+    // Generate one-time token for signup
+    const tokenResult = await authInstance.api.generateOneTimeToken({
+      headers: c.req.raw.headers
+    });
+
+    if (!tokenResult || !tokenResult.token) {
+      dbLogger.error('Failed to generate one-time token');
+      return c.json({ error: "Failed to generate invitation token" }, 500);
+    }
+
+    // Send invitation email with signup link
+    const resend = new Resend(c.env.RESEND_API_KEY);
     const baseUrl = c.env.ENVIRONMENT === "development" 
       ? "http://localhost:5173"  
       : c.env.ENVIRONMENT === "staging" 
         ? "https://dev.codevibesmatter.com" 
         : "https://app.codevibesmatter.com";
 
-    let resetResult;
-    try {
-      resetResult = await authInstance.api.forgetPassword({
-        body: {
-          email: email,
-          redirectTo: `${baseUrl}/complete-registration`
-        }
-      });
+    const signupUrl = `${baseUrl}/sign-up?token=${tokenResult.token}&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&role=${encodeURIComponent(role)}&invitedBy=${encodeURIComponent(c.var.user?.email || '')}`;
+    
+    await resend.emails.send({
+      from: 'VibeStack <noreply@codevibesmatter.com>',
+      to: email,
+      subject: 'Welcome to VibeStack - Create Your Account',
+      html: `
+        <h1>Welcome to VibeStack!</h1>
+        <p>You've been invited to join VibeStack as a <strong>${role}</strong>. Click the link below to create your account:</p>
+        <a href="${signupUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 16px 0;">
+          Create Your Account
+        </a>
+        <p><strong>What's next?</strong></p>
+        <ul>
+          <li>Click the link above to access the signup page</li>
+          <li>Choose your own password</li>
+          <li>Verify your email address</li>
+          <li>Start using VibeStack!</li>
+        </ul>
+        <p style="color: #666; font-size: 14px;">This invitation link will expire in 24 hours for security. If you have any questions, please contact your administrator.</p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #999; font-size: 12px;">If you didn't expect this invitation, you can safely ignore this email.</p>
+      `
+    });
 
-      if (!resetResult || !resetResult.status) {
-        throw new Error('Failed to send invitation email - no result or invalid status');
-      }
-    } catch (emailError) {
-      // Email sending failed - rollback user creation
-      dbLogger.error('Invitation email failed, rolling back user creation', {
-        email,
-        userId: createUserResult.user?.id,
-        error: emailError instanceof Error ? emailError.message : 'Unknown error'
-      });
-
-      try {
-        // Clean up Better Auth tables first, then delete user
-        const db = authInstance.options.database.db;
-        const userId = createUserResult.user?.id;
-        
-        // Step 1: Clean up auth-related tables first
-        await db.deleteFrom('sessions').where('user_id', '=', userId).execute();
-        await db.deleteFrom('accounts').where('user_id', '=', userId).execute();
-        await db.deleteFrom('verifications').where('identifier', '=', email).execute();
-        
-        // Step 2: Now delete the user
-        await db
-          .deleteFrom('users')
-          .where('id', '=', userId)
-          .execute();
-
-        dbLogger.info('Successfully rolled back user creation after email failure', {
-          email,
-          userId
-        });
-      } catch (rollbackError) {
-        dbLogger.error('Failed to rollback user creation after email failure', {
-          email,
-          userId: createUserResult.user?.id,
-          rollbackError: rollbackError instanceof Error ? rollbackError.message : 'Unknown rollback error'
-        });
-      }
-
-      // Return error to user
-      return c.json({ 
-        error: "Failed to send invitation email. User account was not created." 
-      }, 500);
-    }
-
-    // Step 3: Update email verification status if requested
-    if (skipEmailVerification && createUserResult.user?.id) {
-      try {
-        const db = authInstance.options.database.db;
-        await db
-          .updateTable('users')
-          .set({ email_verified: true })
-          .where('id', '=', createUserResult.user.id)
-          .execute();
-        
-        dbLogger.info('Email verification skipped for invited user', { 
-          email, 
-          userId: createUserResult.user.id 
-        });
-      } catch (verificationError) {
-        dbLogger.warn('Failed to update email verification status', {
-          email,
-          userId: createUserResult.user.id,
-          error: verificationError instanceof Error ? verificationError.message : 'Unknown error'
-        });
-      }
-    }
-
-    dbLogger.info('Admin invited new user', { 
+    dbLogger.info('User invitation sent with one-time token', { 
       email, 
       role, 
       invitedBy: c.var.user?.email,
-      skipEmailVerification
+      token: tokenResult.token.substring(0, 10) + '...' // Log partial token for debugging
     });
 
     return c.json({ 
-      message: "User invitation sent successfully.", 
-      user: {
-        id: createUserResult.user?.id,
-        email: createUserResult.user?.email,
-        name: createUserResult.user?.name,
-        role: (createUserResult.user as any)?.role,
-        emailVerified: skipEmailVerification,
-        invited: true
+      message: "Invitation sent successfully. User will receive an email with signup instructions.", 
+      invitation: {
+        email,
+        name,
+        role,
+        expires: "24 hours"
       }
     }, 201);
 
   } catch (error) {
     dbLogger.error('Error in admin user invitation', error);
-    
-    // If we have a partially created user, attempt cleanup
-    // This catches errors that happen before the email rollback logic
-    try {
-      const authInstance = getAuth(c);
-      const db = authInstance.options.database.db;
-      
-      // Try to clean up any user that might have been created with this email
-      if (email) {
-        // Clean up auth tables first
-        await db.deleteFrom('sessions').where('user_id', 'in', 
-          db.selectFrom('users').select('id').where('email', '=', email)
-        ).execute();
-        await db.deleteFrom('accounts').where('user_id', 'in',
-          db.selectFrom('users').select('id').where('email', '=', email)
-        ).execute();
-        await db.deleteFrom('verifications').where('identifier', '=', email).execute();
-        
-        // Then delete the user
-        const cleanupResult = await db
-          .deleteFrom('users')
-          .where('email', '=', email)
-          .execute();
-        
-        // Kysely delete returns an array of DeleteResult objects
-        // For simple deletes, we just check if any results were returned
-        if (cleanupResult && Array.isArray(cleanupResult) && cleanupResult.length > 0) {
-          dbLogger.info('Cleaned up partially created user after general error', {
-            email,
-            operationsCompleted: cleanupResult.length
-          });
-        } else {
-          dbLogger.debug('No users found to clean up', { email });
-        }
-      }
-    } catch (cleanupError) {
-      dbLogger.warn('Could not perform cleanup after invitation error', {
-        cleanupError: cleanupError instanceof Error ? cleanupError.message : 'Unknown cleanup error'
-      });
-    }
-
-    return c.json({ error: "Failed to process user invitation." }, 500);
+    return c.json({ error: "Failed to send user invitation." }, 500);
   }
 });
+
 
 // Handle only POST and GET for other better-auth routes (sign-in, session, etc.)
 // This should come AFTER specific routes like /admin/users
 authRouter.on(["POST", "GET"], "/*", async (c) => {
   const origin = c.req.header('Origin');
   console.log(`[Auth Router] Handling path: ${c.req.path}, Method: ${c.req.method}, Origin: ${origin}`);
+  
+  // Add specific logging for OTP endpoints
+  if (c.req.path.includes('email-otp') || c.req.path.includes('otp')) {
+    console.log('[Auth Router] OTP endpoint detected');
+    if (c.req.method === 'POST') {
+      try {
+        const body = await c.req.text();
+        const parsed = JSON.parse(body);
+        console.log('[Auth Router] OTP request:', {
+          email: parsed.email,
+          otpLength: parsed.otp?.length,
+          endpoint: c.req.path
+        });
+        // Create new request with the body we just read
+        const request = new Request(c.req.raw.url, {
+          method: c.req.method,
+          headers: c.req.raw.headers,
+          body: body
+        });
+        c.req.raw = request;
+      } catch (e) {
+        console.log('[Auth Router] Could not parse OTP request body');
+      }
+    }
+  }
 
   // Sanitized logging for auth requests (no sensitive data)
   if (c.req.path.startsWith('/api/auth/') && c.req.method === 'POST') {
@@ -705,6 +637,7 @@ authRouter.on(["POST", "GET"], "/*", async (c) => {
     return errorResponse;
   }
 });
+
 
 // Verify email change with OTP (user endpoint)
 authRouter.post("/verify-email-change", async (c) => {

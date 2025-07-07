@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 const otpVerifySearchSchema = z.object({
   email: z.string().email(),
   type: z.enum(['email-verification', 'sign-in', 'forget-password']).optional().default('email-verification'),
+  from: z.enum(['invitation', 'signup', 'signin']).optional(),
 })
 
 export const Route = createFileRoute('/(auth)/otp-verify')({
@@ -21,26 +22,29 @@ export const Route = createFileRoute('/(auth)/otp-verify')({
 
 function OtpVerifyPage() {
   const navigate = useNavigate()
-  const { email, type } = Route.useSearch()
+  const { email, type, from } = Route.useSearch()
   const [isResending, setIsResending] = useState(false)
 
   const resendOtp = async () => {
     try {
       setIsResending(true)
+      console.log('[AUTH] Resending OTP for:', { email, type })
       
-      const result = await authClient.emailOTP.sendVerificationOTP({
+      const result = await authClient.emailOtp.sendVerificationOtp({
         email: email,
         type: type
       })
+
+      console.log('[AUTH] Resend OTP result:', result)
 
       if (result.error) {
         throw new Error(result.error.message)
       }
 
-      toast.success('Verification code sent! Please check your inbox.')
+      toast.success('New verification code sent! Please check your inbox.')
 
     } catch (error: any) {
-      console.error('Failed to resend OTP:', error)
+      console.error('[AUTH] Failed to resend OTP:', error)
       toast.error(error?.message || 'Failed to send verification code')
     } finally {
       setIsResending(false)
@@ -61,6 +65,10 @@ function OtpVerifyPage() {
   }
 
   const getDescription = () => {
+    if (from === 'invitation') {
+      return 'Complete your account setup by verifying your email address'
+    }
+    
     switch (type) {
       case 'email-verification':
         return 'We sent a 6-digit code to your email address'
@@ -76,7 +84,11 @@ function OtpVerifyPage() {
   const handleSuccess = () => {
     switch (type) {
       case 'email-verification':
-        navigate({ to: '/' })
+        // After email verification, redirect to sign-in page
+        navigate({ 
+          to: '/sign-in',
+          search: { email, verified: 'true' }
+        })
         break
       case 'sign-in':
         navigate({ to: '/' })
@@ -136,11 +148,17 @@ function OtpVerifyPage() {
           <div className="text-center">
             <Button 
               variant="ghost" 
-              onClick={() => navigate({ to: type === 'sign-in' ? '/sign-in' : '/sign-up' })}
+              onClick={() => {
+                if (from === 'invitation') {
+                  navigate({ to: '/sign-in' })
+                } else {
+                  navigate({ to: type === 'sign-in' ? '/sign-in' : '/sign-up' })
+                }
+              }}
               className="w-full"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to {type === 'sign-in' ? 'sign in' : 'sign up'}
+              Back to {from === 'invitation' ? 'sign in' : (type === 'sign-in' ? 'sign in' : 'sign up')}
             </Button>
           </div>
         </CardContent>

@@ -267,7 +267,7 @@ export class DataGeneratorFactory {
         enumTests.push(data[0]);
       }
     } else if (entityType === 'users') {
-      const roles = ['user', 'admin', 'moderator'];
+      const roles = ['admin', 'member', 'viewer', 'super_admin'];
       
       for (const role of roles) {
         const data = await generator.generateRawData(1, {
