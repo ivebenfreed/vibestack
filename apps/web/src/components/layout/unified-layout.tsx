@@ -63,14 +63,20 @@ const RefreshButton = () => {
       
       // Navigate to root after refresh to avoid service worker redirect issues
       setTimeout(() => {
-        // Navigate to root instead of reloading current route to avoid SW redirect errors
-        window.location.href = '/'
+        // Remember current path to redirect back after refresh
+        const currentPath = window.location.pathname + window.location.search
+        const redirectParam = currentPath !== '/' ? `?redirectAfterRefresh=${encodeURIComponent(currentPath)}` : ''
+        
+        // Navigate to root with redirect parameter
+        window.location.href = `/${redirectParam}`
       }, 300)
       
     } catch (error) {
       console.error('Failed to refresh:', error)
-      // Fallback to navigate to root
-      window.location.href = '/'
+      // Fallback to navigate to root with current path
+      const currentPath = window.location.pathname + window.location.search
+      const redirectParam = currentPath !== '/' ? `?redirectAfterRefresh=${encodeURIComponent(currentPath)}` : ''
+      window.location.href = `/${redirectParam}`
     }
   }
   

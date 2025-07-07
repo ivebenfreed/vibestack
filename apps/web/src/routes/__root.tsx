@@ -1,5 +1,5 @@
 // import { QueryClient } from '@tanstack/react-query' // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
-import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
+import { createRootRouteWithContext, Outlet, useNavigate } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { Toaster } from '@/components/ui/sonner'
 import GeneralError from '@/features/errors/general-error'
@@ -311,6 +311,25 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootComponentInternal() {
   const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  
+  // Handle redirect after refresh
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const redirectPath = urlParams.get('redirectAfterRefresh')
+    
+    if (redirectPath) {
+      console.log('[ROOT] Redirecting after refresh to:', redirectPath)
+      // Clean up the URL and redirect
+      const cleanUrl = window.location.pathname
+      window.history.replaceState({}, '', cleanUrl)
+      
+      // Small delay to ensure app is fully loaded
+      setTimeout(() => {
+        navigate({ to: redirectPath as any, replace: true })
+      }, 100)
+    }
+  }, [navigate])
   
   // Simple online/offline detection 
   const [isOnline, setIsOnline] = useState(navigator.onLine)
