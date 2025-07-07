@@ -39,19 +39,38 @@ export default defineConfig({
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // Cache JS, CSS, HTML, and image assets
           // Fix for direct route navigation - allow all navigation routes
           navigateFallback: 'index.html',
-          navigateFallbackAllowlist: [/.*/], // Allow all routes for SPA navigation
+          navigateFallbackAllowlist: [/^\/(?!(api|assets|_|\.)).*/], // Allow app routes, exclude API and assets
           // Fix redirect handling for direct URL navigation
-          navigateFallbackDenylist: [/^\/_/, /\/[^/?]+\.[^/]+$/], // Exclude API routes and static files
-          // Fix redirect handling for direct URL navigation
+          navigateFallbackDenylist: [/^\/api\//, /^\/assets\//, /^\/_/, /\.[^\/]+$/], // Exclude API routes and static files
+          // Improved runtime caching for navigation
           runtimeCaching: [
             {
-              urlPattern: /^https:\/\/dev\.codevibesmatter\.com\/.*/,
+              urlPattern: ({ request }) => request.mode === 'navigate',
               handler: 'NetworkFirst',
               options: {
                 networkTimeoutSeconds: 3,
                 cacheName: 'navigation-cache',
                 cacheableResponse: {
                   statuses: [0, 200]
+                },
+                fetchOptions: {
+                  redirect: 'follow',
+                  credentials: 'include'
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/dev\.codevibesmatter\.com\/(?!api).*/,
+              handler: 'NetworkFirst',
+              options: {
+                networkTimeoutSeconds: 3,
+                cacheName: 'runtime-navigation',
+                cacheableResponse: {
+                  statuses: [0, 200]
+                },
+                fetchOptions: {
+                  redirect: 'follow',
+                  credentials: 'include'
                 }
               }
             }

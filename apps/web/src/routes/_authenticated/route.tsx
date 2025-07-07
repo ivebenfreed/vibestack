@@ -59,7 +59,14 @@ export const Route = createFileRoute('/_authenticated')({
     
     // Check final auth state
     const finalAuthSnapshot = authActor.getSnapshot()
+    console.log('[AuthenticatedRoute] Final auth state check:', {
+      matches: finalAuthSnapshot.value,
+      user: !!finalAuthSnapshot.context.user,
+      path: window.location.pathname
+    })
+    
     if (!finalAuthSnapshot.matches('authenticated') || !finalAuthSnapshot.context.user) {
+      console.log('[AuthenticatedRoute] Redirecting to sign-in from:', window.location.pathname)
       throw redirect({
         to: '/sign-in',
         search: { redirect: location.pathname },

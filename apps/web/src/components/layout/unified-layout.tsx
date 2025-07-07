@@ -46,17 +46,24 @@ const RefreshButton = () => {
         }
       }
       
-      // Clear all caches to ensure fresh content
+      // Clear only non-essential caches to preserve auth state and routing
       if ('caches' in window) {
         const cacheNames = await caches.keys()
+        // Preserve caches that contain auth, session, or navigation data
+        const cachesToDelete = cacheNames.filter(name => 
+          !name.includes('auth') && 
+          !name.includes('session') && 
+          !name.includes('navigation-cache') &&
+          !name.includes('runtime-navigation')
+        )
         await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
+          cachesToDelete.map(cacheName => caches.delete(cacheName))
         )
       }
       
-      // Give a moment for cache clearing, then hard reload
+      // Use soft reload instead of hard reload to preserve routing state
       setTimeout(() => {
-        // Force reload bypassing cache
+        // Soft reload - preserves current route
         window.location.reload()
       }, 300)
       
