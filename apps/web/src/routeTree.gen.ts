@@ -28,6 +28,7 @@ import { Route as authOtpVerifyImport } from './routes/(auth)/otp-verify'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as authForgotPasswordImport } from './routes/(auth)/forgot-password'
 import { Route as authCompleteRegistrationImport } from './routes/(auth)/complete-registration'
+import { Route as authCheckEmailImport } from './routes/(auth)/check-email'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedDebugRouteImport } from './routes/_authenticated/debug/route'
 import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/tasks/index'
@@ -37,11 +38,14 @@ import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authentic
 import { Route as AuthenticatedDebugIndexImport } from './routes/_authenticated/debug/index'
 import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
+import { Route as AuthenticatedTasksTimelineImport } from './routes/_authenticated/tasks/timeline'
+import { Route as AuthenticatedTasksKanbanImport } from './routes/_authenticated/tasks/kanban'
 import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_authenticated/debug/vibegridfinal-tasks'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugQueryTestImport } from './routes/_authenticated/debug/query-test'
@@ -158,6 +162,12 @@ const authCompleteRegistrationRoute = authCompleteRegistrationImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const authCheckEmailRoute = authCheckEmailImport.update({
+  id: '/(auth)/check-email',
+  path: '/check-email',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const AuthenticatedSettingsRouteRoute = AuthenticatedSettingsRouteImport.update(
   {
     id: '/settings',
@@ -256,6 +266,20 @@ const AuthenticatedDebugDatabaseLazyRoute =
     import('./routes/_authenticated/debug/database.lazy').then((d) => d.Route),
   )
 
+const AuthenticatedTasksTimelineRoute = AuthenticatedTasksTimelineImport.update(
+  {
+    id: '/tasks/timeline',
+    path: '/tasks/timeline',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any,
+)
+
+const AuthenticatedTasksKanbanRoute = AuthenticatedTasksKanbanImport.update({
+  id: '/tasks/kanban',
+  path: '/tasks/kanban',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsImport.update({
     id: '/notifications',
@@ -289,6 +313,13 @@ const AuthenticatedProjectsProjectIdRoute =
     id: '/projects/$projectId',
     path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
+const AuthenticatedDebugVibegridfinalTasksRoute =
+  AuthenticatedDebugVibegridfinalTasksImport.update({
+    id: '/vibegridfinal-tasks',
+    path: '/vibegridfinal-tasks',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
 const AuthenticatedDebugStateMachineTestRoute =
@@ -376,6 +407,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/(auth)/check-email': {
+      id: '/(auth)/check-email'
+      path: '/check-email'
+      fullPath: '/check-email'
+      preLoaderRoute: typeof authCheckEmailImport
+      parentRoute: typeof rootRoute
     }
     '/(auth)/complete-registration': {
       id: '/(auth)/complete-registration'
@@ -531,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugStateMachineTestImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/vibegridfinal-tasks': {
+      id: '/_authenticated/debug/vibegridfinal-tasks'
+      path: '/vibegridfinal-tasks'
+      fullPath: '/debug/vibegridfinal-tasks'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridfinalTasksImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/projects/$projectId': {
       id: '/_authenticated/projects/$projectId'
       path: '/projects/$projectId'
@@ -565,6 +610,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/notifications'
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsImport
       parentRoute: typeof AuthenticatedSettingsRouteImport
+    }
+    '/_authenticated/tasks/kanban': {
+      id: '/_authenticated/tasks/kanban'
+      path: '/tasks/kanban'
+      fullPath: '/tasks/kanban'
+      preLoaderRoute: typeof AuthenticatedTasksKanbanImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/tasks/timeline': {
+      id: '/_authenticated/tasks/timeline'
+      path: '/tasks/timeline'
+      fullPath: '/tasks/timeline'
+      preLoaderRoute: typeof AuthenticatedTasksTimelineImport
+      parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/debug/database': {
       id: '/_authenticated/debug/database'
@@ -663,6 +722,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugQueryTestRoute: typeof AuthenticatedDebugQueryTestRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
+  AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -684,6 +744,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
+    AuthenticatedDebugVibegridfinalTasksRoute:
+      AuthenticatedDebugVibegridfinalTasksRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
@@ -726,6 +788,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
+  AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
+  AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
@@ -738,6 +802,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
+  AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
+  AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
@@ -752,6 +818,7 @@ export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteRouteWithChildren
   '/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/check-email': typeof authCheckEmailRoute
   '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -774,11 +841,14 @@ export interface FileRoutesByFullPath {
   '/debug/query-test': typeof AuthenticatedDebugQueryTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
+  '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -794,6 +864,7 @@ export interface FileRoutesByFullPath {
 }
 
 export interface FileRoutesByTo {
+  '/check-email': typeof authCheckEmailRoute
   '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -816,11 +887,14 @@ export interface FileRoutesByTo {
   '/debug/query-test': typeof AuthenticatedDebugQueryTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
+  '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -840,6 +914,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_authenticated/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/(auth)/check-email': typeof authCheckEmailRoute
   '/(auth)/complete-registration': typeof authCompleteRegistrationRoute
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/otp': typeof authOtpRoute
@@ -862,11 +937,14 @@ export interface FileRoutesById {
   '/_authenticated/debug/query-test': typeof AuthenticatedDebugQueryTestRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/_authenticated/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
+  '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/_authenticated/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
@@ -887,6 +965,7 @@ export interface FileRouteTypes {
     | ''
     | '/debug'
     | '/settings'
+    | '/check-email'
     | '/complete-registration'
     | '/forgot-password'
     | '/otp'
@@ -909,11 +988,14 @@ export interface FileRouteTypes {
     | '/debug/query-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/vibegridfinal-tasks'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
+    | '/tasks/kanban'
+    | '/tasks/timeline'
     | '/debug/database'
     | '/debug/integrity'
     | '/debug/sync'
@@ -928,6 +1010,7 @@ export interface FileRouteTypes {
     | '/settings/admin/users'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/check-email'
     | '/complete-registration'
     | '/forgot-password'
     | '/otp'
@@ -950,11 +1033,14 @@ export interface FileRouteTypes {
     | '/debug/query-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/vibegridfinal-tasks'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
+    | '/tasks/kanban'
+    | '/tasks/timeline'
     | '/debug/database'
     | '/debug/integrity'
     | '/debug/sync'
@@ -972,6 +1058,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_authenticated/debug'
     | '/_authenticated/settings'
+    | '/(auth)/check-email'
     | '/(auth)/complete-registration'
     | '/(auth)/forgot-password'
     | '/(auth)/otp'
@@ -994,11 +1081,14 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/query-test'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
+    | '/_authenticated/debug/vibegridfinal-tasks'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/tasks/kanban'
+    | '/_authenticated/tasks/timeline'
     | '/_authenticated/debug/database'
     | '/_authenticated/debug/integrity'
     | '/_authenticated/debug/sync'
@@ -1016,6 +1106,7 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  authCheckEmailRoute: typeof authCheckEmailRoute
   authCompleteRegistrationRoute: typeof authCompleteRegistrationRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authOtpRoute: typeof authOtpRoute
@@ -1034,6 +1125,7 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  authCheckEmailRoute: authCheckEmailRoute,
   authCompleteRegistrationRoute: authCompleteRegistrationRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
   authOtpRoute: authOtpRoute,
@@ -1061,6 +1153,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/_authenticated",
+        "/(auth)/check-email",
         "/(auth)/complete-registration",
         "/(auth)/forgot-password",
         "/(auth)/otp",
@@ -1084,6 +1177,8 @@ export const routeTree = rootRoute
         "/_authenticated/settings",
         "/_authenticated/",
         "/_authenticated/projects/$projectId",
+        "/_authenticated/tasks/kanban",
+        "/_authenticated/tasks/timeline",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
         "/_authenticated/help-center/",
@@ -1102,6 +1197,7 @@ export const routeTree = rootRoute
         "/_authenticated/debug/query-test",
         "/_authenticated/debug/reactflow-positioning",
         "/_authenticated/debug/state-machine-test",
+        "/_authenticated/debug/vibegridfinal-tasks",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
@@ -1120,6 +1216,9 @@ export const routeTree = rootRoute
         "/_authenticated/settings/",
         "/_authenticated/settings/admin/users"
       ]
+    },
+    "/(auth)/check-email": {
+      "filePath": "(auth)/check-email.tsx"
     },
     "/(auth)/complete-registration": {
       "filePath": "(auth)/complete-registration.tsx"
@@ -1195,6 +1294,10 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/state-machine-test.tsx",
       "parent": "/_authenticated/debug"
     },
+    "/_authenticated/debug/vibegridfinal-tasks": {
+      "filePath": "_authenticated/debug/vibegridfinal-tasks.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/projects/$projectId": {
       "filePath": "_authenticated/projects/$projectId.tsx",
       "parent": "/_authenticated"
@@ -1214,6 +1317,14 @@ export const routeTree = rootRoute
     "/_authenticated/settings/notifications": {
       "filePath": "_authenticated/settings/notifications.tsx",
       "parent": "/_authenticated/settings"
+    },
+    "/_authenticated/tasks/kanban": {
+      "filePath": "_authenticated/tasks/kanban.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/tasks/timeline": {
+      "filePath": "_authenticated/tasks/timeline.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/debug/database": {
       "filePath": "_authenticated/debug/database.lazy.tsx",

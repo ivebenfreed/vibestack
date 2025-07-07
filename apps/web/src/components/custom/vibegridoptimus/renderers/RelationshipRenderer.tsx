@@ -10,6 +10,8 @@ interface RelationshipRendererProps {
   }
   cellType: 'relationship-single' | 'relationship-multi' | 'relationship-collection'
   onContentClick?: (event: React.MouseEvent) => void
+  relationshipResolver?: any
+  column?: any
 }
 
 /**
@@ -20,19 +22,21 @@ export function RelationshipRenderer({
   value, 
   config, 
   cellType,
-  onContentClick 
+  onContentClick,
+  relationshipResolver,
+  column
 }: RelationshipRendererProps): React.ReactNode {
   const displayField = config?.displayField || 'name'
   
   switch (cellType) {
     case 'relationship-single':
-      return renderSingleRelationship(value, displayField, config, onContentClick)
+      return renderSingleRelationship(value, displayField, config, onContentClick, relationshipResolver, column)
       
     case 'relationship-multi':
-      return renderMultiRelationship(value, displayField, config, onContentClick)
+      return renderMultiRelationship(value, displayField, config, onContentClick, relationshipResolver, column)
       
     case 'relationship-collection':
-      return renderCollectionRelationship(value, displayField, config, onContentClick)
+      return renderCollectionRelationship(value, displayField, config, onContentClick, relationshipResolver, column)
       
     default:
       return <span className={CSS_CLASSES.mutedText}>—</span>
@@ -46,7 +50,9 @@ function renderSingleRelationship(
   value: any, 
   displayField: string, 
   config?: RelationshipRendererProps['config'],
-  onContentClick?: (event: React.MouseEvent) => void
+  onContentClick?: (event: React.MouseEvent) => void,
+  relationshipResolver?: any,
+  column?: any
 ): React.ReactNode {
   // Show "Add owner" for empty values
   if (!value) {
