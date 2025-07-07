@@ -20,7 +20,7 @@ import { appInitMachine } from '@/state-machines/machines/app-init-machine'
 import { syncMachineV3 } from '@/state-machines/machines/sync-machine-v3'
 import { useAuth, useSystem } from '@/state-machines'
 import React from 'react'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useRouter } from '@tanstack/react-router'
 
 // Router context interface with atom setters
 interface RouterContext {
