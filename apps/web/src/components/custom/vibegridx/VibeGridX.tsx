@@ -539,6 +539,10 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
       case 'c':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
+          console.log('Copy event triggered:', {
+            selectedCells: selectedCellsRef.current.size,
+            cells: Array.from(selectedCellsRef.current).slice(0, 5)
+          });
           // Show copy indicator
           canvasOverlayRef.current?.selectionManager?.showCopyIndicator(false);
           console.log('Copy: Selected cells copied to clipboard');
@@ -551,6 +555,10 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
       case 'x':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
+          console.log('Cut event triggered:', {
+            selectedCells: selectedCellsRef.current.size,
+            cells: Array.from(selectedCellsRef.current).slice(0, 5)
+          });
           // Show cut indicator
           canvasOverlayRef.current?.selectionManager?.showCopyIndicator(true);
           console.log('Cut: Selected cells cut to clipboard');
@@ -563,6 +571,10 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
       case 'v':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
+          console.log('Paste event triggered:', {
+            targetCell: anchorCellRef.current,
+            selectedCells: selectedCellsRef.current.size
+          });
           // Hide copy/cut indicator
           canvasOverlayRef.current?.selectionManager?.hideCopyIndicator();
           console.log('Paste: Pasting clipboard content');
