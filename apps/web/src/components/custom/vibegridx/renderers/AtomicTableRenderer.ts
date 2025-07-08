@@ -171,6 +171,7 @@ class VirtualGridManager {
 export class AtomicTableRenderer {
   private container: HTMLElement;
   private table: HTMLElement;
+  private headerViewport: HTMLElement;
   private header: HTMLElement;
   private body: HTMLElement;
   private viewport: HTMLElement;
@@ -223,8 +224,18 @@ export class AtomicTableRenderer {
     this.table = document.createElement('div');
     this.table.className = 'vibegridx-table-wrapper';
     
+    // Create header viewport for synchronized horizontal scrolling
+    this.headerViewport = document.createElement('div');
+    this.headerViewport.className = 'vibegridx-header-viewport';
+    this.headerViewport.style.overflow = 'hidden';
+    this.headerViewport.style.position = 'relative';
+    
     this.header = document.createElement('div');
     this.header.className = CSS_CLASSES.HEADER;
+    this.header.style.position = 'relative';
+    this.header.style.whiteSpace = 'nowrap';
+    
+    this.headerViewport.appendChild(this.header);
     
     this.viewport = document.createElement('div');
     this.viewport.className = 'vibegridx-viewport';
@@ -241,7 +252,7 @@ export class AtomicTableRenderer {
     this.viewport.appendChild(this.body);
     
     // Canvas overlay will be added to body after it has content
-    this.table.appendChild(this.header);
+    this.table.appendChild(this.headerViewport);
     this.table.appendChild(this.viewport);
     this.container.appendChild(this.table);
   }
@@ -253,6 +264,9 @@ export class AtomicTableRenderer {
       if (scrollTimeout) cancelAnimationFrame(scrollTimeout);
       
       scrollTimeout = requestAnimationFrame(() => {
+        // Sync horizontal scroll with header
+        this.header.style.transform = `translateX(-${this.viewport.scrollLeft}px)`;
+        
         const rowHeight = this.virtualGrid.getRowHeight();
         const newViewport: ViewportInfo = {
           start: Math.floor(this.viewport.scrollTop / rowHeight),
@@ -462,8 +476,11 @@ export class AtomicTableRenderer {
     const firstRow = state.rows[0];
     const columns = Object.keys(firstRow.data);
     
-    // Header rendered with columns
+    // Calculate total width for header
+    const totalWidth = columns.length * 120; // min-width per cell
+    this.header.style.width = `${totalWidth}px`;
     
+    // Header rendered with columns
     this.header.innerHTML = columns.map(columnId => 
       `<div class="vibegridx-header-cell" data-column="${columnId}">
         ${columnId}
@@ -475,9 +492,14 @@ export class AtomicTableRenderer {
     const visibleRange = this.virtualGrid.getVisibleRange();
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
-    // Set virtual height
+    // Calculate dimensions
     const totalHeight = this.virtualGrid.getTotalHeight();
+    const columnCount = state.rows.length > 0 ? Object.keys(state.rows[0].data).length : 0;
+    const totalWidth = columnCount * 120; // min-width per cell
+    
+    // Set virtual dimensions
     this.body.style.height = `${totalHeight}px`;
+    this.body.style.width = `${totalWidth}px`;
     
     // Ensure canvas overlay exists and matches body dimensions
     let canvasOverlay = this.body.querySelector('.vibegridx-canvas-overlay') as HTMLElement;
@@ -492,8 +514,9 @@ export class AtomicTableRenderer {
       canvasOverlay.style.zIndex = '10';
       this.body.appendChild(canvasOverlay);
     }
-    // Update canvas overlay height to match body
+    // Update canvas overlay dimensions to match body
     canvasOverlay.style.height = `${totalHeight}px`;
+    canvasOverlay.style.width = `${totalWidth}px`;
     
     // Clear existing rows that are no longer visible
     this.rowElements.forEach((element, rowId) => {

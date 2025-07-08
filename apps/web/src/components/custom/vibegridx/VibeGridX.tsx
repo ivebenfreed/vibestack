@@ -1033,11 +1033,6 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
-      {/* Machine State Indicator */}
-      <div className="vibegridx-status-bar">
-        {JSON.stringify(tableState.value)} | v{tableState.context.version}
-      </div>
-      
       {/* Atomic Renderer Container */}
       <div
         ref={containerRef}

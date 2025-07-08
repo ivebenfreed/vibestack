@@ -26,14 +26,23 @@
 }
 
 /* Header */
-.vibegridx-header {
-  display: flex;
-  background: hsl(var(--muted));
+.vibegridx-header-viewport {
+  overflow: hidden;
+  position: relative;
   border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+}
+
+.vibegridx-header {
+  display: inline-flex;
+  background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
   font-weight: 600;
   font-size: 12px;
-  min-height: 32px;
+  height: 32px;
+  position: relative;
+  white-space: nowrap;
+  transition: transform 0.1s ease-out;
 }
 
 .vibegridx-header-cell {
@@ -130,27 +139,11 @@
   }
 }
 
-/* Status Bar */
-.vibegridx-status-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 4px 8px;
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
-  background-color: hsl(var(--muted));
-  border-left: 1px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
-  border-radius: 0 var(--radius) 0 var(--radius-sm);
-  z-index: 1000;
-}
-
 /* Renderer Container */
 .vibegridx-renderer {
   width: 100%;
   height: 100%;
   position: relative;
-  padding-top: 28px; /* Space for status bar */
 }
 
 /* Canvas Overlay (for selection visualization) */
@@ -158,7 +151,6 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
   pointer-events: none;
   z-index: 10;
 }
