@@ -1,0 +1,464 @@
+import { setup, assign, spawnChild, sendTo, fromPromise } from 'xstate';
+import type { 
+  TableContext, 
+  TableEvents, 
+  TableConfig, 
+  ViewportInfo,
+  OptimisticOperation 
+} from '../types';
+
+// ====================================
+// ACTOR IMPORTS (will implement these next)
+// ====================================
+
+import { selectionCoordinatorMachine } from './selection-coordinator';
+import { editCoordinatorMachine } from './edit-coordinator';
+import { viewCoordinatorMachine } from './view-coordinator';
+import { dragCoordinatorMachine } from './drag-coordinator';
+import { rowActorMachine } from './row-actor';
+
+// ====================================
+// HELPER FUNCTIONS
+// ====================================
+
+const createDefaultContext = (input: TableConfig): TableContext => ({
+  id: input.id,
+  entityType: input.entityType,
+  columns: input.columns || [],
+  visibleRowIds: input.initialData?.map(row => row.id) || [],
+  settings: {
+    enableVirtualScrolling: true,
+    enableGrouping: false,
+    enableFiltering: false,
+    enableFormulas: false,
+    pageSize: 50,
+    rowHeight: 40,
+    bufferSize: 10,
+    ...input.settings
+  },
+  version: 0,
+  
+  actors: {
+    selectionCoordinator: null,
+    editCoordinator: null,
+    viewCoordinator: null,
+    dragCoordinator: null,
+    rowActors: new Map()
+  },
+  
+  performance: {
+    lastRenderTime: 0,
+    totalRows: input.initialData?.length || 0,
+    visibleRows: 0,
+    activeActors: 0
+  }
+});
+
+const createViewportFromScroll = (event: any): ViewportInfo => ({
+  start: Math.floor(event.scrollTop / event.itemHeight),
+  end: Math.floor(event.scrollTop / event.itemHeight) + Math.ceil(event.containerHeight / event.itemHeight) + event.bufferSize,
+  height: event.containerHeight,
+  scrollTop: event.scrollTop,
+  itemHeight: event.itemHeight
+});
+
+// ====================================
+// ASYNC ACTORS
+// ====================================
+
+const spawnRowActors = fromPromise(async ({ input }: { 
+  input: { rowIds: string[]; spawn: any; existingActors: Map<string, any> }
+}) => {
+  const { rowIds, spawn, existingActors } = input;
+  const newActors = new Map(existingActors);
+  
+  // Spawn actors for visible rows that don't exist yet
+  for (const rowId of rowIds) {
+    if (!newActors.has(rowId)) {
+      const actor = spawnChild('rowActor', {
+        input: { id: rowId },
+        systemId: `row-${rowId}`
+      });
+      newActors.set(rowId, actor);
+    }
+  }
+  
+  // Cleanup actors for rows no longer visible
+  for (const [rowId, actor] of existingActors) {
+    if (!rowIds.includes(rowId)) {
+      actor.stop?.();
+      newActors.delete(rowId);
+    }
+  }
+  
+  return { actors: newActors };
+});
+
+const updatePerformanceMetrics = fromPromise(async ({ input }: {
+  input: { operation: string; startTime: number; context: TableContext }
+}) => {
+  const { operation, startTime, context } = input;
+  const duration = performance.now() - startTime;
+  
+  // Log performance if slow
+  if (duration > 16) {
+    console.warn(`Slow ${operation}: ${duration.toFixed(2)}ms`);
+  }
+  
+  return {
+    operation,
+    duration,
+    timestamp: Date.now(),
+    totalRows: context.performance.totalRows,
+    visibleRows: context.visibleRowIds.length,
+    activeActors: context.actors.rowActors.size
+  };
+});
+
+// ====================================
+// MAIN TABLE MACHINE
+// ====================================
+
+export const tableBaseMachine = setup({
+  types: {
+    context: {} as TableContext,
+    events: {} as TableEvents,
+    input: {} as TableConfig
+  },
+  
+  actors: {
+    selectionCoordinator: selectionCoordinatorMachine,
+    editCoordinator: editCoordinatorMachine,
+    viewCoordinator: viewCoordinatorMachine,
+    dragCoordinator: dragCoordinatorMachine,
+    rowActor: rowActorMachine,
+    spawnRowActors,
+    updatePerformanceMetrics
+  },
+  
+  actions: {
+    // Initialization actions
+    spawnCoordinators: assign({
+      actors: ({ spawn, context }) => {
+        console.log('TableMachine: Spawning coordinators with context:', {
+          entityType: context.entityType,
+          visibleRowIdsCount: context.visibleRowIds.length,
+          columnsCount: context.columns.length,
+          columnIds: context.columns.map(c => c.id)
+        });
+        
+        return {
+          ...context.actors,
+          selectionCoordinator: spawn('selectionCoordinator', {
+            input: { 
+              entityType: context.entityType,
+              visibleRowIds: context.visibleRowIds,
+              columns: context.columns
+            },
+            systemId: 'selection-coordinator'
+          }),
+          editCoordinator: spawn('editCoordinator', {
+          input: { columns: context.columns },
+          systemId: 'edit-coordinator'
+        }),
+          viewCoordinator: spawn('viewCoordinator', {
+            input: { columns: context.columns },
+            systemId: 'view-coordinator'
+          }),
+          dragCoordinator: spawn('dragCoordinator', {
+            systemId: 'drag-coordinator'
+          })
+        };
+      }
+    }),
+    
+    // Entity configuration
+    setEntityType: assign({
+      entityType: ({ event }) => 
+        event.type === 'SET_ENTITY_TYPE' ? event.entityType : '',
+      columns: ({ event }) => 
+        event.type === 'SET_ENTITY_TYPE' ? event.columns : [],
+      version: ({ context }) => context.version + 1
+    }),
+    
+    setVisibleEntities: assign({
+      visibleRowIds: ({ event }) => 
+        event.type === 'SET_VISIBLE_ENTITIES' ? event.entityIds : [],
+      version: ({ context }) => context.version + 1
+    }),
+    
+    // Performance tracking
+    updatePerformance: assign({
+      performance: ({ context, event }) => {
+        if (event.type === 'PERFORMANCE_MARK') {
+          return {
+            ...context.performance,
+            lastRenderTime: event.duration
+          };
+        }
+        return context.performance;
+      }
+    }),
+    
+    // Version increment for React re-renders
+    incrementVersion: assign({
+      version: ({ context }) => context.version + 1
+    })
+  },
+  
+  guards: {
+    hasVisibleRows: ({ context }) => context.visibleRowIds.length > 0,
+    isVirtualScrollingEnabled: ({ context }) => 
+      context.settings.enableVirtualScrolling === true,
+    canPerformOperation: ({ context, event }) => {
+      // Guard against operations when coordinators aren't ready
+      return context.actors.selectionCoordinator !== null && 
+             context.actors.editCoordinator !== null;
+    }
+  }
+  
+}).createMachine({
+  id: 'vibeGridXTable',
+  
+  initial: 'initializing',
+  
+  context: ({ input }) => createDefaultContext(input),
+  
+  states: {
+    initializing: {
+      entry: [
+        'spawnCoordinators'
+      ],
+      
+      after: {
+        100: 'ready' // Small delay to ensure coordinators are spawned
+      }
+    },
+    
+    ready: {
+      type: 'parallel',
+      
+      states: {
+        // Entity management
+        entityManagement: {
+          initial: 'idle',
+          states: {
+            idle: {
+              on: {
+                SET_ENTITY_TYPE: {
+                  actions: [
+                    'setEntityType',
+                    // Notify coordinators of entity type change
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      ({ event }) => ({ type: 'ENTITY_TYPE_CHANGED', entityType: event.entityType })),
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      ({ event }) => ({ type: 'COLUMNS_CHANGED', columns: event.columns })),
+                    sendTo(({ context }) => context.actors.editCoordinator!, 
+                      ({ event }) => ({ type: 'COLUMNS_CHANGED', columns: event.columns }))
+                  ]
+                },
+                
+                SET_VISIBLE_ENTITIES: {
+                  target: 'updatingRowActors',
+                  actions: 'setVisibleEntities'
+                }
+              }
+            },
+            
+            updatingRowActors: {
+              invoke: {
+                src: 'spawnRowActors',
+                input: ({ context, spawn }) => ({
+                  rowIds: context.visibleRowIds,
+                  spawn,
+                  existingActors: context.actors.rowActors
+                }),
+                onDone: {
+                  target: 'idle',
+                  actions: assign({
+                    actors: ({ context, event }) => ({
+                      ...context.actors,
+                      rowActors: event.output.actors
+                    }),
+                    performance: ({ context, event }) => ({
+                      ...context.performance,
+                      activeActors: event.output.actors.size,
+                      visibleRows: context.visibleRowIds.length
+                    })
+                  })
+                }
+              }
+            }
+          }
+        },
+        
+        // Event routing to coordinators
+        coordinatorRouting: {
+          initial: 'active',
+          states: {
+            active: {
+              on: {
+                // Data events from EntityIntegration
+                'data.entities.updated': {
+                  actions: [
+                    // Update context with new entity data
+                    assign({
+                      version: ({ context }) => context.version + 1,
+                      visibleRowIds: ({ event }) => Object.keys(event.entities)
+                    }),
+                    // Notify selection coordinator of visible rows change
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      ({ event }) => ({ 
+                        type: 'VISIBLE_ROWS_CHANGED', 
+                        rowIds: Object.keys(event.entities) 
+                      })),
+                    // Log the data update
+                    ({ event }) => {
+                      console.log(`TableMachine: Received ${event.entityType} data update - ${Object.keys(event.entities).length} entities`);
+                    }
+                  ]
+                },
+                
+                // Render events from EntityIntegration
+                'view.render.update': {
+                  actions: [
+                    // Increment version to trigger React re-render
+                    'incrementVersion',
+                    // Log render trigger
+                    ({ event }) => {
+                      console.log(`TableMachine: Render update triggered - ${event.reason}`);
+                    }
+                  ]
+                },
+                
+                // Selection events
+                'selection.*': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                // Edit events
+                'edit.*': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                // View events (not render updates)
+                'view.viewport.update': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.group.set': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.sort.set': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.filter.set': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                // Drag events
+                'drag.*': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.dragCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                // Keyboard events (route to appropriate coordinator)
+                'keyboard.arrow': {
+                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'keyboard.copy': {
+                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'keyboard.paste': {
+                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'keyboard.delete': {
+                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'keyboard.enter': {
+                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'keyboard.escape': {
+                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
+                    ({ event }) => event)
+                }
+              }
+            }
+          }
+        },
+        
+        // Performance monitoring
+        performanceMonitoring: {
+          initial: 'monitoring',
+          states: {
+            monitoring: {
+              on: {
+                PERFORMANCE_MARK: {
+                  actions: [
+                    'updatePerformance',
+                    // Log significant performance issues
+                    ({ event }) => {
+                      if (event.duration > 50) {
+                        console.warn(`Performance warning: ${event.operation} took ${event.duration}ms`);
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+// ====================================
+// UTILITY FUNCTIONS
+// ====================================
+
+export const createTableEvent = <T extends TableEvents['type']>(
+  type: T,
+  payload: Omit<Extract<TableEvents, { type: T }>, 'type'>
+): Extract<TableEvents, { type: T }> => {
+  return { type, ...payload } as Extract<TableEvents, { type: T }>;
+};
+
+// Performance measurement helper
+export const measurePerformance = <T>(operation: string, fn: () => T): T => {
+  const start = performance.now();
+  const result = fn();
+  const duration = performance.now() - start;
+  
+  // Can be used to send PERFORMANCE_MARK events
+  if (duration > 5) {
+    console.log(`${operation}: ${duration.toFixed(2)}ms`);
+  }
+  
+  return result;
+};

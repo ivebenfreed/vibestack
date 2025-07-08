@@ -54,6 +54,20 @@ function DebugIndexPage() {
       path: '/debug/grid-machine-test',
       color: 'border-orange-500/20 hover:border-orange-500/30 bg-orange-500/5 dark:border-orange-400/20 dark:hover:border-orange-400/30 dark:bg-orange-400/5',
       badge: 'GRID MACHINE'
+    },
+    {
+      title: '🚀 VibeGridX POC Demo',
+      description: 'Complete POC demonstration of VibeGridX architecture with XState v5 machines, hybrid rendering, entity integration, and canvas overlays.',
+      path: '/debug/vibegridx-demo',
+      color: 'border-indigo-500/20 hover:border-indigo-500/30 bg-indigo-500/5 dark:border-indigo-400/20 dark:hover:border-indigo-400/30 dark:bg-indigo-400/5',
+      badge: 'VIBEGRIDX POC'
+    },
+    {
+      title: '🏗️ VibeGridX Architecture',
+      description: 'Interactive architecture demonstration showing XState v5 coordination, hybrid rendering, virtual scrolling, and complete implementation status.',
+      path: '/debug/vibegridx-architecture-demo',
+      color: 'border-cyan-500/20 hover:border-cyan-500/30 bg-cyan-500/5 dark:border-cyan-400/20 dark:hover:border-cyan-400/30 dark:bg-cyan-400/5',
+      badge: 'ARCHITECTURE'
     }
   ]
 
@@ -86,6 +100,10 @@ function DebugIndexPage() {
                   ? 'bg-violet-500/10 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 border border-violet-500/20'
                   : page.badge === 'GRID MACHINE'
                   ? 'bg-orange-500/10 text-orange-700 dark:bg-orange-400/10 dark:text-orange-300 border border-orange-500/20'
+                  : page.badge === 'VIBEGRIDX POC'
+                  ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
+                  : page.badge === 'ARCHITECTURE'
+                  ? 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300 border border-cyan-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -104,6 +122,8 @@ function DebugIndexPage() {
                    : page.badge === 'SYNC TEST' ? '🧪 Open Test Framework'
                    : page.badge === 'PRODUCTION GRID' ? '⚡ Open Grid Demo'
                    : page.badge === 'GRID MACHINE' ? '🎛️ Open Grid Machine'
+                   : page.badge === 'VIBEGRIDX POC' ? '🚀 Open POC Demo'
+                   : page.badge === 'ARCHITECTURE' ? '🏗️ Open Architecture Demo'
                    : 'Open Tool'}
                 </Button>
               </Link>

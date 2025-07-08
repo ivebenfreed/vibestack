@@ -45,6 +45,8 @@ import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedDebugVibegridxDemoImport } from './routes/_authenticated/debug/vibegridx-demo'
+import { Route as AuthenticatedDebugVibegridxArchitectureDemoImport } from './routes/_authenticated/debug/vibegridx-architecture-demo'
 import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_authenticated/debug/vibegridfinal-tasks'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
@@ -315,6 +317,20 @@ const AuthenticatedProjectsProjectIdRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
+const AuthenticatedDebugVibegridxDemoRoute =
+  AuthenticatedDebugVibegridxDemoImport.update({
+    id: '/vibegridx-demo',
+    path: '/vibegridx-demo',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
+const AuthenticatedDebugVibegridxArchitectureDemoRoute =
+  AuthenticatedDebugVibegridxArchitectureDemoImport.update({
+    id: '/vibegridx-architecture-demo',
+    path: '/vibegridx-architecture-demo',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 const AuthenticatedDebugVibegridfinalTasksRoute =
   AuthenticatedDebugVibegridfinalTasksImport.update({
     id: '/vibegridfinal-tasks',
@@ -576,6 +592,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugVibegridfinalTasksImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/vibegridx-architecture-demo': {
+      id: '/_authenticated/debug/vibegridx-architecture-demo'
+      path: '/vibegridx-architecture-demo'
+      fullPath: '/debug/vibegridx-architecture-demo'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridxArchitectureDemoImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/vibegridx-demo': {
+      id: '/_authenticated/debug/vibegridx-demo'
+      path: '/vibegridx-demo'
+      fullPath: '/debug/vibegridx-demo'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridxDemoImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/projects/$projectId': {
       id: '/_authenticated/projects/$projectId'
       path: '/projects/$projectId'
@@ -723,6 +753,8 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
+  AuthenticatedDebugVibegridxArchitectureDemoRoute: typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
+  AuthenticatedDebugVibegridxDemoRoute: typeof AuthenticatedDebugVibegridxDemoRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -746,6 +778,9 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugVibegridfinalTasksRoute:
       AuthenticatedDebugVibegridfinalTasksRoute,
+    AuthenticatedDebugVibegridxArchitectureDemoRoute:
+      AuthenticatedDebugVibegridxArchitectureDemoRoute,
+    AuthenticatedDebugVibegridxDemoRoute: AuthenticatedDebugVibegridxDemoRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
@@ -842,6 +877,8 @@ export interface FileRoutesByFullPath {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
+  '/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
+  '/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -888,6 +925,8 @@ export interface FileRoutesByTo {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
+  '/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
+  '/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -938,6 +977,8 @@ export interface FileRoutesById {
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
+  '/_authenticated/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
+  '/_authenticated/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -989,6 +1030,8 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegridfinal-tasks'
+    | '/debug/vibegridx-architecture-demo'
+    | '/debug/vibegridx-demo'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -1034,6 +1077,8 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegridfinal-tasks'
+    | '/debug/vibegridx-architecture-demo'
+    | '/debug/vibegridx-demo'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -1082,6 +1127,8 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/vibegridfinal-tasks'
+    | '/_authenticated/debug/vibegridx-architecture-demo'
+    | '/_authenticated/debug/vibegridx-demo'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -1198,6 +1245,8 @@ export const routeTree = rootRoute
         "/_authenticated/debug/reactflow-positioning",
         "/_authenticated/debug/state-machine-test",
         "/_authenticated/debug/vibegridfinal-tasks",
+        "/_authenticated/debug/vibegridx-architecture-demo",
+        "/_authenticated/debug/vibegridx-demo",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
@@ -1296,6 +1345,14 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/vibegridfinal-tasks": {
       "filePath": "_authenticated/debug/vibegridfinal-tasks.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegridx-architecture-demo": {
+      "filePath": "_authenticated/debug/vibegridx-architecture-demo.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegridx-demo": {
+      "filePath": "_authenticated/debug/vibegridx-demo.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/projects/$projectId": {
