@@ -5,6 +5,7 @@ import { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
 import { EntityIntegrationLayer, useTableConfigFromAtoms } from './integration/EntityIntegration';
 import type { TableConfig, RenderState, ViewportInfo, CellRef } from './types';
+import './vibegridx.css';
 
 // ====================================
 // COMPONENT PROPS
@@ -1028,125 +1029,12 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
   return (
     <div
       className={`vibegridx-container ${className}`}
-      style={{ 
-        width,
-        height,
-        position: 'relative',
-        overflow: 'hidden',
-        border: '1px solid hsl(var(--border))',
-        borderRadius: 'var(--radius)',
-        backgroundColor: 'hsl(var(--background))',
-        color: 'hsl(var(--foreground))'
-      }}
+      style={{ width, height }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
-      <style>{`
-        .vibegridx-table {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-        .vibegridx-table-wrapper {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-        }
-        .vibegridx-header {
-          display: flex;
-          background: hsl(var(--muted));
-          border-bottom: 1px solid hsl(var(--border));
-          color: hsl(var(--muted-foreground));
-          font-weight: 600;
-          font-size: 12px;
-          min-height: 32px;
-        }
-        .vibegridx-header-cell {
-          padding: 8px 12px;
-          border-right: 1px solid hsl(var(--border));
-          min-width: 120px;
-          display: flex;
-          align-items: center;
-          cursor: pointer;
-          user-select: none;
-          transition: background-color 0.1s;
-        }
-        .vibegridx-header-cell:hover {
-          background-color: hsl(var(--muted) / 0.8);
-        }
-        .vibegridx-viewport {
-          flex: 1;
-          overflow: auto;
-          background: hsl(var(--background));
-        }
-        .vibegridx-body {
-          position: relative;
-        }
-        .vibegridx-row {
-          display: flex;
-          border-bottom: 1px solid hsl(var(--border));
-          background: hsl(var(--background));
-          box-sizing: border-box;
-          overflow: hidden;
-        }
-        .vibegridx-row:hover {
-          background-color: hsl(var(--accent));
-        }
-        .vibegridx-cell {
-          padding: 8px 12px;
-          border-right: 1px solid hsl(var(--border));
-          min-width: 120px;
-          height: 40px;
-          box-sizing: border-box;
-          display: flex;
-          align-items: center;
-          font-size: 13px;
-          cursor: pointer;
-          color: hsl(var(--foreground));
-          background: inherit;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .vibegridx-selected {
-          background-color: hsl(var(--primary) / 0.1) !important;
-          border: 2px solid hsl(var(--primary)) !important;
-        }
-        .vibegridx-editing {
-          background-color: hsl(var(--chart-2) / 0.1) !important;
-          border: 2px solid hsl(var(--chart-2)) !important;
-        }
-        .vibegridx-dirty {
-          background-color: hsl(var(--chart-4) / 0.1);
-        }
-        .vibegridx-optimistic {
-          background-color: hsl(var(--primary) / 0.1);
-          border-left: 3px solid hsl(var(--primary));
-        }
-        .vibegridx-updated {
-          animation: vibegridx-pulse 0.3s ease-in-out;
-        }
-        @keyframes vibegridx-pulse {
-          0% { background-color: hsl(var(--chart-1) / 0.2); }
-          100% { background-color: transparent; }
-        }
-      `}</style>
       {/* Machine State Indicator */}
-      <div className="vibegridx-status-bar" style={{
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        padding: '4px 8px',
-        fontSize: '10px',
-        color: 'hsl(var(--muted-foreground))',
-        backgroundColor: 'hsl(var(--muted))',
-        borderLeft: '1px solid hsl(var(--border))',
-        borderBottom: '1px solid hsl(var(--border))',
-        borderRadius: '0 var(--radius) 0 var(--radius-sm)',
-        zIndex: 1000
-      }}>
+      <div className="vibegridx-status-bar">
         {JSON.stringify(tableState.value)} | v{tableState.context.version}
       </div>
       
@@ -1154,12 +1042,6 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
       <div
         ref={containerRef}
         className="vibegridx-renderer"
-        style={{
-          width: '100%',
-          height: '100%',
-          position: 'relative',
-          paddingTop: '28px' // Space for status bar
-        }}
       />
     </div>
   );

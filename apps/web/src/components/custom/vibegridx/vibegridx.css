@@ -1,0 +1,201 @@
+/* VibeGridX Styles */
+
+/* Container */
+.vibegridx-container {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Table Structure */
+.vibegridx-table {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.vibegridx-table-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.vibegridx-header {
+  display: flex;
+  background: hsl(var(--muted));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.vibegridx-header-cell {
+  padding: 8px 12px;
+  border-right: 1px solid hsl(var(--border));
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.1s;
+  flex-shrink: 0;
+}
+
+.vibegridx-header-cell:hover {
+  background-color: hsl(var(--muted) / 0.8);
+}
+
+/* Viewport */
+.vibegridx-viewport {
+  flex: 1;
+  overflow: auto;
+  background: hsl(var(--background));
+}
+
+/* Body */
+.vibegridx-body {
+  position: relative;
+}
+
+/* Rows */
+.vibegridx-row {
+  display: flex;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.vibegridx-row:hover {
+  background-color: hsl(var(--accent));
+}
+
+/* Cells */
+.vibegridx-cell {
+  padding: 8px 12px;
+  border-right: 1px solid hsl(var(--border));
+  min-width: 120px;
+  height: 40px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  color: hsl(var(--foreground));
+  background: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Selection States */
+.vibegridx-selected {
+  background-color: hsl(var(--primary) / 0.1) !important;
+  border: 2px solid hsl(var(--primary)) !important;
+}
+
+.vibegridx-editing {
+  background-color: hsl(var(--chart-2) / 0.1) !important;
+  border: 2px solid hsl(var(--chart-2)) !important;
+}
+
+/* Row States */
+.vibegridx-dirty {
+  background-color: hsl(var(--chart-4) / 0.1);
+}
+
+.vibegridx-optimistic {
+  background-color: hsl(var(--primary) / 0.1);
+  border-left: 3px solid hsl(var(--primary));
+}
+
+/* Animations */
+.vibegridx-updated {
+  animation: vibegridx-pulse 0.3s ease-in-out;
+}
+
+@keyframes vibegridx-pulse {
+  0% { 
+    background-color: hsl(var(--chart-1) / 0.2); 
+  }
+  100% { 
+    background-color: transparent; 
+  }
+}
+
+/* Status Bar */
+.vibegridx-status-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-size: 10px;
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--muted));
+  border-left: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  border-radius: 0 var(--radius) 0 var(--radius-sm);
+  z-index: 1000;
+}
+
+/* Renderer Container */
+.vibegridx-renderer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  padding-top: 28px; /* Space for status bar */
+}
+
+/* Canvas Overlay (for selection visualization) */
+.vibegridx-canvas-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Scrollbar Styling */
+.vibegridx-viewport::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.vibegridx-viewport::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.vibegridx-viewport::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 6px;
+}
+
+.vibegridx-viewport::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+.vibegridx-viewport::-webkit-scrollbar-corner {
+  background: hsl(var(--muted));
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .vibegridx-header-cell,
+  .vibegridx-cell {
+    min-width: 80px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  
+  .vibegridx-header {
+    font-size: 11px;
+  }
+}
