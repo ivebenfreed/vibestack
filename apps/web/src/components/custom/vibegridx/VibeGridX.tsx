@@ -134,7 +134,11 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
       onCellDoubleClick: handleCellDoubleClick,
       onColumnClick: handleColumnClick,
       onStateChange: handleRendererStateChange,
-      onScroll: handleScroll
+      onScroll: handleScroll,
+      onKeyDown: (event: KeyboardEvent) => {
+        // Convert native KeyboardEvent to React.KeyboardEvent-like structure
+        handleKeyDown(event as any);
+      }
     });
     
     // Initialize canvas overlay after renderer creates DOM structure
@@ -281,6 +285,12 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
   const handleCellClick = useCallback((rowId: string, columnId: string, event: MouseEvent) => {
     console.log('VibeGridX.handleCellClick:', { rowId, columnId, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey });
     
+    // Ensure the container has focus for keyboard events
+    if (containerRef.current) {
+      containerRef.current.focus();
+      console.log('VibeGridX: Container focused');
+    }
+    
     const cellKey = `${rowId}:${columnId}`;
     
     // Immediately update canvas overlay for instant feedback
@@ -414,6 +424,14 @@ export const VibeGridX: React.FC<VibeGridXProps> = ({
   // ====================================
   
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    console.log('VibeGridX handleKeyDown:', {
+      key: event.key,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      target: event.target,
+      currentTarget: event.currentTarget
+    });
+    
     // Handle arrow key navigation directly for instant feedback
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();

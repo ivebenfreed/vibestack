@@ -296,6 +296,10 @@ export class AtomicTableRenderer {
     
     // Header interaction handlers
     this.header.addEventListener('click', this.handleHeaderClick.bind(this));
+    
+    // Keyboard event handlers - add to viewport which has focus
+    this.viewport.tabIndex = 0; // Make viewport focusable
+    this.viewport.addEventListener('keydown', this.handleKeyDown.bind(this));
   }
   
   // ====================================
@@ -656,6 +660,10 @@ export class AtomicTableRenderer {
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
     
+    // Ensure viewport has focus for keyboard events
+    this.viewport.focus();
+    console.log('AtomicTableRenderer: Viewport focused after cell click');
+    
     this.options.onCellClick?.(rowId, columnId, event);
   }
   
@@ -682,6 +690,17 @@ export class AtomicTableRenderer {
     if (columnId) {
       this.options.onColumnClick?.(columnId, event);
     }
+  }
+  
+  private handleKeyDown(event: KeyboardEvent): void {
+    console.log('AtomicTableRenderer.handleKeyDown:', {
+      key: event.key,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey
+    });
+    
+    // Forward keyboard events to the parent component
+    this.options.onKeyDown?.(event);
   }
   
   // ====================================

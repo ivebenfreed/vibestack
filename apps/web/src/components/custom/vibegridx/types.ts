@@ -282,6 +282,7 @@ export interface RendererOptions {
   onColumnClick?: (columnId: string, event: MouseEvent) => void;
   onStateChange?: (state: any) => void;
   onScroll?: (viewport: ViewportInfo) => void;
+  onKeyDown?: (event: KeyboardEvent) => void;
   debug?: boolean;
 }
 
