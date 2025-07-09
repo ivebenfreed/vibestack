@@ -87,7 +87,7 @@ class SelectionLayerManager {
         width: this.config.cellWidth,
         height: this.config.cellHeight,
         fill: this.config.selectionColor,
-        opacity: 0.3,  // More visible for debugging
+        opacity: 0.3,
         visible: false,
         listening: false
       });
@@ -97,7 +97,7 @@ class SelectionLayerManager {
         width: this.config.cellWidth,
         height: this.config.cellHeight,
         stroke: this.config.selectionBorderColor,
-        strokeWidth: this.config.borderWidth || 2,
+        strokeWidth: this.config.borderWidth,
         fill: 'transparent',
         visible: false,
         listening: false
@@ -169,6 +169,12 @@ class SelectionLayerManager {
   }
   
   updateSelection(selectedCells: Set<string>, viewport: ViewportInfo): void {
+    console.log('SelectionLayerManager.updateSelection:', { 
+      selectedCells: selectedCells.size, 
+      viewport,
+      cellKeys: Array.from(selectedCells)
+    });
+    
     // Hide all currently active shapes
     this.activeShapes.forEach(shapes => {
       shapes.cell.visible(false);
@@ -185,6 +191,7 @@ class SelectionLayerManager {
     
     // Show shapes for selected cells that are visible
     let shapeIndex = 0;
+    let foundPositions = 0;
     
     for (const cellKey of selectedCells) {
       if (shapeIndex >= this.cellShapePool.length) break;
@@ -192,7 +199,10 @@ class SelectionLayerManager {
       const [rowId, columnId] = cellKey.split(':');
       const position = this.getCellPosition(rowId, columnId, viewport);
       
+      console.log('Cell position for', cellKey, ':', position);
+      
       if (position) {
+        foundPositions++;
         const cellShape = this.cellShapePool[shapeIndex];
         const borderShape = this.borderShapePool[shapeIndex];
         
@@ -217,6 +227,20 @@ class SelectionLayerManager {
     // Update fill handle position and selection bounds
     this.calculateSelectionBounds();
     this.updateFillHandlePosition();
+    
+    console.log('SelectionLayerManager: Drawing layer with', foundPositions, 'visible cells');
+    
+    // Debug: Check if stage and container are visible
+    const konvaContainer = this.layer.getStage()?.container();
+    if (konvaContainer) {
+      const rect = konvaContainer.getBoundingClientRect();
+      console.log('Konva container visibility:', {
+        width: rect.width,
+        height: rect.height,
+        visible: rect.width > 0 && rect.height > 0,
+        position: { top: rect.top, left: rect.left }
+      });
+    }
     
     this.layer.batchDraw();
   }
@@ -727,6 +751,9 @@ export class CanvasOverlayManager {
   private dragStartPos: { x: number; y: number } | null = null;
   private dragStartCell: { x: number; y: number } | null = null;
   
+  // Debug background rect
+  private debugBackground?: Konva.Rect;
+  
   constructor(container: HTMLElement, config: Partial<OverlayConfig> = {}) {
     this.container = container;
     
@@ -771,12 +798,13 @@ export class CanvasOverlayManager {
   // ====================================
   
   private initializeStage(): void {
-    const width = this.container.clientWidth || 800; // Fallback width
-    const height = this.container.clientHeight || 600; // Fallback height
+    // Get the container dimensions
+    const width = this.container.clientWidth || 800;
+    const height = this.container.clientHeight || 600;
     
     console.log('CanvasOverlayManager: Initializing Konva stage', { width, height, container: this.container });
     
-    // Initialize stage with dimensions
+    // Initialize stage with viewport dimensions only
     this.stage = new Konva.Stage({
       container: this.container,
       width,
@@ -784,21 +812,27 @@ export class CanvasOverlayManager {
       listening: true // Enable event listening
     });
     
-    // Add a background rect for debugging visibility
-    const debugBackground = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width,
-      height,
-      fill: 'transparent', // Transparent to not interfere
-      listening: false
+    // Defer heavy initialization to next frame to avoid blocking
+    requestAnimationFrame(() => {
+      // Add a background rect for debugging visibility
+      const debugBackground = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width,
+        height,
+        fill: 'rgba(0, 0, 0, 0)', // Transparent background
+        listening: false
+      });
+      
+      const debugLayer = new Konva.Layer();
+      debugLayer.add(debugBackground);
+      this.stage.add(debugLayer);
+      
+      console.log('CanvasOverlayManager: Stage initialized with debug background');
+      
+      // Store debug background reference for resize
+      this.debugBackground = debugBackground;
     });
-    
-    const debugLayer = new Konva.Layer();
-    debugLayer.add(debugBackground);
-    this.stage.add(debugLayer);
-    
-    console.log('CanvasOverlayManager: Stage initialized with debug background');
     
     // Keep canvas interactive - we'll handle event forwarding
     const konvaContainer = this.container.querySelector('.konvajs-content');
@@ -816,17 +850,20 @@ export class CanvasOverlayManager {
       
       console.log('CanvasOverlayManager: Resizing stage', { newWidth, newHeight });
       
-      // Resize stage
+      // Resize stage to viewport size
       this.stage.width(newWidth);
       this.stage.height(newHeight);
       
-      // Update debug background
-      debugBackground.width(newWidth);
-      debugBackground.height(newHeight);
+      // Update debug background if it exists
+      if (this.debugBackground) {
+        this.debugBackground.width(newWidth);
+        this.debugBackground.height(newHeight);
+      }
       
       this.stage.batchDraw();
     });
     
+    // Observe the container
     resizeObserver.observe(this.container);
   }
   
