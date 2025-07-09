@@ -17,6 +17,37 @@ export class CoordinateSystem {
   // Dimension manager reference
   private dimensionManager: ColumnDimensionManager | null = null;
   private columns: Column[] = [];
+  
+  // Position cache
+  private positionCache: Map<string, CellPosition> = new Map();
+  private columnOffsetCache: Map<string, number> = new Map();
+  private columnWidthCache: Map<string, number> = new Map();
+  private cellKeyCache: Map<string, { rowId: string; columnId: string }> = new Map();
+  
+  // Add method to parse cell key with caching
+  parseCellKey(cellKey: string): { rowId: string; columnId: string } | null {
+    let parsed = this.cellKeyCache.get(cellKey);
+    if (parsed) {
+      return parsed;
+    }
+    
+    const parts = cellKey.split(':');
+    if (parts.length !== 2) {
+      return null;
+    }
+    
+    parsed = { rowId: parts[0], columnId: parts[1] };
+    this.cellKeyCache.set(cellKey, parsed);
+    
+    // Limit cache size
+    if (this.cellKeyCache.size > 500) {
+      // Remove oldest entries
+      const keysToDelete = Array.from(this.cellKeyCache.keys()).slice(0, 100);
+      keysToDelete.forEach(key => this.cellKeyCache.delete(key));
+    }
+    
+    return parsed;
+  }
 
   constructor(config: OverlayConfig, dimensionManager?: ColumnDimensionManager) {
     this.config = config;
@@ -32,6 +63,9 @@ export class CoordinateSystem {
     this.columnIndexMap.clear();
     this.indexToRowId.clear();
     this.indexToColumnId.clear();
+    
+    // Clear all caches when mappings change
+    this.clearCaches();
 
     rowIds.forEach((id, index) => {
       this.rowIndexMap.set(id, index);
@@ -44,16 +78,33 @@ export class CoordinateSystem {
     });
   }
   
-  // Columns are now managed by dimensionManager passed during initialization
-  
-  // Get column width
-  private getColumnWidth(columnId: string): number {
-    return this.dimensionManager?.getColumnWidth(columnId) || this.config.cellWidth;
+  private clearCaches(): void {
+    this.positionCache.clear();
+    this.columnOffsetCache.clear();
+    this.columnWidthCache.clear();
+    this.cellKeyCache.clear();
   }
   
-  // Get column offset (x position)
+  // Columns are now managed by dimensionManager passed during initialization
+  
+  // Get column width with caching
+  private getColumnWidth(columnId: string): number {
+    let width = this.columnWidthCache.get(columnId);
+    if (width === undefined) {
+      width = this.dimensionManager?.getColumnWidth(columnId) || this.config.cellWidth;
+      this.columnWidthCache.set(columnId, width);
+    }
+    return width;
+  }
+  
+  // Get column offset (x position) with caching
   private getColumnOffset(columnId: string): number {
-    return this.dimensionManager?.getColumnOffset(columnId) || 0;
+    let offset = this.columnOffsetCache.get(columnId);
+    if (offset === undefined) {
+      offset = this.dimensionManager?.getColumnOffset(columnId) || 0;
+      this.columnOffsetCache.set(columnId, offset);
+    }
+    return offset;
   }
   
   // Get column by x position
@@ -146,12 +197,20 @@ export class CoordinateSystem {
     return { x, y, row, column };
   }
 
-  // Get cell position by IDs
+  // Get cell position by IDs with caching
   getCellPositionByIds(
     rowId: string, 
     columnId: string, 
     viewport: ViewportInfo
   ): CellPosition | null {
+    // Create cache key including viewport to handle scrolling
+    const cacheKey = `${rowId}:${columnId}:${viewport.start}`;
+    
+    let position = this.positionCache.get(cacheKey);
+    if (position) {
+      return position;
+    }
+    
     const rowIndex = this.rowIndexMap.get(rowId);
     const columnIndex = this.columnIndexMap.get(columnId);
 
@@ -159,7 +218,19 @@ export class CoordinateSystem {
       return null;
     }
 
-    return this.cellToViewport(rowIndex, columnIndex, viewport);
+    position = this.cellToViewport(rowIndex, columnIndex, viewport);
+    
+    // Cache the position for future use
+    this.positionCache.set(cacheKey, position);
+    
+    // Limit cache size to prevent memory issues
+    if (this.positionCache.size > 1000) {
+      // Remove oldest entries
+      const keysToDelete = Array.from(this.positionCache.keys()).slice(0, 200);
+      keysToDelete.forEach(key => this.positionCache.delete(key));
+    }
+    
+    return position;
   }
 
   // Convert cell indices to IDs

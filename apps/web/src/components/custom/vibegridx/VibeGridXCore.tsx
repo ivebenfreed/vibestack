@@ -138,7 +138,9 @@ export const useRendererInitialization = (
             editingBorderColor: '#059669',
             enableAnimations: false,
             animationDuration: 0,
-            borderWidth: 2
+            borderWidth: 2,
+            useV2: true // Enable XState-powered overlay system
+            // overlayActor: tableState?.context?.actors?.overlayActor // TODO: Fix shared actor approach
           });
           
           // Set selection change callback

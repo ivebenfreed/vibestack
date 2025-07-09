@@ -17,6 +17,7 @@ import { editCoordinatorMachine } from './edit-coordinator';
 import { viewCoordinatorMachine } from './view-coordinator';
 import { dragCoordinatorMachine } from './drag-coordinator';
 import { rowActorMachine } from './row-actor';
+import { overlayMachine } from './overlay-machine';
 
 // ====================================
 // HELPER FUNCTIONS
@@ -47,6 +48,7 @@ const createDefaultContext = (input: TableConfig): TableContext => ({
     editCoordinator: null,
     viewCoordinator: null,
     dragCoordinator: null,
+    overlayActor: null,
     rowActors: new Map()
   },
   
@@ -142,6 +144,7 @@ export const tableBaseMachine = setup({
     editCoordinator: editCoordinatorMachine,
     viewCoordinator: viewCoordinatorMachine,
     dragCoordinator: dragCoordinatorMachine,
+    overlayActor: overlayMachine,
     rowActor: rowActorMachine,
     spawnRowActors,
     updatePerformanceMetrics
@@ -178,6 +181,9 @@ export const tableBaseMachine = setup({
           }),
           dragCoordinator: spawn('dragCoordinator', {
             systemId: 'drag-coordinator'
+          }),
+          overlayActor: spawn('overlayActor', {
+            systemId: 'overlay-actor'
           })
         };
       }
@@ -352,22 +358,66 @@ export const tableBaseMachine = setup({
                 // Selection events
                 'selection.*': {
                   guard: 'canPerformOperation',
-                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                    ({ event }) => event)
+                  actions: [
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      ({ event }) => event),
+                    // Forward to overlay actor for visualization
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      ({ event }) => {
+                        // Map selection events to overlay events
+                        if (event.type === 'selection.cell.toggle') {
+                          return {
+                            type: 'CELL_CLICK',
+                            cellKey: event.cellKey,
+                            ctrlKey: event.ctrlKey || false,
+                            shiftKey: event.shiftKey || false
+                          };
+                        } else if (event.type === 'selection.bulk.set') {
+                          return {
+                            type: 'SELECTION_UPDATE',
+                            cells: event.selectedCells
+                          };
+                        }
+                        return event;
+                      })
+                  ]
                 },
                 
                 // Edit events
                 'edit.*': {
                   guard: 'canPerformOperation',
-                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
-                    ({ event }) => event)
+                  actions: [
+                    sendTo(({ context }) => context.actors.editCoordinator!, 
+                      ({ event }) => event),
+                    // Forward to overlay actor for visualization
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      ({ event }) => {
+                        if (event.type === 'edit.cell.start') {
+                          return {
+                            type: 'EDIT_START',
+                            cell: { rowId: event.rowId, columnId: event.columnId }
+                          };
+                        } else if (event.type === 'edit.cell.end' || event.type === 'edit.cell.cancel') {
+                          return { type: 'EDIT_END' };
+                        }
+                        return event;
+                      })
+                  ]
                 },
                 
                 // View events (not render updates)
                 'view.viewport.update': {
                   guard: 'canPerformOperation',
-                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
-                    ({ event }) => event)
+                  actions: [
+                    sendTo(({ context }) => context.actors.viewCoordinator!, 
+                      ({ event }) => event),
+                    // Forward viewport updates to overlay actor
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      ({ event }) => ({
+                        type: 'VIEWPORT_UPDATE',
+                        viewport: event.viewport
+                      }))
+                  ]
                 },
                 
                 'view.group.set': {

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { CellRef, ViewportInfo, Column } from '../types';
 import { CanvasOverlayCore } from './CanvasOverlayCore';
+import { CanvasOverlayCoreV2 } from './CanvasOverlayCoreV2';
 import type { OverlayConfig } from './OverlayTypes';
 
 // ====================================
@@ -8,18 +9,24 @@ import type { OverlayConfig } from './OverlayTypes';
 // ====================================
 
 export class CanvasOverlayManager {
-  private core: CanvasOverlayCore;
+  private core: CanvasOverlayCore | CanvasOverlayCoreV2;
   private container: HTMLElement;
   
   // Public API for backward compatibility
   public stage: any; // Exposed for VibeGridX
   public selectionManager: any; // Exposed for keyboard shortcuts
 
-  constructor(container: HTMLElement, config: Partial<OverlayConfig> = {}) {
+  constructor(container: HTMLElement, config: Partial<OverlayConfig & { useV2?: boolean }> = {}) {
     this.container = container;
     
-    // Create the core overlay system
-    this.core = new CanvasOverlayCore(container, config);
+    // Create the core overlay system (V1 or V2 based on config)
+    if (config.useV2) {
+      this.core = new CanvasOverlayCoreV2(container, config);
+      console.log('CanvasOverlayManager: Initialized with XState V2 architecture');
+    } else {
+      this.core = new CanvasOverlayCore(container, config);
+      console.log('CanvasOverlayManager: Initialized with new modular architecture');
+    }
     
     // Expose parts of the API for backward compatibility
     this.stage = (this.core as any).stage;
@@ -27,8 +34,6 @@ export class CanvasOverlayManager {
       showCopyIndicator: (isCut: boolean) => this.core.showCopyIndicator(isCut),
       hideCopyIndicator: () => this.core.hideCopyIndicator()
     };
-    
-    console.log('CanvasOverlayManager: Initialized with new modular architecture');
   }
 
   // Update data mappings (row/column IDs)

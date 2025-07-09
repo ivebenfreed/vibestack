@@ -171,6 +171,7 @@ export interface TableContext {
     editCoordinator: ActorRefFrom<any> | null;
     viewCoordinator: ActorRefFrom<any> | null;
     dragCoordinator: ActorRefFrom<any> | null;
+    overlayActor: ActorRefFrom<any> | null;
     rowActors: Map<string, ActorRefFrom<any>>;
   };
   

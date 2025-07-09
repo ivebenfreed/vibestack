@@ -279,7 +279,7 @@ export class AtomicTableRenderer {
     canvasOverlay.style.top = '0';
     canvasOverlay.style.left = '0';
     // Don't set width/height - let Konva handle it based on viewport
-    canvasOverlay.style.pointerEvents = 'none';
+    canvasOverlay.style.pointerEvents = 'none'; // Canvas is display only, DOM cells handle events
     canvasOverlay.style.zIndex = '10';
     this.body.appendChild(canvasOverlay);
     
@@ -437,6 +437,19 @@ export class AtomicTableRenderer {
           rowCount: state.rows.length,
           visibleRange: this.virtualGrid.getVisibleRange()
         });
+        
+        // Send initial viewport update to canvas overlay
+        const initialViewport: ViewportInfo = {
+          start: this.virtualGrid.getVisibleRange().start,
+          end: this.virtualGrid.getVisibleRange().end,
+          height: this.viewport.clientHeight,
+          width: this.viewport.clientWidth,
+          scrollTop: this.viewport.scrollTop,
+          itemHeight: this.virtualGrid.getRowHeight()
+        };
+        
+        console.log('AtomicTableRenderer: Sending initial viewport to canvas overlay:', initialViewport);
+        this.options.onScroll?.(initialViewport);
       });
       
     } finally {
@@ -764,10 +777,21 @@ export class AtomicTableRenderer {
   
   private handleCellClick(event: MouseEvent): void {
     const cellElement = (event.target as Element).closest(`.${CSS_CLASSES.CELL}`) as HTMLElement;
+    
+    console.log('AtomicTableRenderer.handleCellClick DEBUG:', {
+      target: event.target,
+      currentTarget: event.currentTarget,
+      cellElement: cellElement,
+      eventCoords: { x: event.clientX, y: event.clientY },
+      canvasOverlay: this.body.querySelector('.vibegridx-canvas-overlay-container')
+    });
+    
     if (!cellElement) return;
     
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
+    
+    console.log('AtomicTableRenderer: Cell clicked:', { rowId, columnId });
     
     // Ensure viewport has focus for keyboard events
     this.viewport.focus();

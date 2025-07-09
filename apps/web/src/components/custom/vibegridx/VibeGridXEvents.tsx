@@ -35,6 +35,11 @@ export const createCellClickHandler = (
 ) => {
   return useCallback((rowId: string, columnId: string, event: MouseEvent) => {
     console.log('VibeGridX.handleCellClick:', { rowId, columnId, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey });
+    console.log('VibeGridXEvents.handleCellClick DEBUG:', {
+      hasCanvasOverlay: !!refs.canvasOverlayRef.current,
+      canvasOverlayType: refs.canvasOverlayRef.current?.constructor.name,
+      eventCoords: { x: event.clientX, y: event.clientY }
+    });
     
     const cellKey = `${rowId}:${columnId}`;
     

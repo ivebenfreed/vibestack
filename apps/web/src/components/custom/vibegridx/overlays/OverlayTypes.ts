@@ -7,6 +7,7 @@ import type { CellRef, ViewportInfo } from '../types';
 export interface OverlayConfig {
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
   columns?: any[]; // Column array for coordinate calculations
+  overlayActor?: any; // Overlay machine actor from table machine
   cellWidth: number;
   cellHeight: number;
   borderWidth: number;
