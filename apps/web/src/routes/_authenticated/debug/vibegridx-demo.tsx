@@ -7,7 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { VibeGridX, CanvasOverlay } from '@/components/custom/vibegridx';
-import type { VibeGridXProps, CellRef, ViewportInfo } from '@/components/custom/vibegridx';
+import type { VibeGridXProps, CellRef, ViewportInfo, Column } from '@/components/custom/vibegridx';
+import type { Task } from '@repo/dataforge/client-entities';
 
 // Import actual domain atoms
 import { useTaskAtoms, taskUtils, updateTaskUI, createTaskUI, deleteTaskUI } from '@/domain/task';
@@ -17,6 +18,127 @@ import { useUserAtoms, userUtils, updateUserUI, createUserUI, deleteUserUI } fro
 export const Route = createFileRoute('/_authenticated/debug/vibegridx-demo')({
   component: VibeGridXDemoPage,
 });
+
+// ====================================
+// COLUMN DEFINITIONS
+// ====================================
+
+const taskColumns: Column<Task>[] = [
+  {
+    id: 'id',
+    name: 'ID',
+    field: 'id',
+    type: 'text',
+    width: 80,
+    editable: false
+  },
+  {
+    id: 'title',
+    name: 'Title',
+    field: 'title',
+    type: 'text',
+    width: 200,
+    editable: true
+  },
+  {
+    id: 'status',
+    name: 'Status',
+    field: 'status',
+    type: 'select',
+    width: 120,
+    editable: true,
+    options: [
+      { value: 'todo', label: 'Todo' },
+      { value: 'in_progress', label: 'In Progress' },
+      { value: 'completed', label: 'Completed' }
+    ]
+  },
+  {
+    id: 'priority',
+    name: 'Priority',
+    field: 'priority',
+    type: 'select',
+    width: 100,
+    editable: true,
+    options: [
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' }
+    ]
+  },
+  {
+    id: 'description',
+    name: 'Description',
+    field: 'description',
+    type: 'text',
+    width: 300,
+    editable: true
+  },
+  {
+    id: 'tags',
+    name: 'Tags',
+    field: 'tags',
+    type: 'text',
+    width: 150,
+    editable: true
+  },
+  {
+    id: 'projectId',
+    name: 'Project',
+    field: 'projectId',
+    type: 'text',
+    width: 120,
+    editable: true
+  },
+  {
+    id: 'assignedUserId',
+    name: 'Assigned To',
+    field: 'assignedUserId',
+    type: 'text',
+    width: 120,
+    editable: true
+  },
+  {
+    id: 'dueDate',
+    name: 'Due Date',
+    field: 'dueDate',
+    type: 'date',
+    width: 120,
+    editable: true
+  },
+  {
+    id: 'estimate',
+    name: 'Estimate',
+    field: 'estimate',
+    type: 'number',
+    width: 80,
+    editable: true
+  },
+  {
+    id: 'recurring',
+    name: 'Recurring',
+    field: 'recurring',
+    type: 'boolean',
+    width: 80,
+    editable: true
+  },
+  {
+    id: 'createdAt',
+    name: 'Created',
+    field: 'createdAt',
+    type: 'date',
+    width: 120,
+    editable: false
+  },
+  {
+    id: 'updatedAt',
+    name: 'Updated',
+    field: 'updatedAt',
+    type: 'date',
+    width: 120,
+    editable: false
+  }
+];
 
 // ====================================
 // ENTITY DATA HOOKS
@@ -198,23 +320,8 @@ function VibeGridXDemoTable({
     return str.length > 30 ? str.slice(0, 30) + '...' : str;
   };
   
-  const getColumnWidth = (columnId: string) => {
-    const widthMap: Record<string, string> = {
-      id: 'w-20',
-      title: 'w-48',
-      name: 'w-48',
-      description: 'w-64',
-      status: 'w-24',
-      priority: 'w-20',
-      assignee: 'w-24',
-      assigneeId: 'w-24',
-      ownerId: 'w-24',
-      role: 'w-20',
-      email: 'w-48',
-      department: 'w-32'
-    };
-    return widthMap[columnId] || 'w-32';
-  };
+  // Column widths are now handled by the VibeGridX column definitions
+  // No need for Tailwind width classes
   
   if (isLoading) {
     return (
@@ -254,7 +361,7 @@ function VibeGridXDemoTable({
               {columns.map((column) => (
                 <th 
                   key={column}
-                  className={`p-2 text-left font-medium border-r border-border ${getColumnWidth(column)}`}
+                  className="p-2 text-left font-medium border-r border-border"
                 >
                   <div className="flex items-center gap-2">
                     {column}
@@ -283,7 +390,7 @@ function VibeGridXDemoTable({
                   return (
                     <td
                       key={column}
-                      className={`p-2 border-r border-border cursor-pointer transition-colors ${getColumnWidth(column)} ${
+                      className={`p-2 border-r border-border cursor-pointer transition-colors ${
                         isSelected ? 'bg-primary/10 ring-1 ring-primary/20' : ''
                       } ${isEditing ? 'bg-primary/20 ring-2 ring-primary/40' : ''}`}
                       onClick={() => onCellClick(row.id, column)}
@@ -650,10 +757,11 @@ function VibeGridXDemoPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="border rounded-lg overflow-hidden">
-                <VibeGridX
+                <VibeGridX<Task>
                   ref={vibeGridXRef}
                   data={entityData.data}
                   entityType="task"
+                  columns={taskColumns}
                   enableVirtualScrolling={config.enableVirtualScrolling}
                   enableCanvasOverlays={config.enableCanvasOverlays}
                   enableGrouping={config.enableGrouping}

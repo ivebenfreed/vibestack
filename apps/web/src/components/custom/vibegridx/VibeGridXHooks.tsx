@@ -225,6 +225,7 @@ export const useRenderStateExtractor = (
       
       const renderState = {
         rows,
+        columns,
         selectedCells,
         editingCell,
         groupedData,

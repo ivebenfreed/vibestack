@@ -65,15 +65,7 @@ export const createTaskAdapter = (): DomainAtomAdapter => {
     
     getEntityType: () => 'task',
     
-    getColumns: (): Column[] => [
-      { id: 'title', name: 'Title', field: 'title', type: 'text', editable: true },
-      { id: 'status', name: 'Status', field: 'status', type: 'select', editable: true, options: ['todo', 'in_progress', 'completed'] },
-      { id: 'priority', name: 'Priority', field: 'priority', type: 'select', editable: true, options: ['low', 'medium', 'high'] },
-      { id: 'dueDate', name: 'Due Date', field: 'dueDate', type: 'date', editable: true },
-      { id: 'assigneeId', name: 'Assignee', field: 'assigneeId', type: 'text', editable: true },
-      { id: 'createdAt', name: 'Created', field: 'createdAt', type: 'date', editable: false },
-      { id: 'updatedAt', name: 'Updated', field: 'updatedAt', type: 'date', editable: false }
-    ]
+    getColumns: (): Column[] => []  // Columns now come from component props
   };
 };
 
@@ -110,15 +102,7 @@ export const createProjectAdapter = (): DomainAtomAdapter => {
     
     getEntityType: () => 'project',
     
-    getColumns: (): Column[] => [
-      { id: 'name', name: 'Name', field: 'name', type: 'text', editable: true },
-      { id: 'description', name: 'Description', field: 'description', type: 'text', editable: true },
-      { id: 'status', name: 'Status', field: 'status', type: 'select', editable: true, options: ['planning', 'active', 'completed', 'archived'] },
-      { id: 'startDate', name: 'Start Date', field: 'startDate', type: 'date', editable: true },
-      { id: 'endDate', name: 'End Date', field: 'endDate', type: 'date', editable: true },
-      { id: 'ownerId', name: 'Owner', field: 'ownerId', type: 'text', editable: true },
-      { id: 'createdAt', name: 'Created', field: 'createdAt', type: 'date', editable: false }
-    ]
+    getColumns: (): Column[] => []  // Columns now come from component props
   };
 };
 
@@ -155,14 +139,7 @@ export const createUserAdapter = (): DomainAtomAdapter => {
     
     getEntityType: () => 'user',
     
-    getColumns: (): Column[] => [
-      { id: 'name', name: 'Name', field: 'name', type: 'text', editable: true },
-      { id: 'email', name: 'Email', field: 'email', type: 'text', editable: true },
-      { id: 'role', name: 'Role', field: 'role', type: 'select', editable: true, options: ['user', 'admin', 'owner'] },
-      { id: 'isActive', name: 'Active', field: 'isActive', type: 'boolean', editable: true },
-      { id: 'lastLoginAt', name: 'Last Login', field: 'lastLoginAt', type: 'date', editable: false },
-      { id: 'createdAt', name: 'Created', field: 'createdAt', type: 'date', editable: false }
-    ]
+    getColumns: (): Column[] => []  // Columns now come from component props
   };
 };
 
@@ -371,7 +348,6 @@ export class EntityIntegrationLayer {
   // Create table configuration from entity adapter
   createTableConfig(tableId: string): TableConfig {
     const entities = this.adapter.getAll();
-    const columns = this.adapter.getColumns();
     const entityType = this.adapter.getEntityType();
     
     const initialData: TableRow[] = Object.values(entities).map(entity => 
@@ -381,7 +357,7 @@ export class EntityIntegrationLayer {
     return {
       id: tableId,
       entityType,
-      columns,
+      columns: [], // Columns will come from component props
       initialData,
       settings: {
         enableVirtualScrolling: true,
@@ -438,7 +414,6 @@ export const useTableConfigFromAtoms = (entityType: string, tableId: string): Ta
   
   // Use selectors to get current data
   const entities = adapter.getAll();
-  const columns = adapter.getColumns();
   
   const initialData: TableRow[] = Object.values(entities).map(entity => ({
     id: entity.id,
@@ -454,15 +429,13 @@ export const useTableConfigFromAtoms = (entityType: string, tableId: string): Ta
   
   console.log('useTableConfigFromAtoms: Creating table config', {
     entityType,
-    columnCount: columns.length,
-    columns: columns.map(c => c.id),
     dataCount: initialData.length
   });
 
   return {
     id: tableId,
     entityType,
-    columns,
+    columns: [], // Columns will come from component props
     initialData,
     settings: {
       enableVirtualScrolling: true,

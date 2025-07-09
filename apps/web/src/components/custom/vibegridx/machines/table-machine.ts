@@ -1,4 +1,4 @@
-import { setup, assign, spawnChild, sendTo, fromPromise } from 'xstate';
+import { setup, assign, spawnChild, sendTo, fromPromise, emit } from 'xstate';
 import type { 
   TableContext, 
   TableEvents, 
@@ -6,6 +6,7 @@ import type {
   ViewportInfo,
   OptimisticOperation 
 } from '../types';
+import { createColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 
 // ====================================
 // ACTOR IMPORTS (will implement these next)
@@ -37,6 +38,9 @@ const createDefaultContext = (input: TableConfig): TableContext => ({
     ...input.settings
   },
   version: 0,
+  
+  // Create dimension manager with initial columns
+  dimensionManager: createColumnDimensionManager(input.columns || []),
   
   actors: {
     selectionCoordinator: null,
@@ -123,7 +127,14 @@ export const tableBaseMachine = setup({
   types: {
     context: {} as TableContext,
     events: {} as TableEvents,
-    input: {} as TableConfig
+    input: {} as TableConfig,
+    emitted: {} as
+      | { type: 'vibegridx.cell.click'; rowId: string; columnId: string }
+      | { type: 'vibegridx.cell.edit'; rowId: string; columnId: string; value: any }
+      | { type: 'vibegridx.selection.change'; selectedCells: Set<string> }
+      | { type: 'vibegridx.fill.complete'; originalCells: Set<string>; fillCells: Set<string> }
+      | { type: 'vibegridx.perf.render'; duration: number; cellCount: number }
+      | { type: 'vibegridx.error'; error: Error; context: string }
   },
   
   actors: {
@@ -178,6 +189,13 @@ export const tableBaseMachine = setup({
         event.type === 'SET_ENTITY_TYPE' ? event.entityType : '',
       columns: ({ event }) => 
         event.type === 'SET_ENTITY_TYPE' ? event.columns : [],
+      dimensionManager: ({ event }) => {
+        if (event.type === 'SET_ENTITY_TYPE') {
+          const manager = createColumnDimensionManager(event.columns);
+          return manager;
+        }
+        return undefined;
+      },
       version: ({ context }) => context.version + 1
     }),
     

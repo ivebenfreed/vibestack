@@ -38,6 +38,27 @@ export const createCellClickHandler = (
     
     const cellKey = `${rowId}:${columnId}`;
     
+    // Check if canvas overlay is available
+    if (!refs.canvasOverlayRef.current) {
+      console.warn('Canvas overlay ref not available - initialization may still be pending');
+      
+      // Still update selection state for when overlay becomes available
+      if (event.ctrlKey || event.shiftKey) {
+        // Handle multi-select without canvas overlay
+        const newSelection = new Set<string>(refs.selectedCellsRef.current);
+        if (event.ctrlKey && newSelection.has(cellKey)) {
+          newSelection.delete(cellKey);
+        } else if (event.ctrlKey) {
+          newSelection.add(cellKey);
+        }
+        refs.selectedCellsRef.current = newSelection;
+      } else {
+        // Single select
+        refs.selectedCellsRef.current = new Set([cellKey]);
+        refs.anchorCellRef.current = { rowId, columnId };
+      }
+    }
+    
     // Immediately update canvas overlay for instant feedback
     if (refs.canvasOverlayRef.current) {
       // Simple selection logic for immediate UI update
@@ -348,18 +369,9 @@ export const createScrollHandler = (
       viewport
     });
     
-    // Update canvas overlay viewport and re-render selection
+    // Update canvas overlay viewport (this will automatically re-render selection)
     if (refs.canvasOverlayRef.current) {
-      // Update viewport information first
       refs.canvasOverlayRef.current.updateViewport(viewport);
-      
-      // Then update selection if needed
-      if (refs.selectedCellsRef.current.size > 0) {
-        // Use requestAnimationFrame to update after DOM is updated
-        requestAnimationFrame(() => {
-          refs.canvasOverlayRef.current?.updateSelection(refs.selectedCellsRef.current);
-        });
-      }
     }
   }, [tableSend]);
 };
@@ -379,12 +391,9 @@ export const createRendererStateChangeHandler = (
         console.warn('Slow render detected:', event);
       }
       
-      // Re-render selection overlay after render completes
-      if (refs.canvasOverlayRef.current && refs.selectedCellsRef.current.size > 0) {
-        requestAnimationFrame(() => {
-          refs.canvasOverlayRef.current?.updateSelection(refs.selectedCellsRef.current);
-        });
-      }
+      // Note: We don't need to re-render selection after DOM updates anymore
+      // because the canvas is inside the scrollable container and moves with the content.
+      // The selection will be automatically updated via the selection coordinator subscription.
     }
   }, []);
 };
@@ -408,9 +417,8 @@ export const calculateRangeSelection = (
   
   const entityIds = Object.keys(entities);
   
-  // Use the actual columns from the first entity's data (same as renderer does)
-  const firstEntity = Object.values(entities)[0];
-  const columnIds = firstEntity ? Object.keys(firstEntity) : columns.map(c => c.id);
+  // Use column IDs from column definitions
+  const columnIds = columns.map(c => c.id);
   
   // Find indices
   const startRowIndex = entityIds.indexOf(start.rowId);

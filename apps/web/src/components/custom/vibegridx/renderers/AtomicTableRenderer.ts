@@ -7,6 +7,7 @@ import type {
   ViewportInfo,
   OptimisticOperation 
 } from '../types';
+import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -131,11 +132,15 @@ class VirtualGridManager {
     this.totalRows = totalRows;
     this.rowHeight = viewport.itemHeight;
     
-    // Calculate visible range with small buffer (5 rows each side for smooth scrolling)
+    // Calculate visible range with buffer
+    // Only add buffer if we're not at the edges
     const bufferRows = 5;
+    const canAddTopBuffer = viewport.start > 0;
+    const canAddBottomBuffer = viewport.end < totalRows;
+    
     this.visibleRange = {
-      start: Math.max(0, viewport.start - bufferRows),
-      end: Math.min(totalRows, viewport.end + bufferRows)
+      start: canAddTopBuffer ? Math.max(0, viewport.start - bufferRows) : viewport.start,
+      end: canAddBottomBuffer ? Math.min(totalRows, viewport.end + bufferRows) : viewport.end
     };
     
     // Return true if range changed
@@ -156,7 +161,8 @@ class VirtualGridManager {
   }
   
   getTotalHeight(): number {
-    return this.totalRows * this.rowHeight;
+    // Ensure we don't create extra space beyond actual rows
+    return Math.max(0, this.totalRows * this.rowHeight);
   }
   
   getRowHeight(): number {
@@ -192,6 +198,11 @@ export class AtomicTableRenderer {
   private editingCell: CellRef | null = null;
   private lastRenderState: RenderState | null = null;
   
+  // Column configuration
+  private columns: Column[] = [];
+  private dimensionManager: ColumnDimensionManager | null = null;
+  private rowHeight = 40; // Default row height
+  
   // Batch update queue
   private updateQueue = new Set<string>();
   private batchTimeoutId = 0;
@@ -199,12 +210,22 @@ export class AtomicTableRenderer {
   constructor(options: RendererOptions) {
     this.options = options;
     this.cellFactory = new CellRendererFactory();
+    this.dimensionManager = options.dimensionManager || null;
+    
+    // Set columns if provided
+    if (options.columns) {
+      this.setColumns(options.columns);
+    }
+    
+    // Use configured row height or default
+    this.rowHeight = options.cellHeight || 40;
+    
     this.virtualGrid = new VirtualGridManager({
       start: 0,
       end: 50,
       height: 400,
       scrollTop: 0,
-      itemHeight: 40
+      itemHeight: this.rowHeight
     });
     
     this.container = options.container;
@@ -251,10 +272,61 @@ export class AtomicTableRenderer {
     // Create body first
     this.viewport.appendChild(this.body);
     
+    // Pre-create canvas overlay container for immediate initialization
+    const canvasOverlay = document.createElement('div');
+    canvasOverlay.className = 'vibegridx-canvas-overlay-container';
+    canvasOverlay.style.position = 'absolute';
+    canvasOverlay.style.top = '0';
+    canvasOverlay.style.left = '0';
+    // Don't set width/height - let Konva handle it based on viewport
+    canvasOverlay.style.pointerEvents = 'none';
+    canvasOverlay.style.zIndex = '10';
+    this.body.appendChild(canvasOverlay);
+    
     // Canvas overlay will be added to body after it has content
     this.table.appendChild(this.headerViewport);
     this.table.appendChild(this.viewport);
     this.container.appendChild(this.table);
+    
+    // Immediately notify parent that canvas container is ready
+    if (this.options.onCanvasContainerReady) {
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        this.options.onCanvasContainerReady!(canvasOverlay);
+      });
+    }
+  }
+  
+  // Set or update columns
+  setColumns(columns: Column[]): void {
+    this.columns = columns;
+    // Dimension manager will be set separately via setDimensionManager
+  }
+  
+  // Set dimension manager (called by parent component)
+  setDimensionManager(manager: ColumnDimensionManager): void {
+    this.dimensionManager = manager;
+    
+    // Subscribe to dimension changes
+    manager.subscribe((event) => {
+      // Handle dimension changes - could trigger re-render of affected cells
+      console.log('AtomicTableRenderer: Column dimension changed', event);
+      
+      // Re-render header to reflect new widths
+      if (this.lastRenderState) {
+        this.renderHeader(this.lastRenderState);
+      }
+    });
+  }
+  
+  // Get total width of all columns
+  private getTotalColumnsWidth(): number {
+    return this.dimensionManager?.getTotalWidth() || 0;
+  }
+  
+  // Get column offset position
+  private getColumnOffset(columnId: string): number {
+    return this.dimensionManager?.getColumnOffset(columnId) || 0;
   }
   
   private setupEventListeners() {
@@ -268,11 +340,27 @@ export class AtomicTableRenderer {
         this.header.style.transform = `translateX(-${this.viewport.scrollLeft}px)`;
         
         const rowHeight = this.virtualGrid.getRowHeight();
+        const calculatedStart = Math.floor(this.viewport.scrollTop / rowHeight);
+        const calculatedEnd = calculatedStart + Math.ceil(this.viewport.clientHeight / rowHeight);
+        const cappedEnd = Math.min(calculatedEnd, this.lastRenderState.rows.length);
+        
+        // Debug logging for viewport calculations
+        console.log('Viewport Update Debug:', {
+          scrollTop: this.viewport.scrollTop,
+          scrollHeight: this.viewport.scrollHeight,
+          clientHeight: this.viewport.clientHeight,
+          calculatedStart,
+          calculatedEnd,
+          cappedEnd,
+          totalRows: this.lastRenderState.rows.length,
+          wouldOverflow: calculatedEnd > this.lastRenderState.rows.length
+        });
+        
         const newViewport: ViewportInfo = {
-          start: Math.floor(this.viewport.scrollTop / rowHeight),
-          end: Math.floor(this.viewport.scrollTop / rowHeight) + 
-               Math.ceil(this.viewport.clientHeight / rowHeight),
+          start: calculatedStart,
+          end: cappedEnd, // Cap at actual rows
           height: this.viewport.clientHeight,
+          width: this.viewport.clientWidth,
           scrollTop: this.viewport.scrollTop,
           itemHeight: rowHeight
         };
@@ -282,12 +370,22 @@ export class AtomicTableRenderer {
           const hasViewportChanged = this.virtualGrid.updateViewport(newViewport, this.lastRenderState.rows.length);
           if (hasViewportChanged) {
             this.renderVisibleRows(this.lastRenderState);
+            
+            // Notify that render is complete after scroll
+            this.options.onStateChange?.({
+              type: 'render.complete',
+              renderTime: 0,
+              rowCount: this.lastRenderState.rows.length,
+              visibleRange: this.virtualGrid.getVisibleRange()
+            });
           }
         }
         
         this.options.onScroll?.(newViewport);
       });
     });
+    
+    // Let native scrolling handle wheel events - it naturally bubbles at boundaries
     
     // Cell interaction handlers
     this.body.addEventListener('click', this.handleCellClick.bind(this));
@@ -309,6 +407,11 @@ export class AtomicTableRenderer {
   render(state: RenderState): void {
     this.renderStartTime = performance.now();
     this.lastRenderState = state; // Store for scroll updates
+    
+    // Update columns if provided in state
+    if (state.columns && state.columns.length > 0) {
+      this.setColumns(state.columns);
+    }
     
     try {
       // Batch all DOM writes together before reading dimensions
@@ -458,6 +561,7 @@ export class AtomicTableRenderer {
       start: startIndex,
       end: endIndex,
       height: viewportHeight,
+      width: this.viewport.clientWidth || 800,
       scrollTop: scrollTop,
       itemHeight: itemHeight
     };
@@ -477,19 +581,28 @@ export class AtomicTableRenderer {
   private renderHeader(state: RenderState): void {
     if (!state.rows.length) return;
     
-    const firstRow = state.rows[0];
-    const columns = Object.keys(firstRow.data);
+    // Use columns from configuration if available, otherwise generate from data
+    const columnsToRender = this.columns.length > 0 
+      ? this.columns 
+      : Object.keys(state.rows[0].data).map(key => ({
+          id: key,
+          name: key,
+          field: key,
+          type: 'text' as const,
+          width: 120
+        }));
     
     // Calculate total width for header
-    const totalWidth = columns.length * 120; // min-width per cell
+    const totalWidth = this.getTotalColumnsWidth();
     this.header.style.width = `${totalWidth}px`;
     
     // Header rendered with columns
-    this.header.innerHTML = columns.map(columnId => 
-      `<div class="vibegridx-header-cell" data-column="${columnId}">
-        ${columnId}
-      </div>`
-    ).join('');
+    this.header.innerHTML = columnsToRender.map(column => {
+      const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
+      return `<div class="vibegridx-header-cell" data-column="${column.id}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
+        ${column.name || column.id}
+      </div>`;
+    }).join('');
   }
   
   private renderVisibleRows(state: RenderState): void {
@@ -498,29 +611,14 @@ export class AtomicTableRenderer {
     
     // Calculate dimensions
     const totalHeight = this.virtualGrid.getTotalHeight();
-    const columnCount = state.rows.length > 0 ? Object.keys(state.rows[0].data).length : 0;
-    const totalWidth = columnCount * 120; // min-width per cell
+    const totalWidth = this.getTotalColumnsWidth();
     
     // Set virtual dimensions
     this.body.style.height = `${totalHeight}px`;
     this.body.style.width = `${totalWidth}px`;
     
-    // Ensure canvas overlay exists and matches body dimensions
-    let canvasOverlay = this.body.querySelector('.vibegridx-canvas-overlay') as HTMLElement;
-    if (!canvasOverlay) {
-      canvasOverlay = document.createElement('div');
-      canvasOverlay.className = 'vibegridx-canvas-overlay';
-      canvasOverlay.style.position = 'absolute';
-      canvasOverlay.style.top = '0';
-      canvasOverlay.style.left = '0';
-      canvasOverlay.style.width = '100%';
-      canvasOverlay.style.pointerEvents = 'none';
-      canvasOverlay.style.zIndex = '10';
-      this.body.appendChild(canvasOverlay);
-    }
-    // Update canvas overlay dimensions to match body
-    canvasOverlay.style.height = `${totalHeight}px`;
-    canvasOverlay.style.width = `${totalWidth}px`;
+    // Canvas overlay is already created in initializeDOM, no need to update its size
+    // It will use viewport-based sizing instead of full scrollable area
     
     // Clear existing rows that are no longer visible
     this.rowElements.forEach((element, rowId) => {
@@ -554,6 +652,8 @@ export class AtomicTableRenderer {
     rowElement.style.top = `${top}px`;
     rowElement.style.width = '100%';
     rowElement.style.height = `${this.virtualGrid.getRowHeight()}px`;
+    rowElement.style.borderBottom = '1px solid var(--border)';
+    rowElement.style.boxSizing = 'border-box';
     
     // Render cells
     this.renderRowCells(row, rowElement);
@@ -563,39 +663,48 @@ export class AtomicTableRenderer {
   }
   
   private renderRowCells(row: TableRow, rowElement: HTMLElement): void {
-    const columns = Object.keys(row.data);
+    // Use columns from configuration if available
+    const columnsToRender = this.columns.length > 0 
+      ? this.columns 
+      : Object.keys(row.data).map(key => ({
+          id: key,
+          name: key,
+          field: key,
+          type: 'text' as const,
+          width: 120
+        }));
     
     // Update cell elements map for this row
-    columns.forEach(columnId => {
-      const cellKey = `${row.id}:${columnId}`;
+    columnsToRender.forEach(column => {
+      const cellKey = `${row.id}:${column.id}`;
       const existingCell = this.cellElements.get(cellKey);
       if (existingCell && !rowElement.contains(existingCell)) {
         this.cellElements.delete(cellKey);
       }
     });
     
-    rowElement.innerHTML = columns.map(columnId => {
-      const cellKey = `${row.id}:${columnId}`;
-      const value = row.data[columnId];
-      
-      // Mock column object - in real implementation this would come from state
-      const column: Column = {
-        id: columnId,
-        name: columnId,
-        field: columnId,
-        type: 'text'
-      };
+    // Create cells with proper positioning
+    let cellsHTML = '';
+    
+    columnsToRender.forEach(column => {
+      const cellKey = `${row.id}:${column.id}`;
+      const value = row.data[column.field || column.id];
+      const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
+      const xOffset = this.dimensionManager?.getColumnOffset(column.id) || 0;
       
       const cellContent = this.cellFactory.render(value, column, false); // Never editing in AtomicRenderer
       
-      // REMOVED: Selection and editing classes - handled by Canvas Overlay
-      return `<div class="${CSS_CLASSES.CELL}" 
+      // Position cell absolutely within row
+      cellsHTML += `<div class="${CSS_CLASSES.CELL}" 
                    data-row-id="${row.id}" 
-                   data-column-id="${columnId}"
-                   data-cell-key="${cellKey}">
+                   data-column-id="${column.id}"
+                   data-cell-key="${cellKey}"
+                   style="position: absolute; left: ${xOffset}px; width: ${width}px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box;">
                 ${cellContent}
               </div>`;
-    }).join('');
+    });
+    
+    rowElement.innerHTML = cellsHTML;
     
     // Update cell elements map with new cells
     const cellElements = rowElement.querySelectorAll(`.${CSS_CLASSES.CELL}`);

@@ -4,7 +4,7 @@ import { tableBaseMachine } from './machines/table-machine';
 import { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
 import { EntityIntegrationLayer, useTableConfigFromAtoms } from './integration/EntityIntegration';
-import type { TableConfig, RendererOptions } from './types';
+import type { TableConfig, RendererOptions, Column } from './types';
 
 // ====================================
 // INITIALIZATION TYPES
@@ -23,6 +23,7 @@ export interface InitializationRefs {
 
 export interface InitializationProps {
   entityType: 'task' | 'project' | 'user';
+  columns: Column<any>[];
   tableId?: string;
   enableVirtualScrolling?: boolean;
   enableCanvasOverlays?: boolean;
@@ -40,6 +41,7 @@ export interface InitializationProps {
 export const useTableConfiguration = (props: InitializationProps) => {
   const {
     entityType,
+    columns,
     tableId = `vibegridx-${entityType}-${Date.now()}`,
     enableVirtualScrolling = true,
     enableGrouping = true,
@@ -49,9 +51,10 @@ export const useTableConfiguration = (props: InitializationProps) => {
 
   const tableConfig = useTableConfigFromAtoms(entityType, tableId);
   
-  // Update table config with props
+  // Update table config with props, using provided columns instead of generated ones
   const enhancedTableConfig: TableConfig = {
     ...tableConfig,
+    columns, // Use columns from props
     settings: {
       ...tableConfig.settings,
       enableVirtualScrolling,
@@ -105,96 +108,70 @@ export const useEntityIntegration = (
 
 export const useRendererInitialization = (
   refs: InitializationRefs,
-  rendererOptions: Omit<RendererOptions, 'container'>
+  rendererOptions: Omit<RendererOptions, 'container'>,
+  tableState?: any // XState snapshot with context
 ) => {
   useEffect(() => {
     if (!refs.containerRef.current) return;
     
-    // Initialize atomic renderer (DATA-ONLY)
+    // Get dimensionManager from table state if available
+    const dimensionManager = tableState?.context?.dimensionManager;
+    
+    // Initialize atomic renderer with canvas container callback
     refs.rendererRef.current = new AtomicTableRenderer({
       container: refs.containerRef.current,
-      ...rendererOptions
-    });
-    
-    // Initialize canvas overlay after renderer creates DOM structure
-    // Use MutationObserver for more efficient DOM watching
-    const initializeCanvasOverlay = (container: HTMLElement) => {
-      if (refs.canvasOverlayRef.current) return; // Already initialized
-      
-      refs.canvasOverlayRef.current = new CanvasOverlayManager(container, {
-        cellWidth: 120,
-        cellHeight: 40,
-        selectionColor: '#3b82f6',
-        selectionBorderColor: '#1d4ed8',
-        editingColor: '#10b981',
-        editingBorderColor: '#059669',
-        enableAnimations: false,
-        animationDuration: 0,
-        borderWidth: 2
-      });
-      
-      console.log('VibeGridX: Canvas Overlay initialized');
-      
-      // Set initial viewport
-      const viewport = refs.containerRef.current.querySelector('.vibegridx-viewport');
-      if (viewport) {
-        const initialViewport = {
-          start: 0,
-          end: Math.ceil(viewport.clientHeight / 40), // 40 is row height
-          height: viewport.clientHeight,
-          scrollTop: 0,
-          itemHeight: 40
-        };
-        refs.canvasOverlayRef.current.updateViewport(initialViewport);
-      }
-      
-      if (refs.selectedCellsRef.current.size > 0) {
-        refs.canvasOverlayRef.current.updateSelection(refs.selectedCellsRef.current);
-      }
-    };
-    
-    // Check if canvas container already exists
-    const existingCanvas = refs.containerRef.current.querySelector('.vibegridx-canvas-overlay');
-    if (existingCanvas) {
-      initializeCanvasOverlay(existingCanvas as HTMLElement);
-    } else {
-      // Watch for canvas container to be added
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'childList') {
-            const addedNodes = Array.from(mutation.addedNodes);
-            for (const node of addedNodes) {
-              if (node instanceof HTMLElement) {
-                const canvasContainer = node.classList.contains('vibegridx-canvas-overlay') 
-                  ? node 
-                  : node.querySelector('.vibegridx-canvas-overlay');
-                if (canvasContainer) {
-                  observer.disconnect();
-                  initializeCanvasOverlay(canvasContainer as HTMLElement);
-                  return;
-                }
-              }
-            }
+      dimensionManager,
+      ...rendererOptions,
+      onCanvasContainerReady: (canvasContainer: HTMLElement) => {
+        console.log('useRendererInitialization: Canvas container ready inside viewport');
+        
+        // Initialize canvas overlay inside the scrollable viewport
+        if (!refs.canvasOverlayRef.current) {
+          refs.canvasOverlayRef.current = new CanvasOverlayManager(canvasContainer, {
+            dimensionManager,
+            columns: rendererOptions.columns,
+            cellWidth: 120,
+            cellHeight: 40,
+            selectionColor: '#3b82f6',
+            selectionBorderColor: '#1d4ed8',
+            editingColor: '#10b981',
+            editingBorderColor: '#059669',
+            enableAnimations: false,
+            animationDuration: 0,
+            borderWidth: 2
+          });
+          
+          // Set selection change callback
+          refs.canvasOverlayRef.current.setOnSelectionChange?.(
+            rendererOptions.onSelectionChange || (() => {})
+          );
+          
+          // Set fill complete callback
+          refs.canvasOverlayRef.current.setOnFillComplete?.(
+            rendererOptions.onFillComplete || (() => {})
+          );
+          
+          console.log('VibeGridX: Canvas Overlay initialized inside scrollable viewport');
+          
+          // Update data mappings if we have data
+          const renderState = (window as any).__vibegridx_last_renderstate;
+          
+          if (renderState && renderState.rows.length > 0) {
+            const rowIds = renderState.rows.map((row: any) => row.id);
+            const columnIds = rendererOptions.columns.map((col: any) => col.id);
+            console.log('VibeGridXCore: Updating canvas data mappings on init', {
+              rowCount: rowIds.length,
+              columnCount: columnIds.length
+            });
+            refs.canvasOverlayRef.current!.updateDataMappings(rowIds, columnIds);
+            
+            // Columns are now passed during initialization, no need to update them here
+          } else {
+            console.log('VibeGridXCore: No render state available for canvas init');
           }
         }
-      });
-      
-      observer.observe(refs.containerRef.current, {
-        childList: true,
-        subtree: true
-      });
-      
-      // Fallback timeout in case something goes wrong
-      const fallbackTimer = setTimeout(() => {
-        observer.disconnect();
-        console.warn('VibeGridX: Canvas overlay container not found after timeout');
-      }, 1000);
-      
-      return () => {
-        observer.disconnect();
-        clearTimeout(fallbackTimer);
-      };
-    }
+      }
+    });
     
     return () => {
       refs.rendererRef.current?.destroy();
@@ -216,33 +193,57 @@ export const useSelectionStateSync = (
   useEffect(() => {
     if (!tableActor) return;
     
-    const syncSelectionState = () => {
+    // Subscribe to selection coordinator changes
+    let selectionSubscription: any;
+    
+    const setupSelectionSync = () => {
       const snapshot = tableActor.getSnapshot();
       const selectionCoordinator = snapshot.context.actors?.selectionCoordinator;
       
       if (selectionCoordinator) {
-        const selectionSnapshot = selectionCoordinator.getSnapshot();
-        const selectedCells = selectionSnapshot.context?.selectedCells || new Set();
-        
-        // Sync our local ref with coordinator state
-        refs.selectedCellsRef.current = new Set(selectedCells);
-        
-        // Update canvas if it exists
-        if (refs.canvasOverlayRef.current) {
-          refs.canvasOverlayRef.current.updateSelection(selectedCells);
-        }
-        
-        console.log('VibeGridX: Synced selection state from coordinator', {
-          selectedCells: selectedCells.size
+        // Subscribe to selection changes from the coordinator
+        selectionSubscription = selectionCoordinator.subscribe((selectionSnapshot: any) => {
+          const selectedCells = selectionSnapshot.context?.selectedCells || new Set();
+          
+          // Only update if there's an actual change
+          const currentSize = refs.selectedCellsRef.current.size;
+          const newSize = selectedCells.size;
+          
+          if (currentSize !== newSize || !areSetsEqual(refs.selectedCellsRef.current, selectedCells)) {
+            console.log('VibeGridX: Selection changed from coordinator', {
+              previous: currentSize,
+              new: newSize
+            });
+            
+            // Sync our local ref with coordinator state
+            refs.selectedCellsRef.current = new Set(selectedCells);
+            
+            // Update canvas if it exists
+            if (refs.canvasOverlayRef.current) {
+              refs.canvasOverlayRef.current.updateSelection(selectedCells);
+            }
+          }
         });
       }
     };
     
-    // Sync after coordinator is ready
-    const timeoutId = setTimeout(syncSelectionState, 200);
+    // Setup sync after coordinator is ready
+    const timeoutId = setTimeout(setupSelectionSync, 200);
     
     return () => {
       clearTimeout(timeoutId);
+      if (selectionSubscription) {
+        selectionSubscription.unsubscribe();
+      }
     };
   }, [tableActor]);
 };
+
+// Helper function to compare sets
+function areSetsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
+}

@@ -1,0 +1,75 @@
+import type { CellRef, ViewportInfo } from '../types';
+
+// ====================================
+// OVERLAY CONFIGURATION
+// ====================================
+
+export interface OverlayConfig {
+  dimensionManager?: any; // Will be typed as ColumnDimensionManager
+  columns?: any[]; // Column array for coordinate calculations
+  cellWidth: number;
+  cellHeight: number;
+  borderWidth: number;
+  
+  // Colors
+  selectionColor: string;
+  selectionBorderColor: string;
+  editingColor: string;
+  editingBorderColor: string;
+  dragIndicatorColor: string;
+  
+  // Animation
+  enableAnimations: boolean;
+  animationDuration: number;
+  
+  // Performance
+  enableLayerCaching: boolean;
+  maxSelectableCells: number;
+}
+
+export interface OverlayState {
+  selectedCells: Set<string>;
+  editingCell: CellRef | null;
+  selectionRanges: SelectionRange[];
+  draggedItem: any | null;
+  dropTarget: any | null;
+  viewport: ViewportInfo;
+}
+
+export interface SelectionRange {
+  startRow: number;
+  startColumn: number;
+  endRow: number;
+  endColumn: number;
+}
+
+export interface CellPosition {
+  x: number;
+  y: number;
+  row: number;
+  column: number;
+}
+
+export interface DragState {
+  isDragging: boolean;
+  startPos: { x: number; y: number } | null;
+  startCell: { x: number; y: number } | null;
+  currentPos: { x: number; y: number } | null;
+  currentCell: { x: number; y: number } | null;
+}
+
+// Default configuration
+export const DEFAULT_CONFIG: OverlayConfig = {
+  cellWidth: 120,
+  cellHeight: 40,
+  borderWidth: 2,
+  selectionColor: '#3b82f6',
+  selectionBorderColor: '#1d4ed8',
+  editingColor: '#10b981',
+  editingBorderColor: '#059669',
+  dragIndicatorColor: '#6366f1',
+  enableAnimations: false,
+  animationDuration: 200,
+  enableLayerCaching: true,
+  maxSelectableCells: 1000
+};

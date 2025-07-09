@@ -17,13 +17,15 @@ export interface TableRow {
   };
 }
 
-export interface Column {
+export interface Column<T = any> {
   id: string;
   name: string;
-  field: string;
+  field: keyof T & string;
   type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  width: number; // Required - no defaults
   editable?: boolean;
-  width?: number;
+  minWidth?: number;
+  maxWidth?: number;
   resizable?: boolean;
   sortable?: boolean;
   filterable?: boolean;
@@ -142,7 +144,9 @@ export interface ViewportInfo {
   start: number;
   end: number;
   height: number;
+  width: number;
   scrollTop: number;
+  scrollLeft?: number;
   itemHeight: number;
 }
 
@@ -153,10 +157,13 @@ export interface ViewportInfo {
 export interface TableContext {
   id: string;
   entityType: 'task' | 'project' | 'user' | string;
-  columns: Column[];
+  columns: Column<any>[];
   visibleRowIds: string[];
   settings: TableSettings;
   version: number;
+  
+  // Dimension management
+  dimensionManager?: any; // Will be typed as ColumnDimensionManager after import
   
   // Actor references
   actors: {
@@ -223,6 +230,7 @@ export type TableEvents =
   | { type: 'selection.range.select'; start: CellRef; end: CellRef }
   | { type: 'selection.row.select'; rowId: string; extend?: boolean }
   | { type: 'selection.column.select'; columnId: string; extend?: boolean }
+  | { type: 'selection.bulk.set'; selectedCells: Set<string> }
   | { type: 'selection.clear' }
   
   // Edit events
@@ -266,7 +274,7 @@ export type TableEvents =
 export interface TableConfig {
   id: string;
   entityType: string;
-  columns: Column[];
+  columns: Column<any>[];
   initialData?: TableRow[];
   settings?: TableSettings;
 }
@@ -277,17 +285,34 @@ export interface TableConfig {
 
 export interface RendererOptions {
   container: HTMLElement;
+  columns?: Column<any>[];
+  dimensionManager?: any; // Will be typed as ColumnDimensionManager
   onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onCellDoubleClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onColumnClick?: (columnId: string, event: MouseEvent) => void;
   onStateChange?: (state: any) => void;
   onScroll?: (viewport: ViewportInfo) => void;
   onKeyDown?: (event: KeyboardEvent) => void;
+  onSelectionChange?: (selectedCells: Set<string>) => void;
+  onFillComplete?: (originalCells: Set<string>, fillCells: Set<string>) => void;
+  onCanvasContainerReady?: (container: HTMLElement) => void;
   debug?: boolean;
+  
+  // Canvas overlay configuration
+  cellHeight?: number;
+  cellWidth?: number;
+  selectionColor?: string;
+  selectionBorderColor?: string;
+  editingColor?: string;
+  editingBorderColor?: string;
+  enableAnimations?: boolean;
+  animationDuration?: number;
+  borderWidth?: number;
 }
 
 export interface RenderState {
   rows: TableRow[]; // All rows in the table (renamed from visibleRows for clarity)
+  columns?: Column<any>[];
   selectedCells: Set<string>;
   editingCell: CellRef | null;
   groupedData: GroupNode[];

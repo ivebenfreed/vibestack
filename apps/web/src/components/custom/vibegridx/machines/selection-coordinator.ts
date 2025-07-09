@@ -187,6 +187,14 @@ export const selectionCoordinatorMachine = setup({
         const cellKey = createCellKey(event.rowId, event.columnId);
         const newSelection = new Set(context.selectedCells);
         
+        console.log('SelectionCoordinator: selectCell action', {
+          cellKey,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey,
+          hasAnchor: !!context.anchor,
+          anchor: context.anchor
+        });
+        
         if (event.ctrlKey) {
           // Multi-select: toggle
           if (newSelection.has(cellKey)) {
@@ -196,12 +204,20 @@ export const selectionCoordinatorMachine = setup({
           }
         } else if (event.shiftKey && context.anchor) {
           // Range select
-          return calculateRangeSelection(
+          const rangeSelection = calculateRangeSelection(
             context.anchor, 
             { rowId: event.rowId, columnId: event.columnId },
             context.visibleRowIds,
             context.columns
           );
+          console.log('SelectionCoordinator: Range selection calculated', {
+            anchorCell: context.anchor,
+            targetCell: { rowId: event.rowId, columnId: event.columnId },
+            rangeSize: rangeSelection.size,
+            visibleRowIds: context.visibleRowIds.length,
+            columns: context.columns.length
+          });
+          return rangeSelection;
         } else {
           // Single select
           newSelection.clear();

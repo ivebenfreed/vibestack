@@ -22,9 +22,9 @@ import {
   useRenderStateExtractor,
   useVibeGridXApi
 } from './VibeGridXHooks';
-import type { RenderState, TableRow, CellRef } from './types';
+import type { RenderState, TableRow, CellRef, Column } from './types';
 import type { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
-import type { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
+import { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
 import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 import './vibegridx.css';
 
@@ -32,8 +32,9 @@ import './vibegridx.css';
 // COMPONENT PROPS
 // ====================================
 
-interface VibeGridXProps {
+interface VibeGridXProps<T = any> {
   entityType: 'task' | 'project' | 'user';
+  columns: Column<T>[];  // Required typed columns
   tableId?: string;
   className?: string;
   height?: number;
@@ -65,8 +66,11 @@ interface VibeGridXProps {
 // MAIN COMPONENT
 // ====================================
 
-export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
+export const VibeGridX = <T extends Record<string, any> = any>(
+  props: VibeGridXProps<T>
+): React.ReactElement => {
   const {
+    columns,
     className = '',
     height = 600,
     width = '100%',
@@ -76,6 +80,34 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
     onEditingChange,
     onPerformanceUpdate,
   } = props;
+  
+  // ====================================
+  // HMR DETECTION AND HANDLING
+  // ====================================
+  
+  // Force refresh on HMR to avoid direct DOM issues
+  useEffect(() => {
+    if (import.meta.hot) {
+      const handleHMR = (payload: any) => {
+        // Only reload if VibeGridX-related files are updated
+        const isVibeGridXUpdate = payload?.updates?.some((update: any) => 
+          update.path?.includes('/vibegridx/') || 
+          update.acceptedPath?.includes('/vibegridx/')
+        );
+        
+        if (isVibeGridXUpdate) {
+          console.log('VibeGridX: HMR detected for VibeGridX files, forcing page refresh to avoid DOM issues');
+          window.location.reload();
+        }
+      };
+      
+      import.meta.hot.on('vite:beforeUpdate', handleHMR);
+      
+      return () => {
+        import.meta.hot.off('vite:beforeUpdate', handleHMR);
+      };
+    }
+  }, []);
   
   // ====================================
   // REFS AND STATE
@@ -140,7 +172,23 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
   // RENDERER INITIALIZATION
   // ====================================
   
+  // Debug: Add wheel event debugging at the top level
+  useEffect(() => {
+    if (containerRef.current) {
+      console.log('VibeGridX: Adding wheel event debugging to main container');
+      
+      containerRef.current.addEventListener('wheel', (e) => {
+        console.log('VibeGridX: Wheel event on MAIN CONTAINER', {
+          deltaY: e.deltaY,
+          defaultPrevented: e.defaultPrevented,
+          target: (e.target as HTMLElement).className
+        });
+      }, { passive: true, capture: true });
+    }
+  }, []);
+  
   useRendererInitialization(refs, {
+    columns: tableConfig.columns,
     onCellClick: handleCellClick,
     onCellDoubleClick: handleCellDoubleClick,
     onColumnClick: handleColumnClick,
@@ -148,6 +196,63 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
     onScroll: handleScroll,
     onKeyDown: (event: KeyboardEvent) => {
       handleKeyDown(event as any);
+    },
+    onSelectionChange: (selectedCells: Set<string>) => {
+      // Update XState machine with drag selection
+      tableSend({
+        type: 'selection.bulk.set',
+        selectedCells
+      });
+      
+      // Call user callback if provided
+      onSelectionChange?.(selectedCells);
+    },
+    onFillComplete: (originalCells: Set<string>, fillCells: Set<string>) => {
+      console.log('VibeGridX: Fill operation requested', {
+        originalCount: originalCells.size,
+        fillCount: fillCells.size
+      });
+      
+      // Get the value from the first original cell to use for filling
+      if (originalCells.size > 0 && fillCells.size > 0) {
+        const firstCell = Array.from(originalCells)[0];
+        const [rowId, columnId] = firstCell.split(':');
+        
+        // Find the value in the current data
+        const snapshot = tableActor.getSnapshot();
+        const row = snapshot.context.rows.find((r: any) => r.id === rowId);
+        
+        if (row && row.data[columnId] !== undefined) {
+          const fillValue = row.data[columnId];
+          
+          // For now, we'll use the integration layer to update cells
+          // This is a temporary solution until bulk edit is implemented
+          for (const cellKey of fillCells) {
+            const [targetRowId, targetColumnId] = cellKey.split(':');
+            
+            // Find the target row
+            const targetRow = snapshot.context.rows.find((r: any) => r.id === targetRowId);
+            if (targetRow) {
+              // Create an update for this cell
+              const updatedRow = {
+                ...targetRow,
+                data: {
+                  ...targetRow.data,
+                  [targetColumnId]: fillValue
+                }
+              };
+              
+              // Send update through table machine
+              tableSend({
+                type: 'data.row.update',
+                row: updatedRow
+              });
+            }
+          }
+          
+          console.log(`VibeGridX: Filled ${fillCells.size} cells with value:`, fillValue);
+        }
+      }
     },
     cellHeight: 40,
     selectionColor: '#3b82f6',
@@ -157,10 +262,68 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
     enableAnimations: false,
     animationDuration: 0,
     borderWidth: 2
-  });
+  }, tableState);
   
   // Selection state sync
   useSelectionStateSync(tableActor, refs);
+  
+  // ====================================
+  // XSTATE EVENT LISTENERS
+  // ====================================
+  
+  useEffect(() => {
+    if (!tableActor) return;
+    
+    // Check if the actor supports event listeners (XState v5 feature)
+    if (!tableActor.on) {
+      console.log('VibeGridX: Actor does not support event listeners');
+      return;
+    }
+    
+    // Listen for emitted events from the state machine
+    const unsubscribers: Array<() => void> = [];
+    
+    try {
+      // Selection change events
+      const unsubSelection = tableActor.on('vibegridx.selection.change', (event) => {
+        console.log('VibeGridX: Selection changed via XState event', event.selectedCells.size);
+        onSelectionChange?.(event.selectedCells);
+      });
+      if (unsubSelection) unsubscribers.push(unsubSelection);
+      
+      // Performance events
+      const unsubPerf = tableActor.on('vibegridx.perf.render', (event) => {
+        onPerformanceUpdate?.({
+          lastRenderTime: event.duration,
+          visibleRows: event.cellCount,
+          cacheSize: 0,
+          updateQueueSize: 0,
+          timestamp: Date.now()
+        });
+      });
+      if (unsubPerf) unsubscribers.push(unsubPerf);
+      
+      // Error events
+      const unsubError = tableActor.on('vibegridx.error', (event) => {
+        console.error(`VibeGridX Error in ${event.context}:`, event.error);
+      });
+      if (unsubError) unsubscribers.push(unsubError);
+    } catch (error) {
+      console.warn('VibeGridX: Failed to set up event listeners:', error);
+    }
+    
+    return () => {
+      unsubscribers.forEach(fn => {
+        if (typeof fn === 'function') {
+          try {
+            fn();
+          } catch (error) {
+            console.warn('VibeGridX: Error during event listener cleanup:', error);
+          }
+        }
+      });
+    };
+  }, [tableActor, onSelectionChange, onPerformanceUpdate]);
   
   // ====================================
   // PERFORMANCE MONITORING
@@ -181,6 +344,7 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
       console.log('VibeGridX: Skipping actor subscription setup - missing renderer or actor');
       return;
     }
+    
     
     // Avoid duplicate subscriptions
     if (subscriptionRef.current) {
@@ -215,6 +379,26 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
       
       const renderState = extractRenderStateFromActor(snapshot);
       if (renderState) {
+        // Store last render state for canvas initialization
+        (window as any).__vibegridx_last_renderstate = renderState;
+        
+        // Update canvas overlay with data mappings
+        if (renderState.rows.length > 0) {
+          const rowIds = renderState.rows.map(row => row.id);
+          const columnIds = columns.map(col => col.id);
+          
+          if (canvasOverlayRef.current) {
+            console.log('VibeGridX: Updating canvas data mappings', { 
+              rowCount: rowIds.length, 
+              columnCount: columnIds.length 
+            });
+            canvasOverlayRef.current.updateDataMappings(rowIds, columnIds);
+            // Columns are now passed during initialization, no need to update them here
+          } else {
+            console.log('VibeGridX: Canvas not ready yet, will update mappings later');
+          }
+        }
+        
         // HYBRID RENDERING: Only process data changes
         
         // 1. Data changes - use granular updates
@@ -302,7 +486,7 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
   return (
     <div
       className={`vibegridx-container ${className}`}
-      style={{ width, height }}
+      style={{ width, height, position: 'relative' }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
@@ -310,6 +494,13 @@ export const VibeGridX: React.FC<VibeGridXProps> = (props) => {
       <div
         ref={containerRef}
         className="vibegridx-renderer"
+        style={{ width: '100%', height: '100%' }}
+      />
+      
+      {/* Canvas Overlay Container will be created inside the viewport by AtomicTableRenderer */}
+      <div
+        ref={overlayContainerRef}
+        style={{ display: 'none' }}
       />
     </div>
   );
