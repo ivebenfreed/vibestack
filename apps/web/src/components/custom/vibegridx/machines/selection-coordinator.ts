@@ -55,14 +55,24 @@ const calculateRangeSelection = (
 
 const moveCell = (
   current: CellRef, 
-  direction: 'up' | 'down' | 'left' | 'right',
+  direction: string,
   visibleRowIds: string[],
   columns: any[]
 ): CellRef => {
   const currentRowIndex = visibleRowIds.indexOf(current.rowId);
   const currentColIndex = columns.findIndex(col => col.id === current.columnId);
   
+  console.log('moveCell:', {
+    current,
+    direction,
+    currentRowIndex,
+    currentColIndex,
+    totalRows: visibleRowIds.length,
+    totalCols: columns.length
+  });
+  
   if (currentRowIndex === -1 || currentColIndex === -1) {
+    console.warn('moveCell: Current cell not found in visible rows/columns');
     return current;
   }
   
@@ -154,7 +164,7 @@ type SelectionEvents =
   | { type: 'selection.drag.start'; startCell: CellRef }
   | { type: 'selection.drag.move'; currentCell: CellRef; selectedCells: Set<string> }
   | { type: 'selection.drag.end'; selectedCells: Set<string> }
-  | { type: 'keyboard.arrow'; direction: string; extend?: boolean }
+  | { type: 'keyboard.arrow'; direction: 'up' | 'down' | 'left' | 'right'; extend?: boolean }
   | { type: 'keyboard.copy' }
   | { type: 'keyboard.paste' }
   // Internal events
@@ -225,10 +235,10 @@ export const selectionCoordinatorMachine = setup({
         return newSelection;
       },
       
-      activeCell: ({ event }) => 
+      activeCell: ({ context, event }) => 
         event.type === 'selection.cell.select' 
           ? { rowId: event.rowId, columnId: event.columnId } 
-          : null,
+          : context.activeCell,
           
       anchor: ({ context, event }) => {
         if (event.type !== 'selection.cell.select') return context.anchor;
@@ -333,7 +343,18 @@ export const selectionCoordinatorMachine = setup({
     
     // Keyboard navigation
     moveSelection: assign(({ context, event }) => {
-      if (event.type !== 'keyboard.arrow' || !context.activeCell) return {};
+      if (event.type !== 'keyboard.arrow') return {};
+      
+      if (!context.activeCell) {
+        console.warn('SelectionCoordinator: No active cell for arrow navigation');
+        return {};
+      }
+      
+      console.log('SelectionCoordinator: Moving selection', {
+        from: context.activeCell,
+        direction: event.direction,
+        extend: event.extend
+      });
       
       const newCell = moveCell(
         context.activeCell,
