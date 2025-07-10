@@ -27,12 +27,14 @@ import { overlayMachine } from './overlay-machine';
 const createDefaultContext = (input: TableConfig): TableContext => {
   const initialRowCount = input.initialData?.length || 0;
   const rowHeight = input.settings?.rowHeight || 40;
+  const initialRowIds = input.initialData?.map(row => row.id) || [];
   
   return {
     id: input.id,
     entityType: input.entityType,
     columns: input.columns || [],
-    visibleRowIds: input.initialData?.map(row => row.id) || [],
+    visibleRowIds: initialRowIds, // Initially all rows are visible
+    allRowIds: initialRowIds, // Store all row IDs
     settings: {
       enableVirtualScrolling: true,
       enableGrouping: false,
@@ -213,15 +215,23 @@ export const tableBaseMachine = setup({
     }),
     
     setVisibleEntities: assign({
-      visibleRowIds: ({ context, event }) => {
+      allRowIds: ({ context, event }) => {
         if (event.type === 'SET_VISIBLE_ENTITIES') {
           // Update row dimension manager with new row count
           const newRowCount = event.entityIds.length;
           context.rowDimensionManager?.setRowCount(newRowCount);
           
+          // Send all rows update to selection coordinator
+          if (context.actors?.selectionCoordinator) {
+            context.actors.selectionCoordinator.send({
+              type: 'ALL_ROWS_CHANGED',
+              rowIds: event.entityIds
+            });
+          }
+          
           return event.entityIds;
         }
-        return context.visibleRowIds;
+        return context.allRowIds;
       },
       version: ({ context }) => context.version + 1,
       performance: ({ context, event }) => {
@@ -352,18 +362,19 @@ export const tableBaseMachine = setup({
                     // Update context with new entity data
                     assign({
                       version: ({ context }) => context.version + 1,
-                      visibleRowIds: ({ event }) => Object.keys(event.entities)
+                      allRowIds: ({ event }) => Object.keys(event.entities),
+                      // Don't update visibleRowIds here - that should only be updated by viewport events
+                      // visibleRowIds represents what's currently visible in the viewport, not all data
                     }),
-                    // Notify selection coordinator of visible rows change
+                    // Also send all rows for column selection
                     sendTo(({ context }) => context.actors.selectionCoordinator!, 
                       ({ event }) => {
                         const rowIds = Object.keys(event.entities);
-                        console.log('TableMachine: Sending VISIBLE_ROWS_CHANGED to selection coordinator', {
-                          rowCount: rowIds.length,
-                          sampleRowIds: rowIds.slice(0, 3)
+                        console.log('TableMachine: Sending ALL_ROWS_CHANGED to selection coordinator', {
+                          rowCount: rowIds.length
                         });
                         return { 
-                          type: 'VISIBLE_ROWS_CHANGED', 
+                          type: 'ALL_ROWS_CHANGED', 
                           rowIds
                         };
                       }),
@@ -440,6 +451,30 @@ export const tableBaseMachine = setup({
                 'view.viewport.update': {
                   guard: 'canPerformOperation',
                   actions: [
+                    // Update visible row IDs based on viewport
+                    assign({
+                      visibleRowIds: ({ context, event }) => {
+                        // Get visible row IDs from allRowIds based on viewport indices
+                        const visibleIds = context.allRowIds.slice(event.viewport.start, event.viewport.end);
+                        
+                        // Send updated visible rows to selection coordinator
+                        if (context.actors.selectionCoordinator) {
+                          context.actors.selectionCoordinator.send({
+                            type: 'VISIBLE_ROWS_CHANGED',
+                            rowIds: visibleIds
+                          });
+                        }
+                        
+                        console.log('TableMachine: Viewport update', {
+                          viewportStart: event.viewport.start,
+                          viewportEnd: event.viewport.end,
+                          allRowsCount: context.allRowIds.length,
+                          visibleRowsCount: visibleIds.length
+                        });
+                        
+                        return visibleIds;
+                      }
+                    }),
                     sendTo(({ context }) => context.actors.viewCoordinator!, 
                       ({ event }) => event),
                     // Forward viewport updates to overlay actor

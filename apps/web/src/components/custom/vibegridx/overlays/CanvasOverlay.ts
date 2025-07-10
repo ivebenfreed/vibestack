@@ -270,6 +270,18 @@ export class CanvasOverlay {
     this.machine.send({ type: 'CLEAR_CLIPBOARD' });
   }
   
+  hasClipboardOutline(): boolean {
+    const snapshot = this.machine.getSnapshot();
+    return snapshot.context.shapesVisible.copyIndicator && 
+           snapshot.context.clipboardState !== null;
+  }
+  
+  hasFillOperation(): boolean {
+    const snapshot = this.machine.getSnapshot();
+    return snapshot.context.fillState !== null || 
+           snapshot.context.shapesVisible.fillPreview;
+  }
+  
   destroy(): void {
     // Only stop machine if we created it
     if (!this.config.overlayActor) {

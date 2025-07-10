@@ -136,6 +136,7 @@ const extractSelectedData = fromPromise(async ({ input }: {
 interface SelectionCoordinatorContext extends SelectionContext {
   entityType: string;
   visibleRowIds: string[];
+  allRowIds: string[]; // All row IDs for full column selection
   columns: any[];
   
   // Clipboard functionality
@@ -170,6 +171,7 @@ type SelectionEvents =
   // Internal events
   | { type: 'ENTITY_TYPE_CHANGED'; entityType: string }
   | { type: 'VISIBLE_ROWS_CHANGED'; rowIds: string[] }
+  | { type: 'ALL_ROWS_CHANGED'; rowIds: string[] }
   | { type: 'COLUMNS_CHANGED'; columns: any[] }
   | { type: 'FILL_START'; cellRef: CellRef; value: any }
   | { type: 'FILL_EXTEND'; targetRef: CellRef }
@@ -312,8 +314,15 @@ export const selectionCoordinatorMachine = setup({
         
         const newSelection = new Set<string>();
         
-        // Select all cells in the column
-        context.visibleRowIds.forEach(rowId => {
+        // Select all cells in the column (use allRowIds for complete selection)
+        const rowIds = context.allRowIds.length > 0 ? context.allRowIds : context.visibleRowIds;
+        console.log('SelectionCoordinator: Column selection using', {
+          allRowIdsCount: context.allRowIds.length,
+          visibleRowIdsCount: context.visibleRowIds.length,
+          usingAllRows: context.allRowIds.length > 0
+        });
+        
+        rowIds.forEach(rowId => {
           newSelection.add(createCellKey(rowId, event.columnId));
         });
         
@@ -328,7 +337,7 @@ export const selectionCoordinatorMachine = setup({
       activeCell: ({ context, event }) => {
         if (event.type !== 'selection.column.select') return context.activeCell;
         
-        // Set active cell to first row of the column
+        // Set active cell to first visible row of the column
         return {
           rowId: context.visibleRowIds[0] || '',
           columnId: event.columnId
@@ -425,6 +434,19 @@ export const selectionCoordinatorMachine = setup({
     updateColumns: assign({
       columns: ({ event }) => 
         event.type === 'COLUMNS_CHANGED' ? event.columns : []
+    }),
+    
+    updateAllRows: assign({
+      allRowIds: ({ event }) => {
+        if (event.type === 'ALL_ROWS_CHANGED') {
+          console.log('SelectionCoordinator: Received ALL_ROWS_CHANGED', {
+            rowCount: event.rowIds.length,
+            sampleRowIds: event.rowIds.slice(0, 3)
+          });
+          return event.rowIds;
+        }
+        return [];
+      }
     })
   },
   
@@ -458,6 +480,7 @@ export const selectionCoordinatorMachine = setup({
   context: ({ input }) => ({
     entityType: input.entityType,
     visibleRowIds: input.visibleRowIds || [],
+    allRowIds: input.allRowIds || [],
     columns: input.columns || [],
     selectedCells: new Set(),
     activeCell: null,
@@ -527,6 +550,10 @@ export const selectionCoordinatorMachine = setup({
         
         VISIBLE_ROWS_CHANGED: {
           actions: 'updateVisibleRows'
+        },
+        
+        ALL_ROWS_CHANGED: {
+          actions: 'updateAllRows'
         },
         
         COLUMNS_CHANGED: {

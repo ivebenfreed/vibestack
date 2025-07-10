@@ -158,7 +158,8 @@ export interface TableContext {
   id: string;
   entityType: 'task' | 'project' | 'user' | string;
   columns: Column<any>[];
-  visibleRowIds: string[];
+  visibleRowIds: string[]; // Currently visible row IDs in viewport
+  allRowIds: string[]; // All row IDs in the dataset
   settings: TableSettings;
   version: number;
   

@@ -202,17 +202,24 @@ export const createKeyboardHandler = (
         
       case 'Escape':
         event.preventDefault();
-        console.log('Escape: Clear selection and cancel operations');
         
-        // Cancel any active fill operation
-        if (refs.canvasOverlayRef.current?.overlayRenderer) {
+        // Priority 1: Cancel copy/cut outline if it exists
+        if (refs.canvasOverlayRef.current?.hasClipboardOutline()) {
+          console.log('Escape: Clearing copy/cut outline');
+          refs.canvasOverlayRef.current.hideCopyIndicator();
+        } 
+        // Priority 2: Cancel fill operation if active
+        else if (refs.canvasOverlayRef.current?.hasFillOperation()) {
+          console.log('Escape: Canceling fill operation');
           refs.canvasOverlayRef.current.overlayRenderer.cancelFill();
         }
-        
-        // Send to XState to clear selection
-        tableSend({
-          type: 'keyboard.escape'
-        });
+        // Priority 3: Clear selection if nothing else to cancel
+        else if (refs.selectedCellsRef.current.size > 0) {
+          console.log('Escape: Clearing selection');
+          tableSend({
+            type: 'selection.clear'
+          });
+        }
         break;
         
       case 'Delete':
