@@ -3,8 +3,11 @@
 // ====================================
 
 // Main component
+// Legacy export
 export { VibeGridX } from './VibeGridX';
 export type { VibeGridXProps } from './VibeGridX';
+
+// Modular components removed - files don't exist
 
 // ====================================
 // CORE TYPES
@@ -64,8 +67,7 @@ export {
   createTaskAdapter,
   createProjectAdapter,
   createUserAdapter,
-  useEntityIntegration,
-  useTableConfigFromAtoms
+  useEntityIntegration
 } from './integration/EntityIntegration';
 
 // ====================================

@@ -2,6 +2,21 @@
 import type { ActorRefFrom } from 'xstate';
 
 // ====================================
+// ENUM OPTION INTERFACE
+// ====================================
+
+export interface EnumOption {
+  value: string | number;
+  label: string;
+  color?: string;
+  backgroundColor?: string;
+  icon?: string;
+  description?: string;
+  group?: string;
+  disabled?: boolean;
+}
+
+// ====================================
 // CORE ENTITY TYPES
 // ====================================
 
@@ -21,7 +36,7 @@ export interface Column<T = any> {
   id: string;
   name: string;
   field: keyof T & string;
-  type: 'text' | 'number' | 'date' | 'boolean' | 'select';
+  type: 'text' | 'number' | 'date' | 'boolean' | 'enum' | 'select';
   width: number; // Required - no defaults
   editable?: boolean;
   minWidth?: number;
@@ -29,7 +44,93 @@ export interface Column<T = any> {
   resizable?: boolean;
   sortable?: boolean;
   filterable?: boolean;
-  options?: string[]; // for select type
+  options?: string[] | EnumOption[]; // for select/enum type
+  
+  // Display formatting
+  displayFormat?: string;
+  align?: 'left' | 'center' | 'right';
+  className?: string;
+  style?: Record<string, any>;
+  
+  // Validation
+  required?: boolean;
+  validate?: (value: any) => string | null;
+  
+  // Text renderer options
+  placeholder?: string;
+  maxLength?: number;
+  minLength?: number;
+  pattern?: string;
+  patternError?: string;
+  searchTerm?: string;
+  textTransform?: 'uppercase' | 'lowercase' | 'capitalize';
+  colorMap?: Record<string, string>;
+  fontWeight?: string;
+  fontSize?: string;
+  
+  // Number renderer options
+  precision?: number;
+  minimumFractionDigits?: number;
+  maximumFractionDigits?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  useLocale?: boolean;
+  locale?: string;
+  currency?: string;
+  prefix?: string;
+  suffix?: string;
+  showArrows?: boolean;
+  showPlusSign?: boolean;
+  negativeFormat?: 'minus' | 'parentheses';
+  negativeColor?: string;
+  positiveColor?: string;
+  zeroColor?: string;
+  colorScale?: any;
+  numberFormat?: any;
+  
+  // Date renderer options
+  dateFormat?: string;
+  inputFormat?: string;
+  dateOptions?: Intl.DateTimeFormatOptions;
+  timeOptions?: Intl.DateTimeFormatOptions;
+  dateTimeOptions?: Intl.DateTimeFormatOptions;
+  showRelativeTime?: boolean;
+  relativeTimePosition?: 'append' | 'replace';
+  minDate?: string | Date;
+  maxDate?: string | Date;
+  allowedDaysOfWeek?: number[];
+  pastColor?: string;
+  futureColor?: string;
+  todayColor?: string;
+  highlightOverdue?: boolean;
+  highlightUpcoming?: boolean;
+  upcomingDays?: number;
+  customFormat?: (date: Date) => string;
+  
+  // Boolean renderer options
+  allowNull?: boolean;
+  trueLabel?: string;
+  falseLabel?: string;
+  nullLabel?: string;
+  trueIcon?: string;
+  falseIcon?: string;
+  nullIcon?: string;
+  trueColor?: string;
+  falseColor?: string;
+  nullColor?: string;
+  trueBadgeColor?: string;
+  falseBadgeColor?: string;
+  nullBadgeColor?: string;
+  readOnly?: boolean;
+  
+  // Enum renderer options
+  enumOptions?: EnumOption[];
+  strictEnum?: boolean;
+  multiple?: boolean;
+  maxSelections?: number;
+  minSelections?: number;
+  customRender?: (value: any, option?: EnumOption) => string;
 }
 
 export interface TableSettings {

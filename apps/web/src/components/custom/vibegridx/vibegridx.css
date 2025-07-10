@@ -1,5 +1,8 @@
 /* VibeGridX Styles */
 
+/* Import additional styles */
+@import './vibegridx-cells.css';
+
 /* CSS Variables for dynamic configuration */
 :root {
   --vibegridx-header-height: 32px;

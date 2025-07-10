@@ -8,7 +8,13 @@ import type {
   OptimisticOperation 
 } from '../types';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
-import { createDefaultCellRendererRegistry, type CellRendererRegistry, type CellState } from './cells';
+import { 
+  renderText, 
+  renderNumber, 
+  renderDate, 
+  renderBoolean, 
+  renderEnum 
+} from './fast-renderers';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -110,7 +116,6 @@ export class AtomicTableRenderer {
   private body: HTMLElement;
   private viewport: HTMLElement;
   
-  private cellRegistry: CellRendererRegistry;
   private virtualGrid: VirtualGridManager;
   private options: RendererOptions;
   
@@ -137,12 +142,6 @@ export class AtomicTableRenderer {
   
   constructor(options: RendererOptions) {
     this.options = options;
-    this.cellRegistry = options.cellRegistry || createDefaultCellRendererRegistry();
-    console.log('AtomicTableRenderer: Cell registry created:', {
-      hasRegistry: !!this.cellRegistry,
-      registryType: this.cellRegistry.constructor.name,
-      hasRenderMethod: typeof this.cellRegistry.renderCell === 'function'
-    });
     this.dimensionManager = options.dimensionManager || null;
     
     // Set columns if provided
@@ -263,26 +262,27 @@ export class AtomicTableRenderer {
   }
   
   private setupEventListeners() {
-    // Scroll handling with throttling
-    let scrollTimeout = 0;
+    // Scroll handling with simple throttling
+    let isScrolling = false;
+    
     this.viewport.addEventListener('scroll', () => {
-      if (scrollTimeout) cancelAnimationFrame(scrollTimeout);
+      // Always sync header immediately for smooth horizontal scrolling
+      this.header.style.transform = `translateX(-${this.viewport.scrollLeft}px)`;
       
-      scrollTimeout = requestAnimationFrame(() => {
-        // Sync horizontal scroll with header
-        this.header.style.transform = `translateX(-${this.viewport.scrollLeft}px)`;
-        
+      // Prevent multiple simultaneous updates
+      if (isScrolling) return;
+      
+      isScrolling = true;
+      
+      requestAnimationFrame(() => {
         const rowHeight = this.virtualGrid.getRowHeight();
         const calculatedStart = Math.floor(this.viewport.scrollTop / rowHeight);
         const calculatedEnd = calculatedStart + Math.ceil(this.viewport.clientHeight / rowHeight);
         const cappedEnd = this.lastRenderState ? Math.min(calculatedEnd, this.lastRenderState.rows.length) : calculatedEnd;
         
-        // Debug logging disabled - too verbose during scrolling
-        // console.log('Viewport Update Debug:', { ... });
-        
         const newViewport: ViewportInfo = {
           start: calculatedStart,
-          end: cappedEnd, // Cap at actual rows
+          end: cappedEnd,
           height: this.viewport.clientHeight,
           width: this.viewport.clientWidth,
           scrollTop: this.viewport.scrollTop,
@@ -307,6 +307,9 @@ export class AtomicTableRenderer {
         }
         
         this.options.onScroll?.(newViewport);
+        
+        // Allow next update
+        isScrolling = false;
       });
     });
     
@@ -636,33 +639,14 @@ export class AtomicTableRenderer {
       const isEditing = this.editingCell?.rowId === row.id && this.editingCell?.columnId === column.id;
       const isDirty = row.metadata.isDirty || false;
       
-      // Use simple renderer for most cases to avoid object allocation overhead
-      let cellContent: string;
+      // Always use fast renderer for simplicity and performance
+      const cellContent = this.renderValueFast(value, column);
       let cellClass = CSS_CLASSES.CELL;
       
-      if (!isSelected && !isEditing && !isDirty) {
-        // Fast path: 95% of cells - just render the value directly
-        cellContent = this.renderValueFast(value, column);
-      } else {
-        // Slow path: Complex state rendering for special cells
-        const cellState: CellState = {
-          isSelected,
-          isEditing,
-          isDirty,
-          isOptimistic: false,
-          isHovered: false,
-          isFocused: false
-        };
-        
-        try {
-          const cellResult = this.cellRegistry.renderCell(value, column, cellState);
-          cellContent = cellResult.content;
-          cellClass = `${CSS_CLASSES.CELL} ${cellResult.className}`;
-        } catch (error) {
-          console.error('AtomicTableRenderer: Cell rendering error for', cellKey, error);
-          cellContent = String(value || '');
-        }
-      }
+      // Add state classes if needed
+      if (isSelected) cellClass += ` ${CSS_CLASSES.SELECTED}`;
+      if (isEditing) cellClass += ` ${CSS_CLASSES.EDITING}`;
+      if (isDirty) cellClass += ` ${CSS_CLASSES.DIRTY}`;
       
       // Position cell absolutely within row - simplified for performance
       cellsHTML += `<div class="${cellClass}" 
@@ -782,38 +766,19 @@ export class AtomicTableRenderer {
   // FAST CELL RENDERING
   // ====================================
   
+  // Map of renderers for quick lookup
+  private static readonly renderers: Record<string, (value: any, column: Column) => string> = {
+    text: renderText,
+    number: renderNumber,
+    date: renderDate,
+    boolean: renderBoolean,
+    enum: renderEnum,
+    select: renderText, // Reuse text renderer for select
+  };
+  
   private renderValueFast(value: any, column: Column): string {
-    if (value === null || value === undefined) return '';
-    
-    switch (column.type) {
-      case 'text':
-        if (typeof value === 'object') {
-          try {
-            const json = JSON.stringify(value);
-            return json.length > 50 ? json.substring(0, 47) + '...' : json;
-          } catch {
-            return '[Object]';
-          }
-        }
-        return String(value);
-        
-      case 'number':
-        return typeof value === 'number' ? value.toLocaleString() : String(value);
-        
-      case 'date':
-        const date = value instanceof Date ? value : new Date(value);
-        return date.toLocaleDateString();
-        
-      case 'boolean':
-        return value ? '✓' : '';
-        
-      case 'select':
-      case 'enum':
-        return String(value);
-        
-      default:
-        return String(value);
-    }
+    const renderer = AtomicTableRenderer.renderers[column.type] || renderText;
+    return renderer(value, column);
   }
 
   // ====================================

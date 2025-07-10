@@ -44,11 +44,11 @@ const taskColumns: Column<Task>[] = [
     id: 'status',
     name: 'Status',
     field: 'status',
-    type: 'select',
+    type: 'enum',
     width: 120,
     editable: true,
-    options: [
-      { value: 'todo', label: 'Todo' },
+    enumOptions: [
+      { value: 'open', label: 'Open' },
       { value: 'in_progress', label: 'In Progress' },
       { value: 'completed', label: 'Completed' }
     ]
@@ -57,10 +57,10 @@ const taskColumns: Column<Task>[] = [
     id: 'priority',
     name: 'Priority',
     field: 'priority',
-    type: 'select',
+    type: 'enum',
     width: 100,
     editable: true,
-    options: [
+    enumOptions: [
       { value: 'low', label: 'Low' },
       { value: 'medium', label: 'Medium' },
       { value: 'high', label: 'High' }
