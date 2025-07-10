@@ -55,16 +55,7 @@ export class FillHandleLayer {
     this.stage.add(this.fillHandleLayer);
     this.fillHandleLayer.moveToTop(); // Above visual-only layers
     
-    // Test if events work at all on this layer
-    this.fillHandleLayer.on('click', () => {
-      console.log('FillHandleLayer: Interactive layer click detected!');
-    });
     
-    this.fillHandleLayer.on('mousemove', () => {
-      console.log('FillHandleLayer: Interactive layer mousemove detected!');
-    });
-    
-    console.log('FillHandleLayer: Hybrid architecture - DOM for cells, Konva for controls');
   }
   
   // ====================================
@@ -76,20 +67,15 @@ export class FillHandleLayer {
   }
   
   renderFillHandle(selectedCells: Set<string>, viewport: ViewportInfo): void {
-    console.log('FillHandleLayer.renderFillHandle:', selectedCells.size, 'cells');
-    
     if (selectedCells.size === 0) {
-      console.log('FillHandleLayer: No selected cells, hiding fill handle');
       this.hideFillHandle();
       return;
     }
     
     // Calculate selection bounds
     const bounds = this.getSelectionBounds(selectedCells, viewport);
-    console.log('FillHandleLayer: Selection bounds calculated:', bounds);
     
     if (!bounds) {
-      console.log('FillHandleLayer: No valid bounds, hiding fill handle');
       this.hideFillHandle();
       return;
     }
@@ -98,37 +84,24 @@ export class FillHandleLayer {
     const handleX = bounds.maxX - 5;
     const handleY = bounds.maxY - 5;
     
-    console.log('FillHandleLayer: Fill handle position calculated:', { handleX, handleY, bounds });
-    
     // Check if handle is within viewport
     const isWithinViewport = handleY >= -10 && handleY <= viewport.height + 10 &&
                              handleX >= -10 && handleX <= viewport.width + 10;
     
-    console.log('FillHandleLayer: Viewport check:', { 
-      isWithinViewport, 
-      handleY, 
-      handleX,
-      viewport: { height: viewport.height, width: viewport.width }
-    });
-    
     if (!isWithinViewport) {
-      console.log('FillHandleLayer: Fill handle outside viewport, hiding');
       this.hideFillHandle();
       return;
     }
     
     // Create or update fill handle
     if (!this.activeFillHandle) {
-      console.log('FillHandleLayer: Creating new fill handle');
       this.createFillHandle(bounds.maxX, bounds.maxY);
     } else {
-      console.log('FillHandleLayer: Updating existing fill handle position');
       this.updateFillHandlePosition(bounds.maxX, bounds.maxY);
     }
   }
   
   renderFillPreview(previewCells: Set<string>, viewport: ViewportInfo): void {
-    console.log('FillHandleLayer.renderFillPreview:', previewCells.size, 'cells');
     
     // Clear existing preview
     this.clearFillPreview();
@@ -146,22 +119,10 @@ export class FillHandleLayer {
       }
       
       const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
-      console.log('FillHandleLayer: Position for', cellKey, position);
       
-      // Debug coordinate system mappings if position is null
+      // Skip if position not found
       if (!position) {
-        const dimensions = this.coordinateSystem.getDimensions();
-        const mappings = this.coordinateSystem.hasMappings(parsed.rowId, parsed.columnId);
-        const allMappedIds = this.coordinateSystem.getAllMappedIds();
-        console.log('FillHandleLayer: Coordinate system debug for', cellKey, {
-          rowId: parsed.rowId,
-          columnId: parsed.columnId,
-          systemDimensions: dimensions,
-          hasRowMapping: mappings.hasRow,
-          hasColumnMapping: mappings.hasColumn,
-          allRowIds: allMappedIds.rowIds.slice(0, 5), // First 5 for debugging
-          totalMappedRows: allMappedIds.rowIds.length
-        });
+        continue;
       }
       
       if (position) {
@@ -183,22 +144,9 @@ export class FillHandleLayer {
         this.layer.add(shape);
         this.activeFillPreviewShapes.push(shape);
         configuredShapes++;
-        console.log('FillHandleLayer: Created preview shape', {
-          position,
-          columnWidth,
-          visible: shape.visible(),
-          opacity: shape.opacity()
-        });
-      } else {
-        console.warn('FillHandleLayer: No position for cell', cellKey);
       }
     }
     
-    console.log('FillHandleLayer: Preview render complete', {
-      totalCells: previewCells.size,
-      configuredShapes,
-      activeShapes: this.activeFillPreviewShapes.length
-    });
     
     this.layer.batchDraw();
   }
@@ -237,12 +185,6 @@ export class FillHandleLayer {
     // Calculate drag delta relative to selection bottom (VERTICAL ONLY)
     const dragDeltaY = dragPos.y - selectionBounds.maxY;
     
-    console.log('FillHandleLayer: Calculating vertical-only fill', {
-      dragPos,
-      selectionBounds,
-      dragDeltaY,
-      cellHeight: this.config.cellHeight
-    });
     
     // Only proceed if dragging down and more than 5 pixels
     if (dragDeltaY <= 5) {
@@ -308,15 +250,6 @@ export class FillHandleLayer {
       }
     }
     
-    console.log('FillHandleLayer: Vertical fill result', {
-      originalCells: selectedCells.size,
-      selectedColumns: Array.from(selectedColumns),
-      maxRowIndex,
-      additionalRows,
-      totalRowsAvailable: allRowIds.length,
-      totalPreviewCells: previewCells.size,
-      sampleRowIds: allRowIds.slice(0, 5) // Show first 5 for debugging
-    });
     
     return previewCells;
   }
@@ -326,7 +259,6 @@ export class FillHandleLayer {
   // ====================================
   
   private createFillHandle(x: number, y: number): void {
-    console.log('FillHandleLayer: Creating fill handle with hover effects at', { x, y });
     
     // Create fill handle with Konva events enabled
     this.activeFillHandle = new Konva.Rect({
@@ -368,7 +300,6 @@ export class FillHandleLayer {
     
     this.fillHandleLayer.batchDraw();
     
-    console.log('FillHandleLayer: Fill handle created (visual only)');
   }
   
   private updateFillHandlePosition(x: number, y: number): void {
@@ -442,7 +373,6 @@ export class FillHandleLayer {
     this.activeFillHandle.on('mouseenter', () => {
       if (!this.activeFillHandle) return;
       
-      console.log('FillHandleLayer: Fill handle mouseenter - increasing size');
       
       const currentPos = this.activeFillHandle.position();
       const sizeDiff = (hoverSize - this.originalSize) / 2;
@@ -466,7 +396,6 @@ export class FillHandleLayer {
     this.activeFillHandle.on('mouseleave', () => {
       if (!this.activeFillHandle) return;
       
-      console.log('FillHandleLayer: Fill handle mouseleave - restoring size');
       
       const currentPos = this.activeFillHandle.position();
       const sizeDiff = (hoverSize - this.originalSize) / 2;
@@ -493,7 +422,6 @@ export class FillHandleLayer {
     
     // Drag start
     this.activeFillHandle.on('dragstart', () => {
-      console.log('FillHandleLayer: Fill drag started');
       this.machine.send({ type: 'FILL_START', direction: 'vertical' });
     });
     
@@ -519,8 +447,6 @@ export class FillHandleLayer {
     
     // Drag end - complete fill
     this.activeFillHandle.on('dragend', () => {
-      console.log('FillHandleLayer: Fill drag ended');
-      
       if (!this.activeFillHandle) return;
       
       const pos = this.stage.getPointerPosition();
@@ -591,13 +517,11 @@ export class FillHandleLayer {
     
     // Add hover effects
     interceptor.addEventListener('mouseenter', () => {
-      console.log('FillHandleLayer: Fill handle hover started');
       interceptor.style.cursor = 'ns-resize';
       this.enlargeFillHandle();
     });
     
     interceptor.addEventListener('mouseleave', () => {
-      console.log('FillHandleLayer: Fill handle hover ended');
       interceptor.style.cursor = 'crosshair';
       this.shrinkFillHandle();
     });
@@ -607,7 +531,6 @@ export class FillHandleLayer {
     let startY = 0;
     
     interceptor.addEventListener('mousedown', (e) => {
-      console.log('FillHandleLayer: Fill handle drag started');
       e.stopPropagation();
       e.preventDefault();
       
@@ -623,19 +546,11 @@ export class FillHandleLayer {
       if (!isDragging) return;
       
       const deltaY = e.clientY - startY;
-      console.log('FillHandleLayer: Fill handle dragging', { deltaY, clientY: e.clientY, startY });
-      
       // Convert screen coordinates to canvas coordinates
       const canvasContainer = this.stage.container();
       const containerRect = canvasContainer.getBoundingClientRect();
       const canvasX = e.clientX - containerRect.left;
       const canvasY = e.clientY - containerRect.top;
-      
-      console.log('FillHandleLayer: Converted coordinates', { 
-        screen: { x: e.clientX, y: e.clientY },
-        canvas: { x: canvasX, y: canvasY },
-        containerRect
-      });
       
       // Calculate fill preview
       const context = this.machine.getSnapshot().context;
@@ -645,7 +560,6 @@ export class FillHandleLayer {
           context.selectedCells,
           context.viewport
         );
-        console.log('FillHandleLayer: Preview cells calculated', { previewCells: previewCells.size });
         this.renderFillPreview(previewCells, context.viewport);
       }
     };
@@ -653,7 +567,6 @@ export class FillHandleLayer {
     const handleMouseUp = (e: MouseEvent) => {
       if (!isDragging) return;
       
-      console.log('FillHandleLayer: Fill handle drag ended');
       isDragging = false;
       
       // Convert screen coordinates to canvas coordinates
@@ -671,7 +584,6 @@ export class FillHandleLayer {
           context.viewport
         );
         
-        console.log('FillHandleLayer: Final fill cells', { fillCells: fillCells.size });
         this.clearFillPreview();
         if (this.machine) {
         this.machine.send({ type: 'FILL_COMPLETE', fillCells });
@@ -697,7 +609,6 @@ export class FillHandleLayer {
     // Store reference for cleanup
     (this.activeFillHandle as any)._domInterceptor = interceptor;
     
-    console.log('FillHandleLayer: DOM event interceptor created', { x, y, width, height });
   }
 
   private cleanupFillHandle(): void {
@@ -722,7 +633,6 @@ export class FillHandleLayer {
     // Destroy the visual shape
     this.activeFillHandle.destroy();
     
-    console.log('FillHandleLayer: Fill handle cleaned up');
   }
   
   // ====================================
@@ -738,6 +648,5 @@ export class FillHandleLayer {
       this.fillHandleLayer.destroy();
     }
     
-    console.log('FillHandleLayer: Destroyed');
   }
 }

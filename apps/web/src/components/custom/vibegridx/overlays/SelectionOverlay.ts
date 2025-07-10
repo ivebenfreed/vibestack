@@ -45,11 +45,6 @@ export class SelectionOverlay {
       return;
     }
     
-    console.log('SelectionOverlay.updateSelection:', {
-      selectedCells: selectedCells.size,
-      viewport: !!viewport,
-      changed: selectionChanged
-    });
     
     if (!viewport) {
       this.clear();
@@ -86,16 +81,10 @@ export class SelectionOverlay {
   
   private renderCell(cellKey: string, viewport: ViewportInfo): void {
     const position = this.getPositionForCell(cellKey, viewport);
-    console.log('SelectionOverlay.renderCell:', {
-      cellKey,
-      position,
-      coordinateSystemDimensions: this.coordinateSystem.getDimensions(),
-      hasMappings: this.coordinateSystem.parseCellKey(cellKey) ? 
-        this.coordinateSystem.hasMappings(
-          this.coordinateSystem.parseCellKey(cellKey)!.rowId,
-          this.coordinateSystem.parseCellKey(cellKey)!.columnId
-        ) : null
-    });
+    // Only log if position is null for debugging
+    if (!position) {
+      console.log('SelectionOverlay.renderCell: No position for', cellKey);
+    }
     if (!position) return;
     
     const parsed = this.coordinateSystem.parseCellKey(cellKey);

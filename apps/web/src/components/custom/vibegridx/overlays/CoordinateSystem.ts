@@ -59,12 +59,6 @@ export class CoordinateSystem {
     rowIds: string[], 
     columnIds: string[]
   ): void {
-    console.log('CoordinateSystem.updateMappings called:', {
-      rowCount: rowIds.length,
-      columnCount: columnIds.length,
-      sampleRowIds: rowIds.slice(0, 3),
-      sampleColumnIds: columnIds.slice(0, 3)
-    });
     
     this.rowIndexMap.clear();
     this.columnIndexMap.clear();
@@ -84,10 +78,6 @@ export class CoordinateSystem {
       this.indexToColumnId.set(index, id);
     });
     
-    console.log('CoordinateSystem.updateMappings complete:', {
-      rowMapSize: this.rowIndexMap.size,
-      columnMapSize: this.columnIndexMap.size
-    });
   }
   
   private clearCaches(): void {
@@ -152,14 +142,6 @@ export class CoordinateSystem {
       return null;
     }
     
-    console.log('CoordinateSystem.viewportToCell:', {
-      inputX: x,
-      inputY: y,
-      absoluteRow: row,
-      columnId: columnInfo.columnId,
-      columnIndex: columnInfo.columnIndex,
-      viewport: { start: viewport.start, end: viewport.end }
-    });
 
     // Validate bounds
     if (row < 0) {
@@ -189,12 +171,6 @@ export class CoordinateSystem {
       // Y position relative to viewport (subtract scroll offset)
       const y = row * this.config.cellHeight - actualScrollTop;
       
-      console.log('CoordinateSystem.cellToViewport: Fallback calculation FIXED', {
-        row, column, 
-        viewport: { scrollTop: viewport.scrollTop, start: viewport.start },
-        actualScrollTop,
-        calculation: { rawY: row * this.config.cellHeight, staleScrollOffset: viewport.scrollTop, actualScrollOffset: actualScrollTop, finalY: y }
-      });
       
       return { x, y, row, column };
     }
@@ -209,18 +185,6 @@ export class CoordinateSystem {
     // Y position relative to viewport (subtract scroll offset)
     const y = row * this.config.cellHeight - actualScrollTop;
 
-    console.log('CoordinateSystem.cellToViewport: Standard calculation FIXED', {
-      row, column, columnId,
-      viewport: { scrollTop: viewport.scrollTop, start: viewport.start },
-      actualScrollTop,
-      calculation: { 
-        rawY: row * this.config.cellHeight, 
-        staleScrollOffset: viewport.scrollTop,
-        actualScrollOffset: actualScrollTop, 
-        finalY: y,
-        cellHeight: this.config.cellHeight
-      }
-    });
 
     return { x, y, row, column };
   }

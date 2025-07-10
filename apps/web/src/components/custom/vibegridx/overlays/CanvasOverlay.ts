@@ -161,11 +161,6 @@ export class CanvasOverlay {
     this.machine.subscribe((snapshot) => {
       const context = snapshot.context;
       
-      console.log('CanvasOverlay: State update', {
-        selectedCells: context.selectedCells.size,
-        viewport: !!context.viewport,
-        fillHandleVisible: context.shapesVisible.fillHandle
-      });
       
       // Always update all overlays - let each overlay decide if it needs to re-render
       this.updateAllOverlays(context);
