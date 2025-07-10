@@ -81,11 +81,10 @@ export class SelectionOverlay {
   
   private renderCell(cellKey: string, viewport: ViewportInfo): void {
     const position = this.getPositionForCell(cellKey, viewport);
-    // Only log if position is null for debugging
     if (!position) {
-      console.log('SelectionOverlay.renderCell: No position for', cellKey);
+      // Cell is not in current viewport, skip rendering
+      return;
     }
-    if (!position) return;
     
     const parsed = this.coordinateSystem.parseCellKey(cellKey);
     if (!parsed) return;

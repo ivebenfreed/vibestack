@@ -160,21 +160,21 @@ export const useRendererInitialization = (
           
           console.log('VibeGridX: Canvas Overlay initialized inside scrollable viewport');
           
-          // Update data mappings if we have data
-          const renderState = (window as any).__vibegridx_last_renderstate;
-          
-          if (renderState && renderState.rows.length > 0) {
-            const rowIds = renderState.rows.map((row: any) => row.id);
+          // Update data mappings if we have integration
+          if (refs.integrationRef.current) {
+            const allEntities = refs.integrationRef.current.getAllEntityData();
+            const allRowIds = Object.keys(allEntities);
             const columnIds = rendererOptions.columns.map((col: any) => col.id);
-            console.log('VibeGridXCore: Updating canvas data mappings on init', {
-              rowCount: rowIds.length,
-              columnCount: columnIds.length
-            });
-            refs.canvasOverlayRef.current!.updateDataMappings(rowIds, columnIds);
             
-            // Columns are now passed during initialization, no need to update them here
+            if (allRowIds.length > 0) {
+              console.log('VibeGridXCore: Updating canvas data mappings on init', {
+                rowCount: allRowIds.length,
+                columnCount: columnIds.length
+              });
+              refs.canvasOverlayRef.current!.updateDataMappings(allRowIds, columnIds);
+            }
           } else {
-            console.log('VibeGridXCore: No render state available for canvas init');
+            console.log('VibeGridXCore: No integration available for canvas init');
           }
         }
       }

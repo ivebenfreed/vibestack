@@ -385,20 +385,21 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         (window as any).__vibegridx_last_renderstate = renderState;
         
         // Update canvas overlay with data mappings
-        if (renderState.rows.length > 0) {
-          const rowIds = renderState.rows.map(row => row.id);
+        if (renderState.rows.length > 0 && canvasOverlayRef.current) {
+          // Get ALL row IDs from the integration layer, not just visible ones
+          const allEntities = integrationRef.current?.getAllEntityData() || {};
+          const allRowIds = Object.keys(allEntities);
           const columnIds = columns.map(col => col.id);
           
-          if (canvasOverlayRef.current) {
-            console.log('VibeGridX: Updating canvas data mappings', { 
-              rowCount: rowIds.length, 
-              columnCount: columnIds.length 
-            });
-            canvasOverlayRef.current.updateDataMappings(rowIds, columnIds);
-            // Columns are now passed during initialization, no need to update them here
-          } else {
-            console.log('VibeGridX: Canvas not ready yet, will update mappings later');
-          }
+          console.log('VibeGridX: Updating canvas data mappings', { 
+            allRowCount: allRowIds.length,
+            visibleRowCount: renderState.rows.length,
+            columnCount: columnIds.length 
+          });
+          
+          // Update coordinate system with ALL rows so it can track positions
+          // for selected cells even when they're not visible
+          canvasOverlayRef.current.updateDataMappings(allRowIds, columnIds);
         }
         
         // HYBRID RENDERING: Only process data changes
