@@ -322,7 +322,7 @@ export class FillHandleLayer {
     if (interceptor) {
       interceptor.style.left = `${x}px`;
       interceptor.style.top = `${y}px`;
-      console.log('FillHandleLayer: Updated DOM interceptor position', { x, y });
+      // Position updated silently - too frequent to log
     }
   }
   

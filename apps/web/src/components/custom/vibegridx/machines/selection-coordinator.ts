@@ -202,18 +202,14 @@ export const selectionCoordinatorMachine = setup({
         const cellKey = createCellKey(event.rowId, event.columnId);
         const newSelection = new Set(context.selectedCells);
         
-        console.log('SelectionCoordinator: selectCell action', {
-          cellKey,
-          ctrlKey: event.ctrlKey,
-          shiftKey: event.shiftKey,
-          hasAnchor: !!context.anchor,
-          anchor: context.anchor,
-          currentSelection: Array.from(context.selectedCells),
-          currentSelectionSize: context.selectedCells.size,
-          activeCell: context.activeCell,
-          visibleRowIds: context.visibleRowIds.length,
-          columns: context.columns.length
-        });
+        // Only log selection changes for debugging special cases
+        if (event.shiftKey || context.selectedCells.size > 50) {
+          console.log('SelectionCoordinator: selectCell', {
+            cellKey,
+            shiftKey: event.shiftKey,
+            currentSize: context.selectedCells.size
+          });
+        }
         
         if (event.shiftKey && context.anchor) {
           // Range select
@@ -223,13 +219,7 @@ export const selectionCoordinatorMachine = setup({
             context.visibleRowIds,
             context.columns
           );
-          console.log('SelectionCoordinator: Range selection calculated', {
-            anchorCell: context.anchor,
-            targetCell: { rowId: event.rowId, columnId: event.columnId },
-            rangeSize: rangeSelection.size,
-            visibleRowIds: context.visibleRowIds.length,
-            columns: context.columns.length
-          });
+          // Range selection completed
           return rangeSelection;
         } else {
           // Single select

@@ -76,21 +76,15 @@ export const createCellClickHandler = (
   callbacks: EventHandlerCallbacks
 ) => {
   return useCallback((rowId: string, columnId: string, event: MouseEvent) => {
-    console.log('VibeGridX.handleCellClick:', { rowId, columnId, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey });
-    console.log('VibeGridXEvents.handleCellClick DEBUG:', {
-      hasCanvasOverlay: !!refs.canvasOverlayRef.current,
-      canvasOverlayType: refs.canvasOverlayRef.current?.constructor.name,
-      eventCoords: { x: event.clientX, y: event.clientY }
-    });
+    // Log only for shift/ctrl clicks
+    if (event.shiftKey || event.ctrlKey) {
+      console.log('VibeGridX.handleCellClick:', { rowId, columnId, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey });
+    }
     
     const cellKey = `${rowId}:${columnId}`;
     
-    // Log the click action
-    if (event.shiftKey) {
-      console.log(`Shift+Click: Selecting range to ${cellKey}`);
-    } else {
-      console.log(`Click: Selecting cell ${cellKey}`);
-      // Update anchor for regular clicks
+    // Update anchor for regular clicks
+    if (!event.shiftKey) {
       refs.anchorCellRef.current = { rowId, columnId };
     }
     
@@ -142,20 +136,21 @@ export const createKeyboardHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((event: React.KeyboardEvent | KeyboardEvent) => {
-    console.log('VibeGridX handleKeyDown:', {
-      key: event.key,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey,
-      target: event.target,
-      currentTarget: event.currentTarget
-    });
+    // Only log special key combinations
+    if ((event.ctrlKey || event.metaKey) && event.key !== 'Control' && event.key !== 'Meta' && event.key !== 'Alt') {
+      console.log('VibeGridX handleKeyDown:', {
+        key: event.key,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey
+      });
+    }
     
     // Handle arrow key navigation
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();
       event.stopPropagation();
       
-      console.log(`${event.shiftKey ? 'Shift+' : ''}${event.key}: Sending to selection coordinator`);
+      // Arrow key navigation handled by selection coordinator
       
       // Send to XState selection coordinator which will handle all the logic
       tableSend({
@@ -413,7 +408,7 @@ export const createMouseMoveHandler = (
       if (deltaX > 5 || deltaY > 5) {
         // Start drag selection
         dragState.isDragging = true;
-        console.log('VibeGridXEvents: Starting drag selection from', dragState.startCell);
+        // Starting drag selection
         
         tableSend({
           type: 'selection.drag.start',
@@ -465,7 +460,7 @@ export const createMouseUpHandler = (
     
     if (dragState.isDragging) {
       // Complete drag selection
-      console.log('VibeGridXEvents: Completing drag selection');
+      // Completing drag selection
       
       tableSend({
         type: 'selection.drag.end',
@@ -587,12 +582,7 @@ export const calculateRangeSelection = (
     }
   }
   
-  console.log('Range selection calculated:', {
-    minRow, maxRow,
-    minCol, maxCol,
-    totalCells: selection.size,
-    sample: Array.from(selection).slice(0, 5)
-  });
+  // Range selection completed - size: selection.size
   
   return selection;
 };

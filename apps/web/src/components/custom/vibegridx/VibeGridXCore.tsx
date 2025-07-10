@@ -217,10 +217,7 @@ export const useSelectionStateSync = (
           const newSize = selectedCells.size;
           
           if (currentSize !== newSize || !areSetsEqual(refs.selectedCellsRef.current, selectedCells)) {
-            console.log('VibeGridX: Selection changed from coordinator', {
-              previous: currentSize,
-              new: newSize
-            });
+            // Selection updated from coordinator
             
             // Sync our local ref with coordinator state
             refs.selectedCellsRef.current = new Set(selectedCells);

@@ -40,13 +40,13 @@ export class SelectionOverlay {
     // Always update when viewport changes, even if selection hasn't
     // This ensures cells become visible when scrolling
     
-    console.log('SelectionOverlay.updateSelection:', {
-      selectedCount: selectedCells.size,
-      hasViewport: !!viewport,
-      viewportStart: viewport?.start,
-      viewportEnd: viewport?.end,
-      sampleCells: Array.from(selectedCells).slice(0, 3)
-    });
+    // Only log significant selection changes
+    if (selectedCells.size > 100 || selectedCells.size === 0) {
+      console.log('SelectionOverlay.updateSelection:', {
+        selectedCount: selectedCells.size,
+        hasViewport: !!viewport
+      });
+    }
     
     if (!viewport) {
       this.clear();
@@ -84,12 +84,14 @@ export class SelectionOverlay {
       }
     }
     
-    console.log('SelectionOverlay: Render summary', {
-      totalSelected: selectedCells.size,
-      rendered: renderedCount,
-      skipped: skippedCount,
-      existingShapes: this.selectionShapes.size
-    });
+    // Only log render summary for large selections or when there are issues
+    if (selectedCells.size > 100 || skippedCount > 0) {
+      console.log('SelectionOverlay: Render summary', {
+        totalSelected: selectedCells.size,
+        rendered: renderedCount,
+        skipped: skippedCount
+      });
+    }
     
     this.layer.batchDraw();
     

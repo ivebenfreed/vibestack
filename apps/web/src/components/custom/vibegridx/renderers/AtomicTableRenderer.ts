@@ -769,24 +769,15 @@ export class AtomicTableRenderer {
   private handleCellClick(event: MouseEvent): void {
     const cellElement = (event.target as Element).closest(`.${CSS_CLASSES.CELL}`) as HTMLElement;
     
-    console.log('AtomicTableRenderer.handleCellClick DEBUG:', {
-      target: event.target,
-      currentTarget: event.currentTarget,
-      cellElement: cellElement,
-      eventCoords: { x: event.clientX, y: event.clientY },
-      canvasOverlay: this.body.querySelector('.vibegridx-canvas-overlay-container')
-    });
+    // Debug logging disabled - too verbose for normal operation
     
     if (!cellElement) return;
     
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
     
-    console.log('AtomicTableRenderer: Cell clicked:', { rowId, columnId });
-    
     // Ensure viewport has focus for keyboard events
     this.viewport.focus();
-    console.log('AtomicTableRenderer: Viewport focused after cell click');
     
     this.options.onCellClick?.(rowId, columnId, event);
   }
