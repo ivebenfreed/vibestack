@@ -106,46 +106,48 @@ export const createCellClickHandler = (
       }
     }
     
-    // Immediately update canvas overlay for instant feedback
-    if (refs.canvasOverlayRef.current) {
-      // Simple selection logic for immediate UI update
-      const newSelection = new Set<string>();
+    // Handle selection logic
+    const newSelection = new Set<string>();
+    
+    if (event.ctrlKey || event.metaKey) {
+      // Control/Cmd click: Toggle individual cell selection
+      refs.selectedCellsRef.current.forEach(key => newSelection.add(key));
       
-      if (event.ctrlKey && refs.selectedCellsRef.current.has(cellKey)) {
-        // Multi-select: copy current selection and toggle
-        refs.selectedCellsRef.current.forEach(key => newSelection.add(key));
+      if (newSelection.has(cellKey)) {
+        // Deselect if already selected
         newSelection.delete(cellKey);
-      } else if (event.ctrlKey) {
-        // Multi-select: copy current selection and add
-        refs.selectedCellsRef.current.forEach(key => newSelection.add(key));
-        newSelection.add(cellKey);
-      } else if (event.shiftKey && refs.anchorCellRef.current) {
-        // Range select
-        const rangeSelection = calculateRangeSelection(
-          refs.anchorCellRef.current,
-          { rowId, columnId },
-          refs.integrationRef.current,
-          refs.columns
-        );
-        rangeSelection.forEach(key => newSelection.add(key));
+        console.log(`Ctrl+Click: Deselected ${cellKey}`);
       } else {
-        // Single select - also set anchor for future shift+click
+        // Add to selection
         newSelection.add(cellKey);
-        refs.anchorCellRef.current = { rowId, columnId };
+        console.log(`Ctrl+Click: Added ${cellKey} to selection`);
       }
       
-      refs.selectedCellsRef.current = newSelection;
-      console.log('Updating canvas overlay with selection:', newSelection.size);
+      // Don't change anchor on ctrl+click to preserve it for future shift+click
+    } else if (event.shiftKey && refs.anchorCellRef.current) {
+      // Shift click: Range selection from anchor to clicked cell
+      const rangeSelection = calculateRangeSelection(
+        refs.anchorCellRef.current,
+        { rowId, columnId },
+        refs.integrationRef.current,
+        refs.columns
+      );
+      rangeSelection.forEach(key => newSelection.add(key));
+      console.log(`Shift+Click: Selected range of ${rangeSelection.size} cells`);
       
-      // Use unified function to update with DOM positions
+      // Don't change anchor on shift+click
+    } else {
+      // Regular click: Single cell selection
+      newSelection.add(cellKey);
+      refs.anchorCellRef.current = { rowId, columnId };
+      console.log(`Click: Selected single cell ${cellKey}`);
+    }
+    
+    // Update refs and canvas
+    refs.selectedCellsRef.current = newSelection;
+    
+    if (refs.canvasOverlayRef.current) {
       updateSelectionWithDOM(refs.canvasOverlayRef.current, newSelection);
-      
-      // Log selection action
-      console.log(`Selection: ${newSelection.size} cells selected`, {
-        ctrl: event.ctrlKey,
-        shift: event.shiftKey,
-        cells: newSelection.size <= 5 ? Array.from(newSelection) : `${newSelection.size} cells`
-      });
     } else {
       console.warn('Canvas overlay ref not available');
     }
@@ -235,61 +237,107 @@ export const createKeyboardHandler = (
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();
       
-      if (refs.selectedCellsRef.current.size === 1 && refs.integrationRef.current) {
+      if (!refs.integrationRef.current) return;
+      
+      const entities = refs.integrationRef.current.getAllEntityData();
+      const columns = refs.integrationRef.current.getColumns();
+      const entityIds = Object.keys(entities);
+      const columnIds = columns.map(c => c.id);
+      
+      // Determine starting position
+      let currentRowIndex: number;
+      let currentColIndex: number;
+      
+      if (refs.selectedCellsRef.current.size === 0) {
+        // No selection - start from top-left
+        currentRowIndex = 0;
+        currentColIndex = 0;
+      } else if (refs.selectedCellsRef.current.size === 1) {
+        // Single cell selected - move from there
         const currentCellKey = Array.from(refs.selectedCellsRef.current)[0];
         const [rowId, columnId] = currentCellKey.split(':');
-        
-        const entities = refs.integrationRef.current.getAllEntityData();
-        const columns = refs.integrationRef.current.getColumns();
-        
-        const entityIds = Object.keys(entities);
-        const columnIds = columns.map(c => c.id);
-        
-        const currentRowIndex = entityIds.indexOf(rowId);
-        const currentColIndex = columnIds.indexOf(columnId);
-        
-        let newRowIndex = currentRowIndex;
-        let newColIndex = currentColIndex;
-        
-        switch (event.key) {
-          case 'ArrowUp':
-            newRowIndex = Math.max(0, currentRowIndex - 1);
-            break;
-          case 'ArrowDown':
-            newRowIndex = Math.min(entityIds.length - 1, currentRowIndex + 1);
-            break;
-          case 'ArrowLeft':
-            newColIndex = Math.max(0, currentColIndex - 1);
-            break;
-          case 'ArrowRight':
-            newColIndex = Math.min(columnIds.length - 1, currentColIndex + 1);
-            break;
+        currentRowIndex = entityIds.indexOf(rowId);
+        currentColIndex = columnIds.indexOf(columnId);
+      } else {
+        // Multiple cells selected - move from the anchor cell
+        if (refs.anchorCellRef.current) {
+          currentRowIndex = entityIds.indexOf(refs.anchorCellRef.current.rowId);
+          currentColIndex = columnIds.indexOf(refs.anchorCellRef.current.columnId);
+        } else {
+          // Fallback to first selected cell
+          const firstCell = Array.from(refs.selectedCellsRef.current)[0];
+          const [rowId, columnId] = firstCell.split(':');
+          currentRowIndex = entityIds.indexOf(rowId);
+          currentColIndex = columnIds.indexOf(columnId);
         }
+      }
+      
+      // Calculate new position
+      let newRowIndex = currentRowIndex;
+      let newColIndex = currentColIndex;
+      
+      switch (event.key) {
+        case 'ArrowUp':
+          newRowIndex = Math.max(0, currentRowIndex - 1);
+          break;
+        case 'ArrowDown':
+          newRowIndex = Math.min(entityIds.length - 1, currentRowIndex + 1);
+          break;
+        case 'ArrowLeft':
+          newColIndex = Math.max(0, currentColIndex - 1);
+          break;
+        case 'ArrowRight':
+          newColIndex = Math.min(columnIds.length - 1, currentColIndex + 1);
+          break;
+      }
+      
+      const newRowId = entityIds[newRowIndex];
+      const newColumnId = columnIds[newColIndex];
+      
+      if (newRowId && newColumnId) {
+        const newCellKey = `${newRowId}:${newColumnId}`;
         
-        const newRowId = entityIds[newRowIndex];
-        const newColumnId = columnIds[newColIndex];
-        
-        if (newRowId && newColumnId) {
-          const newCellKey = `${newRowId}:${newColumnId}`;
+        if (event.shiftKey) {
+          // Shift+Arrow: Extend selection from anchor
+          const anchor = refs.anchorCellRef.current || { 
+            rowId: entityIds[currentRowIndex], 
+            columnId: columnIds[currentColIndex] 
+          };
           
-          if (event.shiftKey) {
-            // Extend selection
-            const rangeSelection = calculateRangeSelection(
-              refs.anchorCellRef.current || { rowId, columnId },
-              { rowId: newRowId, columnId: newColumnId },
-              refs.integrationRef.current,
-              refs.columns
-            );
-            refs.selectedCellsRef.current = rangeSelection;
-            updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
-          } else {
-            // Move selection
-            refs.selectedCellsRef.current = new Set([newCellKey]);
-            refs.anchorCellRef.current = { rowId: newRowId, columnId: newColumnId };
-            updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
+          // If no anchor set yet, use current position as anchor
+          if (!refs.anchorCellRef.current) {
+            refs.anchorCellRef.current = anchor;
           }
           
-          console.log(`Keyboard nav: ${event.shiftKey ? 'Extended' : 'Moved'} to ${newCellKey}`);
+          const rangeSelection = calculateRangeSelection(
+            refs.anchorCellRef.current,
+            { rowId: newRowId, columnId: newColumnId },
+            refs.integrationRef.current,
+            refs.columns
+          );
+          
+          refs.selectedCellsRef.current = rangeSelection;
+          updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
+          console.log(`Shift+${event.key}: Extended selection to ${rangeSelection.size} cells`);
+        } else {
+          // Regular Arrow: Move selection to single cell
+          refs.selectedCellsRef.current = new Set([newCellKey]);
+          refs.anchorCellRef.current = { rowId: newRowId, columnId: newColumnId };
+          updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
+          console.log(`${event.key}: Moved to ${newCellKey}`);
+        }
+        
+        // Ensure the new cell is visible by scrolling if needed
+        const cellElement = document.querySelector(
+          `.vibegridx-cell[data-row-id="${newRowId}"][data-column-id="${newColumnId}"]`
+        ) as HTMLElement;
+        
+        if (cellElement) {
+          cellElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest', 
+            inline: 'nearest' 
+          });
         }
       }
       
@@ -310,6 +358,62 @@ export const createKeyboardHandler = (
           type: 'keyboard.enter',
           shift: event.shiftKey
         });
+        break;
+        
+      case 'Tab':
+        event.preventDefault();
+        
+        // Tab navigation - move to next/previous cell
+        if (refs.integrationRef.current && refs.selectedCellsRef.current.size === 1) {
+          const currentCellKey = Array.from(refs.selectedCellsRef.current)[0];
+          const [rowId, columnId] = currentCellKey.split(':');
+          
+          const entities = refs.integrationRef.current.getAllEntityData();
+          const columns = refs.integrationRef.current.getColumns();
+          const entityIds = Object.keys(entities);
+          const columnIds = columns.map(c => c.id);
+          
+          const currentRowIndex = entityIds.indexOf(rowId);
+          const currentColIndex = columnIds.indexOf(columnId);
+          
+          let newRowIndex = currentRowIndex;
+          let newColIndex = currentColIndex;
+          
+          if (event.shiftKey) {
+            // Shift+Tab: Move backwards
+            newColIndex--;
+            if (newColIndex < 0) {
+              newColIndex = columnIds.length - 1;
+              newRowIndex = Math.max(0, currentRowIndex - 1);
+            }
+          } else {
+            // Tab: Move forwards
+            newColIndex++;
+            if (newColIndex >= columnIds.length) {
+              newColIndex = 0;
+              newRowIndex = Math.min(entityIds.length - 1, currentRowIndex + 1);
+            }
+          }
+          
+          const newRowId = entityIds[newRowIndex];
+          const newColumnId = columnIds[newColIndex];
+          
+          if (newRowId && newColumnId) {
+            const newCellKey = `${newRowId}:${newColumnId}`;
+            refs.selectedCellsRef.current = new Set([newCellKey]);
+            refs.anchorCellRef.current = { rowId: newRowId, columnId: newColumnId };
+            updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
+            console.log(`Tab: Moved to ${newCellKey}`);
+            
+            // Ensure visible
+            const cellElement = document.querySelector(
+              `.vibegridx-cell[data-row-id="${newRowId}"][data-column-id="${newColumnId}"]`
+            ) as HTMLElement;
+            if (cellElement) {
+              cellElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            }
+          }
+        }
         break;
         
       case 'Escape':
