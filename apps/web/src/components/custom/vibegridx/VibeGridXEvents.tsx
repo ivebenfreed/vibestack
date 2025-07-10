@@ -85,18 +85,12 @@ export const createCellClickHandler = (
     
     const cellKey = `${rowId}:${columnId}`;
     
-    // Log the click action based on modifiers
-    if (event.ctrlKey || event.metaKey) {
-      const isSelected = refs.selectedCellsRef.current.has(cellKey);
-      console.log(`Ctrl+Click: Will ${isSelected ? 'deselect' : 'select'} ${cellKey}`);
-    } else if (event.shiftKey) {
-      console.log(`Shift+Click: Will select range to ${cellKey}`);
+    // Log the click action
+    if (event.shiftKey) {
+      console.log(`Shift+Click: Selecting range to ${cellKey}`);
     } else {
-      console.log(`Click: Will select single cell ${cellKey}`);
-    }
-    
-    // Update anchor for non-shift clicks
-    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      console.log(`Click: Selecting cell ${cellKey}`);
+      // Update anchor for regular clicks
       refs.anchorCellRef.current = { rowId, columnId };
     }
     
@@ -134,33 +128,13 @@ export const createColumnClickHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((columnId: string, event: MouseEvent) => {
-    // Select entire column
-    if (refs.integrationRef.current) {
-      const entities = refs.integrationRef.current.getAllEntityData();
-      const newSelection = new Set<string>();
-      
-      if (event.ctrlKey && refs.selectedCellsRef.current.size > 0) {
-        // Add to existing selection
-        refs.selectedCellsRef.current.forEach(key => newSelection.add(key));
-      }
-      
-      // Add all cells in this column
-      Object.keys(entities).forEach(rowId => {
-        newSelection.add(`${rowId}:${columnId}`);
-      });
-      
-      refs.selectedCellsRef.current = newSelection;
-      updateSelectionWithDOM(refs.canvasOverlayRef.current, newSelection);
-      
-      console.log(`Column selection: ${columnId} - ${newSelection.size} cells selected`);
-      
-      // Send to XState
-      tableSend({
-        type: 'selection.column.select',
-        columnId,
-        extend: event.ctrlKey
-      });
-    }
+    console.log(`Column header clicked: ${columnId}`);
+    
+    // Send to XState to select entire column
+    tableSend({
+      type: 'selection.column.select',
+      columnId
+    });
   }, [tableSend]);
 };
 

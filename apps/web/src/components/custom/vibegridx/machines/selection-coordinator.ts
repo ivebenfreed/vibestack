@@ -195,17 +195,12 @@ export const selectionCoordinatorMachine = setup({
           ctrlKey: event.ctrlKey,
           shiftKey: event.shiftKey,
           hasAnchor: !!context.anchor,
-          anchor: context.anchor
+          anchor: context.anchor,
+          currentSelection: Array.from(context.selectedCells),
+          currentSelectionSize: context.selectedCells.size
         });
         
-        if (event.ctrlKey) {
-          // Multi-select: toggle
-          if (newSelection.has(cellKey)) {
-            newSelection.delete(cellKey);
-          } else {
-            newSelection.add(cellKey);
-          }
-        } else if (event.shiftKey && context.anchor) {
+        if (event.shiftKey && context.anchor) {
           // Range select
           const rangeSelection = calculateRangeSelection(
             context.anchor, 
@@ -238,8 +233,8 @@ export const selectionCoordinatorMachine = setup({
       anchor: ({ context, event }) => {
         if (event.type !== 'selection.cell.select') return context.anchor;
         
-        // Set anchor for future range selections
-        return event.shiftKey && context.anchor ? context.anchor : {
+        // Keep anchor on shift+click, otherwise set new anchor
+        return event.shiftKey ? context.anchor : {
           rowId: event.rowId,
           columnId: event.columnId
         };
