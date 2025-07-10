@@ -386,9 +386,9 @@ export class AtomicTableRenderer {
     // Header interaction handlers
     this.header.addEventListener('click', this.handleHeaderClick.bind(this));
     
-    // Keyboard event handlers - add to viewport which has focus
-    this.viewport.tabIndex = 0; // Make viewport focusable
-    this.viewport.addEventListener('keydown', this.handleKeyDown.bind(this));
+    // Make viewport focusable but don't add keyboard listener here
+    // Keyboard events are handled at the VibeGridX component level to avoid duplication
+    this.viewport.tabIndex = 0;
   }
   
   // ====================================
@@ -819,16 +819,6 @@ export class AtomicTableRenderer {
     }
   }
   
-  private handleKeyDown(event: KeyboardEvent): void {
-    console.log('AtomicTableRenderer.handleKeyDown:', {
-      key: event.key,
-      ctrlKey: event.ctrlKey,
-      metaKey: event.metaKey
-    });
-    
-    // Forward keyboard events to the parent component
-    this.options.onKeyDown?.(event);
-  }
   
   // ====================================
   // UTILITY METHODS

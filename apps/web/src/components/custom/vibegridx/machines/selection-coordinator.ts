@@ -207,7 +207,10 @@ export const selectionCoordinatorMachine = setup({
           hasAnchor: !!context.anchor,
           anchor: context.anchor,
           currentSelection: Array.from(context.selectedCells),
-          currentSelectionSize: context.selectedCells.size
+          currentSelectionSize: context.selectedCells.size,
+          activeCell: context.activeCell,
+          visibleRowIds: context.visibleRowIds.length,
+          columns: context.columns.length
         });
         
         if (event.shiftKey && context.anchor) {
@@ -407,8 +410,16 @@ export const selectionCoordinatorMachine = setup({
     }),
     
     updateVisibleRows: assign({
-      visibleRowIds: ({ event }) => 
-        event.type === 'VISIBLE_ROWS_CHANGED' ? event.rowIds : []
+      visibleRowIds: ({ event }) => {
+        if (event.type === 'VISIBLE_ROWS_CHANGED') {
+          console.log('SelectionCoordinator: Received VISIBLE_ROWS_CHANGED', {
+            rowCount: event.rowIds.length,
+            sampleRowIds: event.rowIds.slice(0, 3)
+          });
+          return event.rowIds;
+        }
+        return [];
+      }
     }),
     
     updateColumns: assign({
@@ -420,10 +431,22 @@ export const selectionCoordinatorMachine = setup({
   guards: {
     hasSelection: ({ context }) => context.selectedCells.size > 0,
     hasActiveCell: ({ context }) => context.activeCell !== null,
-    canNavigate: ({ context }) => 
-      context.activeCell !== null && 
-      context.visibleRowIds.length > 0 && 
-      context.columns.length > 0,
+    canNavigate: ({ context }) => {
+      const canNav = context.activeCell !== null && 
+        context.visibleRowIds.length > 0 && 
+        context.columns.length > 0;
+      
+      if (!canNav) {
+        console.log('SelectionCoordinator: Cannot navigate', {
+          hasActiveCell: context.activeCell !== null,
+          activeCell: context.activeCell,
+          visibleRowIdsLength: context.visibleRowIds.length,
+          columnsLength: context.columns.length
+        });
+      }
+      
+      return canNav;
+    },
     isMultiCellSelection: ({ context }) => context.selectedCells.size > 1
   }
   
@@ -480,7 +503,9 @@ export const selectionCoordinatorMachine = setup({
         // Keyboard navigation
         'keyboard.arrow': {
           guard: 'canNavigate',
-          actions: 'moveSelection'
+          actions: ['moveSelection', ({ event }) => {
+            console.log('SelectionCoordinator: Processing keyboard.arrow event', event);
+          }]
         },
         
         // Clipboard operations

@@ -356,10 +356,17 @@ export const tableBaseMachine = setup({
                     }),
                     // Notify selection coordinator of visible rows change
                     sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => ({ 
-                        type: 'VISIBLE_ROWS_CHANGED', 
-                        rowIds: Object.keys(event.entities) 
-                      })),
+                      ({ event }) => {
+                        const rowIds = Object.keys(event.entities);
+                        console.log('TableMachine: Sending VISIBLE_ROWS_CHANGED to selection coordinator', {
+                          rowCount: rowIds.length,
+                          sampleRowIds: rowIds.slice(0, 3)
+                        });
+                        return { 
+                          type: 'VISIBLE_ROWS_CHANGED', 
+                          rowIds
+                        };
+                      }),
                     // Log the data update
                     ({ event }) => {
                       console.log(`TableMachine: Received ${event.entityType} data update - ${Object.keys(event.entities).length} entities`);

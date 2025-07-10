@@ -158,6 +158,7 @@ export const createKeyboardHandler = (
     // Handle arrow key navigation
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();
+      event.stopPropagation();
       
       console.log(`${event.shiftKey ? 'Shift+' : ''}${event.key}: Sending to selection coordinator`);
       

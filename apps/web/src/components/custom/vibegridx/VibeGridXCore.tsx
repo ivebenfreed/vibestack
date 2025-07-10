@@ -227,24 +227,8 @@ export const useSelectionStateSync = (
             
             // Update canvas if it exists
             if (refs.canvasOverlayRef.current) {
-              // Get DOM positions for selected cells
-              const cellElements = new Map<string, DOMRect>();
-              
-              selectedCells.forEach(cellKey => {
-                const [rowId, columnId] = cellKey.split(':');
-                const cellElement = document.querySelector(
-                  `.vibegridx-cell[data-row-id="${rowId}"][data-column-id="${columnId}"]`
-                ) as HTMLElement;
-                
-                if (cellElement) {
-                  cellElements.set(cellKey, cellElement.getBoundingClientRect());
-                }
-              });
-              
-              // Update overlay with DOM positions
-              if (cellElements.size > 0) {
-                refs.canvasOverlayRef.current.updateSelectionWithDOMPositions(cellElements);
-              }
+              // Update overlay with selection
+              refs.canvasOverlayRef.current.updateSelection(selectedCells);
             }
           }
         });
