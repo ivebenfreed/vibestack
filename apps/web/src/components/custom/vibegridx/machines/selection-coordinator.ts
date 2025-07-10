@@ -240,6 +240,7 @@ export const selectionCoordinatorMachine = setup({
         return newSelection;
       },
       
+      
       activeCell: ({ context, event }) => 
         event.type === 'selection.cell.select' 
           ? { rowId: event.rowId, columnId: event.columnId } 
@@ -333,6 +334,7 @@ export const selectionCoordinatorMachine = setup({
         
         return newSelection;
       },
+      
       
       activeCell: ({ context, event }) => {
         if (event.type !== 'selection.column.select') return context.activeCell;
@@ -428,7 +430,8 @@ export const selectionCoordinatorMachine = setup({
           return event.rowIds;
         }
         return [];
-      }
+      },
+      
     }),
     
     updateColumns: assign({
