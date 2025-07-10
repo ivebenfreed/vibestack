@@ -344,17 +344,8 @@ export class AtomicTableRenderer {
         const calculatedEnd = calculatedStart + Math.ceil(this.viewport.clientHeight / rowHeight);
         const cappedEnd = Math.min(calculatedEnd, this.lastRenderState.rows.length);
         
-        // Debug logging for viewport calculations
-        console.log('Viewport Update Debug:', {
-          scrollTop: this.viewport.scrollTop,
-          scrollHeight: this.viewport.scrollHeight,
-          clientHeight: this.viewport.clientHeight,
-          calculatedStart,
-          calculatedEnd,
-          cappedEnd,
-          totalRows: this.lastRenderState.rows.length,
-          wouldOverflow: calculatedEnd > this.lastRenderState.rows.length
-        });
+        // Debug logging disabled - too verbose during scrolling
+        // console.log('Viewport Update Debug:', { ... });
         
         const newViewport: ViewportInfo = {
           start: calculatedStart,
@@ -811,8 +802,11 @@ export class AtomicTableRenderer {
   }
   
   private handleMouseDown(event: MouseEvent): void {
-    // Handle selection start, drag start, etc.
+    // Prevent text selection during drag
     event.preventDefault();
+    
+    // Let parent component handle drag selection through proper event flow
+    // The renderer should only be responsible for rendering, not selection logic
   }
   
   private handleHeaderClick(event: MouseEvent): void {

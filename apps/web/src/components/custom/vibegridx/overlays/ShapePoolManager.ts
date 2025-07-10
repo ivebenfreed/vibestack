@@ -115,13 +115,16 @@ class ObjectPool<T extends Konva.Shape> {
       }
       
       // Stop any animations on the shape itself
-      pooled.shape.stopDrag();
-      pooled.shape.to({
-        duration: 0
-      });
+      if (pooled.shape) {
+        pooled.shape.stopDrag();
+        // Avoid calling to() with minimal params as it can cause issues
+        // Just reset the shape directly
+      }
       
-      this.resetFn(pooled.shape);
-      pooled.shape.visible(false);
+      if (pooled.shape) {
+        this.resetFn(pooled.shape);
+        pooled.shape.visible(false);
+      }
     }
   }
   
@@ -335,14 +338,23 @@ export class ShapePoolManager {
       fill: this.config.selectionBorderColor,
       stroke: 'white',
       strokeWidth: 2,
-      draggable: false, // Don't make it freely draggable
+      draggable: true, // Enable dragging for fill functionality
       cornerRadius: 2,
       shadowColor: 'black',
       shadowBlur: 3,
       shadowOffset: { x: 1, y: 1 },
       shadowOpacity: 0.4,
       listening: true, // Ensure it can receive events
-      cursor: 'crosshair'
+      name: 'fill-handle' // Name for identification
+    });
+    
+    // Constrain dragging to vertical only
+    handle.dragBoundFunc(function(pos) {
+      // Keep the x position fixed, only allow vertical movement
+      return {
+        x: this.absolutePosition().x,
+        y: pos.y
+      };
     });
     
     console.log('ShapePoolManager.createFillHandle: Fill handle properties', {

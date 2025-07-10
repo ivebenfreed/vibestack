@@ -1,6 +1,5 @@
 import React from 'react';
 import type { CellRef, ViewportInfo, Column } from '../types';
-import { CanvasOverlayCore } from './CanvasOverlayCore';
 import { CanvasOverlayCoreV2 } from './CanvasOverlayCoreV2';
 import type { OverlayConfig } from './OverlayTypes';
 
@@ -9,73 +8,86 @@ import type { OverlayConfig } from './OverlayTypes';
 // ====================================
 
 export class CanvasOverlayManager {
-  private core: CanvasOverlayCore | CanvasOverlayCoreV2;
+  private overlay: CanvasOverlayCoreV2;
   private container: HTMLElement;
   
   // Public API for backward compatibility
   public stage: any; // Exposed for VibeGridX
   public selectionManager: any; // Exposed for keyboard shortcuts
+  public overlayRenderer: {
+    handleCopy: (cells: Set<string>) => void;
+    handleCut: (cells: Set<string>) => void;
+    handlePaste: () => void;
+    cancelFill: () => void;
+  }; // Exposed for copy/cut/paste and fill operations
 
-  constructor(container: HTMLElement, config: Partial<OverlayConfig & { useV2?: boolean }> = {}) {
+  constructor(container: HTMLElement, config: Partial<OverlayConfig> = {}) {
     this.container = container;
     
-    // Create the core overlay system (V1 or V2 based on config)
-    if (config.useV2) {
-      this.core = new CanvasOverlayCoreV2(container, config);
-      console.log('CanvasOverlayManager: Initialized with XState V2 architecture');
-    } else {
-      this.core = new CanvasOverlayCore(container, config);
-      console.log('CanvasOverlayManager: Initialized with new modular architecture');
-    }
+    // Create the V2 overlay system (XState-based)
+    this.overlay = new CanvasOverlayCoreV2(container, config);
+    console.log('CanvasOverlayManager: Initialized with XState architecture');
+    
+    // Get the renderer reference
+    const renderer = (this.overlay as any).renderer;
     
     // Expose parts of the API for backward compatibility
-    this.stage = (this.core as any).stage;
+    this.stage = (this.overlay as any).stage;
+    this.overlayRenderer = {
+      handleCopy: (cells: Set<string>) => renderer.handleCopy(cells),
+      handleCut: (cells: Set<string>) => renderer.handleCut(cells),
+      handlePaste: () => renderer.handlePaste(),
+      cancelFill: () => this.overlay.cancelFill()
+    };
     this.selectionManager = {
-      showCopyIndicator: (isCut: boolean) => this.core.showCopyIndicator(isCut),
-      hideCopyIndicator: () => this.core.hideCopyIndicator()
+      showCopyIndicator: (isCut: boolean) => this.overlay.showCopyIndicator(isCut),
+      hideCopyIndicator: () => this.overlay.hideCopyIndicator()
     };
   }
 
   // Update data mappings (row/column IDs)
   updateDataMappings(rowIds: string[], columnIds: string[]): void {
-    this.core.updateDataMappings(rowIds, columnIds);
+    this.overlay.updateDataMappings(rowIds, columnIds);
   }
-
-  // Columns are now passed during initialization via config.dimensionManager
 
   // Update selection
   updateSelection(selectedCells: Set<string>): void {
-    this.core.updateSelection(selectedCells);
+    this.overlay.updateSelection(selectedCells);
+  }
+  
+  // Update selection with DOM positions - NEW METHOD
+  updateSelectionWithDOMPositions(cellElements: Map<string, DOMRect>): void {
+    this.overlay.updateSelectionWithDOMPositions(cellElements);
   }
 
   // Update editing cell
   updateEditingCell(editingCell: CellRef | null): void {
-    this.core.updateEditingCell(editingCell);
+    this.overlay.updateEditingCell(editingCell);
   }
 
   // Update viewport (called on scroll)
   updateViewport(viewport: ViewportInfo): void {
-    this.core.updateViewport(viewport);
+    this.overlay.updateViewport(viewport);
   }
 
   // Set selection change callback
   setOnSelectionChange(callback: (selectedCells: Set<string>) => void): void {
-    this.core.onSelectionChange = callback;
+    this.overlay.onSelectionChange = callback;
   }
 
   // Set fill complete callback
   setOnFillComplete(callback: (originalCells: Set<string>, fillCells: Set<string>) => void): void {
-    this.core.onFillComplete = callback;
+    this.overlay.onFillComplete = callback;
   }
 
   // Performance metrics
   getPerformanceMetrics() {
-    return this.core.getPerformanceMetrics();
+    return this.overlay.getPerformanceMetrics();
   }
 
   // Destroy
   destroy(): void {
-    this.core.destroy();
+    this.overlay.destroy();
   }
 }
 

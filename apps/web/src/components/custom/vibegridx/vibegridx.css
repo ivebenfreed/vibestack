@@ -182,19 +182,20 @@
   pointer-events: none;
 }
 
-/* Konva content should be interactive for drag selection */
+/* Konva content should NOT be interactive - DOM handles all events */
 .vibegridx-canvas-overlay-container .konvajs-content {
-  pointer-events: auto !important;
+  pointer-events: none !important;
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-/* Ensure canvas is properly positioned */
+/* Ensure canvas is properly positioned and non-interactive */
 .vibegridx-canvas-overlay-container canvas {
   position: absolute;
   top: 0;
   left: 0;
+  pointer-events: none !important;
 }
 
 /* Scrollbar Styling */

@@ -1,5 +1,5 @@
 import { useCallback, MutableRefObject } from 'react';
-import type { CellRef, ViewportInfo } from './types';
+import type { CellRef, ViewportInfo, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
 import type { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
@@ -9,11 +9,53 @@ import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 // EVENT HANDLER TYPES
 // ====================================
 
+// Unified function to update overlay with DOM positions
+const updateSelectionWithDOM = (
+  overlayManager: CanvasOverlayManager | null,
+  selectedCells: Set<string>
+) => {
+  if (!overlayManager) return;
+  
+  // For large selections, use requestAnimationFrame for better performance
+  const updateFn = () => {
+    const cellElements = new Map<string, DOMRect>();
+    
+    // Query DOM positions for selected cells
+    selectedCells.forEach(cellKey => {
+      const [rowId, columnId] = cellKey.split(':');
+      const cellElement = document.querySelector(
+        `.vibegridx-cell[data-row-id="${rowId}"][data-column-id="${columnId}"]`
+      ) as HTMLElement;
+      
+      if (cellElement) {
+        cellElements.set(cellKey, cellElement.getBoundingClientRect());
+      }
+    });
+    
+    // Update overlay with DOM positions
+    overlayManager.updateSelectionWithDOMPositions(cellElements);
+  };
+  
+  // For small selections, update immediately
+  // For large selections, defer to next frame
+  if (selectedCells.size > 100) {
+    requestAnimationFrame(updateFn);
+  } else {
+    updateFn();
+  }
+};
+
 export interface EventHandlerRefs {
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<CellRef | null>;
   canvasOverlayRef: MutableRefObject<CanvasOverlayManager | null>;
   integrationRef: MutableRefObject<EntityIntegrationLayer | null>;
+  dragStateRef: MutableRefObject<{
+    isDragging: boolean;
+    startCell: CellRef | null;
+    startPos: { x: number; y: number } | null;
+  }>;
+  columns: Column[];
 }
 
 export interface EventHandlerCallbacks {
@@ -82,7 +124,8 @@ export const createCellClickHandler = (
         const rangeSelection = calculateRangeSelection(
           refs.anchorCellRef.current,
           { rowId, columnId },
-          refs.integrationRef.current
+          refs.integrationRef.current,
+          refs.columns
         );
         rangeSelection.forEach(key => newSelection.add(key));
       } else {
@@ -93,7 +136,9 @@ export const createCellClickHandler = (
       
       refs.selectedCellsRef.current = newSelection;
       console.log('Updating canvas overlay with selection:', newSelection.size);
-      refs.canvasOverlayRef.current.updateSelection(newSelection);
+      
+      // Use unified function to update with DOM positions
+      updateSelectionWithDOM(refs.canvasOverlayRef.current, newSelection);
       
       // Log selection action
       console.log(`Selection: ${newSelection.size} cells selected`, {
@@ -155,7 +200,7 @@ export const createColumnClickHandler = (
       });
       
       refs.selectedCellsRef.current = newSelection;
-      refs.canvasOverlayRef.current?.updateSelection(newSelection);
+      updateSelectionWithDOM(refs.canvasOverlayRef.current, newSelection);
       
       console.log(`Column selection: ${columnId} - ${newSelection.size} cells selected`);
       
@@ -232,15 +277,16 @@ export const createKeyboardHandler = (
             const rangeSelection = calculateRangeSelection(
               refs.anchorCellRef.current || { rowId, columnId },
               { rowId: newRowId, columnId: newColumnId },
-              refs.integrationRef.current
+              refs.integrationRef.current,
+              refs.columns
             );
             refs.selectedCellsRef.current = rangeSelection;
-            refs.canvasOverlayRef.current?.updateSelection(rangeSelection);
+            updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
           } else {
             // Move selection
             refs.selectedCellsRef.current = new Set([newCellKey]);
             refs.anchorCellRef.current = { rowId: newRowId, columnId: newColumnId };
-            refs.canvasOverlayRef.current?.updateSelection(refs.selectedCellsRef.current);
+            updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
           }
           
           console.log(`Keyboard nav: ${event.shiftKey ? 'Extended' : 'Moved'} to ${newCellKey}`);
@@ -271,7 +317,12 @@ export const createKeyboardHandler = (
         // Clear selection immediately
         refs.selectedCellsRef.current.clear();
         refs.anchorCellRef.current = null;
-        refs.canvasOverlayRef.current?.updateSelection(refs.selectedCellsRef.current);
+        updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
+        
+        // Cancel any active fill operation
+        if (refs.canvasOverlayRef.current?.overlayRenderer) {
+          refs.canvasOverlayRef.current.overlayRenderer.cancelFill();
+        }
         
         tableSend({
           type: 'keyboard.escape'
@@ -302,7 +353,7 @@ export const createKeyboardHandler = (
             });
             
             refs.selectedCellsRef.current = allCells;
-            refs.canvasOverlayRef.current?.updateSelection(allCells);
+            updateSelectionWithDOM(refs.canvasOverlayRef.current, allCells);
             console.log(`Select All: ${allCells.size} cells selected`);
           }
         }
@@ -315,8 +366,10 @@ export const createKeyboardHandler = (
             selectedCells: refs.selectedCellsRef.current.size,
             cells: Array.from(refs.selectedCellsRef.current).slice(0, 5)
           });
-          // Show copy indicator
-          refs.canvasOverlayRef.current?.selectionManager?.showCopyIndicator(false);
+          // Send copy event to overlay machine
+          if (refs.canvasOverlayRef.current?.overlayRenderer) {
+            refs.canvasOverlayRef.current.overlayRenderer.handleCopy(refs.selectedCellsRef.current);
+          }
           console.log('Copy: Selected cells copied to clipboard');
           tableSend({
             type: 'keyboard.copy'
@@ -331,8 +384,10 @@ export const createKeyboardHandler = (
             selectedCells: refs.selectedCellsRef.current.size,
             cells: Array.from(refs.selectedCellsRef.current).slice(0, 5)
           });
-          // Show cut indicator
-          refs.canvasOverlayRef.current?.selectionManager?.showCopyIndicator(true);
+          // Send cut event to overlay machine
+          if (refs.canvasOverlayRef.current?.overlayRenderer) {
+            refs.canvasOverlayRef.current.overlayRenderer.handleCut(refs.selectedCellsRef.current);
+          }
           console.log('Cut: Selected cells cut to clipboard');
           tableSend({
             type: 'keyboard.cut'
@@ -347,8 +402,10 @@ export const createKeyboardHandler = (
             targetCell: refs.anchorCellRef.current,
             selectedCells: refs.selectedCellsRef.current.size
           });
-          // Hide copy/cut indicator
-          refs.canvasOverlayRef.current?.selectionManager?.hideCopyIndicator();
+          // Send paste event to overlay machine
+          if (refs.canvasOverlayRef.current?.overlayRenderer) {
+            refs.canvasOverlayRef.current.overlayRenderer.handlePaste();
+          }
           console.log('Paste: Pasting clipboard content');
           tableSend({
             type: 'keyboard.paste'
@@ -367,17 +424,25 @@ export const createScrollHandler = (
   refs: EventHandlerRefs,
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
+  // Throttle scroll updates to prevent infinite loops
+  let lastScrollTime = 0;
+  const THROTTLE_MS = 16; // ~60fps
+  
   return useCallback((viewport: ViewportInfo) => {
+    const now = performance.now();
+    if (now - lastScrollTime < THROTTLE_MS) {
+      return; // Skip this update
+    }
+    lastScrollTime = now;
+    
     // Update viewport in table machine
     tableSend({
       type: 'view.viewport.update',
       viewport
     });
     
-    // Update canvas overlay viewport (this will automatically re-render selection)
-    if (refs.canvasOverlayRef.current) {
-      refs.canvasOverlayRef.current.updateViewport(viewport);
-    }
+    // DON'T update canvas overlay on every scroll - let it be handled by selection updates only
+    // This breaks the infinite loop between scroll -> canvas update -> scroll
   }, [tableSend]);
 };
 
@@ -404,13 +469,193 @@ export const createRendererStateChangeHandler = (
 };
 
 // ====================================
+// DRAG HANDLERS
+// ====================================
+
+export const createMouseDownHandler = (
+  refs: EventHandlerRefs,
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((event: MouseEvent) => {
+    // Find the cell under the mouse
+    const cellElement = (event.target as Element).closest('.vibegridx-cell') as HTMLElement;
+    if (!cellElement) return;
+    
+    const rowId = cellElement.dataset.rowId;
+    const columnId = cellElement.dataset.columnId;
+    if (!rowId || !columnId) return;
+    
+    // Store drag start state
+    refs.dragStateRef.current = {
+      isDragging: false,
+      startCell: { rowId, columnId },
+      startPos: { x: event.clientX, y: event.clientY }
+    };
+    
+    // Immediately handle the selection on mousedown
+    const cellKey = `${rowId}:${columnId}`;
+    
+    if (!event.ctrlKey && !event.shiftKey) {
+      // Single cell selection - clear and select immediately
+      refs.selectedCellsRef.current = new Set([cellKey]);
+      refs.anchorCellRef.current = { rowId, columnId };
+      
+      // Update overlay immediately
+      updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
+      
+      // Send selection event
+      tableSend({
+        type: 'selection.cell.select',
+        rowId,
+        columnId,
+        ctrlKey: false,
+        shiftKey: false
+      });
+    }
+    // For ctrl/shift clicks, let the mouseup handler deal with it
+    
+    // Prevent text selection
+    event.preventDefault();
+  }, [tableSend]);
+};
+
+export const createMouseMoveHandler = (
+  refs: EventHandlerRefs,
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((event: MouseEvent) => {
+    const dragState = refs.dragStateRef.current;
+    if (!dragState.startCell || !dragState.startPos) return;
+    
+    // Check if we should start dragging
+    if (!dragState.isDragging) {
+      const deltaX = Math.abs(event.clientX - dragState.startPos.x);
+      const deltaY = Math.abs(event.clientY - dragState.startPos.y);
+      
+      if (deltaX > 5 || deltaY > 5) {
+        // Start drag selection
+        dragState.isDragging = true;
+        console.log('VibeGridXEvents: Starting drag selection from', dragState.startCell);
+        
+        tableSend({
+          type: 'selection.drag.start',
+          startCell: dragState.startCell
+        });
+      }
+    }
+    
+    if (dragState.isDragging) {
+      // Find cell under current mouse position
+      const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
+      const targetCell = elementUnderMouse?.closest('.vibegridx-cell') as HTMLElement;
+      
+      if (targetCell) {
+        const rowId = targetCell.dataset.rowId;
+        const columnId = targetCell.dataset.columnId;
+        
+        if (rowId && columnId) {
+          // Calculate range selection
+          const rangeSelection = calculateRangeSelection(
+            dragState.startCell,
+            { rowId, columnId },
+            refs.integrationRef.current,
+            refs.columns
+          );
+          
+          // Update selection immediately for visual feedback
+          refs.selectedCellsRef.current = rangeSelection;
+          updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
+          
+          // Send drag move event to state machine
+          tableSend({
+            type: 'selection.drag.move',
+            currentCell: { rowId, columnId },
+            selectedCells: rangeSelection
+          });
+        }
+      }
+    }
+  }, [tableSend]);
+};
+
+export const createMouseUpHandler = (
+  refs: EventHandlerRefs,
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((event: MouseEvent) => {
+    const dragState = refs.dragStateRef.current;
+    
+    if (dragState.isDragging) {
+      // Complete drag selection
+      console.log('VibeGridXEvents: Completing drag selection');
+      
+      tableSend({
+        type: 'selection.drag.end',
+        selectedCells: refs.selectedCellsRef.current
+      });
+    } else if (dragState.startCell && (event.ctrlKey || event.shiftKey)) {
+      // It was a ctrl/shift click, handle special selection
+      const cellElement = (event.target as Element).closest('.vibegridx-cell') as HTMLElement;
+      if (cellElement) {
+        const rowId = cellElement.dataset.rowId;
+        const columnId = cellElement.dataset.columnId;
+        
+        if (rowId && columnId) {
+          // Handle ctrl/shift click
+          const cellKey = `${rowId}:${columnId}`;
+          
+          if (event.ctrlKey) {
+            // Toggle selection
+            const newSelection = new Set(refs.selectedCellsRef.current);
+            if (newSelection.has(cellKey)) {
+              newSelection.delete(cellKey);
+            } else {
+              newSelection.add(cellKey);
+            }
+            refs.selectedCellsRef.current = newSelection;
+            updateSelectionWithDOM(refs.canvasOverlayRef.current, newSelection);
+          } else if (event.shiftKey && refs.anchorCellRef.current) {
+            // Range selection
+            const rangeSelection = calculateRangeSelection(
+              refs.anchorCellRef.current,
+              { rowId, columnId },
+              refs.integrationRef.current,
+              refs.columns
+            );
+            refs.selectedCellsRef.current = rangeSelection;
+            updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
+          }
+          
+          // Send selection event
+          tableSend({
+            type: 'selection.cell.select',
+            rowId,
+            columnId,
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey
+          });
+        }
+      }
+    }
+    
+    // Reset drag state
+    refs.dragStateRef.current = {
+      isDragging: false,
+      startCell: null,
+      startPos: null
+    };
+  }, [tableSend]);
+};
+
+// ====================================
 // HELPER FUNCTIONS
 // ====================================
 
 export const calculateRangeSelection = (
   start: CellRef, 
   end: CellRef, 
-  integration: EntityIntegrationLayer | null
+  integration: EntityIntegrationLayer | null,
+  columns?: Column[]
 ): Set<string> => {
   const selection = new Set<string>();
   
@@ -418,12 +663,11 @@ export const calculateRangeSelection = (
   
   // Get all entity IDs and column IDs
   const entities = integration.getAllEntityData();
-  const columns = integration.getColumns();
   
   const entityIds = Object.keys(entities);
   
-  // Use column IDs from column definitions
-  const columnIds = columns.map(c => c.id);
+  // Use column IDs from column definitions passed as parameter
+  const columnIds = (columns || []).map(c => c.id);
   
   // Find indices
   const startRowIndex = entityIds.indexOf(start.rowId);

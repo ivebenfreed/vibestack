@@ -50,6 +50,7 @@ export class CanvasOverlayCoreV2 {
       this.overlayMachine,
       {
         dimensionManager: this.config.dimensionManager as ColumnDimensionManager,
+        rowDimensionManager: this.config.rowDimensionManager,
         columns: this.config.columns || [],
         cellWidth: this.config.cellWidth,
         cellHeight: this.config.cellHeight,
@@ -90,74 +91,7 @@ export class CanvasOverlayCoreV2 {
     console.log('CanvasOverlayCoreV2: Initialized with XState architecture');
   }
   
-  private forwardEventToDOM(eventType: string, canvasPos: { x: number; y: number } | null, originalEvent: MouseEvent): void {
-    if (!canvasPos) return;
-    
-    // Get the viewport element to calculate absolute position
-    const viewportElement = this.container.closest('.vibegridx-viewport');
-    if (!viewportElement) return;
-    
-    const viewportRect = viewportElement.getBoundingClientRect();
-    
-    // Calculate absolute screen position
-    const absoluteX = viewportRect.left + canvasPos.x;
-    const absoluteY = viewportRect.top + canvasPos.y;
-    
-    // Temporarily hide the canvas to find the element underneath
-    const originalPointerEvents = this.container.style.pointerEvents;
-    const originalCanvasPointerEvents = this.stage.content.style.pointerEvents;
-    
-    this.container.style.pointerEvents = 'none';
-    this.stage.content.style.pointerEvents = 'none';
-    
-    // Find the DOM element at this position
-    const elementBelow = document.elementFromPoint(absoluteX, absoluteY);
-    
-    // Debug: Check if there are any cells in the DOM
-    const bodyElement = this.container.closest('.vibegridx-body');
-    const allCells = bodyElement?.querySelectorAll('.vibegridx-cell');
-    console.log('DOM Structure Debug:', {
-      bodyElement,
-      cellCount: allCells?.length,
-      firstCell: allCells?.[0],
-      firstCellRect: allCells?.[0]?.getBoundingClientRect()
-    });
-    
-    // Restore canvas pointer events
-    this.container.style.pointerEvents = originalPointerEvents;
-    this.stage.content.style.pointerEvents = originalCanvasPointerEvents;
-    
-    console.log('CanvasOverlayCoreV2.forwardEventToDOM:', {
-      eventType,
-      canvasPos,
-      absolutePos: { x: absoluteX, y: absoluteY },
-      elementBelow,
-      elementClass: elementBelow?.className,
-      elementTagName: elementBelow?.tagName,
-      isCell: elementBelow?.classList.contains('vibegridx-cell'),
-      viewportRect,
-      containerRect: this.container.getBoundingClientRect()
-    });
-    
-    // If we found a cell element, dispatch the event to it
-    if (elementBelow && elementBelow.classList.contains('vibegridx-cell')) {
-      const syntheticEvent = new MouseEvent(eventType, {
-        bubbles: true,
-        cancelable: true,
-        clientX: absoluteX,
-        clientY: absoluteY,
-        ctrlKey: originalEvent.ctrlKey,
-        shiftKey: originalEvent.shiftKey,
-        altKey: originalEvent.altKey,
-        metaKey: originalEvent.metaKey,
-        button: originalEvent.button,
-        buttons: originalEvent.buttons
-      });
-      
-      console.log('CanvasOverlayCoreV2: Dispatching synthetic event to DOM cell');
-      elementBelow.dispatchEvent(syntheticEvent);
-    }
-  }
+  // Event forwarding removed - DOM handles all events directly
 
   private initializeStage(): void {
     // Get viewport dimensions
@@ -165,10 +99,9 @@ export class CanvasOverlayCoreV2 {
     const viewportWidth = viewportElement?.clientWidth || 800;
     const viewportHeight = viewportElement?.clientHeight || 600;
     
-    // Size canvas to match visible range with buffer
-    const bufferRows = 10;
+    // Canvas matches viewport size exactly
     const width = viewportWidth;
-    const height = viewportHeight + (this.config.cellHeight * bufferRows);
+    const height = viewportHeight;
     
     console.log('CanvasOverlayCoreV2: Initializing stage', { 
       viewportWidth,
@@ -187,7 +120,7 @@ export class CanvasOverlayCoreV2 {
       container: this.container,
       width,
       height,
-      listening: true,
+      listening: true,  // Enable for hover effects only
       preventDefault: false
     });
     
@@ -202,11 +135,20 @@ export class CanvasOverlayCoreV2 {
       }
     });
     
-    // Enable pointer events on the stage for interaction
+    // Enable pointer events only for hover effects (fill handle)
+    // Click events will still go to DOM through event bubbling
     this.stage.content.style.pointerEvents = 'auto';
+    this.stage.content.style.cursor = 'default';
     
-    // Position canvas at the top initially
+    // Container allows events to bubble through to DOM
+    this.container.style.pointerEvents = 'none';
+    
+    // Set canvas to be above cells but still allow click-through to cells
+    this.stage.content.style.position = 'relative';
+    
+    // Initial position - will be updated on scroll
     this.container.style.top = '0px';
+    this.container.style.left = '0px';
     
     // The canvas should handle overlay interactions directly, not forward to DOM
     // Let's see what's happening with the overlay machine selection
@@ -248,6 +190,22 @@ export class CanvasOverlayCoreV2 {
     // Send selection update to machine instead of directly to renderer
     this.overlayMachine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
   }
+  
+  // New method: Update selection with DOM positions
+  updateSelectionWithDOMPositions(cellElements: Map<string, DOMRect>): void {
+    // Extract cell keys from the DOM elements
+    const selectedCells = new Set<string>(cellElements.keys());
+    
+    // CRITICAL FIX: Ensure canvas is positioned correctly before selection rendering
+    const actualScrollTop = document.querySelector('.vibegridx-viewport')?.scrollTop || 0;
+    this.container.style.top = `${actualScrollTop}px`;
+    
+    console.log('CanvasOverlayCoreV2: Updating selection through machine for', selectedCells.size, 'cells');
+    
+    // Only send selection update to machine - let it handle positioning through coordinate system
+    // This is more reliable than trying to manually convert DOM positions
+    this.overlayMachine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
+  }
 
   // Update editing cell
   updateEditingCell(editingCell: CellRef | null): void {
@@ -256,63 +214,88 @@ export class CanvasOverlayCoreV2 {
 
   // Update viewport (called on scroll)
   updateViewport(viewport: ViewportInfo): void {
-    console.log('CanvasOverlayCoreV2.updateViewport:', viewport);
+    // CRITICAL FIX: Update canvas container position to follow scroll
+    // The canvas needs to move with the viewport so shapes stay visible
+    const actualScrollTop = document.querySelector('.vibegridx-viewport')?.scrollTop || 0;
+    this.container.style.top = `${actualScrollTop}px`;
     
-    // Get total rows from data mappings
-    const expandedViewport = this.expandViewportWithBuffer(viewport);
-    
-    // Update renderer
-    this.renderer.updateViewport(expandedViewport);
-    
-    // Reposition canvas if needed
-    this.repositionCanvasIfNeeded(expandedViewport);
-    
-    // Log current context for debugging
-    const currentContext = this.overlayMachine.getSnapshot().context;
-    console.log('CanvasOverlayCoreV2: Current context after viewport update:', {
-      selectedCells: currentContext.selectedCells.size,
-      viewport: currentContext.viewport,
-      shapesVisible: currentContext.shapesVisible
+    console.log('CanvasOverlayCoreV2.updateViewport: Positioning canvas container', {
+      viewport: { scrollTop: viewport.scrollTop },
+      actualScrollTop,
+      containerTop: this.container.style.top
     });
     
-    // If we have selections but no viewport, that's the problem
-    if (currentContext.selectedCells.size > 0 && !currentContext.viewport) {
-      console.warn('CanvasOverlayCoreV2: Have selections but no viewport - this will prevent rendering');
+    // Send viewport update to machine ONLY - don't directly update renderer to avoid loops
+    this.overlayMachine.send({ type: 'VIEWPORT_UPDATE', viewport });
+  }
+  
+  private refreshDOMPositions(selectedCells: Set<string>): void {
+    const cellElements = new Map<string, DOMRect>();
+    
+    selectedCells.forEach(cellKey => {
+      const [rowId, columnId] = cellKey.split(':');
+      const cellElement = document.querySelector(
+        `.vibegridx-cell[data-row-id="${rowId}"][data-column-id="${columnId}"]`
+      ) as HTMLElement;
+      
+      if (cellElement) {
+        cellElements.set(cellKey, cellElement.getBoundingClientRect());
+      } else {
+        console.warn('CanvasOverlayCoreV2: Cell element not found for', cellKey, 'after scroll - may be outside viewport');
+      }
+    });
+    
+    if (cellElements.size > 0) {
+      console.log('CanvasOverlayCoreV2: Refreshing DOM positions for', cellElements.size, 'cells after scroll');
+      this.updateSelectionWithDOMPositions(cellElements);
+    } else {
+      console.log('CanvasOverlayCoreV2: No cell elements found after scroll - cells are outside virtual viewport, letting normal rendering handle it');
+      // Don't clear selection visual when cells are outside viewport
+      // The selection state is maintained in the machine, and the normal rendering flow
+      // will handle positioning the shapes correctly using the coordinate system
+      // 
+      // Just trigger a normal selection update through the machine
+      this.overlayMachine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
     }
   }
   
   private expandViewportWithBuffer(viewport: ViewportInfo): ViewportInfo {
     const bufferRows = 5;
-    const totalRows = 1000; // This should come from actual data
+    // Get actual row count from rowDimensionManager
+    const totalRows = this.config.rowDimensionManager?.getRowCount() || 0;
+    
+    // The last valid row index is totalRows - 1
+    const lastValidIndex = Math.max(0, totalRows - 1);
     
     const canAddTopBuffer = viewport.start > 0;
-    const canAddBottomBuffer = viewport.end < totalRows;
+    const canAddBottomBuffer = viewport.end < lastValidIndex;
     
     return {
       ...viewport,
       start: canAddTopBuffer ? Math.max(0, viewport.start - bufferRows) : viewport.start,
-      end: canAddBottomBuffer ? Math.min(totalRows, viewport.end + bufferRows) : viewport.end
+      end: canAddBottomBuffer ? Math.min(lastValidIndex, viewport.end + bufferRows) : Math.min(viewport.end, lastValidIndex)
     };
   }
   
   private repositionCanvasIfNeeded(viewport: ViewportInfo): void {
-    // Calculate the Y position for the canvas based on visible range
-    const canvasTop = viewport.start * this.config.cellHeight;
-    
-    // Get current scroll position from container's parent (viewport)
+    // Keep canvas viewport-sized but don't transform the layer
     const viewportElement = this.container.closest('.vibegridx-viewport') as HTMLElement;
     if (!viewportElement) return;
     
-    const scrollTop = viewportElement.scrollTop;
+    // Canvas stays viewport-sized
+    const canvasHeight = viewportElement.clientHeight;
+    const canvasWidth = viewportElement.clientWidth;
     
-    // Position canvas to align with visible content
-    this.container.style.top = `${canvasTop}px`;
-    
-    // Ensure canvas is properly sized
-    const requiredHeight = (viewport.end - viewport.start) * this.config.cellHeight;
-    if (this.stage.height() < requiredHeight) {
-      this.stage.height(requiredHeight + this.config.cellHeight * 5); // Add buffer
+    if (this.stage.height() !== canvasHeight) {
+      this.stage.height(canvasHeight);
     }
+    
+    if (this.stage.width() !== canvasWidth) {
+      this.stage.width(canvasWidth);
+    }
+    
+    // Don't transform the layer - handle scrolling through coordinate calculations
+    // This ensures consistency between mouse events and shape rendering
   }
 
   // Copy/Cut indicator methods (for backward compatibility)
@@ -332,6 +315,16 @@ export class CanvasOverlayCoreV2 {
   refresh(): void {
     // The renderer automatically refreshes on state changes
     // This is here for backward compatibility
+  }
+
+  // Expose renderer for compatibility with existing event handlers
+  get overlayRenderer() {
+    return this.renderer;
+  }
+
+  // Cancel any active fill operation
+  cancelFill(): void {
+    this.renderer.cancelFill();
   }
 
   // Performance metrics

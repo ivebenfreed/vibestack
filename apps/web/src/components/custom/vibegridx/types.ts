@@ -164,6 +164,7 @@ export interface TableContext {
   
   // Dimension management
   dimensionManager?: any; // Will be typed as ColumnDimensionManager after import
+  rowDimensionManager?: any; // Will be typed as RowDimensionManager after import
   
   // Actor references
   actors: {
@@ -233,6 +234,9 @@ export type TableEvents =
   | { type: 'selection.column.select'; columnId: string; extend?: boolean }
   | { type: 'selection.bulk.set'; selectedCells: Set<string> }
   | { type: 'selection.clear' }
+  | { type: 'selection.drag.start'; startCell: CellRef }
+  | { type: 'selection.drag.move'; currentCell: CellRef; selectedCells: Set<string> }
+  | { type: 'selection.drag.end'; selectedCells: Set<string> }
   
   // Edit events
   | { type: 'edit.cell.start'; rowId: string; columnId: string }
@@ -288,6 +292,7 @@ export interface RendererOptions {
   container: HTMLElement;
   columns?: Column<any>[];
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
+  rowDimensionManager?: any; // Will be typed as RowDimensionManager
   onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onCellDoubleClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onColumnClick?: (columnId: string, event: MouseEvent) => void;

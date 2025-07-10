@@ -130,14 +130,9 @@ export class CoordinateSystem {
 
   // Convert viewport coordinates to cell indices
   viewportToCell(x: number, y: number, viewport: ViewportInfo): CellPosition | null {
-    // The canvas is positioned at viewport.start * cellHeight
-    // The Y coordinate we receive is relative to the canvas position (0,0 is top-left of canvas)
-    // So we need to calculate which row this Y position represents within the canvas
-    const canvasStartRow = viewport.start;
-    
-    // Calculate the row index by adding the canvas start row to the row within canvas
-    const rowWithinCanvas = Math.floor(y / this.config.cellHeight);
-    const row = canvasStartRow + rowWithinCanvas;
+    // Canvas is at top: 0, so we need to account for scroll position
+    // Y coordinate is absolute position in the canvas
+    const row = Math.floor(y / this.config.cellHeight);
     
     // Find column by x position using actual column widths
     const columnInfo = this.getColumnByX(x);
@@ -148,8 +143,6 @@ export class CoordinateSystem {
     console.log('CoordinateSystem.viewportToCell:', {
       inputX: x,
       inputY: y,
-      canvasStartRow,
-      rowWithinCanvas,
       absoluteRow: row,
       columnId: columnInfo.columnId,
       columnIndex: columnInfo.columnIndex,
@@ -176,23 +169,46 @@ export class CoordinateSystem {
     if (!columnId) {
       // Fallback to old calculation if column not found
       const x = column * this.config.cellWidth;
-      const canvasStartRow = viewport.start;
-      const canvasOffsetY = canvasStartRow * this.config.cellHeight;
-      const y = row * this.config.cellHeight - canvasOffsetY;
+      
+      // HOTFIX: Use actual DOM scroll position instead of potentially stale viewport.scrollTop
+      const viewportElement = document.querySelector('.vibegridx-viewport') as HTMLElement;
+      const actualScrollTop = viewportElement?.scrollTop || 0;
+      
+      // Y position relative to viewport (subtract scroll offset)
+      const y = row * this.config.cellHeight - actualScrollTop;
+      
+      console.log('CoordinateSystem.cellToViewport: Fallback calculation FIXED', {
+        row, column, 
+        viewport: { scrollTop: viewport.scrollTop, start: viewport.start },
+        actualScrollTop,
+        calculation: { rawY: row * this.config.cellHeight, staleScrollOffset: viewport.scrollTop, actualScrollOffset: actualScrollTop, finalY: y }
+      });
+      
       return { x, y, row, column };
     }
     
     // Use actual column offset
     const x = this.getColumnOffset(columnId);
     
-    // When canvas is inside scroll container, we need to adjust for canvas offset
-    // The canvas is positioned based on the virtual grid's visible range
-    // Note: The viewport passed here already includes buffer rows from CanvasOverlayCore
-    const canvasStartRow = viewport.start; // Already includes buffer
-    const canvasOffsetY = canvasStartRow * this.config.cellHeight;
+    // HOTFIX: Use actual DOM scroll position instead of potentially stale viewport.scrollTop
+    const viewportElement = document.querySelector('.vibegridx-viewport') as HTMLElement;
+    const actualScrollTop = viewportElement?.scrollTop || 0;
     
-    // Calculate Y position relative to the canvas's current position
-    const y = row * this.config.cellHeight - canvasOffsetY;
+    // Y position relative to viewport (subtract scroll offset)
+    const y = row * this.config.cellHeight - actualScrollTop;
+
+    console.log('CoordinateSystem.cellToViewport: Standard calculation FIXED', {
+      row, column, columnId,
+      viewport: { scrollTop: viewport.scrollTop, start: viewport.start },
+      actualScrollTop,
+      calculation: { 
+        rawY: row * this.config.cellHeight, 
+        staleScrollOffset: viewport.scrollTop,
+        actualScrollOffset: actualScrollTop, 
+        finalY: y,
+        cellHeight: this.config.cellHeight
+      }
+    });
 
     return { x, y, row, column };
   }
@@ -328,6 +344,22 @@ export class CoordinateSystem {
     return {
       rowCount: this.rowIndexMap.size,
       columnCount: this.columnIndexMap.size
+    };
+  }
+  
+  // Debug method to check if mappings exist for specific IDs
+  hasMappings(rowId: string, columnId: string): { hasRow: boolean; hasColumn: boolean } {
+    return {
+      hasRow: this.rowIndexMap.has(rowId),
+      hasColumn: this.columnIndexMap.has(columnId)
+    };
+  }
+  
+  // Debug method to get all mapped IDs
+  getAllMappedIds(): { rowIds: string[]; columnIds: string[] } {
+    return {
+      rowIds: Array.from(this.rowIndexMap.keys()),
+      columnIds: Array.from(this.columnIndexMap.keys())
     };
   }
 }

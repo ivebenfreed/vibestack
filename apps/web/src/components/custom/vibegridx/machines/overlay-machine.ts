@@ -35,6 +35,7 @@ export interface OverlayContext {
     previewCells: Set<string>;
   } | null;
   
+  
   // Clipboard state
   clipboardState: {
     copiedCells: Set<string>;
@@ -161,7 +162,12 @@ export const overlayMachine = createMachine({
             },
             FILL_CANCEL: {
               target: 'idle',
-              actions: 'clearFillState'
+              actions: ['clearFillState', ({ context }) => {
+                console.log('OverlayMachine: FILL_CANCEL received, clearing fill state', {
+                  previousFillState: context.fillState,
+                  previousShapesVisible: context.shapesVisible
+                });
+              }]
             }
           }
         }
@@ -233,7 +239,7 @@ export const overlayMachine = createMachine({
           on: {
             PASTE: {
               target: 'empty',
-              actions: ['pasteFromClipboard', 'clearCutCells', 'emitPasteComplete']
+              actions: ['pasteFromClipboard', 'clearCutCells', 'clearClipboard', 'emitPasteComplete']
             },
             CLEAR_CLIPBOARD: {
               target: 'empty',
@@ -313,34 +319,7 @@ export const overlayMachine = createMachine({
         // Keep existing anchor when shift-clicking
         return context.anchorCell;
       },
-      shapesVisible: ({ context, event }) => {
-        if (event.type !== 'CELL_CLICK') return context.shapesVisible;
-        
-        // Determine if there will be a selection after this click
-        let willHaveSelection = false;
-        
-        if (event.ctrlKey) {
-          // Toggle - will have selection unless we're removing the last cell
-          const wouldRemove = context.selectedCells.has(event.cellKey);
-          willHaveSelection = wouldRemove ? context.selectedCells.size > 1 : true;
-        } else if (event.shiftKey && context.anchorCell) {
-          // Range selection - will always have at least one cell
-          willHaveSelection = true;
-        } else {
-          // Single selection - will always have exactly one cell
-          willHaveSelection = true;
-        }
-        
-        console.log('OverlayMachine: Setting fillHandle visibility', {
-          willHaveSelection,
-          currentShapesVisible: context.shapesVisible
-        });
-        
-        return {
-          ...context.shapesVisible,
-          fillHandle: willHaveSelection
-        };
-      }
+      // Don't manage fillHandle visibility here - let updateSelection handle it
     }),
     
     handleRangeSelect: assign({
@@ -356,10 +335,7 @@ export const overlayMachine = createMachine({
           column: event.anchorColumn
         };
       },
-      shapesVisible: ({ context }) => ({
-        ...context.shapesVisible,
-        fillHandle: true // Always show fill handle after range selection
-      })
+      // Don't manage fillHandle visibility here - let updateSelection handle it
     }),
     
     updateSelection: assign({
@@ -471,14 +447,7 @@ export const overlayMachine = createMachine({
         // This would need to be enhanced to pass row/column data with the drag end
         return null;
       },
-      shapesVisible: ({ context, event }) => {
-        if (event.type !== 'DRAG_END') return context.shapesVisible;
-        
-        return {
-          ...context.shapesVisible,
-          fillHandle: event.cells.size > 0
-        };
-      }
+      // Don't manage fillHandle visibility here - let updateSelection handle it
     }),
     
     clearDragState: assign({
@@ -595,7 +564,11 @@ export const overlayMachine = createMachine({
           copiedCells: new Set(event.cells),
           isCut: false
         };
-      }
+      },
+      shapesVisible: ({ context }) => ({
+        ...context.shapesVisible,
+        copyIndicator: true
+      })
     }),
     
     cutToClipboard: assign({
@@ -606,11 +579,19 @@ export const overlayMachine = createMachine({
           copiedCells: new Set(event.cells),
           isCut: true
         };
-      }
+      },
+      shapesVisible: ({ context }) => ({
+        ...context.shapesVisible,
+        copyIndicator: true
+      })
     }),
     
     clearClipboard: assign({
-      clipboardState: null
+      clipboardState: null,
+      shapesVisible: ({ context }) => ({
+        ...context.shapesVisible,
+        copyIndicator: false
+      })
     }),
     
     // Viewport actions

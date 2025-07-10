@@ -19,6 +19,11 @@ export interface InitializationRefs {
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<any>;
   subscriptionRef: MutableRefObject<any>;
+  dragStateRef: MutableRefObject<{
+    isDragging: boolean;
+    startCell: any | null;
+    startPos: { x: number; y: number } | null;
+  }>;
 }
 
 export interface InitializationProps {
@@ -114,13 +119,15 @@ export const useRendererInitialization = (
   useEffect(() => {
     if (!refs.containerRef.current) return;
     
-    // Get dimensionManager from table state if available
+    // Get dimension managers from table state if available
     const dimensionManager = tableState?.context?.dimensionManager;
+    const rowDimensionManager = tableState?.context?.rowDimensionManager;
     
     // Initialize atomic renderer with canvas container callback
     refs.rendererRef.current = new AtomicTableRenderer({
       container: refs.containerRef.current,
       dimensionManager,
+      rowDimensionManager,
       ...rendererOptions,
       onCanvasContainerReady: (canvasContainer: HTMLElement) => {
         console.log('useRendererInitialization: Canvas container ready inside viewport');
@@ -129,9 +136,10 @@ export const useRendererInitialization = (
         if (!refs.canvasOverlayRef.current) {
           refs.canvasOverlayRef.current = new CanvasOverlayManager(canvasContainer, {
             dimensionManager,
+            rowDimensionManager,
             columns: rendererOptions.columns,
             cellWidth: 120,
-            cellHeight: 40,
+            cellHeight: rowDimensionManager?.getRowHeight() || 40,
             selectionColor: '#3b82f6',
             selectionBorderColor: '#1d4ed8',
             editingColor: '#10b981',
@@ -222,7 +230,24 @@ export const useSelectionStateSync = (
             
             // Update canvas if it exists
             if (refs.canvasOverlayRef.current) {
-              refs.canvasOverlayRef.current.updateSelection(selectedCells);
+              // Get DOM positions for selected cells
+              const cellElements = new Map<string, DOMRect>();
+              
+              selectedCells.forEach(cellKey => {
+                const [rowId, columnId] = cellKey.split(':');
+                const cellElement = document.querySelector(
+                  `.vibegridx-cell[data-row-id="${rowId}"][data-column-id="${columnId}"]`
+                ) as HTMLElement;
+                
+                if (cellElement) {
+                  cellElements.set(cellKey, cellElement.getBoundingClientRect());
+                }
+              });
+              
+              // Update overlay with DOM positions
+              if (cellElements.size > 0) {
+                refs.canvasOverlayRef.current.updateSelectionWithDOMPositions(cellElements);
+              }
             }
           }
         });

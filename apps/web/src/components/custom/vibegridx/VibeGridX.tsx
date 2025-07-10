@@ -14,6 +14,9 @@ import {
   createKeyboardHandler,
   createScrollHandler,
   createRendererStateChangeHandler,
+  createMouseDownHandler,
+  createMouseMoveHandler,
+  createMouseUpHandler,
   type EventHandlerRefs,
   type EventHandlerCallbacks
 } from './VibeGridXEvents';
@@ -121,9 +124,14 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
   const subscriptionRef = useRef<any>(null);
+  const dragStateRef = useRef<{
+    isDragging: boolean;
+    startCell: CellRef | null;
+    startPos: { x: number; y: number } | null;
+  }>({ isDragging: false, startCell: null, startPos: null });
   
   // Refs object for event handlers
-  const refs: InitializationRefs = {
+  const refs: InitializationRefs & { columns: Column[] } = {
     containerRef,
     overlayContainerRef,
     rendererRef,
@@ -131,7 +139,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     integrationRef,
     selectedCellsRef,
     anchorCellRef,
-    subscriptionRef
+    subscriptionRef,
+    dragStateRef,
+    columns
   };
   
   // ====================================
@@ -168,24 +178,16 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const handleScroll = createScrollHandler(refs, tableSend);
   const handleRendererStateChange = createRendererStateChangeHandler(refs, eventCallbacks);
   
+  // Drag handlers
+  const handleMouseDown = createMouseDownHandler(refs, tableSend);
+  const handleMouseMove = createMouseMoveHandler(refs, tableSend);
+  const handleMouseUp = createMouseUpHandler(refs, tableSend);
+  
   // ====================================
   // RENDERER INITIALIZATION
   // ====================================
   
-  // Debug: Add wheel event debugging at the top level
-  useEffect(() => {
-    if (containerRef.current) {
-      console.log('VibeGridX: Adding wheel event debugging to main container');
-      
-      containerRef.current.addEventListener('wheel', (e) => {
-        console.log('VibeGridX: Wheel event on MAIN CONTAINER', {
-          deltaY: e.deltaY,
-          defaultPrevented: e.defaultPrevented,
-          target: (e.target as HTMLElement).className
-        });
-      }, { passive: true, capture: true });
-    }
-  }, []);
+  // Remove wheel event debugging - not needed anymore
   
   useRendererInitialization(refs, {
     columns: tableConfig.columns,
@@ -478,6 +480,35 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // ====================================
   
   // Selection state sync is now handled by useSelectionStateSync hook
+  
+  // ====================================
+  // DRAG EVENT HANDLERS
+  // ====================================
+  
+  // Attach drag handlers to the viewport after renderer is ready
+  useEffect(() => {
+    if (!rendererRef.current) return;
+    
+    // Get the viewport element from the renderer
+    const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
+    if (!viewport) {
+      console.warn('VibeGridX: Could not find viewport element for drag handlers');
+      return;
+    }
+    
+    // Attach drag event handlers
+    viewport.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    console.log('VibeGridX: Attached drag event handlers to viewport');
+    
+    return () => {
+      viewport.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleMouseDown, handleMouseMove, handleMouseUp]);
   
   // ====================================
   // RENDER

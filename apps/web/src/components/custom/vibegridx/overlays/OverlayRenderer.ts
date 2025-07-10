@@ -4,7 +4,9 @@ import type { OverlayContext, OverlayMachineActor } from '../machines/overlay-ma
 import { ShapePoolManager } from './ShapePoolManager';
 import { CoordinateSystem } from './CoordinateSystem';
 import { ViewportOptimizer } from './ViewportOptimizer';
+import { FillHandleLayer } from './FillHandleLayer';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import type { RowDimensionManager } from '../dimensions/RowDimensionManager';
 import { areSetsEqual, getCellsInRange, getSelectionBounds, calculateFillCells, createCellKey } from './OverlayUtils';
 
 // ====================================
@@ -13,6 +15,7 @@ import { areSetsEqual, getCellsInRange, getSelectionBounds, calculateFillCells, 
 
 export interface OverlayRendererConfig {
   dimensionManager: ColumnDimensionManager;
+  rowDimensionManager?: RowDimensionManager;
   columns: Column[];
   cellWidth: number;
   cellHeight: number;
@@ -35,19 +38,20 @@ export class OverlayRenderer {
   private shapePool: ShapePoolManager;
   private coordinateSystem: CoordinateSystem;
   private viewportOptimizer: ViewportOptimizer;
+  private fillHandleLayer: FillHandleLayer;
   
   // Shape references
   private activeSelectionShapes: Map<string, { cell: Konva.Rect; border: Konva.Rect }> = new Map();
   private activeDragPreview: Konva.Rect | null = null;
   private activeEditingShapes: { background: Konva.Rect; border: Konva.Rect } | null = null;
-  private activeFillHandle: Konva.Rect | null = null;
-  private activeFillPreviewShapes: Konva.Rect[] = [];
   private activeCopyIndicator: Konva.Rect | null = null;
   
   // Performance tracking
   private renderCount = 0;
   private lastRenderTime = 0;
   private renderThrottleTimer: number | null = null;
+  
+  // Removed DOM overlay - using existing DOM event system
   
   // State tracking for selective updates
   private previousState: {
@@ -58,6 +62,7 @@ export class OverlayRenderer {
     isFilling: boolean;
     fillPreviewCells: Set<string>;
     viewport: ViewportInfo | null;
+    clipboardState: { copiedCells: Set<string>; isCut: boolean } | null;
   } | null = null;
   
   // Dirty regions for optimized rendering
@@ -73,9 +78,10 @@ export class OverlayRenderer {
     this.machine = machine;
     this.config = config;
     
-    // Create main layer
+    // Create main layer - disable listening so only fill handle gets hover events
     this.layer = new Konva.Layer({
-      name: 'overlay-layer'
+      name: 'overlay-layer',
+      listening: false
     });
     this.stage.add(this.layer);
     
@@ -92,6 +98,7 @@ export class OverlayRenderer {
       maxSelectableCells: 1000
     } as any);
     
+    
     this.shapePool = new ShapePoolManager(this.layer, {
       cellWidth: config.cellWidth,
       cellHeight: config.cellHeight,
@@ -102,11 +109,24 @@ export class OverlayRenderer {
       borderWidth: config.borderWidth
     });
     
+    // Initialize fill handle layer
+    this.fillHandleLayer = new FillHandleLayer(
+      this.layer,
+      this.machine,
+      {
+        cellHeight: config.cellHeight,
+        dimensionManager: config.dimensionManager,
+        selectionBorderColor: config.selectionBorderColor
+      },
+      this.coordinateSystem,
+      this.shapePool
+    );
+    
     // Subscribe to machine state changes
     this.setupMachineSubscription();
     
-    // Set up event handlers
-    this.setupEventHandlers();
+    // Event handlers disabled - DOM handles all interactions
+    // this.setupEventHandlers();
   }
   
   private setupMachineSubscription(): void {
@@ -118,7 +138,7 @@ export class OverlayRenderer {
       const changes = this.detectStateChanges(context);
       
       if (changes.size > 0) {
-        console.log('OverlayRenderer: Detected changes', Array.from(changes));
+        // Change detection logging disabled - too verbose during scrolling
         
         // Add changed regions to dirty set
         changes.forEach(change => this.dirtyRegions.add(change));
@@ -179,7 +199,14 @@ export class OverlayRenderer {
       }
       
       // Check clipboard changes
-      if (context.clipboardState !== this.previousState.editingCell) {
+      const prevClipboard = this.previousState.clipboardState;
+      const currClipboard = context.clipboardState;
+      
+      if ((currClipboard && !prevClipboard) || 
+          (!currClipboard && prevClipboard) ||
+          (currClipboard && prevClipboard && 
+           (currClipboard.isCut !== prevClipboard.isCut ||
+            !areSetsEqual(currClipboard.copiedCells, prevClipboard.copiedCells)))) {
         changes.add('clipboard');
       }
       
@@ -204,7 +231,11 @@ export class OverlayRenderer {
         null,
       isFilling: context.fillState?.isActive ?? false,
       fillPreviewCells: context.fillState?.previewCells ? new Set(context.fillState.previewCells) : new Set(),
-      viewport: context.viewport
+      viewport: context.viewport,
+      clipboardState: context.clipboardState ? {
+        copiedCells: new Set(context.clipboardState.copiedCells),
+        isCut: context.clipboardState.isCut
+      } : null
     };
     
     return changes;
@@ -245,8 +276,21 @@ export class OverlayRenderer {
       const viewport = this.machine.getSnapshot().context.viewport;
       if (!viewport) return;
       
-      const cellPos = this.coordinateSystem.viewportToCell(pos.x, pos.y, viewport);
-      if (!cellPos) return;
+      // Since we're not transforming the layer, mouse position needs scroll adjustment
+      // to get the absolute position in the document
+      const adjustedY = pos.y + (viewport.scrollTop || 0);
+      
+      console.log('OverlayRenderer.mousedown: Position adjustment', {
+        mouseY: pos.y,
+        scrollTop: viewport.scrollTop,
+        adjustedY
+      });
+      
+      const cellPos = this.coordinateSystem.viewportToCell(pos.x, adjustedY, viewport);
+      if (!cellPos) {
+        console.warn('OverlayRenderer.mousedown: No cell found at position');
+        return;
+      }
       
       // Store start position for potential drag
       mouseDownPos = pos;
@@ -319,7 +363,9 @@ export class OverlayRenderer {
       
       if (context.dragState?.isDragging) {
         // Already dragging - update drag state
-        const cellPos = this.coordinateSystem.viewportToCell(pos.x, pos.y, context.viewport);
+        // Since we're not transforming the layer, adjust Y for scroll
+        const adjustedY = pos.y + (context.viewport.scrollTop || 0);
+        const cellPos = this.coordinateSystem.viewportToCell(pos.x, adjustedY, context.viewport);
         if (!cellPos) return;
         
         this.machine.send({
@@ -429,13 +475,16 @@ export class OverlayRenderer {
       }
     }
     
-    if (this.dirtyRegions.has('fill')) {
+    // Always check fill handle visibility when selection changes
+    if (this.dirtyRegions.has('fill') || this.dirtyRegions.has('selection')) {
       // Fill handle
       if (context.shapesVisible.fillHandle && context.selectedCells.size > 0) {
         console.log('OverlayRenderer: Rendering fill handle');
         this.renderFillHandle(context.selectionBounds);
-      } else if (this.activeFillHandle) {
-        this.activeFillHandle.visible(false);
+      } else {
+        // Always hide fill handle when conditions aren't met
+        console.log('OverlayRenderer: Hiding fill handle (no selection or visibility off)');
+        this.fillHandleLayer.hideFillHandle();
       }
       
       // Fill preview
@@ -566,9 +615,57 @@ export class OverlayRenderer {
       
       const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
       
+      // Debug position calculation - let's check if viewport.scrollTop matches actual DOM scroll
+      const viewportElement = document.querySelector('.vibegridx-viewport') as HTMLElement;
+      const actualScrollTop = viewportElement?.scrollTop || 0;
+      
+      console.log('OverlayRenderer.renderSelection: Position calculation DEBUG', {
+        cellKey,
+        viewport: { 
+          scrollTop: viewport.scrollTop, 
+          height: viewport.height,
+          start: viewport.start,
+          end: viewport.end
+        },
+        actualDOMScroll: actualScrollTop,
+        scrollMismatch: Math.abs((viewport.scrollTop || 0) - actualScrollTop) > 5,
+        position,
+        rowCalculation: {
+          parsedRowId: parsed.rowId,
+          rowIndex: position?.row,
+          expectedY: position?.row ? position.row * this.config.cellHeight : 'N/A',
+          expectedYWithScroll: position?.row ? (position.row * this.config.cellHeight - actualScrollTop) : 'N/A'
+        },
+        boundsCheck: {
+          minY: -this.config.cellHeight * 2,
+          maxY: viewport.height + this.config.cellHeight * 2,
+          passes: position && position.y >= -this.config.cellHeight * 2 && position.y <= viewport.height + this.config.cellHeight * 2
+        }
+      });
+      
       if (position && position.y >= -this.config.cellHeight * 2 && 
           position.y <= viewport.height + this.config.cellHeight * 2) {
         const columnWidth = this.config.dimensionManager.getColumnWidth(parsed.columnId);
+        
+        console.log('OverlayRenderer.renderSelection: CONFIGURING SHAPES', {
+          cellKey,
+          position: { x: position.x, y: position.y },
+          dimensions: { width: columnWidth, height: this.config.cellHeight },
+          shapeInfo: {
+            cellShape: { 
+              id: cellShapes[index].id(),
+              visible: cellShapes[index].visible(),
+              listening: cellShapes[index].listening(),
+              parent: cellShapes[index].getParent()?.name() || 'none'
+            },
+            borderShape: {
+              id: borderShapes[index].id(), 
+              visible: borderShapes[index].visible(),
+              listening: borderShapes[index].listening(),
+              parent: borderShapes[index].getParent()?.name() || 'none'
+            }
+          }
+        });
         
         // Configure shapes
         this.shapePool.configureForCell(
@@ -587,6 +684,28 @@ export class OverlayRenderer {
           this.config.cellHeight - 1
         );
         
+        console.log('OverlayRenderer.renderSelection: SHAPES CONFIGURED', {
+          cellKey,
+          cellShape: {
+            x: cellShapes[index].x(),
+            y: cellShapes[index].y(),
+            width: cellShapes[index].width(),
+            height: cellShapes[index].height(),
+            visible: cellShapes[index].visible(),
+            opacity: cellShapes[index].opacity(),
+            fill: cellShapes[index].fill()
+          },
+          borderShape: {
+            x: borderShapes[index].x(),
+            y: borderShapes[index].y(),
+            width: borderShapes[index].width(),
+            height: borderShapes[index].height(),
+            visible: borderShapes[index].visible(),
+            opacity: borderShapes[index].opacity(),
+            stroke: borderShapes[index].stroke()
+          }
+        });
+        
         // Track active shapes
         this.activeSelectionShapes.set(cellKey, {
           cell: cellShapes[index],
@@ -594,8 +713,58 @@ export class OverlayRenderer {
         });
         
         index++;
+      } else {
+        console.log('OverlayRenderer.renderSelection: POSITION OUT OF BOUNDS', {
+          cellKey,
+          position,
+          viewport: { height: viewport.height },
+          bounds: {
+            minY: -this.config.cellHeight * 2,
+            maxY: viewport.height + this.config.cellHeight * 2
+          },
+          boundsCheck: position ? {
+            yTooLow: position.y < -this.config.cellHeight * 2,
+            yTooHigh: position.y > viewport.height + this.config.cellHeight * 2
+          } : 'no position'
+        });
       }
     }
+    
+    console.log('OverlayRenderer.renderSelection: RENDER COMPLETE', {
+      totalCells: selectedCells.size,
+      visibleCells: visibleCells.size,
+      shapesConfigured: index,
+      activeShapes: this.activeSelectionShapes.size,
+      layerInfo: {
+        layerName: this.layer.name(),
+        layerVisible: this.layer.visible(),
+        layerOpacity: this.layer.opacity(),
+        children: this.layer.children.length,
+        stage: this.stage.name()
+      },
+      canvasDebug: {
+        stageSize: { width: this.stage.width(), height: this.stage.height() },
+        stagePosition: { x: this.stage.x(), y: this.stage.y() },
+        layerTransform: { 
+          x: this.layer.x(), 
+          y: this.layer.y(), 
+          scaleX: this.layer.scaleX(), 
+          scaleY: this.layer.scaleY() 
+        },
+        containerElement: {
+          exists: !!this.stage.container(),
+          position: this.stage.container()?.style.position || 'none',
+          top: this.stage.container()?.style.top || 'none',
+          left: this.stage.container()?.style.left || 'none',
+          pointerEvents: this.stage.container()?.style.pointerEvents || 'none'
+        }
+      }
+    });
+    
+    // Canvas positioning is now working correctly
+    
+    // Force layer redraw
+    this.layer.batchDraw();
   }
   
   private renderEditing(editingCell: any, viewport: ViewportInfo): void {
@@ -669,36 +838,35 @@ export class OverlayRenderer {
   
   private renderFillHandle(selectionBounds: any): void {
     const context = this.machine.getSnapshot().context;
-    console.log('OverlayRenderer.renderFillHandle: Entry', {
-      selectedCells: context.selectedCells.size,
-      viewport: !!context.viewport,
-      activeFillHandle: !!this.activeFillHandle
-    });
     
     if (!context.selectedCells.size || !context.viewport) {
-      console.log('OverlayRenderer.renderFillHandle: Early return - no cells or viewport');
+      this.fillHandleLayer.hideFillHandle();
       return;
     }
     
-    // Calculate actual selection bounds using the same logic as selection rendering
-    const cellKeys = Array.from(context.selectedCells);
+    // Delegate to FillHandleLayer
+    this.fillHandleLayer.renderFillHandle(context.selectedCells, context.viewport);
+  }
+  
+  private renderFillPreview(previewCells: Set<string>, viewport: ViewportInfo): void {
+    // Delegate to FillHandleLayer
+    this.fillHandleLayer.renderFillPreview(previewCells, viewport);
+  }
+  
+  private renderCopyIndicator(clipboardState: any, selectionBounds: any): void {
+    if (!clipboardState || !clipboardState.copiedCells || clipboardState.copiedCells.size === 0) return;
+    
+    const context = this.machine.getSnapshot().context;
+    if (!context.viewport) return;
+    
+    // Calculate bounds from the copied cells
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
-    console.log('OverlayRenderer.renderFillHandle: Processing cells', cellKeys);
-    
-    for (const cellKey of cellKeys) {
+    for (const cellKey of clipboardState.copiedCells) {
       const parsed = this.coordinateSystem.parseCellKey(cellKey);
       if (!parsed) continue;
       
       const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, context.viewport);
-      
-      console.log('OverlayRenderer.renderFillHandle: Cell position', {
-        cellKey,
-        rowId: parsed.rowId,
-        columnId: parsed.columnId,
-        position
-      });
-      
       if (position) {
         const columnWidth = this.config.dimensionManager.getColumnWidth(parsed.columnId);
         const cellRight = position.x + columnWidth;
@@ -708,148 +876,28 @@ export class OverlayRenderer {
         minY = Math.min(minY, position.y);
         maxX = Math.max(maxX, cellRight);
         maxY = Math.max(maxY, cellBottom);
-        
-        console.log('OverlayRenderer.renderFillHandle: Updated bounds', {
-          minX, minY, maxX, maxY,
-          columnWidth, cellRight, cellBottom
-        });
       }
     }
     
     // Only render if we have valid bounds
-    if (minX === Infinity) {
-      console.log('OverlayRenderer.renderFillHandle: No valid bounds found');
-      return;
-    }
-    
-    console.log('OverlayRenderer.renderFillHandle: Final bounds', {
-      minX, minY, maxX, maxY
-    });
-    
-    if (!this.activeFillHandle) {
-      console.log('OverlayRenderer.renderFillHandle: Creating new fill handle', {
-        maxX, maxY
-      });
-      
-      this.activeFillHandle = this.shapePool.createFillHandle(maxX, maxY);
-      
-      console.log('OverlayRenderer.renderFillHandle: Fill handle created', {
-        fillHandle: this.activeFillHandle,
-        visible: this.activeFillHandle.visible(),
-        position: this.activeFillHandle.position()
-      });
-      
-      // Store event handlers for cleanup
-      const fillHandleEvents = {
-        dragstart: (e: any) => {
-          console.log('Fill handle dragstart', e);
-          this.machine.send({ type: 'FILL_START', direction: 'vertical' });
-        },
-        dragmove: (e: any) => {
-          console.log('Fill handle dragmove', e);
-          const pos = this.stage.getPointerPosition();
-          if (!pos || !context.viewport) return;
-          
-          // Calculate fill preview cells based on drag position
-          const previewCells = this.calculateFillPreviewCells(pos, context.selectedCells, context.viewport);
-          console.log('Fill handle dragmove: calculated preview cells', previewCells.size);
-          
-          // Render fill preview directly instead of going through machine
-          this.renderFillPreview(previewCells, context.viewport);
-          this.layer.batchDraw();
-        },
-        dragend: (e: any) => {
-          console.log('Fill handle dragend', e);
-          const pos = this.stage.getPointerPosition();
-          if (!pos || !context.viewport) return;
-          
-          // Calculate final fill cells
-          const fillCells = this.calculateFillPreviewCells(pos, context.selectedCells, context.viewport);
-          console.log('Fill handle dragend: calculated fill cells', fillCells.size);
-          
-          // Clear fill preview and complete the fill
-          this.clearFillPreview();
-          this.machine.send({ type: 'FILL_COMPLETE', fillCells });
-        },
-        click: (e: any) => {
-          console.log('Fill handle clicked', e);
-        },
-        mousedown: (e: any) => {
-          console.log('Fill handle mousedown', e);
-        }
-      };
-      
-      // Store event handlers on the handle for cleanup
-      (this.activeFillHandle as any)._fillHandleEvents = fillHandleEvents;
-      
-      // Set up fill handle drag events
-      this.activeFillHandle.on('dragstart', fillHandleEvents.dragstart);
-      this.activeFillHandle.on('dragmove', fillHandleEvents.dragmove);
-      this.activeFillHandle.on('dragend', fillHandleEvents.dragend);
-      this.activeFillHandle.on('click', fillHandleEvents.click);
-      this.activeFillHandle.on('mousedown', fillHandleEvents.mousedown);
-    } else {
-      console.log('OverlayRenderer.renderFillHandle: Positioning existing fill handle', {
-        newPosition: { x: maxX - 5, y: maxY - 5 },
-        currentPosition: this.activeFillHandle.position()
-      });
-      
-      this.activeFillHandle.position({
-        x: maxX - 5,
-        y: maxY - 5
-      });
-      this.activeFillHandle.visible(true);
-      
-      console.log('OverlayRenderer.renderFillHandle: Fill handle positioned', {
-        position: this.activeFillHandle.position(),
-        visible: this.activeFillHandle.visible()
-      });
-    }
-  }
-  
-  private renderFillPreview(previewCells: Set<string>, viewport: ViewportInfo): void {
-    const shapes = this.shapePool.acquire<Konva.Rect>('preview', previewCells.size);
-    
-    let index = 0;
-    for (const cellKey of previewCells) {
-      if (index >= shapes.length) break;
-      
-      const parsed = this.coordinateSystem.parseCellKey(cellKey);
-      if (!parsed) continue;
-      
-      const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
-      
-      if (position) {
-        const columnWidth = this.config.dimensionManager.getColumnWidth(parsed.columnId);
-        this.shapePool.configureForCell(
-          shapes[index],
-          position.x,
-          position.y,
-          columnWidth - 1,
-          this.config.cellHeight - 1
-        );
-        this.activeFillPreviewShapes.push(shapes[index]);
-        index++;
-      }
-    }
-  }
-  
-  private renderCopyIndicator(clipboardState: any, selectionBounds: any): void {
-    if (!selectionBounds) return;
+    if (minX === Infinity) return;
     
     const [indicator] = this.shapePool.acquire<Konva.Rect>('indicator', 1);
     
     indicator.position({
-      x: selectionBounds.minX,
-      y: selectionBounds.minY
+      x: minX,
+      y: minY
     });
     
     indicator.size({
-      width: selectionBounds.maxX - selectionBounds.minX,
-      height: selectionBounds.maxY - selectionBounds.minY
+      width: maxX - minX,
+      height: maxY - minY
     });
     
     indicator.stroke(clipboardState.isCut ? '#ef4444' : '#6366f1');
+    indicator.strokeWidth(2);
+    indicator.dash([5, 5]);
+    indicator.fill('transparent');
     indicator.visible(true);
     
     // Animate dash offset
@@ -889,27 +937,9 @@ export class OverlayRenderer {
       this.activeEditingShapes = null;
     }
     
-    // Release fill preview shapes
-    if (this.activeFillPreviewShapes.length > 0) {
-      this.shapePool.release('preview', this.activeFillPreviewShapes);
-      this.activeFillPreviewShapes = [];
-    }
-    
-    // Clean up and hide fill handle
-    if (this.activeFillHandle) {
-      // Remove event listeners to prevent memory leaks
-      const events = (this.activeFillHandle as any)._fillHandleEvents;
-      if (events) {
-        this.activeFillHandle.off('dragstart', events.dragstart);
-        this.activeFillHandle.off('dragmove', events.dragmove);
-        this.activeFillHandle.off('dragend', events.dragend);
-        this.activeFillHandle.off('click', events.click);
-        this.activeFillHandle.off('mousedown', events.mousedown);
-        delete (this.activeFillHandle as any)._fillHandleEvents;
-      }
-      this.activeFillHandle.destroy();
-      this.activeFillHandle = null;
-    }
+    // Clean up fill handle layer
+    this.fillHandleLayer.hideFillHandle();
+    this.fillHandleLayer.clearFillPreview();
     
     // Release copy indicator
     if (this.activeCopyIndicator) {
@@ -975,7 +1005,9 @@ export class OverlayRenderer {
     if (selectedCells.size === 0) return new Set();
     
     // Get the cell position at drag location
-    const dragCell = this.coordinateSystem.viewportToCell(dragPos.x, dragPos.y, viewport);
+    // Adjust Y for scroll since we're not transforming the layer
+    const adjustedY = dragPos.y + (viewport.scrollTop || 0);
+    const dragCell = this.coordinateSystem.viewportToCell(dragPos.x, adjustedY, viewport);
     if (!dragCell) return new Set();
     
     // Get bounds of current selection
@@ -1007,12 +1039,8 @@ export class OverlayRenderer {
   }
   
   private clearFillPreview(): void {
-    // Release fill preview shapes
-    if (this.activeFillPreviewShapes.length > 0) {
-      this.shapePool.release('preview', this.activeFillPreviewShapes);
-      this.activeFillPreviewShapes = [];
-    }
-    this.layer.batchDraw();
+    // Delegate to FillHandleLayer
+    this.fillHandleLayer.clearFillPreview();
   }
   
   // Public API
@@ -1021,7 +1049,7 @@ export class OverlayRenderer {
   }
   
   updateViewport(viewport: ViewportInfo): void {
-    console.log('OverlayRenderer.updateViewport:', viewport);
+    // Viewport update logging disabled - too verbose
     this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });
   }
   
@@ -1034,12 +1062,107 @@ export class OverlayRenderer {
     this.machine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
   }
   
+  // New method to update selection with DOM positions
+  updateSelectionWithPositions(cellPositions: Map<string, { x: number; y: number; width: number; height: number }>): void {
+    // Selection position update logging disabled - too verbose
+    
+    // Clear existing selection shapes
+    this.shapePool.releaseAll('selection');
+    this.shapePool.releaseAll('border');
+    this.activeSelectionShapes.clear();
+    
+    // Get viewport bounds for filtering
+    const viewportWidth = this.stage.width();
+    const viewportHeight = this.stage.height();
+    
+    // Filter out cells that are completely outside viewport
+    const visibleCells = new Map<string, { x: number; y: number; width: number; height: number }>();
+    cellPositions.forEach((pos, cellKey) => {
+      // Check if cell is at least partially visible
+      if (pos.x < viewportWidth && pos.x + pos.width > 0 &&
+          pos.y < viewportHeight && pos.y + pos.height > 0) {
+        visibleCells.set(cellKey, pos);
+      }
+    });
+    
+    // Get shapes only for visible cells
+    const cellShapes = this.shapePool.acquire<Konva.Rect>('selection', visibleCells.size);
+    const borderShapes = this.shapePool.acquire<Konva.Rect>('border', visibleCells.size);
+    
+    // Render each visible cell using DOM positions
+    let index = 0;
+    visibleCells.forEach((pos, cellKey) => {
+      if (index >= cellShapes.length) return;
+      
+      // Configure shapes with DOM positions
+      const cellShape = cellShapes[index];
+      const borderShape = borderShapes[index];
+      
+      cellShape.setAttrs({
+        x: pos.x,
+        y: pos.y,
+        width: pos.width,
+        height: pos.height,
+        fill: this.config.selectionColor,
+        stroke: 'transparent',
+        strokeWidth: 0
+      });
+      cellShape.visible(true);
+      
+      borderShape.setAttrs({
+        x: pos.x,
+        y: pos.y,
+        width: pos.width - 1,
+        height: pos.height - 1,
+        fill: 'transparent',
+        stroke: this.config.selectionBorderColor,
+        strokeWidth: this.config.borderWidth
+      });
+      borderShape.visible(true);
+      
+      // Track active shapes
+      this.activeSelectionShapes.set(cellKey, {
+        cell: cellShape,
+        border: borderShape
+      });
+      
+      index++;
+    });
+    
+    // Update layer
+    this.layer.batchDraw();
+  }
+  
   updateEditingCell(cell: any): void {
     if (cell) {
       this.machine.send({ type: 'EDIT_START', cell });
     } else {
       this.machine.send({ type: 'EDIT_END' });
     }
+  }
+  
+  handleCopy(cells: Set<string>): void {
+    this.machine.send({ type: 'COPY', cells });
+  }
+  
+  handleCut(cells: Set<string>): void {
+    this.machine.send({ type: 'CUT', cells });
+  }
+  
+  handlePaste(): void {
+    this.machine.send({ type: 'PASTE' });
+  }
+  
+  forceRedraw(): void {
+    // Mark all regions as dirty to force a complete redraw
+    this.dirtyRegions.add('selection');
+    this.dirtyRegions.add('editing');
+    this.dirtyRegions.add('drag');
+    this.dirtyRegions.add('fill');
+    this.dirtyRegions.add('clipboard');
+    
+    // Request immediate render
+    this.requestRender();
   }
   
   getPerformanceMetrics() {
@@ -1051,28 +1174,23 @@ export class OverlayRenderer {
     };
   }
   
+  // Cancel any active fill operation
+  cancelFill(): void {
+    console.log('OverlayRenderer.cancelFill: Canceling active fill operation');
+    this.machine.send({ type: 'FILL_CANCEL' });
+  }
+  
   destroy(): void {
     if (this.renderThrottleTimer) {
       cancelAnimationFrame(this.renderThrottleTimer);
     }
     
-    // Clean up fill handle event listeners
-    if (this.activeFillHandle) {
-      const events = (this.activeFillHandle as any)._fillHandleEvents;
-      if (events) {
-        this.activeFillHandle.off('dragstart', events.dragstart);
-        this.activeFillHandle.off('dragmove', events.dragmove);
-        this.activeFillHandle.off('dragend', events.dragend);
-        this.activeFillHandle.off('click', events.click);
-        this.activeFillHandle.off('mousedown', events.mousedown);
-        delete (this.activeFillHandle as any)._fillHandleEvents;
-      }
-      this.activeFillHandle.destroy();
-      this.activeFillHandle = null;
-    }
+    // Clean up fill handle layer
+    this.fillHandleLayer.destroy();
     
     this.clearAllShapes();
     this.shapePool.destroy();
     this.layer.destroy();
   }
+  
 }

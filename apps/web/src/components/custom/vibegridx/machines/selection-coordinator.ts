@@ -151,6 +151,9 @@ type SelectionEvents =
   | { type: 'selection.row.select'; rowId: string }
   | { type: 'selection.column.select'; columnId: string }
   | { type: 'selection.clear' }
+  | { type: 'selection.drag.start'; startCell: CellRef }
+  | { type: 'selection.drag.move'; currentCell: CellRef; selectedCells: Set<string> }
+  | { type: 'selection.drag.end'; selectedCells: Set<string> }
   | { type: 'keyboard.arrow'; direction: string; extend?: boolean }
   | { type: 'keyboard.copy' }
   | { type: 'keyboard.paste' }
@@ -450,6 +453,14 @@ export const selectionCoordinatorMachine = setup({
           actions: 'clearSelection'
         },
         
+        // Drag selection events
+        'selection.drag.start': {
+          target: 'dragging',
+          actions: assign({
+            anchor: ({ event }) => event.startCell
+          })
+        },
+        
         // Keyboard navigation
         'keyboard.arrow': {
           guard: 'canNavigate',
@@ -492,6 +503,28 @@ export const selectionCoordinatorMachine = setup({
               targetCells: new Set()
             })
           })
+        }
+      }
+    },
+    
+    dragging: {
+      on: {
+        'selection.drag.move': {
+          actions: assign({
+            selectedCells: ({ event }) => event.selectedCells
+          })
+        },
+        
+        'selection.drag.end': {
+          target: 'idle',
+          actions: assign({
+            selectedCells: ({ event }) => event.selectedCells
+          })
+        },
+        
+        'selection.clear': {
+          target: 'idle',
+          actions: 'clearSelection'
         }
       }
     },

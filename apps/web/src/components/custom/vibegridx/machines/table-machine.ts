@@ -7,6 +7,7 @@ import type {
   OptimisticOperation 
 } from '../types';
 import { createColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import { createRowDimensionManager } from '../dimensions/RowDimensionManager';
 
 // ====================================
 // ACTOR IMPORTS (will implement these next)
@@ -23,42 +24,48 @@ import { overlayMachine } from './overlay-machine';
 // HELPER FUNCTIONS
 // ====================================
 
-const createDefaultContext = (input: TableConfig): TableContext => ({
-  id: input.id,
-  entityType: input.entityType,
-  columns: input.columns || [],
-  visibleRowIds: input.initialData?.map(row => row.id) || [],
-  settings: {
-    enableVirtualScrolling: true,
-    enableGrouping: false,
-    enableFiltering: false,
-    enableFormulas: false,
-    pageSize: 50,
-    rowHeight: 40,
-    bufferSize: 10,
-    ...input.settings
-  },
-  version: 0,
+const createDefaultContext = (input: TableConfig): TableContext => {
+  const initialRowCount = input.initialData?.length || 0;
+  const rowHeight = input.settings?.rowHeight || 40;
   
-  // Create dimension manager with initial columns
-  dimensionManager: createColumnDimensionManager(input.columns || []),
-  
-  actors: {
-    selectionCoordinator: null,
-    editCoordinator: null,
-    viewCoordinator: null,
-    dragCoordinator: null,
-    overlayActor: null,
-    rowActors: new Map()
-  },
-  
-  performance: {
-    lastRenderTime: 0,
-    totalRows: input.initialData?.length || 0,
-    visibleRows: 0,
-    activeActors: 0
-  }
-});
+  return {
+    id: input.id,
+    entityType: input.entityType,
+    columns: input.columns || [],
+    visibleRowIds: input.initialData?.map(row => row.id) || [],
+    settings: {
+      enableVirtualScrolling: true,
+      enableGrouping: false,
+      enableFiltering: false,
+      enableFormulas: false,
+      pageSize: 50,
+      rowHeight: rowHeight,
+      bufferSize: 10,
+      ...input.settings
+    },
+    version: 0,
+    
+    // Create dimension managers
+    dimensionManager: createColumnDimensionManager(input.columns || []),
+    rowDimensionManager: createRowDimensionManager(initialRowCount, rowHeight),
+    
+    actors: {
+      selectionCoordinator: null,
+      editCoordinator: null,
+      viewCoordinator: null,
+      dragCoordinator: null,
+      overlayActor: null,
+      rowActors: new Map()
+    },
+    
+    performance: {
+      lastRenderTime: 0,
+      totalRows: initialRowCount,
+      visibleRows: 0,
+      activeActors: 0
+    }
+  };
+};
 
 const createViewportFromScroll = (event: any): ViewportInfo => ({
   start: Math.floor(event.scrollTop / event.itemHeight),
@@ -206,9 +213,26 @@ export const tableBaseMachine = setup({
     }),
     
     setVisibleEntities: assign({
-      visibleRowIds: ({ event }) => 
-        event.type === 'SET_VISIBLE_ENTITIES' ? event.entityIds : [],
-      version: ({ context }) => context.version + 1
+      visibleRowIds: ({ context, event }) => {
+        if (event.type === 'SET_VISIBLE_ENTITIES') {
+          // Update row dimension manager with new row count
+          const newRowCount = event.entityIds.length;
+          context.rowDimensionManager?.setRowCount(newRowCount);
+          
+          return event.entityIds;
+        }
+        return context.visibleRowIds;
+      },
+      version: ({ context }) => context.version + 1,
+      performance: ({ context, event }) => {
+        if (event.type === 'SET_VISIBLE_ENTITIES') {
+          return {
+            ...context.performance,
+            totalRows: event.entityIds.length
+          };
+        }
+        return context.performance;
+      }
     }),
     
     // Performance tracking
