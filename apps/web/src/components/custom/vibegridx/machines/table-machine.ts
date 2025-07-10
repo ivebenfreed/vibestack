@@ -453,13 +453,6 @@ export const tableBaseMachine = setup({
                           });
                         }
                         
-                        console.log('TableMachine: Viewport update', {
-                          viewportStart: event.viewport.start,
-                          viewportEnd: event.viewport.end,
-                          allRowsCount: context.allRowIds.length,
-                          visibleRowsCount: visibleIds.length
-                        });
-                        
                         return visibleIds;
                       }
                     }),

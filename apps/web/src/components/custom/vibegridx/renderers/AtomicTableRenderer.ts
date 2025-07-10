@@ -8,6 +8,7 @@ import type {
   OptimisticOperation 
 } from '../types';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import { createDefaultCellRendererRegistry, type CellRendererRegistry, type CellState } from './cells';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -32,81 +33,8 @@ const CSS_CLASSES = {
   OPTIMISTIC: 'vibegridx-optimistic'
 } as const;
 
-// ====================================
-// CELL RENDERER FACTORY
-// ====================================
-
-class CellRendererFactory {
-  private renderers = new Map<string, (value: any, column: Column, isEditing: boolean) => string>();
-  
-  constructor() {
-    this.registerBuiltInRenderers();
-  }
-  
-  private registerBuiltInRenderers() {
-    // Text renderer - handle objects and arrays properly
-    this.renderers.set('text', (value) => {
-      if (value === null || value === undefined) return '';
-      if (typeof value === 'object') {
-        // Handle objects and arrays by showing a truncated JSON
-        try {
-          const json = JSON.stringify(value);
-          return json.length > 50 ? json.substring(0, 47) + '...' : json;
-        } catch {
-          return '[Complex Object]';
-        }
-      }
-      return String(value);
-    });
-    
-    // Number renderer
-    this.renderers.set('number', (value) => {
-      if (value === null || value === undefined) return '';
-      return typeof value === 'number' ? value.toLocaleString() : String(value);
-    });
-    
-    // Date renderer
-    this.renderers.set('date', (value) => {
-      if (!value) return '';
-      const date = value instanceof Date ? value : new Date(value);
-      return date.toLocaleDateString();
-    });
-    
-    // Boolean renderer
-    this.renderers.set('boolean', (value) => {
-      return value ? '✓' : '';
-    });
-    
-    // Select renderer
-    this.renderers.set('select', (value, column) => {
-      if (!value) return '';
-      return column.options?.includes(value) ? String(value) : `⚠️ ${value}`;
-    });
-  }
-  
-  render(value: any, column: Column, isEditing: boolean = false): string {
-    if (isEditing) {
-      return this.renderEditableCell(value, column);
-    }
-    
-    const renderer = this.renderers.get(column.type) || this.renderers.get('text')!;
-    return renderer(value, column, isEditing);
-  }
-  
-  private renderEditableCell(value: any, column: Column): string {
-    switch (column.type) {
-      case 'boolean':
-        return `<input type="checkbox" ${value ? 'checked' : ''} data-cell-editor="true">`;
-      case 'select':
-        const options = column.options?.map(opt => 
-          `<option value="${opt}" ${opt === value ? 'selected' : ''}>${opt}</option>`
-        ).join('') || '';
-        return `<select data-cell-editor="true">${options}</select>`;
-      default:
-        return `<input type="text" value="${value || ''}" data-cell-editor="true">`;
-    }
-  }
-}
+// NOTE: CellRendererFactory removed - now using modular CellRendererRegistry
+// This provides better type safety, extensibility, and consistent formatting
 
 // ====================================
 // VIRTUAL GRID MANAGER
@@ -182,7 +110,7 @@ export class AtomicTableRenderer {
   private body: HTMLElement;
   private viewport: HTMLElement;
   
-  private cellFactory: CellRendererFactory;
+  private cellRegistry: CellRendererRegistry;
   private virtualGrid: VirtualGridManager;
   private options: RendererOptions;
   
@@ -209,7 +137,12 @@ export class AtomicTableRenderer {
   
   constructor(options: RendererOptions) {
     this.options = options;
-    this.cellFactory = new CellRendererFactory();
+    this.cellRegistry = options.cellRegistry || createDefaultCellRendererRegistry();
+    console.log('AtomicTableRenderer: Cell registry created:', {
+      hasRegistry: !!this.cellRegistry,
+      registryType: this.cellRegistry.constructor.name,
+      hasRenderMethod: typeof this.cellRegistry.renderCell === 'function'
+    });
     this.dimensionManager = options.dimensionManager || null;
     
     // Set columns if provided
@@ -342,7 +275,7 @@ export class AtomicTableRenderer {
         const rowHeight = this.virtualGrid.getRowHeight();
         const calculatedStart = Math.floor(this.viewport.scrollTop / rowHeight);
         const calculatedEnd = calculatedStart + Math.ceil(this.viewport.clientHeight / rowHeight);
-        const cappedEnd = Math.min(calculatedEnd, this.lastRenderState.rows.length);
+        const cappedEnd = this.lastRenderState ? Math.min(calculatedEnd, this.lastRenderState.rows.length) : calculatedEnd;
         
         // Debug logging disabled - too verbose during scrolling
         // console.log('Viewport Update Debug:', { ... });
@@ -353,6 +286,7 @@ export class AtomicTableRenderer {
           height: this.viewport.clientHeight,
           width: this.viewport.clientWidth,
           scrollTop: this.viewport.scrollTop,
+          scrollLeft: this.viewport.scrollLeft,
           itemHeight: rowHeight
         };
         
@@ -436,6 +370,7 @@ export class AtomicTableRenderer {
           height: this.viewport.clientHeight,
           width: this.viewport.clientWidth,
           scrollTop: this.viewport.scrollTop,
+          scrollLeft: this.viewport.scrollLeft,
           itemHeight: this.virtualGrid.getRowHeight()
         };
         
@@ -696,13 +631,45 @@ export class AtomicTableRenderer {
       const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
       const xOffset = this.dimensionManager?.getColumnOffset(column.id) || 0;
       
-      const cellContent = this.cellFactory.render(value, column, false); // Never editing in AtomicRenderer
+      // Fast path: Skip complex state for normal cells (95% of cases)
+      const isSelected = this.selectedCells.has(cellKey);
+      const isEditing = this.editingCell?.rowId === row.id && this.editingCell?.columnId === column.id;
+      const isDirty = row.metadata.isDirty || false;
       
-      // Position cell absolutely within row
-      cellsHTML += `<div class="${CSS_CLASSES.CELL}" 
+      // Use simple renderer for most cases to avoid object allocation overhead
+      let cellContent: string;
+      let cellClass = CSS_CLASSES.CELL;
+      
+      if (!isSelected && !isEditing && !isDirty) {
+        // Fast path: 95% of cells - just render the value directly
+        cellContent = this.renderValueFast(value, column);
+      } else {
+        // Slow path: Complex state rendering for special cells
+        const cellState: CellState = {
+          isSelected,
+          isEditing,
+          isDirty,
+          isOptimistic: false,
+          isHovered: false,
+          isFocused: false
+        };
+        
+        try {
+          const cellResult = this.cellRegistry.renderCell(value, column, cellState);
+          cellContent = cellResult.content;
+          cellClass = `${CSS_CLASSES.CELL} ${cellResult.className}`;
+        } catch (error) {
+          console.error('AtomicTableRenderer: Cell rendering error for', cellKey, error);
+          cellContent = String(value || '');
+        }
+      }
+      
+      // Position cell absolutely within row - simplified for performance
+      cellsHTML += `<div class="${cellClass}" 
                    data-row-id="${row.id}" 
                    data-column-id="${column.id}"
                    data-cell-key="${cellKey}"
+                   role="gridcell"
                    style="position: absolute; left: ${xOffset}px; width: ${width}px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box;">
                 ${cellContent}
               </div>`;
@@ -811,6 +778,44 @@ export class AtomicTableRenderer {
   }
   
   
+  // ====================================
+  // FAST CELL RENDERING
+  // ====================================
+  
+  private renderValueFast(value: any, column: Column): string {
+    if (value === null || value === undefined) return '';
+    
+    switch (column.type) {
+      case 'text':
+        if (typeof value === 'object') {
+          try {
+            const json = JSON.stringify(value);
+            return json.length > 50 ? json.substring(0, 47) + '...' : json;
+          } catch {
+            return '[Object]';
+          }
+        }
+        return String(value);
+        
+      case 'number':
+        return typeof value === 'number' ? value.toLocaleString() : String(value);
+        
+      case 'date':
+        const date = value instanceof Date ? value : new Date(value);
+        return date.toLocaleDateString();
+        
+      case 'boolean':
+        return value ? '✓' : '';
+        
+      case 'select':
+      case 'enum':
+        return String(value);
+        
+      default:
+        return String(value);
+    }
+  }
+
   // ====================================
   // UTILITY METHODS
   // ====================================

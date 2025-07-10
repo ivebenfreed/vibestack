@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { VibeGridX, CanvasOverlay } from '@/components/custom/vibegridx';
-import type { VibeGridXProps, CellRef, ViewportInfo, Column } from '@/components/custom/vibegridx';
+import { VibeGridX } from '@/components/custom/vibegridx';
+import type { CellRef, ViewportInfo, Column } from '@/components/custom/vibegridx';
 import type { Task } from '@repo/dataforge/client-entities';
 
 // Import actual domain atoms
@@ -252,76 +252,35 @@ const useEntityOperations = (entityType: string) => {
 };
 
 // ====================================
-// DEMO TABLE COMPONENT
+// DEMO GRID COMPONENT
 // ====================================
 
-interface VibeGridXDemoTableProps {
+interface VibeGridXDemoGridProps {
+  entityType: 'task' | 'project' | 'user';
   data: any[];
-  entityType: string;
-  selectedCells: Set<string>;
-  editingCell: CellRef | null;
-  onCellClick: (rowId: string, columnId: string) => void;
-  onCellDoubleClick: (rowId: string, columnId: string) => void;
-  config: any;
+  columns: Column[];
   isLoading: boolean;
+  onPerformanceUpdate?: (metrics: any) => void;
 }
 
-function VibeGridXDemoTable({ 
+function VibeGridXDemoGrid({ 
+  entityType,
   data, 
-  entityType, 
-  selectedCells, 
-  editingCell, 
-  onCellClick, 
-  onCellDoubleClick, 
-  config,
-  isLoading 
-}: VibeGridXDemoTableProps) {
-  const [editingValue, setEditingValue] = useState('');
+  columns,
+  isLoading,
+  onPerformanceUpdate
+}: VibeGridXDemoGridProps) {
+  // Original VibeGridX doesn't have a useVibeGridX hook, we'll manage state locally
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [editingCell, setEditingCell] = useState<CellRef | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
   
-  // Get columns from first data item
-  const columns = data.length > 0 ? Object.keys(data[0]).filter(key => 
-    !['version', 'isDirty', 'isNew'].includes(key)
-  ) : [];
-  
-  const handleCellDoubleClickInternal = (rowId: string, columnId: string, currentValue: any) => {
-    setEditingValue(String(currentValue || ''));
-    onCellDoubleClick(rowId, columnId);
-  };
-  
-  const handleEditSave = () => {
-    console.log('Save edit:', editingCell, editingValue);
-    // In real implementation, this would update the entity
-  };
-  
-  const handleEditCancel = () => {
-    setEditingValue('');
-  };
-  
-  const formatCellValue = (value: any, columnId: string) => {
-    if (value === null || value === undefined) return '';
-    
-    // Date formatting
-    if (columnId.includes('Date') || columnId.includes('At')) {
-      if (value instanceof Date) {
-        return value.toLocaleDateString();
-      }
-      if (typeof value === 'string' && !isNaN(Date.parse(value))) {
-        return new Date(value).toLocaleDateString();
-      }
+  // Update performance metrics when they change
+  useEffect(() => {
+    if (performanceMetrics) {
+      onPerformanceUpdate?.(performanceMetrics);
     }
-    
-    // Boolean formatting
-    if (typeof value === 'boolean') {
-      return value ? '✓' : '';
-    }
-    
-    // Truncate long strings
-    const str = String(value);
-    return str.length > 30 ? str.slice(0, 30) + '...' : str;
-  };
-  
-  // Column widths are now handled by the VibeGridX column definitions
-  // No need for Tailwind width classes
+  }, [performanceMetrics, onPerformanceUpdate]);
   
   if (isLoading) {
     return (
@@ -339,113 +298,53 @@ function VibeGridXDemoTable({
       {/* Header */}
       <div className="bg-muted/50 border-b p-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h3 className="font-semibold">VibeGridX {entityType} Grid</h3>
+          <h3 className="font-semibold">VibeGridX {entityType} Grid (Atomic)</h3>
           <div className="flex gap-2">
             <Badge variant="outline" className="text-xs">XState v5</Badge>
-            <Badge variant="outline" className="text-xs">Hybrid Render</Badge>
-            {config.enableVirtualScrolling && <Badge variant="outline" className="text-xs">Virtual Scroll</Badge>}
-            {config.enableCanvasOverlays && <Badge variant="outline" className="text-xs">Canvas</Badge>}
+            <Badge variant="outline" className="text-xs">Atomic Render</Badge>
+            <Badge variant="outline" className="text-xs">Virtual Scroll</Badge>
+            <Badge variant="outline" className="text-xs">Canvas Overlays</Badge>
           </div>
         </div>
         <div className="text-xs text-muted-foreground">
-          {data.length} rows • {selectedCells.size} selected
+          {data.length} rows • {selectedCells.size} selected • {editingCell ? 'Editing' : 'Ready'}
         </div>
       </div>
       
-      {/* Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          {/* Table Header */}
-          <thead className="bg-muted/30 sticky top-0 z-10">
-            <tr>
-              {columns.map((column) => (
-                <th 
-                  key={column}
-                  className="p-2 text-left font-medium border-r border-border"
-                >
-                  <div className="flex items-center gap-2">
-                    {column}
-                    <div className="text-xs text-muted-foreground">↕</div>
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          
-          {/* Table Body */}
-          <tbody>
-            {data.slice(0, 50).map((row, rowIndex) => (
-              <tr 
-                key={row.id}
-                className={`border-b border-border hover:bg-muted/20 ${
-                  rowIndex % 2 === 0 ? 'bg-background' : 'bg-muted/10'
-                }`}
-              >
-                {columns.map((column) => {
-                  const cellKey = `${row.id}:${column}`;
-                  const isSelected = selectedCells.has(cellKey);
-                  const isEditing = editingCell?.rowId === row.id && editingCell?.columnId === column;
-                  const cellValue = row[column];
-                  
-                  return (
-                    <td
-                      key={column}
-                      className={`p-2 border-r border-border cursor-pointer transition-colors ${
-                        isSelected ? 'bg-primary/10 ring-1 ring-primary/20' : ''
-                      } ${isEditing ? 'bg-primary/20 ring-2 ring-primary/40' : ''}`}
-                      onClick={() => onCellClick(row.id, column)}
-                      onDoubleClick={() => handleCellDoubleClickInternal(row.id, column, cellValue)}
-                    >
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            className="flex-1 px-1 py-0.5 text-xs border rounded"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleEditSave();
-                              } else if (e.key === 'Escape') {
-                                handleEditCancel();
-                              }
-                            }}
-                          />
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleEditSave}>
-                              ✓
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleEditCancel}>
-                              ✕
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="truncate">
-                          {formatCellValue(cellValue, column)}
-                          {row.isDirty && <span className="ml-1 text-orange-500">●</span>}
-                          {row.isNew && <span className="ml-1 text-green-500">●</span>}
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Grid Component */}
+      <div className="flex-1">
+        <VibeGridX<any>
+          data={data}
+          entityType={entityType}
+          columns={columns}
+          enableVirtualScrolling={true}
+          enableCanvasOverlays={true}
+          enableGrouping={true}
+          enableFiltering={true}
+          enableSorting={true}
+          enableDragAndDrop={true}
+          bufferSize={10}
+          onSelectionChange={setSelectedCells}
+          onEditingChange={setEditingCell}
+          onCellClick={(rowId, columnId) => {
+            // Cell click handled
+          }}
+          onCellDoubleClick={(rowId, columnId) => {
+            console.log('[Demo] Cell double-clicked:', { rowId, columnId });
+          }}
+          onPerformanceUpdate={setPerformanceMetrics}
+        />
       </div>
       
       {/* Footer */}
       <div className="bg-muted/50 border-t p-2 text-xs text-muted-foreground flex justify-between">
         <div>
-          Showing {Math.min(50, data.length)} of {data.length} rows (Virtual Scrolling Active)
+          Showing {Math.min(50, data.length)} of {data.length} rows
         </div>
         <div className="flex gap-4">
-          <span>Grouping: ON</span>
-          <span>Filtering: ON</span>
-          <span>Drag & Drop: ON</span>
+          <span>Cell Renderers: Active</span>
+          <span>React Editors: Active</span>
+          <span>Event System: Active</span>
         </div>
       </div>
     </div>
@@ -475,13 +374,10 @@ function VibeGridXDemoPage() {
   
   // Demo state
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [editingCell, setEditingCell] = useState<CellRef | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
   const [events, setEvents] = useState<Array<{ type: string; data: any; timestamp: number }>>([]);
   
   // Refs
-  const vibeGridXRef = useRef<any>(null);
   const eventsRef = useRef<HTMLDivElement>(null);
   
   // Real domain data - only tasks for now
@@ -502,32 +398,12 @@ function VibeGridXDemoPage() {
     setEvents(prev => [newEvent, ...prev.slice(0, 49)]); // Keep last 50 events
   }, []);
   
-  const handleCellClick = useCallback((rowId: string, columnId: string) => {
-    const cellKey = `${rowId}:${columnId}`;
-    setSelectedCells(prev => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(cellKey)) {
-        newSelection.delete(cellKey);
-      } else {
-        newSelection.add(cellKey);
-      }
-      return newSelection;
+  const handlePerformanceUpdate = useCallback((metrics: any) => {
+    setPerformanceMetrics(metrics);
+    addEvent('performance.update', { 
+      renderTime: metrics.lastRenderTime,
+      cellCount: metrics.cellCount 
     });
-    addEvent('cell.click', { rowId, columnId, cellKey });
-  }, [addEvent]);
-  
-  const handleCellDoubleClick = useCallback((rowId: string, columnId: string) => {
-    addEvent('cell.doubleClick', { rowId, columnId });
-  }, [addEvent]);
-  
-  const handleSelectionChange = useCallback((selection: Set<string>) => {
-    setSelectedCells(selection);
-    addEvent('selection.change', { count: selection.size, cells: Array.from(selection).slice(0, 5) });
-  }, [addEvent]);
-  
-  const handleEditingChange = useCallback((cell: CellRef | null) => {
-    setEditingCell(cell);
-    addEvent('editing.change', cell);
   }, [addEvent]);
   
   // ====================================
@@ -753,27 +629,16 @@ function VibeGridXDemoPage() {
         <div className="lg:col-span-3 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>VibeGridX - Tasks ({entityData.count})</CardTitle>
+              <CardTitle>VibeGridX Atomic - Tasks ({entityData.count})</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="border rounded-lg overflow-hidden">
-                <VibeGridX<Task>
-                  ref={vibeGridXRef}
-                  data={entityData.data}
+                <VibeGridXDemoGrid
                   entityType="task"
+                  data={entityData.data}
                   columns={taskColumns}
-                  enableVirtualScrolling={config.enableVirtualScrolling}
-                  enableCanvasOverlays={config.enableCanvasOverlays}
-                  enableGrouping={config.enableGrouping}
-                  enableFiltering={config.enableFiltering}
-                  enableSorting={config.enableSorting}
-                  enableDragAndDrop={config.enableDragAndDrop}
-                  bufferSize={config.bufferSize}
-                  onSelectionChange={handleSelectionChange}
-                  onEditingChange={handleEditingChange}
-                  onCellClick={handleCellClick}
-                  onCellDoubleClick={handleCellDoubleClick}
-                  onPerformanceUpdate={(metrics) => setPerformanceMetrics(metrics)}
+                  isLoading={isLoading}
+                  onPerformanceUpdate={handlePerformanceUpdate}
                 />
               </div>
             </CardContent>
@@ -812,11 +677,11 @@ function VibeGridXDemoPage() {
               <div className="font-medium">Rendering & Integration:</div>
               <ul className="space-y-1 text-muted-foreground">
                 <li>✅ AtomicTableRenderer</li>
-                <li>✅ EntityIntegrationLayer</li>
-                <li>✅ VirtualScrollManager</li>
-                <li>✅ CanvasOverlayManager</li>
-                <li>✅ Main VibeGridX Component</li>
-                <li>✅ Complete Type System</li>
+                <li>✅ Virtual Scrolling</li>
+                <li>✅ Canvas Selection Overlays</li>
+                <li>✅ Direct DOM Performance</li>
+                <li>✅ Entity Integration Layer</li>
+                <li>✅ Hybrid React + Direct DOM</li>
               </ul>
             </div>
           </div>

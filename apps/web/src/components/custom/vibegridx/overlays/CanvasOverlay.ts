@@ -143,6 +143,11 @@ export class CanvasOverlay {
     const width = viewportElement?.clientWidth || 800;
     const height = viewportElement?.clientHeight || 600;
     
+    // Ensure container doesn't extend scrollable area
+    this.container.style.overflow = 'hidden';
+    this.container.style.width = width + 'px';
+    this.container.style.height = height + 'px';
+    
     this.stage = new Konva.Stage({
       container: this.container,
       width,
@@ -233,9 +238,24 @@ export class CanvasOverlay {
   }
   
   updateViewport(viewport: ViewportInfo): void {
-    // Update canvas position to follow scroll
-    const actualScrollTop = document.querySelector('.vibegridx-viewport')?.scrollTop || 0;
-    this.container.style.top = `${actualScrollTop}px`;
+    // Transform both vertically and horizontally to keep canvas in viewport
+    this.container.style.transform = `translate(${viewport.scrollLeft}px, ${viewport.scrollTop}px)`;
+    
+    
+    // Get actual viewport element dimensions (not from viewport parameter which may be wrong)
+    const viewportElement = this.container.closest('.vibegridx-viewport') as HTMLElement;
+    const actualWidth = viewportElement?.clientWidth || viewport.width;
+    const actualHeight = viewportElement?.clientHeight || viewport.height;
+    
+    // Ensure stage covers the viewport
+    this.stage.size({
+      width: actualWidth,
+      height: actualHeight
+    });
+    
+    // Update container size
+    this.container.style.width = actualWidth + 'px';
+    this.container.style.height = actualHeight + 'px';
     
     this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });
   }

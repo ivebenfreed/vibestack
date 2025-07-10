@@ -8,7 +8,7 @@ import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManage
 
 export class CoordinateSystem {
   private config: OverlayConfig;
-  private rowIndexMap: Map<string, number> = new Map();
+  rowIndexMap: Map<string, number> = new Map();
   private columnIndexMap: Map<string, number> = new Map();
   private indexToRowId: Map<number, string> = new Map();
   private indexToColumnId: Map<number, string> = new Map();
@@ -18,8 +18,7 @@ export class CoordinateSystem {
   private dimensionManager: ColumnDimensionManager | null = null;
   private columns: Column[] = [];
   
-  // Position cache
-  private positionCache: Map<string, CellPosition> = new Map();
+  // Column caches - these are worth keeping since they avoid iteration
   private columnOffsetCache: Map<string, number> = new Map();
   private columnWidthCache: Map<string, number> = new Map();
   private cellKeyCache: Map<string, { rowId: string; columnId: string }> = new Map();
@@ -81,7 +80,6 @@ export class CoordinateSystem {
   }
   
   private clearCaches(): void {
-    this.positionCache.clear();
     this.columnOffsetCache.clear();
     this.columnWidthCache.clear();
     this.cellKeyCache.clear();
@@ -100,7 +98,7 @@ export class CoordinateSystem {
   }
   
   // Get column offset (x position) with caching
-  private getColumnOffset(columnId: string): number {
+  getColumnOffset(columnId: string): number {
     let offset = this.columnOffsetCache.get(columnId);
     if (offset === undefined) {
       offset = this.dimensionManager?.getColumnOffset(columnId) || 0;
@@ -161,75 +159,42 @@ export class CoordinateSystem {
     // Get column ID from index
     const columnId = this.indexToColumnId.get(column);
     if (!columnId) {
-      // Fallback to old calculation if column not found
+      // Fallback to old calculation if column not found  
       const x = column * this.config.cellWidth;
       
-      // HOTFIX: Use actual DOM scroll position instead of potentially stale viewport.scrollTop
-      const viewportElement = document.querySelector('.vibegridx-viewport') as HTMLElement;
-      const actualScrollTop = viewportElement?.scrollTop || 0;
-      
-      // Y position relative to viewport (subtract scroll offset)
-      const y = row * this.config.cellHeight - actualScrollTop;
+      // Use absolute positions - canvas transform handles scroll positioning
+      const y = row * this.config.cellHeight;
       
       
       return { x, y, row, column };
     }
     
-    // Use actual column offset
-    const x = this.getColumnOffset(columnId);
+    // Use actual column offset and subtract horizontal scroll to get viewport-relative position
+    const x = this.getColumnOffset(columnId) - (viewport.scrollLeft || 0);
     
-    // HOTFIX: Use actual DOM scroll position instead of potentially stale viewport.scrollTop
-    const viewportElement = document.querySelector('.vibegridx-viewport') as HTMLElement;
-    const actualScrollTop = viewportElement?.scrollTop || 0;
-    
-    // Y position relative to viewport (subtract scroll offset)
-    const y = row * this.config.cellHeight - actualScrollTop;
+    // Use viewport scrollTop for consistent positioning  
+    const y = row * this.config.cellHeight - viewport.scrollTop;
 
+    // Debug removed - was causing error
 
     return { x, y, row, column };
   }
 
-  // Get cell position by IDs with caching
+  // Get cell position by IDs - no caching needed for simple arithmetic
   getCellPositionByIds(
     rowId: string, 
     columnId: string, 
     viewport: ViewportInfo
   ): CellPosition | null {
-    // Create cache key including viewport to handle scrolling
-    const cacheKey = `${rowId}:${columnId}:${viewport.start}`;
-    
-    let position = this.positionCache.get(cacheKey);
-    if (position) {
-      return position;
-    }
-    
     const rowIndex = this.rowIndexMap.get(rowId);
     const columnIndex = this.columnIndexMap.get(columnId);
 
     if (rowIndex === undefined || columnIndex === undefined) {
-      if (rowIndex === undefined && this.rowIndexMap.size > 0) {
-        console.log('CoordinateSystem: Row not found', {
-          rowId,
-          mapSize: this.rowIndexMap.size,
-          sampleKeys: Array.from(this.rowIndexMap.keys()).slice(0, 3)
-        });
-      }
       return null;
     }
 
-    position = this.cellToViewport(rowIndex, columnIndex, viewport);
-    
-    // Cache the position for future use
-    this.positionCache.set(cacheKey, position);
-    
-    // Limit cache size to prevent memory issues
-    if (this.positionCache.size > 1000) {
-      // Remove oldest entries
-      const keysToDelete = Array.from(this.positionCache.keys()).slice(0, 200);
-      keysToDelete.forEach(key => this.positionCache.delete(key));
-    }
-    
-    return position;
+    // Direct calculation - no caching needed
+    return this.cellToViewport(rowIndex, columnIndex, viewport);
   }
 
   // Convert cell indices to IDs

@@ -1,9 +1,9 @@
-import { useEffect, useRef, MutableRefObject } from 'react';
+import { useEffect, useRef, useMemo, MutableRefObject } from 'react';
 import { useMachine } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
 import { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
-import { EntityIntegrationLayer, useTableConfigFromAtoms } from './integration/EntityIntegration';
+import { EntityIntegrationLayer, createDomainAdapter } from './integration/EntityIntegration';
 import type { TableConfig, RendererOptions, Column } from './types';
 
 // ====================================
@@ -54,22 +54,36 @@ export const useTableConfiguration = (props: InitializationProps) => {
     bufferSize = 10,
   } = props;
 
-  const tableConfig = useTableConfigFromAtoms(entityType, tableId);
-  
-  // Update table config with props, using provided columns instead of generated ones
-  const enhancedTableConfig: TableConfig = {
-    ...tableConfig,
-    columns, // Use columns from props
-    settings: {
-      ...tableConfig.settings,
-      enableVirtualScrolling,
-      enableGrouping,
-      enableFiltering,
-      bufferSize
-    }
-  };
+  // Get entity data directly from atom and memoize the table config
+  const tableConfig: TableConfig = useMemo(() => {
+    const adapter = createDomainAdapter(entityType);
+    const entities = adapter.getAll();
+    
+    return {
+      id: tableId,
+      entityType,
+      columns, // Use columns from props directly
+      initialData: Object.values(entities).map(entity => ({
+        id: entity.id,
+        data: { ...entity },
+        metadata: {
+          createdAt: entity.createdAt || new Date(),
+          updatedAt: entity.updatedAt || new Date(), 
+          version: entity.version || 1,
+          isNew: entity.isNew || false,
+          isDirty: entity.isDirty || false
+        }
+      })),
+      settings: {
+        enableVirtualScrolling,
+        enableGrouping,
+        enableFiltering,
+        bufferSize
+      }
+    };
+  }, [entityType, tableId, columns, enableVirtualScrolling, enableGrouping, enableFiltering, bufferSize]);
 
-  return { tableConfig: enhancedTableConfig, tableId };
+  return { tableConfig, tableId };
 };
 
 // ====================================
@@ -226,6 +240,14 @@ export const useSelectionStateSync = (
             if (refs.canvasOverlayRef.current) {
               // Update overlay with selection
               refs.canvasOverlayRef.current.updateSelection(selectedCells);
+              
+              // Also trigger viewport update to ensure selections are positioned correctly after scroll
+              // Get current viewport from table machine
+              const tableSnapshot = tableActor.getSnapshot();
+              const currentViewport = tableSnapshot?.context?.viewport;
+              if (currentViewport) {
+                refs.canvasOverlayRef.current.updateViewport(currentViewport);
+              }
             }
           }
         });

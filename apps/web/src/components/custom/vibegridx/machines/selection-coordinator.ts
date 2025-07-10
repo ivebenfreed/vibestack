@@ -62,15 +62,6 @@ const moveCell = (
   const currentRowIndex = visibleRowIds.indexOf(current.rowId);
   const currentColIndex = columns.findIndex(col => col.id === current.columnId);
   
-  console.log('moveCell:', {
-    current,
-    direction,
-    currentRowIndex,
-    currentColIndex,
-    totalRows: visibleRowIds.length,
-    totalCols: columns.length
-  });
-  
   if (currentRowIndex === -1 || currentColIndex === -1) {
     console.warn('moveCell: Current cell not found in visible rows/columns');
     return current;
@@ -322,12 +313,6 @@ export const selectionCoordinatorMachine = setup({
         return {};
       }
       
-      console.log('SelectionCoordinator: Moving selection', {
-        from: context.activeCell,
-        direction: event.direction,
-        extend: event.extend
-      });
-      
       const newCell = moveCell(
         context.activeCell,
         event.direction,
@@ -381,10 +366,6 @@ export const selectionCoordinatorMachine = setup({
     updateVisibleRows: assign({
       visibleRowIds: ({ event }) => {
         if (event.type === 'VISIBLE_ROWS_CHANGED') {
-          console.log('SelectionCoordinator: Received VISIBLE_ROWS_CHANGED', {
-            rowCount: event.rowIds.length,
-            sampleRowIds: event.rowIds.slice(0, 3)
-          });
           return event.rowIds;
         }
         return [];

@@ -314,8 +314,10 @@ export const createScrollHandler = (
       viewport
     });
     
-    // DON'T update canvas overlay on every scroll - let it be handled by selection updates only
-    // This breaks the infinite loop between scroll -> canvas update -> scroll
+    // Update canvas overlay viewport for correct selection positioning
+    if (refs.canvasOverlayRef.current) {
+      refs.canvasOverlayRef.current.updateViewport(viewport);
+    }
   }, [tableSend]);
 };
 
@@ -548,17 +550,18 @@ export const calculateRangeSelection = (
   const startColIndex = columnIds.indexOf(start.columnId);
   const endColIndex = columnIds.indexOf(end.columnId);
   
-  console.log('calculateRangeSelection:', {
-    start,
-    end,
-    columnIds,
-    startColIndex,
-    endColIndex,
-    entityCount: entityIds.length,
-    startColumnId: start.columnId,
-    endColumnId: end.columnId,
-    columnsFromIntegration: columns
-  });
+  // Debug logging removed to prevent spam during mouse drag
+  // console.log('calculateRangeSelection:', {
+  //   start,
+  //   end,
+  //   columnIds,
+  //   startColIndex,
+  //   endColIndex,
+  //   entityCount: entityIds.length,
+  //   startColumnId: start.columnId,
+  //   endColumnId: end.columnId,
+  //   columnsFromIntegration: columns
+  // });
   
   if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
     console.warn('Invalid indices in range selection:', { startRowIndex, endRowIndex, startColIndex, endColIndex });

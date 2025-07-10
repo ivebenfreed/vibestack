@@ -1,4 +1,5 @@
 import { useSelector } from '@xstate/store/react';
+import { useMemo } from 'react';
 import { shallowEqual } from '@/lib/utils';
 import type { TableRow, Column, TableConfig } from '../types';
 import type { ActorRefFrom } from 'xstate';
@@ -426,11 +427,6 @@ export const useTableConfigFromAtoms = (entityType: string, tableId: string): Ta
       isDirty: entity.isDirty || false
     }
   }));
-  
-  console.log('useTableConfigFromAtoms: Creating table config', {
-    entityType,
-    dataCount: initialData.length
-  });
 
   return {
     id: tableId,

@@ -30,8 +30,8 @@ export const useChangeDetection = () => {
     rowData: new Map()
   });
 
-  const hasDataChanged = useCallback((snapshot: any): boolean => {
-    const currentVersion = snapshot.context?.version || 0;
+  const hasDataChanged = useCallback((renderState: RenderState): boolean => {
+    const currentVersion = renderState.version || 0;
     const previousVersion = previousState.current.version;
     
     // Only log on actual data changes, not on every scroll event
@@ -140,7 +140,7 @@ export const useChangeDetection = () => {
 export const useRenderStateExtractor = (
   integrationRef: React.MutableRefObject<EntityIntegrationLayer | null>
 ) => {
-  const extractRenderStateFromActor = useCallback((snapshot: any): RenderState | null => {
+  const extractRenderStateFromActor = useCallback((snapshot: any, providedColumns?: Column[]): RenderState | null => {
     if (!integrationRef.current) {
       console.warn('extractRenderStateFromActor: No integration layer available');
       return null;
@@ -149,7 +149,8 @@ export const useRenderStateExtractor = (
     try {
       // Get entity data from integration layer
       const entityData = integrationRef.current.getAllEntityData();
-      const columns = integrationRef.current.getColumns();
+      // Use provided columns if available, otherwise get from integration
+      const columns = providedColumns || integrationRef.current.getColumns();
       
       // Only log during initial render or when entity count changes
       const entityCount = Object.keys(entityData).length;

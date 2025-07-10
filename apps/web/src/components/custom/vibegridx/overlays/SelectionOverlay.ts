@@ -40,8 +40,8 @@ export class SelectionOverlay {
     // Always update when viewport changes, even if selection hasn't
     // This ensures cells become visible when scrolling
     
-    // Only log significant selection changes
-    if (selectedCells.size > 100 || selectedCells.size === 0) {
+    // Only log when there are actual selections (remove 0 case to avoid scroll spam)
+    if (selectedCells.size > 100) {
       console.log('SelectionOverlay.updateSelection:', {
         selectedCount: selectedCells.size,
         hasViewport: !!viewport
@@ -84,8 +84,8 @@ export class SelectionOverlay {
       }
     }
     
-    // Only log render summary for large selections or when there are issues
-    if (selectedCells.size > 100 || skippedCount > 0) {
+    // Only log render summary for large selections with issues (avoid scroll spam)
+    if (selectedCells.size > 100 && skippedCount > 0) {
       console.log('SelectionOverlay: Render summary', {
         totalSelected: selectedCells.size,
         rendered: renderedCount,
@@ -148,6 +148,8 @@ export class SelectionOverlay {
     const width = this.config.dimensionManager?.getColumnWidth(parsed.columnId) || 100;
     const height = this.config.cellHeight;
     
+    // Shape positioning working correctly
+    
     shapes.rect.position(position);
     shapes.rect.size({ width, height });
     
@@ -161,7 +163,11 @@ export class SelectionOverlay {
     const parsed = this.coordinateSystem.parseCellKey(cellKey);
     if (!parsed) return null;
     
-    return this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
+    const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
+    
+    // Position calculation working correctly
+    
+    return position;
   }
   
   clear(): void {
