@@ -27,7 +27,7 @@ import {
 } from './VibeGridXHooks';
 import type { RenderState, TableRow, CellRef, Column } from './types';
 import type { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
-import { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
+import { CanvasOverlay } from './overlays/CanvasOverlay';
 import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 import './vibegridx.css';
 

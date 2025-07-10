@@ -2,7 +2,7 @@ import { useCallback, MutableRefObject } from 'react';
 import type { CellRef, ViewportInfo, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
-import type { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
+import type { CanvasOverlay } from './overlays/CanvasOverlay';
 import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 
 // ====================================
@@ -11,7 +11,7 @@ import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 
 // Unified function to update overlay with DOM positions
 const updateSelectionWithDOM = (
-  overlayManager: CanvasOverlayManager | null,
+  overlayManager: CanvasOverlay | null,
   selectedCells: Set<string>
 ) => {
   if (!overlayManager) return;
@@ -32,8 +32,8 @@ const updateSelectionWithDOM = (
       }
     });
     
-    // Update overlay with DOM positions
-    overlayManager.updateSelectionWithDOMPositions(cellElements);
+    // Update overlay with selection
+    overlayManager.updateSelection(selectedCells);
   };
   
   // For small selections, update immediately
@@ -48,7 +48,7 @@ const updateSelectionWithDOM = (
 export interface EventHandlerRefs {
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<CellRef | null>;
-  canvasOverlayRef: MutableRefObject<CanvasOverlayManager | null>;
+  canvasOverlayRef: MutableRefObject<CanvasOverlay | null>;
   integrationRef: MutableRefObject<EntityIntegrationLayer | null>;
   dragStateRef: MutableRefObject<{
     isDragging: boolean;

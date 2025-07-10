@@ -59,6 +59,13 @@ export class CoordinateSystem {
     rowIds: string[], 
     columnIds: string[]
   ): void {
+    console.log('CoordinateSystem.updateMappings called:', {
+      rowCount: rowIds.length,
+      columnCount: columnIds.length,
+      sampleRowIds: rowIds.slice(0, 3),
+      sampleColumnIds: columnIds.slice(0, 3)
+    });
+    
     this.rowIndexMap.clear();
     this.columnIndexMap.clear();
     this.indexToRowId.clear();
@@ -75,6 +82,11 @@ export class CoordinateSystem {
     columnIds.forEach((id, index) => {
       this.columnIndexMap.set(id, index);
       this.indexToColumnId.set(index, id);
+    });
+    
+    console.log('CoordinateSystem.updateMappings complete:', {
+      rowMapSize: this.rowIndexMap.size,
+      columnMapSize: this.columnIndexMap.size
     });
   }
   

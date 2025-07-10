@@ -82,10 +82,7 @@ export {
 // CANVAS OVERLAYS
 // ====================================
 
-export {
-  CanvasOverlayManager,
-  CanvasOverlay
-} from './overlays/CanvasOverlayManager';
+export { CanvasOverlay } from './overlays/CanvasOverlay';
 
 // ====================================
 // UTILITY HOOKS

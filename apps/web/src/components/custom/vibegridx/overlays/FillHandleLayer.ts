@@ -2,7 +2,6 @@ import Konva from 'konva';
 import type { ViewportInfo } from '../types';
 import type { OverlayMachineActor } from '../machines/overlay-machine';
 import { CoordinateSystem } from './CoordinateSystem';
-import { ShapePoolManager } from './ShapePoolManager';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 
 // ====================================
@@ -19,10 +18,9 @@ export class FillHandleLayer {
   private stage: Konva.Stage;
   private layer: Konva.Layer;
   private fillHandleLayer: Konva.Layer; // Dedicated interactive layer
-  private machine: OverlayMachineActor;
+  private machine: OverlayMachineActor | null = null;
   private config: FillHandleConfig;
   private coordinateSystem: CoordinateSystem;
-  private shapePool: ShapePoolManager;
   
   // Fill handle state
   private activeFillHandle: Konva.Rect | null = null;
@@ -32,18 +30,21 @@ export class FillHandleLayer {
   private originalSize = 10;
   
   constructor(
-    layer: Konva.Layer,
-    machine: OverlayMachineActor,
-    config: FillHandleConfig,
+    stage: Konva.Stage,
     coordinateSystem: CoordinateSystem,
-    shapePool: ShapePoolManager
+    config: FillHandleConfig
   ) {
-    this.layer = layer; // Main layer for preview shapes
-    this.stage = layer.getStage()!;
-    this.machine = machine;
-    this.config = config;
+    this.stage = stage;
     this.coordinateSystem = coordinateSystem;
-    this.shapePool = shapePool;
+    this.config = config;
+    
+    // Create main layer for preview shapes
+    this.layer = new Konva.Layer({
+      name: 'fill-preview-layer',
+      listening: false
+    });
+    stage.add(this.layer);
+    
     
     // Create dedicated interactive layer for specialized controls
     this.fillHandleLayer = new Konva.Layer({
@@ -69,6 +70,10 @@ export class FillHandleLayer {
   // ====================================
   // PUBLIC API
   // ====================================
+  
+  setMachine(machine: OverlayMachineActor): void {
+    this.machine = machine;
+  }
   
   renderFillHandle(selectedCells: Set<string>, viewport: ViewportInfo): void {
     console.log('FillHandleLayer.renderFillHandle:', selectedCells.size, 'cells');
@@ -130,14 +135,9 @@ export class FillHandleLayer {
     
     if (previewCells.size === 0) return;
     
-    // Get shapes for preview
-    const shapes = this.shapePool.acquire<Konva.Rect>('preview', previewCells.size);
-    console.log('FillHandleLayer: Acquired shapes from pool', shapes.length);
-    
-    let index = 0;
+    // Create shapes for preview
     let configuredShapes = 0;
     for (const cellKey of previewCells) {
-      if (index >= shapes.length) break;
       
       const parsed = this.coordinateSystem.parseCellKey(cellKey);
       if (!parsed) {
@@ -166,31 +166,29 @@ export class FillHandleLayer {
       
       if (position) {
         const columnWidth = this.config.dimensionManager.getColumnWidth(parsed.columnId);
-        this.shapePool.configureForCell(
-          shapes[index],
-          position.x,
-          position.y,
-          columnWidth - 1,
-          this.config.cellHeight - 1
-        );
+        // Create preview shape
+        const shape = new Konva.Rect({
+          x: position.x,
+          y: position.y,
+          width: columnWidth - 1,
+          height: this.config.cellHeight - 1,
+          fill: this.config.selectionBorderColor,
+          opacity: 0.3,
+          stroke: this.config.selectionBorderColor,
+          strokeWidth: 1,
+          dash: [3, 3],
+          visible: true
+        });
         
-        // Style preview shapes with proper fill preview appearance
-        shapes[index].visible(true);
-        shapes[index].opacity(0.3);
-        shapes[index].fill(this.config.selectionBorderColor);
-        shapes[index].stroke(this.config.selectionBorderColor);
-        shapes[index].strokeWidth(1);
-        shapes[index].dash([3, 3]);
-        
-        this.activeFillPreviewShapes.push(shapes[index]);
+        this.layer.add(shape);
+        this.activeFillPreviewShapes.push(shape);
         configuredShapes++;
-        console.log('FillHandleLayer: Configured preview shape', index, {
+        console.log('FillHandleLayer: Created preview shape', {
           position,
           columnWidth,
-          visible: shapes[index].visible(),
-          opacity: shapes[index].opacity()
+          visible: shape.visible(),
+          opacity: shape.opacity()
         });
-        index++;
       } else {
         console.warn('FillHandleLayer: No position for cell', cellKey);
       }
@@ -207,7 +205,8 @@ export class FillHandleLayer {
   
   clearFillPreview(): void {
     if (this.activeFillPreviewShapes.length > 0) {
-      this.shapePool.release('preview', this.activeFillPreviewShapes);
+      // Destroy all preview shapes
+      this.activeFillPreviewShapes.forEach(shape => shape.destroy());
       this.activeFillPreviewShapes = [];
       this.layer.batchDraw();
     }
@@ -539,7 +538,9 @@ export class FillHandleLayer {
       
       // Clear preview and complete fill
       this.clearFillPreview();
-      this.machine.send({ type: 'FILL_COMPLETE', fillCells });
+      if (this.machine) {
+        this.machine.send({ type: 'FILL_COMPLETE', fillCells });
+      }
       
       // Restore cursor
       this.stage.content.style.cursor = 'default';
@@ -672,7 +673,9 @@ export class FillHandleLayer {
         
         console.log('FillHandleLayer: Final fill cells', { fillCells: fillCells.size });
         this.clearFillPreview();
+        if (this.machine) {
         this.machine.send({ type: 'FILL_COMPLETE', fillCells });
+      }
       }
       
       // Remove global listeners

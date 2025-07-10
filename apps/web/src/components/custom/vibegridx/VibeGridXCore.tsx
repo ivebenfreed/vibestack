@@ -2,7 +2,7 @@ import { useEffect, useRef, MutableRefObject } from 'react';
 import { useMachine } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
 import { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
-import { CanvasOverlayManager } from './overlays/CanvasOverlayManager';
+import { CanvasOverlay } from './overlays/CanvasOverlay';
 import { EntityIntegrationLayer, useTableConfigFromAtoms } from './integration/EntityIntegration';
 import type { TableConfig, RendererOptions, Column } from './types';
 
@@ -14,7 +14,7 @@ export interface InitializationRefs {
   containerRef: MutableRefObject<HTMLDivElement | null>;
   overlayContainerRef: MutableRefObject<HTMLDivElement | null>;
   rendererRef: MutableRefObject<AtomicTableRenderer | null>;
-  canvasOverlayRef: MutableRefObject<CanvasOverlayManager | null>;
+  canvasOverlayRef: MutableRefObject<CanvasOverlay | null>;
   integrationRef: MutableRefObject<EntityIntegrationLayer | null>;
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<any>;
@@ -134,7 +134,7 @@ export const useRendererInitialization = (
         
         // Initialize canvas overlay inside the scrollable viewport
         if (!refs.canvasOverlayRef.current) {
-          refs.canvasOverlayRef.current = new CanvasOverlayManager(canvasContainer, {
+          refs.canvasOverlayRef.current = new CanvasOverlay(canvasContainer, {
             dimensionManager,
             rowDimensionManager,
             columns: rendererOptions.columns,
@@ -147,19 +147,16 @@ export const useRendererInitialization = (
             enableAnimations: false,
             animationDuration: 0,
             borderWidth: 2,
-            useV2: true // Enable XState-powered overlay system
-            // overlayActor: tableState?.context?.actors?.overlayActor // TODO: Fix shared actor approach
+            overlayActor: tableState?.context?.actors?.overlayActor // Use shared actor from table machine
           });
           
           // Set selection change callback
-          refs.canvasOverlayRef.current.setOnSelectionChange?.(
-            rendererOptions.onSelectionChange || (() => {})
-          );
+          refs.canvasOverlayRef.current.onSelectionChange = 
+            rendererOptions.onSelectionChange || (() => {});
           
           // Set fill complete callback
-          refs.canvasOverlayRef.current.setOnFillComplete?.(
-            rendererOptions.onFillComplete || (() => {})
-          );
+          refs.canvasOverlayRef.current.onFillComplete = 
+            rendererOptions.onFillComplete || (() => {});
           
           console.log('VibeGridX: Canvas Overlay initialized inside scrollable viewport');
           
