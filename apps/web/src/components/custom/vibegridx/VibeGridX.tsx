@@ -119,7 +119,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<AtomicTableRenderer | null>(null);
-  const canvasOverlayRef = useRef<CanvasOverlayManager | null>(null);
+  const canvasOverlayRef = useRef<CanvasOverlay | null>(null);
   const integrationRef = useRef<EntityIntegrationLayer | null>(null);
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
