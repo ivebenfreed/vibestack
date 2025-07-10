@@ -37,33 +37,59 @@ export class SelectionOverlay {
   }
   
   updateSelection(selectedCells: Set<string>, viewport: ViewportInfo | null): void {
-    // Quick check if anything changed
-    const selectionChanged = !this.areSetsEqual(this.lastSelectedCells, selectedCells);
+    // Always update when viewport changes, even if selection hasn't
+    // This ensures cells become visible when scrolling
     
-    if (!selectionChanged && viewport) {
-      // No change in selection, skip update
-      return;
-    }
-    
+    console.log('SelectionOverlay.updateSelection:', {
+      selectedCount: selectedCells.size,
+      hasViewport: !!viewport,
+      viewportStart: viewport?.start,
+      viewportEnd: viewport?.end,
+      sampleCells: Array.from(selectedCells).slice(0, 3)
+    });
     
     if (!viewport) {
       this.clear();
       return;
     }
     
-    // Remove shapes for deselected cells
+    // Remove shapes for deselected cells or cells outside viewport
     for (const [cellKey, shapes] of this.selectionShapes) {
       if (!selectedCells.has(cellKey)) {
+        // Cell is no longer selected
         shapes.rect.destroy();
         shapes.border.destroy();
         this.selectionShapes.delete(cellKey);
+      } else {
+        // Check if selected cell is still in viewport
+        const position = this.getPositionForCell(cellKey, viewport);
+        if (!position) {
+          // Cell is selected but not in viewport, hide it
+          shapes.rect.visible(false);
+          shapes.border.visible(false);
+        }
       }
     }
     
     // Add/update shapes for selected cells
+    let renderedCount = 0;
+    let skippedCount = 0;
+    
     for (const cellKey of selectedCells) {
-      this.renderCell(cellKey, viewport);
+      const rendered = this.renderCell(cellKey, viewport);
+      if (rendered) {
+        renderedCount++;
+      } else {
+        skippedCount++;
+      }
     }
+    
+    console.log('SelectionOverlay: Render summary', {
+      totalSelected: selectedCells.size,
+      rendered: renderedCount,
+      skipped: skippedCount,
+      existingShapes: this.selectionShapes.size
+    });
     
     this.layer.batchDraw();
     
@@ -79,15 +105,15 @@ export class SelectionOverlay {
     return true;
   }
   
-  private renderCell(cellKey: string, viewport: ViewportInfo): void {
+  private renderCell(cellKey: string, viewport: ViewportInfo): boolean {
     const position = this.getPositionForCell(cellKey, viewport);
     if (!position) {
       // Cell is not in current viewport, skip rendering
-      return;
+      return false;
     }
     
     const parsed = this.coordinateSystem.parseCellKey(cellKey);
-    if (!parsed) return;
+    if (!parsed) return false;
     
     // Get or create shapes
     let shapes = this.selectionShapes.get(cellKey);
@@ -110,6 +136,10 @@ export class SelectionOverlay {
       
       shapes = { rect, border };
       this.selectionShapes.set(cellKey, shapes);
+    } else {
+      // Make sure existing shapes are visible
+      shapes.rect.visible(true);
+      shapes.border.visible(true);
     }
     
     // Update position and size
@@ -121,6 +151,8 @@ export class SelectionOverlay {
     
     shapes.border.position(position);
     shapes.border.size({ width, height });
+    
+    return true;
   }
   
   private getPositionForCell(cellKey: string, viewport: ViewportInfo): { x: number; y: number } | null {

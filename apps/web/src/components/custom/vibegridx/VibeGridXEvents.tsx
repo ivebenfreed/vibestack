@@ -128,13 +128,8 @@ export const createColumnClickHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((columnId: string, event: MouseEvent) => {
-    console.log(`Column header clicked: ${columnId}`);
-    
-    // Send to XState to select entire column
-    tableSend({
-      type: 'selection.column.select',
-      columnId
-    });
+    // Column selection disabled - not practical for spreadsheet operations
+    console.log(`Column header clicked: ${columnId} (selection disabled)`);
   }, [tableSend]);
 };
 

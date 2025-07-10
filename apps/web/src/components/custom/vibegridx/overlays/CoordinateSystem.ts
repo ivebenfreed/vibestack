@@ -207,6 +207,13 @@ export class CoordinateSystem {
     const columnIndex = this.columnIndexMap.get(columnId);
 
     if (rowIndex === undefined || columnIndex === undefined) {
+      if (rowIndex === undefined && this.rowIndexMap.size > 0) {
+        console.log('CoordinateSystem: Row not found', {
+          rowId,
+          mapSize: this.rowIndexMap.size,
+          sampleKeys: Array.from(this.rowIndexMap.keys()).slice(0, 3)
+        });
+      }
       return null;
     }
 

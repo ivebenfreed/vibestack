@@ -366,18 +366,6 @@ export const tableBaseMachine = setup({
                       // Don't update visibleRowIds here - that should only be updated by viewport events
                       // visibleRowIds represents what's currently visible in the viewport, not all data
                     }),
-                    // Also send all rows for column selection
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => {
-                        const rowIds = Object.keys(event.entities);
-                        console.log('TableMachine: Sending ALL_ROWS_CHANGED to selection coordinator', {
-                          rowCount: rowIds.length
-                        });
-                        return { 
-                          type: 'ALL_ROWS_CHANGED', 
-                          rowIds
-                        };
-                      }),
                     // Log the data update
                     ({ event }) => {
                       console.log(`TableMachine: Received ${event.entityType} data update - ${Object.keys(event.entities).length} entities`);

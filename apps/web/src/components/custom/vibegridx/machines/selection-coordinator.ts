@@ -308,43 +308,11 @@ export const selectionCoordinatorMachine = setup({
       }
     }),
     
-    // Column selection
+    // Column selection - DISABLED
+    // Not practical for spreadsheet operations where copy/paste needs contiguous cells
     selectColumn: assign({
-      selectedCells: ({ context, event }) => {
-        if (event.type !== 'selection.column.select') return context.selectedCells;
-        
-        const newSelection = new Set<string>();
-        
-        // Select all cells in the column (use allRowIds for complete selection)
-        const rowIds = context.allRowIds.length > 0 ? context.allRowIds : context.visibleRowIds;
-        console.log('SelectionCoordinator: Column selection using', {
-          allRowIdsCount: context.allRowIds.length,
-          visibleRowIdsCount: context.visibleRowIds.length,
-          usingAllRows: context.allRowIds.length > 0
-        });
-        
-        rowIds.forEach(rowId => {
-          newSelection.add(createCellKey(rowId, event.columnId));
-        });
-        
-        if (event.extend) {
-          // Add to existing selection
-          context.selectedCells.forEach(cellKey => newSelection.add(cellKey));
-        }
-        
-        return newSelection;
-      },
-      
-      
-      activeCell: ({ context, event }) => {
-        if (event.type !== 'selection.column.select') return context.activeCell;
-        
-        // Set active cell to first visible row of the column
-        return {
-          rowId: context.visibleRowIds[0] || '',
-          columnId: event.columnId
-        };
-      }
+      selectedCells: ({ context }) => context.selectedCells,
+      activeCell: ({ context }) => context.activeCell
     }),
     
     // Clear selection
@@ -510,9 +478,10 @@ export const selectionCoordinatorMachine = setup({
           actions: 'selectRow'
         },
         
-        'selection.column.select': {
-          actions: 'selectColumn'
-        },
+        // Column selection disabled
+        // 'selection.column.select': {
+        //   actions: 'selectColumn'
+        // },
         
         'selection.clear': {
           actions: 'clearSelection'
