@@ -46,6 +46,11 @@ export interface Column<T = any> {
   filterable?: boolean;
   options?: string[] | EnumOption[]; // for select/enum type
   
+  // Relationship fields
+  cellType?: 'relationship-single' | 'relationship-multi' | 'relationship-collection' | string;
+  relationshipTable?: string; // Table name to look up related entities
+  relationshipDisplayField?: string; // Field to display from related entity
+  
   // Display formatting
   displayFormat?: string;
   align?: 'left' | 'center' | 'right';
@@ -387,6 +392,17 @@ export interface TableConfig {
 }
 
 // ====================================
+// RELATIONSHIP DATA TYPES
+// ====================================
+
+export interface RelationshipDataProvider {
+  [key: string]: {
+    data: Array<{ id: string; name?: string; [key: string]: any }>
+    displayField?: string
+  }
+}
+
+// ====================================
 // RENDERER TYPES
 // ====================================
 
@@ -395,6 +411,7 @@ export interface RendererOptions {
   columns?: Column<any>[];
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
+  relationshipData?: RelationshipDataProvider;
   onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onCellDoubleClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onColumnClick?: (columnId: string, event: MouseEvent) => void;
@@ -426,4 +443,5 @@ export interface RenderState {
   groupedData: GroupNode[];
   optimisticOperations: Map<string, OptimisticOperation>;
   version: number;
+  sortBy?: SortConfig[]; // Current sort configuration
 }

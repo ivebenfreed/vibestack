@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,26 +27,29 @@ const taskColumns: Column<Task>[] = [
   {
     id: 'id',
     name: 'ID',
-    field: 'id',
+    field: 'id' as keyof Task,
     type: 'text',
     width: 80,
-    editable: false
+    editable: false,
+    sortable: false
   },
   {
     id: 'title',
     name: 'Title',
-    field: 'title',
+    field: 'title' as keyof Task,
     type: 'text',
     width: 200,
-    editable: true
+    editable: true,
+    sortable: true
   },
   {
     id: 'status',
     name: 'Status',
-    field: 'status',
+    field: 'status' as keyof Task,
     type: 'enum',
     width: 120,
     editable: true,
+    sortable: true,
     enumOptions: [
       { value: 'open', label: 'Open' },
       { value: 'in_progress', label: 'In Progress' },
@@ -56,10 +59,11 @@ const taskColumns: Column<Task>[] = [
   {
     id: 'priority',
     name: 'Priority',
-    field: 'priority',
+    field: 'priority' as keyof Task,
     type: 'enum',
     width: 100,
     editable: true,
+    sortable: true,
     enumOptions: [
       { value: 'low', label: 'Low' },
       { value: 'medium', label: 'Medium' },
@@ -69,74 +73,71 @@ const taskColumns: Column<Task>[] = [
   {
     id: 'description',
     name: 'Description',
-    field: 'description',
+    field: 'description' as keyof Task,
     type: 'text',
     width: 300,
-    editable: true
+    editable: true,
+    sortable: true
   },
   {
     id: 'tags',
     name: 'Tags',
-    field: 'tags',
+    field: 'tags' as keyof Task,
     type: 'text',
     width: 150,
-    editable: true
+    editable: true,
+    sortable: false
   },
   {
     id: 'projectId',
     name: 'Project',
-    field: 'projectId',
+    field: 'projectId' as keyof Task,
     type: 'text',
-    width: 120,
-    editable: true
+    cellType: 'relationship-single',
+    relationshipTable: 'projectId',
+    relationshipDisplayField: 'name',
+    width: 180,
+    editable: true,
+    sortable: true
   },
   {
-    id: 'assignedUserId',
+    id: 'assigneeId',
     name: 'Assigned To',
-    field: 'assignedUserId',
+    field: 'assigneeId' as keyof Task,
     type: 'text',
-    width: 120,
-    editable: true
+    cellType: 'relationship-single',
+    relationshipTable: 'assigneeId',
+    relationshipDisplayField: 'name',
+    width: 180,
+    editable: true,
+    sortable: true
   },
   {
     id: 'dueDate',
     name: 'Due Date',
-    field: 'dueDate',
+    field: 'dueDate' as keyof Task,
     type: 'date',
     width: 120,
-    editable: true
-  },
-  {
-    id: 'estimate',
-    name: 'Estimate',
-    field: 'estimate',
-    type: 'number',
-    width: 80,
-    editable: true
-  },
-  {
-    id: 'recurring',
-    name: 'Recurring',
-    field: 'recurring',
-    type: 'boolean',
-    width: 80,
-    editable: true
+    editable: true,
+    sortable: true
   },
   {
     id: 'createdAt',
     name: 'Created',
-    field: 'createdAt',
+    field: 'createdAt' as keyof Task,
     type: 'date',
     width: 120,
-    editable: false
+    editable: false,
+    sortable: true
   },
   {
     id: 'updatedAt',
     name: 'Updated',
-    field: 'updatedAt',
+    field: 'updatedAt' as keyof Task,
     type: 'date',
     width: 120,
-    editable: false
+    editable: false,
+    sortable: true
   }
 ];
 
@@ -260,6 +261,7 @@ interface VibeGridXDemoGridProps {
   data: any[];
   columns: Column[];
   isLoading: boolean;
+  relationshipData?: any;
   onPerformanceUpdate?: (metrics: any) => void;
 }
 
@@ -268,6 +270,7 @@ function VibeGridXDemoGrid({
   data, 
   columns,
   isLoading,
+  relationshipData,
   onPerformanceUpdate
 }: VibeGridXDemoGridProps) {
   // Original VibeGridX doesn't have a useVibeGridX hook, we'll manage state locally
@@ -317,6 +320,7 @@ function VibeGridXDemoGrid({
           data={data}
           entityType={entityType}
           columns={columns}
+          relationshipData={relationshipData}
           enableVirtualScrolling={true}
           enableCanvasOverlays={true}
           enableGrouping={true}
@@ -384,10 +388,37 @@ function VibeGridXDemoPage() {
   const entityData = useEntityData('tasks');
   const entityOperations = useEntityOperations('tasks');
   
+  // Get projects and users for relationship data
+  const projects = useProjectAtoms.allProjects();
+  const users = useUserAtoms.allUsers();
+  
+  // Create relationship data structure - convert array to lookup object
+  const relationshipData = useMemo(() => {
+    const projectLookup = projects.reduce((acc, project) => {
+      acc[project.id] = project;
+      return acc;
+    }, {} as Record<string, any>);
+    
+    const userLookup = users.reduce((acc, user) => {
+      acc[user.id] = user;
+      return acc;
+    }, {} as Record<string, any>);
+    
+    
+    return {
+      projectId: projectLookup,
+      assigneeId: userLookup
+    };
+  }, [projects, users]);
+  
   // Ensure data is loaded on mount
   useEffect(() => {
     entityOperations.refreshData();
+    // Also ensure projects and users are loaded
+    projectUtils.ensureLoaded();
+    userUtils.ensureLoaded();
   }, [entityOperations.refreshData]);
+  
   
   // ====================================
   // EVENT HANDLERS
@@ -638,6 +669,7 @@ function VibeGridXDemoPage() {
                   data={entityData.data}
                   columns={taskColumns}
                   isLoading={isLoading}
+                  relationshipData={relationshipData}
                   onPerformanceUpdate={handlePerformanceUpdate}
                 />
               </div>

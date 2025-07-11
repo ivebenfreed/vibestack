@@ -5,7 +5,8 @@ import type {
   RendererOptions, 
   CellRef, 
   ViewportInfo,
-  OptimisticOperation 
+  OptimisticOperation,
+  SortConfig 
 } from '../types';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import { 
@@ -13,7 +14,9 @@ import {
   renderNumber, 
   renderDate, 
   renderBoolean, 
-  renderEnum 
+  renderEnum,
+  renderRelationship,
+  type RelationshipData
 } from './fast-renderers';
 
 // ====================================
@@ -135,6 +138,7 @@ export class AtomicTableRenderer {
   private columns: Column[] = [];
   private dimensionManager: ColumnDimensionManager | null = null;
   private rowHeight = 40; // Default row height
+  private relationshipData: any = {}; // Relationship data for lookups
   
   // Batch update queue
   private updateQueue = new Set<string>();
@@ -143,6 +147,7 @@ export class AtomicTableRenderer {
   constructor(options: RendererOptions) {
     this.options = options;
     this.dimensionManager = options.dimensionManager || null;
+    this.relationshipData = options.relationshipData || {};
     
     // Set columns if provided
     if (options.columns) {
@@ -233,6 +238,15 @@ export class AtomicTableRenderer {
   setColumns(columns: Column[]): void {
     this.columns = columns;
     // Dimension manager will be set separately via setDimensionManager
+  }
+  
+  // Set or update relationship data
+  setRelationshipData(relationshipData: any): void {
+    this.relationshipData = relationshipData || {};
+    // Trigger re-render if we have existing data
+    if (this.lastRenderState) {
+      this.render(this.lastRenderState);
+    }
   }
   
   // Set dimension manager (called by parent component)
@@ -329,27 +343,76 @@ export class AtomicTableRenderer {
   }
   
   // ====================================
+  // SORTING HELPERS
+  // ====================================
+  
+  private applySorting(rows: TableRow[], sortBy: SortConfig[]): TableRow[] {
+    if (sortBy.length === 0) return rows;
+    
+    return [...rows].sort((a, b) => {
+      for (const sort of sortBy) {
+        const aValue = a.data[sort.field];
+        const bValue = b.data[sort.field];
+        
+        if (aValue === bValue) continue;
+        
+        let comparison = 0;
+        
+        if (aValue == null && bValue == null) {
+          comparison = 0;
+        } else if (aValue == null) {
+          comparison = 1; // null values go to the end
+        } else if (bValue == null) {
+          comparison = -1;
+        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+          comparison = aValue - bValue;
+        } else if (aValue instanceof Date && bValue instanceof Date) {
+          comparison = aValue.getTime() - bValue.getTime();
+        } else {
+          comparison = String(aValue).localeCompare(String(bValue));
+        }
+        
+        return sort.direction === 'desc' ? -comparison : comparison;
+      }
+      
+      return 0;
+    });
+  }
+  
+  // ====================================
   // PUBLIC RENDERING API
   // ====================================
   
   render(state: RenderState): void {
     this.renderStartTime = performance.now();
-    this.lastRenderState = state; // Store for scroll updates
+    
+    // Apply sorting to rows if sort configuration exists
+    let sortedState = state;
+    if (state.sortBy && state.sortBy.length > 0) {
+      console.log('[AtomicTableRenderer] Applying sort:', state.sortBy);
+      const sortedRows = this.applySorting(state.rows, state.sortBy);
+      sortedState = {
+        ...state,
+        rows: sortedRows
+      };
+    }
+    
+    this.lastRenderState = sortedState; // Store sorted state for scroll updates
     
     // Update columns if provided in state
-    if (state.columns && state.columns.length > 0) {
-      this.setColumns(state.columns);
+    if (sortedState.columns && sortedState.columns.length > 0) {
+      this.setColumns(sortedState.columns);
     }
     
     try {
       // Batch all DOM writes together before reading dimensions
-      this.renderHeader(state);
+      this.renderHeader(sortedState);
       
       // Use requestAnimationFrame to defer dimension reading until after browser paint
       requestAnimationFrame(() => {
-        this.updateViewport(state);
-        this.renderVisibleRows(state);
-        this.applyOptimisticOperations(state.optimisticOperations);
+        this.updateViewport(sortedState);
+        this.renderVisibleRows(sortedState);
+        this.applyOptimisticOperations(sortedState.optimisticOperations);
         
         // Move performance timing to RAF callback
         this.lastRenderTime = performance.now() - this.renderStartTime;
@@ -531,18 +594,45 @@ export class AtomicTableRenderer {
           name: key,
           field: key,
           type: 'text' as const,
-          width: 120
+          width: 120,
+          sortable: true
         }));
     
     // Calculate total width for header
     const totalWidth = this.getTotalColumnsWidth();
     this.header.style.width = `${totalWidth}px`;
     
+    // Get current sort state from render state (if available)
+    const sortState = (state as any).sortBy || [];
+    
     // Header rendered with columns
     this.header.innerHTML = columnsToRender.map(column => {
       const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
-      return `<div class="vibegridx-header-cell" data-column="${column.id}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
-        ${column.name || column.id}
+      const field = column.field || column.id;
+      
+      // Find sort info for this column
+      const sortInfo = sortState.find((s: any) => s.field === field);
+      const sortIndex = sortInfo ? sortState.indexOf(sortInfo) : -1;
+      
+      // Debug log
+      if (sortInfo) {
+        console.log(`[AtomicTableRenderer] Column ${column.id} has sort:`, sortInfo);
+      }
+      
+      // Build sort indicator
+      let sortIndicator = '';
+      if (sortInfo) {
+        const arrow = sortInfo.direction === 'asc' ? '▲' : '▼';
+        const sortNumber = sortState.length > 1 ? `<sup>${sortIndex + 1}</sup>` : '';
+        sortIndicator = `<span class="vibegridx-sort-indicator">${arrow}${sortNumber}</span>`;
+      }
+      
+      // Add sortable class if column is sortable
+      const sortableClass = column.sortable !== false ? 'vibegridx-sortable' : '';
+      
+      return `<div class="vibegridx-header-cell ${sortableClass}" data-column="${column.id}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
+        <span class="vibegridx-header-text">${column.name || column.id}</span>
+        ${sortIndicator}
       </div>`;
     }).join('');
   }
@@ -767,17 +857,29 @@ export class AtomicTableRenderer {
   // ====================================
   
   // Map of renderers for quick lookup
-  private static readonly renderers: Record<string, (value: any, column: Column) => string> = {
+  private static readonly renderers: Record<string, (value: any, column: Column, relationshipData?: any) => string> = {
     text: renderText,
     number: renderNumber,
     date: renderDate,
     boolean: renderBoolean,
     enum: renderEnum,
     select: renderText, // Reuse text renderer for select
+    relationship: renderRelationship,
+    'relationship-single': renderRelationship,
+    'relationship-multi': renderRelationship,
+    'relationship-collection': renderRelationship,
   };
   
   private renderValueFast(value: any, column: Column): string {
-    const renderer = AtomicTableRenderer.renderers[column.type] || renderText;
+    // Check column cellType first, then fall back to type
+    const cellType = column.cellType || column.type;
+    const renderer = AtomicTableRenderer.renderers[cellType] || renderText;
+    
+    // For relationship types, pass the relationship data
+    if (cellType?.startsWith('relationship')) {
+      return (renderer as any)(value, column, this.relationshipData);
+    }
+    
     return renderer(value, column);
   }
 

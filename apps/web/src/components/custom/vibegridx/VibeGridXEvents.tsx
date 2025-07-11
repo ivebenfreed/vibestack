@@ -56,6 +56,7 @@ export interface EventHandlerRefs {
     startPos: { x: number; y: number } | null;
   }>;
   columns: Column[];
+  sortState?: Array<{ field: string; direction: 'asc' | 'desc' }>;
 }
 
 export interface EventHandlerCallbacks {
@@ -122,9 +123,64 @@ export const createColumnClickHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((columnId: string, event: MouseEvent) => {
-    // Column selection disabled - not practical for spreadsheet operations
-    console.log(`Column header clicked: ${columnId} (selection disabled)`);
-  }, [tableSend]);
+    // Find the column definition
+    const column = refs.columns.find(c => c.id === columnId);
+    if (!column || column.sortable === false) {
+      return; // Column not sortable
+    }
+    
+    const field = column.field || columnId;
+    const currentSort = refs.sortState || [];
+    
+    // Find existing sort config for this field
+    const existingIndex = currentSort.findIndex(s => s.field === field);
+    const existing = existingIndex >= 0 ? currentSort[existingIndex] : null;
+    
+    let newSortConfig: Array<{ field: string; direction: 'asc' | 'desc' }>;
+    
+    if (event.shiftKey) {
+      // Multi-column sort
+      newSortConfig = [...currentSort];
+      
+      if (existing) {
+        // Toggle existing: asc -> desc -> remove
+        if (existing.direction === 'asc') {
+          newSortConfig[existingIndex] = { field, direction: 'desc' };
+        } else {
+          newSortConfig.splice(existingIndex, 1);
+        }
+      } else {
+        // Add new sort
+        newSortConfig.push({ field, direction: 'asc' });
+      }
+    } else {
+      // Single column sort
+      if (existing && currentSort.length === 1) {
+        // Toggle: asc -> desc -> none
+        if (existing.direction === 'asc') {
+          newSortConfig = [{ field, direction: 'desc' }];
+        } else {
+          newSortConfig = [];
+        }
+      } else {
+        // New single column sort
+        newSortConfig = [{ field, direction: 'asc' }];
+      }
+    }
+    
+    console.log(`[VibeGridX] Sorting column ${columnId}:`, {
+      field,
+      existing,
+      newSortConfig,
+      shiftKey: event.shiftKey
+    });
+    
+    // Send sort event to view coordinator
+    tableSend({
+      type: 'view.sort.set',
+      sortBy: newSortConfig
+    });
+  }, [tableSend, refs.columns, refs.sortState]);
 };
 
 // ====================================

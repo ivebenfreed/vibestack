@@ -185,7 +185,10 @@ export const tableBaseMachine = setup({
           systemId: 'edit-coordinator'
         }),
           viewCoordinator: spawn('viewCoordinator', {
-            input: { columns: context.columns },
+            input: { 
+              columns: context.columns,
+              entityType: context.entityType 
+            },
             systemId: 'view-coordinator'
           }),
           dragCoordinator: spawn('dragCoordinator', {
@@ -369,6 +372,52 @@ export const tableBaseMachine = setup({
                     // Log the data update
                     ({ event }) => {
                       console.log(`TableMachine: Received ${event.entityType} data update - ${Object.keys(event.entities).length} entities`);
+                    },
+                    // Forward data to view coordinator for processing (sorting/filtering)
+                    ({ context, event }) => {
+                      const viewCoordinator = context.actors.viewCoordinator;
+                      if (viewCoordinator) {
+                        // Convert entities to TableRow format
+                        const rows = Object.values(event.entities).map((entity: any) => ({
+                          id: entity.id,
+                          data: { ...entity },
+                          metadata: {
+                            createdAt: entity.createdAt || new Date(),
+                            updatedAt: entity.updatedAt || new Date(),
+                            version: entity.version || 1,
+                            isNew: entity.isNew || false,
+                            isDirty: entity.isDirty || false
+                          }
+                        }));
+                        
+                        viewCoordinator.send({
+                          type: 'ROWS_UPDATED',
+                          rows
+                        });
+                      }
+                    }
+                  ]
+                },
+                
+                // No-op event (used when view coordinator has no initial state)
+                'noop': {},
+                
+                // View state change from view coordinator
+                'view.state.changed': {
+                  actions: [
+                    // Increment version to trigger re-render
+                    assign({
+                      version: ({ context }) => context.version + 1
+                    }),
+                    ({ event, context }) => {
+                      console.log('TableMachine: View state changed, triggering re-render', event.viewState);
+                      
+                      // Persist sort state to localStorage
+                      if (event.viewState?.sortBy && typeof window !== 'undefined') {
+                        const storageKey = `vibegridx-sort-${context.entityType}`;
+                        localStorage.setItem(storageKey, JSON.stringify(event.viewState.sortBy));
+                        console.log(`TableMachine: Persisted sort state for ${context.entityType}`);
+                      }
                     }
                   ]
                 },

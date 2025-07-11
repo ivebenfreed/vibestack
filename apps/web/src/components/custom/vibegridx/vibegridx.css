@@ -66,6 +66,7 @@
   /* Width now set dynamically via inline styles */
   display: flex;
   align-items: center;
+  justify-content: space-between;
   cursor: pointer;
   user-select: none;
   transition: background-color 0.1s;
@@ -75,6 +76,31 @@
 
 .vibegridx-header-cell:hover {
   background-color: hsl(var(--muted) / 0.8);
+}
+
+.vibegridx-header-cell.vibegridx-sortable {
+  cursor: pointer;
+}
+
+.vibegridx-header-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vibegridx-sort-indicator {
+  margin-left: 4px;
+  font-size: 10px;
+  color: hsl(var(--primary));
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.vibegridx-sort-indicator sup {
+  font-size: 8px;
+  line-height: 1;
 }
 
 /* Viewport */

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   useTableConfiguration, 
   useTableMachine, 
@@ -45,6 +45,7 @@ interface VibeGridXProps<T = any> {
   
   // Optional external data (if not using entity integration)
   data?: any[];
+  relationshipData?: any;
   
   // Event handlers
   onCellClick?: (rowId: string, columnId: string) => void;
@@ -77,6 +78,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     className = '',
     height = 600,
     width = '100%',
+    relationshipData,
     onCellClick,
     onCellDoubleClick,
     onSelectionChange,
@@ -130,8 +132,26 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     startPos: { x: number; y: number } | null;
   }>({ isDragging: false, startCell: null, startPos: null });
   
+  // ====================================
+  // CORE INITIALIZATION
+  // ====================================
+  
+  const { tableConfig, tableId } = useTableConfiguration(props);
+  const { tableState, tableSend, tableActor } = useTableMachine(tableConfig);
+  
+  // Extract sort state from view coordinator (after tableState is available)
+  const sortState = useMemo(() => {
+    if (!tableState?.context?.actors?.viewCoordinator) return [];
+    try {
+      const viewSnapshot = tableState.context.actors.viewCoordinator.getSnapshot();
+      return viewSnapshot.context?.sortBy || [];
+    } catch {
+      return [];
+    }
+  }, [tableState]);
+
   // Refs object for event handlers
-  const refs: InitializationRefs & { columns: Column[] } = {
+  const refs: InitializationRefs & { columns: Column[]; sortState?: any[] } = {
     containerRef,
     overlayContainerRef,
     rendererRef,
@@ -141,18 +161,12 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     anchorCellRef,
     subscriptionRef,
     dragStateRef,
-    columns
+    columns,
+    sortState
   };
   
-  // ====================================
-  // CORE INITIALIZATION
-  // ====================================
-  
-  const { tableConfig, tableId } = useTableConfiguration(props);
-  const { tableState, tableSend, tableActor } = useTableMachine(tableConfig);
-  
-  // Entity integration
-  useEntityIntegration(tableActor, props.entityType, integrationRef);
+  // Entity integration (pass columns)
+  useEntityIntegration(tableActor, props.entityType, integrationRef, columns);
   
   // State extraction hooks
   const { hasDataChanged, getChangedRows, hasSelectionChanged } = useChangeDetection();
@@ -191,6 +205,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   useRendererInitialization(refs, {
     columns: tableConfig.columns,
+    relationshipData: relationshipData,
     onCellClick: handleCellClick,
     onCellDoubleClick: handleCellDoubleClick,
     onColumnClick: handleColumnClick,
@@ -268,6 +283,13 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   // Selection state sync
   useSelectionStateSync(tableActor, refs);
+  
+  // Update relationship data when it changes
+  useEffect(() => {
+    if (!refs.rendererRef.current || !relationshipData) return;
+    
+    refs.rendererRef.current.setRelationshipData(relationshipData);
+  }, [relationshipData]);
   
   // ====================================
   // XSTATE EVENT LISTENERS
@@ -366,11 +388,21 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       const stateValue = snapshot.value;
       const version = snapshot.context?.version;
       
-      // Skip selection-only updates since we handle those directly
+      // Check if this is a meaningful change that requires re-render
+      const currentSortState = snapshot.context.actors?.viewCoordinator?.getSnapshot()?.context?.sortBy;
+      const lastSortState = (window as any).__vibegridx_last_sortstate;
+      const sortChanged = JSON.stringify(currentSortState) !== JSON.stringify(lastSortState);
+      
+      if (sortChanged) {
+        console.log('VibeGridX: Sort state changed:', currentSortState);
+        (window as any).__vibegridx_last_sortstate = currentSortState;
+      }
+      
+      // Skip if only selection changed (no data or sort changes)
       const isDataChange = hasDataChanged(snapshot);
       
-      if (!isDataChange) {
-        // This is likely a selection change - skip expensive processing
+      if (!isDataChange && !sortChanged) {
+        // Skip expensive processing for selection-only changes
         return;
       }
       
@@ -407,9 +439,10 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         // 1. Data changes - use granular updates
         const { changedRows, newRows, deletedRowIds, isStructuralChange } = getChangedRows(renderState);
         
-        if (isStructuralChange) {
-          // Structural changes need full re-render (new rows, deleted rows, initial load)
-          console.log(`VibeGridX: STRUCTURAL CHANGE - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
+        if (isStructuralChange || sortChanged) {
+          // Structural changes or sort changes need full re-render
+          const reason = sortChanged ? 'SORT CHANGE' : 'STRUCTURAL CHANGE';
+          console.log(`VibeGridX: ${reason} - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
           rendererRef.current!.render(renderState);
             // Report performance metrics after render
             setTimeout(() => {

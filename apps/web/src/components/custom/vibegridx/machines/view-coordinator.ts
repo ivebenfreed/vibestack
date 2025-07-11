@@ -1,4 +1,4 @@
-import { setup, assign, fromPromise } from 'xstate';
+import { setup, assign, fromPromise, sendParent } from 'xstate';
 import type { 
   ViewContext, 
   GroupNode, 
@@ -186,11 +186,24 @@ const processDataTransformation = fromPromise(async ({ input }: {
 }) => {
   const { rows, filters, sortBy, groupBy, columns } = input;
   
+  console.log('[processDataTransformation] Starting with:', {
+    rowCount: rows.length,
+    sortBy,
+    hasFilters: filters.length > 0,
+    hasGrouping: groupBy.length > 0
+  });
+  
   // Apply filters first
   const filteredRows = applyFilters(rows, filters);
   
   // Then apply sorting
   const sortedRows = applySorting(filteredRows, sortBy);
+  
+  console.log('[processDataTransformation] After sorting:', {
+    sortedRowCount: sortedRows.length,
+    firstRow: sortedRows[0]?.data,
+    lastRow: sortedRows[sortedRows.length - 1]?.data
+  });
   
   // Finally create group tree if needed
   const groupTree = createGroupTree(sortedRows, groupBy, columns);
@@ -275,6 +288,7 @@ interface ViewCoordinatorContext extends ViewContext {
   allRows: TableRow[];
   processedRows: TableRow[];
   totalRowCount: number;
+  version: number;
   
   // Processing state
   isProcessing: boolean;
@@ -338,9 +352,23 @@ export const viewCoordinatorMachine = setup({
     
     // Sort management
     setSortBy: assign({
-      sortBy: ({ event }) => 
-        event.type === 'view.sort.set' ? event.sortBy : []
+      sortBy: ({ event }) => {
+        if (event.type === 'view.sort.set') {
+          console.log('[ViewCoordinator] Setting sortBy:', event.sortBy);
+          return event.sortBy;
+        }
+        return [];
+      },
+      version: ({ context }) => context.version + 1
     }),
+    
+    notifyParentOfSortChange: ({ context }) => {
+      // Send event to parent to trigger re-render
+      if (context.sortBy && context.sortBy.length >= 0) {
+        console.log('[ViewCoordinator] Notifying parent of sort change');
+        // This will be handled by sendParent in the event handler
+      }
+    },
     
     // Filter management
     setFilters: assign({
@@ -438,34 +466,72 @@ export const viewCoordinatorMachine = setup({
   
   initial: 'idle',
   
-  context: ({ input }) => ({
-    entityType: '',
-    columns: input.columns,
-    allRows: [],
-    processedRows: [],
-    totalRowCount: 0,
+  context: ({ input }) => {
+    // Get entity type from parent context via input
+    const entityType = (input as any).entityType || '';
     
-    groupBy: [],
-    groupTree: [],
-    collapsedGroups: new Set(),
-    sortBy: [],
-    filters: [],
-    viewport: {
-      start: 0,
-      end: 50,
-      height: 400,
-      scrollTop: 0,
-      itemHeight: 40
-    },
+    // Try to restore persisted sort state
+    const persistedSort = typeof window !== 'undefined' && entityType
+      ? localStorage.getItem(`vibegridx-sort-${entityType}`)
+      : null;
     
-    isProcessing: false,
-    processingQueue: [],
-    lastProcessTime: 0,
-    processedItemCount: 0
-  }),
+    const initialSortBy = persistedSort ? JSON.parse(persistedSort) : [];
+    
+    if (initialSortBy.length > 0) {
+      console.log(`ViewCoordinator: Restored sort state for ${entityType}:`, initialSortBy);
+    }
+    
+    return {
+      entityType,
+      columns: input.columns,
+      allRows: [],
+      processedRows: [],
+      totalRowCount: 0,
+      
+      groupBy: [],
+      groupTree: [],
+      collapsedGroups: new Set(),
+      sortBy: initialSortBy,
+      filters: [],
+      viewport: {
+        start: 0,
+        end: 50,
+        height: 400,
+        scrollTop: 0,
+        itemHeight: 40
+      },
+      
+      isProcessing: false,
+      processingQueue: [],
+      lastProcessTime: 0,
+      processedItemCount: 0,
+      version: 0
+    };
+  },
   
   states: {
     idle: {
+      entry: [
+        // If we have initial sort state, notify parent to trigger render
+        ({ context }) => {
+          if (context.sortBy.length > 0) {
+            console.log('ViewCoordinator: Notifying parent of initial sort state');
+          }
+        },
+        sendParent(({ context }) => {
+          if (context.sortBy.length > 0) {
+            return {
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy
+              }
+            };
+          }
+          return { type: 'noop' }; // XState requires an event to be returned
+        })
+      ],
       on: {
         // Configuration changes
         'view.group.set': {
@@ -478,8 +544,16 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.sort.set': {
-          target: 'processing',
-          actions: ['setSortBy', 'startProcessing']
+          actions: ['setSortBy', 
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy
+              }
+            }))
+          ]
         },
         
         'view.filter.set': {
@@ -514,15 +588,26 @@ export const viewCoordinatorMachine = setup({
     },
     
     processing: {
+      entry: () => {
+        console.log('[ViewCoordinator] Entering processing state');
+      },
       invoke: {
         src: 'processDataTransformation',
-        input: ({ context }) => ({
-          rows: context.allRows,
-          filters: context.filters,
-          sortBy: context.sortBy,
-          groupBy: context.groupBy,
-          columns: context.columns
-        }),
+        input: ({ context }) => {
+          console.log('[ViewCoordinator] Processing data with:', {
+            rowCount: context.allRows.length,
+            sortBy: context.sortBy,
+            filters: context.filters.length,
+            groupBy: context.groupBy
+          });
+          return {
+            rows: context.allRows,
+            filters: context.filters,
+            sortBy: context.sortBy,
+            groupBy: context.groupBy,
+            columns: context.columns
+          };
+        },
         onDone: [
           {
             guard: 'hasGroups',

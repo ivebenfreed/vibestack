@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { useSelector } from '@xstate/react';
-import type { TableRow, RenderState, CellRef, OptimisticOperation } from './types';
+import type { TableRow, RenderState, CellRef, OptimisticOperation, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
 import type { EntityIntegrationLayer } from './integration/EntityIntegration';
@@ -30,8 +30,8 @@ export const useChangeDetection = () => {
     rowData: new Map()
   });
 
-  const hasDataChanged = useCallback((renderState: RenderState): boolean => {
-    const currentVersion = renderState.version || 0;
+  const hasDataChanged = useCallback((snapshot: any): boolean => {
+    const currentVersion = snapshot.context?.version || 0;
     const previousVersion = previousState.current.version;
     
     // Only log on actual data changes, not on every scroll event
@@ -215,10 +215,17 @@ export const useRenderStateExtractor = (
       }
       
       // Safely extract view state
+      let sortBy = [];
       if (viewCoordinator) {
         try {
           const viewSnapshot = viewCoordinator.getSnapshot();
           groupedData = viewSnapshot.context?.groupedData || [];
+          sortBy = viewSnapshot.context?.sortBy || [];
+          
+          // Debug log
+          if (sortBy.length > 0) {
+            console.log('[RenderStateExtractor] Extracted sortBy:', sortBy);
+          }
         } catch (error) {
           console.warn('Failed to get view coordinator snapshot:', error);
         }
@@ -231,7 +238,8 @@ export const useRenderStateExtractor = (
         editingCell,
         groupedData,
         optimisticOperations,
-        version: snapshot.context.version || 0
+        version: snapshot.context.version || 0,
+        sortBy // Add sort state to render state
       };
       
       console.log('Final render state:', {

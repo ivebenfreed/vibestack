@@ -8,6 +8,8 @@ export { renderNumber } from './renderNumber';
 export { renderDate } from './renderDate';
 export { renderBoolean } from './renderBoolean';
 export { renderEnum } from './renderEnum';
+export { renderRelationship } from './renderRelationship';
+export type { RelationshipData } from './renderRelationship';
 
 // Re-export the renderer type for convenience
 import type { Column } from '../../types';
@@ -24,4 +26,8 @@ export const fastRenderers = {
   boolean: () => import('./renderBoolean').then(m => m.renderBoolean),
   enum: () => import('./renderEnum').then(m => m.renderEnum),
   select: () => import('./renderText').then(m => m.renderText), // Reuse text renderer
+  relationship: () => import('./renderRelationship').then(m => m.renderRelationship),
+  'relationship-single': () => import('./renderRelationship').then(m => m.renderRelationship),
+  'relationship-multi': () => import('./renderRelationship').then(m => m.renderRelationship),
+  'relationship-collection': () => import('./renderRelationship').then(m => m.renderRelationship),
 };

@@ -29,6 +29,7 @@ interface VibeGridXModularProps<T = any> {
   
   // Optional external data
   data?: any[];
+  relationshipData?: any;
   
   // Event handlers
   onCellClick?: (rowId: string, columnId: string) => void;
@@ -68,6 +69,7 @@ export const VibeGridXModular = <T extends Record<string, any> = any>(
     className = '',
     height = 600,
     width = '100%',
+    relationshipData,
     onCellClick,
     onCellDoubleClick,
     onSelectionChange,
@@ -170,6 +172,7 @@ export const VibeGridXModular = <T extends Record<string, any> = any>(
     const renderer = createModularTableRenderer({
       container: containerRef.current,
       columns: tableConfig.columns,
+      relationshipData: relationshipData,
       customCellRenderers,
       onCanvasContainerReady: (canvasContainer) => {
         // TEMPORARILY DISABLED: Canvas overlay is blocking view
@@ -309,6 +312,13 @@ export const VibeGridXModular = <T extends Record<string, any> = any>(
     columns,
     tableConfig.columns
   ]);
+  
+  // Update relationship data when it changes
+  useEffect(() => {
+    if (!rendererRef.current || !isInitialized || !relationshipData) return;
+    
+    rendererRef.current.setRelationshipData(relationshipData);
+  }, [relationshipData, isInitialized]);
   
   // ====================================
   // KEYBOARD HANDLING

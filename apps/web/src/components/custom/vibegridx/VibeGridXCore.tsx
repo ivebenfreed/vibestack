@@ -105,20 +105,21 @@ export const useTableMachine = (tableConfig: TableConfig) => {
 export const useEntityIntegration = (
   tableActor: any,
   entityType: string,
-  integrationRef: MutableRefObject<EntityIntegrationLayer | null>
+  integrationRef: MutableRefObject<EntityIntegrationLayer | null>,
+  columns?: Column[]
 ) => {
   useEffect(() => {
     if (!tableActor) return;
     
     // Create and connect entity integration layer
     integrationRef.current = new EntityIntegrationLayer(entityType);
-    integrationRef.current.connectToTable(tableActor);
+    integrationRef.current.connectToTable(tableActor, columns);
     
     return () => {
       integrationRef.current?.disconnect();
       integrationRef.current = null;
     };
-  }, [tableActor, entityType]);
+  }, [tableActor, entityType, columns]);
 };
 
 // ====================================

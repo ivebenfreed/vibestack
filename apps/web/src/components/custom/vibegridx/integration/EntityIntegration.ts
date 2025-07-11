@@ -171,16 +171,25 @@ export class EntityIntegrationLayer {
   private atomSubscription: (() => void) | null = null;
   private isInitialized = false;
   private lastEntityCount = 0;
+  private columns: Column[] = [];
   
   constructor(entityType: string) {
     this.adapter = createDomainAdapter(entityType);
   }
   
   // Connect to table machine
-  connectToTable(tableActor: ActorRefFrom<any>) {
+  connectToTable(tableActor: ActorRefFrom<any>, columns?: Column[]) {
     this.tableActor = tableActor;
+    if (columns) {
+      this.columns = columns;
+    }
     // No need to initialize - table machine already has config from input
     this.setupEntityDataSubscription();
+  }
+  
+  // Set columns (can be called separately if needed)
+  setColumns(columns: Column[]) {
+    this.columns = columns;
   }
   
   // Set up subscription to entity data changes
@@ -334,7 +343,7 @@ export class EntityIntegrationLayer {
   
   // Get columns configuration
   getColumns(): Column[] {
-    return this.adapter.getColumns();
+    return this.columns;
   }
   
   // Get entity type
