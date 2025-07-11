@@ -195,6 +195,9 @@ export const tableBaseMachine = setup({
             systemId: 'drag-coordinator'
           }),
           overlayActor: spawn('overlayActor', {
+            input: {
+              initialViewport: context.settings?.initialViewport || null
+            },
             systemId: 'overlay-actor'
           })
         };
@@ -438,18 +441,30 @@ export const tableBaseMachine = setup({
                 'selection.*': {
                   guard: 'canPerformOperation',
                   actions: [
+                    ({ context, event }) => {
+                      console.log('TableMachine: Received selection event', {
+                        eventType: event.type,
+                        hasSelectionCoordinator: !!context.actors.selectionCoordinator,
+                        eventDetails: event
+                      });
+                    },
                     sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => event),
+                      ({ event }) => {
+                        console.log('TableMachine: Forwarding to selection coordinator', event);
+                        return event;
+                      }),
                     // Forward to overlay actor for visualization
                     sendTo(({ context }) => context.actors.overlayActor!, 
                       ({ event }) => {
                         // Map selection events to overlay events
-                        if (event.type === 'selection.cell.toggle') {
+                        if (event.type === 'selection.cell.select') {
                           return {
                             type: 'CELL_CLICK',
-                            cellKey: event.cellKey,
+                            cellKey: `${event.rowId}:${event.columnId}`,
                             ctrlKey: event.ctrlKey || false,
-                            shiftKey: event.shiftKey || false
+                            shiftKey: event.shiftKey || false,
+                            row: 0, // Will be calculated by overlay
+                            column: 0 // Will be calculated by overlay
                           };
                         } else if (event.type === 'selection.bulk.set') {
                           return {
@@ -528,6 +543,12 @@ export const tableBaseMachine = setup({
                     ({ event }) => event)
                 },
                 
+                'view.column.click': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
                 'view.filter.set': {
                   guard: 'canPerformOperation',
                   actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
@@ -541,6 +562,39 @@ export const tableBaseMachine = setup({
                     ({ event }) => event)
                 },
                 
+                // Coordinate manager events
+                'COORDINATE_MANAGER_SET': {
+                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'COORDINATE_MAPPING_CHANGED': {
+                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                // Selection state changes from selection coordinator
+                'selection.state.changed': {
+                  actions: [
+                    ({ context, event }) => {
+                      console.log('TableMachine: Received selection.state.changed from selection coordinator', {
+                        selectedCellsSize: event.selectedCells?.size || 0,
+                        activeCell: event.activeCell,
+                        hasOverlayActor: !!context.actors.overlayActor
+                      });
+                    },
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      ({ event }) => {
+                        const overlayEvent = {
+                          type: 'SELECTION_UPDATE',
+                          cells: event.selectedCells
+                        };
+                        console.log('TableMachine: Forwarding to overlay actor', overlayEvent);
+                        return overlayEvent;
+                      })
+                  ]
+                },
+                
                 // Keyboard events (route to appropriate coordinator)
                 'keyboard.arrow': {
                   actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
@@ -548,8 +602,29 @@ export const tableBaseMachine = setup({
                 },
                 
                 'keyboard.copy': {
-                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                    ({ event }) => event)
+                  actions: [
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      ({ event }) => event),
+                    // Also send to overlay actor for visual feedback
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      ({ context }) => ({ 
+                        type: 'COPY',
+                        cells: context.actors.selectionCoordinator?.getSnapshot().context.selectedCells || new Set()
+                      }))
+                  ]
+                },
+                
+                'keyboard.cut': {
+                  actions: [
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      ({ event }) => event),
+                    // Also send to overlay actor for visual feedback
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      ({ context }) => ({ 
+                        type: 'CUT',
+                        cells: context.actors.selectionCoordinator?.getSnapshot().context.selectedCells || new Set()
+                      }))
+                  ]
                 },
                 
                 'keyboard.paste': {
@@ -568,8 +643,17 @@ export const tableBaseMachine = setup({
                 },
                 
                 'keyboard.escape': {
-                  actions: sendTo(({ context }) => context.actors.editCoordinator!, 
-                    ({ event }) => event)
+                  actions: [
+                    // Send to overlay actor first to clear any visual states
+                    sendTo(({ context }) => context.actors.overlayActor!, 
+                      () => ({ type: 'ESCAPE' })),
+                    // Then to edit coordinator to cancel any editing
+                    sendTo(({ context }) => context.actors.editCoordinator!, 
+                      ({ event }) => event),
+                    // Finally to selection coordinator to clear selection if needed
+                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
+                      () => ({ type: 'selection.clear' }))
+                  ]
                 }
               }
             }

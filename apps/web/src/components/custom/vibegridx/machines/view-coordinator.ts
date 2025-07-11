@@ -370,6 +370,69 @@ export const viewCoordinatorMachine = setup({
       }
     },
     
+    // Handle column click for sort toggling
+    handleColumnClick: assign({
+      sortBy: ({ context, event }) => {
+        console.log('[ViewCoordinator] handleColumnClick called with event:', event);
+        
+        if (event.type !== 'view.column.click') {
+          console.log('[ViewCoordinator] Event type is not view.column.click:', event.type);
+          return context.sortBy;
+        }
+        
+        const { field, shiftKey } = event;
+        console.log('[ViewCoordinator] Processing column click:', { field, shiftKey });
+        
+        const currentSort = context.sortBy || [];
+        console.log('[ViewCoordinator] Current sort state:', currentSort);
+        
+        // Find existing sort config for this field
+        const existingIndex = currentSort.findIndex(s => s.field === field);
+        const existing = existingIndex >= 0 ? currentSort[existingIndex] : null;
+        
+        let newSortConfig: Array<{ field: string; direction: 'asc' | 'desc' }>;
+        
+        if (shiftKey) {
+          // Multi-column sort
+          newSortConfig = [...currentSort];
+          
+          if (existing) {
+            // Toggle existing: asc -> desc -> remove
+            if (existing.direction === 'asc') {
+              newSortConfig[existingIndex] = { field, direction: 'desc' };
+            } else {
+              newSortConfig.splice(existingIndex, 1);
+            }
+          } else {
+            // Add new sort
+            newSortConfig.push({ field, direction: 'asc' });
+          }
+        } else {
+          // Single column sort
+          if (existing && currentSort.length === 1) {
+            // Toggle: asc -> desc -> none
+            if (existing.direction === 'asc') {
+              newSortConfig = [{ field, direction: 'desc' }];
+            } else {
+              newSortConfig = [];
+            }
+          } else {
+            // New single column sort
+            newSortConfig = [{ field, direction: 'asc' }];
+          }
+        }
+        
+        console.log(`[ViewCoordinator] Column ${field} clicked:`, {
+          existing,
+          newSortConfig,
+          shiftKey
+        });
+        
+        return newSortConfig;
+      },
+      version: ({ context }) => context.version + 1
+    }),
+    
     // Filter management
     setFilters: assign({
       filters: ({ event }) => 
@@ -552,6 +615,24 @@ export const viewCoordinatorMachine = setup({
                 filters: context.filters,
                 groupBy: context.groupBy
               }
+            }))
+          ]
+        },
+        
+        'view.column.click': {
+          target: 'processing',
+          actions: ['handleColumnClick', 'startProcessing',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy
+              }
+            })),
+            // Clear selections when sort changes
+            sendParent(() => ({
+              type: 'selection.clear'
             }))
           ]
         },

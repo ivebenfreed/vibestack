@@ -102,15 +102,9 @@ export class CanvasOverlay {
       }
     );
     
-    // Use provided machine or create new one
-    if (this.config.overlayActor) {
-      this.machine = this.config.overlayActor;
-      console.log('CanvasOverlay: Using provided overlay machine');
-    } else {
-      this.machine = createActor(overlayMachine);
-      this.machine.start();
-      console.log('CanvasOverlay: Created new overlay machine');
-    }
+    // Always use the provided overlay actor (single source of truth)
+    this.machine = this.config.overlayActor;
+    console.log('CanvasOverlay: Using provided overlay actor from table machine');
     
     // Set machine reference in fill handle layer
     this.fillHandleLayer.setMachine(this.machine);
@@ -166,6 +160,11 @@ export class CanvasOverlay {
     this.machine.subscribe((snapshot) => {
       const context = snapshot.context;
       
+      console.log('CanvasOverlay: Machine state changed', {
+        selectedCells: context.selectedCells.size,
+        viewport: context.viewport ? 'exists' : 'null',
+        viewportDetails: context.viewport
+      });
       
       // Always update all overlays - let each overlay decide if it needs to re-render
       this.updateAllOverlays(context);
@@ -173,6 +172,19 @@ export class CanvasOverlay {
   }
   
   private updateAllOverlays(context: any): void {
+    // Log viewport state for debugging
+    if (!context.viewport && context.selectedCells.size > 0) {
+      console.warn('CanvasOverlay: Trying to render selection but viewport is null', {
+        selectedCells: context.selectedCells.size,
+        viewport: context.viewport
+      });
+    }
+    
+    console.log('CanvasOverlay.updateAllOverlays: Updating overlays', {
+      selectedCells: context.selectedCells.size,
+      viewport: !!context.viewport
+    });
+    
     // Update selection
     this.selectionOverlay.updateSelection(context.selectedCells, context.viewport);
     
@@ -256,6 +268,22 @@ export class CanvasOverlay {
     // Update container size
     this.container.style.width = actualWidth + 'px';
     this.container.style.height = actualHeight + 'px';
+    
+    console.log('CanvasOverlay.updateViewport:', {
+      transform: `translate(${viewport.scrollLeft}px, ${viewport.scrollTop}px)`,
+      stageSize: { width: actualWidth, height: actualHeight },
+      viewport: {
+        scrollTop: viewport.scrollTop,
+        scrollLeft: viewport.scrollLeft,
+        start: viewport.start,
+        end: viewport.end,
+        height: viewport.height,
+        width: viewport.width,
+        visibleRows: `${viewport.start}-${viewport.end}`
+      },
+      containerBounds: this.container.getBoundingClientRect(),
+      stagePosition: { x: this.stage.x(), y: this.stage.y() }
+    });
     
     this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });
   }

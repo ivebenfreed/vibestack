@@ -8,7 +8,7 @@ export interface OverlayConfig {
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
   columns?: any[]; // Column array for coordinate calculations
-  overlayActor?: any; // Overlay machine actor from table machine
+  overlayActor: any; // REQUIRED: Overlay machine actor from table machine (single source of truth)
   cellWidth: number;
   cellHeight: number;
   borderWidth: number;

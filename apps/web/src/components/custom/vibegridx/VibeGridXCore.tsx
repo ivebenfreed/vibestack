@@ -30,6 +30,8 @@ export interface InitializationProps {
   entityType: 'task' | 'project' | 'user';
   columns: Column<any>[];
   tableId?: string;
+  height?: number;
+  width?: number | string;
   enableVirtualScrolling?: boolean;
   enableCanvasOverlays?: boolean;
   bufferSize?: number;
@@ -48,6 +50,8 @@ export const useTableConfiguration = (props: InitializationProps) => {
     entityType,
     columns,
     tableId = `vibegridx-${entityType}-${Date.now()}`,
+    height = 600,
+    width = 800,
     enableVirtualScrolling = true,
     enableGrouping = true,
     enableFiltering = true,
@@ -78,10 +82,20 @@ export const useTableConfiguration = (props: InitializationProps) => {
         enableVirtualScrolling,
         enableGrouping,
         enableFiltering,
-        bufferSize
+        bufferSize,
+        // Calculate initial viewport based on height
+        initialViewport: {
+          start: 0,
+          end: Math.ceil((typeof height === 'number' ? height : 600) / 40), // Assuming 40px row height
+          height: typeof height === 'number' ? height : 600,
+          width: typeof width === 'number' ? width : 800,
+          scrollTop: 0,
+          scrollLeft: 0,
+          itemHeight: 40
+        }
       }
     };
-  }, [entityType, tableId, columns, enableVirtualScrolling, enableGrouping, enableFiltering, bufferSize]);
+  }, [entityType, tableId, columns, height, width, enableVirtualScrolling, enableGrouping, enableFiltering, bufferSize]);
 
   return { tableConfig, tableId };
 };
@@ -148,7 +162,16 @@ export const useRendererInitialization = (
         console.log('useRendererInitialization: Canvas container ready inside viewport');
         
         // Initialize canvas overlay inside the scrollable viewport
-        if (!refs.canvasOverlayRef.current) {
+        console.log('useRendererInitialization: Checking overlay actor', {
+          hasTableState: !!tableState,
+          hasContext: !!tableState?.context,
+          hasActors: !!tableState?.context?.actors,
+          hasOverlayActor: !!tableState?.context?.actors?.overlayActor,
+          actors: tableState?.context?.actors
+        });
+        
+        if (!refs.canvasOverlayRef.current && tableState?.context?.actors?.overlayActor) {
+          console.log('useRendererInitialization: Creating CanvasOverlay');
           refs.canvasOverlayRef.current = new CanvasOverlay(canvasContainer, {
             dimensionManager,
             rowDimensionManager,
@@ -162,7 +185,7 @@ export const useRendererInitialization = (
             enableAnimations: false,
             animationDuration: 0,
             borderWidth: 2,
-            overlayActor: tableState?.context?.actors?.overlayActor // Use shared actor from table machine
+            overlayActor: tableState.context.actors.overlayActor // Required: Use shared actor from table machine
           });
           
           // Set selection change callback

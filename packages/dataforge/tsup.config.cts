@@ -9,6 +9,7 @@ const config = {
     'src/generated/server-entities.ts', 
     'src/generated/column-configurations.ts', 
     'src/generated/rdg-column-configurations.ts',
+    'src/generated/vibegridx-columns.ts',
     'src/generated/*-operations.ts'
   ],
   format: ['esm'],

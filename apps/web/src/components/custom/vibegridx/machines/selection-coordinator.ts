@@ -1,4 +1,4 @@
-import { setup, assign, fromPromise } from 'xstate';
+import { setup, assign, fromPromise, sendParent } from 'xstate';
 import type { 
   SelectionContext, 
   CellRef, 
@@ -6,6 +6,7 @@ import type {
   SelectionMode,
   TableEvents 
 } from '../types';
+import type { VibeGridXCoordinateManager, CoordinatePosition } from '../coordinates/VibeGridXCoordinateManager';
 
 // ====================================
 // HELPER FUNCTIONS
@@ -130,6 +131,13 @@ interface SelectionCoordinatorContext extends SelectionContext {
   allRowIds: string[]; // All row IDs for full column selection
   columns: any[];
   
+  // Coordinate manager for reliable position tracking
+  coordinateManager: VibeGridXCoordinateManager | null;
+  
+  // Logical position-based selection (stable across sorts)
+  selectedPositions: Set<string>; // "rowIndex:columnIndex" format
+  anchorPosition: CoordinatePosition | null;
+  
   // Clipboard functionality
   clipboard: {
     cells: string[];
@@ -154,8 +162,8 @@ type SelectionEvents =
   | { type: 'selection.column.select'; columnId: string }
   | { type: 'selection.clear' }
   | { type: 'selection.drag.start'; startCell: CellRef }
-  | { type: 'selection.drag.move'; currentCell: CellRef; selectedCells: Set<string> }
-  | { type: 'selection.drag.end'; selectedCells: Set<string> }
+  | { type: 'selection.drag.move'; currentCell: CellRef }
+  | { type: 'selection.drag.end' }
   | { type: 'keyboard.arrow'; direction: 'up' | 'down' | 'left' | 'right'; extend?: boolean }
   | { type: 'keyboard.copy' }
   | { type: 'keyboard.paste' }
@@ -164,6 +172,8 @@ type SelectionEvents =
   | { type: 'VISIBLE_ROWS_CHANGED'; rowIds: string[] }
   | { type: 'ALL_ROWS_CHANGED'; rowIds: string[] }
   | { type: 'COLUMNS_CHANGED'; columns: any[] }
+  | { type: 'COORDINATE_MANAGER_SET'; coordinateManager: VibeGridXCoordinateManager }
+  | { type: 'COORDINATE_MAPPING_CHANGED' }
   | { type: 'FILL_START'; cellRef: CellRef; value: any }
   | { type: 'FILL_EXTEND'; targetRef: CellRef }
   | { type: 'FILL_APPLY' }
@@ -191,7 +201,7 @@ export const selectionCoordinatorMachine = setup({
         if (event.type !== 'selection.cell.select') return context.selectedCells;
         
         const cellKey = createCellKey(event.rowId, event.columnId);
-        const newSelection = new Set(context.selectedCells);
+        const cellRef = { rowId: event.rowId, columnId: event.columnId };
         
         // Only log selection changes for debugging special cases
         if (event.shiftKey || context.selectedCells.size > 50) {
@@ -202,25 +212,50 @@ export const selectionCoordinatorMachine = setup({
           });
         }
         
-        if (event.shiftKey && context.anchor) {
-          // Range select
-          const rangeSelection = calculateRangeSelection(
-            context.anchor, 
-            { rowId: event.rowId, columnId: event.columnId },
-            context.visibleRowIds,
-            context.columns
+        if (event.shiftKey && context.anchor && context.coordinateManager) {
+          // Range select using coordinate manager
+          const rangeSelection = context.coordinateManager.calculateCellRange(
+            context.anchor,
+            cellRef
           );
-          // Range selection completed
           return rangeSelection;
         } else {
           // Single select
-          newSelection.clear();
+          const newSelection = new Set<string>();
           newSelection.add(cellKey);
+          return newSelection;
         }
-        
-        return newSelection;
       },
       
+      selectedPositions: ({ context, event }) => {
+        if (event.type !== 'selection.cell.select' || !context.coordinateManager) {
+          return context.selectedPositions;
+        }
+        
+        const cellRef = { rowId: event.rowId, columnId: event.columnId };
+        const position = context.coordinateManager.cellRefToPosition(cellRef);
+        
+        if (!position) return context.selectedPositions;
+        
+        if (event.shiftKey && context.anchorPosition) {
+          // Range select using logical positions
+          const range = context.coordinateManager.calculateLogicalRange(
+            context.coordinateManager.positionToCellRef(context.anchorPosition)!,
+            cellRef
+          );
+          
+          const newPositions = new Set<string>();
+          range.forEach(pos => {
+            newPositions.add(`${pos.rowIndex}:${pos.columnIndex}`);
+          });
+          return newPositions;
+        } else {
+          // Single select
+          const newPositions = new Set<string>();
+          newPositions.add(`${position.rowIndex}:${position.columnIndex}`);
+          return newPositions;
+        }
+      },
       
       activeCell: ({ context, event }) => 
         event.type === 'selection.cell.select' 
@@ -235,6 +270,18 @@ export const selectionCoordinatorMachine = setup({
           rowId: event.rowId,
           columnId: event.columnId
         };
+      },
+      
+      anchorPosition: ({ context, event }) => {
+        if (event.type !== 'selection.cell.select' || !context.coordinateManager) {
+          return context.anchorPosition;
+        }
+        
+        // Keep anchor position on shift+click, otherwise set new anchor position
+        if (event.shiftKey) return context.anchorPosition;
+        
+        const cellRef = { rowId: event.rowId, columnId: event.columnId };
+        return context.coordinateManager.cellRefToPosition(cellRef);
       }
     }),
     
@@ -299,8 +346,10 @@ export const selectionCoordinatorMachine = setup({
     // Clear selection
     clearSelection: assign({
       selectedCells: new Set(),
+      selectedPositions: new Set(),
       activeCell: null,
       anchor: null,
+      anchorPosition: null,
       selectionRanges: []
     }),
     
@@ -308,43 +357,56 @@ export const selectionCoordinatorMachine = setup({
     moveSelection: assign(({ context, event }) => {
       if (event.type !== 'keyboard.arrow') return {};
       
-      if (!context.activeCell) {
-        console.warn('SelectionCoordinator: No active cell for arrow navigation');
+      if (!context.activeCell || !context.coordinateManager) {
+        console.warn('SelectionCoordinator: No active cell or coordinate manager for arrow navigation');
         return {};
       }
       
-      const newCell = moveCell(
+      const newCell = context.coordinateManager.moveCellRef(
         context.activeCell,
-        event.direction,
-        context.visibleRowIds,
-        context.columns
+        event.direction
       );
       
+      if (!newCell) return {};
+      
       const cellKey = createCellKey(newCell.rowId, newCell.columnId);
+      const newPosition = context.coordinateManager.cellRefToPosition(newCell);
+      
+      if (!newPosition) return {};
       
       if (event.extend) {
         // Extend selection (range selection)
         const anchor = context.anchor || context.activeCell;
-        const rangeSelection = calculateRangeSelection(
-          anchor,
-          newCell,
-          context.visibleRowIds,
-          context.columns
-        );
+        const anchorPosition = context.anchorPosition || context.coordinateManager.cellRefToPosition(context.activeCell);
         
-        return {
-          selectedCells: rangeSelection,
-          activeCell: newCell,
-          anchor
-        };
+        if (anchorPosition) {
+          const rangeSelection = context.coordinateManager.calculateCellRange(anchor, newCell);
+          const rangePositions = context.coordinateManager.calculateLogicalRange(anchor, newCell);
+          const positionSet = new Set<string>();
+          rangePositions.forEach(pos => {
+            positionSet.add(`${pos.rowIndex}:${pos.columnIndex}`);
+          });
+          
+          return {
+            selectedCells: rangeSelection,
+            selectedPositions: positionSet,
+            activeCell: newCell,
+            anchor,
+            anchorPosition
+          };
+        }
       } else {
         // Move selection
         return {
           selectedCells: new Set([cellKey]),
+          selectedPositions: new Set([`${newPosition.rowIndex}:${newPosition.columnIndex}`]),
           activeCell: newCell,
-          anchor: newCell
+          anchor: newCell,
+          anchorPosition: newPosition
         };
       }
+      
+      return {};
     }),
     
     // Clipboard operations
@@ -389,6 +451,45 @@ export const selectionCoordinatorMachine = setup({
         }
         return [];
       }
+    }),
+    
+    // Coordinate manager actions
+    setCoordinateManager: assign({
+      coordinateManager: ({ event }) => {
+        if (event.type === 'COORDINATE_MANAGER_SET') {
+          console.log('SelectionCoordinator: Setting coordinate manager', {
+            hasManager: !!event.coordinateManager,
+            managerType: event.coordinateManager?.constructor?.name
+          });
+          return event.coordinateManager;
+        }
+        return null;
+      }
+    }),
+    
+    syncSelectionToPositions: assign({
+      selectedPositions: ({ context }) => {
+        if (!context.coordinateManager) return context.selectedPositions;
+        
+        // Convert current cell keys to logical positions
+        return context.coordinateManager.cellKeysToPositions(context.selectedCells);
+      }
+    }),
+    
+    syncPositionsToSelection: assign({
+      selectedCells: ({ context }) => {
+        if (!context.coordinateManager) return context.selectedCells;
+        
+        // Convert logical positions back to current cell keys
+        return context.coordinateManager.positionsToCellKeys(context.selectedPositions);
+      },
+      
+      activeCell: ({ context }) => {
+        if (!context.coordinateManager || !context.anchorPosition) return context.activeCell;
+        
+        // Convert anchor position back to cell ref
+        return context.coordinateManager.positionToCellRef(context.anchorPosition);
+      }
     })
   },
   
@@ -424,8 +525,11 @@ export const selectionCoordinatorMachine = setup({
     visibleRowIds: input.visibleRowIds || [],
     allRowIds: input.allRowIds || [],
     columns: input.columns || [],
+    coordinateManager: null,
     selectedCells: new Set(),
+    selectedPositions: new Set(),
     activeCell: null,
+    anchorPosition: null,
     selectionRanges: [],
     selectionMode: 'single' as SelectionMode,
     anchor: null,
@@ -435,18 +539,60 @@ export const selectionCoordinatorMachine = setup({
   
   states: {
     idle: {
+      entry: [
+        ({ context }) => {
+          console.log('SelectionCoordinator: Entering idle state', {
+            entityType: context.entityType,
+            hasCoordinateManager: !!context.coordinateManager,
+            selectedCellsSize: context.selectedCells.size
+          });
+        }
+      ],
       on: {
         // Selection events
         'selection.cell.select': {
-          actions: 'selectCell'
+          actions: ['selectCell', 
+            // Debug logging
+            ({ context, event }) => {
+              console.log('SelectionCoordinator: selection.cell.select processed', {
+                eventType: event.type,
+                rowId: event.rowId,
+                columnId: event.columnId,
+                selectedCellsSize: context.selectedCells.size,
+                contextKeys: Object.keys(context)
+              });
+            },
+            // Emit selection change to parent (table machine) for overlay forwarding
+            sendParent(({ context }) => {
+              const parentEvent = {
+                type: 'selection.state.changed',
+                selectedCells: context.selectedCells,
+                activeCell: context.activeCell
+              };
+              console.log('SelectionCoordinator: Sending to parent (table machine)', parentEvent);
+              return parentEvent;
+            })
+          ]
         },
         
         'selection.range.select': {
-          actions: 'selectRange'
+          actions: ['selectRange',
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
+            }))
+          ]
         },
         
         'selection.row.select': {
-          actions: 'selectRow'
+          actions: ['selectRow',
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
+            }))
+          ]
         },
         
         // Column selection disabled
@@ -455,7 +601,13 @@ export const selectionCoordinatorMachine = setup({
         // },
         
         'selection.clear': {
-          actions: 'clearSelection'
+          actions: ['clearSelection',
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
+            }))
+          ]
         },
         
         // Drag selection events
@@ -469,9 +621,16 @@ export const selectionCoordinatorMachine = setup({
         // Keyboard navigation
         'keyboard.arrow': {
           guard: 'canNavigate',
-          actions: ['moveSelection', ({ event }) => {
-            console.log('SelectionCoordinator: Processing keyboard.arrow event', event);
-          }]
+          actions: ['moveSelection', 
+            ({ event }) => {
+              console.log('SelectionCoordinator: Processing keyboard.arrow event', event);
+            },
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
+            }))
+          ]
         },
         
         // Clipboard operations
@@ -503,6 +662,25 @@ export const selectionCoordinatorMachine = setup({
           actions: 'updateColumns'
         },
         
+        // Coordinate manager events
+        COORDINATE_MANAGER_SET: {
+          actions: [
+            'setCoordinateManager', 
+            'syncSelectionToPositions',
+            ({ event, context }) => {
+              console.log('SelectionCoordinator: COORDINATE_MANAGER_SET', {
+                hasCoordinateManager: !!event.coordinateManager,
+                coordinateManagerMethods: event.coordinateManager ? Object.getOwnPropertyNames(Object.getPrototypeOf(event.coordinateManager)) : [],
+                contextHasManager: !!context.coordinateManager
+              });
+            }
+          ]
+        },
+        
+        COORDINATE_MAPPING_CHANGED: {
+          actions: 'syncPositionsToSelection'
+        },
+        
         // Fill operations
         FILL_START: {
           target: 'filling',
@@ -521,16 +699,55 @@ export const selectionCoordinatorMachine = setup({
     dragging: {
       on: {
         'selection.drag.move': {
-          actions: assign({
-            selectedCells: ({ event }) => event.selectedCells
-          })
+          actions: [
+            assign({
+              selectedCells: ({ context, event }) => {
+                console.log('SelectionCoordinator: drag.move', {
+                  hasCoordinateManager: !!context.coordinateManager,
+                  hasAnchor: !!context.anchor,
+                  anchor: context.anchor,
+                  currentCell: event.currentCell
+                });
+                
+                // Use coordinate manager to calculate range with sorted positions
+                if (context.coordinateManager && context.anchor && event.currentCell) {
+                  const range = context.coordinateManager.calculateCellRange(
+                    context.anchor,
+                    event.currentCell
+                  );
+                  console.log('SelectionCoordinator: Using coordinate manager, range size:', range.size);
+                  return range;
+                }
+                // Fallback to old method if no coordinate manager
+                console.log('SelectionCoordinator: Fallback to calculateRangeSelection');
+                return calculateRangeSelection(
+                  context.anchor!,
+                  event.currentCell,
+                  context.visibleRowIds,
+                  context.columns
+                );
+              },
+              activeCell: ({ event }) => event.currentCell
+            }),
+            // Send update to parent so overlay can render
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
+            }))
+          ]
         },
         
         'selection.drag.end': {
           target: 'idle',
-          actions: assign({
-            selectedCells: ({ event }) => event.selectedCells
-          })
+          actions: [
+            // Selection is already set during drag.move, just notify parent
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
+            }))
+          ]
         },
         
         'selection.clear': {

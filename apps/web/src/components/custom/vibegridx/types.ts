@@ -147,6 +147,7 @@ export interface TableSettings {
   pageSize?: number;
   rowHeight?: number;
   bufferSize?: number;
+  initialViewport?: ViewportInfo;
 }
 
 // ====================================
@@ -365,6 +366,7 @@ export type TableEvents =
   | { type: 'view.group.set'; groupBy: string[] }
   | { type: 'view.group.toggle'; groupId: string }
   | { type: 'view.sort.set'; sortBy: SortConfig[] }
+  | { type: 'view.column.click'; columnId: string; field: string; shiftKey: boolean }
   | { type: 'view.filter.set'; filters: FilterConfig[] }
   | { type: 'view.viewport.update'; viewport: ViewportInfo }
   

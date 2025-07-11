@@ -9,6 +9,14 @@ import { Separator } from '@/components/ui/separator';
 import { VibeGridX } from '@/components/custom/vibegridx';
 import type { CellRef, ViewportInfo, Column } from '@/components/custom/vibegridx';
 import type { Task } from '@repo/dataforge/client-entities';
+import { 
+  TaskColumns, 
+  getEditableColumns, 
+  getSortableColumns,
+  getSystemFields,
+  getRelationshipColumns,
+  type VibeGridXColumn 
+} from '@repo/dataforge/vibegridx-columns';
 
 // Import actual domain atoms
 import { useTaskAtoms, taskUtils, updateTaskUI, createTaskUI, deleteTaskUI } from '@/domain/task';
@@ -23,123 +31,62 @@ export const Route = createFileRoute('/_authenticated/debug/vibegridx-demo')({
 // COLUMN DEFINITIONS
 // ====================================
 
-const taskColumns: Column<Task>[] = [
-  {
-    id: 'id',
-    name: 'ID',
-    field: 'id' as keyof Task,
-    type: 'text',
-    width: 80,
-    editable: false,
-    sortable: false
-  },
-  {
-    id: 'title',
-    name: 'Title',
-    field: 'title' as keyof Task,
-    type: 'text',
-    width: 200,
-    editable: true,
-    sortable: true
-  },
-  {
-    id: 'status',
-    name: 'Status',
-    field: 'status' as keyof Task,
-    type: 'enum',
-    width: 120,
-    editable: true,
-    sortable: true,
-    enumOptions: [
-      { value: 'open', label: 'Open' },
-      { value: 'in_progress', label: 'In Progress' },
-      { value: 'completed', label: 'Completed' }
-    ]
-  },
-  {
-    id: 'priority',
-    name: 'Priority',
-    field: 'priority' as keyof Task,
-    type: 'enum',
-    width: 100,
-    editable: true,
-    sortable: true,
-    enumOptions: [
-      { value: 'low', label: 'Low' },
-      { value: 'medium', label: 'Medium' },
-      { value: 'high', label: 'High' }
-    ]
-  },
-  {
-    id: 'description',
-    name: 'Description',
-    field: 'description' as keyof Task,
-    type: 'text',
-    width: 300,
-    editable: true,
-    sortable: true
-  },
-  {
-    id: 'tags',
-    name: 'Tags',
-    field: 'tags' as keyof Task,
-    type: 'text',
-    width: 150,
-    editable: true,
-    sortable: false
-  },
-  {
-    id: 'projectId',
-    name: 'Project',
-    field: 'projectId' as keyof Task,
-    type: 'text',
-    cellType: 'relationship-single',
-    relationshipTable: 'projectId',
-    relationshipDisplayField: 'name',
-    width: 180,
-    editable: true,
-    sortable: true
-  },
-  {
-    id: 'assigneeId',
-    name: 'Assigned To',
-    field: 'assigneeId' as keyof Task,
-    type: 'text',
-    cellType: 'relationship-single',
-    relationshipTable: 'assigneeId',
-    relationshipDisplayField: 'name',
-    width: 180,
-    editable: true,
-    sortable: true
-  },
-  {
-    id: 'dueDate',
-    name: 'Due Date',
-    field: 'dueDate' as keyof Task,
-    type: 'date',
-    width: 120,
-    editable: true,
-    sortable: true
-  },
-  {
-    id: 'createdAt',
-    name: 'Created',
-    field: 'createdAt' as keyof Task,
-    type: 'date',
-    width: 120,
-    editable: false,
-    sortable: true
-  },
-  {
-    id: 'updatedAt',
-    name: 'Updated',
-    field: 'updatedAt' as keyof Task,
-    type: 'date',
-    width: 120,
-    editable: false,
-    sortable: true
-  }
+// Map generated columns to VibeGridX Column interface
+const mapToVibeGridXColumn = (col: VibeGridXColumn<Task>): Column<Task> => {
+  const mapped: Column<Task> = {
+    id: col.id,
+    name: col.name,
+    field: col.field,
+    type: col.type,
+    width: col.width,
+    editable: col.editable,
+    minWidth: col.minWidth,
+    maxWidth: col.maxWidth,
+    resizable: col.resizable,
+    sortable: col.sortable,
+    filterable: col.filterable,
+    ...(col.options && { options: col.options }),
+    ...(col.cellType && { cellType: col.cellType }),
+    ...(col.relationshipTable && { relationshipTable: col.relationshipTable }),
+    ...(col.relationshipDisplayField && { relationshipDisplayField: col.relationshipDisplayField }),
+    ...(col.enumOptions && { enumOptions: col.enumOptions }),
+    ...(col.placeholder && { placeholder: col.placeholder }),
+    ...(col.dateFormat && { dateFormat: col.dateFormat }),
+    ...(col.maxLength && { maxLength: col.maxLength }),
+    ...(col.required && { required: col.required }),
+    // Store metadata for advanced features
+    ...(col.meta && { metadata: col.meta })
+  };
+  return mapped;
+};
+
+// Select specific columns for the demo
+const selectedColumnIds = [
+  'title',
+  'status', 
+  'priority',
+  'description',
+  'project',
+  'assignee',
+  'dueDate',
+  'createdAt',
+  'updatedAt'
 ];
+
+// Filter and map columns
+const taskColumns: Column<Task>[] = TaskColumns
+  .filter(col => selectedColumnIds.includes(col.id))
+  .map(mapToVibeGridXColumn);
+
+// Log column info for debugging
+console.log('[Demo] Using generated columns:', {
+  totalColumns: TaskColumns.length,
+  selectedColumns: taskColumns.length,
+  editableColumns: getEditableColumns(TaskColumns).length,
+  sortableColumns: getSortableColumns(TaskColumns).length,
+  systemFields: getSystemFields(TaskColumns).length,
+  relationshipColumns: getRelationshipColumns(TaskColumns).length
+});
 
 // ====================================
 // ENTITY DATA HOOKS
@@ -393,6 +340,7 @@ function VibeGridXDemoPage() {
   const users = useUserAtoms.allUsers();
   
   // Create relationship data structure - convert array to lookup object
+  // Match the table names from generated columns
   const relationshipData = useMemo(() => {
     const projectLookup = projects.reduce((acc, project) => {
       acc[project.id] = project;
@@ -404,10 +352,10 @@ function VibeGridXDemoPage() {
       return acc;
     }, {} as Record<string, any>);
     
-    
     return {
-      projectId: projectLookup,
-      assigneeId: userLookup
+      // Match the relationshipTable values from generated columns
+      project: projectLookup,
+      assignee: userLookup
     };
   }, [projects, users]);
   
@@ -530,17 +478,47 @@ function VibeGridXDemoPage() {
   const renderControls = () => (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm">Configuration</CardTitle>
+        <CardTitle className="text-sm">Generated Columns Info</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>✓ Virtual Scrolling (Always On)</p>
-          <p>✓ Canvas Overlays (Always On)</p>
-          <p>✓ Grouping Support</p>
-          <p>✓ Filtering Support</p>
-          <p>✓ Sorting Support</p>
-          <p>✓ Drag & Drop Support</p>
+        <div className="text-xs space-y-2">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Total Columns:</span>
+            <Badge variant="outline">{TaskColumns.length}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Displayed:</span>
+            <Badge variant="outline">{taskColumns.length}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Editable:</span>
+            <Badge variant="outline">{getEditableColumns(TaskColumns).length}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Sortable:</span>
+            <Badge variant="outline">{getSortableColumns(TaskColumns).length}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">System Fields:</span>
+            <Badge variant="outline">{getSystemFields(TaskColumns).length}</Badge>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Relationships:</span>
+            <Badge variant="outline">{getRelationshipColumns(TaskColumns).length}</Badge>
+          </div>
         </div>
+        
+        <Separator />
+        
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>✓ Build-time Generation</p>
+          <p>✓ Type Safety</p>
+          <p>✓ Business Logic</p>
+          <p>✓ Validation Rules</p>
+          <p>✓ Permission System</p>
+          <p>✓ State Transitions</p>
+        </div>
+        
         <div className="pt-3 space-y-2">
           <Button 
             variant="outline" 
@@ -633,7 +611,11 @@ function VibeGridXDemoPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div className="space-y-1">
+              <div className="font-medium">Build-time Generation</div>
+              <div className="text-muted-foreground">DataForge column generator</div>
+            </div>
             <div className="space-y-1">
               <div className="font-medium">XState v5 Machines</div>
               <div className="text-muted-foreground">Actor hierarchy coordination</div>
@@ -647,8 +629,8 @@ function VibeGridXDemoPage() {
               <div className="text-muted-foreground">Domain atoms connector</div>
             </div>
             <div className="space-y-1">
-              <div className="font-medium">Virtual Scrolling</div>
-              <div className="text-muted-foreground">Actor lifecycle management</div>
+              <div className="font-medium">Rich Metadata</div>
+              <div className="text-muted-foreground">Business logic & validation</div>
             </div>
           </div>
         </CardContent>
@@ -660,7 +642,14 @@ function VibeGridXDemoPage() {
         <div className="lg:col-span-3 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>VibeGridX Atomic - Tasks ({entityData.count})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>VibeGridX Atomic - Tasks ({entityData.count})</CardTitle>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="text-xs">Generated Columns</Badge>
+                  <Badge variant="outline" className="text-xs">Metadata Rich</Badge>
+                  <Badge variant="outline" className="text-xs">Type Safe</Badge>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="border rounded-lg overflow-hidden">
@@ -672,6 +661,58 @@ function VibeGridXDemoPage() {
                   relationshipData={relationshipData}
                   onPerformanceUpdate={handlePerformanceUpdate}
                 />
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Column Metadata Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Generated Column Metadata</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="font-medium">Business Logic Columns:</div>
+                  <div className="space-y-1 text-muted-foreground">
+                    {TaskColumns.filter(col => col.meta?.businessLogic).map(col => (
+                      <div key={col.id} className="flex items-center justify-between">
+                        <span>{col.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {col.meta?.businessLogic?.requiresPermission ? 'Secured' : 'Logic'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="font-medium">Validation Rules:</div>
+                  <div className="space-y-1 text-muted-foreground">
+                    {TaskColumns.filter(col => col.meta?.validation).map(col => (
+                      <div key={col.id} className="flex items-center justify-between">
+                        <span>{col.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {col.meta?.validation?.required ? 'Required' : 'Validated'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="font-medium">Relationship Types:</div>
+                  <div className="space-y-1 text-muted-foreground">
+                    {TaskColumns.filter(col => col.meta?.relationshipConfig).map(col => (
+                      <div key={col.id} className="flex items-center justify-between">
+                        <span>{col.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {col.meta?.relationshipConfig?.relationshipType}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -693,9 +734,9 @@ function VibeGridXDemoPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="space-y-2">
-              <div className="font-medium">Completed Components:</div>
+              <div className="font-medium">Core Architecture:</div>
               <ul className="space-y-1 text-muted-foreground">
                 <li>✅ XState v5 Machine Architecture</li>
                 <li>✅ SelectionCoordinator Actor</li>
@@ -706,7 +747,7 @@ function VibeGridXDemoPage() {
               </ul>
             </div>
             <div className="space-y-2">
-              <div className="font-medium">Rendering & Integration:</div>
+              <div className="font-medium">Rendering & Performance:</div>
               <ul className="space-y-1 text-muted-foreground">
                 <li>✅ AtomicTableRenderer</li>
                 <li>✅ Virtual Scrolling</li>
@@ -714,6 +755,17 @@ function VibeGridXDemoPage() {
                 <li>✅ Direct DOM Performance</li>
                 <li>✅ Entity Integration Layer</li>
                 <li>✅ Hybrid React + Direct DOM</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <div className="font-medium">Build-time Generation:</div>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>✅ DataForge Column Generator</li>
+                <li>✅ Type-safe Column Definitions</li>
+                <li>✅ Business Logic Metadata</li>
+                <li>✅ Validation Rules Integration</li>
+                <li>✅ Permission System</li>
+                <li>✅ State Transition Rules</li>
               </ul>
             </div>
           </div>

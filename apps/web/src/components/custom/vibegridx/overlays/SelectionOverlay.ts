@@ -40,13 +40,13 @@ export class SelectionOverlay {
     // Always update when viewport changes, even if selection hasn't
     // This ensures cells become visible when scrolling
     
-    // Only log when there are actual selections (remove 0 case to avoid scroll spam)
-    if (selectedCells.size > 100) {
-      console.log('SelectionOverlay.updateSelection:', {
-        selectedCount: selectedCells.size,
-        hasViewport: !!viewport
-      });
-    }
+    console.log('SelectionOverlay.updateSelection called', {
+      selectedCells: selectedCells.size,
+      viewport: !!viewport,
+      viewportDetails: viewport,
+      coordinateSystemRows: this.coordinateSystem.rowIndexMap.size,
+      coordinateSystemColumns: this.coordinateSystem.columnIndexMap.size
+    });
     
     if (!viewport) {
       this.clear();
@@ -76,6 +76,7 @@ export class SelectionOverlay {
     let skippedCount = 0;
     
     for (const cellKey of selectedCells) {
+      console.log('SelectionOverlay: Attempting to render cell', cellKey);
       const rendered = this.renderCell(cellKey, viewport);
       if (rendered) {
         renderedCount++;
@@ -83,6 +84,13 @@ export class SelectionOverlay {
         skippedCount++;
       }
     }
+    
+    console.log('SelectionOverlay: Render summary', {
+      totalSelected: selectedCells.size,
+      rendered: renderedCount,
+      skipped: skippedCount,
+      shapeCount: this.selectionShapes.size
+    });
     
     // Only log render summary for large selections with issues (avoid scroll spam)
     if (selectedCells.size > 100 && skippedCount > 0) {
@@ -92,6 +100,8 @@ export class SelectionOverlay {
         skipped: skippedCount
       });
     }
+    
+    // Batch draw to update the canvas
     
     this.layer.batchDraw();
     
@@ -110,12 +120,29 @@ export class SelectionOverlay {
   private renderCell(cellKey: string, viewport: ViewportInfo): boolean {
     const position = this.getPositionForCell(cellKey, viewport);
     if (!position) {
+      console.log('SelectionOverlay.renderCell: No position for cell', cellKey);
       // Cell is not in current viewport, skip rendering
       return false;
     }
     
     const parsed = this.coordinateSystem.parseCellKey(cellKey);
-    if (!parsed) return false;
+    if (!parsed) {
+      console.log('SelectionOverlay.renderCell: Failed to parse cell key', cellKey);
+      return false;
+    }
+    
+    console.log('SelectionOverlay.renderCell: Rendering cell', {
+      cellKey,
+      position,
+      parsed,
+      viewport: {
+        start: viewport.start,
+        end: viewport.end,
+        scrollTop: viewport.scrollTop,
+        height: viewport.height
+      },
+      isInViewport: position.y >= viewport.scrollTop && position.y <= (viewport.scrollTop + viewport.height)
+    });
     
     // Get or create shapes
     let shapes = this.selectionShapes.get(cellKey);
@@ -161,11 +188,20 @@ export class SelectionOverlay {
   
   private getPositionForCell(cellKey: string, viewport: ViewportInfo): { x: number; y: number } | null {
     const parsed = this.coordinateSystem.parseCellKey(cellKey);
-    if (!parsed) return null;
+    if (!parsed) {
+      console.log('SelectionOverlay.getPositionForCell: Failed to parse key', cellKey);
+      return null;
+    }
+    
+    console.log('SelectionOverlay.getPositionForCell: Getting position for', {
+      cellKey,
+      rowId: parsed.rowId,
+      columnId: parsed.columnId
+    });
     
     const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
     
-    // Position calculation working correctly
+    console.log('SelectionOverlay.getPositionForCell: Got position', position);
     
     return position;
   }

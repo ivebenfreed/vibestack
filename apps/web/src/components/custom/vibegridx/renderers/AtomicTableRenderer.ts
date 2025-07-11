@@ -329,10 +329,11 @@ export class AtomicTableRenderer {
     
     // Let native scrolling handle wheel events - it naturally bubbles at boundaries
     
-    // Cell interaction handlers
-    this.body.addEventListener('click', this.handleCellClick.bind(this));
+    // Cell interaction handlers - REMOVED to prevent duplicate events
+    // All mouse events are now handled at the VibeGridX level
+    // this.body.addEventListener('click', this.handleCellClick.bind(this));
     this.body.addEventListener('dblclick', this.handleCellDoubleClick.bind(this));
-    this.body.addEventListener('mousedown', this.handleMouseDown.bind(this));
+    // this.body.addEventListener('mousedown', this.handleMouseDown.bind(this));
     
     // Header interaction handlers
     this.header.addEventListener('click', this.handleHeaderClick.bind(this));
@@ -441,6 +442,7 @@ export class AtomicTableRenderer {
         };
         
         console.log('AtomicTableRenderer: Sending initial viewport to canvas overlay:', initialViewport);
+        // CRITICAL: Send initial viewport so overlay can render selections
         this.options.onScroll?.(initialViewport);
       });
       
@@ -810,12 +812,17 @@ export class AtomicTableRenderer {
   private handleCellClick(event: MouseEvent): void {
     const cellElement = (event.target as Element).closest(`.${CSS_CLASSES.CELL}`) as HTMLElement;
     
-    // Debug logging disabled - too verbose for normal operation
-    
     if (!cellElement) return;
     
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
+    
+    console.log('[AtomicTableRenderer] Cell clicked:', {
+      rowId,
+      columnId,
+      element: cellElement,
+      cellText: cellElement.textContent?.trim()
+    });
     
     // Ensure viewport has focus for keyboard events
     this.viewport.focus();
@@ -842,11 +849,15 @@ export class AtomicTableRenderer {
   }
   
   private handleHeaderClick(event: MouseEvent): void {
+    console.log('[AtomicTableRenderer] Header clicked:', event.target);
     const headerCell = (event.target as Element).closest('.vibegridx-header-cell') as HTMLElement;
+    console.log('[AtomicTableRenderer] Found header cell:', headerCell);
     if (!headerCell) return;
     
     const columnId = headerCell.dataset.column;
+    console.log('[AtomicTableRenderer] Column ID:', columnId);
     if (columnId) {
+      console.log('[AtomicTableRenderer] Calling onColumnClick with:', columnId, event);
       this.options.onColumnClick?.(columnId, event);
     }
   }

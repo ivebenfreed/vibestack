@@ -56,7 +56,7 @@ export interface EventHandlerRefs {
     startPos: { x: number; y: number } | null;
   }>;
   columns: Column[];
-  sortState?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  coordinateManagerRef?: MutableRefObject<any | null>; // VibeGridXCoordinateManager
 }
 
 export interface EventHandlerCallbacks {
@@ -77,27 +77,9 @@ export const createCellClickHandler = (
   callbacks: EventHandlerCallbacks
 ) => {
   return useCallback((rowId: string, columnId: string, event: MouseEvent) => {
-    // Log only for shift/ctrl clicks
-    if (event.shiftKey || event.ctrlKey) {
-      console.log('VibeGridX.handleCellClick:', { rowId, columnId, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey });
-    }
-    
-    const cellKey = `${rowId}:${columnId}`;
-    
-    // Update anchor for regular clicks
-    if (!event.shiftKey) {
-      refs.anchorCellRef.current = { rowId, columnId };
-    }
-    
-    // Send selection event to table machine for state management
-    tableSend({
-      type: 'selection.cell.select',
-      rowId,
-      columnId,
-      ctrlKey: event.ctrlKey,
-      shiftKey: event.shiftKey
-    });
-    
+    // This handler is no longer used since we handle clicks in mousedown/mouseup
+    // Keeping it for compatibility but it shouldn't be called
+    console.warn('VibeGridXEvents: Unexpected call to createCellClickHandler - this should not happen');
     callbacks.onCellClick?.(rowId, columnId);
   }, [tableSend, callbacks.onCellClick]);
 };
@@ -123,64 +105,27 @@ export const createColumnClickHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((columnId: string, event: MouseEvent) => {
+    console.log('[VibeGridXEvents] Column click handler called:', columnId, event);
+    
     // Find the column definition
     const column = refs.columns.find(c => c.id === columnId);
+    console.log('[VibeGridXEvents] Found column:', column);
+    
     if (!column || column.sortable === false) {
+      console.log('[VibeGridXEvents] Column not sortable, returning');
       return; // Column not sortable
     }
     
-    const field = column.field || columnId;
-    const currentSort = refs.sortState || [];
+    console.log('[VibeGridXEvents] Sending view.column.click event to XState');
     
-    // Find existing sort config for this field
-    const existingIndex = currentSort.findIndex(s => s.field === field);
-    const existing = existingIndex >= 0 ? currentSort[existingIndex] : null;
-    
-    let newSortConfig: Array<{ field: string; direction: 'asc' | 'desc' }>;
-    
-    if (event.shiftKey) {
-      // Multi-column sort
-      newSortConfig = [...currentSort];
-      
-      if (existing) {
-        // Toggle existing: asc -> desc -> remove
-        if (existing.direction === 'asc') {
-          newSortConfig[existingIndex] = { field, direction: 'desc' };
-        } else {
-          newSortConfig.splice(existingIndex, 1);
-        }
-      } else {
-        // Add new sort
-        newSortConfig.push({ field, direction: 'asc' });
-      }
-    } else {
-      // Single column sort
-      if (existing && currentSort.length === 1) {
-        // Toggle: asc -> desc -> none
-        if (existing.direction === 'asc') {
-          newSortConfig = [{ field, direction: 'desc' }];
-        } else {
-          newSortConfig = [];
-        }
-      } else {
-        // New single column sort
-        newSortConfig = [{ field, direction: 'asc' }];
-      }
-    }
-    
-    console.log(`[VibeGridX] Sorting column ${columnId}:`, {
-      field,
-      existing,
-      newSortConfig,
+    // Just send the column click event to XState - let it handle the logic
+    tableSend({
+      type: 'view.column.click',
+      columnId,
+      field: column.field || columnId,
       shiftKey: event.shiftKey
     });
-    
-    // Send sort event to view coordinator
-    tableSend({
-      type: 'view.sort.set',
-      sortBy: newSortConfig
-    });
-  }, [tableSend, refs.columns, refs.sortState]);
+  }, [tableSend, refs.columns]);
 };
 
 // ====================================
@@ -248,24 +193,12 @@ export const createKeyboardHandler = (
         
       case 'Escape':
         event.preventDefault();
+        console.log('Escape key pressed');
         
-        // Priority 1: Cancel copy/cut outline if it exists
-        if (refs.canvasOverlayRef.current?.hasClipboardOutline()) {
-          console.log('Escape: Clearing copy/cut outline');
-          refs.canvasOverlayRef.current.hideCopyIndicator();
-        } 
-        // Priority 2: Cancel fill operation if active
-        else if (refs.canvasOverlayRef.current?.hasFillOperation()) {
-          console.log('Escape: Canceling fill operation');
-          refs.canvasOverlayRef.current.overlayRenderer.cancelFill();
-        }
-        // Priority 3: Clear selection if nothing else to cancel
-        else if (refs.selectedCellsRef.current.size > 0) {
-          console.log('Escape: Clearing selection');
-          tableSend({
-            type: 'selection.clear'
-          });
-        }
+        // Send escape event to state machine - let it handle the priority logic
+        tableSend({
+          type: 'keyboard.escape'
+        });
         break;
         
       case 'Delete':
@@ -291,15 +224,7 @@ export const createKeyboardHandler = (
       case 'c':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Copy event triggered:', {
-            selectedCells: refs.selectedCellsRef.current.size,
-            cells: Array.from(refs.selectedCellsRef.current).slice(0, 5)
-          });
-          // Send copy event to overlay machine
-          if (refs.canvasOverlayRef.current?.overlayRenderer) {
-            refs.canvasOverlayRef.current.overlayRenderer.handleCopy(refs.selectedCellsRef.current);
-          }
-          console.log('Copy: Selected cells copied to clipboard');
+          console.log('Ctrl+C: Copy');
           tableSend({
             type: 'keyboard.copy'
           });
@@ -309,15 +234,7 @@ export const createKeyboardHandler = (
       case 'x':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Cut event triggered:', {
-            selectedCells: refs.selectedCellsRef.current.size,
-            cells: Array.from(refs.selectedCellsRef.current).slice(0, 5)
-          });
-          // Send cut event to overlay machine
-          if (refs.canvasOverlayRef.current?.overlayRenderer) {
-            refs.canvasOverlayRef.current.overlayRenderer.handleCut(refs.selectedCellsRef.current);
-          }
-          console.log('Cut: Selected cells cut to clipboard');
+          console.log('Ctrl+X: Cut');
           tableSend({
             type: 'keyboard.cut'
           });
@@ -327,15 +244,7 @@ export const createKeyboardHandler = (
       case 'v':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          console.log('Paste event triggered:', {
-            targetCell: refs.anchorCellRef.current,
-            selectedCells: refs.selectedCellsRef.current.size
-          });
-          // Send paste event to overlay machine
-          if (refs.canvasOverlayRef.current?.overlayRenderer) {
-            refs.canvasOverlayRef.current.overlayRenderer.handlePaste();
-          }
-          console.log('Paste: Pasting clipboard content');
+          console.log('Ctrl+V: Paste');
           tableSend({
             type: 'keyboard.paste'
           });
@@ -363,6 +272,8 @@ export const createScrollHandler = (
       return; // Skip this update
     }
     lastScrollTime = now;
+    
+    console.log('VibeGridXEvents: Sending viewport update to table machine', viewport);
     
     // Update viewport in table machine
     tableSend({
@@ -416,6 +327,12 @@ export const createMouseDownHandler = (
     const columnId = cellElement.dataset.columnId;
     if (!rowId || !columnId) return;
     
+    // Focus the grid container to enable keyboard events
+    const gridContainer = cellElement.closest('.vibegridx-container') as HTMLElement;
+    if (gridContainer && document.activeElement !== gridContainer) {
+      gridContainer.focus();
+    }
+    
     // Store drag start state
     refs.dragStateRef.current = {
       isDragging: false,
@@ -427,14 +344,8 @@ export const createMouseDownHandler = (
     const cellKey = `${rowId}:${columnId}`;
     
     if (!event.ctrlKey && !event.shiftKey) {
-      // Single cell selection - clear and select immediately
-      refs.selectedCellsRef.current = new Set([cellKey]);
-      refs.anchorCellRef.current = { rowId, columnId };
-      
-      // Update overlay immediately
-      updateSelectionWithDOM(refs.canvasOverlayRef.current, refs.selectedCellsRef.current);
-      
-      // Send selection event
+      // Single cell selection - send event to XState
+      // Don't update DOM directly - let XState handle it for consistency
       tableSend({
         type: 'selection.cell.select',
         rowId,
@@ -443,7 +354,7 @@ export const createMouseDownHandler = (
         shiftKey: false
       });
     }
-    // For ctrl/shift clicks, let the mouseup handler deal with it
+    // For ctrl/shift clicks, let the click handler deal with it
     
     // Prevent text selection
     event.preventDefault();
@@ -454,6 +365,9 @@ export const createMouseMoveHandler = (
   refs: EventHandlerRefs,
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
+  // Track last cell to avoid duplicate events
+  let lastCellKey: string | null = null;
+  
   return useCallback((event: MouseEvent) => {
     const dragState = refs.dragStateRef.current;
     if (!dragState.startCell || !dragState.startPos) return;
@@ -466,7 +380,7 @@ export const createMouseMoveHandler = (
       if (deltaX > 5 || deltaY > 5) {
         // Start drag selection
         dragState.isDragging = true;
-        // Starting drag selection
+        lastCellKey = `${dragState.startCell.rowId}:${dragState.startCell.columnId}`;
         
         tableSend({
           type: 'selection.drag.start',
@@ -485,24 +399,18 @@ export const createMouseMoveHandler = (
         const columnId = targetCell.dataset.columnId;
         
         if (rowId && columnId) {
-          // Calculate range selection
-          const rangeSelection = calculateRangeSelection(
-            dragState.startCell,
-            { rowId, columnId },
-            refs.integrationRef.current,
-            refs.columns
-          );
+          const currentCellKey = `${rowId}:${columnId}`;
           
-          // Update selection immediately for visual feedback
-          refs.selectedCellsRef.current = rangeSelection;
-          updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
-          
-          // Send drag move event to state machine
-          tableSend({
-            type: 'selection.drag.move',
-            currentCell: { rowId, columnId },
-            selectedCells: rangeSelection
-          });
+          // Only send update if we've moved to a different cell
+          if (currentCellKey !== lastCellKey) {
+            lastCellKey = currentCellKey;
+            
+            // Just send the current cell - let selection coordinator calculate the range
+            tableSend({
+              type: 'selection.drag.move',
+              currentCell: { rowId, columnId }
+            });
+          }
         }
       }
     }
@@ -517,12 +425,9 @@ export const createMouseUpHandler = (
     const dragState = refs.dragStateRef.current;
     
     if (dragState.isDragging) {
-      // Complete drag selection
-      // Completing drag selection
-      
+      // Just send drag end - selection coordinator already has the selection
       tableSend({
-        type: 'selection.drag.end',
-        selectedCells: refs.selectedCellsRef.current
+        type: 'selection.drag.end'
       });
     } else if (dragState.startCell && (event.ctrlKey || event.shiftKey)) {
       // It was a ctrl/shift click, handle special selection
@@ -535,29 +440,7 @@ export const createMouseUpHandler = (
           // Handle ctrl/shift click
           const cellKey = `${rowId}:${columnId}`;
           
-          if (event.ctrlKey) {
-            // Toggle selection
-            const newSelection = new Set(refs.selectedCellsRef.current);
-            if (newSelection.has(cellKey)) {
-              newSelection.delete(cellKey);
-            } else {
-              newSelection.add(cellKey);
-            }
-            refs.selectedCellsRef.current = newSelection;
-            updateSelectionWithDOM(refs.canvasOverlayRef.current, newSelection);
-          } else if (event.shiftKey && refs.anchorCellRef.current) {
-            // Range selection
-            const rangeSelection = calculateRangeSelection(
-              refs.anchorCellRef.current,
-              { rowId, columnId },
-              refs.integrationRef.current,
-              refs.columns
-            );
-            refs.selectedCellsRef.current = rangeSelection;
-            updateSelectionWithDOM(refs.canvasOverlayRef.current, rangeSelection);
-          }
-          
-          // Send selection event
+          // Send selection event - let XState handle all selection logic
           tableSend({
             type: 'selection.cell.select',
             rowId,
@@ -578,70 +461,3 @@ export const createMouseUpHandler = (
   }, [tableSend]);
 };
 
-// ====================================
-// HELPER FUNCTIONS
-// ====================================
-
-export const calculateRangeSelection = (
-  start: CellRef, 
-  end: CellRef, 
-  integration: EntityIntegrationLayer | null,
-  columns?: Column[]
-): Set<string> => {
-  const selection = new Set<string>();
-  
-  if (!integration) return selection;
-  
-  // Get all entity IDs and column IDs
-  const entities = integration.getAllEntityData();
-  
-  const entityIds = Object.keys(entities);
-  
-  // Use column IDs from column definitions passed as parameter
-  const columnIds = (columns || []).map(c => c.id);
-  
-  // Find indices
-  const startRowIndex = entityIds.indexOf(start.rowId);
-  const endRowIndex = entityIds.indexOf(end.rowId);
-  const startColIndex = columnIds.indexOf(start.columnId);
-  const endColIndex = columnIds.indexOf(end.columnId);
-  
-  // Debug logging removed to prevent spam during mouse drag
-  // console.log('calculateRangeSelection:', {
-  //   start,
-  //   end,
-  //   columnIds,
-  //   startColIndex,
-  //   endColIndex,
-  //   entityCount: entityIds.length,
-  //   startColumnId: start.columnId,
-  //   endColumnId: end.columnId,
-  //   columnsFromIntegration: columns
-  // });
-  
-  if (startRowIndex === -1 || endRowIndex === -1 || startColIndex === -1 || endColIndex === -1) {
-    console.warn('Invalid indices in range selection:', { startRowIndex, endRowIndex, startColIndex, endColIndex });
-    return selection;
-  }
-  
-  // Calculate range
-  const minRow = Math.min(startRowIndex, endRowIndex);
-  const maxRow = Math.max(startRowIndex, endRowIndex);
-  const minCol = Math.min(startColIndex, endColIndex);
-  const maxCol = Math.max(startColIndex, endColIndex);
-  
-  // Add all cells in range
-  for (let row = minRow; row <= maxRow; row++) {
-    for (let col = minCol; col <= maxCol; col++) {
-      const rowId = entityIds[row];
-      const columnId = columnIds[col];
-      if (rowId && columnId) {
-        selection.add(`${rowId}:${columnId}`);
-      }
-    }
-  }
-  
-  // Range selection completed - size: selection.size
-  
-  return selection;
-};

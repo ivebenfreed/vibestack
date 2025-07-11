@@ -29,6 +29,7 @@ import type { RenderState, TableRow, CellRef, Column } from './types';
 import type { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
 import type { EntityIntegrationLayer } from './integration/EntityIntegration';
+import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
 import './vibegridx.css';
 
 // ====================================
@@ -126,6 +127,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
   const subscriptionRef = useRef<any>(null);
+  const coordinateManagerRef = useRef<VibeGridXCoordinateManager | null>(null);
   const dragStateRef = useRef<{
     isDragging: boolean;
     startCell: CellRef | null;
@@ -139,19 +141,40 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const { tableConfig, tableId } = useTableConfiguration(props);
   const { tableState, tableSend, tableActor } = useTableMachine(tableConfig);
   
-  // Extract sort state from view coordinator (after tableState is available)
-  const sortState = useMemo(() => {
-    if (!tableState?.context?.actors?.viewCoordinator) return [];
-    try {
-      const viewSnapshot = tableState.context.actors.viewCoordinator.getSnapshot();
-      return viewSnapshot.context?.sortBy || [];
-    } catch {
-      return [];
+  // Initialize coordinate manager once
+  useEffect(() => {
+    if (!coordinateManagerRef.current && tableActor) {
+      coordinateManagerRef.current = createVibeGridXCoordinateManager();
+      console.log('VibeGridX: Coordinate manager created');
+      
+      // Immediately send coordinate manager to selection coordinator
+      tableSend({
+        type: 'COORDINATE_MANAGER_SET',
+        coordinateManager: coordinateManagerRef.current
+      });
+      
+      // Initialize with columns if available
+      if (columns.length > 0) {
+        coordinateManagerRef.current.updateColumns(columns);
+      }
+      
+      // Set up coordinate change listener
+      const unsubscribe = coordinateManagerRef.current.subscribe((event) => {
+        console.log('VibeGridX: Coordinate mapping changed:', event.type);
+        
+        // Notify selection coordinator when coordinates change
+        tableSend({
+          type: 'COORDINATE_MAPPING_CHANGED'
+        });
+      });
+      
+      // Store unsubscribe function
+      return unsubscribe;
     }
-  }, [tableState]);
-
+  }, [tableSend, tableActor, columns]);
+  
   // Refs object for event handlers
-  const refs: InitializationRefs & { columns: Column[]; sortState?: any[] } = {
+  const refs: InitializationRefs & { columns: Column[]; coordinateManagerRef: React.RefObject<VibeGridXCoordinateManager | null> } = {
     containerRef,
     overlayContainerRef,
     rendererRef,
@@ -161,8 +184,8 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     anchorCellRef,
     subscriptionRef,
     dragStateRef,
-    columns,
-    sortState
+    coordinateManagerRef,
+    columns
   };
   
   // Entity integration (pass columns)
@@ -185,6 +208,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // EVENT HANDLERS
   // ====================================
   
+  // Cell click is now handled by mousedown/mouseup to avoid duplicate events
   const handleCellClick = createCellClickHandler(refs, tableSend, eventCallbacks);
   const handleCellDoubleClick = createCellDoubleClickHandler(tableSend, eventCallbacks);
   const handleColumnClick = createColumnClickHandler(refs, tableSend);
@@ -281,8 +305,8 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     borderWidth: 2
   }, tableState);
   
-  // Selection state sync
-  useSelectionStateSync(tableActor, refs);
+  // Selection state sync - REMOVED: Now handled reactively through XState event flow
+  // useSelectionStateSync(tableActor, refs);
   
   // Update relationship data when it changes
   useEffect(() => {
@@ -416,22 +440,80 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         // Store last render state for canvas initialization
         (window as any).__vibegridx_last_renderstate = renderState;
         
-        // Update canvas overlay with data mappings
-        if (renderState.rows.length > 0 && canvasOverlayRef.current) {
-          // Get ALL row IDs from the integration layer, not just visible ones
-          const allEntities = integrationRef.current?.getAllEntityData() || {};
-          const allRowIds = Object.keys(allEntities);
-          const columnIds = columns.map(col => col.id);
+        // Update coordinate manager and canvas overlay with data mappings
+        if (renderState.rows.length > 0 && coordinateManagerRef.current) {
+          const sortBy = (snapshot.context.actors?.viewCoordinator?.getSnapshot()?.context?.sortBy) || [];
           
-          console.log('VibeGridX: Updating canvas data mappings', { 
-            allRowCount: allRowIds.length,
-            visibleRowCount: renderState.rows.length,
-            columnCount: columnIds.length 
+          // IMPORTANT: We need to use the SAME sorted order that the renderer will use
+          // The renderer applies its own sorting, so we need to match that exactly
+          let sortedRows = renderState.rows;
+          if (sortBy.length > 0) {
+            // Apply the same sorting logic as AtomicTableRenderer
+            sortedRows = [...renderState.rows].sort((a, b) => {
+              for (const sort of sortBy) {
+                const aValue = a.data[sort.field];
+                const bValue = b.data[sort.field];
+                
+                if (aValue === bValue) continue;
+                
+                let comparison = 0;
+                
+                if (aValue == null && bValue == null) {
+                  comparison = 0;
+                } else if (aValue == null) {
+                  comparison = 1; // null values go to the end
+                } else if (bValue == null) {
+                  comparison = -1;
+                } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+                  comparison = aValue - bValue;
+                } else if (aValue instanceof Date && bValue instanceof Date) {
+                  comparison = aValue.getTime() - bValue.getTime();
+                } else {
+                  comparison = String(aValue).localeCompare(String(bValue));
+                }
+                
+                if (comparison !== 0) {
+                  return sort.direction === 'desc' ? -comparison : comparison;
+                }
+              }
+              return 0;
+            });
+          }
+          
+          // Update coordinate manager with the SAME sorted data the renderer will use
+          coordinateManagerRef.current.updateRows(sortedRows, sortBy);
+          coordinateManagerRef.current.updateColumns(columns);
+          
+          console.log('VibeGridX: Updated coordinate manager', { 
+            rowCount: sortedRows.length,
+            columnCount: columns.length,
+            sortBy: sortBy,
+            firstRowId: sortedRows[0]?.id,
+            lastRowId: sortedRows[sortedRows.length - 1]?.id
           });
           
-          // Update coordinate system with ALL rows so it can track positions
-          // for selected cells even when they're not visible
-          canvasOverlayRef.current.updateDataMappings(allRowIds, columnIds);
+          // Notify selection coordinator of coordinate mapping changes
+          tableSend({
+            type: 'COORDINATE_MANAGER_SET',
+            coordinateManager: coordinateManagerRef.current
+          });
+          
+          // Update canvas overlay with sorted row IDs in the correct order
+          if (canvasOverlayRef.current) {
+            const sortedRowIds = sortedRows.map(row => row.id);
+            const columnIds = coordinateManagerRef.current.getColumnIds();
+            
+            console.log('VibeGridX: Updating canvas data mappings', { 
+              sortedRowCount: sortedRowIds.length,
+              visibleRowCount: sortedRows.length,
+              columnCount: columnIds.length,
+              firstRowId: sortedRowIds[0],
+              lastRowId: sortedRowIds[sortedRowIds.length - 1]
+            });
+            
+            // Update coordinate system with sorted rows so overlay positions match table
+            canvasOverlayRef.current.updateDataMappings(sortedRowIds, columnIds);
+          }
         }
         
         // HYBRID RENDERING: Only process data changes

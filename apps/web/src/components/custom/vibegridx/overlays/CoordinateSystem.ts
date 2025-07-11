@@ -16,7 +16,7 @@ export class CoordinateSystem {
   
   // Dimension manager reference
   private dimensionManager: ColumnDimensionManager | null = null;
-  private columns: Column[] = [];
+  public columns: Column[] = [];
   
   // Column caches - these are worth keeping since they avoid iteration
   private columnOffsetCache: Map<string, number> = new Map();
@@ -58,6 +58,15 @@ export class CoordinateSystem {
     rowIds: string[], 
     columnIds: string[]
   ): void {
+    console.log('CoordinateSystem.updateMappings: Updating with new data order', {
+      rowCount: rowIds.length,
+      columnCount: columnIds.length,
+      firstFewRows: rowIds.slice(0, 5),
+      lastFewRows: rowIds.slice(-5),
+      columns: columnIds,
+      // Log specific row we're tracking
+      trackedRowIndex: rowIds.indexOf('0fd83795-24be-4f8c-8a0f-cb085d23bc9a')
+    });
     
     this.rowIndexMap.clear();
     this.columnIndexMap.clear();
@@ -130,12 +139,14 @@ export class CoordinateSystem {
 
   // Convert viewport coordinates to cell indices
   viewportToCell(x: number, y: number, viewport: ViewportInfo): CellPosition | null {
-    // Canvas is at top: 0, so we need to account for scroll position
-    // Y coordinate is absolute position in the canvas
-    const row = Math.floor(y / this.config.cellHeight);
+    // Canvas is transformed by scroll, so input coordinates are relative to viewport
+    // We need to convert back to absolute positions
+    const absoluteY = y + viewport.scrollTop;
+    const absoluteX = x + (viewport.scrollLeft || 0);
+    const row = Math.floor(absoluteY / this.config.cellHeight);
     
-    // Find column by x position using actual column widths
-    const columnInfo = this.getColumnByX(x);
+    // Find column by absolute x position using actual column widths
+    const columnInfo = this.getColumnByX(absoluteX);
     if (!columnInfo) {
       return null;
     }
@@ -147,8 +158,8 @@ export class CoordinateSystem {
     }
 
     return {
-      x: this.getColumnOffset(columnInfo.columnId),
-      y: y, // Y is already relative to canvas
+      x: x, // Keep x relative to viewport for consistency
+      y: y, // Keep y relative to viewport for consistency
       row,
       column: columnInfo.columnIndex
     };
@@ -160,22 +171,22 @@ export class CoordinateSystem {
     const columnId = this.indexToColumnId.get(column);
     if (!columnId) {
       // Fallback to old calculation if column not found  
-      const x = column * this.config.cellWidth;
+      const x = column * this.config.cellWidth - (viewport.scrollLeft || 0);
       
-      // Use absolute positions - canvas transform handles scroll positioning
-      const y = row * this.config.cellHeight;
+      // Canvas is transformed by scrollTop, so shapes need to be positioned
+      // relative to the current viewport, not absolute document position
+      const y = row * this.config.cellHeight - viewport.scrollTop;
       
       
       return { x, y, row, column };
     }
     
-    // Use actual column offset and subtract horizontal scroll to get viewport-relative position
+    // Get column position and adjust for horizontal scroll
     const x = this.getColumnOffset(columnId) - (viewport.scrollLeft || 0);
     
-    // Use viewport scrollTop for consistent positioning  
+    // Canvas is transformed by scrollTop, so we need to position shapes
+    // relative to the current viewport, not absolute document position
     const y = row * this.config.cellHeight - viewport.scrollTop;
-
-    // Debug removed - was causing error
 
     return { x, y, row, column };
   }
@@ -190,11 +201,23 @@ export class CoordinateSystem {
     const columnIndex = this.columnIndexMap.get(columnId);
 
     if (rowIndex === undefined || columnIndex === undefined) {
+      console.log('CoordinateSystem.getCellPositionByIds: Missing mapping', {
+        rowId,
+        columnId,
+        rowIndex,
+        columnIndex,
+        totalRows: this.rowIndexMap.size,
+        totalColumns: this.columnIndexMap.size,
+        sampleRowMappings: Array.from(this.rowIndexMap.entries()).slice(0, 3),
+        sampleColumnMappings: Array.from(this.columnIndexMap.entries()).slice(0, 3)
+      });
       return null;
     }
 
     // Direct calculation - no caching needed
-    return this.cellToViewport(rowIndex, columnIndex, viewport);
+    const position = this.cellToViewport(rowIndex, columnIndex, viewport);
+    // Reduced logging - only log errors or important state changes
+    return position;
   }
 
   // Convert cell indices to IDs
@@ -209,10 +232,23 @@ export class CoordinateSystem {
   isCellVisible(row: number, column: number, viewport: ViewportInfo): boolean {
     const position = this.cellToViewport(row, column, viewport);
     
-    return position.y >= -this.config.cellHeight && 
+    // Since position.y is now relative to viewport (0 = top of viewport),
+    // we check if it's within the viewport height
+    const isVisible = position.y >= -this.config.cellHeight && 
            position.y <= viewport.height + this.config.cellHeight &&
            position.x >= 0 &&
            position.x <= viewport.width;
+           
+    console.log('CoordinateSystem.isCellVisible:', {
+      row,
+      column,
+      position,
+      viewportHeight: viewport.height,
+      viewportWidth: viewport.width,
+      isVisible
+    });
+    
+    return isVisible;
   }
 
   // Get visible cell range for the current viewport

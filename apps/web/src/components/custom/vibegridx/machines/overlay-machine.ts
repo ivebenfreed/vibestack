@@ -77,6 +77,7 @@ export type OverlayEvent =
   | { type: 'CUT'; cells: Set<string> }
   | { type: 'PASTE' }
   | { type: 'CLEAR_CLIPBOARD' }
+  | { type: 'ESCAPE' }
   | { type: 'RENDER_COMPLETE'; duration: number };
 
 // ====================================
@@ -88,9 +89,21 @@ export const overlayMachine = createMachine({
   types: {} as {
     context: OverlayContext;
     events: OverlayEvent;
+    input: {
+      initialViewport?: ViewportInfo | null;
+    };
   },
-  context: {
-    viewport: null,
+  context: ({ input }) => ({
+    // Use viewport from input if provided, otherwise use default
+    viewport: input?.initialViewport || {
+      start: 0,
+      end: 50,
+      height: 600,
+      width: 800,
+      scrollTop: 0,
+      scrollLeft: 0,
+      itemHeight: 40
+    } as ViewportInfo,
     selectedCells: new Set(),
     selectionBounds: null,
     anchorCell: null,
@@ -108,8 +121,52 @@ export const overlayMachine = createMachine({
     },
     lastRenderTime: 0,
     renderCount: 0
-  },
+  }),
   type: 'parallel',
+  // Global event handlers that work across all parallel states
+  on: {
+    ESCAPE: {
+      actions: [
+        ({ context }) => {
+          console.log('OverlayMachine: ESCAPE received', {
+            hasClipboard: !!context.clipboardState,
+            hasFillState: !!context.fillState,
+            hasSelection: context.selectedCells.size > 0
+          });
+        },
+        // Priority 1: Clear clipboard visual (copy/cut outline)
+        assign({
+          clipboardState: ({ context }) => {
+            if (context.clipboardState) {
+              console.log('OverlayMachine: Clearing clipboard state');
+              return null;
+            }
+            return context.clipboardState;
+          },
+          shapesVisible: ({ context }) => ({
+            ...context.shapesVisible,
+            copyIndicator: false
+          })
+        }),
+        // Priority 2: Cancel fill operation
+        assign({
+          fillState: ({ context }) => {
+            if (context.fillState) {
+              console.log('OverlayMachine: Canceling fill operation');
+              return null;
+            }
+            return context.fillState;
+          },
+          shapesVisible: ({ context }) => ({
+            ...context.shapesVisible,
+            fillHandle: context.fillState ? false : context.shapesVisible.fillHandle,
+            fillPreview: false
+          })
+        })
+        // Note: Selection clearing is handled by selection coordinator
+      ]
+    }
+  },
   states: {
     // Selection management
     selection: {
@@ -118,13 +175,25 @@ export const overlayMachine = createMachine({
         idle: {
           on: {
             CELL_CLICK: {
-              actions: ['handleCellClick', 'emitSelectionChange']
+              // Don't emit selection change - this is a reactive update from table machine
+              actions: ['handleCellClick']
             },
             RANGE_SELECT: {
-              actions: ['handleRangeSelect', 'emitSelectionChange']
+              // Don't emit selection change - this is a reactive update
+              actions: ['handleRangeSelect']
             },
             SELECTION_UPDATE: {
-              actions: ['updateSelection', 'calculateSelectionBounds']
+              actions: [
+                ({ context, event }) => {
+                  console.log('OverlayMachine: Received SELECTION_UPDATE', {
+                    eventType: event.type,
+                    cellsSize: event.cells?.size || 0,
+                    previousSelectedSize: context.selectedCells.size
+                  });
+                },
+                'updateSelection', 
+                'calculateSelectionBounds'
+              ]
             },
             FILL_START: {
               target: 'filling',
