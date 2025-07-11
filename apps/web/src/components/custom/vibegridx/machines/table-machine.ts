@@ -574,6 +574,43 @@ export const tableBaseMachine = setup({
                     ({ event }) => event)
                 },
                 
+                // Column drag events
+                'view.columns.drag.start': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.drag.move': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.drag.end': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.drag.cancel': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.order.set': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.order.reset': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
                 'view.filter.set': {
                   guard: 'canPerformOperation',
                   actions: sendTo(({ context }) => context.actors.viewCoordinator!, 

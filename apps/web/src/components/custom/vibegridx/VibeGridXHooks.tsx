@@ -217,12 +217,14 @@ export const useRenderStateExtractor = (
       // Safely extract view state
       let sortBy = [];
       let columnVisibility = {};
+      let columnOrder = [];
       if (viewCoordinator) {
         try {
           const viewSnapshot = viewCoordinator.getSnapshot();
           groupedData = viewSnapshot.context?.groupedData || [];
           sortBy = viewSnapshot.context?.sortBy || [];
           columnVisibility = viewSnapshot.context?.columnVisibility || {};
+          columnOrder = viewSnapshot.context?.columnOrder || [];
           
           // Debug log
           if (sortBy.length > 0) {
@@ -231,6 +233,9 @@ export const useRenderStateExtractor = (
           if (Object.keys(columnVisibility).length > 0) {
             const hiddenCount = Object.values(columnVisibility).filter(visible => !visible).length;
             console.log('[RenderStateExtractor] Extracted columnVisibility:', { hiddenCount });
+          }
+          if (columnOrder.length > 0) {
+            console.log('[RenderStateExtractor] Extracted columnOrder:', columnOrder.length);
           }
         } catch (error) {
           console.warn('Failed to get view coordinator snapshot:', error);
@@ -246,7 +251,8 @@ export const useRenderStateExtractor = (
         optimisticOperations,
         version: snapshot.context.version || 0,
         sortBy, // Add sort state to render state
-        columnVisibility // Add column visibility state to render state
+        columnVisibility, // Add column visibility state to render state
+        columnOrder // Add column order to render state
       };
       
       console.log('Final render state:', {

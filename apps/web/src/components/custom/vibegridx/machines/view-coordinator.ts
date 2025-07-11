@@ -7,7 +7,8 @@ import type {
   ViewportInfo, 
   Column, 
   TableRow,
-  TableEvents 
+  TableEvents,
+  ColumnDragState 
 } from '../types';
 
 // ====================================
@@ -300,6 +301,9 @@ interface ViewCoordinatorContext extends ViewContext {
   // Performance metrics
   lastProcessTime: number;
   processedItemCount: number;
+  
+  // Column drag state
+  columnDragState: ColumnDragState;
 }
 
 // Helper function to calculate hidden column count
@@ -317,6 +321,12 @@ type ViewEvents =
   | { type: 'view.columns.show.all' }
   | { type: 'view.columns.hide.all' }
   | { type: 'view.columns.visibility.set'; visibility: Record<string, boolean> }
+  | { type: 'view.columns.drag.start'; columnId: string; x: number; y: number }
+  | { type: 'view.columns.drag.move'; x: number; y: number }
+  | { type: 'view.columns.drag.end'; targetIndex: number }
+  | { type: 'view.columns.drag.cancel' }
+  | { type: 'view.columns.order.set'; order: string[] }
+  | { type: 'view.columns.order.reset' }
   // Internal events
   | { type: 'COLUMNS_CHANGED'; columns: Column[] }
   | { type: 'ROWS_UPDATED'; rows: TableRow[] }
@@ -616,6 +626,120 @@ export const viewCoordinatorMachine = setup({
         return calculateHiddenCount(event.visibility);
       },
       version: ({ context }) => context.version + 1
+    }),
+    
+    // Column drag actions
+    startColumnDrag: assign({
+      columnDragState: ({ context, event }) => {
+        if (event.type !== 'view.columns.drag.start') return context.columnDragState;
+        
+        const columnIndex = context.columnOrder.indexOf(event.columnId);
+        return {
+          isDragging: true,
+          draggedColumnId: event.columnId,
+          draggedColumnIndex: columnIndex,
+          currentDropIndex: columnIndex,
+          mouseX: event.x,
+          mouseY: event.y
+        };
+      }
+    }),
+    
+    updateColumnDrag: assign({
+      columnDragState: ({ context, event }) => {
+        if (event.type !== 'view.columns.drag.move' || !context.columnDragState.isDragging) {
+          return context.columnDragState;
+        }
+        
+        return {
+          ...context.columnDragState,
+          mouseX: event.x,
+          mouseY: event.y
+        };
+      }
+    }),
+    
+    endColumnDrag: assign({
+      columnOrder: ({ context, event }) => {
+        if (event.type !== 'view.columns.drag.end' || !context.columnDragState.isDragging) {
+          return context.columnOrder;
+        }
+        
+        const fromIndex = context.columnDragState.draggedColumnIndex;
+        const toIndex = event.targetIndex;
+        
+        if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) {
+          return context.columnOrder;
+        }
+        
+        // Reorder columns
+        const newOrder = [...context.columnOrder];
+        const [removed] = newOrder.splice(fromIndex, 1);
+        newOrder.splice(toIndex, 0, removed);
+        
+        // Persist to localStorage
+        if (context.entityType && typeof window !== 'undefined') {
+          localStorage.setItem(
+            `vibegridx-column-order-${context.entityType}`,
+            JSON.stringify(newOrder)
+          );
+        }
+        
+        console.log('ViewCoordinator: Column reordered', { from: fromIndex, to: toIndex });
+        return newOrder;
+      },
+      columnDragState: () => ({
+        isDragging: false,
+        draggedColumnId: null,
+        draggedColumnIndex: -1,
+        currentDropIndex: -1,
+        mouseX: 0,
+        mouseY: 0
+      }),
+      version: ({ context }) => context.version + 1
+    }),
+    
+    cancelColumnDrag: assign({
+      columnDragState: () => ({
+        isDragging: false,
+        draggedColumnId: null,
+        draggedColumnIndex: -1,
+        currentDropIndex: -1,
+        mouseX: 0,
+        mouseY: 0
+      })
+    }),
+    
+    setColumnOrder: assign({
+      columnOrder: ({ event }) => {
+        if (event.type !== 'view.columns.order.set') return [];
+        
+        // Persist to localStorage
+        const context = event as any;
+        if (context.entityType && typeof window !== 'undefined') {
+          localStorage.setItem(
+            `vibegridx-column-order-${context.entityType}`,
+            JSON.stringify(event.order)
+          );
+        }
+        
+        return event.order;
+      },
+      version: ({ context }) => context.version + 1
+    }),
+    
+    resetColumnOrder: assign({
+      columnOrder: ({ context }) => {
+        const defaultOrder = context.columns.map(col => col.id);
+        
+        // Clear persisted order
+        if (context.entityType && typeof window !== 'undefined') {
+          localStorage.removeItem(`vibegridx-column-order-${context.entityType}`);
+        }
+        
+        return defaultOrder;
+      },
+      version: ({ context }) => context.version + 1
     })
   },
   
@@ -671,6 +795,21 @@ export const viewCoordinatorMachine = setup({
       console.log(`ViewCoordinator: Restored column visibility for ${entityType}, ${initialHiddenCount} hidden`);
     }
     
+    // Try to restore persisted column order
+    const persistedOrder = typeof window !== 'undefined' && entityType
+      ? localStorage.getItem(`vibegridx-column-order-${entityType}`)
+      : null;
+    
+    // Default column order is the order they were defined
+    const defaultOrder = input.columns.map(col => col.id);
+    const initialColumnOrder = persistedOrder 
+      ? JSON.parse(persistedOrder)
+      : defaultOrder;
+    
+    if (persistedOrder) {
+      console.log(`ViewCoordinator: Restored column order for ${entityType}`);
+    }
+    
     return {
       entityType,
       columns: input.columns,
@@ -692,29 +831,47 @@ export const viewCoordinatorMachine = setup({
       },
       columnVisibility: initialColumnVisibility,
       hiddenColumnCount: initialHiddenCount,
+      columnOrder: initialColumnOrder,
       
       isProcessing: false,
       processingQueue: [],
       lastProcessTime: 0,
       processedItemCount: 0,
-      version: 0
+      version: 0,
+      
+      // Initialize column drag state
+      columnDragState: {
+        isDragging: false,
+        draggedColumnId: null,
+        draggedColumnIndex: -1,
+        currentDropIndex: -1,
+        mouseX: 0,
+        mouseY: 0
+      }
     };
   },
   
   states: {
     idle: {
       entry: [
-        // If we have initial sort state or hidden columns, notify parent to trigger render
+        // If we have initial sort state, hidden columns, or custom column order, notify parent to trigger render
         ({ context }) => {
-          if (context.sortBy.length > 0 || context.hiddenColumnCount > 0) {
+          const hasInitialState = context.sortBy.length > 0 || 
+                                  context.hiddenColumnCount > 0 ||
+                                  JSON.stringify(context.columnOrder) !== JSON.stringify(context.columns.map(c => c.id));
+          if (hasInitialState) {
             console.log('ViewCoordinator: Notifying parent of initial view state', {
               sortBy: context.sortBy.length,
-              hiddenColumns: context.hiddenColumnCount
+              hiddenColumns: context.hiddenColumnCount,
+              hasCustomOrder: JSON.stringify(context.columnOrder) !== JSON.stringify(context.columns.map(c => c.id))
             });
           }
         },
         sendParent(({ context }) => {
-          if (context.sortBy.length > 0 || context.hiddenColumnCount > 0) {
+          const hasInitialState = context.sortBy.length > 0 || 
+                                  context.hiddenColumnCount > 0 ||
+                                  JSON.stringify(context.columnOrder) !== JSON.stringify(context.columns.map(c => c.id));
+          if (hasInitialState) {
             return {
               type: 'view.state.changed',
               viewState: {
@@ -722,7 +879,8 @@ export const viewCoordinatorMachine = setup({
                 filters: context.filters,
                 groupBy: context.groupBy,
                 columnVisibility: context.columnVisibility,
-                hiddenColumnCount: context.hiddenColumnCount
+                hiddenColumnCount: context.hiddenColumnCount,
+                columnOrder: context.columnOrder
               }
             };
           }
@@ -856,6 +1014,82 @@ export const viewCoordinatorMachine = setup({
                 groupBy: context.groupBy,
                 columnVisibility: context.columnVisibility,
                 hiddenColumnCount: context.hiddenColumnCount
+              }
+            }))
+          ]
+        },
+        
+        // Column drag events
+        'view.columns.drag.start': {
+          actions: ['startColumnDrag',
+            sendParent(({ context }) => ({
+              type: 'view.drag.started',
+              columnDragState: context.columnDragState
+            }))
+          ]
+        },
+        
+        'view.columns.drag.move': {
+          actions: ['updateColumnDrag',
+            sendParent(({ context }) => ({
+              type: 'view.drag.updated',
+              columnDragState: context.columnDragState
+            }))
+          ]
+        },
+        
+        'view.columns.drag.end': {
+          actions: ['endColumnDrag',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount,
+                columnOrder: context.columnOrder
+              }
+            }))
+          ]
+        },
+        
+        'view.columns.drag.cancel': {
+          actions: ['cancelColumnDrag',
+            sendParent(({ context }) => ({
+              type: 'view.drag.cancelled',
+              columnDragState: context.columnDragState
+            }))
+          ]
+        },
+        
+        'view.columns.order.set': {
+          actions: ['setColumnOrder',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount,
+                columnOrder: context.columnOrder
+              }
+            }))
+          ]
+        },
+        
+        'view.columns.order.reset': {
+          actions: ['resetColumnOrder',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount,
+                columnOrder: context.columnOrder
               }
             }))
           ]

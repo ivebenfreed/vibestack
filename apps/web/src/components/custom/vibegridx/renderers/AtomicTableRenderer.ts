@@ -257,7 +257,45 @@ export class AtomicTableRenderer {
     // Update dimensions without triggering full re-render to avoid infinite loop
     this.updateHeaderDimensions();
   }
+  
+  setColumnOrder(order: string[]): void {
+    console.log('[AtomicTableRenderer] Setting column order:', order);
+    
+    // Reorder columns based on the provided order
+    const orderedColumns: Column[] = [];
+    
+    // First add columns in the specified order
+    for (const columnId of order) {
+      const column = this.columns.find(col => col.id === columnId);
+      if (column) {
+        orderedColumns.push(column);
+      }
+    }
+    
+    // Then add any columns not in the order (in case of mismatch)
+    for (const column of this.columns) {
+      if (!order.includes(column.id)) {
+        orderedColumns.push(column);
+      }
+    }
+    
+    this.columns = orderedColumns;
+    this.updateVisibleColumns();
+    
+    // Update header dimensions and trigger re-render
+    this.updateHeaderDimensions();
+    
+    // Re-render the header with new order
+    const currentState = this.getLastRenderState();
+    if (currentState) {
+      this.renderHeader(currentState);
+    }
+  }
 
+  private getLastRenderState(): RenderState | null {
+    return this.lastRenderState;
+  }
+  
   // Update the list of visible columns based on visibility settings
   private updateVisibleColumns(): void {
     this.visibleColumns = this.columns.filter(column => {
@@ -418,6 +456,11 @@ export class AtomicTableRenderer {
     // Header interaction handlers
     this.header.addEventListener('click', this.handleHeaderClick.bind(this));
     
+    // Column drag handlers
+    this.header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
+    document.addEventListener('mousemove', this.handleDragMove.bind(this));
+    document.addEventListener('mouseup', this.handleDragEnd.bind(this));
+    
     // Make viewport focusable but don't add keyboard listener here
     // Keyboard events are handled at the VibeGridX component level to avoid duplication
     this.viewport.tabIndex = 0;
@@ -488,6 +531,11 @@ export class AtomicTableRenderer {
     // Update column visibility if provided in state
     if (sortedState.columnVisibility) {
       this.setColumnVisibility(sortedState.columnVisibility);
+    }
+    
+    // Apply column order from render state
+    if (sortedState.columnOrder && sortedState.columnOrder.length > 0) {
+      this.setColumnOrder(sortedState.columnOrder);
     }
     
     try {
@@ -707,20 +755,23 @@ export class AtomicTableRenderer {
         console.log(`[AtomicTableRenderer] Column ${column.id} has sort:`, sortInfo);
       }
       
-      // Build sort indicator
-      let sortIndicator = '';
+      // Add sort class if column is sorted
+      let sortClass = '';
       if (sortInfo) {
-        const arrow = sortInfo.direction === 'asc' ? '▲' : '▼';
-        const sortNumber = sortState.length > 1 ? `<sup>${sortIndex + 1}</sup>` : '';
-        sortIndicator = `<span class="vibegridx-sort-indicator">${arrow}${sortNumber}</span>`;
+        sortClass = sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc';
       }
       
       // Add sortable class if column is sortable
       const sortableClass = column.sortable !== false ? 'vibegridx-sortable' : '';
       
-      return `<div class="vibegridx-header-cell ${sortableClass}" data-column="${column.id}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
+      return `<div class="vibegridx-header-cell ${sortableClass} ${sortClass}" data-column="${column.id}" data-field="${field}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
         <span class="vibegridx-header-text">${column.name || column.id}</span>
-        ${sortIndicator}
+        <span class="vibegridx-sort-icon">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'asc' ? '1' : '0.3'}"/>
+            <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/>
+          </svg>
+        </span>
       </div>`;
     }).join('');
   }
@@ -957,18 +1008,217 @@ export class AtomicTableRenderer {
     // The renderer should only be responsible for rendering, not selection logic
   }
   
+  // Column drag state
+  private dragState: {
+    isDragging: boolean;
+    draggedColumnId: string | null;
+    startX: number;
+    startY: number;
+    offsetX: number;
+    offsetY: number;
+    dragPreview: HTMLElement | null;
+    dropIndicator: HTMLElement | null;
+  } = {
+    isDragging: false,
+    draggedColumnId: null,
+    startX: 0,
+    startY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    dragPreview: null,
+    dropIndicator: null
+  };
+  
+  private handleHeaderMouseDown(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
+    const sortIcon = target.closest('.vibegridx-sort-icon');
+    
+    // Don't start drag if clicking on sort icon
+    if (headerCell && !sortIcon) {
+      event.preventDefault();
+      
+      const columnId = headerCell.dataset.column;
+      if (columnId) {
+        // Calculate offset from click position to header cell position
+        const headerRect = headerCell.getBoundingClientRect();
+        const offsetX = event.clientX - headerRect.left;
+        const offsetY = event.clientY - headerRect.top;
+        
+        // Create drag preview
+        const columnText = headerCell.querySelector('.vibegridx-header-text')?.textContent || columnId;
+        const dragPreview = document.createElement('div');
+        dragPreview.className = 'vibegridx-drag-preview';
+        dragPreview.textContent = columnText;
+        // Position preview so text stays under cursor
+        dragPreview.style.left = `${event.clientX - offsetX}px`;
+        dragPreview.style.top = `${event.clientY - offsetY}px`;
+        document.body.appendChild(dragPreview);
+        
+        // Create drop indicator
+        const dropIndicator = document.createElement('div');
+        dropIndicator.className = 'vibegridx-drop-indicator';
+        this.headerViewport.appendChild(dropIndicator);
+        
+        this.dragState = {
+          isDragging: true,
+          draggedColumnId: columnId,
+          startX: event.clientX,
+          startY: event.clientY,
+          offsetX,
+          offsetY,
+          dragPreview,
+          dropIndicator
+        };
+        
+        // Add dragging class to header cell
+        headerCell.classList.add('vibegridx-dragging');
+        
+        // Notify parent component
+        this.options.onColumnDragStart?.(columnId, event.clientX, event.clientY);
+      }
+    }
+  }
+  
+  private handleDragMove(event: MouseEvent): void {
+    if (!this.dragState.isDragging || !this.dragState.dragPreview) return;
+    
+    event.preventDefault();
+    
+    // Update drag preview position maintaining the offset
+    this.dragState.dragPreview.style.left = `${event.clientX - this.dragState.offsetX}px`;
+    this.dragState.dragPreview.style.top = `${event.clientY - this.dragState.offsetY}px`;
+    
+    // Calculate drop position and update displacement
+    const headerRect = this.header.getBoundingClientRect();
+    const relativeX = event.clientX - headerRect.left + this.viewport.scrollLeft;
+    
+    // Find target position and update column displacement
+    let targetIndex = 0;
+    let accumulatedWidth = 0;
+    let dropX = 0;
+    
+    // Clear all displacement classes
+    this.header.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
+      const htmlCell = cell as HTMLElement;
+      htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right');
+      htmlCell.style.removeProperty('--drag-offset');
+    });
+    
+    // Find current position of dragged column
+    const draggedIndex = this.visibleColumns.findIndex(col => col.id === this.dragState.draggedColumnId);
+    
+    for (let i = 0; i < this.visibleColumns.length; i++) {
+      const column = this.visibleColumns[i];
+      const columnWidth = this.dimensionManager?.getColumnWidth(column.id) || 120;
+      const midPoint = accumulatedWidth + columnWidth / 2;
+      
+      if (relativeX < midPoint) {
+        targetIndex = i;
+        dropX = accumulatedWidth;
+        break;
+      }
+      
+      targetIndex = i + 1;
+      dropX = accumulatedWidth + columnWidth;
+      accumulatedWidth += columnWidth;
+    }
+    
+    // Get the width of the dragged column
+    const draggedColumn = this.visibleColumns[draggedIndex];
+    const draggedWidth = this.dimensionManager?.getColumnWidth(draggedColumn.id) || 120;
+    
+    // Apply displacement classes with proper offset
+    this.visibleColumns.forEach((column, index) => {
+      const cell = this.header.querySelector(`[data-column="${column.id}"]`) as HTMLElement;
+      if (cell && column.id !== this.dragState.draggedColumnId) {
+        if (draggedIndex < targetIndex && index >= draggedIndex && index < targetIndex) {
+          cell.classList.add('vibegridx-will-move-left');
+          cell.style.setProperty('--drag-offset', `-${draggedWidth}px`);
+        } else if (draggedIndex > targetIndex && index >= targetIndex && index < draggedIndex) {
+          cell.classList.add('vibegridx-will-move-right');
+          cell.style.setProperty('--drag-offset', `${draggedWidth}px`);
+        }
+      }
+    });
+    
+    // Update drop indicator position
+    if (this.dragState.dropIndicator) {
+      this.dragState.dropIndicator.style.left = `${dropX}px`;
+    }
+    
+    this.options.onColumnDragMove?.(event.clientX, event.clientY);
+  }
+  
+  private handleDragEnd(event: MouseEvent): void {
+    if (!this.dragState.isDragging) return;
+    
+    event.preventDefault();
+    
+    // Remove drag preview
+    if (this.dragState.dragPreview) {
+      this.dragState.dragPreview.remove();
+    }
+    
+    // Remove drop indicator
+    if (this.dragState.dropIndicator) {
+      this.dragState.dropIndicator.remove();
+    }
+    
+    // Remove all displacement classes
+    this.header.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
+      const htmlCell = cell as HTMLElement;
+      htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-dragging');
+      htmlCell.style.removeProperty('--drag-offset');
+    });
+    
+    // Calculate target index based on mouse position
+    const headerRect = this.header.getBoundingClientRect();
+    const relativeX = event.clientX - headerRect.left + this.viewport.scrollLeft;
+    
+    // Find target column index
+    let targetIndex = 0;
+    let accumulatedWidth = 0;
+    for (let i = 0; i < this.visibleColumns.length; i++) {
+      const columnWidth = this.dimensionManager?.getColumnWidth(this.visibleColumns[i].id) || 120;
+      if (relativeX > accumulatedWidth + columnWidth / 2) {
+        targetIndex = i + 1;
+      }
+      accumulatedWidth += columnWidth;
+    }
+    
+    // Reset drag state
+    this.dragState = {
+      isDragging: false,
+      draggedColumnId: null,
+      startX: 0,
+      startY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      dragPreview: null,
+      dropIndicator: null
+    };
+    
+    // Notify parent component
+    this.options.onColumnDragEnd?.(targetIndex);
+  }
+  
   private handleHeaderClick(event: MouseEvent): void {
-    console.log('[AtomicTableRenderer] Header clicked:', event.target);
-    const headerCell = (event.target as Element).closest('.vibegridx-header-cell') as HTMLElement;
-    console.log('[AtomicTableRenderer] Found header cell:', headerCell);
+    const target = event.target as HTMLElement;
+    const sortIcon = target.closest('.vibegridx-sort-icon');
+    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
+    
     if (!headerCell) return;
     
     const columnId = headerCell.dataset.column;
-    console.log('[AtomicTableRenderer] Column ID:', columnId);
-    if (columnId) {
-      console.log('[AtomicTableRenderer] Calling onColumnClick with:', columnId, event);
+    
+    // Only handle clicks on the sort icon itself
+    if (sortIcon && columnId) {
+      // Handle sort icon click
+      console.log('[AtomicTableRenderer] Sort icon clicked for column:', columnId);
       this.options.onColumnClick?.(columnId, event);
     }
+    // Remove the else clause - no sorting on general header clicks
   }
   
   

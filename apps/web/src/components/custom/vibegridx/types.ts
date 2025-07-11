@@ -282,6 +282,7 @@ export interface ViewContext {
   viewport: ViewportInfo;
   columnVisibility: Record<string, boolean>; // columnId -> visible
   hiddenColumnCount: number;
+  columnOrder: string[]; // Array of column IDs in display order
 }
 
 export interface DragContext {
@@ -289,6 +290,16 @@ export interface DragContext {
   dropTarget: DropTarget | null;
   isActive: boolean;
   constraints: Record<string, any>;
+}
+
+// Column drag state for header reordering
+export interface ColumnDragState {
+  isDragging: boolean;
+  draggedColumnId: string | null;
+  draggedColumnIndex: number;
+  currentDropIndex: number;
+  mouseX: number;
+  mouseY: number;
 }
 
 // ====================================
@@ -338,6 +349,13 @@ export type TableEvents =
   | { type: 'view.columns.show.all' }
   | { type: 'view.columns.hide.all' }
   | { type: 'view.columns.visibility.set'; visibility: Record<string, boolean> }
+  | { type: 'view.columns.drag.start'; columnId: string; x: number; y: number }
+  | { type: 'view.columns.drag.move'; x: number; y: number }
+  | { type: 'view.columns.drag.end'; targetIndex: number }
+  | { type: 'view.columns.drag.cancel' }
+  | { type: 'view.columns.reorder'; fromIndex: number; toIndex: number }
+  | { type: 'view.columns.order.set'; order: string[] }
+  | { type: 'view.columns.order.reset' }
   
   // Drag events
   | { type: 'drag.row.start'; rowId: string }
@@ -386,6 +404,9 @@ export interface RendererOptions {
   onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onCellDoubleClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onColumnClick?: (columnId: string, event: MouseEvent) => void;
+  onColumnDragStart?: (columnId: string, x: number, y: number) => void;
+  onColumnDragMove?: (x: number, y: number) => void;
+  onColumnDragEnd?: (targetIndex: number) => void;
   onStateChange?: (state: any) => void;
   onScroll?: (viewport: ViewportInfo) => void;
   onKeyDown?: (event: KeyboardEvent) => void;
@@ -416,4 +437,5 @@ export interface RenderState {
   version: number;
   sortBy?: SortConfig[]; // Current sort configuration
   columnVisibility?: Record<string, boolean>; // Column visibility state
+  columnOrder?: string[]; // Column order array
 }

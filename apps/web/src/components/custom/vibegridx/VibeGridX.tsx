@@ -17,6 +17,9 @@ import {
   createMouseDownHandler,
   createMouseMoveHandler,
   createMouseUpHandler,
+  createColumnDragStartHandler,
+  createColumnDragMoveHandler,
+  createColumnDragEndHandler,
   type EventHandlerRefs,
   type EventHandlerCallbacks
 } from './VibeGridXEvents';
@@ -217,10 +220,15 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const handleScroll = createScrollHandler(refs, tableSend);
   const handleRendererStateChange = createRendererStateChangeHandler(refs, eventCallbacks);
   
-  // Drag handlers
+  // Cell selection drag handlers
   const handleMouseDown = createMouseDownHandler(refs, tableSend);
   const handleMouseMove = createMouseMoveHandler(refs, tableSend);
   const handleMouseUp = createMouseUpHandler(refs, tableSend);
+  
+  // Column drag handlers
+  const handleColumnDragStart = createColumnDragStartHandler(tableSend);
+  const handleColumnDragMove = createColumnDragMoveHandler(tableSend);
+  const handleColumnDragEnd = createColumnDragEndHandler(tableSend);
   
   // ====================================
   // RENDERER INITIALIZATION
@@ -234,6 +242,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     onCellClick: handleCellClick,
     onCellDoubleClick: handleCellDoubleClick,
     onColumnClick: handleColumnClick,
+    onColumnDragStart: handleColumnDragStart,
+    onColumnDragMove: handleColumnDragMove,
+    onColumnDragEnd: handleColumnDragEnd,
     onStateChange: handleRendererStateChange,
     onScroll: handleScroll,
     onKeyDown: (event: KeyboardEvent) => {
@@ -359,6 +370,38 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         console.error(`VibeGridX Error in ${event.context}:`, event.error);
       });
       if (unsubError) unsubscribers.push(unsubError);
+      
+      // Column drag events
+      const unsubDragStarted = tableActor.on('view.drag.started', (event) => {
+        console.log('VibeGridX: Column drag started', event.columnDragState);
+        if (canvasOverlayRef.current && event.columnDragState) {
+          canvasOverlayRef.current.updateColumnDrag(
+            event.columnDragState,
+            event.columnDragState.mouseX,
+            event.columnDragState.mouseY
+          );
+        }
+      });
+      if (unsubDragStarted) unsubscribers.push(unsubDragStarted);
+      
+      const unsubDragUpdated = tableActor.on('view.drag.updated', (event) => {
+        if (canvasOverlayRef.current && event.columnDragState) {
+          canvasOverlayRef.current.updateColumnDrag(
+            event.columnDragState,
+            event.columnDragState.mouseX,
+            event.columnDragState.mouseY
+          );
+        }
+      });
+      if (unsubDragUpdated) unsubscribers.push(unsubDragUpdated);
+      
+      const unsubDragCancelled = tableActor.on('view.drag.cancelled', (event) => {
+        console.log('VibeGridX: Column drag cancelled');
+        if (canvasOverlayRef.current) {
+          canvasOverlayRef.current.updateColumnDrag(null, 0, 0);
+        }
+      });
+      if (unsubDragCancelled) unsubscribers.push(unsubDragCancelled);
     } catch (error) {
       console.warn('VibeGridX: Failed to set up event listeners:', error);
     }
@@ -425,6 +468,10 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       const lastColumnVisibility = (window as any).__vibegridx_last_columnvisibility;
       const columnVisibilityChanged = JSON.stringify(currentColumnVisibility) !== JSON.stringify(lastColumnVisibility);
       
+      const currentColumnOrder = viewCoordinatorSnapshot?.context?.columnOrder;
+      const lastColumnOrder = (window as any).__vibegridx_last_columnorder;
+      const columnOrderChanged = JSON.stringify(currentColumnOrder) !== JSON.stringify(lastColumnOrder);
+      
       if (sortChanged) {
         console.log('VibeGridX: Sort state changed:', currentSortState);
         (window as any).__vibegridx_last_sortstate = currentSortState;
@@ -435,10 +482,15 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         (window as any).__vibegridx_last_columnvisibility = currentColumnVisibility;
       }
       
-      // Skip if only selection changed (no data, sort, or column visibility changes)
+      if (columnOrderChanged) {
+        console.log('VibeGridX: Column order changed:', currentColumnOrder);
+        (window as any).__vibegridx_last_columnorder = currentColumnOrder;
+      }
+      
+      // Skip if only selection changed (no data, sort, column visibility, or column order changes)
       const isDataChange = hasDataChanged(snapshot);
       
-      if (!isDataChange && !sortChanged && !columnVisibilityChanged) {
+      if (!isDataChange && !sortChanged && !columnVisibilityChanged && !columnOrderChanged) {
         // Skip expensive processing for selection-only changes
         return;
       }
@@ -554,11 +606,17 @@ export const VibeGridX = <T extends Record<string, any> = any>(
               }
             }
           }, 50);
-        } else if (columnVisibilityChanged) {
-          // Column visibility changes only need renderer column update (no coordinate manager updates)
-          console.log('VibeGridX: COLUMN VISIBILITY CHANGE - Lightweight renderer update');
+        } else if (columnVisibilityChanged || columnOrderChanged) {
+          // Column visibility or order changes only need renderer column update (no coordinate manager updates)
+          console.log('VibeGridX: COLUMN CHANGE - Lightweight renderer update', {
+            visibilityChanged: columnVisibilityChanged,
+            orderChanged: columnOrderChanged
+          });
           if (renderState.columnVisibility && rendererRef.current) {
             rendererRef.current.setColumnVisibility(renderState.columnVisibility);
+          }
+          if (renderState.columnOrder && rendererRef.current) {
+            rendererRef.current.setColumnOrder(renderState.columnOrder);
           }
           // Skip expensive coordinate manager and canvas updates
           return;

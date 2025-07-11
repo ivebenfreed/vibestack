@@ -311,7 +311,35 @@ export const createRendererStateChangeHandler = (
 };
 
 // ====================================
-// DRAG HANDLERS
+// COLUMN DRAG HANDLERS
+// ====================================
+
+export const createColumnDragStartHandler = (
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((columnId: string, x: number, y: number) => {
+    tableSend({ type: 'view.columns.drag.start', columnId, x, y });
+  }, [tableSend]);
+};
+
+export const createColumnDragMoveHandler = (
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((x: number, y: number) => {
+    tableSend({ type: 'view.columns.drag.move', x, y });
+  }, [tableSend]);
+};
+
+export const createColumnDragEndHandler = (
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((targetIndex: number) => {
+    tableSend({ type: 'view.columns.drag.end', targetIndex });
+  }, [tableSend]);
+};
+
+// ====================================
+// CELL SELECTION DRAG HANDLERS
 // ====================================
 
 export const createMouseDownHandler = (

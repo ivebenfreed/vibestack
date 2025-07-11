@@ -9,8 +9,10 @@ import { FillHandleLayer } from './FillHandleLayer';
 import { SelectionOverlay } from './SelectionOverlay';
 import { ClipboardOverlay } from './ClipboardOverlay';
 import { DragPreviewOverlay } from './DragPreviewOverlay';
+import { ColumnDragOverlay } from './ColumnDragOverlay';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import type { RowDimensionManager } from '../dimensions/RowDimensionManager';
+import type { ColumnDragState } from '../types';
 
 // ====================================
 // SIMPLIFIED CANVAS OVERLAY
@@ -33,6 +35,7 @@ export class CanvasOverlay {
   private selectionOverlay: SelectionOverlay;
   private clipboardOverlay: ClipboardOverlay;
   private dragPreviewOverlay: DragPreviewOverlay;
+  private columnDragOverlay: ColumnDragOverlay;
   
   // Callbacks
   public onSelectionChange?: (selectedCells: Set<string>) => void;
@@ -99,6 +102,15 @@ export class CanvasOverlay {
         selectionBorderColor: this.config.selectionBorderColor,
         cellWidth: this.config.cellWidth,
         cellHeight: this.config.cellHeight
+      }
+    );
+    
+    this.columnDragOverlay = new ColumnDragOverlay(
+      this.layer,
+      this.config.dimensionManager as ColumnDimensionManager,
+      {
+        cellHeight: this.config.cellHeight,
+        headerHeight: 40 // Standard header height
       }
     );
     
@@ -249,6 +261,18 @@ export class CanvasOverlay {
     this.machine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
   }
   
+  updateColumnDrag(dragState: ColumnDragState | null, mouseX: number, mouseY: number): void {
+    if (dragState && dragState.isDragging) {
+      this.columnDragOverlay.updateDragPreview(dragState, mouseX, mouseY);
+    } else {
+      this.columnDragOverlay.clear();
+    }
+  }
+  
+  getColumnDropIndex(mouseX: number): number {
+    return this.columnDragOverlay.getDropIndex(mouseX);
+  }
+  
   updateViewport(viewport: ViewportInfo): void {
     // Transform both vertically and horizontally to keep canvas in viewport
     this.container.style.transform = `translate(${viewport.scrollLeft}px, ${viewport.scrollTop}px)`;
@@ -340,6 +364,7 @@ export class CanvasOverlay {
     this.selectionOverlay.destroy();
     this.clipboardOverlay.destroy();
     this.dragPreviewOverlay.destroy();
+    this.columnDragOverlay.destroy();
     
     // Destroy layers
     this.fillHandleLayer.destroy();

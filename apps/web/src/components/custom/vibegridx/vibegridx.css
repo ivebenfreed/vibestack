@@ -5,7 +5,7 @@
 
 /* CSS Variables for dynamic configuration */
 :root {
-  --vibegridx-header-height: 32px;
+  --vibegridx-header-height: 40px;
   --vibegridx-cell-height: 40px;
   --vibegridx-cell-width: 120px;
 }
@@ -15,7 +15,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid #e5e7eb;
   border-radius: var(--radius);
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -50,10 +50,7 @@
 .vibegridx-header-viewport {
   overflow: hidden;
   position: relative;
-  border-bottom: 1px solid hsl(var(--border));
   background: hsl(var(--muted));
-  /* DEBUG: Purple outline for header viewport - REMOVE AFTER DEBUGGING */
-  /* box-shadow: inset 0 0 0 2px purple; */
 }
 
 .vibegridx-header {
@@ -70,20 +67,33 @@
 
 .vibegridx-header-cell {
   padding: 8px 12px;
-  border-right: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
+  border-left: none;
   /* Width now set dynamically via inline styles */
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
+  justify-content: flex-start; /* Align text to left */
+  cursor: grab;
   user-select: none;
   transition: background-color 0.1s;
   flex-shrink: 0;
   box-sizing: border-box;
+  position: relative;
 }
 
+.vibegridx-header-cell:active {
+  cursor: grabbing;
+}
+
+/* First header cell needs left border */
+.vibegridx-header-cell:first-child {
+  border-left: 1px solid var(--border);
+}
+
+
 .vibegridx-header-cell:hover {
-  background-color: hsl(var(--muted) / 0.8);
+  background-color: hsl(var(--accent));
+  z-index: 1; /* Ensure hover state shows above adjacent cells */
 }
 
 .vibegridx-header-cell.vibegridx-sortable {
@@ -91,10 +101,10 @@
 }
 
 .vibegridx-header-text {
-  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
 }
 
 .vibegridx-sort-indicator {
@@ -109,6 +119,97 @@
 .vibegridx-sort-indicator sup {
   font-size: 8px;
   line-height: 1;
+}
+
+/* Sort dropdown icon */
+.vibegridx-sort-icon {
+  margin-left: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 0;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.vibegridx-header-cell:hover .vibegridx-sort-icon {
+  opacity: 0.5;
+}
+
+.vibegridx-sort-icon:hover {
+  opacity: 0.8 !important;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--accent));
+}
+
+/* Active sort states */
+.vibegridx-header-cell.sort-asc .vibegridx-sort-icon,
+.vibegridx-header-cell.sort-desc .vibegridx-sort-icon {
+  opacity: 1;
+  color: hsl(var(--primary));
+}
+
+.vibegridx-sort-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Hide the old sort indicator */
+.vibegridx-sort-indicator {
+  display: none;
+}
+
+/* Column being dragged */
+.vibegridx-header-cell.vibegridx-dragging {
+  opacity: 0;
+  cursor: grabbing;
+  transition: none;
+}
+
+/* Drag preview */
+.vibegridx-drag-preview {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  padding: 8px 12px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--primary));
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+  font-size: 12px;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+  opacity: 0.9;
+}
+
+/* Column displacement during drag */
+.vibegridx-header-cell.vibegridx-will-move-left {
+  transform: translateX(var(--drag-offset, -120px));
+  transition: transform 0.2s ease-out;
+}
+
+.vibegridx-header-cell.vibegridx-will-move-right {
+  transform: translateX(var(--drag-offset, 120px));
+  transition: transform 0.2s ease-out;
+}
+
+/* Drop indicator */
+.vibegridx-drop-indicator {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background-color: hsl(var(--primary));
+  pointer-events: none;
+  z-index: 10;
+  transition: left 0.2s ease-out;
 }
 
 /* Viewport */
@@ -138,7 +239,6 @@
 /* Rows */
 .vibegridx-row {
   display: flex;
-  border-bottom: 1px solid hsl(var(--border));
   background: hsl(var(--background));
   box-sizing: border-box;
 }
@@ -150,7 +250,9 @@
 /* Cells */
 .vibegridx-cell {
   padding: 8px 12px;
-  border-right: 1px solid hsl(var(--border));
+  border: 1px solid var(--border);
+  border-left: none;
+  border-top: none;
   /* Width and height now set dynamically via inline styles */
   box-sizing: border-box;
   display: flex;
@@ -162,6 +264,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* First cell in row needs left border */
+.vibegridx-cell:first-child {
+  border-left: 1px solid var(--border);
 }
 
 /* Selection States */
