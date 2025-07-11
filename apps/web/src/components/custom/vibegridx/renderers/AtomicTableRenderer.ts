@@ -508,6 +508,7 @@ export class AtomicTableRenderer {
   // ====================================
   
   render(state: RenderState): void {
+    console.log('[AtomicTableRenderer] render called with state version:', state.version);
     this.renderStartTime = performance.now();
     
     // Apply sorting to rows if sort configuration exists
@@ -720,6 +721,7 @@ export class AtomicTableRenderer {
   }
   
   private renderHeader(state: RenderState): void {
+    console.log('[AtomicTableRenderer] renderHeader called');
     if (!state.rows.length) return;
     
     // Use visible columns from configuration if available, otherwise generate from data
@@ -772,6 +774,7 @@ export class AtomicTableRenderer {
             <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/>
           </svg>
         </span>
+        <div class="vibegridx-resize-handle" data-column="${column.id}"></div>
       </div>`;
     }).join('');
   }
@@ -906,8 +909,10 @@ export class AtomicTableRenderer {
                    data-column-id="${column.id}"
                    data-cell-key="${cellKey}"
                    role="gridcell"
-                   style="position: absolute; left: ${xOffset}px; width: ${width}px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box;">
-                ${cellContent}
+                   style="position: absolute; left: ${xOffset}px; width: ${width}px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box; overflow: hidden;">
+                <div style="width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 12px; box-sizing: border-box;">
+                  ${cellContent}
+                </div>
               </div>`;
     });
     
@@ -1028,14 +1033,51 @@ export class AtomicTableRenderer {
     dragPreview: null,
     dropIndicator: null
   };
+
+  // Resize state tracking (preview handled by overlay)
+  private isResizing: boolean = false;
   
   private handleHeaderMouseDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
     const sortIcon = target.closest('.vibegridx-sort-icon');
+    const resizeHandle = target.closest('.vibegridx-resize-handle');
+    
+    console.log('[AtomicTableRenderer] handleHeaderMouseDown', {
+      target: target.className,
+      hasResizeHandle: !!resizeHandle,
+      hasSortIcon: !!sortIcon,
+      hasHeaderCell: !!headerCell
+    });
+    
+    // Handle resize
+    if (resizeHandle) {
+      event.preventDefault();
+      const columnId = (resizeHandle as HTMLElement).dataset.column;
+      console.log('[AtomicTableRenderer] Resize handle clicked', { columnId });
+      
+      if (columnId && this.dimensionManager) {
+        const currentWidth = this.dimensionManager.getColumnWidth(columnId) || 120;
+        console.log('[AtomicTableRenderer] Sending resize start event', { columnId, currentWidth });
+        
+        // Send resize start event to XState
+        this.options.onColumnResizeStart?.(columnId, event.clientX, currentWidth);
+        
+        // Set resizing state
+        this.isResizing = true;
+        
+        // Add resizing class to container
+        this.container.classList.add('vibegridx-resizing');
+        
+        // Add global mouse event listeners
+        document.addEventListener('mousemove', this.handleResizeMove);
+        document.addEventListener('mouseup', this.handleResizeEnd);
+      }
+      return;
+    }
     
     // Don't start drag if clicking on sort icon
-    if (headerCell && !sortIcon) {
+    if (headerCell && !sortIcon && !resizeHandle) {
       event.preventDefault();
       
       const columnId = headerCell.dataset.column;
@@ -1081,6 +1123,9 @@ export class AtomicTableRenderer {
   }
   
   private handleDragMove(event: MouseEvent): void {
+    // Skip if we're resizing
+    if (this.isResizing) return;
+    
     if (!this.dragState.isDragging || !this.dragState.dragPreview) return;
     
     event.preventDefault();
@@ -1151,6 +1196,9 @@ export class AtomicTableRenderer {
   }
   
   private handleDragEnd(event: MouseEvent): void {
+    // Skip if we're resizing
+    if (this.isResizing) return;
+    
     if (!this.dragState.isDragging) return;
     
     event.preventDefault();
@@ -1207,8 +1255,9 @@ export class AtomicTableRenderer {
     const target = event.target as HTMLElement;
     const sortIcon = target.closest('.vibegridx-sort-icon');
     const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
+    const resizeHandle = target.closest('.vibegridx-resize-handle');
     
-    if (!headerCell) return;
+    if (!headerCell || resizeHandle) return;
     
     const columnId = headerCell.dataset.column;
     
@@ -1220,7 +1269,31 @@ export class AtomicTableRenderer {
     }
     // Remove the else clause - no sorting on general header clicks
   }
-  
+
+  // Column resize handlers
+  private handleResizeMove = (event: MouseEvent): void => {
+    console.log('[AtomicTableRenderer] handleResizeMove', { clientX: event.clientX });
+    // Send move event to XState
+    this.options.onColumnResizeMove?.(event.clientX);
+  };
+
+  private handleResizeEnd = (event: MouseEvent): void => {
+    console.log('[AtomicTableRenderer] handleResizeEnd');
+    
+    // Clear resizing state
+    this.isResizing = false;
+    
+    // Remove resizing class
+    this.container.classList.remove('vibegridx-resizing');
+    
+    // Remove global listeners
+    document.removeEventListener('mousemove', this.handleResizeMove);
+    document.removeEventListener('mouseup', this.handleResizeEnd);
+    
+    // Send end event to XState
+    this.options.onColumnResizeEnd?.();
+  };
+
   
   // ====================================
   // FAST CELL RENDERING

@@ -10,9 +10,10 @@ import { SelectionOverlay } from './SelectionOverlay';
 import { ClipboardOverlay } from './ClipboardOverlay';
 import { DragPreviewOverlay } from './DragPreviewOverlay';
 import { ColumnDragOverlay } from './ColumnDragOverlay';
+import { ColumnResizeOverlay } from './ColumnResizeOverlay';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import type { RowDimensionManager } from '../dimensions/RowDimensionManager';
-import type { ColumnDragState } from '../types';
+import type { ColumnDragState, ColumnResizeState } from '../types';
 
 // ====================================
 // SIMPLIFIED CANVAS OVERLAY
@@ -36,6 +37,7 @@ export class CanvasOverlay {
   private clipboardOverlay: ClipboardOverlay;
   private dragPreviewOverlay: DragPreviewOverlay;
   private columnDragOverlay: ColumnDragOverlay;
+  private columnResizeOverlay: ColumnResizeOverlay;
   
   // Callbacks
   public onSelectionChange?: (selectedCells: Set<string>) => void;
@@ -114,6 +116,15 @@ export class CanvasOverlay {
       }
     );
     
+    this.columnResizeOverlay = new ColumnResizeOverlay(
+      this.layer,
+      this.config.dimensionManager as ColumnDimensionManager,
+      {
+        cellHeight: this.config.cellHeight,
+        headerHeight: 40 // Standard header height
+      }
+    );
+    
     // Always use the provided overlay actor (single source of truth)
     this.machine = this.config.overlayActor;
     console.log('CanvasOverlay: Using provided overlay actor from table machine');
@@ -141,6 +152,7 @@ export class CanvasOverlay {
       
       console.log('CanvasOverlay: Sending initial viewport', initialViewport);
       this.machine.send({ type: 'VIEWPORT_UPDATE', viewport: initialViewport });
+      this.columnResizeOverlay.updateViewport(initialViewport);
     }
   }
   
@@ -269,6 +281,10 @@ export class CanvasOverlay {
     }
   }
   
+  updateColumnResize(resizeState: ColumnResizeState | null): void {
+    this.columnResizeOverlay.updateResizePreview(resizeState);
+  }
+  
   getColumnDropIndex(mouseX: number): number {
     return this.columnDragOverlay.getDropIndex(mouseX);
   }
@@ -310,6 +326,9 @@ export class CanvasOverlay {
     });
     
     this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });
+    
+    // Update resize overlay with viewport info
+    this.columnResizeOverlay.updateViewport(viewport);
   }
   
   // Expose methods for event handlers

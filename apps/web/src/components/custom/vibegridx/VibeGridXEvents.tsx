@@ -1,4 +1,4 @@
-import { useCallback, MutableRefObject } from 'react';
+import { useCallback, MutableRefObject, useRef } from 'react';
 import type { CellRef, ViewportInfo, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
@@ -337,6 +337,47 @@ export const createColumnDragEndHandler = (
     tableSend({ type: 'view.columns.drag.end', targetIndex });
   }, [tableSend]);
 };
+
+// ====================================
+// COLUMN RESIZE HANDLERS
+// ====================================
+
+export const createColumnResizeStartHandler = (
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback((columnId: string, x: number, width: number) => {
+    console.log('[VibeGridXEvents] Column resize start', { columnId, x, width });
+    tableSend({ type: 'view.columns.resize.start', columnId, x, width });
+  }, [tableSend]);
+};
+
+export const createColumnResizeMoveHandler = (
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  const lastUpdateRef = useRef(0);
+  const throttleMs = 32; // ~30fps - more conservative for resize operations
+  
+  return useCallback((x: number) => {
+    const now = Date.now();
+    if (now - lastUpdateRef.current < throttleMs) {
+      return; // Skip this update
+    }
+    lastUpdateRef.current = now;
+    
+    console.log('[VibeGridXEvents] Column resize move', { x });
+    tableSend({ type: 'view.columns.resize.move', x });
+  }, [tableSend]);
+};
+
+export const createColumnResizeEndHandler = (
+  tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
+) => {
+  return useCallback(() => {
+    console.log('[VibeGridXEvents] Column resize end');
+    tableSend({ type: 'view.columns.resize.end' });
+  }, [tableSend]);
+};
+
 
 // ====================================
 // CELL SELECTION DRAG HANDLERS

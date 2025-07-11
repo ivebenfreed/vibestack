@@ -611,7 +611,62 @@ export const tableBaseMachine = setup({
                     ({ event }) => event)
                 },
                 
+                'view.column.resized': {
+                  actions: [
+                    ({ context, event }) => {
+                      console.log('TableMachine: Received view.column.resized', { 
+                        columnId: event.columnId, 
+                        width: event.width,
+                        hasDimensionManager: !!context.dimensionManager
+                      });
+                      
+                      // Update dimension manager with new column width
+                      if (event.type === 'view.column.resized' && context.dimensionManager) {
+                        context.dimensionManager.setColumnWidth(event.columnId, event.width);
+                        
+                        // Persist column width to localStorage
+                        if (typeof window !== 'undefined') {
+                          const entityType = context.entityType || 'default';
+                          const widthsKey = `vibegridx-column-widths-${entityType}`;
+                          const widths = JSON.parse(localStorage.getItem(widthsKey) || '{}');
+                          widths[event.columnId] = event.width;
+                          localStorage.setItem(widthsKey, JSON.stringify(widths));
+                        }
+                      }
+                    },
+                    // Increment version to trigger re-render
+                    assign({
+                      version: ({ context }) => context.version + 1
+                    })
+                  ]
+                },
+                
                 'view.filter.set': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                // Column resize events
+                'view.columns.resize.start': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.resize.move': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.resize.end': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.resize.cancel': {
                   guard: 'canPerformOperation',
                   actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
                     ({ event }) => event)
@@ -715,6 +770,34 @@ export const tableBaseMachine = setup({
                     // Finally to selection coordinator to clear selection if needed
                     sendTo(({ context }) => context.actors.selectionCoordinator!, 
                       () => ({ type: 'selection.clear' }))
+                  ]
+                },
+                
+                // Resize events from view coordinator
+                'view.resize.started': {
+                  actions: [
+                    ({ event }) => {
+                      console.log('TableMachine: Received view.resize.started', event);
+                    },
+                    emit(({ event }) => event) // Emit event for listeners
+                  ]
+                },
+                
+                'view.resize.updated': {
+                  actions: [
+                    ({ event }) => {
+                      console.log('TableMachine: Received view.resize.updated', event);
+                    },
+                    emit(({ event }) => event) // Emit event for listeners
+                  ]
+                },
+                
+                'view.resize.ended': {
+                  actions: [
+                    ({ event }) => {
+                      console.log('TableMachine: Received view.resize.ended', event);
+                    },
+                    emit(({ event }) => event) // Emit event for listeners
                   ]
                 }
               }

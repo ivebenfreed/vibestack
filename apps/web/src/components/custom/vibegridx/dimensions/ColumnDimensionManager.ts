@@ -152,6 +152,40 @@ export class ColumnDimensionManager {
     return dimensions?.index ?? -1;
   }
   
+  /**
+   * Get column X position by index
+   */
+  getColumnX(index: number): number {
+    const column = this.columns[index];
+    if (!column) return 0;
+    const dimensions = this.dimensionsMap.get(column.id);
+    return dimensions?.offset || 0;
+  }
+  
+  /**
+   * Get column name by index
+   */
+  getColumnName(index: number): string {
+    const column = this.columns[index];
+    return column?.name || '';
+  }
+  
+  /**
+   * Get column index at X position
+   */
+  getColumnIndexAtX(x: number): number {
+    for (let i = 0; i < this.columns.length; i++) {
+      const column = this.columns[i];
+      const dimensions = this.dimensionsMap.get(column.id);
+      if (!dimensions) continue;
+      
+      if (x >= dimensions.offset && x < dimensions.offset + dimensions.width) {
+        return i;
+      }
+    }
+    return this.columns.length; // Return last index + 1 if beyond all columns
+  }
+  
   // ====================================
   // DIMENSION UPDATES
   // ====================================
@@ -328,9 +362,23 @@ export class ColumnDimensionManager {
 
 export function createColumnDimensionManager(
   columns: Column[], 
-  defaultWidth: number = 120
+  defaultWidth: number = 120,
+  entityType?: string
 ): ColumnDimensionManager {
   const manager = new ColumnDimensionManager(defaultWidth);
+  
+  // Load persisted widths from localStorage
+  if (entityType && typeof window !== 'undefined') {
+    const widthsKey = `vibegridx-column-widths-${entityType}`;
+    const persistedWidths = JSON.parse(localStorage.getItem(widthsKey) || '{}');
+    
+    // Apply persisted widths to columns
+    columns = columns.map(col => ({
+      ...col,
+      width: persistedWidths[col.id] || col.width || defaultWidth
+    }));
+  }
+  
   manager.setColumns(columns);
   return manager;
 }

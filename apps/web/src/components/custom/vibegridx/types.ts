@@ -302,6 +302,16 @@ export interface ColumnDragState {
   mouseY: number;
 }
 
+// Column resize state
+export interface ColumnResizeState {
+  isResizing: boolean;
+  resizingColumnId: string | null;
+  startX: number;
+  startWidth: number;
+  currentX: number;
+  previewWidth: number;
+}
+
 // ====================================
 // EVENT TYPES
 // ====================================
@@ -356,6 +366,11 @@ export type TableEvents =
   | { type: 'view.columns.reorder'; fromIndex: number; toIndex: number }
   | { type: 'view.columns.order.set'; order: string[] }
   | { type: 'view.columns.order.reset' }
+  | { type: 'view.columns.resize.start'; columnId: string; x: number; width: number }
+  | { type: 'view.columns.resize.move'; x: number }
+  | { type: 'view.columns.resize.end' }
+  | { type: 'view.columns.resize.cancel' }
+  | { type: 'view.column.resized'; columnId: string; width: number } // Event from view coordinator to parent
   
   // Drag events
   | { type: 'drag.row.start'; rowId: string }
@@ -366,7 +381,13 @@ export type TableEvents =
   // Performance events
   | { type: 'PERFORMANCE_MARK'; operation: string; duration: number }
   | { type: 'ACTOR_SPAWNED'; actorType: string; actorId: string }
-  | { type: 'ACTOR_STOPPED'; actorType: string; actorId: string };
+  | { type: 'ACTOR_STOPPED'; actorType: string; actorId: string }
+  
+  // Resize state events from view coordinator
+  | { type: 'view.resize.started'; columnResizeState: ColumnResizeState }
+  | { type: 'view.resize.updated'; columnResizeState: ColumnResizeState }
+  | { type: 'view.resize.ended' }
+  | { type: 'view.resize.cancelled' };
 
 // ====================================
 // CONFIGURATION TYPES
@@ -407,6 +428,9 @@ export interface RendererOptions {
   onColumnDragStart?: (columnId: string, x: number, y: number) => void;
   onColumnDragMove?: (x: number, y: number) => void;
   onColumnDragEnd?: (targetIndex: number) => void;
+  onColumnResizeStart?: (columnId: string, x: number, width: number) => void;
+  onColumnResizeMove?: (x: number) => void;
+  onColumnResizeEnd?: () => void;
   onStateChange?: (state: any) => void;
   onScroll?: (viewport: ViewportInfo) => void;
   onKeyDown?: (event: KeyboardEvent) => void;

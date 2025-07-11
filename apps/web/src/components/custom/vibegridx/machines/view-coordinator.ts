@@ -8,7 +8,8 @@ import type {
   Column, 
   TableRow,
   TableEvents,
-  ColumnDragState 
+  ColumnDragState,
+  ColumnResizeState 
 } from '../types';
 
 // ====================================
@@ -304,6 +305,9 @@ interface ViewCoordinatorContext extends ViewContext {
   
   // Column drag state
   columnDragState: ColumnDragState;
+  
+  // Column resize state
+  columnResizeState: ColumnResizeState;
 }
 
 // Helper function to calculate hidden column count
@@ -327,6 +331,10 @@ type ViewEvents =
   | { type: 'view.columns.drag.cancel' }
   | { type: 'view.columns.order.set'; order: string[] }
   | { type: 'view.columns.order.reset' }
+  | { type: 'view.columns.resize.start'; columnId: string; x: number; width: number }
+  | { type: 'view.columns.resize.move'; x: number }
+  | { type: 'view.columns.resize.end' }
+  | { type: 'view.columns.resize.cancel' }
   // Internal events
   | { type: 'COLUMNS_CHANGED'; columns: Column[] }
   | { type: 'ROWS_UPDATED'; rows: TableRow[] }
@@ -847,6 +855,16 @@ export const viewCoordinatorMachine = setup({
         currentDropIndex: -1,
         mouseX: 0,
         mouseY: 0
+      },
+      
+      // Initialize column resize state
+      columnResizeState: {
+        isResizing: false,
+        resizingColumnId: null,
+        startX: 0,
+        startWidth: 0,
+        currentX: 0,
+        previewWidth: 0
       }
     };
   },
@@ -1059,6 +1077,123 @@ export const viewCoordinatorMachine = setup({
             sendParent(({ context }) => ({
               type: 'view.drag.cancelled',
               columnDragState: context.columnDragState
+            }))
+          ]
+        },
+        
+        // Column resize events
+        'view.columns.resize.start': {
+          actions: [
+            ({ event }) => {
+              console.log('[ViewCoordinator] Resize start event received', event);
+            },
+            assign({
+              columnResizeState: ({ event }) => {
+                if (event.type !== 'view.columns.resize.start') return null as any;
+                return {
+                  isResizing: true,
+                  resizingColumnId: event.columnId,
+                  startX: event.x,
+                  startWidth: event.width,
+                  currentX: event.x,
+                  previewWidth: event.width
+                };
+              }
+            }),
+            sendParent(({ context }) => ({
+              type: 'view.resize.started',
+              columnResizeState: context.columnResizeState
+            }))
+          ]
+        },
+        
+        'view.columns.resize.move': {
+          actions: [
+            ({ event, context }) => {
+              console.log('[ViewCoordinator] Resize move event received', { 
+                x: event.x,
+                isResizing: context.columnResizeState?.isResizing 
+              });
+            },
+            assign({
+              columnResizeState: ({ context, event }) => {
+                if (event.type !== 'view.columns.resize.move' || !context.columnResizeState.isResizing) {
+                  return context.columnResizeState;
+                }
+                
+                const deltaX = event.x - context.columnResizeState.startX;
+                
+                // Find the column to get its constraints
+                const column = context.columns.find(c => c.id === context.columnResizeState.resizingColumnId);
+                const minWidth = column?.minWidth || 50;
+                const maxWidth = column?.maxWidth || 500;
+                
+                // Apply constraints
+                const calculatedWidth = context.columnResizeState.startWidth + deltaX;
+                const newWidth = Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
+                
+                console.log('[ViewCoordinator] Calculating new width', {
+                  startX: context.columnResizeState.startX,
+                  currentX: event.x,
+                  deltaX,
+                  startWidth: context.columnResizeState.startWidth,
+                  calculatedWidth,
+                  newWidth,
+                  minWidth,
+                  maxWidth
+                });
+                
+                return {
+                  ...context.columnResizeState,
+                  currentX: event.x,
+                  previewWidth: newWidth
+                };
+              }
+            }),
+            sendParent(({ context }) => ({
+              type: 'view.resize.updated',
+              columnResizeState: context.columnResizeState
+            }))
+          ]
+        },
+        
+        'view.columns.resize.end': {
+          actions: [
+            sendParent(({ context }) => ({
+              type: 'view.column.resized',
+              columnId: context.columnResizeState.resizingColumnId!,
+              width: context.columnResizeState.previewWidth
+            })),
+            assign({
+              columnResizeState: {
+                isResizing: false,
+                resizingColumnId: null,
+                startX: 0,
+                startWidth: 0,
+                currentX: 0,
+                previewWidth: 0
+              }
+            }),
+            sendParent(({ context }) => ({
+              type: 'view.resize.ended'
+            }))
+          ]
+        },
+        
+        'view.columns.resize.cancel': {
+          actions: [
+            assign({
+              columnResizeState: {
+                isResizing: false,
+                resizingColumnId: null,
+                startX: 0,
+                startWidth: 0,
+                currentX: 0,
+                previewWidth: 0
+              }
+            }),
+            sendParent(({ context }) => ({
+              type: 'view.resize.cancelled'
             }))
           ]
         },

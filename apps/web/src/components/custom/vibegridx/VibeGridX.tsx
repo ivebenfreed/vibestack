@@ -20,6 +20,9 @@ import {
   createColumnDragStartHandler,
   createColumnDragMoveHandler,
   createColumnDragEndHandler,
+  createColumnResizeStartHandler,
+  createColumnResizeMoveHandler,
+  createColumnResizeEndHandler,
   type EventHandlerRefs,
   type EventHandlerCallbacks
 } from './VibeGridXEvents';
@@ -230,6 +233,11 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const handleColumnDragMove = createColumnDragMoveHandler(tableSend);
   const handleColumnDragEnd = createColumnDragEndHandler(tableSend);
   
+  // Column resize handlers
+  const handleColumnResizeStart = createColumnResizeStartHandler(tableSend);
+  const handleColumnResizeMove = createColumnResizeMoveHandler(tableSend);
+  const handleColumnResizeEnd = createColumnResizeEndHandler(tableSend);
+  
   // ====================================
   // RENDERER INITIALIZATION
   // ====================================
@@ -245,6 +253,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     onColumnDragStart: handleColumnDragStart,
     onColumnDragMove: handleColumnDragMove,
     onColumnDragEnd: handleColumnDragEnd,
+    onColumnResizeStart: handleColumnResizeStart,
+    onColumnResizeMove: handleColumnResizeMove,
+    onColumnResizeEnd: handleColumnResizeEnd,
     onStateChange: handleRendererStateChange,
     onScroll: handleScroll,
     onKeyDown: (event: KeyboardEvent) => {
@@ -402,6 +413,34 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         }
       });
       if (unsubDragCancelled) unsubscribers.push(unsubDragCancelled);
+      
+      // Column resize events
+      const unsubResizeStarted = tableActor.on('view.resize.started', (event) => {
+        console.log('VibeGridX: Column resize started', event.columnResizeState);
+        if (canvasOverlayRef.current && event.columnResizeState) {
+          // Start resize preview through overlay
+          canvasOverlayRef.current.updateColumnResize(event.columnResizeState);
+        }
+      });
+      if (unsubResizeStarted) unsubscribers.push(unsubResizeStarted);
+      
+      const unsubResizeUpdated = tableActor.on('view.resize.updated', (event) => {
+        console.log('VibeGridX: Column resize updated', event.columnResizeState);
+        if (canvasOverlayRef.current && event.columnResizeState) {
+          // Update resize preview through overlay
+          canvasOverlayRef.current.updateColumnResize(event.columnResizeState);
+        }
+      });
+      if (unsubResizeUpdated) unsubscribers.push(unsubResizeUpdated);
+      
+      const unsubResizeEnded = tableActor.on('view.resize.ended', (event) => {
+        console.log('VibeGridX: Column resize ended');
+        if (canvasOverlayRef.current) {
+          // Clear resize preview
+          canvasOverlayRef.current.updateColumnResize(null);
+        }
+      });
+      if (unsubResizeEnded) unsubscribers.push(unsubResizeEnded);
     } catch (error) {
       console.warn('VibeGridX: Failed to set up event listeners:', error);
     }
@@ -487,10 +526,19 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         (window as any).__vibegridx_last_columnorder = currentColumnOrder;
       }
       
-      // Skip if only selection changed (no data, sort, column visibility, or column order changes)
+      // Check if dimensions changed (e.g., column resize)
+      const currentVersion = snapshot.context?.version;
+      const lastVersion = (window as any).__vibegridx_last_version;
+      const dimensionsChanged = currentVersion !== lastVersion && !sortChanged && !columnVisibilityChanged && !columnOrderChanged;
+      if (dimensionsChanged) {
+        console.log('VibeGridX: Dimensions changed, version:', currentVersion);
+        (window as any).__vibegridx_last_version = currentVersion;
+      }
+      
+      // Skip if only selection changed (no data, sort, column visibility, column order, or dimension changes)
       const isDataChange = hasDataChanged(snapshot);
       
-      if (!isDataChange && !sortChanged && !columnVisibilityChanged && !columnOrderChanged) {
+      if (!isDataChange && !sortChanged && !columnVisibilityChanged && !columnOrderChanged && !dimensionsChanged) {
         // Skip expensive processing for selection-only changes
         return;
       }
@@ -586,9 +634,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         // 1. Data changes - use granular updates
         const { changedRows, newRows, deletedRowIds, isStructuralChange } = getChangedRows(renderState);
         
-        if (isStructuralChange || sortChanged) {
-          // Structural changes or sort changes need full re-render
-          const reason = sortChanged ? 'SORT CHANGE' : 'STRUCTURAL CHANGE';
+        if (isStructuralChange || sortChanged || dimensionsChanged) {
+          // Structural changes, sort changes, or dimension changes need full re-render
+          const reason = sortChanged ? 'SORT CHANGE' : dimensionsChanged ? 'DIMENSION CHANGE' : 'STRUCTURAL CHANGE';
           console.log(`VibeGridX: ${reason} - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
           rendererRef.current!.render(renderState);
           // Report performance metrics after render
