@@ -72,6 +72,7 @@ interface VibeGridXProps<T = any> {
   enableFiltering?: boolean;
   enableSorting?: boolean;
   enableDragAndDrop?: boolean;
+  enableSelectionColumn?: boolean; // Enable checkbox selection column
 }
 
 // ====================================
@@ -87,6 +88,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     height = 600,
     width = '100%',
     relationshipData,
+    enableSelectionColumn = false,
     onCellClick,
     onCellDoubleClick,
     onSelectionChange,
@@ -247,6 +249,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   useRendererInitialization(refs, {
     columns: tableConfig.columns,
     relationshipData: relationshipData,
+    enableSelectionColumn: enableSelectionColumn,
     onCellClick: handleCellClick,
     onCellDoubleClick: handleCellDoubleClick,
     onColumnClick: handleColumnClick,
@@ -341,6 +344,22 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // Column visibility updates are handled through XState events - no useEffect needed
   
   // ====================================
+  // GLOBAL EVENT DISPATCHER FOR CHECKBOXES
+  // ====================================
+  
+  useEffect(() => {
+    // Set up global event dispatcher for checkbox events
+    (window as any).vibegridxDispatch = (event: any) => {
+      console.log('VibeGridX: Global event dispatch', event);
+      tableSend(event);
+    };
+    
+    return () => {
+      delete (window as any).vibegridxDispatch;
+    };
+  }, [tableSend]);
+  
+  // ====================================
   // XSTATE EVENT LISTENERS
   // ====================================
   
@@ -363,6 +382,16 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         onSelectionChange?.(event.selectedCells);
       });
       if (unsubSelection) unsubscribers.push(unsubSelection);
+      
+      // Row selection change events (for checkboxes)
+      const unsubRowSelection = tableActor.on('selection.rows.changed', (event) => {
+        console.log('VibeGridX: Row selection changed', event.selectedRows);
+        // Update renderer with new selected rows
+        if (refs.rendererRef.current) {
+          refs.rendererRef.current.setSelectedRows(event.selectedRows);
+        }
+      });
+      if (unsubRowSelection) unsubscribers.push(unsubRowSelection);
       
       // Performance events
       const unsubPerf = tableActor.on('vibegridx.perf.render', (event) => {

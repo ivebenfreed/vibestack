@@ -9,6 +9,7 @@ export interface OverlayConfig {
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
   columns?: any[]; // Column array for coordinate calculations
   overlayActor: any; // REQUIRED: Overlay machine actor from table machine (single source of truth)
+  enableSelectionColumn?: boolean; // Enable selection column with checkboxes
   cellWidth: number;
   cellHeight: number;
   borderWidth: number;

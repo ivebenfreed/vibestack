@@ -164,6 +164,10 @@ type SelectionEvents =
   | { type: 'selection.drag.start'; startCell: CellRef }
   | { type: 'selection.drag.move'; currentCell: CellRef }
   | { type: 'selection.drag.end' }
+  | { type: 'selection.checkbox.toggle'; rowId: string }
+  | { type: 'selection.checkbox.all' }
+  | { type: 'selection.checkbox.none' }
+  | { type: 'selection.checkbox.range'; startRowId: string; endRowId: string }
   | { type: 'keyboard.arrow'; direction: 'up' | 'down' | 'left' | 'right'; extend?: boolean }
   | { type: 'keyboard.copy' }
   | { type: 'keyboard.paste' }
@@ -346,11 +350,13 @@ export const selectionCoordinatorMachine = setup({
     // Clear selection
     clearSelection: assign({
       selectedCells: new Set(),
+      selectedRows: new Set(),
       selectedPositions: new Set(),
       activeCell: null,
       anchor: null,
       anchorPosition: null,
-      selectionRanges: []
+      selectionRanges: [],
+      lastSelectedRowId: null
     }),
     
     // Keyboard navigation
@@ -527,12 +533,14 @@ export const selectionCoordinatorMachine = setup({
     columns: input.columns || [],
     coordinateManager: null,
     selectedCells: new Set(),
+    selectedRows: new Set(),
     selectedPositions: new Set(),
     activeCell: null,
     anchorPosition: null,
     selectionRanges: [],
     selectionMode: 'single' as SelectionMode,
     anchor: null,
+    lastSelectedRowId: null,
     clipboard: null,
     fillHandle: null
   }),
@@ -599,6 +607,83 @@ export const selectionCoordinatorMachine = setup({
         // 'selection.column.select': {
         //   actions: 'selectColumn'
         // },
+        
+        'selection.checkbox.toggle': {
+          actions: [
+            assign({
+              selectedRows: ({ context, event }) => {
+                const newSelectedRows = new Set(context.selectedRows);
+                if (newSelectedRows.has(event.rowId)) {
+                  newSelectedRows.delete(event.rowId);
+                } else {
+                  newSelectedRows.add(event.rowId);
+                }
+                return newSelectedRows;
+              },
+              lastSelectedRowId: ({ event }) => event.rowId
+            }),
+            sendParent(({ context }) => ({
+              type: 'selection.rows.changed',
+              selectedRows: context.selectedRows
+            }))
+          ]
+        },
+        
+        'selection.checkbox.all': {
+          actions: [
+            assign({
+              selectedRows: ({ context }) => new Set(context.visibleRowIds),
+              lastSelectedRowId: ({ context }) => context.visibleRowIds[context.visibleRowIds.length - 1] || null
+            }),
+            sendParent(({ context }) => ({
+              type: 'selection.rows.changed',
+              selectedRows: context.selectedRows
+            }))
+          ]
+        },
+        
+        'selection.checkbox.none': {
+          actions: [
+            assign({
+              selectedRows: () => new Set(),
+              lastSelectedRowId: () => null
+            }),
+            sendParent(() => ({
+              type: 'selection.rows.changed',
+              selectedRows: new Set()
+            }))
+          ]
+        },
+        
+        'selection.checkbox.range': {
+          actions: [
+            assign({
+              selectedRows: ({ context, event }) => {
+                const startIndex = context.visibleRowIds.indexOf(event.startRowId);
+                const endIndex = context.visibleRowIds.indexOf(event.endRowId);
+                
+                if (startIndex === -1 || endIndex === -1) {
+                  return context.selectedRows;
+                }
+                
+                const minIndex = Math.min(startIndex, endIndex);
+                const maxIndex = Math.max(startIndex, endIndex);
+                const newSelectedRows = new Set(context.selectedRows);
+                
+                for (let i = minIndex; i <= maxIndex; i++) {
+                  newSelectedRows.add(context.visibleRowIds[i]);
+                }
+                
+                return newSelectedRows;
+              },
+              lastSelectedRowId: ({ event }) => event.endRowId
+            }),
+            sendParent(({ context }) => ({
+              type: 'selection.rows.changed',
+              selectedRows: context.selectedRows
+            }))
+          ]
+        },
         
         'selection.clear': {
           actions: ['clearSelection',

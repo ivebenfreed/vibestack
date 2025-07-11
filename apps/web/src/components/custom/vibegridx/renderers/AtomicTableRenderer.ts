@@ -137,6 +137,7 @@ export class AtomicTableRenderer {
   private rowElements = new Map<string, HTMLElement>();
   private cellElements = new Map<string, HTMLElement>(); // "rowId:columnId" -> element
   private selectedCells = new Set<string>();
+  private selectedRows = new Set<string>(); // For checkbox selection
   private editingCell: CellRef | null = null;
   private lastRenderState: RenderState | null = null;
   
@@ -147,6 +148,7 @@ export class AtomicTableRenderer {
   private dimensionManager: ColumnDimensionManager | null = null;
   private rowHeight = 40; // Default row height
   private relationshipData: any = {}; // Relationship data for lookups
+  private enableSelectionColumn = false; // Whether to show selection column
   
   // Batch update queue
   private updateQueue = new Set<string>();
@@ -156,6 +158,7 @@ export class AtomicTableRenderer {
     this.options = options;
     this.dimensionManager = options.dimensionManager || null;
     this.relationshipData = options.relationshipData || {};
+    this.enableSelectionColumn = options.enableSelectionColumn || false;
     
     // Set columns if provided
     if (options.columns) {
@@ -361,6 +364,12 @@ export class AtomicTableRenderer {
     
     // Calculate total width based on visible columns only
     let totalWidth = 0;
+    
+    // Add selection column width if enabled
+    if (this.enableSelectionColumn) {
+      totalWidth += 48; // Fixed width for selection column
+    }
+    
     this.visibleColumns.forEach(column => {
       totalWidth += this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
     });
@@ -374,6 +383,12 @@ export class AtomicTableRenderer {
     
     // Calculate offset based on visible columns that come before this column
     let offset = 0;
+    
+    // Add selection column width if enabled
+    if (this.enableSelectionColumn) {
+      offset += 48; // Fixed width for selection column
+    }
+    
     for (const column of this.visibleColumns) {
       if (column.id === columnId) {
         break;
@@ -683,6 +698,30 @@ export class AtomicTableRenderer {
     });
   }
   
+  setSelectedRows(selectedRows: Set<string>): void {
+    this.selectedRows = new Set(selectedRows);
+    
+    // Update all visible row checkboxes
+    this.rowElements.forEach((rowElement, rowId) => {
+      const checkbox = rowElement.querySelector('.vibegridx-row-checkbox') as HTMLInputElement;
+      if (checkbox) {
+        checkbox.checked = this.selectedRows.has(rowId);
+      }
+    });
+    
+    // Update header checkbox state if selection column is enabled
+    if (this.enableSelectionColumn && this.lastRenderState) {
+      const headerCheckbox = this.header.querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
+      if (headerCheckbox) {
+        const allSelected = this.selectedRows.size === this.lastRenderState.rows.length && this.lastRenderState.rows.length > 0;
+        const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < this.lastRenderState.rows.length;
+        
+        headerCheckbox.checked = allSelected;
+        headerCheckbox.indeterminate = someSelected;
+      }
+    }
+  }
+  
   // ====================================
   // PRIVATE RENDERING METHODS
   // ====================================
@@ -743,8 +782,30 @@ export class AtomicTableRenderer {
     // Get current sort state from render state (if available)
     const sortState = (state as any).sortBy || [];
     
+    // Build header HTML
+    let headerHTML = '';
+    
+    // Add selection column header if enabled
+    if (this.enableSelectionColumn) {
+      const allSelected = this.selectedRows.size === state.rows.length && state.rows.length > 0;
+      const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
+      
+      headerHTML += `
+        <div class="vibegridx-header-cell vibegridx-selection-header" 
+             data-column="__selection" 
+             style="width: 48px; min-width: 48px; max-width: 48px; position: sticky; left: 0; z-index: 10; background: var(--background);">
+          <label class="vibegridx-checkbox-wrapper">
+            <input type="checkbox" 
+                   class="vibegridx-header-checkbox" 
+                   ${allSelected ? 'checked' : ''}
+                   ${someSelected ? 'indeterminate' : ''}>
+            <span class="vibegridx-checkbox-custom"></span>
+          </label>
+        </div>`;
+    }
+    
     // Header rendered with columns
-    this.header.innerHTML = columnsToRender.map(column => {
+    headerHTML += columnsToRender.map(column => {
       const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
       const field = column.field || column.id;
       
@@ -777,6 +838,37 @@ export class AtomicTableRenderer {
         <div class="vibegridx-resize-handle" data-column="${column.id}"></div>
       </div>`;
     }).join('');
+    
+    this.header.innerHTML = headerHTML;
+    
+    // Add event listener to header checkbox if selection column is enabled
+    if (this.enableSelectionColumn) {
+      const headerCheckbox = this.header.querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
+      if (headerCheckbox) {
+        // Update indeterminate state
+        const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
+        headerCheckbox.indeterminate = someSelected;
+        
+        // Add click handler
+        headerCheckbox.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const checked = (event.target as HTMLInputElement).checked;
+          
+          // Dispatch XState event for select all/none
+          if (checked) {
+            this.options.onSelectionChange?.(new Set()); // Clear first
+            // Then dispatch select all event
+            const selectAllEvent = { type: 'selection.checkbox.all' as const };
+            (window as any).vibegridxDispatch?.(selectAllEvent);
+          } else {
+            this.options.onSelectionChange?.(new Set());
+            // Dispatch select none event
+            const selectNoneEvent = { type: 'selection.checkbox.none' as const };
+            (window as any).vibegridxDispatch?.(selectNoneEvent);
+          }
+        });
+      }
+    }
   }
   
   private renderVisibleRows(state: RenderState): void {
@@ -883,6 +975,28 @@ export class AtomicTableRenderer {
     // Create cells with proper positioning
     let cellsHTML = '';
     
+    // Add selection checkbox cell if enabled
+    if (this.enableSelectionColumn) {
+      const isRowSelected = this.selectedRows.has(row.id);
+      cellsHTML += `
+        <div class="vibegridx-cell vibegridx-selection-cell" 
+             data-row-id="${row.id}" 
+             data-column-id="__selection"
+             data-cell-key="${row.id}:__selection"
+             role="gridcell"
+             style="position: absolute; left: 0; width: 48px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box; overflow: hidden; position: sticky; z-index: 5; background: var(--background);">
+          <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+            <label class="vibegridx-checkbox-wrapper" data-row-id="${row.id}">
+              <input type="checkbox" 
+                     class="vibegridx-row-checkbox" 
+                     data-row-id="${row.id}"
+                     ${isRowSelected ? 'checked' : ''}>
+              <span class="vibegridx-checkbox-custom"></span>
+            </label>
+          </div>
+        </div>`;
+    }
+    
     columnsToRender.forEach(column => {
       const cellKey = `${row.id}:${column.id}`;
       const value = row.data[column.field || column.id];
@@ -926,7 +1040,43 @@ export class AtomicTableRenderer {
         this.cellElements.set(cellKey, cellElement as HTMLElement);
       }
     });
+    
+    // Add checkbox event listeners if selection column is enabled
+    if (this.enableSelectionColumn) {
+      const rowCheckbox = rowElement.querySelector('.vibegridx-row-checkbox') as HTMLInputElement;
+      if (rowCheckbox) {
+        rowCheckbox.addEventListener('click', (event) => {
+          event.stopPropagation();
+          const rowId = (event.target as HTMLElement).getAttribute('data-row-id');
+          
+          if (rowId) {
+            // Check for shift key for range selection
+            if (event.shiftKey && this.lastSelectedRowId && this.lastSelectedRowId !== rowId) {
+              // Dispatch range selection event
+              const rangeEvent = { 
+                type: 'selection.checkbox.range' as const, 
+                startRowId: this.lastSelectedRowId,
+                endRowId: rowId
+              };
+              (window as any).vibegridxDispatch?.(rangeEvent);
+            } else {
+              // Dispatch toggle event
+              const toggleEvent = { 
+                type: 'selection.checkbox.toggle' as const, 
+                rowId 
+              };
+              (window as any).vibegridxDispatch?.(toggleEvent);
+            }
+            
+            // Update last selected row
+            this.lastSelectedRowId = rowId;
+          }
+        });
+      }
+    }
   }
+  
+  private lastSelectedRowId: string | null = null;
   
   // REMOVED: updateSelections - handled by Canvas Overlay Manager
   

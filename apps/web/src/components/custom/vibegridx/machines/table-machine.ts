@@ -46,6 +46,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       ...input.settings
     },
     version: 0,
+    enableSelectionColumn: input.enableSelectionColumn || false,
     
     // Create dimension managers
     dimensionManager: createColumnDimensionManager(input.columns || []),

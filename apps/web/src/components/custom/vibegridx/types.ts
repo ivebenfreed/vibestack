@@ -232,6 +232,7 @@ export interface TableContext {
   allRowIds: string[]; // All row IDs in the dataset
   settings: TableSettings;
   version: number;
+  enableSelectionColumn: boolean;
   
   // Dimension management
   dimensionManager?: any; // Will be typed as ColumnDimensionManager after import
@@ -258,10 +259,12 @@ export interface TableContext {
 
 export interface SelectionContext {
   selectedCells: Set<string>; // "rowId:columnId"
+  selectedRows: Set<string>; // Row IDs for checkbox selection
   activeCell: CellRef | null;
   selectionRanges: SelectionRange[];
   selectionMode: SelectionMode;
   anchor: CellRef | null; // For range selection
+  lastSelectedRowId: string | null; // For shift+click range selection
 }
 
 export interface EditContext {
@@ -312,6 +315,13 @@ export interface ColumnResizeState {
   previewWidth: number;
 }
 
+// Row selection state
+export interface RowSelectionState {
+  selectedRows: Set<string>;
+  lastSelectedRowId: string | null;
+  selectionMode: 'checkbox' | 'cell' | 'both';
+}
+
 // ====================================
 // EVENT TYPES
 // ====================================
@@ -331,6 +341,10 @@ export type TableEvents =
   | { type: 'selection.drag.start'; startCell: CellRef }
   | { type: 'selection.drag.move'; currentCell: CellRef; selectedCells: Set<string> }
   | { type: 'selection.drag.end'; selectedCells: Set<string> }
+  | { type: 'selection.checkbox.toggle'; rowId: string }
+  | { type: 'selection.checkbox.all' }
+  | { type: 'selection.checkbox.none' }
+  | { type: 'selection.checkbox.range'; startRowId: string; endRowId: string }
   
   // Edit events
   | { type: 'edit.cell.start'; rowId: string; columnId: string }
@@ -399,6 +413,7 @@ export interface TableConfig {
   columns: Column<any>[];
   initialData?: TableRow[];
   settings?: TableSettings;
+  enableSelectionColumn?: boolean;
 }
 
 // ====================================
@@ -422,6 +437,7 @@ export interface RendererOptions {
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
   relationshipData?: RelationshipDataProvider;
+  enableSelectionColumn?: boolean;
   onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onCellDoubleClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
   onColumnClick?: (columnId: string, event: MouseEvent) => void;

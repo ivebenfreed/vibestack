@@ -39,6 +39,7 @@ export interface InitializationProps {
   enableFiltering?: boolean;
   enableSorting?: boolean;
   enableDragAndDrop?: boolean;
+  enableSelectionColumn?: boolean;
 }
 
 // ====================================
@@ -56,6 +57,7 @@ export const useTableConfiguration = (props: InitializationProps) => {
     enableGrouping = true,
     enableFiltering = true,
     bufferSize = 10,
+    enableSelectionColumn = false,
   } = props;
 
   // Get entity data directly from atom and memoize the table config
@@ -67,6 +69,7 @@ export const useTableConfiguration = (props: InitializationProps) => {
       id: tableId,
       entityType,
       columns, // Use columns from props directly
+      enableSelectionColumn,
       initialData: Object.values(entities).map(entity => ({
         id: entity.id,
         data: { ...entity },
@@ -95,7 +98,7 @@ export const useTableConfiguration = (props: InitializationProps) => {
         }
       }
     };
-  }, [entityType, tableId, columns, height, width, enableVirtualScrolling, enableGrouping, enableFiltering, bufferSize]);
+  }, [entityType, tableId, columns, height, width, enableVirtualScrolling, enableGrouping, enableFiltering, bufferSize, enableSelectionColumn]);
 
   return { tableConfig, tableId };
 };

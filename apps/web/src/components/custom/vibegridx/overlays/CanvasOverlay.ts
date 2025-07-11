@@ -11,6 +11,7 @@ import { ClipboardOverlay } from './ClipboardOverlay';
 import { DragPreviewOverlay } from './DragPreviewOverlay';
 import { ColumnDragOverlay } from './ColumnDragOverlay';
 import { ColumnResizeOverlay } from './ColumnResizeOverlay';
+import { SelectionColumnOverlay } from './SelectionColumnOverlay';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import type { RowDimensionManager } from '../dimensions/RowDimensionManager';
 import type { ColumnDragState, ColumnResizeState } from '../types';
@@ -38,6 +39,7 @@ export class CanvasOverlay {
   private dragPreviewOverlay: DragPreviewOverlay;
   private columnDragOverlay: ColumnDragOverlay;
   private columnResizeOverlay: ColumnResizeOverlay;
+  private selectionColumnOverlay: SelectionColumnOverlay | null = null;
   
   // Callbacks
   public onSelectionChange?: (selectedCells: Set<string>) => void;
@@ -124,6 +126,22 @@ export class CanvasOverlay {
         headerHeight: 40 // Standard header height
       }
     );
+    
+    // Initialize selection column overlay if enabled
+    if (this.config.enableSelectionColumn) {
+      this.selectionColumnOverlay = new SelectionColumnOverlay(
+        this.layer,
+        {
+          cellHeight: this.config.cellHeight,
+          headerHeight: 40
+        },
+        (event) => {
+          // Dispatch events to the parent through window for now
+          // TODO: Replace with proper event system
+          (window as any).vibegridxDispatch?.(event);
+        }
+      );
+    }
     
     // Always use the provided overlay actor (single source of truth)
     this.machine = this.config.overlayActor;
@@ -287,6 +305,22 @@ export class CanvasOverlay {
   
   getColumnDropIndex(mouseX: number): number {
     return this.columnDragOverlay.getDropIndex(mouseX);
+  }
+  
+  updateSelectionColumn(params: {
+    selectedRows: Set<string>;
+    visibleRowIds: string[];
+    allRowIds: string[];
+  }): void {
+    if (this.selectionColumnOverlay) {
+      const viewport = this.machine.getSnapshot().context.viewport;
+      this.selectionColumnOverlay.update({
+        selectedRows: params.selectedRows,
+        visibleRowIds: params.visibleRowIds,
+        allRowIds: params.allRowIds,
+        viewport
+      });
+    }
   }
   
   updateViewport(viewport: ViewportInfo): void {
