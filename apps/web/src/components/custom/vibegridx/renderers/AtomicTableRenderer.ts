@@ -70,14 +70,13 @@ class VirtualGridManager {
     this.rowHeight = viewport.itemHeight;
     
     // Calculate visible range with buffer
-    // Only add buffer if we're not at the edges
     const bufferRows = 5;
-    const canAddTopBuffer = viewport.start > 0;
-    const canAddBottomBuffer = viewport.end < totalRows;
     
+    // Always try to render a few extra rows for smooth scrolling
+    // But ensure we don't go beyond the actual data
     this.visibleRange = {
-      start: canAddTopBuffer ? Math.max(0, viewport.start - bufferRows) : viewport.start,
-      end: canAddBottomBuffer ? Math.min(totalRows, viewport.end + bufferRows) : viewport.end
+      start: Math.max(0, viewport.start - bufferRows),
+      end: Math.min(totalRows, viewport.end + bufferRows)
     };
     
     // Return true if range changed
@@ -94,12 +93,19 @@ class VirtualGridManager {
   }
   
   getRowTop(index: number): number {
+    // Since we use box-sizing: border-box, borders are included in row height
     return index * this.rowHeight;
   }
   
   getTotalHeight(): number {
-    // Ensure we don't create extra space beyond actual rows
-    return Math.max(0, this.totalRows * this.rowHeight);
+    // Calculate base height for all rows
+    const baseHeight = this.totalRows * this.rowHeight;
+    
+    // Add extra space at the bottom to ensure the last row is never cut off
+    // This needs to be at least one row height to guarantee full visibility
+    const bottomPadding = this.rowHeight;
+    
+    return Math.max(0, baseHeight + bottomPadding);
   }
   
   getRowHeight(): number {
@@ -136,6 +142,8 @@ export class AtomicTableRenderer {
   
   // Column configuration
   private columns: Column[] = [];
+  private columnVisibility: Record<string, boolean> = {};
+  private visibleColumns: Column[] = [];
   private dimensionManager: ColumnDimensionManager | null = null;
   private rowHeight = 40; // Default row height
   private relationshipData: any = {}; // Relationship data for lookups
@@ -237,7 +245,51 @@ export class AtomicTableRenderer {
   // Set or update columns
   setColumns(columns: Column[]): void {
     this.columns = columns;
+    this.updateVisibleColumns();
     // Dimension manager will be set separately via setDimensionManager
+  }
+
+  // Set or update column visibility
+  setColumnVisibility(visibility: Record<string, boolean>): void {
+    this.columnVisibility = visibility;
+    this.updateVisibleColumns();
+    
+    // Update dimensions without triggering full re-render to avoid infinite loop
+    this.updateHeaderDimensions();
+  }
+
+  // Update the list of visible columns based on visibility settings
+  private updateVisibleColumns(): void {
+    this.visibleColumns = this.columns.filter(column => {
+      // Column is visible if not explicitly hidden
+      return this.columnVisibility[column.id] !== false;
+    });
+    
+    console.log('[AtomicTableRenderer] Updated visible columns:', {
+      totalColumns: this.columns.length,
+      visibleColumns: this.visibleColumns.length,
+      hiddenColumns: this.columns.length - this.visibleColumns.length
+    });
+  }
+
+  // Update header dimensions without full re-render
+  private updateHeaderDimensions(): void {
+    if (this.header && this.visibleColumns.length > 0) {
+      const totalWidth = this.getTotalColumnsWidth();
+      this.header.style.width = `${totalWidth}px`;
+      
+      // Update dimension manager with visible columns
+      if (this.dimensionManager) {
+        this.dimensionManager.setColumns(this.visibleColumns);
+      }
+      
+      // Re-render header content to show/hide columns
+      if (this.lastRenderState) {
+        this.renderHeader(this.lastRenderState);
+        // Also re-render visible rows to update cell positions
+        this.renderVisibleRows(this.lastRenderState);
+      }
+    }
   }
   
   // Set or update relationship data
@@ -265,14 +317,33 @@ export class AtomicTableRenderer {
     });
   }
   
-  // Get total width of all columns
+  // Get total width of all visible columns
   private getTotalColumnsWidth(): number {
-    return this.dimensionManager?.getTotalWidth() || 0;
+    if (!this.dimensionManager) return 0;
+    
+    // Calculate total width based on visible columns only
+    let totalWidth = 0;
+    this.visibleColumns.forEach(column => {
+      totalWidth += this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
+    });
+    
+    return totalWidth;
   }
   
-  // Get column offset position
+  // Get column offset position for visible columns only
   private getColumnOffset(columnId: string): number {
-    return this.dimensionManager?.getColumnOffset(columnId) || 0;
+    if (!this.dimensionManager) return 0;
+    
+    // Calculate offset based on visible columns that come before this column
+    let offset = 0;
+    for (const column of this.visibleColumns) {
+      if (column.id === columnId) {
+        break;
+      }
+      offset += this.dimensionManager.getColumnWidth(column.id) || column.width || 120;
+    }
+    
+    return offset;
   }
   
   private setupEventListeners() {
@@ -290,16 +361,25 @@ export class AtomicTableRenderer {
       
       requestAnimationFrame(() => {
         const rowHeight = this.virtualGrid.getRowHeight();
-        const calculatedStart = Math.floor(this.viewport.scrollTop / rowHeight);
-        const calculatedEnd = calculatedStart + Math.ceil(this.viewport.clientHeight / rowHeight);
+        const scrollTop = this.viewport.scrollTop;
+        const viewportHeight = this.viewport.clientHeight;
+        
+        // Calculate visible rows more accurately
+        const calculatedStart = Math.floor(scrollTop / rowHeight);
+        // Calculate how many rows fit in viewport, ensuring we always show enough
+        const visibleRowCount = Math.ceil(viewportHeight / rowHeight);
+        // Add 1 extra row to ensure smooth scrolling and full visibility
+        const calculatedEnd = calculatedStart + visibleRowCount + 1;
+        
+        // Cap to actual row count
         const cappedEnd = this.lastRenderState ? Math.min(calculatedEnd, this.lastRenderState.rows.length) : calculatedEnd;
         
         const newViewport: ViewportInfo = {
           start: calculatedStart,
           end: cappedEnd,
-          height: this.viewport.clientHeight,
+          height: viewportHeight,
           width: this.viewport.clientWidth,
-          scrollTop: this.viewport.scrollTop,
+          scrollTop: scrollTop,
           scrollLeft: this.viewport.scrollLeft,
           itemHeight: rowHeight
         };
@@ -403,6 +483,11 @@ export class AtomicTableRenderer {
     // Update columns if provided in state
     if (sortedState.columns && sortedState.columns.length > 0) {
       this.setColumns(sortedState.columns);
+    }
+    
+    // Update column visibility if provided in state
+    if (sortedState.columnVisibility) {
+      this.setColumnVisibility(sortedState.columnVisibility);
     }
     
     try {
@@ -557,12 +642,13 @@ export class AtomicTableRenderer {
     // Update virtual grid with current data
     const viewportHeight = this.viewport.clientHeight || 600;
     const scrollTop = this.viewport.scrollTop || 0;
-    const itemHeight = 40;
+    const itemHeight = this.rowHeight;
     
     // Calculate actual visible rows based on viewport
     const visibleRowCount = Math.ceil(viewportHeight / itemHeight);
     const startIndex = Math.floor(scrollTop / itemHeight);
-    const endIndex = Math.min(startIndex + visibleRowCount, state.rows.length);
+    // Add 1 extra row to ensure the last visible row is fully shown
+    const endIndex = Math.min(startIndex + visibleRowCount + 1, state.rows.length);
     
     const currentViewport: ViewportInfo = {
       start: startIndex,
@@ -588,9 +674,9 @@ export class AtomicTableRenderer {
   private renderHeader(state: RenderState): void {
     if (!state.rows.length) return;
     
-    // Use columns from configuration if available, otherwise generate from data
-    const columnsToRender = this.columns.length > 0 
-      ? this.columns 
+    // Use visible columns from configuration if available, otherwise generate from data
+    const columnsToRender = this.visibleColumns.length > 0 
+      ? this.visibleColumns 
       : Object.keys(state.rows[0].data).map(key => ({
           id: key,
           name: key,
@@ -651,6 +737,29 @@ export class AtomicTableRenderer {
     this.body.style.height = `${totalHeight}px`;
     this.body.style.width = `${totalWidth}px`;
     
+    // Ensure the viewport allows scrolling to show all content
+    // Add a small timeout to ensure DOM has updated
+    requestAnimationFrame(() => {
+      const maxScroll = totalHeight - this.viewport.clientHeight;
+      if (maxScroll > 0 && this.viewport.scrollHeight <= this.viewport.clientHeight) {
+        // Force scrollbar to appear if content is taller than viewport
+        this.viewport.style.overflowY = 'scroll';
+      }
+    });
+    
+    console.log('[AtomicTableRenderer] Virtual dimensions set:', {
+      totalHeight,
+      totalWidth,
+      rowCount: state.rows.length,
+      rowHeight: this.virtualGrid.getRowHeight(),
+      viewportHeight: this.viewport.clientHeight,
+      maxScrollTop: totalHeight - this.viewport.clientHeight,
+      containerHeight: this.container.clientHeight,
+      tableHeight: this.table.clientHeight,
+      viewportScrollHeight: this.viewport.scrollHeight,
+      bodyOffsetHeight: this.body.offsetHeight
+    });
+    
     // Canvas overlay is already created in initializeDOM, no need to update its size
     // It will use viewport-based sizing instead of full scrollable area
     
@@ -697,9 +806,9 @@ export class AtomicTableRenderer {
   }
   
   private renderRowCells(row: TableRow, rowElement: HTMLElement): void {
-    // Use columns from configuration if available
-    const columnsToRender = this.columns.length > 0 
-      ? this.columns 
+    // Use visible columns from configuration if available
+    const columnsToRender = this.visibleColumns.length > 0 
+      ? this.visibleColumns 
       : Object.keys(row.data).map(key => ({
           id: key,
           name: key,
@@ -875,6 +984,8 @@ export class AtomicTableRenderer {
     boolean: renderBoolean,
     enum: renderEnum,
     select: renderText, // Reuse text renderer for select
+    uuid: renderText, // UUID is text-based
+    json: renderText, // JSON displayed as text (could be enhanced later)
     relationship: renderRelationship,
     'relationship-single': renderRelationship,
     'relationship-multi': renderRelationship,

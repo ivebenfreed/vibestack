@@ -1,20 +1,6 @@
 // Core types for VibeGridX XState v5 architecture
 import type { ActorRefFrom } from 'xstate';
-
-// ====================================
-// ENUM OPTION INTERFACE
-// ====================================
-
-export interface EnumOption {
-  value: string | number;
-  label: string;
-  color?: string;
-  backgroundColor?: string;
-  icon?: string;
-  description?: string;
-  group?: string;
-  disabled?: boolean;
-}
+import type { EnumOption, VibeGridXColumn } from '@repo/dataforge/vibegridx-columns';
 
 // ====================================
 // CORE ENTITY TYPES
@@ -32,38 +18,16 @@ export interface TableRow {
   };
 }
 
-export interface Column<T = any> {
-  id: string;
-  name: string;
-  field: keyof T & string;
-  type: 'text' | 'number' | 'date' | 'boolean' | 'enum' | 'select';
-  width: number; // Required - no defaults
-  editable?: boolean;
-  minWidth?: number;
-  maxWidth?: number;
-  resizable?: boolean;
-  sortable?: boolean;
-  filterable?: boolean;
-  options?: string[] | EnumOption[]; // for select/enum type
+// Extend the generated column type with runtime-specific options
+export interface Column<T = any> extends VibeGridXColumn<T> {
+  // Additional runtime options not in generated columns
+  options?: string[] | EnumOption[]; // Allow string[] for backward compatibility
   
-  // Relationship fields
-  cellType?: 'relationship-single' | 'relationship-multi' | 'relationship-collection' | string;
-  relationshipTable?: string; // Table name to look up related entities
-  relationshipDisplayField?: string; // Field to display from related entity
-  
-  // Display formatting
-  displayFormat?: string;
-  align?: 'left' | 'center' | 'right';
+  // Additional display formatting
   className?: string;
   style?: Record<string, any>;
   
-  // Validation
-  required?: boolean;
-  validate?: (value: any) => string | null;
-  
-  // Text renderer options
-  placeholder?: string;
-  maxLength?: number;
+  // Additional text renderer options
   minLength?: number;
   pattern?: string;
   patternError?: string;
@@ -73,12 +37,9 @@ export interface Column<T = any> {
   fontWeight?: string;
   fontSize?: string;
   
-  // Number renderer options
-  precision?: number;
+  // Additional number renderer options
   minimumFractionDigits?: number;
   maximumFractionDigits?: number;
-  min?: number;
-  max?: number;
   step?: number;
   useLocale?: boolean;
   locale?: string;
@@ -94,8 +55,7 @@ export interface Column<T = any> {
   colorScale?: any;
   numberFormat?: any;
   
-  // Date renderer options
-  dateFormat?: string;
+  // Additional date renderer options
   inputFormat?: string;
   dateOptions?: Intl.DateTimeFormatOptions;
   timeOptions?: Intl.DateTimeFormatOptions;
@@ -136,6 +96,9 @@ export interface Column<T = any> {
   maxSelections?: number;
   minSelections?: number;
   customRender?: (value: any, option?: EnumOption) => string;
+  
+  // Column visibility options
+  hideable?: boolean; // Whether column can be hidden (default: true)
 }
 
 export interface TableSettings {
@@ -317,6 +280,8 @@ export interface ViewContext {
   sortBy: SortConfig[];
   filters: FilterConfig[];
   viewport: ViewportInfo;
+  columnVisibility: Record<string, boolean>; // columnId -> visible
+  hiddenColumnCount: number;
 }
 
 export interface DragContext {
@@ -369,6 +334,10 @@ export type TableEvents =
   | { type: 'view.column.click'; columnId: string; field: string; shiftKey: boolean }
   | { type: 'view.filter.set'; filters: FilterConfig[] }
   | { type: 'view.viewport.update'; viewport: ViewportInfo }
+  | { type: 'view.columns.toggle'; columnId: string }
+  | { type: 'view.columns.show.all' }
+  | { type: 'view.columns.hide.all' }
+  | { type: 'view.columns.visibility.set'; visibility: Record<string, boolean> }
   
   // Drag events
   | { type: 'drag.row.start'; rowId: string }
@@ -446,4 +415,5 @@ export interface RenderState {
   optimisticOperations: Map<string, OptimisticOperation>;
   version: number;
   sortBy?: SortConfig[]; // Current sort configuration
+  columnVisibility?: Record<string, boolean>; // Column visibility state
 }

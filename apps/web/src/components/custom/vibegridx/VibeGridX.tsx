@@ -30,6 +30,7 @@ import type { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
 import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
+import { VibeGridXHeader } from './components/VibeGridXHeader';
 import './vibegridx.css';
 
 // ====================================
@@ -314,6 +315,8 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     
     refs.rendererRef.current.setRelationshipData(relationshipData);
   }, [relationshipData]);
+
+  // Column visibility updates are handled through XState events - no useEffect needed
   
   // ====================================
   // XSTATE EVENT LISTENERS
@@ -413,19 +416,29 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       const version = snapshot.context?.version;
       
       // Check if this is a meaningful change that requires re-render
-      const currentSortState = snapshot.context.actors?.viewCoordinator?.getSnapshot()?.context?.sortBy;
+      const viewCoordinatorSnapshot = snapshot.context.actors?.viewCoordinator?.getSnapshot();
+      const currentSortState = viewCoordinatorSnapshot?.context?.sortBy;
       const lastSortState = (window as any).__vibegridx_last_sortstate;
       const sortChanged = JSON.stringify(currentSortState) !== JSON.stringify(lastSortState);
+      
+      const currentColumnVisibility = viewCoordinatorSnapshot?.context?.columnVisibility;
+      const lastColumnVisibility = (window as any).__vibegridx_last_columnvisibility;
+      const columnVisibilityChanged = JSON.stringify(currentColumnVisibility) !== JSON.stringify(lastColumnVisibility);
       
       if (sortChanged) {
         console.log('VibeGridX: Sort state changed:', currentSortState);
         (window as any).__vibegridx_last_sortstate = currentSortState;
       }
       
-      // Skip if only selection changed (no data or sort changes)
+      if (columnVisibilityChanged) {
+        console.log('VibeGridX: Column visibility changed:', currentColumnVisibility);
+        (window as any).__vibegridx_last_columnvisibility = currentColumnVisibility;
+      }
+      
+      // Skip if only selection changed (no data, sort, or column visibility changes)
       const isDataChange = hasDataChanged(snapshot);
       
-      if (!isDataChange && !sortChanged) {
+      if (!isDataChange && !sortChanged && !columnVisibilityChanged) {
         // Skip expensive processing for selection-only changes
         return;
       }
@@ -526,21 +539,29 @@ export const VibeGridX = <T extends Record<string, any> = any>(
           const reason = sortChanged ? 'SORT CHANGE' : 'STRUCTURAL CHANGE';
           console.log(`VibeGridX: ${reason} - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
           rendererRef.current!.render(renderState);
-            // Report performance metrics after render
-            setTimeout(() => {
-              if (rendererRef.current && onPerformanceUpdate) {
-                const metrics = rendererRef.current.getPerformanceMetrics();
-                if (metrics) {
-                  onPerformanceUpdate({
-                    lastRenderTime: metrics.lastRenderTime,
-                    visibleRows: metrics.visibleRows,
-                    cacheSize: metrics.cacheSize,
-                    updateQueueSize: metrics.updateQueueSize,
-                    timestamp: Date.now()
-                  });
-                }
+          // Report performance metrics after render
+          setTimeout(() => {
+            if (rendererRef.current && onPerformanceUpdate) {
+              const metrics = rendererRef.current.getPerformanceMetrics();
+              if (metrics) {
+                onPerformanceUpdate({
+                  lastRenderTime: metrics.lastRenderTime,
+                  visibleRows: metrics.visibleRows,
+                  cacheSize: metrics.cacheSize,
+                  updateQueueSize: metrics.updateQueueSize,
+                  timestamp: Date.now()
+                });
               }
-            }, 50);
+            }
+          }, 50);
+        } else if (columnVisibilityChanged) {
+          // Column visibility changes only need renderer column update (no coordinate manager updates)
+          console.log('VibeGridX: COLUMN VISIBILITY CHANGE - Lightweight renderer update');
+          if (renderState.columnVisibility && rendererRef.current) {
+            rendererRef.current.setColumnVisibility(renderState.columnVisibility);
+          }
+          // Skip expensive coordinate manager and canvas updates
+          return;
         } else if (changedRows.length > 0) {
           // Only specific rows changed - update those rows only
           console.log(`VibeGridX: ROW CHANGES - Updating ${changedRows.length} specific rows`);
@@ -592,6 +613,23 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const vibeGridXApi = useVibeGridXApi(tableSend, tableState, tableActor, rendererRef);
   
   // ====================================
+  // COLUMN VISIBILITY HANDLERS (Pure XState Events)
+  // ====================================
+  
+  // Column visibility handlers
+  const handleToggleColumn = useCallback((columnId: string) => {
+    vibeGridXApi.toggleColumnVisibility(columnId);
+  }, [vibeGridXApi]);
+  
+  const handleShowAllColumns = useCallback(() => {
+    vibeGridXApi.showAllColumns();
+  }, [vibeGridXApi]);
+  
+  const handleHideAllColumns = useCallback(() => {
+    vibeGridXApi.hideAllColumns();
+  }, [vibeGridXApi]);
+  
+  // ====================================
   // STATE MACHINE EVENT SUBSCRIPTIONS
   // ====================================
   
@@ -637,11 +675,20 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
+      {/* Header with Column Visibility Controls */}
+      <VibeGridXHeader
+        columns={columns}
+        tableActor={tableActor}
+        onToggleColumn={handleToggleColumn}
+        onShowAll={handleShowAllColumns}
+        onHideAll={handleHideAllColumns}
+      />
+      
       {/* Atomic Renderer Container */}
       <div
         ref={containerRef}
         className="vibegridx-renderer"
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: 'calc(100% - 48px)' }} // Subtract header height
       />
       
       {/* Canvas Overlay Container will be created inside the viewport by AtomicTableRenderer */}

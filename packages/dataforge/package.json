@@ -53,7 +53,7 @@
     "generate-rdg-columns": "tsx src/scripts/generate-rdg-columns.ts",
     "generate-vibegridx-columns": "tsx src/scripts/generate-vibegridx-columns.ts",
     "generate-crud-operations": "node --loader ts-node/esm src/scripts/generate-crud-operations.ts",
-    "generate": "pnpm run generate-entities && pnpm run generate-column-configs && pnpm run generate-rdg-columns && pnpm run generate-vibegridx-columns && pnpm run generate-crud-operations",
+    "generate": "pnpm run generate-entities && pnpm run generate-vibegridx-columns && pnpm run generate-crud-operations",
     "compile": "tsup",
     "build": "pnpm run forge:build",
     "migration:generate:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",

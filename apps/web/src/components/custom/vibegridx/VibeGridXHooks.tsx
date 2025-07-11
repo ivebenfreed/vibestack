@@ -216,15 +216,21 @@ export const useRenderStateExtractor = (
       
       // Safely extract view state
       let sortBy = [];
+      let columnVisibility = {};
       if (viewCoordinator) {
         try {
           const viewSnapshot = viewCoordinator.getSnapshot();
           groupedData = viewSnapshot.context?.groupedData || [];
           sortBy = viewSnapshot.context?.sortBy || [];
+          columnVisibility = viewSnapshot.context?.columnVisibility || {};
           
           // Debug log
           if (sortBy.length > 0) {
             console.log('[RenderStateExtractor] Extracted sortBy:', sortBy);
+          }
+          if (Object.keys(columnVisibility).length > 0) {
+            const hiddenCount = Object.values(columnVisibility).filter(visible => !visible).length;
+            console.log('[RenderStateExtractor] Extracted columnVisibility:', { hiddenCount });
           }
         } catch (error) {
           console.warn('Failed to get view coordinator snapshot:', error);
@@ -239,7 +245,8 @@ export const useRenderStateExtractor = (
         groupedData,
         optimisticOperations,
         version: snapshot.context.version || 0,
-        sortBy // Add sort state to render state
+        sortBy, // Add sort state to render state
+        columnVisibility // Add column visibility state to render state
       };
       
       console.log('Final render state:', {
@@ -308,6 +315,23 @@ export const useVibeGridXApi = (
     
     setFilters: (filters: any[]) => {
       tableSend({ type: 'view.filter.set', filters });
+    },
+    
+    // Column visibility API
+    toggleColumnVisibility: (columnId: string) => {
+      tableSend({ type: 'view.columns.toggle', columnId });
+    },
+    
+    showAllColumns: () => {
+      tableSend({ type: 'view.columns.show.all' });
+    },
+    
+    hideAllColumns: () => {
+      tableSend({ type: 'view.columns.hide.all' });
+    },
+    
+    setColumnVisibility: (visibility: Record<string, boolean>) => {
+      tableSend({ type: 'view.columns.visibility.set', visibility });
     },
     
     // Data API

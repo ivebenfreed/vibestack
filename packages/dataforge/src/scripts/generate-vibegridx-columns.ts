@@ -7,6 +7,19 @@ import fs from 'fs/promises';
 // Import the generated client entities
 import * as ClientEntities from '../generated/client-entities.js';
 
+// Import configuration
+import {
+  VIBEGRIDX_GENERATOR_CONFIG,
+  type VibeGridXGeneratorConfig,
+  getColumnWidth as getConfigColumnWidth,
+  getMinColumnWidth as getConfigMinColumnWidth,
+  getMaxColumnWidth as getConfigMaxColumnWidth,
+  getPlaceholder as getConfigPlaceholder,
+  isSystemField as isConfigSystemField,
+  isHideable as isConfigHideable,
+  mapDbTypeToCellType,
+} from '../config/vibegridx-generator-config.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PACKAGE_ROOT = path.resolve(__dirname, '../..');
@@ -14,7 +27,7 @@ const PACKAGE_ROOT = path.resolve(__dirname, '../..');
 /**
  * Main function to generate VibeGridX column configurations
  */
-async function generateVibeGridXColumnFile() {
+async function generateVibeGridXColumnFile(config: VibeGridXGeneratorConfig = VIBEGRIDX_GENERATOR_CONFIG) {
     // Get entity classes from ClientEntities
     const entityClasses: Function[] = [];
     
@@ -34,7 +47,7 @@ async function generateVibeGridXColumnFile() {
     await fs.mkdir(generatedDir, { recursive: true });
     
     // Generate column configurations
-    const columnConfigOutput = generateVibeGridXColumns(entityClasses);
+    const columnConfigOutput = generateVibeGridXColumns(entityClasses, config);
     const columnConfigPath = path.join(generatedDir, 'vibegridx-columns.ts');
     await fs.writeFile(columnConfigPath, columnConfigOutput);
     console.log('Generated VibeGridX column configurations at:', columnConfigPath);
@@ -43,7 +56,7 @@ async function generateVibeGridXColumnFile() {
 /**
  * Generate VibeGridX column configurations from client entities
  */
-function generateVibeGridXColumns(entityClasses: Function[]): string {
+function generateVibeGridXColumns(entityClasses: Function[], config: VibeGridXGeneratorConfig = VIBEGRIDX_GENERATOR_CONFIG): string {
     const storage = getMetadataArgsStorage();
     
     // Generate dynamic imports
@@ -62,6 +75,19 @@ import type {
 // VIBEGRIDX COLUMN TYPES
 // ============================================================================
 
+// EnumOption interface for type-safe enum options
+export interface EnumOption {
+  value: string | number;
+  label: string;
+  cssClass?: string;
+  color?: string;
+  backgroundColor?: string;
+  icon?: string;
+  description?: string;
+  group?: string;
+  disabled?: boolean;
+}
+
 // Define our extended Column interface for generation
 export interface VibeGridXColumn<T = any> {
   id: string;
@@ -75,7 +101,8 @@ export interface VibeGridXColumn<T = any> {
   resizable?: boolean;
   sortable?: boolean;
   filterable?: boolean;
-  options?: string[] | any[]; // for select/enum type
+  hideable?: boolean;
+  options?: EnumOption[]; // for select/enum type
   
   // Relationship fields
   cellType?: 'relationship-single' | 'relationship-multi' | 'relationship-collection' | string;
@@ -97,9 +124,6 @@ export interface VibeGridXColumn<T = any> {
   max?: number;
   dateFormat?: string;
   maxLength?: number;
-  
-  // Enum options
-  enumOptions?: any[];
   
   // Extended metadata
   meta?: {
@@ -154,8 +178,10 @@ export type CellType =
 
 `;
 
-    // Generate enum options
-    output += generateEnumOptions();
+    // Generate enum options if enabled
+    if (config.outputOptions.generateEnumOptions) {
+        output += generateEnumOptions();
+    }
 
     output += `
 // ============================================================================
@@ -166,11 +192,13 @@ export type CellType =
 
     // Generate column definitions for each entity
     for (const entity of entityClasses) {
-        output += generateEntityVibeGridXColumns(entity, entityClasses, storage);
+        output += generateEntityVibeGridXColumns(entity, entityClasses, storage, config);
     }
 
-    // Add utility functions
-    output += generateUtilityFunctions(entityClasses);
+    // Add utility functions if enabled
+    if (config.outputOptions.includeUtilityFunctions) {
+        output += generateUtilityFunctions(entityClasses);
+    }
 
     return output;
 }
@@ -211,7 +239,7 @@ function generateEnumOptions(): string {
 /**
  * Generate VibeGridX columns for a single entity
  */
-function generateEntityVibeGridXColumns(entity: Function, allEntities: Function[], storage: any): string {
+function generateEntityVibeGridXColumns(entity: Function, allEntities: Function[], storage: any, config: VibeGridXGeneratorConfig): string {
     const entityName = entity.name;
     
     // Find the entity schema
@@ -229,57 +257,65 @@ function generateEntityVibeGridXColumns(entity: Function, allEntities: Function[
     
     // Generate column definitions
     for (const [propertyName, columnDef] of Object.entries(columns)) {
-        const config = generateColumnConfigFromSchema(entity, propertyName, columnDef as any);
+        const colConfig = generateColumnConfigFromSchema(entity, propertyName, columnDef as any, config);
         
         output += `  {\n`;
         output += `    id: '${propertyName}',\n`;
         output += `    name: '${formatFieldLabel(propertyName)}',\n`;
         output += `    field: '${propertyName}' as keyof ${entityName},\n`;
-        output += `    type: '${mapToVibeGridXType(config.cellType)}',\n`;
-        output += `    width: ${getColumnWidth(config.cellType, config.validation?.maxLength)},\n`;
-        output += `    minWidth: ${getMinColumnWidth(config.cellType)},\n`;
-        output += `    maxWidth: ${getMaxColumnWidth(config.cellType)},\n`;
-        output += `    editable: ${config.editable},\n`;
-        output += `    sortable: ${!config.systemField},\n`;
-        output += `    filterable: true,\n`;
-        output += `    resizable: true,\n`;
+        output += `    type: '${mapToVibeGridXType(colConfig.cellType)}',\n`;
+        output += `    width: ${getConfigColumnWidth(colConfig.cellType, config, colConfig.validation?.maxLength)},\n`;
+        output += `    minWidth: ${getConfigMinColumnWidth(colConfig.cellType, config)},\n`;
+        output += `    maxWidth: ${getConfigMaxColumnWidth(colConfig.cellType, config)},\n`;
+        output += `    editable: ${colConfig.editable},\n`;
+        output += `    sortable: ${config.processingRules.sortableByDefault},\n`;
+        output += `    filterable: ${config.processingRules.filterableByDefault},\n`;
+        output += `    resizable: ${config.processingRules.resizableByDefault},\n`;
+        output += `    hideable: ${isConfigHideable(propertyName, config)},\n`;
         
         // Add cellType for special types
-        if (config.cellType === 'uuid' || config.cellType === 'json' || config.cellType.startsWith('relationship')) {
-            output += `    cellType: '${config.cellType}',\n`;
+        if (colConfig.cellType === 'uuid' || colConfig.cellType === 'json' || colConfig.cellType.startsWith('relationship')) {
+            output += `    cellType: '${colConfig.cellType}',\n`;
         }
         
-        if (config.enumType) {
-            output += `    options: Object.entries(${config.enumType}Options).map(([value, label]) => ({ value, label })),\n`;
+        if (colConfig.enumType) {
+            output += `    options: Object.entries(${colConfig.enumType}Options).map(([value, label]) => ({\n`;
+            output += `      value,\n`;
+            output += `      label,\n`;
+            output += `      cssClass: 'vibegridx-enum-badge-' + value.toLowerCase().replace(/[^a-z0-9]/g, '-')\n`;
+            output += `    })),\n`;
         }
         
-        if (config.validation?.maxLength) {
-            output += `    maxLength: ${config.validation.maxLength},\n`;
+        if (colConfig.validation?.maxLength) {
+            output += `    maxLength: ${colConfig.validation.maxLength},\n`;
         }
         
-        if (config.cellType === 'date') {
-            output += `    dateFormat: '${config.dbType.includes('timestamp') ? 'MMM dd, yyyy HH:mm' : 'MMM dd, yyyy'}',\n`;
+        if (colConfig.cellType === 'date') {
+            const dateFormat = colConfig.dbType.includes('timestamp') 
+                ? config.formatting.dateFormats.timestamp 
+                : config.formatting.dateFormats.date;
+            output += `    dateFormat: '${dateFormat}',\n`;
         }
         
-        if (config.nullable || config.systemField) {
-            output += `    placeholder: '${getPlaceholder(propertyName, config.cellType)}',\n`;
+        if (colConfig.nullable || colConfig.systemField) {
+            output += `    placeholder: '${getConfigPlaceholder(propertyName, colConfig.cellType, config)}',\n`;
         }
         
-        if (config.validation?.required) {
+        if (colConfig.validation?.required) {
             output += `    required: true,\n`;
         }
         
         // Add metadata
-        if (config.systemField || config.businessLogic || config.validation) {
+        if (colConfig.systemField || colConfig.businessLogic || colConfig.validation) {
             output += `    meta: {\n`;
-            if (config.systemField) {
+            if (colConfig.systemField) {
                 output += `      systemField: true,\n`;
             }
-            if (config.businessLogic && Object.keys(config.businessLogic).length > 0) {
-                output += `      businessLogic: ${JSON.stringify(config.businessLogic, null, 8).split('\n').join('\n      ')},\n`;
+            if (colConfig.businessLogic && Object.keys(colConfig.businessLogic).length > 0) {
+                output += `      businessLogic: ${JSON.stringify(colConfig.businessLogic, null, 8).split('\n').join('\n      ')},\n`;
             }
-            if (config.validation && Object.keys(config.validation).length > 0) {
-                output += `      validation: ${JSON.stringify(config.validation, null, 8).split('\n').join('\n      ')},\n`;
+            if (colConfig.validation && Object.keys(colConfig.validation).length > 0) {
+                output += `      validation: ${JSON.stringify(colConfig.validation, null, 8).split('\n').join('\n      ')},\n`;
             }
             output += `    },\n`;
         }
@@ -290,7 +326,7 @@ function generateEntityVibeGridXColumns(entity: Function, allEntities: Function[
     // Generate relationship columns
     for (const [propertyName, relationDef] of Object.entries(relations)) {
         const relation = relationDef as any;
-        const relConfig = generateRelationshipConfig(entity, propertyName, relation, allEntities);
+        const relConfig = generateRelationshipConfig(entity, propertyName, relation, allEntities, config);
         
         if (relConfig) {
             const cellType = getCellTypeForRelation(relation.type);
@@ -307,13 +343,14 @@ function generateEntityVibeGridXColumns(entity: Function, allEntities: Function[
             }
             
             output += `    type: 'select',\n`;
-            output += `    width: ${getColumnWidth(cellType)},\n`;
-            output += `    minWidth: ${getMinColumnWidth(cellType)},\n`;
-            output += `    maxWidth: ${getMaxColumnWidth(cellType)},\n`;
+            output += `    width: ${getConfigColumnWidth(cellType, config)},\n`;
+            output += `    minWidth: ${getConfigMinColumnWidth(cellType, config)},\n`;
+            output += `    maxWidth: ${getConfigMaxColumnWidth(cellType, config)},\n`;
             output += `    editable: ${relConfig.editable},\n`;
-            output += `    sortable: ${relation.type === 'many-to-one' || relation.type === 'one-to-one'},\n`;
-            output += `    filterable: true,\n`;
-            output += `    resizable: true,\n`;
+            output += `    sortable: ${config.processingRules.sortableByDefault},\n`;
+            output += `    filterable: ${config.processingRules.filterableByDefault},\n`;
+            output += `    resizable: ${config.processingRules.resizableByDefault},\n`;
+            output += `    hideable: ${isConfigHideable(propertyName, config)},\n`;
             output += `    cellType: '${cellType}',\n`;
             output += `    relationshipTable: '${propertyName}',\n`;
             output += `    relationshipDisplayField: '${relConfig.displayField || 'name'}',\n`;
@@ -354,18 +391,18 @@ function findSchemaForEntity(entityName: string): any {
 /**
  * Generate column config from schema
  */
-function generateColumnConfigFromSchema(entity: Function, propertyName: string, columnDef: any): any {
+function generateColumnConfigFromSchema(entity: Function, propertyName: string, columnDef: any, config: VibeGridXGeneratorConfig): any {
     const dbType = columnDef.type || 'text';
     const nullable = columnDef.nullable === true;
-    const isSystem = isSystemField(propertyName);
+    const isSystem = isConfigSystemField(propertyName, config);
     
-    // Determine cell type
+    // Determine cell type using config
     let cellType = 'text';
     let enumType = null;
     
     if (columnDef.enum) {
         cellType = 'enum';
-        // Determine enum type name
+        // Determine enum type name from metadata
         if (propertyName === 'status') {
             if (entity.name === 'Task') enumType = 'TaskStatus';
             else if (entity.name === 'Project') enumType = 'ProjectStatus';
@@ -374,16 +411,13 @@ function generateColumnConfigFromSchema(entity: Function, propertyName: string, 
         } else if (propertyName === 'role') {
             enumType = 'UserRole';
         }
-    } else if (['int', 'integer', 'bigint', 'number', 'decimal', 'float'].includes(dbType)) {
-        cellType = 'number';
-    } else if (dbType === 'boolean') {
-        cellType = 'boolean';
-    } else if (['date', 'timestamp', 'timestamptz'].includes(dbType)) {
-        cellType = 'date';
-    } else if (dbType === 'uuid') {
-        cellType = 'uuid';
-    } else if (['json', 'jsonb'].includes(dbType)) {
-        cellType = 'json';
+    } else {
+        // Use config mapping for database type to cell type
+        cellType = mapDbTypeToCellType(dbType, config);
+        
+        // Special case for uuid and json that might not be in the mapping
+        if (dbType === 'uuid') cellType = 'uuid';
+        else if (['json', 'jsonb'].includes(dbType)) cellType = 'json';
     }
     
     // Generate validation
@@ -394,11 +428,11 @@ function generateColumnConfigFromSchema(entity: Function, propertyName: string, 
     if (!nullable && !isSystem) {
         validation.required = true;
     }
-    if (propertyName === 'email') {
-        validation.pattern = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$';
+    if (config.typeDetection.fieldNamePatterns.email.test(propertyName)) {
+        validation.pattern = config.validationPatterns.email;
     }
-    if (propertyName.includes('url') || propertyName.includes('Url')) {
-        validation.pattern = '^https?://.*';
+    if (config.typeDetection.fieldNamePatterns.url.test(propertyName)) {
+        validation.pattern = config.validationPatterns.url;
     }
     
     // Generate business logic
@@ -441,7 +475,7 @@ function generateColumnConfigFromSchema(entity: Function, propertyName: string, 
         businessLogic.targetEntity = relationName.charAt(0).toUpperCase() + relationName.slice(1);
     }
     
-    if (propertyName === 'email' || propertyName === 'password') {
+    if (config.typeDetection.fieldNamePatterns.email.test(propertyName) || config.typeDetection.fieldNamePatterns.password.test(propertyName)) {
         businessLogic.sensitive = true;
         businessLogic.maskInLogs = true;
     }
@@ -461,9 +495,9 @@ function generateColumnConfigFromSchema(entity: Function, propertyName: string, 
 /**
  * Generate relationship config
  */
-function generateRelationshipConfig(entity: Function, propertyName: string, relationDef: any, allEntities: Function[]): any {
+function generateRelationshipConfig(entity: Function, propertyName: string, relationDef: any, allEntities: Function[], config: VibeGridXGeneratorConfig = VIBEGRIDX_GENERATOR_CONFIG): any {
     const targetEntityName = relationDef.target;
-    const isEditable = relationDef.type === 'many-to-one' || relationDef.type === 'one-to-one';
+    const isEditable = config.processingRules.relationshipEditableTypes.includes(relationDef.type);
     const nullable = relationDef.nullable !== false;
     
     const businessLogic = {
@@ -475,7 +509,7 @@ function generateRelationshipConfig(entity: Function, propertyName: string, rela
     };
     
     const searchFields = getSearchFields(targetEntityName);
-    const allowCreate = relationDef.type === 'many-to-one' || relationDef.type === 'one-to-one';
+    const allowCreate = config.processingRules.relationshipAllowCreateTypes.includes(relationDef.type);
     
     return {
         targetEntity: targetEntityName,
@@ -488,12 +522,7 @@ function generateRelationshipConfig(entity: Function, propertyName: string, rela
     };
 }
 
-/**
- * Utility functions
- */
-function isSystemField(propertyName: string): boolean {
-    return ['id', 'clientId', 'createdAt', 'updatedAt'].includes(propertyName);
-}
+// isSystemField function removed - use isConfigSystemField from config instead
 
 function mapToVibeGridXType(cellType: string): string {
     switch (cellType) {
@@ -560,99 +589,13 @@ function formatFieldLabel(propertyName: string): string {
         .trim();
 }
 
-function getColumnWidth(cellType: string, maxLength?: number): number {
-    switch (cellType) {
-        case 'uuid':
-            return 120;
-        case 'date':
-            return 150;
-        case 'number':
-            return 100;
-        case 'boolean':
-            return 80;
-        case 'enum':
-            return 120;
-        case 'text':
-            if (maxLength) {
-                if (maxLength <= 50) return 150;
-                if (maxLength <= 100) return 200;
-                return 250;
-            }
-            return 200;
-        case 'relationship-single':
-            return 180;
-        case 'relationship-multi':
-            return 220;
-        case 'relationship-collection':
-            return 200;
-        case 'json':
-            return 220;
-        default:
-            return 150;
-    }
-}
+// getColumnWidth function removed - use getConfigColumnWidth from config instead
 
-function getMinColumnWidth(cellType: string): number {
-    switch (cellType) {
-        case 'uuid':
-            return 100;
-        case 'date':
-            return 120;
-        case 'number':
-            return 80;
-        case 'boolean':
-            return 70;
-        case 'enum':
-            return 100;
-        case 'text':
-            return 120;
-        case 'relationship-single':
-            return 140;
-        case 'relationship-multi':
-            return 160;
-        case 'relationship-collection':
-            return 160;
-        case 'json':
-            return 140;
-        default:
-            return 100;
-    }
-}
+// getMinColumnWidth function removed - use getConfigMinColumnWidth from config instead
 
-function getMaxColumnWidth(cellType: string): number {
-    switch (cellType) {
-        case 'uuid':
-            return 150;
-        case 'date':
-            return 200;
-        case 'number':
-            return 150;
-        case 'boolean':
-            return 100;
-        case 'enum':
-            return 200;
-        case 'text':
-            return 600;
-        case 'relationship-single':
-            return 400;
-        case 'relationship-multi':
-            return 400;
-        case 'relationship-collection':
-            return 500;
-        case 'json':
-            return 500;
-        default:
-            return 400;
-    }
-}
+// getMaxColumnWidth function removed - use getConfigMaxColumnWidth from config instead
 
-function getPlaceholder(propertyName: string, cellType: string): string {
-    if (cellType === 'date') return 'Select date...';
-    if (cellType === 'number') return '0';
-    if (cellType === 'enum') return 'Select...';
-    if (cellType === 'relationship-single' || cellType === 'relationship-multi') return 'Select...';
-    return `Enter ${formatFieldLabel(propertyName).toLowerCase()}...`;
-}
+// getPlaceholder function removed - use getConfigPlaceholder from config instead
 
 /**
  * Generate utility functions

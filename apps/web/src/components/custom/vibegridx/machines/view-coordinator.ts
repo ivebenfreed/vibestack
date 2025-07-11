@@ -302,12 +302,21 @@ interface ViewCoordinatorContext extends ViewContext {
   processedItemCount: number;
 }
 
+// Helper function to calculate hidden column count
+const calculateHiddenCount = (visibility: Record<string, boolean>): number => {
+  return Object.values(visibility).filter(visible => !visible).length;
+};
+
 type ViewEvents = 
   | { type: 'view.group.set'; groupBy: string[] }
   | { type: 'view.group.toggle'; groupId: string }
   | { type: 'view.sort.set'; sortBy: any[] }
   | { type: 'view.filter.set'; filters: any[] }
   | { type: 'view.viewport.update'; viewport: any }
+  | { type: 'view.columns.toggle'; columnId: string }
+  | { type: 'view.columns.show.all' }
+  | { type: 'view.columns.hide.all' }
+  | { type: 'view.columns.visibility.set'; visibility: Record<string, boolean> }
   // Internal events
   | { type: 'COLUMNS_CHANGED'; columns: Column[] }
   | { type: 'ROWS_UPDATED'; rows: TableRow[] }
@@ -509,7 +518,105 @@ export const viewCoordinatorMachine = setup({
       if (processingTime > 100) {
         console.warn(`View processing slow: ${processingTime}ms for ${context.processedItemCount} items`);
       }
-    }
+    },
+    
+    // Column visibility management
+    toggleColumnVisibility: assign({
+      columnVisibility: ({ context, event }) => {
+        if (event.type !== 'view.columns.toggle') return context.columnVisibility;
+        
+        const newVisibility = { ...context.columnVisibility };
+        const columnId = event.columnId;
+        
+        // Find the column to check if it's hideable
+        const column = context.columns.find(col => col.id === columnId);
+        if (column && column.hideable === false) {
+          // Don't toggle non-hideable columns
+          return context.columnVisibility;
+        }
+        
+        newVisibility[columnId] = !newVisibility[columnId];
+        
+        // Persist to localStorage
+        if (context.entityType && typeof window !== 'undefined') {
+          localStorage.setItem(
+            `vibegridx-columns-${context.entityType}`,
+            JSON.stringify(newVisibility)
+          );
+        }
+        
+        return newVisibility;
+      },
+      hiddenColumnCount: ({ context, event }) => {
+        if (event.type !== 'view.columns.toggle') return context.hiddenColumnCount;
+        
+        const columnId = event.columnId;
+        const currentlyVisible = context.columnVisibility[columnId] !== false;
+        
+        // Calculate new count based on toggle
+        if (currentlyVisible) {
+          return context.hiddenColumnCount + 1;
+        } else {
+          return Math.max(0, context.hiddenColumnCount - 1);
+        }
+      },
+      version: ({ context }) => context.version + 1
+    }),
+    
+    showAllColumns: assign({
+      columnVisibility: ({ context }) => {
+        const newVisibility = Object.fromEntries(
+          context.columns.map(col => [col.id, true])
+        );
+        
+        // Persist to localStorage
+        if (context.entityType && typeof window !== 'undefined') {
+          localStorage.setItem(
+            `vibegridx-columns-${context.entityType}`,
+            JSON.stringify(newVisibility)
+          );
+        }
+        
+        return newVisibility;
+      },
+      hiddenColumnCount: 0,
+      version: ({ context }) => context.version + 1
+    }),
+    
+    hideAllColumns: assign({
+      columnVisibility: ({ context }) => {
+        const newVisibility = Object.fromEntries(
+          context.columns.map(col => [col.id, col.hideable === false ? true : false])
+        );
+        
+        // Persist to localStorage
+        if (context.entityType && typeof window !== 'undefined') {
+          localStorage.setItem(
+            `vibegridx-columns-${context.entityType}`,
+            JSON.stringify(newVisibility)
+          );
+        }
+        
+        return newVisibility;
+      },
+      hiddenColumnCount: ({ context }) => {
+        // Count columns that can be hidden
+        return context.columns.filter(col => col.hideable !== false).length;
+      },
+      version: ({ context }) => context.version + 1
+    }),
+    
+    setColumnVisibility: assign({
+      columnVisibility: ({ event }) => {
+        if (event.type !== 'view.columns.visibility.set') return {};
+        return event.visibility;
+      },
+      hiddenColumnCount: ({ event }) => {
+        if (event.type !== 'view.columns.visibility.set') return 0;
+        return calculateHiddenCount(event.visibility);
+      },
+      version: ({ context }) => context.version + 1
+    })
   },
   
   guards: {
@@ -544,6 +651,26 @@ export const viewCoordinatorMachine = setup({
       console.log(`ViewCoordinator: Restored sort state for ${entityType}:`, initialSortBy);
     }
     
+    // Try to restore persisted column visibility state
+    const persistedColumns = typeof window !== 'undefined' && entityType
+      ? localStorage.getItem(`vibegridx-columns-${entityType}`)
+      : null;
+    
+    // Initialize all columns as visible by default
+    const defaultVisibility = Object.fromEntries(
+      input.columns.map(col => [col.id, true])
+    );
+    
+    const initialColumnVisibility = persistedColumns 
+      ? { ...defaultVisibility, ...JSON.parse(persistedColumns) }
+      : defaultVisibility;
+    
+    const initialHiddenCount = calculateHiddenCount(initialColumnVisibility);
+    
+    if (persistedColumns) {
+      console.log(`ViewCoordinator: Restored column visibility for ${entityType}, ${initialHiddenCount} hidden`);
+    }
+    
     return {
       entityType,
       columns: input.columns,
@@ -563,6 +690,8 @@ export const viewCoordinatorMachine = setup({
         scrollTop: 0,
         itemHeight: 40
       },
+      columnVisibility: initialColumnVisibility,
+      hiddenColumnCount: initialHiddenCount,
       
       isProcessing: false,
       processingQueue: [],
@@ -575,20 +704,25 @@ export const viewCoordinatorMachine = setup({
   states: {
     idle: {
       entry: [
-        // If we have initial sort state, notify parent to trigger render
+        // If we have initial sort state or hidden columns, notify parent to trigger render
         ({ context }) => {
-          if (context.sortBy.length > 0) {
-            console.log('ViewCoordinator: Notifying parent of initial sort state');
+          if (context.sortBy.length > 0 || context.hiddenColumnCount > 0) {
+            console.log('ViewCoordinator: Notifying parent of initial view state', {
+              sortBy: context.sortBy.length,
+              hiddenColumns: context.hiddenColumnCount
+            });
           }
         },
         sendParent(({ context }) => {
-          if (context.sortBy.length > 0) {
+          if (context.sortBy.length > 0 || context.hiddenColumnCount > 0) {
             return {
               type: 'view.state.changed',
               viewState: {
                 sortBy: context.sortBy,
                 filters: context.filters,
-                groupBy: context.groupBy
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount
               }
             };
           }
@@ -664,6 +798,67 @@ export const viewCoordinatorMachine = setup({
           guard: 'hasData',
           target: 'processing',
           actions: 'startProcessing'
+        },
+        
+        // Column visibility events
+        'view.columns.toggle': {
+          actions: ['toggleColumnVisibility',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount
+              }
+            }))
+          ]
+        },
+        
+        'view.columns.show.all': {
+          actions: ['showAllColumns',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount
+              }
+            }))
+          ]
+        },
+        
+        'view.columns.hide.all': {
+          actions: ['hideAllColumns',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount
+              }
+            }))
+          ]
+        },
+        
+        'view.columns.visibility.set': {
+          actions: ['setColumnVisibility',
+            sendParent(({ context }) => ({
+              type: 'view.state.changed',
+              viewState: {
+                sortBy: context.sortBy,
+                filters: context.filters,
+                groupBy: context.groupBy,
+                columnVisibility: context.columnVisibility,
+                hiddenColumnCount: context.hiddenColumnCount
+              }
+            }))
+          ]
         }
       }
     },

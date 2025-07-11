@@ -7,7 +7,7 @@ const config = {
     'src/index.ts', 
     'src/generated/client-entities.ts', 
     'src/generated/server-entities.ts', 
-    'src/generated/column-configurations.ts', 
+    'src/generated/column-configurations.ts',
     'src/generated/rdg-column-configurations.ts',
     'src/generated/vibegridx-columns.ts',
     'src/generated/*-operations.ts'

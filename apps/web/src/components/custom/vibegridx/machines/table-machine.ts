@@ -549,6 +549,31 @@ export const tableBaseMachine = setup({
                     ({ event }) => event)
                 },
                 
+                // Column visibility events
+                'view.columns.toggle': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.show.all': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.hide.all': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
+                'view.columns.visibility.set': {
+                  guard: 'canPerformOperation',
+                  actions: sendTo(({ context }) => context.actors.viewCoordinator!, 
+                    ({ event }) => event)
+                },
+                
                 'view.filter.set': {
                   guard: 'canPerformOperation',
                   actions: sendTo(({ context }) => context.actors.viewCoordinator!, 

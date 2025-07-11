@@ -26,6 +26,8 @@ export const fastRenderers = {
   boolean: () => import('./renderBoolean').then(m => m.renderBoolean),
   enum: () => import('./renderEnum').then(m => m.renderEnum),
   select: () => import('./renderText').then(m => m.renderText), // Reuse text renderer
+  uuid: () => import('./renderText').then(m => m.renderText), // UUID is text-based
+  json: () => import('./renderText').then(m => m.renderText), // JSON displayed as text
   relationship: () => import('./renderRelationship').then(m => m.renderRelationship),
   'relationship-single': () => import('./renderRelationship').then(m => m.renderRelationship),
   'relationship-multi': () => import('./renderRelationship').then(m => m.renderRelationship),
