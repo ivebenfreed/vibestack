@@ -21,16 +21,20 @@ import type { RenderState, RendererOptions, ViewportInfo } from '../types';
 
 export type RendererActorEvent = 
   | { type: 'INITIALIZE'; options: RendererOptions }
+  | { type: 'RENDER'; state: RenderState; coordinateMapping?: any }
   | { type: 'RENDER_ROWS'; state: RenderState }
   | { type: 'UPDATE_VIEWPORT'; viewport: ViewportInfo }
   | { type: 'UPDATE_COLUMNS'; columns: any[] }
+  | { type: 'UPDATE_COLUMN_WIDTH'; columnId: string; width: number }
   | { type: 'DESTROY' };
 
 export type RendererActorResponse =
   | { type: 'RENDERER_READY' }
-  | { type: 'ROWS_RENDERED'; actualOrder: string[]; viewport: ViewportInfo | null }
+  | { type: 'CANVAS_CONTAINER_READY'; container: HTMLElement }
+  | { type: 'ROWS_RENDERED'; actualOrder?: string[]; viewport?: ViewportInfo | null; rowCount?: number }
   | { type: 'VIEWPORT_UPDATED'; viewport: ViewportInfo }
   | { type: 'COLUMNS_UPDATED' }
+  | { type: 'COLUMN_WIDTH_UPDATED' }
   | { type: 'RENDERER_ERROR'; error: string };
 
 // ====================================
@@ -39,6 +43,10 @@ export type RendererActorResponse =
 
 export const rendererActor = fromCallback<RendererActorEvent, RendererActorResponse>(({ sendBack, receive }) => {
   let renderer: AtomicTableRenderer | null = null;
+  let renderState: RenderState | null = null;
+  let isInitializing = false;
+  let isInitialized = false;
+  let pendingRenderEvents: Array<{ type: string; state?: RenderState; coordinateMapping?: any }> = [];
   
   console.log('RendererActor: Created callback actor');
   
@@ -50,14 +58,113 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
         case 'INITIALIZE':
           console.log('RendererActor: Initializing with options:', event.options);
           
+          // Prevent multiple initializations
+          if (isInitializing) {
+            console.warn('RendererActor: Already initializing, ignoring duplicate INITIALIZE event');
+            return;
+          }
+          
+          if (isInitialized) {
+            console.warn('RendererActor: Already initialized, ignoring duplicate INITIALIZE event');
+            return;
+          }
+          
+          isInitializing = true;
+          
           // Import AtomicTableRenderer dynamically to avoid circular imports
           import('../renderers/AtomicTableRenderer').then(({ AtomicTableRenderer }) => {
-            renderer = new AtomicTableRenderer(event.options);
-            console.log('RendererActor: Renderer created successfully');
+            // Merge stored options from window with event options
+            const storedOptions = (window as any).__vibegridx_renderer_options || {};
+            const mergedOptions = {
+              ...storedOptions,
+              ...event.options,
+              onStateChange: (state: any) => {
+                console.log('RendererActor: Received state change from AtomicTableRenderer:', state);
+                
+                // Handle canvas container ready event
+                if (state.type === 'canvas.container.ready') {
+                  console.log('RendererActor: Canvas container ready, emitting CANVAS_CONTAINER_READY');
+                  sendBack({
+                    type: 'CANVAS_CONTAINER_READY',
+                    container: state.container
+                  });
+                }
+                
+                // Forward other state changes if there was an original handler
+                if (storedOptions.onStateChange) {
+                  storedOptions.onStateChange(state);
+                }
+              }
+            };
+            
+            const container = mergedOptions.container;
+            console.log('RendererActor: Creating renderer with merged options:', {
+              hasStoredOptions: !!storedOptions,
+              hasEventOptions: !!event.options,
+              container,
+              containerBounds: container ? container.getBoundingClientRect() : null,
+              containerStyle: container ? {
+                width: container.style.width,
+                height: container.style.height,
+                position: container.style.position
+              } : null,
+              containerComputedStyle: container ? {
+                width: window.getComputedStyle(container).width,
+                height: window.getComputedStyle(container).height,
+                display: window.getComputedStyle(container).display,
+                position: window.getComputedStyle(container).position
+              } : null
+            });
+            
+            renderer = new AtomicTableRenderer(mergedOptions);
+            isInitializing = false;
+            isInitialized = true;
+            
+            console.log('RendererActor: Renderer created successfully', {
+              renderer,
+              containerAfterInit: container ? {
+                bounds: container.getBoundingClientRect(),
+                clientDimensions: {
+                  clientWidth: container.clientWidth,
+                  clientHeight: container.clientHeight
+                }
+              } : null,
+              pendingEventsCount: pendingRenderEvents.length
+            });
             
             sendBack({ type: 'RENDERER_READY' });
+            
+            // Process any queued render events
+            if (pendingRenderEvents.length > 0) {
+              console.log(`RendererActor: Processing ${pendingRenderEvents.length} queued render events`);
+              
+              for (const queuedEvent of pendingRenderEvents) {
+                if (queuedEvent.type === 'RENDER' && queuedEvent.state) {
+                  console.log('RendererActor: Processing queued RENDER event');
+                  renderer.render(queuedEvent.state);
+                  sendBack({
+                    type: 'ROWS_RENDERED',
+                    rowCount: queuedEvent.state.rows?.length || 0
+                  });
+                } else if (queuedEvent.type === 'RENDER_ROWS' && queuedEvent.state) {
+                  console.log('RendererActor: Processing queued RENDER_ROWS event');
+                  renderer.render(queuedEvent.state);
+                  const actualOrder = renderer.getRenderedRowIds?.() || [];
+                  const currentViewport = renderer.getCurrentViewport?.() || null;
+                  sendBack({
+                    type: 'ROWS_RENDERED',
+                    actualOrder,
+                    viewport: currentViewport
+                  });
+                }
+              }
+              
+              // Clear the queue
+              pendingRenderEvents = [];
+            }
           }).catch((error) => {
             console.error('RendererActor: Failed to create renderer:', error);
+            isInitializing = false; // Reset flag on error
             sendBack({ 
               type: 'RENDERER_ERROR', 
               error: `Failed to initialize renderer: ${error.message}` 
@@ -67,12 +174,22 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
         case 'RENDER_ROWS':
           if (!renderer) {
-            console.warn('RendererActor: Cannot render - renderer not initialized');
-            sendBack({ 
-              type: 'RENDERER_ERROR', 
-              error: 'Renderer not initialized' 
-            });
-            return;
+            if (isInitializing) {
+              // Queue the event for processing after initialization
+              console.log('RendererActor: Queueing RENDER_ROWS event during initialization');
+              pendingRenderEvents.push({
+                type: 'RENDER_ROWS',
+                state: event.state
+              });
+              return;
+            } else {
+              console.warn('RendererActor: Cannot render - renderer not initialized');
+              sendBack({ 
+                type: 'RENDERER_ERROR', 
+                error: 'Renderer not initialized' 
+              });
+              return;
+            }
           }
           
           console.log('RendererActor: Rendering rows:', {
@@ -154,9 +271,32 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           break;
           
         case 'RENDER':
+          console.log('RendererActor: RENDER event received', {
+            hasRenderer: !!renderer,
+            isInitialized,
+            isInitializing,
+            hasState: !!event.state,
+            stateKeys: event.state ? Object.keys(event.state) : [],
+            queueLength: pendingRenderEvents.length
+          });
+          
           if (!renderer) {
-            console.warn('RendererActor: Cannot render - renderer not initialized');
-            return;
+            if (isInitializing) {
+              // Queue the event for processing after initialization
+              console.log('RendererActor: Queueing RENDER event during initialization');
+              pendingRenderEvents.push({
+                type: 'RENDER',
+                state: event.state,
+                coordinateMapping: (event as any).coordinateMapping
+              });
+              return;
+            } else {
+              console.warn('RendererActor: Cannot render - renderer not initialized', {
+                isInitializing,
+                isInitialized
+              });
+              return;
+            }
           }
           
           if (!event.state) {
@@ -166,14 +306,22 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           console.log('RendererActor: Rendering with state:', {
             rows: event.state.rows?.length,
-            columns: event.state.columns?.length
+            columns: event.state.columns?.length,
+            version: event.state.version
           });
           
           // Store the render state
           renderState = event.state;
           
-          // Render with the new state
-          renderer.render(event.state);
+          try {
+            // Render with the new state
+            console.log('RendererActor: About to call renderer.render()');
+            renderer.render(event.state);
+            console.log('RendererActor: renderer.render() completed successfully');
+          } catch (renderError) {
+            console.error('RendererActor: Error in renderer.render():', renderError);
+            throw renderError;
+          }
           
           sendBack({ 
             type: 'ROWS_RENDERED',
@@ -230,5 +378,5 @@ export function isRendererActorEvent(event: any): event is RendererActorEvent {
  */
 export function isRendererActorResponse(response: any): response is RendererActorResponse {
   return response && typeof response.type === 'string' && 
-    ['RENDERER_READY', 'ROWS_RENDERED', 'VIEWPORT_UPDATED', 'COLUMNS_UPDATED', 'RENDERER_ERROR'].includes(response.type);
+    ['RENDERER_READY', 'CANVAS_CONTAINER_READY', 'ROWS_RENDERED', 'VIEWPORT_UPDATED', 'COLUMNS_UPDATED', 'RENDERER_ERROR'].includes(response.type);
 }

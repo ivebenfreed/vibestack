@@ -94,19 +94,26 @@ export const useRendererInitialization = (
         // Store canvas container for deferred overlay initialization
         (refs as any).canvasContainer = canvasContainer;
         
-        // Initialize canvas actor with embedded canvas container
-        if (!refs.canvasOverlayRef.current && tableState?.context?.actors?.canvasActor) {
-          console.log('useRendererInitialization: Initializing canvas actor with embedded container');
-          
-          // Send INITIALIZE event to canvas actor
-          tableState.context.actors.canvasActor.send({
-            type: 'INITIALIZE',
-            container: canvasContainer,
-            config: {
-              dimensionManager,
-              rowDimensionManager,
-              coordinateManager,
-              columns: rendererOptions.columns,
+        // Defer canvas initialization until after first render completes
+        // This ensures the renderer has set up the viewport and initial state
+        console.log('useRendererInitialization: Deferring canvas initialization until after first render');
+        
+        // Use requestAnimationFrame to ensure DOM is ready and first render is complete
+        requestAnimationFrame(() => {
+          // Double RAF to ensure we're after the renderer's RAF callback
+          requestAnimationFrame(() => {
+            if (!refs.canvasOverlayRef.current && tableState?.context?.actors?.canvasActor) {
+              console.log('useRendererInitialization: Now initializing canvas actor after render complete');
+              
+              // Send INITIALIZE event to canvas actor
+              tableState.context.actors.canvasActor.send({
+                type: 'INITIALIZE',
+                container: canvasContainer,
+                config: {
+                  dimensionManager,
+                  rowDimensionManager,
+                  coordinateManager,
+                  columns: rendererOptions.columns,
               cellWidth: 120,
               cellHeight: rowDimensionManager?.getRowHeight() || 40,
               selectionColor: '#3b82f6',
@@ -116,15 +123,17 @@ export const useRendererInitialization = (
               enableAnimations: false,
               animationDuration: 0,
               borderWidth: 2,
-              overlayActor: tableState.context.actors.overlayActor // Required: Use shared actor from table machine
+                  overlayActor: tableState.context.actors.overlayActor // Required: Use shared actor from table machine
+                }
+              });
+              
+              // Mark as initialized so we don't send INITIALIZE again
+              (refs as any).canvasActorInitialized = true;
+              
+              console.log('VibeGridX: Canvas Overlay initialized with embedded container');
             }
           });
-          
-          // Mark as initialized so we don't send INITIALIZE again
-          (refs as any).canvasActorInitialized = true;
-          
-          console.log('VibeGridX: Canvas Overlay initialized with embedded container');
-        }
+        });
       }
     });
     

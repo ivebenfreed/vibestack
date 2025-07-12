@@ -128,16 +128,12 @@ export const viewHandlers = {
     actions: [
       viewActions.updateViewport,
       
-      // Send to overlay actor for canvas updates
-      sendTo(
-        ({ context }) => context.actors.overlayActor!,
-        ({ event }) => ({
-          type: 'VIEWPORT_UPDATE',
-          viewport: event.viewport
-        })
-      ),
+      // Update viewport in table state
+      assign({
+        viewport: ({ event }) => event.viewport
+      }),
       
-      // Send to canvas actor
+      // Send viewport update to canvas actor
       sendTo(
         ({ context }) => context.actors.canvasActor!,
         ({ event }) => ({
@@ -372,13 +368,13 @@ export const viewHandlers = {
         }
       }),
       
-      // Send column width update to renderer
+      // Send column width update to renderer actor for real-time visual feedback
       sendTo(
         ({ context }) => context.actors.rendererActor!,
         ({ context }) => ({
           type: 'UPDATE_COLUMN_WIDTH',
-          columnId: context.columnResizeState?.columnId,
-          width: context.columnResizeState?.currentWidth
+          columnId: context.columnResizeState!.columnId,
+          width: context.columnResizeState!.currentWidth
         })
       ),
       
@@ -431,26 +427,10 @@ export const viewHandlers = {
         }
       },
       
-      // Trigger a full re-render to ensure all cells are properly sized
-      sendTo(
-        ({ context }) => context.actors.rendererActor!,
-        ({ context }) => ({
-          type: 'RENDER',
-          state: {
-            rows: context.rows,
-            columns: context.columns,
-            selectedCells: context.selectedCells,
-            editingCell: null,
-            groupedData: [],
-            optimisticOperations: new Map(),
-            version: context.version + 1,
-            sortBy: context.sortBy,
-            columnVisibility: context.columnVisibility,
-            columnOrder: context.columnOrder,
-            columnWidths: context.columnWidths
-          }
-        })
-      ),
+      // Increment version to trigger re-render
+      assign({
+        version: ({ context }) => context.version + 1
+      }),
       
       // Clear the resize state (do this last)
       viewActions.endColumnResize,

@@ -3,7 +3,7 @@ import { createActor } from 'xstate';
 import type { CellRef, ViewportInfo, Column } from '../types';
 import type { OverlayConfig, VisualCellPosition } from './OverlayTypes';
 import { DEFAULT_CONFIG } from './OverlayTypes';
-import { overlayMachine, type OverlayMachineActor } from '../machines/overlay-machine';
+// overlayMachine removed - using direct canvas actor approach
 // ActorRef import removed - no longer needed
 import type { VibeGridXCoordinateManager } from '../coordinates/VibeGridXCoordinateManager';
 import type { CoordinateProvider } from './CoordinateProvider';
@@ -28,8 +28,7 @@ export class CanvasOverlay implements CoordinateProvider {
   private layer: Konva.Layer;
   private config: OverlayConfig;
   
-  // XState machine
-  private machine: OverlayMachineActor;
+  // Machine removed - using direct canvas actor approach
   
   // Direct reference to coordinate manager
   private coordinateManager: VibeGridXCoordinateManager | null = null;
@@ -137,20 +136,7 @@ export class CanvasOverlay implements CoordinateProvider {
       );
     }
     
-    // Always use the provided overlay actor (single source of truth)
-    this.machine = this.config.overlayActor;
-    console.log('CanvasOverlay: Using provided overlay actor from table machine');
-    
-    // Set machine reference in fill handle layer
-    this.fillHandleLayer.setMachine(this.machine);
-    
-    // Subscribe to machine state changes
-    this.setupMachineSubscription();
-    
-    // Set up machine event listeners
-    this.setupMachineListeners();
-    
-    // Send initial viewport to machine if available
+    // Send initial viewport if available
     const viewportElement = this.container.closest('.vibegridx-viewport');
     if (viewportElement) {
       const initialViewport: ViewportInfo = {
@@ -162,11 +148,7 @@ export class CanvasOverlay implements CoordinateProvider {
         itemHeight: this.config.cellHeight
       };
       
-      console.log('CanvasOverlay: Sending initial viewport', initialViewport);
-      this.machine.send({ type: 'VIEWPORT_UPDATE', viewport: initialViewport });
       this.columnResizeOverlay.updateViewport(initialViewport);
-      
-      // Also initialize our own viewport transform immediately
       this.updateViewport(initialViewport);
     }
   }
@@ -257,28 +239,7 @@ export class CanvasOverlay implements CoordinateProvider {
     this.layer.draw();
   }
   
-  private setupMachineSubscription(): void {
-    // Subscribe to machine state and update all overlays
-    // XState doesn't provide selective subscriptions, so we update everything
-    this.machine.subscribe((snapshot) => {
-      const context = snapshot.context;
-      
-      // Only log if there are actually selections or operations to render
-      if (context.selectedCells.size > 0 || 
-          context.shapesVisible.fillHandle || 
-          context.shapesVisible.fillPreview || 
-          context.shapesVisible.copyIndicator || 
-          context.shapesVisible.dragPreview) {
-        console.log('CanvasOverlay: Machine state changed', {
-          selectedCells: context.selectedCells.size,
-          viewport: context.viewport ? 'exists' : 'null'
-        });
-      }
-      
-      // Always update all overlays - let each overlay decide if it needs to re-render
-      this.updateAllOverlays(context);
-    });
-  }
+  // Machine subscription removed - viewport updates come via canvas actor directly
   
   private updateAllOverlays(context: any): void {
     // Skip all overlay updates during initialization if there are no selections and no active operations
@@ -342,21 +303,7 @@ export class CanvasOverlay implements CoordinateProvider {
     );
   }
   
-  private setupMachineListeners(): void {
-    // Listen for selection changes
-    this.machine.on('overlay.selection.changed', (event) => {
-      if (this.onSelectionChange) {
-        this.onSelectionChange(event.selectedCells);
-      }
-    });
-    
-    // Listen for fill complete
-    this.machine.on('overlay.fill.completed', (event) => {
-      if (this.onFillComplete && event.fillState) {
-        this.onFillComplete(event.fillState.originalSelection, event.fillState.previewCells);
-      }
-    });
-  }
+  // Machine listeners removed - events come via canvas actor directly
   
   
   
@@ -434,7 +381,8 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   updateSelection(selectedCells: Set<string>): void {
-    this.machine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
+    // No machine to send to - selection updates come via canvas actor
+    console.log('CanvasOverlay: updateSelection called directly', { cellCount: selectedCells.size });
   }
   
   updateSelectionVisual(visualCells: VisualCellPosition[]): void {
@@ -513,7 +461,7 @@ export class CanvasOverlay implements CoordinateProvider {
       this.layer.batchDraw();
     }
     
-    this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });
+    // No machine to send to - viewport updates come via canvas actor directly
     
     // Update resize overlay with viewport info
     this.columnResizeOverlay.updateViewport(viewport);

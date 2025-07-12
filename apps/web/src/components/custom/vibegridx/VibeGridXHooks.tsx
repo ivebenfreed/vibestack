@@ -156,7 +156,7 @@ export const useVibeGridXApi = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send'],
   tableState: any,
   tableActor: ActorRefFrom<typeof tableBaseMachine>,
-  rendererRef: React.MutableRefObject<any>
+  rendererRef?: React.MutableRefObject<any> // Make optional for renderer actor pattern
 ) => {
   return useMemo(() => ({
     // Selection API
@@ -223,7 +223,7 @@ export const useVibeGridXApi = (
     // Performance API
     getMetrics: () => {
       return {
-        renderer: rendererRef.current?.getPerformanceMetrics(),
+        renderer: rendererRef?.current?.getPerformanceMetrics(), // Optional chaining for renderer actor pattern
         machine: {
           state: tableState.value,
           context: tableState.context

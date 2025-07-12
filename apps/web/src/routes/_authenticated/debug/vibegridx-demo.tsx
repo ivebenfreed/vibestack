@@ -7,6 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { VibeGridX } from '@/components/custom/vibegridx';
+import { tasksAtom } from '@/domain/task';
+import { projectsAtom } from '@/domain/project'; 
+import { usersAtom } from '@/domain/user';
 import type { CellRef, ViewportInfo, Column } from '@/components/custom/vibegridx';
 import type { Task } from '@repo/dataforge/client-entities';
 import { 
@@ -268,9 +271,16 @@ function VibeGridXDemoGrid({
       {/* Grid Component */}
       <div className="flex-1">
         <VibeGridX<any>
-          data={data}
           entityType={entityType}
           columns={columns}
+          height={550}
+          atomConfig={{
+            primaryAtom: tasksAtom as any,
+            relationshipAtoms: {
+              projects: projectsAtom as any,
+              users: usersAtom as any
+            }
+          }}
           relationshipData={relationshipData}
           enableVirtualScrolling={true}
           enableCanvasOverlays={true}

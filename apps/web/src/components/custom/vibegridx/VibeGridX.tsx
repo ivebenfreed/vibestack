@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
-import { useMachine } from '@xstate/react';
+import { useMachine, useSelector } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
 import { 
-  useRendererInitialization,
-  useSelectionStateSync,
   type InitializationRefs 
 } from './VibeGridXCore';
 // PortalCanvasOverlayProvider removed - using embedded canvas approach
@@ -43,15 +41,15 @@ import './vibegridx.css';
 // ====================================
 
 interface VibeGridXProps<T = any> {
-  entityType: 'task' | 'project' | 'user';
+  entityType: string;  // Any entity type, not just hardcoded ones
   columns: Column<T>[];  // Required typed columns
+  atomConfig: import('./machines/table-machine/slices/atom-slice').AtomSliceConfig; // Required for data source
   tableId?: string;
   className?: string;
   height?: number;
   width?: number;
   
-  // Optional external data (if not using entity integration)
-  data?: any[];
+  // Optional relationship data
   relationshipData?: any;
   
   // Event handlers
@@ -88,6 +86,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     width = '100%',
     relationshipData,
     enableSelectionColumn = false,
+    atomConfig,
     onCellClick,
     onCellDoubleClick,
     onSelectionChange,
@@ -148,6 +147,13 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // Generate stable table ID that persists across renders
   const tableId = useRef(`vibegridx-${props.entityType}-${Date.now()}`).current;
   
+  // Atom configuration must be provided - no defaults for true genericity
+  const resolvedAtomConfig = atomConfig;
+  
+  if (!resolvedAtomConfig) {
+    console.error('VibeGridX: atomConfig prop is required. Please provide an atom configuration.');
+  }
+  
   // Create machine with props directly - machine will handle its own state
   const [tableState, tableSend, tableActor] = useMachine(tableBaseMachine, {
     input: {
@@ -155,6 +161,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       entityType: props.entityType,
       columns: props.columns,
       enableSelectionColumn: enableSelectionColumn,
+      atomConfig: resolvedAtomConfig,
       settings: {
         enableVirtualScrolling: props.enableVirtualScrolling ?? true,
         enableGrouping: props.enableGrouping ?? true,
@@ -244,134 +251,165 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // RENDERER INITIALIZATION
   // ====================================
   
-  // Remove wheel event debugging - not needed anymore
+  // Renderer is now initialized and managed by the renderer actor
+  // The renderer actor receives INITIALIZE event from table machine
+  // and creates the AtomicTableRenderer instance internally
   
-  useRendererInitialization(refs, {
-    columns: columns,
-    relationshipData: relationshipData,
-    enableSelectionColumn: enableSelectionColumn,
-    onCellClick: handleCellClick,
-    onCellDoubleClick: handleCellDoubleClick,
-    onColumnClick: handleColumnClick,
-    onColumnDragStart: handleColumnDragStart,
-    onColumnDragMove: handleColumnDragMove,
-    onColumnDragEnd: handleColumnDragEnd,
-    onColumnResizeStart: handleColumnResizeStart,
-    onColumnResizeMove: handleColumnResizeMove,
-    onColumnResizeEnd: handleColumnResizeEnd,
-    onStateChange: handleRendererStateChange,
-    onScroll: handleScroll,
-    onKeyDown: (event: KeyboardEvent) => {
-      handleKeyDown(event as any);
-    },
-    onSelectionChange: (selectedCells: Set<string>) => {
-      // Update XState machine with drag selection
-      tableSend({
-        type: 'selection.bulk.set',
-        selectedCells
-      });
-      
-      // Call user callback if provided
-      onSelectionChange?.(selectedCells);
-    },
-    onFillComplete: (originalCells: Set<string>, fillCells: Set<string>) => {
-      console.log('VibeGridX: Fill operation requested', {
-        originalCount: originalCells.size,
-        fillCount: fillCells.size
-      });
-      
-      // Check if this is a selection column fill operation
-      const isSelectionColumnFill = Array.from(fillCells).some(cellKey => {
-        const [, columnId] = cellKey.split(':');
-        return columnId === '__selection';
-      });
-      
-      if (isSelectionColumnFill) {
-        // Handle selection column fill - select/deselect rows
-        const rowIdsToSelect = new Set<string>();
-        
-        // Get all row IDs from fill cells
-        fillCells.forEach(cellKey => {
-          const [rowId, columnId] = cellKey.split(':');
-          if (columnId === '__selection') {
-            rowIdsToSelect.add(rowId);
-          }
+  // Initialize renderer when renderer actor is available
+  useEffect(() => {
+    if (!containerRef.current || !tableState?.context?.actors?.rendererActor) return;
+    
+    // Store renderer options in window for renderer actor to access
+    const rendererOptions = {
+      container: containerRef.current, // Real DOM container
+      columns: columns,
+      relationshipData: relationshipData,
+      enableSelectionColumn: enableSelectionColumn,
+      onCellClick: handleCellClick,
+      onCellDoubleClick: handleCellDoubleClick,
+      onColumnClick: handleColumnClick,
+      onColumnDragStart: handleColumnDragStart,
+      onColumnDragMove: handleColumnDragMove,
+      onColumnDragEnd: handleColumnDragEnd,
+      onColumnResizeStart: handleColumnResizeStart,
+      onColumnResizeMove: handleColumnResizeMove,
+      onColumnResizeEnd: handleColumnResizeEnd,
+      onStateChange: handleRendererStateChange,
+      onScroll: handleScroll,
+      onKeyDown: (event: KeyboardEvent) => {
+        handleKeyDown(event as any);
+      },
+      onSelectionChange: (selectedCells: Set<string>) => {
+        // Update XState machine with drag selection
+        tableSend({
+          type: 'selection.bulk.set',
+          selectedCells
         });
         
-        // Also include original selection
-        originalCells.forEach(cellKey => {
-          const [rowId, columnId] = cellKey.split(':');
-          if (columnId === '__selection') {
-            rowIdsToSelect.add(rowId);
-          }
+        // Call user callback if provided
+        onSelectionChange?.(selectedCells);
+      },
+      onFillComplete: (originalCells: Set<string>, fillCells: Set<string>) => {
+        console.log('VibeGridX: Fill operation requested', {
+          originalCount: originalCells.size,
+          fillCount: fillCells.size
         });
         
-        // Send checkbox range selection event
-        if (rowIdsToSelect.size > 0) {
-          const rowIds = Array.from(rowIdsToSelect);
-          const firstRowId = rowIds[0];
-          const lastRowId = rowIds[rowIds.length - 1];
+        // Check if this is a selection column fill operation
+        const isSelectionColumnFill = Array.from(fillCells).some(cellKey => {
+          const [, columnId] = cellKey.split(':');
+          return columnId === '__selection';
+        });
+        
+        if (isSelectionColumnFill) {
+          // Handle selection column fill - select/deselect rows
+          const rowIdsToSelect = new Set<string>();
           
-          tableSend({
-            type: 'selection.checkbox.range',
-            startRowId: firstRowId,
-            endRowId: lastRowId
+          // Get all row IDs from fill cells
+          fillCells.forEach(cellKey => {
+            const [rowId, columnId] = cellKey.split(':');
+            if (columnId === '__selection') {
+              rowIdsToSelect.add(rowId);
+            }
           });
           
-          console.log(`VibeGridX: Selected ${rowIdsToSelect.size} rows via fill handle`);
-        }
-      } else {
-        // Regular data fill operation
-        if (originalCells.size > 0 && fillCells.size > 0) {
-          const firstCell = Array.from(originalCells)[0];
-          const [rowId, columnId] = firstCell.split(':');
-          
-          // Find the value in the current data
-          const snapshot = tableActor.getSnapshot();
-          const row = snapshot.context.rows.find((r: any) => r.id === rowId);
-          
-          if (row && row.data[columnId] !== undefined) {
-            const fillValue = row.data[columnId];
-            
-            // For now, we'll use the integration layer to update cells
-            // This is a temporary solution until bulk edit is implemented
-            for (const cellKey of fillCells) {
-              const [targetRowId, targetColumnId] = cellKey.split(':');
-              
-              // Find the target row
-              const targetRow = snapshot.context.rows.find((r: any) => r.id === targetRowId);
-              if (targetRow) {
-                // Create an update for this cell
-                const updatedRow = {
-                  ...targetRow,
-                  data: {
-                    ...targetRow.data,
-                    [targetColumnId]: fillValue
-                  }
-                };
-                
-                // Send update through table machine
-                tableSend({
-                  type: 'data.row.update',
-                  row: updatedRow
-                });
-              }
+          // Also include original selection
+          originalCells.forEach(cellKey => {
+            const [rowId, columnId] = cellKey.split(':');
+            if (columnId === '__selection') {
+              rowIdsToSelect.add(rowId);
             }
+          });
+          
+          // Send checkbox range selection event
+          if (rowIdsToSelect.size > 0) {
+            const rowIds = Array.from(rowIdsToSelect);
+            const firstRowId = rowIds[0];
+            const lastRowId = rowIds[rowIds.length - 1];
             
-            console.log(`VibeGridX: Filled ${fillCells.size} cells with value:`, fillValue);
+            tableSend({
+              type: 'selection.checkbox.range',
+              startRowId: firstRowId,
+              endRowId: lastRowId
+            });
+            
+            console.log(`VibeGridX: Selected ${rowIdsToSelect.size} rows via fill handle`);
+          }
+        } else {
+          // Regular data fill operation
+          if (originalCells.size > 0 && fillCells.size > 0) {
+            const firstCell = Array.from(originalCells)[0];
+            const [rowId, columnId] = firstCell.split(':');
+            
+            // Find the value in the current data
+            const snapshot = tableActor.getSnapshot();
+            const row = snapshot.context.rows.find((r: any) => r.id === rowId);
+            
+            if (row && row.data[columnId] !== undefined) {
+              const fillValue = row.data[columnId];
+              
+              // For now, we'll use the integration layer to update cells
+              // This is a temporary solution until bulk edit is implemented
+              for (const cellKey of fillCells) {
+                const [targetRowId, targetColumnId] = cellKey.split(':');
+                
+                // Find the target row
+                const targetRow = snapshot.context.rows.find((r: any) => r.id === targetRowId);
+                if (targetRow) {
+                  // Create an update for this cell
+                  const updatedRow = {
+                    ...targetRow,
+                    data: {
+                      ...targetRow.data,
+                      [targetColumnId]: fillValue
+                    }
+                  };
+                  
+                  // Send update through table machine
+                  tableSend({
+                    type: 'data.row.update',
+                    row: updatedRow
+                  });
+                }
+              }
+              
+              console.log(`VibeGridX: Filled ${fillCells.size} cells with value:`, fillValue);
+            }
           }
         }
-      }
-    },
-    cellHeight: 40,
-    selectionColor: '#3b82f6',
-    selectionBorderColor: '#1d4ed8',
-    editingColor: '#10b981',
-    editingBorderColor: '#059669',
-    enableAnimations: false,
-    animationDuration: 0,
-    borderWidth: 2
-  }, tableState);
+      },
+      cellHeight: 40,
+      selectionColor: '#3b82f6',
+      selectionBorderColor: '#1d4ed8',
+      editingColor: '#10b981',
+      editingBorderColor: '#059669',
+      enableAnimations: false,
+      animationDuration: 0,
+      borderWidth: 2
+    };
+    
+    // Store for renderer actor to pick up
+    (window as any).__vibegridx_renderer_options = rendererOptions;
+    
+    // Send INITIALIZE to renderer actor when actor is available
+    const rendererActor = tableState.context.actors.rendererActor;
+    
+    console.log('VibeGridX: Sending INITIALIZE to renderer actor (actor available)', {
+      container: containerRef.current,
+      containerBounds: containerRef.current.getBoundingClientRect(),
+      machineState: tableState.value,
+      hasRendererActor: !!rendererActor
+    });
+    
+    rendererActor.send({
+      type: 'INITIALIZE',
+      options: rendererOptions
+    });
+    
+    return () => {
+      delete (window as any).__vibegridx_renderer_options;
+    };
+  }, [tableState?.context?.actors?.rendererActor]); // Only trigger when renderer actor becomes available
   
   // Selection state sync - REMOVED: Now handled reactively through XState event flow
   // useSelectionStateSync(tableActor, refs);
@@ -382,6 +420,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     
     refs.rendererRef.current.setRelationshipData(relationshipData);
   }, [relationshipData]);
+  
+  // Renderer is now managed through the renderer actor
+  // No need for direct window reference
 
   // Column visibility updates are handled through XState events - no useEffect needed
   
@@ -540,152 +581,133 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // ====================================
   
   // ====================================
-  // ACTOR-DRIVEN RENDERING (NO REACT EFFECTS)
+  // XSTATE V5 PATTERN - USE USESELECTOR FOR STATE TRACKING
   // ====================================
   
+  // Use XState v5 useSelector pattern for optimal performance
+  const renderTrigger = useSelector(tableActor, (snapshot) => {
+    const version = snapshot.context?.version || 0;
+    const hasProcessedRows = snapshot.context?.rows && snapshot.context.rows.length > 0;
+    const machineState = snapshot.value;
+    
+    return {
+      version,
+      hasProcessedRows,
+      machineState,
+      // Include snapshot reference for render processing
+      snapshot
+    };
+  }, (prev, next) => {
+    // Custom comparison - only update when version changes and we have processed rows
+    return prev.version === next.version || !next.hasProcessedRows || next.machineState === 'initializing';
+  });
+  
+  // Track previous version to detect changes
+  const previousVersionRef = useRef<number | undefined>();
+  
+  // Process render when trigger changes
   useEffect(() => {
-    if (!rendererRef.current || !tableActor) {
-      console.log('VibeGridX: Skipping actor subscription setup - missing renderer or actor');
+    if (!renderTrigger.hasProcessedRows || renderTrigger.machineState === 'initializing') {
+      console.log('VibeGridX: Skipping render - not ready', {
+        hasProcessedRows: renderTrigger.hasProcessedRows,
+        machineState: renderTrigger.machineState
+      });
       return;
     }
     
+    const currentVersion = renderTrigger.version;
+    const isFirstRender = previousVersionRef.current === undefined;
     
-    // Avoid duplicate subscriptions
-    if (subscriptionRef.current) {
-      console.log('VibeGridX: Subscription already exists, skipping setup');
+    // Skip if no version change (unless first render)
+    if (!isFirstRender && previousVersionRef.current === currentVersion) {
       return;
     }
     
-    console.log('VibeGridX: Setting up actor subscription for TableMachine -> AtomicRenderer');
+    previousVersionRef.current = currentVersion;
     
-    let subscriptionCount = 0;
-    
-    // XState v5 proper subscription pattern - listen to version changes
-    let previousVersion: number | undefined;
-    
-    const subscription = tableActor.subscribe((snapshot) => {
-      subscriptionCount++;
-      
-      const currentVersion = snapshot.context?.version || 0;
-      const hasProcessedRows = snapshot.context?.rows && snapshot.context.rows.length > 0;
-      
-      // Simple checks:
-      // 1. Version must change (or be first render)  
-      // 2. Must have processed rows from ViewActor
-      if (previousVersion !== undefined && currentVersion === previousVersion) {
-        return; // No version change, no render needed
-      }
-      
-      if (!hasProcessedRows) {
-        return; // No processed rows from ViewActor yet
-      }
-      
-      // Version changed and view is ready - render!
-      const isFirstRender = previousVersion === undefined;
-      previousVersion = currentVersion;
-      
-      console.log('VibeGridX: Rendering', {
-        version: currentVersion,
-        isFirstRender
-      });
-      
-      console.log('[RENDER FLOW 1] Extracting render state from actor');
-      const renderState = extractRenderStateFromActor(snapshot);
-      console.log('[RENDER FLOW 2] Render state extracted:', {
-        hasRenderState: !!renderState,
-        rowCount: renderState?.rows.length || 0,
-        firstRowId: renderState?.rows[0]?.id
-      });
-      
-      if (renderState) {
-        // Process the render state update
-        const { changedRows, newRows, deletedRowIds, isStructuralChange } = getChangedRows(renderState);
-        
-        if (isStructuralChange) {
-          // Use initialize for first render, render for subsequent updates
-          if (isFirstRender) {
-            console.log(`VibeGridX: INITIAL LOAD - Initializing table (${renderState.rows.length} rows)`);
-            rendererRef.current!.initialize(renderState);
-          } else {
-            console.log(`VibeGridX: STRUCTURAL CHANGE - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
-            rendererRef.current!.render(renderState);
-          }
-          // Report performance metrics after render
-          setTimeout(() => {
-            if (rendererRef.current && onPerformanceUpdate) {
-              const metrics = rendererRef.current.getPerformanceMetrics();
-              if (metrics) {
-                onPerformanceUpdate({
-                  lastRenderTime: metrics.lastRenderTime,
-                  visibleRows: metrics.visibleRows,
-                  cacheSize: metrics.cacheSize,
-                  updateQueueSize: metrics.updateQueueSize,
-                  timestamp: Date.now()
-                });
-              }
-            }
-          }, 50);
-        } else if (!isFirstRender && (renderState.columnVisibility || renderState.columnOrder)) {
-          // Column visibility or order changes need renderer updates (skip during first render)
-          console.log('VibeGridX: COLUMN CHANGE - Updating renderer only', {
-            hasVisibility: !!renderState.columnVisibility,
-            hasOrder: !!renderState.columnOrder
-          });
-          if (renderState.columnVisibility && rendererRef.current) {
-            rendererRef.current.setColumnVisibility(renderState.columnVisibility);
-          }
-          if (renderState.columnOrder && rendererRef.current) {
-            rendererRef.current.setColumnOrder(renderState.columnOrder);
-          }
-          
-          // Trigger full render to update visible columns
-          rendererRef.current!.render(renderState);
-          
-          // Coordinate updates are handled by the table machine
-          return;
-        } else if (changedRows.length > 0) {
-          // Only specific rows changed - update those rows only
-          console.log(`VibeGridX: ROW CHANGES - Updating ${changedRows.length} specific rows`);
-          rendererRef.current!.updateRows(changedRows);
-          // Report performance metrics after render
-          setTimeout(() => {
-            if (rendererRef.current && onPerformanceUpdate) {
-              const metrics = rendererRef.current.getPerformanceMetrics();
-              if (metrics) {
-                onPerformanceUpdate({
-                  lastRenderTime: metrics.lastRenderTime,
-                  visibleRows: metrics.visibleRows,
-                  cacheSize: metrics.cacheSize,
-                  updateQueueSize: metrics.updateQueueSize,
-                  timestamp: Date.now()
-                });
-              }
-            }
-          }, 50);
-        }
-        
-        // 2. Editing changes go to Canvas Overlay (if needed)
-        if (renderState.editingCell && canvasOverlayRef.current) {
-          canvasOverlayRef.current.updateEditingCell(renderState.editingCell);
-        }
-        
-      } else {
-        console.warn('VibeGridX: extractRenderStateFromActor returned null');
-      }
+    console.log('VibeGridX: Processing render trigger', {
+      version: currentVersion,
+      isFirstRender
     });
     
-    // No need for initial render trigger - machine already has data from config
+    // Extract render state
+    console.log('[RENDER FLOW 1] Extracting render state from actor');
+    const renderState = extractRenderStateFromActor(renderTrigger.snapshot);
+    console.log('[RENDER FLOW 2] Render state extracted:', {
+      hasRenderState: !!renderState,
+      rowCount: renderState?.rows.length || 0,
+      firstRowId: renderState?.rows[0]?.id
+    });
     
-    // Store subscription reference
-    subscriptionRef.current = subscription;
+    if (!renderState) {
+      console.warn('VibeGridX: extractRenderStateFromActor returned null');
+      return;
+    }
     
+    // Process the render state update
+    const { changedRows, newRows, deletedRowIds, isStructuralChange } = getChangedRows(renderState);
     
-    return () => {
-      console.log('VibeGridX: Cleaning up actor subscriptions');
-      subscription.unsubscribe();
-      subscriptionRef.current = null;
-    };
-  }, [tableActor, getChangedRows, extractRenderStateFromActor, onPerformanceUpdate]); // Simplified dependencies
+    // Get the renderer actor
+    const rendererActor = renderTrigger.snapshot.context?.actors?.rendererActor;
+    if (!rendererActor) {
+      console.warn('VibeGridX: No renderer actor available');
+      return;
+    }
+    
+    if (isStructuralChange) {
+      // Send render command to renderer actor
+      if (isFirstRender) {
+        console.log(`VibeGridX: INITIAL LOAD - Sending render to actor (${renderState.rows.length} rows)`);
+      } else {
+        console.log(`VibeGridX: STRUCTURAL CHANGE - Sending render to actor (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
+      }
+      
+      // Send RENDER event to renderer actor
+      rendererActor.send({
+        type: 'RENDER',
+        state: renderState,
+        coordinateMapping: renderTrigger.snapshot.context?.coordinateMapping
+      });
+      
+      // Performance metrics will be reported by the renderer actor
+    } else if (!isFirstRender && (renderState.columnVisibility || renderState.columnOrder)) {
+      // Column visibility or order changes need renderer updates (skip during first render)
+      console.log('VibeGridX: COLUMN CHANGE - Sending to renderer actor', {
+        hasVisibility: !!renderState.columnVisibility,
+        hasOrder: !!renderState.columnOrder
+      });
+      
+      // Send column updates to renderer actor
+      if (renderState.columns) {
+        rendererActor.send({
+          type: 'UPDATE_COLUMNS',
+          columns: renderState.columns
+        });
+      }
+      
+      // Trigger full render to update visible columns
+      rendererActor.send({
+        type: 'RENDER',
+        state: renderState,
+        coordinateMapping: renderTrigger.snapshot.context?.coordinateMapping
+      });
+    } else if (changedRows.length > 0) {
+      // Only specific rows changed - update those rows only
+      console.log(`VibeGridX: ROW CHANGES - Updating ${changedRows.length} specific rows`);
+      
+      // For now, send full render since updateRows is not implemented in actor
+      rendererActor.send({
+        type: 'RENDER',
+        state: renderState,
+        coordinateMapping: renderTrigger.snapshot.context?.coordinateMapping
+      });
+    }
+    
+    // Update canvas overlay if needed
+    if (renderState.editingCell && canvasOverlayRef.current) {
+      canvasOverlayRef.current.updateEditingCell(renderState.editingCell);
+    }
+  }, [renderTrigger]); // Only depend on the selector result
   
   // ====================================
   // PUBLIC API
@@ -722,13 +744,23 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   // Attach drag handlers to the viewport after renderer is ready
   useEffect(() => {
-    if (!rendererRef.current) return;
+    // Wait for renderer to be ready
+    if (tableState?.value === 'initializing') return;
     
-    // Get the viewport element from the renderer
+    // Get the viewport element from the container
     const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
     if (!viewport) {
-      console.warn('VibeGridX: Could not find viewport element for drag handlers');
-      return;
+      // Renderer might not have created viewport yet, wait a bit
+      const timer = setTimeout(() => {
+        const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
+        if (viewport) {
+          // Attach drag event handlers
+          viewport.addEventListener('mousedown', handleMouseDown);
+          console.log('VibeGridX: Attached drag event handlers to viewport (delayed)');
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
     
     // Attach drag event handlers
@@ -743,7 +775,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp]);
+  }, [tableState?.value, handleMouseDown, handleMouseMove, handleMouseUp]);
   
   // ====================================
   // RENDER

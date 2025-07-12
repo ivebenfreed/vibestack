@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import type { ViewportInfo } from '../types';
-import type { OverlayMachineActor } from '../machines/overlay-machine';
+// OverlayMachineActor removed - using direct canvas actor approach
 import type { CoordinateProvider } from './CoordinateProvider';
 import { CoordinateHelper } from './CoordinateProvider';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
@@ -19,7 +19,7 @@ export class FillHandleLayer {
   private stage: Konva.Stage;
   private layer: Konva.Layer;
   private fillHandleLayer: Konva.Layer; // Dedicated interactive layer
-  private machine: OverlayMachineActor | null = null;
+  // Machine removed - using direct canvas actor approach
   private config: FillHandleConfig;
   private coordinateHelper: CoordinateHelper;
   
@@ -63,9 +63,7 @@ export class FillHandleLayer {
   // PUBLIC API
   // ====================================
   
-  setMachine(machine: OverlayMachineActor): void {
-    this.machine = machine;
-  }
+  // setMachine removed - using direct canvas actor approach
   
   renderFillHandle(selectedCells: Set<string>, viewport: ViewportInfo): void {
     if (selectedCells.size === 0) {

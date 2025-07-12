@@ -31,7 +31,7 @@ import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
 import { editActor } from '../../actors/edit-actor';
 import { dragActor } from '../../actors/drag-actor';
-import { overlayActor } from '../../actors/overlay-actor';
+// No overlay actor needed - canvas subscribes directly to table machine context
 
 // Import managers (for backward compatibility)
 import { createVibeGridXCoordinateManager } from '../../coordinates/VibeGridXCoordinateManager';
@@ -72,8 +72,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Create overlay state
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
   
-  // Create atom state
-  const atomState = createInitialAtomState();
+  // Create atom state with config
+  const atomState = createInitialAtomState(input.atomConfig);
   
   return {
     id: input.id,
@@ -230,7 +230,6 @@ export const tableBaseMachine = setup({
     viewActor,
     editActor,
     dragActor,
-    overlayActor,
     rowActor: rowActorMachine,
     spawnRowActors,
     updatePerformanceMetrics
@@ -290,8 +289,8 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
-        // Set up atom subscriptions first
-        atomActions.setupAtomSubscription,
+        // Set up atom subscriptions
+        atomActions.setupPrimaryAtomSubscription,
         atomActions.setupRelationshipAtoms,
         
         // Spawn core actors
@@ -306,15 +305,7 @@ export const tableBaseMachine = setup({
               }
             }),
             canvasActor: spawn('canvasActor', { id: 'canvas' }),
-            overlayActor: spawn('overlayActor', { 
-              id: 'overlay',
-              input: {
-                cellHeight: context.settings.rowHeight,
-                rowDimensionManager: context.rowDimensionManager,
-                dimensionManager: context.dimensionManager,
-                coordinateManager: context.coordinateManager
-              }
-            }),
+            overlayActor: null, // Canvas subscribes directly to table machine
             editActor: spawn('editActor', { 
               id: 'edit',
               input: {
@@ -324,11 +315,56 @@ export const tableBaseMachine = setup({
             dragActor: spawn('dragActor', { id: 'drag' })
             // viewActor is invoked as needed, not spawned
           })
-        })
+        }),
+        
+        // NOTE: INITIALIZE is now sent by React component when DOM is ready
+        // This prevents race condition with DOM elements
       ],
       
-      always: {
-        target: 'active'
+      on: {
+        RENDERER_READY: {
+          target: 'active'
+        },
+        
+        CANVAS_CONTAINER_READY: {
+          actions: [
+            // Initialize canvas actor with the embedded container
+            ({ context, event }) => {
+              console.log('TableMachine: Canvas container ready, initializing canvas actor', {
+                hasCanvasActor: !!context.actors.canvasActor,
+                container: event.container,
+                containerBounds: event.container.getBoundingClientRect()
+              });
+              
+              if (context.actors.canvasActor) {
+                context.actors.canvasActor.send({
+                  type: 'INITIALIZE',
+                  container: event.container,
+                  config: {
+                    cellHeight: context.settings.rowHeight,
+                    cellWidth: 120,
+                    selectionColor: '#3b82f6',
+                    selectionBorderColor: '#1d4ed8',
+                    editingColor: '#10b981',
+                    editingBorderColor: '#059669',
+                    enableAnimations: false,
+                    animationDuration: 0,
+                    borderWidth: 2,
+                    // No machine needed - canvas will be updated directly via actor events
+                    dimensionManager: context.dimensionManager,
+                    coordinateManager: context.coordinateManager
+                  }
+                });
+              }
+            }
+          ]
+        }
+      },
+      
+      after: {
+        100: {
+          target: 'active'
+        }
       }
     },
     
@@ -453,7 +489,12 @@ export const tableBaseMachine = setup({
                       version: context.version + 1,
                       sortBy: context.sortBy,
                       columnVisibility: context.columnVisibility,
-                      columnOrder: context.columnOrder
+                      columnOrder: context.columnOrder,
+                      // Include dimensions from table machine context
+                      columnWidths: context.columnWidths,
+                      columnOffsets: context.columnOffsets,
+                      totalWidth: context.totalWidth,
+                      totalHeight: context.totalHeight
                     },
                     coordinateMapping: event.output.coordinateMapping
                   })
@@ -466,6 +507,41 @@ export const tableBaseMachine = setup({
       
       // Handle these events at the active state level
       on: {
+      // Canvas initialization
+      CANVAS_CONTAINER_READY: {
+        actions: [
+          // Initialize canvas actor with the embedded container
+          ({ context, event }) => {
+            console.log('TableMachine: Canvas container ready in active state, initializing canvas actor', {
+              hasCanvasActor: !!context.actors.canvasActor,
+              container: event.container,
+              containerBounds: event.container.getBoundingClientRect()
+            });
+            
+            if (context.actors.canvasActor) {
+              context.actors.canvasActor.send({
+                type: 'INITIALIZE',
+                container: event.container,
+                config: {
+                  cellHeight: context.settings.rowHeight,
+                  cellWidth: 120,
+                  selectionColor: '#3b82f6',
+                  selectionBorderColor: '#1d4ed8',
+                  editingColor: '#10b981',
+                  editingBorderColor: '#059669',
+                  enableAnimations: false,
+                  animationDuration: 0,
+                  borderWidth: 2,
+                  // No machine needed - canvas will be updated directly via actor events
+                  dimensionManager: context.dimensionManager,
+                  coordinateManager: context.coordinateManager
+                }
+              });
+            }
+          }
+        ]
+      },
+      
       // Selection events
       ...selectionHandlers,
       

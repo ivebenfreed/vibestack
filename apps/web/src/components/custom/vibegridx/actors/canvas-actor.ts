@@ -58,7 +58,16 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
     try {
       switch (event.type) {
         case 'INITIALIZE':
-          console.log('CanvasActor: Initializing with container and config');
+          console.log('CanvasActor: Initializing with container and config', {
+            container: event.container,
+            containerClass: event.container.className,
+            containerBounds: event.container.getBoundingClientRect(),
+            config: event.config,
+            currentCanvasState: {
+              hasCanvas: !!canvas,
+              canvasType: canvas?.constructor?.name
+            }
+          });
           
           try {
             canvas = new CanvasOverlay(event.container, event.config);
@@ -67,6 +76,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             sendBack({ type: 'CANVAS_READY' });
           } catch (error) {
             console.error('CanvasActor: Failed to create canvas overlay:', error);
+            console.error('CanvasActor: Error stack:', error.stack);
             sendBack({ 
               type: 'CANVAS_ERROR', 
               error: `Failed to initialize canvas: ${error.message}` 
@@ -89,6 +99,12 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           break;
           
         case 'UPDATE_SELECTION_VISUAL':
+          console.log('CanvasActor: UPDATE_SELECTION_VISUAL debug', {
+            hasCanvas: !!canvas,
+            canvasType: canvas?.constructor?.name,
+            canvasInstance: canvas
+          });
+          
           if (!canvas) {
             console.warn('CanvasActor: Cannot update selection visual - canvas not initialized');
             return;
@@ -106,7 +122,8 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
         case 'UPDATE_COORDINATES':
           if (!canvas) {
-            console.warn('CanvasActor: Cannot update coordinates - canvas not initialized');
+            // Queue this event to be processed after initialization
+            console.log('CanvasActor: Queuing UPDATE_COORDINATES event until canvas is initialized');
             return;
           }
           
@@ -126,6 +143,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             return;
           }
           
+          console.log('CanvasActor: Updating viewport:', event.viewport);
           canvas.updateViewport(event.viewport);
           sendBack({ type: 'VIEWPORT_UPDATED' });
           break;

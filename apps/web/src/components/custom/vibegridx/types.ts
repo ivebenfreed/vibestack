@@ -441,6 +441,7 @@ export interface TableConfig {
   id: string;
   entityType: string;
   columns: Column<any>[];
+  atomConfig: import('./machines/table-machine/slices/atom-slice').AtomSliceConfig; // Required
   initialData?: TableRow[];
   settings?: TableSettings;
   enableSelectionColumn?: boolean;
@@ -483,7 +484,7 @@ export interface RendererOptions {
   onKeyDown?: (event: KeyboardEvent) => void;
   onSelectionChange?: (selectedCells: Set<string>) => void;
   onFillComplete?: (originalCells: Set<string>, fillCells: Set<string>) => void;
-  onCanvasContainerReady?: (container: HTMLElement) => void;
+  // onCanvasContainerReady removed - now using event-driven pattern
   debug?: boolean;
   
   // Canvas overlay configuration
@@ -509,5 +510,8 @@ export interface RenderState {
   sortBy?: SortConfig[]; // Current sort configuration
   columnVisibility?: Record<string, boolean>; // Column visibility state
   columnOrder?: string[]; // Column order array
-  columnWidths?: Record<string, number>; // Column widths
+  columnWidths?: Record<string, number>; // Column widths from table machine context
+  columnOffsets?: Record<string, number>; // Column offsets from table machine context
+  totalWidth?: number; // Total width of all columns from table machine context
+  totalHeight?: number; // Total height from table machine context
 }

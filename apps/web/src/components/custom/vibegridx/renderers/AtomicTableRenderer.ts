@@ -124,6 +124,7 @@ export class AtomicTableRenderer {
   private header: HTMLElement;
   private body: HTMLElement;
   private viewport: HTMLElement;
+  private canvasContainer: HTMLElement | null = null;
   
   private virtualGrid: VirtualGridManager;
   private options: RendererOptions;
@@ -190,18 +191,44 @@ export class AtomicTableRenderer {
   // ====================================
   
   private initializeDOM() {
+    console.log('AtomicTableRenderer.initializeDOM: Starting DOM initialization', {
+      containerElement: this.container,
+      containerBounds: this.container.getBoundingClientRect(),
+      containerStyle: {
+        width: this.container.style.width,
+        height: this.container.style.height,
+        position: this.container.style.position
+      },
+      containerComputedStyle: window.getComputedStyle(this.container)
+    });
+
     this.container.innerHTML = '';
     this.container.className = CSS_CLASSES.TABLE;
     
     // Create table structure
     this.table = document.createElement('div');
     this.table.className = 'vibegridx-table-wrapper';
+    this.table.style.display = 'flex';
+    this.table.style.flexDirection = 'column';
+    this.table.style.width = '100%';
+    this.table.style.height = '100%';
+    
+    console.log('AtomicTableRenderer.initializeDOM: Created table wrapper', {
+      tableBounds: this.table.getBoundingClientRect(),
+      tableStyle: {
+        display: this.table.style.display,
+        flexDirection: this.table.style.flexDirection,
+        width: this.table.style.width,
+        height: this.table.style.height
+      }
+    });
     
     // Create header viewport for synchronized horizontal scrolling
     this.headerViewport = document.createElement('div');
     this.headerViewport.className = 'vibegridx-header-viewport';
     this.headerViewport.style.overflow = 'hidden';
     this.headerViewport.style.position = 'relative';
+    this.headerViewport.style.flexShrink = '0'; // Don't shrink header
     
     this.header = document.createElement('div');
     this.header.className = CSS_CLASSES.HEADER;
@@ -214,8 +241,20 @@ export class AtomicTableRenderer {
     this.viewport.className = 'vibegridx-viewport';
     this.viewport.style.overflow = 'auto';
     this.viewport.style.position = 'relative';
-    this.viewport.style.flex = '1';
+    this.viewport.style.flex = '1 1 auto'; // Grow and shrink
     this.viewport.style.minHeight = '0';
+    this.viewport.style.width = '100%';
+    
+    console.log('AtomicTableRenderer.initializeDOM: Created viewport before body', {
+      viewportBounds: this.viewport.getBoundingClientRect(),
+      viewportStyle: {
+        overflow: this.viewport.style.overflow,
+        position: this.viewport.style.position,
+        flex: this.viewport.style.flex,
+        minHeight: this.viewport.style.minHeight,
+        width: this.viewport.style.width
+      }
+    });
     
     this.body = document.createElement('div');
     this.body.className = CSS_CLASSES.BODY;
@@ -241,13 +280,38 @@ export class AtomicTableRenderer {
     this.table.appendChild(this.viewport);
     this.container.appendChild(this.table);
     
-    // Immediately notify parent that canvas container is ready
-    if (this.options.onCanvasContainerReady) {
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        this.options.onCanvasContainerReady!(canvasOverlay);
+    console.log('AtomicTableRenderer.initializeDOM: DOM structure complete', {
+      containerBounds: this.container.getBoundingClientRect(),
+      tableBounds: this.table.getBoundingClientRect(),
+      viewportBounds: this.viewport.getBoundingClientRect(),
+      bodyBounds: this.body.getBoundingClientRect(),
+      viewportClientDimensions: {
+        clientWidth: this.viewport.clientWidth,
+        clientHeight: this.viewport.clientHeight,
+        scrollWidth: this.viewport.scrollWidth,
+        scrollHeight: this.viewport.scrollHeight
+      }
+    });
+    
+    // Store canvas container for renderer actor to emit event
+    this.canvasContainer = canvasOverlay;
+    
+    // Use requestAnimationFrame to ensure DOM is ready before emitting
+    requestAnimationFrame(() => {
+      console.log('AtomicTableRenderer.initializeDOM: Canvas container ready, will emit event', {
+        viewportBounds: this.viewport.getBoundingClientRect(),
+        viewportClientDimensions: {
+          clientWidth: this.viewport.clientWidth,
+          clientHeight: this.viewport.clientHeight
+        }
       });
-    }
+      
+      // Notify via state change that canvas container is ready
+      this.options.onStateChange?.({
+        type: 'canvas.container.ready',
+        container: canvasOverlay
+      });
+    });
   }
   
   // Set or update columns
@@ -425,11 +489,23 @@ export class AtomicTableRenderer {
     });
   }
   
-  // Get total width of all visible columns
+  // Get total width of all visible columns using table machine context
   private getTotalColumnsWidth(): number {
-    if (!this.dimensionManager) return 0;
+    // Use render state column widths if available (from table machine context)
+    if (this.lastRenderState && this.lastRenderState.columnWidths) {
+      let totalWidth = 0;
+      
+      // Selection column is always included
+      totalWidth += 48; // Fixed width for selection column
+      
+      this.visibleColumns.forEach(column => {
+        totalWidth += this.lastRenderState.columnWidths[column.id] || column.width || 120;
+      });
+      
+      return totalWidth;
+    }
     
-    // Calculate total width based on visible columns only
+    // Fallback: calculate from column definitions
     let totalWidth = 0;
     
     // Selection column is always included
@@ -439,14 +515,25 @@ export class AtomicTableRenderer {
       totalWidth += this.columnWidths[column.id] || column.width || 120;
     });
     
+    console.log('AtomicTableRenderer: Total width calculation:', {
+      totalWidth,
+      visibleColumns: this.visibleColumns.length,
+      hasRenderState: !!this.lastRenderState,
+      hasColumnWidths: !!(this.lastRenderState?.columnWidths),
+      columnWidths: this.columnWidths
+    });
+    
     return totalWidth;
   }
   
-  // Get column offset position for visible columns only
+  // Get column offset position for visible columns only using table machine context
   private getColumnOffset(columnId: string): number {
-    if (!this.dimensionManager) return 0;
+    // Use render state column offsets if available (from table machine context)
+    if (this.lastRenderState && this.lastRenderState.columnOffsets && this.lastRenderState.columnOffsets[columnId] !== undefined) {
+      return this.lastRenderState.columnOffsets[columnId];
+    }
     
-    // Calculate offset based on visible columns that come before this column
+    // Fallback: calculate offset based on visible columns that come before this column
     let offset = 0;
     
     // Selection column is always included and goes first
@@ -456,10 +543,9 @@ export class AtomicTableRenderer {
       if (column.id === columnId) {
         break;
       }
-      const columnWidth = this.columnWidths[column.id] || column.width || 120;
-      offset += columnWidth;
+      const width = (this.lastRenderState?.columnWidths?.[column.id]) || this.columnWidths[column.id] || column.width || 120;
+      offset += width;
     }
-    
     
     return offset;
   }
@@ -590,6 +676,28 @@ export class AtomicTableRenderer {
   
   render(state: RenderState): void {
     console.log('[AtomicTableRenderer] render called with state version:', state.version);
+    console.log('[AtomicTableRenderer] render - DOM state check:', {
+      containerElement: this.container,
+      containerBounds: this.container.getBoundingClientRect(),
+      containerClientDimensions: {
+        clientWidth: this.container.clientWidth,
+        clientHeight: this.container.clientHeight
+      },
+      tableElement: this.table,
+      tableBounds: this.table ? this.table.getBoundingClientRect() : null,
+      tableClientDimensions: this.table ? {
+        clientWidth: this.table.clientWidth,
+        clientHeight: this.table.clientHeight
+      } : null,
+      viewportElement: this.viewport,
+      viewportBounds: this.viewport ? this.viewport.getBoundingClientRect() : null,
+      viewportClientDimensions: this.viewport ? {
+        clientWidth: this.viewport.clientWidth,
+        clientHeight: this.viewport.clientHeight
+      } : null,
+      stateRowCount: state.rows.length
+    });
+    
     this.renderStartTime = performance.now();
     
     // Rows are already pre-sorted by render state extractor
@@ -796,10 +904,50 @@ export class AtomicTableRenderer {
   // ====================================
   
   private updateViewport(state: RenderState): void {
-    // Update virtual grid with current data
-    const viewportHeight = this.viewport.clientHeight || 600;
+    console.log('AtomicTableRenderer.updateViewport: Starting viewport calculation', {
+      viewportElement: this.viewport,
+      viewportBounds: this.viewport.getBoundingClientRect(),
+      viewportClientDimensions: {
+        clientWidth: this.viewport.clientWidth,
+        clientHeight: this.viewport.clientHeight,
+        scrollWidth: this.viewport.scrollWidth,
+        scrollHeight: this.viewport.scrollHeight,
+        offsetWidth: this.viewport.offsetWidth,
+        offsetHeight: this.viewport.offsetHeight
+      },
+      viewportComputedStyle: {
+        display: window.getComputedStyle(this.viewport).display,
+        width: window.getComputedStyle(this.viewport).width,
+        height: window.getComputedStyle(this.viewport).height,
+        flex: window.getComputedStyle(this.viewport).flex,
+        position: window.getComputedStyle(this.viewport).position
+      },
+      containerDimensions: {
+        clientWidth: this.container.clientWidth,
+        clientHeight: this.container.clientHeight,
+        bounds: this.container.getBoundingClientRect()
+      },
+      tableDimensions: {
+        clientWidth: this.table.clientWidth,
+        clientHeight: this.table.clientHeight,
+        bounds: this.table.getBoundingClientRect()
+      }
+    });
+
+    // Update virtual grid with current data - use simple fallbacks like the working version
+    const rawViewportHeight = this.viewport.clientHeight;
+    const viewportHeight = rawViewportHeight || 600; // Simple fallback
     const scrollTop = this.viewport.scrollTop || 0;
     const itemHeight = this.rowHeight;
+    
+    console.log('AtomicTableRenderer.updateViewport: Dimension calculation', {
+      rawViewportHeight,
+      viewportHeight,
+      fallbackUsed: rawViewportHeight === 0,
+      scrollTop,
+      itemHeight,
+      rowCount: state.rows.length
+    });
     
     // Calculate actual visible rows based on viewport
     const visibleRowCount = Math.ceil(viewportHeight / itemHeight);
@@ -807,23 +955,29 @@ export class AtomicTableRenderer {
     // Add 1 extra row to ensure the last visible row is fully shown
     const endIndex = Math.min(startIndex + visibleRowCount + 1, state.rows.length);
     
+    const rawViewportWidth = this.viewport.clientWidth;
     const currentViewport: ViewportInfo = {
       start: startIndex,
       end: endIndex,
       height: viewportHeight,
-      width: this.viewport.clientWidth || 800,
+      width: rawViewportWidth || 800, // Simple fallback like working version
       scrollTop: scrollTop,
+      scrollLeft: this.viewport.scrollLeft || 0,
       itemHeight: itemHeight
     };
     
-    // Only log viewport changes if debugging is needed
-    if (this.options.debug) {
-      console.log('AtomicTableRenderer.updateViewport:', {
-        currentViewport,
-        visibleRowCount,
-        rowCount: state.rows.length
-      });
-    }
+    console.log('AtomicTableRenderer.updateViewport: Final viewport calculation', {
+      currentViewport,
+      visibleRowCount,
+      rawDimensions: {
+        rawViewportHeight,
+        rawViewportWidth,
+        fallbacksUsed: {
+          height: rawViewportHeight === 0,
+          width: rawViewportWidth === 0
+        }
+      }
+    });
     
     this.virtualGrid.updateViewport(currentViewport, state.rows.length);
   }

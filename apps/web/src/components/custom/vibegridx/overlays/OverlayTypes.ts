@@ -21,7 +21,8 @@ export interface OverlayConfig {
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
   coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager
   columns?: any[]; // Column array for coordinate calculations
-  overlayActor: any; // REQUIRED: Overlay machine actor from table machine (single source of truth)
+  overlayActor?: any; // Legacy: Overlay machine actor  
+  tableMachine?: any; // PREFERRED: Table machine for direct context subscription
   enableSelectionColumn?: boolean; // Enable selection column with checkboxes
   cellWidth: number;
   cellHeight: number;

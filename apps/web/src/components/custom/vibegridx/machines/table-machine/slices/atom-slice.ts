@@ -1,11 +1,22 @@
 // ====================================
-// ATOM SLICE - Direct Atom Subscription Management
+// ATOM SLICE - Generic Atom Subscription Management
 // ====================================
 
 import { assign } from 'xstate';
-import { tasksAtom } from '@/domain/task';
-import { projectsAtom } from '@/domain/project';
-import { usersAtom } from '@/domain/user';
+
+// ====================================
+// CONFIGURATION TYPES
+// ====================================
+
+export interface AtomGetter {
+  get: () => Record<string, any>;
+  subscribe: (callback: (value: Record<string, any>) => void) => () => void;
+}
+
+export interface AtomSliceConfig {
+  primaryAtom: AtomGetter;
+  relationshipAtoms?: Record<string, AtomGetter>;
+}
 
 // ====================================
 // STATE INTERFACE
@@ -17,12 +28,11 @@ export interface AtomState {
   allRowIds: string[];
   entityRecords: Record<string, any>;
   
+  // Atom configuration
+  atomConfig: AtomSliceConfig | null;
+  
   // Atom subscriptions
-  atomUnsubscribes: {
-    tasks?: () => void;
-    projects?: () => void;
-    users?: () => void;
-  };
+  atomUnsubscribes: Map<string, () => void>;
   
   // Tracking
   lastAtomUpdate: number;
@@ -33,106 +43,51 @@ export interface AtomState {
 // INITIAL STATE
 // ====================================
 
-export const createInitialAtomState = (): AtomState => ({
+export const createInitialAtomState = (atomConfig?: AtomSliceConfig | null): AtomState => ({
   entities: [],
   allRowIds: [],
   entityRecords: {},
-  atomUnsubscribes: {},
+  atomConfig: atomConfig || null,
+  atomUnsubscribes: new Map(),
   lastAtomUpdate: 0,
   atomUpdateCount: 0
 });
-
-// ====================================
-// ATOM SUBSCRIPTION SETUP
-// ====================================
-
-export const setupAtomSubscriptions = (
-  entityType: string,
-  onUpdate: (entities: any[]) => void
-): (() => void) => {
-  console.log('AtomSlice: Setting up subscriptions for', entityType);
-  
-  switch (entityType) {
-    case 'task': {
-      // Get initial data
-      const initialTasks = tasksAtom.get();
-      const taskArray = Object.values(initialTasks);
-      console.log('AtomSlice: Initial tasks:', taskArray.length);
-      
-      // Send initial update
-      if (taskArray.length > 0) {
-        onUpdate(taskArray);
-      }
-      
-      // Subscribe to changes
-      const unsubscribe = tasksAtom.subscribe((tasksRecord) => {
-        const tasks = Object.values(tasksRecord);
-        console.log('AtomSlice: Tasks updated:', tasks.length);
-        onUpdate(tasks);
-      });
-      
-      return unsubscribe;
-    }
-    
-    case 'project': {
-      // Get initial data
-      const initialProjects = projectsAtom.get();
-      const projectArray = Object.values(initialProjects);
-      console.log('AtomSlice: Initial projects:', projectArray.length);
-      
-      // Send initial update
-      if (projectArray.length > 0) {
-        onUpdate(projectArray);
-      }
-      
-      // Subscribe to changes
-      const unsubscribe = projectsAtom.subscribe((projectsRecord) => {
-        const projects = Object.values(projectsRecord);
-        console.log('AtomSlice: Projects updated:', projects.length);
-        onUpdate(projects);
-      });
-      
-      return unsubscribe;
-    }
-    
-    case 'user': {
-      // Get initial data
-      const initialUsers = usersAtom.get();
-      const userArray = Object.values(initialUsers);
-      console.log('AtomSlice: Initial users:', userArray.length);
-      
-      // Send initial update
-      if (userArray.length > 0) {
-        onUpdate(userArray);
-      }
-      
-      // Subscribe to changes
-      const unsubscribe = usersAtom.subscribe((usersRecord) => {
-        const users = Object.values(usersRecord);
-        console.log('AtomSlice: Users updated:', users.length);
-        onUpdate(users);
-      });
-      
-      return unsubscribe;
-    }
-    
-    default:
-      console.warn('AtomSlice: Unknown entity type:', entityType);
-      return () => {};
-  }
-};
 
 // ====================================
 // ACTIONS
 // ====================================
 
 export const atomActions = {
-  setupAtomSubscription: assign({
+  setupPrimaryAtomSubscription: assign({
     atomUnsubscribes: ({ context, self }: any) => {
-      const entityType = context.entityType;
+      const atomConfig = context.atomConfig;
+      if (!atomConfig?.primaryAtom) {
+        console.log('AtomSlice: No primary atom configured');
+        return context.atomUnsubscribes;
+      }
+
+      console.log('AtomSlice: Setting up primary atom subscription');
       
-      // Set up subscription with callback that sends event to self
-      const unsubscribe = setupAtomSubscriptions(entityType, (entities) => {
+      // Get initial data
+      const initialData = atomConfig.primaryAtom.get();
+      const dataArray = Object.values(initialData);
+      console.log('AtomSlice: Initial data:', dataArray.length);
+      
+      // Delay initial update to ensure machine is in active state
+      if (dataArray.length > 0) {
+        setTimeout(() => {
+          console.log('AtomSlice: Sending initial data update');
+          self.send({
+            type: 'ATOM_DATA_UPDATED',
+            entities: dataArray
+          });
+        }, 150); // After the 100ms timeout for active state transition
+      }
+      
+      // Subscribe to changes
+      const unsubscribe = atomConfig.primaryAtom.subscribe((dataRecord) => {
+        const entities = Object.values(dataRecord);
+        console.log('AtomSlice: Data updated:', entities.length);
         self.send({
           type: 'ATOM_DATA_UPDATED',
           entities
@@ -140,10 +95,36 @@ export const atomActions = {
       });
       
       // Store unsubscribe function
-      return {
-        ...context.atomUnsubscribes,
-        [entityType]: unsubscribe
-      };
+      const newUnsubscribes = new Map(context.atomUnsubscribes);
+      newUnsubscribes.set('primary', unsubscribe);
+      
+      return newUnsubscribes;
+    }
+  }),
+
+  setupRelationshipAtoms: assign({
+    atomUnsubscribes: ({ context, self }: any) => {
+      const atomConfig = context.atomConfig;
+      if (!atomConfig?.relationshipAtoms) {
+        console.log('AtomSlice: No relationship atoms configured');
+        return context.atomUnsubscribes;
+      }
+
+      console.log('AtomSlice: Setting up relationship atom subscriptions');
+      const newUnsubscribes = new Map(context.atomUnsubscribes);
+      
+      Object.entries(atomConfig.relationshipAtoms).forEach(([key, atom]) => {
+        if (!newUnsubscribes.has(key)) {
+          const unsubscribe = atom.subscribe(() => {
+            // Just trigger a re-render when relationship data changes
+            self.send({ type: 'RELATIONSHIP_DATA_UPDATED' });
+          });
+          newUnsubscribes.set(key, unsubscribe);
+          console.log(`AtomSlice: Subscribed to relationship atom: ${key}`);
+        }
+      });
+      
+      return newUnsubscribes;
     }
   }),
 
@@ -167,39 +148,12 @@ export const atomActions = {
   cleanupAtomSubscriptions: assign({
     atomUnsubscribes: ({ context }: any) => {
       // Unsubscribe from all atoms
-      Object.values(context.atomUnsubscribes).forEach((unsubscribe: any) => {
-        if (typeof unsubscribe === 'function') {
-          unsubscribe();
-        }
+      context.atomUnsubscribes.forEach((unsubscribe: () => void) => {
+        unsubscribe();
       });
       
-      return {};
-    }
-  }),
-
-  // Helper to get related atoms for relationship resolution
-  setupRelationshipAtoms: assign({
-    atomUnsubscribes: ({ context, self }: any) => {
-      const newUnsubscribes = { ...context.atomUnsubscribes };
-      
-      // Always subscribe to projects and users for relationship resolution
-      if (!newUnsubscribes.projects) {
-        const projectsUnsubscribe = projectsAtom.subscribe(() => {
-          // Just trigger a re-render when projects change
-          self.send({ type: 'RELATIONSHIP_DATA_UPDATED' });
-        });
-        newUnsubscribes.projects = projectsUnsubscribe;
-      }
-      
-      if (!newUnsubscribes.users) {
-        const usersUnsubscribe = usersAtom.subscribe(() => {
-          // Just trigger a re-render when users change
-          self.send({ type: 'RELATIONSHIP_DATA_UPDATED' });
-        });
-        newUnsubscribes.users = usersUnsubscribe;
-      }
-      
-      return newUnsubscribes;
+      console.log('AtomSlice: Cleaned up all atom subscriptions');
+      return new Map();
     }
   })
 };
@@ -208,18 +162,22 @@ export const atomActions = {
 // ATOM DATA GETTERS
 // ====================================
 
-export const getAtomData = {
-  tasks: () => tasksAtom.get(),
-  projects: () => projectsAtom.get(),
-  users: () => usersAtom.get(),
-  
-  // Get specific entity by ID
-  getTaskById: (id: string) => tasksAtom.get()[id],
-  getProjectById: (id: string) => projectsAtom.get()[id],
-  getUserById: (id: string) => usersAtom.get()[id],
-  
-  // Get all as arrays
-  getAllTasks: () => Object.values(tasksAtom.get()),
-  getAllProjects: () => Object.values(projectsAtom.get()),
-  getAllUsers: () => Object.values(usersAtom.get())
+export const getAtomData = (atomConfig: AtomSliceConfig | null) => {
+  if (!atomConfig) {
+    return {
+      primary: () => ({}),
+      relationships: {} as Record<string, () => Record<string, any>>
+    };
+  }
+
+  return {
+    primary: () => atomConfig.primaryAtom.get(),
+    relationships: Object.entries(atomConfig.relationshipAtoms || {}).reduce(
+      (acc, [key, atom]) => ({
+        ...acc,
+        [key]: () => atom.get()
+      }),
+      {} as Record<string, () => Record<string, any>>
+    )
+  };
 };
