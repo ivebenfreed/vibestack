@@ -45,10 +45,6 @@ export type {
 // ====================================
 
 export { tableBaseMachine, createTableEvent, measurePerformance } from './machines/table-machine';
-export { selectionCoordinatorMachine } from './machines/selection-coordinator';
-export { editCoordinatorMachine } from './machines/edit-coordinator';
-export { viewCoordinatorMachine } from './machines/view-coordinator';
-export { dragCoordinatorMachine } from './machines/drag-coordinator';
 export { rowActorMachine } from './machines/row-actor';
 
 // ====================================
