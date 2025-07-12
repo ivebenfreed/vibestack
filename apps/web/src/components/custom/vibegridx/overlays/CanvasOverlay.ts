@@ -478,13 +478,15 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   updateViewport(viewport: ViewportInfo): void {
-    // Transform with scroll to keep canvas positioned relative to table content
+    // Canvas MUST move with scroll to stay aligned with table content
     this.container.style.transform = `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`;
     
     console.log('CanvasOverlay.updateViewport with transform:', {
       scrollTop: viewport.scrollTop,
       scrollLeft: viewport.scrollLeft || 0,
-      transform: `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`
+      transform: `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`,
+      containerBounds: this.container.getBoundingClientRect(),
+      stageBounds: this.stage ? { x: this.stage.x(), y: this.stage.y(), width: this.stage.width(), height: this.stage.height() } : null
     });
     
     // Get actual viewport element dimensions (not from viewport parameter which may be wrong)

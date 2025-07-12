@@ -55,32 +55,39 @@ export const calculateVisualPositions = (
     const absoluteRowIndex = rowData.sortedIndex;
     console.log('Row found:', { rowId, absoluteRowIndex, viewport });
     
-    // Check if row is in viewport
-    if (absoluteRowIndex < viewport.start || absoluteRowIndex > viewport.end) {
-      console.log('Row outside viewport:', { absoluteRowIndex, viewportStart: viewport.start, viewportEnd: viewport.end });
-      continue;
-    }
+    // Allow rendering selections even when scrolled off-screen
+    // Canvas transform will handle positioning correctly
+    console.log('Row position calculation (allowing off-screen):', { 
+      absoluteRowIndex, 
+      viewportStart: viewport.start, 
+      viewportEnd: viewport.end,
+      isInViewport: absoluteRowIndex >= viewport.start && absoluteRowIndex <= viewport.end
+    });
     
-    // Calculate VIEWPORT-RELATIVE position since canvas moves with CSS transform
-    // Convert absolute row index to viewport-relative position
-    const viewportRelativeRowIndex = absoluteRowIndex - viewport.start;
-    const viewportRelativeY = viewportRelativeRowIndex * rowHeight;
-    const viewportRelativeX = colData.offset;
+    // Calculate position compensated for canvas scroll transform
+    // Canvas moves down with scroll, so selection position must move up to stay aligned
+    const baseY = absoluteRowIndex * rowHeight;
+    const baseX = colData.offset;
+    
+    // Subtract scroll offset to compensate for canvas movement
+    const scrollCompensatedY = baseY - (viewport.scrollTop || 0);
+    const scrollCompensatedX = baseX - (viewport.scrollLeft || 0);
     
     console.log('calculateVisualPositions: Cell position calculation', {
       cellKey,
       absoluteRowIndex,
-      viewportStart: viewport.start,
-      viewportRelativeRowIndex,
-      viewportRelativeY,
-      columnOffset: colData.offset,
-      viewportRelativeX
+      baseY,
+      baseX,
+      scrollCompensatedY,
+      scrollCompensatedX,
+      viewportScrollTop: viewport.scrollTop,
+      viewportScrollLeft: viewport.scrollLeft
     });
     
     visualPositions.push({
       cellKey,
-      x: viewportRelativeX,
-      y: viewportRelativeY,
+      x: scrollCompensatedX,
+      y: scrollCompensatedY,
       width: colData.width,
       height: rowHeight
     });

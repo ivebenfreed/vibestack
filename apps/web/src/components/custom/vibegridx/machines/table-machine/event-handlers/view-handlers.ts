@@ -146,9 +146,16 @@ export const viewHandlers = {
         })
       ),
       
-      // Update visual positions for selected cells
+      // Update selection positions with scroll offset to keep them pinned to cells
       ({ context, self }) => {
-        if (context.selectedCells.size > 0) {
+        console.log('ViewHandler: Viewport update - updating selection positions with scroll offset', {
+          selectedCellsSize: context.selectedCells?.size || 0,
+          viewportStart: context.viewport?.start,
+          viewportScrollTop: context.viewport?.scrollTop
+        });
+        
+        if (context.selectedCells && context.selectedCells.size > 0) {
+          console.log('ViewHandler: Recalculating selection positions with scroll offset');
           const visualPositions = calculateVisualPositions(
             context.selectedCells,
             context.coordinateMapping,
@@ -157,6 +164,7 @@ export const viewHandlers = {
           );
           
           if (context.actors.canvasActor && visualPositions.length > 0) {
+            console.log('ViewHandler: Sending scroll-adjusted visual positions to canvas actor');
             self.send({
               type: 'FORWARD_TO_CANVAS',
               event: {

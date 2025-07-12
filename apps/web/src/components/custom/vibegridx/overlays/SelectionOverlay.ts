@@ -381,7 +381,8 @@ export class SelectionOverlay {
         x: visualCell.x,
         y: visualCell.y,
         width: visualCell.width,
-        height: visualCell.height
+        height: visualCell.height,
+        timestamp: Date.now()
       });
       
       let shapes = this.selectionShapes.get(visualCell.cellKey);
@@ -416,6 +417,13 @@ export class SelectionOverlay {
         this.selectionShapes.set(visualCell.cellKey, shapes);
       } else {
         // Update existing shapes position and size
+        console.log('SelectionOverlay: Updating existing shape position', {
+          cellKey: visualCell.cellKey,
+          oldPosition: { x: shapes.rect.x(), y: shapes.rect.y() },
+          newPosition: { x: visualCell.x, y: visualCell.y },
+          timestamp: Date.now()
+        });
+        
         shapes.rect.position({ x: visualCell.x, y: visualCell.y });
         shapes.rect.size({ width: visualCell.width, height: visualCell.height });
         
