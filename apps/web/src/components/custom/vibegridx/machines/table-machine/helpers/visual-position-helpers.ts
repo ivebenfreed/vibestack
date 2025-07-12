@@ -61,23 +61,26 @@ export const calculateVisualPositions = (
       continue;
     }
     
-    // Calculate ABSOLUTE position since canvas is in the scrollable body
-    // Not viewport-relative anymore
-    const absoluteY = absoluteRowIndex * rowHeight;
-    const absoluteX = colData.offset;
+    // Calculate VIEWPORT-RELATIVE position since canvas moves with CSS transform
+    // Convert absolute row index to viewport-relative position
+    const viewportRelativeRowIndex = absoluteRowIndex - viewport.start;
+    const viewportRelativeY = viewportRelativeRowIndex * rowHeight;
+    const viewportRelativeX = colData.offset;
     
     console.log('calculateVisualPositions: Cell position calculation', {
       cellKey,
       absoluteRowIndex,
-      absoluteY,
+      viewportStart: viewport.start,
+      viewportRelativeRowIndex,
+      viewportRelativeY,
       columnOffset: colData.offset,
-      absoluteX
+      viewportRelativeX
     });
     
     visualPositions.push({
       cellKey,
-      x: absoluteX,
-      y: absoluteY,
+      x: viewportRelativeX,
+      y: viewportRelativeY,
       width: colData.width,
       height: rowHeight
     });

@@ -165,6 +165,9 @@ export class CanvasOverlay implements CoordinateProvider {
       console.log('CanvasOverlay: Sending initial viewport', initialViewport);
       this.machine.send({ type: 'VIEWPORT_UPDATE', viewport: initialViewport });
       this.columnResizeOverlay.updateViewport(initialViewport);
+      
+      // Also initialize our own viewport transform immediately
+      this.updateViewport(initialViewport);
     }
   }
   

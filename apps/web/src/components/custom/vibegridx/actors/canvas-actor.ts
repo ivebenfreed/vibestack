@@ -89,11 +89,18 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           break;
           
         case 'UPDATE_SELECTION_VISUAL':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot update selection visual - canvas not initialized');
+            return;
+          }
+          
           console.log('CanvasActor: Updating selection with visual positions:', {
-            cellCount: event.visualCells.length
+            cellCount: event.visualCells.length,
+            positions: event.visualCells
           });
           
-          // Visual updates are handled by the overlay machine through portal canvas
+          // Update canvas overlay with pre-calculated visual positions
+          canvas.updateSelectionVisual(event.visualCells);
           sendBack({ type: 'SELECTION_UPDATED' });
           break;
           
