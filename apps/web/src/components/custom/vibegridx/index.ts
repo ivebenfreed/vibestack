@@ -57,18 +57,7 @@ export { rowActorMachine } from './machines/row-actor';
 
 export { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 
-// ====================================
-// ENTITY INTEGRATION
-// ====================================
-
-export {
-  EntityIntegrationLayer,
-  createDomainAdapter,
-  createTaskAdapter,
-  createProjectAdapter,
-  createUserAdapter,
-  useEntityIntegration
-} from './integration/EntityIntegration';
+// Entity integration removed - table machine now subscribes directly to atoms
 
 // ====================================
 // VIRTUALIZATION

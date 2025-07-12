@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useSelector } from '@xstate/react';
 import { 
   useTableConfiguration, 
-  useTableMachine, 
-  useEntityIntegration, 
+  useTableMachine,
   type InitializationRefs 
 } from './VibeGridXCore';
 import { useChangeDetection, useRenderStateExtractor } from './VibeGridXHooks';
@@ -12,7 +11,6 @@ import { CanvasOverlay } from './overlays/CanvasOverlay';
 import { EditingOverlayManager, useEditingOverlay } from './editing/EditingOverlayManager';
 import { createEventCoordinator, type EventCoordinator } from './events/EventCoordinator';
 import type { RenderState, TableRow, CellRef, Column } from './types';
-import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 import './vibegridx.css';
 
 // ====================================

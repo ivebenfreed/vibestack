@@ -3,7 +3,6 @@ import { useSelector } from '@xstate/react';
 import type { TableRow, RenderState, CellRef, OptimisticOperation, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
-import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 
 // ====================================
 // STATE EXTRACTION HOOKS
@@ -88,7 +87,7 @@ export const useChangeDetection = () => {
 // RENDER STATE EXTRACTION
 // ====================================
 
-export const useRenderStateExtractor = (integrationRef: React.MutableRefObject<EntityIntegrationLayer | null>) => {
+export const useRenderStateExtractor = () => {
   const extractRenderStateFromActor = useCallback((snapshot: any, providedColumns?: Column[]): RenderState | null => {
     try {
       // Get state from table machine context
@@ -143,7 +142,7 @@ export const useRenderStateExtractor = (integrationRef: React.MutableRefObject<E
       console.error('Error extracting render state:', error);
       return null;
     }
-  }, [integrationRef]);
+  }, []);
 
   return { extractRenderStateFromActor };
 };

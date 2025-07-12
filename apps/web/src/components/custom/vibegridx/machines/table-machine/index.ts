@@ -12,6 +12,7 @@ import { createInitialViewState, viewActions } from './slices/view-slice';
 import { createInitialEditState, editActions } from './slices/edit-slice';
 import { createInitialDragState, dragActions } from './slices/drag-slice';
 import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
+import { createInitialAtomState, atomActions } from './slices/atom-slice';
 
 // Import event handlers
 import { selectionHandlers } from './event-handlers/selection-handlers';
@@ -71,6 +72,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Create overlay state
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
   
+  // Create atom state
+  const atomState = createInitialAtomState();
+  
   return {
     id: input.id,
     entityType: input.entityType,
@@ -108,6 +112,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Spread overlay state
     ...overlayState,
+    
+    // Spread atom state
+    ...atomState,
     
     // Coordinate manager for backward compatibility
     coordinateManager: (() => {
@@ -248,6 +255,9 @@ export const tableBaseMachine = setup({
     // Overlay actions
     ...overlayActions,
     
+    // Atom actions
+    ...atomActions,
+    
     // Additional actions
     logError: ({ event }) => {
       console.error('TableMachine Error:', event);
@@ -280,6 +290,10 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
+        // Set up atom subscriptions first
+        atomActions.setupAtomSubscription,
+        atomActions.setupRelationshipAtoms,
+        
         // Spawn core actors
         assign({
           actors: ({ context, spawn }) => ({
@@ -321,9 +335,24 @@ export const tableBaseMachine = setup({
     active: {
       initial: 'idle',
       
+      // Cleanup atom subscriptions when leaving active state
+      exit: atomActions.cleanupAtomSubscriptions,
+      
       states: {
         idle: {
           on: {
+            // Handle atom data updates
+            ATOM_DATA_UPDATED: {
+              target: 'processingViewData',
+              actions: atomActions.updateEntitiesFromAtom
+            },
+            
+            // Handle relationship data updates (just trigger reprocessing)
+            RELATIONSHIP_DATA_UPDATED: {
+              target: 'processingViewData'
+            },
+            
+            // Legacy event for backward compatibility
             SET_VISIBLE_ENTITIES: {
               target: 'processingViewData',
               actions: assign({
@@ -348,6 +377,11 @@ export const tableBaseMachine = setup({
         processingViewData: {
           // Allow handling events while processing
           on: {
+            // Handle atom updates even while processing
+            ATOM_DATA_UPDATED: {
+              actions: atomActions.updateEntitiesFromAtom
+            },
+            
             // Selection events should be queued or handled
             ...selectionHandlers,
             ...keyboardHandlers,

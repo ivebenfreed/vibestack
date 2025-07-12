@@ -197,9 +197,16 @@ const performBatchEdit = fromPromise(async ({ input }: {
 
 export const editActor = fromPromise(async ({ input }: {
   input: { 
-    event: { type: string; [key: string]: any };
+    event?: { type: string; [key: string]: any };
+    columns?: any[];
   }
 }) => {
+  // Handle initial spawn input
+  if (!input.event) {
+    console.log('EditActor: Initial spawn with columns', { columns: input.columns });
+    return { type: 'INITIALIZED' };
+  }
+  
   const { event } = input;
   const { type } = event;
   

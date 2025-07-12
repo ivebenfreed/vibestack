@@ -3,7 +3,6 @@ import { useMachine } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
 import { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
-import { EntityIntegrationLayer, createDomainAdapter } from './integration/EntityIntegration';
 import type { TableConfig, RendererOptions, Column } from './types';
 
 // ====================================
@@ -15,7 +14,6 @@ export interface InitializationRefs {
   overlayContainerRef: MutableRefObject<HTMLDivElement | null>;
   rendererRef: MutableRefObject<AtomicTableRenderer | null>;
   canvasOverlayRef: MutableRefObject<CanvasOverlay | null>;
-  integrationRef: MutableRefObject<EntityIntegrationLayer | null>;
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<any>;
   subscriptionRef: MutableRefObject<any>;
@@ -45,29 +43,6 @@ export interface InitializationProps {
 // Removed useTableConfiguration and useTableMachine hooks - 
 // these were unnecessary abstractions that caused recreation issues
 
-// ====================================
-// ENTITY INTEGRATION HOOK
-// ====================================
-
-export const useEntityIntegration = (
-  tableActor: any,
-  entityType: string,
-  integrationRef: MutableRefObject<EntityIntegrationLayer | null>,
-  columns?: Column[]
-) => {
-  useEffect(() => {
-    if (!tableActor) return;
-    
-    // Create and connect entity integration layer
-    integrationRef.current = new EntityIntegrationLayer(entityType);
-    integrationRef.current.connectToTable(tableActor, columns);
-    
-    return () => {
-      integrationRef.current?.disconnect();
-      integrationRef.current = null;
-    };
-  }, [tableActor, entityType, columns]);
-};
 
 // ====================================
 // RENDERER INITIALIZATION HOOK

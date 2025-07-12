@@ -3,7 +3,6 @@ import type { CellRef, ViewportInfo, Column } from './types';
 import type { ActorRefFrom } from 'xstate';
 import type { tableBaseMachine } from './machines/table-machine';
 import type { CanvasOverlay } from './overlays/CanvasOverlay';
-import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 
 // ====================================
 // EVENT HANDLER TYPES
@@ -49,7 +48,6 @@ export interface EventHandlerRefs {
   selectedCellsRef: MutableRefObject<Set<string>>;
   anchorCellRef: MutableRefObject<CellRef | null>;
   canvasOverlayRef: MutableRefObject<CanvasOverlay | null>;
-  integrationRef: MutableRefObject<EntityIntegrationLayer | null>;
   dragStateRef: MutableRefObject<{
     isDragging: boolean;
     startCell: CellRef | null;
@@ -300,14 +298,8 @@ export const createRendererStateChangeHandler = (
       // The selection will be automatically updated via the selection coordinator subscription.
     } else if (event.type === 'rows.sorted') {
       // Forward the sorted row IDs to the table machine
-      const tableActor = refs.tableActorRef.current;
-      if (tableActor) {
-        tableActor.send({
-          type: 'ROWS_SORTED',
-          rowIds: event.rowIds,
-          sortBy: event.sortBy
-        });
-      }
+      // This event is no longer needed - sorting is handled by the table machine
+      console.log('Rows sorted event (deprecated):', event);
     }
   }, [refs]);
 };

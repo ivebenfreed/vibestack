@@ -229,10 +229,16 @@ const performCellDrag = fromPromise(async ({ input }: {
 
 export const dragActor = fromPromise(async ({ input }: {
   input: { 
-    type: string;
+    type?: string;
     [key: string]: any;
   }
 }) => {
+  // Handle initial spawn
+  if (!input || !input.type) {
+    console.log('DragActor: Initial spawn');
+    return { type: 'INITIALIZED' };
+  }
+  
   const { type } = input;
   
   console.log('DragActor: Processing operation', { type, input });

@@ -229,10 +229,24 @@ const performViewportUpdate = fromPromise(async ({ input }: {
 
 export const overlayActor = fromPromise(async ({ input }: {
   input: { 
-    type: string;
+    type?: string;
+    cellHeight?: number;
+    rowDimensionManager?: any;
+    dimensionManager?: any;
+    coordinateManager?: any;
     [key: string]: any;
   }
 }) => {
+  // Handle initial spawn
+  if (!input || !input.type) {
+    console.log('OverlayActor: Initial spawn', {
+      cellHeight: input?.cellHeight,
+      hasDimensionManager: !!input?.dimensionManager,
+      hasCoordinateManager: !!input?.coordinateManager
+    });
+    return { type: 'INITIALIZED' };
+  }
+  
   const { type } = input;
   
   console.log('OverlayActor: Processing operation', { type, input });

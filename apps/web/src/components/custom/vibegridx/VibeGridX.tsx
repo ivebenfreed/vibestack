@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMachine } from '@xstate/react';
 import { tableBaseMachine } from './machines/table-machine';
 import { 
-  useEntityIntegration, 
   useRendererInitialization,
   useSelectionStateSync,
   type InitializationRefs 
@@ -35,7 +34,6 @@ import {
 import type { RenderState, TableRow, CellRef, Column } from './types';
 import type { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
-import type { EntityIntegrationLayer } from './integration/EntityIntegration';
 import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
 import { VibeGridXHeader } from './components/VibeGridXHeader';
 import './vibegridx.css';
@@ -133,7 +131,6 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const overlayContainerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<AtomicTableRenderer | null>(null);
   const canvasOverlayRef = useRef<CanvasOverlay | null>(null);
-  const integrationRef = useRef<EntityIntegrationLayer | null>(null);
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
   const subscriptionRef = useRef<any>(null);
@@ -196,7 +193,6 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     overlayContainerRef,
     rendererRef,
     canvasOverlayRef,
-    integrationRef,
     selectedCellsRef,
     anchorCellRef,
     subscriptionRef,
@@ -204,12 +200,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     columns
   };
   
-  // Entity integration (pass columns)
-  useEntityIntegration(tableActor, props.entityType, integrationRef, columns);
-  
   // State extraction hooks
   const { getChangedRows } = useChangeDetection();
-  const { extractRenderStateFromActor } = useRenderStateExtractor(integrationRef);
+  const { extractRenderStateFromActor } = useRenderStateExtractor();
   
   // Event callbacks
   const eventCallbacks: EventHandlerCallbacks = {
