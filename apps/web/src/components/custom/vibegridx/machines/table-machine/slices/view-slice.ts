@@ -225,6 +225,78 @@ export const viewActions = {
   // Viewport actions
   updateViewport: assign({
     viewport: ({ event }) => event.viewport
+  }),
+  
+  // Column drag actions
+  startColumnDrag: assign({
+    columnDragState: ({ event }: any) => ({
+      columnId: event.columnId,
+      startX: event.x,
+      startY: event.y,
+      mouseX: event.x,
+      mouseY: event.y
+    })
+  }),
+  
+  updateColumnDrag: assign({
+    columnDragState: ({ context, event }: any) => {
+      if (!context.columnDragState) return null;
+      return {
+        ...context.columnDragState,
+        mouseX: event.x,
+        mouseY: event.y
+      };
+    }
+  }),
+  
+  endColumnDrag: assign({
+    columnDragState: null
+  }),
+  
+  clearColumnDrag: assign({
+    columnDragState: null
+  }),
+  
+  // Column resize actions
+  startColumnResize: assign({
+    columnResizeState: ({ event }: any) => ({
+      isResizing: true,
+      resizingColumnId: event.columnId,
+      columnId: event.columnId,
+      startX: event.x,
+      startWidth: event.width,
+      currentWidth: event.width,
+      previewWidth: event.width,
+      minWidth: 50,
+      maxWidth: 1000
+    })
+  }),
+  
+  updateColumnResize: assign({
+    columnResizeState: ({ context, event }: any) => {
+      if (!context.columnResizeState) return null;
+      const deltaX = event.x - context.columnResizeState.startX;
+      const newWidth = Math.max(
+        context.columnResizeState.minWidth,
+        Math.min(
+          context.columnResizeState.maxWidth,
+          context.columnResizeState.startWidth + deltaX
+        )
+      );
+      return {
+        ...context.columnResizeState,
+        currentWidth: newWidth,
+        previewWidth: newWidth
+      };
+    }
+  }),
+  
+  endColumnResize: assign({
+    columnResizeState: null
+  }),
+  
+  clearColumnResize: assign({
+    columnResizeState: null
   })
 };
 

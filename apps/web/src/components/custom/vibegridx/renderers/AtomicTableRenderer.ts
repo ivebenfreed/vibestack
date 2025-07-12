@@ -146,6 +146,7 @@ export class AtomicTableRenderer {
   private columns: Column[] = [];
   private columnVisibility: Record<string, boolean> = {};
   private visibleColumns: Column[] = [];
+  private columnWidths: Record<string, number> = {};
   private dimensionManager: ColumnDimensionManager | null = null;
   private coordinateManager: any = null; // VibeGridXCoordinateManager
   private rowHeight = 40; // Default row height
@@ -435,7 +436,7 @@ export class AtomicTableRenderer {
     totalWidth += 48; // Fixed width for selection column
     
     this.visibleColumns.forEach(column => {
-      totalWidth += this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
+      totalWidth += this.columnWidths[column.id] || column.width || 120;
     });
     
     return totalWidth;
@@ -455,7 +456,7 @@ export class AtomicTableRenderer {
       if (column.id === columnId) {
         break;
       }
-      const columnWidth = this.dimensionManager.getColumnWidth(column.id) || column.width || 120;
+      const columnWidth = this.columnWidths[column.id] || column.width || 120;
       offset += columnWidth;
     }
     
@@ -597,6 +598,11 @@ export class AtomicTableRenderer {
     // Update columns if provided in state
     if (state.columns && state.columns.length > 0) {
       this.setColumns(state.columns);
+    }
+    
+    // Update column widths if provided
+    if (state.columnWidths) {
+      this.columnWidths = state.columnWidths;
     }
     
     // NOTE: Coordinate manager updates removed - now handled by coordinate actor
@@ -870,7 +876,7 @@ export class AtomicTableRenderer {
     
     // Header rendered with columns
     headerHTML += columnsToRender.map((column, index) => {
-      const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
+      const width = this.columnWidths[column.id] || column.width || 120;
       const field = column.field || column.id;
       const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
       
@@ -1065,7 +1071,7 @@ export class AtomicTableRenderer {
     columnsToRender.forEach((column, index) => {
       const cellKey = `${row.id}:${column.id}`;
       const value = row.data[column.field || column.id];
-      const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
+      const width = this.columnWidths[column.id] || column.width || 120;
       const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
       
       
@@ -1293,7 +1299,7 @@ export class AtomicTableRenderer {
       console.log('[AtomicTableRenderer] Resize handle clicked', { columnId });
       
       if (columnId && this.dimensionManager) {
-        const currentWidth = this.dimensionManager.getColumnWidth(columnId) || 120;
+        const currentWidth = this.columnWidths[columnId] || 120;
         console.log('[AtomicTableRenderer] Sending resize start event', { columnId, currentWidth });
         
         // Send resize start event to XState
@@ -1391,7 +1397,7 @@ export class AtomicTableRenderer {
     
     for (let i = 0; i < this.visibleColumns.length; i++) {
       const column = this.visibleColumns[i];
-      const columnWidth = this.dimensionManager?.getColumnWidth(column.id) || 120;
+      const columnWidth = this.columnWidths[column.id] || 120;
       const midPoint = accumulatedWidth + columnWidth / 2;
       
       if (relativeX < midPoint) {
@@ -1407,7 +1413,7 @@ export class AtomicTableRenderer {
     
     // Get the width of the dragged column
     const draggedColumn = this.visibleColumns[draggedIndex];
-    const draggedWidth = this.dimensionManager?.getColumnWidth(draggedColumn.id) || 120;
+    const draggedWidth = this.columnWidths[draggedColumn.id] || 120;
     
     // Apply displacement classes with proper offset
     this.visibleColumns.forEach((column, index) => {
@@ -1464,7 +1470,7 @@ export class AtomicTableRenderer {
     let targetIndex = 0;
     let accumulatedWidth = 0;
     for (let i = 0; i < this.visibleColumns.length; i++) {
-      const columnWidth = this.dimensionManager?.getColumnWidth(this.visibleColumns[i].id) || 120;
+      const columnWidth = this.columnWidths[this.visibleColumns[i].id] || 120;
       if (relativeX > accumulatedWidth + columnWidth / 2) {
         targetIndex = i + 1;
       }
@@ -1584,6 +1590,41 @@ export class AtomicTableRenderer {
       },
       updateQueueSize: this.updateQueue.size
     };
+  }
+  
+  // Update a single column width
+  updateColumnWidth(columnId: string, width: number): void {
+    console.log('[AtomicTableRenderer] Updating column width', { columnId, width });
+    
+    // Update our internal state
+    this.columnWidths[columnId] = width;
+    
+    // Update the header cell width
+    const headerCell = this.header.querySelector(`[data-column="${columnId}"]`) as HTMLElement;
+    if (headerCell) {
+      headerCell.style.width = `${width}px`;
+      headerCell.style.minWidth = `${width}px`;
+      headerCell.style.maxWidth = `${width}px`;
+    }
+    
+    // Update all visible body cells for this column
+    const cells = this.body.querySelectorAll(`[data-column-id="${columnId}"]`) as NodeListOf<HTMLElement>;
+    cells.forEach(cell => {
+      cell.style.width = `${width}px`;
+      cell.style.minWidth = `${width}px`;
+      cell.style.maxWidth = `${width}px`;
+    });
+    
+    // Update total header width
+    let totalWidth = 48; // Selection column width
+    this.visibleColumns.forEach(col => {
+      if (col.id === columnId) {
+        totalWidth += width;
+      } else {
+        totalWidth += this.columnWidths[col.id] || col.width || 120;
+      }
+    });
+    this.header.style.width = `${totalWidth}px`;
   }
   
   destroy(): void {

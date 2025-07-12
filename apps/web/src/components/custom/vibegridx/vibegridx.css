@@ -255,6 +255,39 @@
   user-select: none !important;
 }
 
+/* Column being resized */
+.vibegridx-header-cell.vibegridx-resizing {
+  background-color: hsl(var(--accent));
+  transition: none;
+}
+
+/* Active resize handle */
+.vibegridx-resize-handle.active::after {
+  opacity: 1 !important;
+  background-color: hsl(var(--primary));
+}
+
+/* Resize feedback line */
+.vibegridx-resize-line {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background-color: hsl(var(--primary));
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.8;
+}
+
+/* Resize constraint feedback */
+.vibegridx-resize-handle.at-min-width {
+  cursor: e-resize !important;
+}
+
+.vibegridx-resize-handle.at-max-width {
+  cursor: w-resize !important;
+}
+
 /* Resize preview is now handled by Canvas overlay */
 
 /* Viewport */

@@ -135,6 +135,52 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           sendBack({ type: 'COLUMNS_UPDATED' });
           break;
           
+        case 'UPDATE_COLUMN_WIDTH':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update column width - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Updating column width:', event.columnId, event.width);
+          
+          // Update column width in renderer
+          if (renderer.updateColumnWidth) {
+            renderer.updateColumnWidth(event.columnId, event.width);
+          } else {
+            console.warn('RendererActor: Renderer does not support updateColumnWidth');
+          }
+          
+          sendBack({ type: 'COLUMN_WIDTH_UPDATED' });
+          break;
+          
+        case 'RENDER':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot render - renderer not initialized');
+            return;
+          }
+          
+          if (!event.state) {
+            console.warn('RendererActor: Cannot render - no state provided');
+            return;
+          }
+          
+          console.log('RendererActor: Rendering with state:', {
+            rows: event.state.rows?.length,
+            columns: event.state.columns?.length
+          });
+          
+          // Store the render state
+          renderState = event.state;
+          
+          // Render with the new state
+          renderer.render(event.state);
+          
+          sendBack({ 
+            type: 'ROWS_RENDERED',
+            rowCount: event.state.rows?.length || 0
+          });
+          break;
+          
         case 'DESTROY':
           console.log('RendererActor: Destroying renderer');
           

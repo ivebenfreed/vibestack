@@ -509,4 +509,5 @@ export interface RenderState {
   sortBy?: SortConfig[]; // Current sort configuration
   columnVisibility?: Record<string, boolean>; // Column visibility state
   columnOrder?: string[]; // Column order array
+  columnWidths?: Record<string, number>; // Column widths
 }

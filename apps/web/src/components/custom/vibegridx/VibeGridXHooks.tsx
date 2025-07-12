@@ -134,7 +134,8 @@ export const useRenderStateExtractor = () => {
         version: context.version || 0,
         sortBy, // Include for renderer awareness
         columnVisibility,
-        columnOrder
+        columnOrder,
+        columnWidths: context.columnWidths || {}
       };
       
       return renderState;

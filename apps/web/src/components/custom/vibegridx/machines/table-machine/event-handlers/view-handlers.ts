@@ -2,7 +2,7 @@
 // VIEW EVENT HANDLERS
 // ====================================
 
-import { sendTo, assign, raise } from 'xstate';
+import { sendTo, assign, raise, emit } from 'xstate';
 import { viewActions } from '../slices/view-slice';
 
 export const viewHandlers = {
@@ -208,6 +208,267 @@ export const viewHandlers = {
           columnId: event.columnId,
           newWidth: event.width
         });
+      }
+    ]
+  },
+  
+  // Column drag events
+  'view.columns.drag.start': {
+    actions: [
+      viewActions.startColumnDrag,
+      
+      // Emit event for UI feedback
+      emit(({ event }) => ({
+        type: 'view.drag.started',
+        columnDragState: {
+          columnId: event.columnId,
+          startX: event.x,
+          startY: event.y,
+          mouseX: event.x,
+          mouseY: event.y
+        }
+      })),
+      
+      ({ event }) => {
+        console.log('TableMachine: Column drag started', {
+          columnId: event.columnId,
+          position: { x: event.x, y: event.y }
+        });
+      }
+    ]
+  },
+  
+  'view.columns.drag.move': {
+    actions: [
+      viewActions.updateColumnDrag,
+      
+      // Emit event for UI feedback
+      emit(({ context }) => ({
+        type: 'view.drag.updated',
+        columnDragState: context.columnDragState
+      })),
+      
+      ({ event }) => {
+        console.log('TableMachine: Column drag move', {
+          position: { x: event.x, y: event.y }
+        });
+      }
+    ]
+  },
+  
+  'view.columns.drag.end': {
+    actions: [
+      viewActions.endColumnDrag,
+      
+      // Reorder columns if valid drop
+      ({ context, event }) => {
+        if (event.targetIndex !== undefined && context.columnDragState?.columnId) {
+          const columns = context.columns;
+          const draggedColumn = columns.find(c => c.id === context.columnDragState.columnId);
+          const currentIndex = columns.indexOf(draggedColumn!);
+          
+          if (currentIndex !== -1 && currentIndex !== event.targetIndex) {
+            // Update column order
+            const newOrder = [...context.columnOrder];
+            const [removed] = newOrder.splice(currentIndex, 1);
+            newOrder.splice(event.targetIndex, 0, removed);
+            
+            // Save to storage
+            saveToStorage(context.entityType, 'columnOrder', newOrder);
+          }
+        }
+      },
+      
+      // Update column order in context
+      assign({
+        columnOrder: ({ context, event }) => {
+          if (event.targetIndex !== undefined && context.columnDragState?.columnId) {
+            const columns = context.columns;
+            const draggedColumn = columns.find(c => c.id === context.columnDragState.columnId);
+            const currentIndex = columns.indexOf(draggedColumn!);
+            
+            if (currentIndex !== -1 && currentIndex !== event.targetIndex) {
+              const newOrder = [...context.columnOrder];
+              const [removed] = newOrder.splice(currentIndex, 1);
+              newOrder.splice(event.targetIndex, 0, removed);
+              return newOrder;
+            }
+          }
+          return context.columnOrder;
+        }
+      }),
+      
+      // Clear drag state
+      viewActions.clearColumnDrag,
+      
+      // Emit event for UI feedback
+      emit({ type: 'view.drag.ended' }),
+      
+      ({ event }) => {
+        console.log('TableMachine: Column drag ended', {
+          targetIndex: event.targetIndex
+        });
+      }
+    ]
+  },
+  
+  'view.columns.drag.cancel': {
+    actions: [
+      viewActions.clearColumnDrag,
+      
+      // Emit event for UI feedback
+      emit({ type: 'view.drag.cancelled' }),
+      
+      () => {
+        console.log('TableMachine: Column drag cancelled');
+      }
+    ]
+  },
+  
+  // Column resize events
+  'view.columns.resize.start': {
+    actions: [
+      viewActions.startColumnResize,
+      
+      // Emit event for UI feedback
+      emit(({ context, event }) => ({
+        type: 'view.resize.started',
+        columnResizeState: context.columnResizeState || {
+          isResizing: true,
+          resizingColumnId: event.columnId,
+          columnId: event.columnId,
+          startX: event.x,
+          startWidth: event.width,
+          currentWidth: event.width,
+          previewWidth: event.width,
+          minWidth: 50,
+          maxWidth: 1000
+        }
+      })),
+      
+      ({ event }) => {
+        console.log('TableMachine: Column resize started', {
+          columnId: event.columnId,
+          startX: event.x,
+          startWidth: event.width
+        });
+      }
+    ]
+  },
+  
+  'view.columns.resize.move': {
+    actions: [
+      viewActions.updateColumnResize,
+      
+      // Update column widths in context directly
+      assign({
+        columnWidths: ({ context }) => {
+          if (!context.columnResizeState) return context.columnWidths;
+          const { columnId, currentWidth } = context.columnResizeState;
+          return {
+            ...context.columnWidths,
+            [columnId]: currentWidth
+          };
+        }
+      }),
+      
+      // Send column width update to renderer
+      sendTo(
+        ({ context }) => context.actors.rendererActor!,
+        ({ context }) => ({
+          type: 'UPDATE_COLUMN_WIDTH',
+          columnId: context.columnResizeState?.columnId,
+          width: context.columnResizeState?.currentWidth
+        })
+      ),
+      
+      // Emit event for UI feedback  
+      emit(({ context }) => ({
+        type: 'view.resize.updated',
+        columnResizeState: context.columnResizeState
+      })),
+      
+      ({ event }) => {
+        console.log('TableMachine: Column resize move', {
+          x: event.x
+        });
+      }
+    ]
+  },
+  
+  'view.columns.resize.end': {
+    actions: [
+      // Log the final state before any modifications
+      ({ context }) => {
+        console.log('TableMachine: Column resize ended', {
+          columnId: context.columnResizeState?.columnId,
+          finalWidth: context.columnResizeState?.currentWidth
+        });
+      },
+      
+      
+      // Update column widths in context
+      assign({
+        columnWidths: ({ context }) => {
+          if (context.columnResizeState) {
+            const { columnId, currentWidth } = context.columnResizeState;
+            return {
+              ...context.columnWidths,
+              [columnId]: currentWidth
+            };
+          }
+          return context.columnWidths;
+        }
+      }),
+      
+      // Persist to localStorage
+      ({ context }) => {
+        if (context.columnResizeState) {
+          const { columnId, currentWidth } = context.columnResizeState;
+          const columnWidths = loadFromStorage(context.entityType, 'columnWidths', {});
+          columnWidths[columnId] = currentWidth;
+          saveToStorage(context.entityType, 'columnWidths', columnWidths);
+        }
+      },
+      
+      // Trigger a full re-render to ensure all cells are properly sized
+      sendTo(
+        ({ context }) => context.actors.rendererActor!,
+        ({ context }) => ({
+          type: 'RENDER',
+          state: {
+            rows: context.rows,
+            columns: context.columns,
+            selectedCells: context.selectedCells,
+            editingCell: null,
+            groupedData: [],
+            optimisticOperations: new Map(),
+            version: context.version + 1,
+            sortBy: context.sortBy,
+            columnVisibility: context.columnVisibility,
+            columnOrder: context.columnOrder,
+            columnWidths: context.columnWidths
+          }
+        })
+      ),
+      
+      // Clear the resize state (do this last)
+      viewActions.endColumnResize,
+      
+      // Emit event for UI feedback
+      emit({ type: 'view.resize.ended' })
+    ]
+  },
+  
+  'view.columns.resize.cancel': {
+    actions: [
+      viewActions.clearColumnResize,
+      
+      // Emit event for UI feedback
+      emit({ type: 'view.resize.cancelled' }),
+      
+      () => {
+        console.log('TableMachine: Column resize cancelled');
       }
     ]
   }
