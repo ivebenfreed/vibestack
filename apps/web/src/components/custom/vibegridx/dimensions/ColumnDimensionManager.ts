@@ -30,6 +30,8 @@ export class ColumnDimensionManager {
   private totalWidth: number = 0;
   private defaultColumnWidth: number = 120;
   private listeners = new Set<DimensionChangeListener>();
+  private enableSelectionColumn: boolean = false;
+  private selectionColumnWidth: number = 48;
   
   constructor(defaultWidth: number = 120) {
     this.defaultColumnWidth = defaultWidth;
@@ -49,11 +51,26 @@ export class ColumnDimensionManager {
   }
   
   /**
+   * Enable or disable the selection column
+   */
+  setSelectionColumnEnabled(enabled: boolean): void {
+    if (this.enableSelectionColumn !== enabled) {
+      this.enableSelectionColumn = enabled;
+      this.recalculateDimensions();
+    }
+  }
+  
+  /**
    * Recalculate all column dimensions and offsets
    */
   private recalculateDimensions(): void {
     this.dimensionsMap.clear();
     let currentOffset = 0;
+    
+    // Account for selection column if enabled
+    if (this.enableSelectionColumn) {
+      currentOffset = this.selectionColumnWidth;
+    }
     
     this.columns.forEach((column, index) => {
       const width = column.width || this.defaultColumnWidth;

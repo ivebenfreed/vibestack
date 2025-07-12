@@ -228,6 +228,7 @@ export interface TableContext {
   id: string;
   entityType: 'task' | 'project' | 'user' | string;
   columns: Column<any>[];
+  rows: TableRow[]; // Processed and sorted rows ready for rendering
   visibleRowIds: string[]; // Currently visible row IDs in viewport
   allRowIds: string[]; // All row IDs in the dataset
   settings: TableSettings;
@@ -237,6 +238,8 @@ export interface TableContext {
   // Dimension management
   dimensionManager?: any; // Will be typed as ColumnDimensionManager after import
   rowDimensionManager?: any; // Will be typed as RowDimensionManager after import
+  coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager after import
+  selectionManager?: any; // Will be typed as VibeGridXSelectionManager after import
   
   // Actor references
   actors: {
@@ -330,6 +333,7 @@ export type TableEvents =
   // Entity configuration
   | { type: 'SET_ENTITY_TYPE'; entityType: string; columns: Column[] }
   | { type: 'SET_VISIBLE_ENTITIES'; entityIds: string[] }
+  | { type: 'ROWS_SORTED'; rowIds: string[]; sortBy: SortConfig[] }
   
   // Selection events
   | { type: 'selection.cell.select'; rowId: string; columnId: string; ctrlKey?: boolean; shiftKey?: boolean }
@@ -436,6 +440,7 @@ export interface RendererOptions {
   columns?: Column<any>[];
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
+  coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager
   relationshipData?: RelationshipDataProvider;
   enableSelectionColumn?: boolean;
   onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;

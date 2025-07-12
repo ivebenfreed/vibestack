@@ -136,7 +136,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
   const subscriptionRef = useRef<any>(null);
-  const coordinateManagerRef = useRef<VibeGridXCoordinateManager | null>(null);
+  // Coordinate manager is now owned by table machine, not React refs
   const dragStateRef = useRef<{
     isDragging: boolean;
     startCell: CellRef | null;
@@ -150,40 +150,17 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const { tableConfig, tableId } = useTableConfiguration(props);
   const { tableState, tableSend, tableActor } = useTableMachine(tableConfig);
   
-  // Initialize coordinate manager once
+  // Debug table state for initial render
   useEffect(() => {
-    if (!coordinateManagerRef.current && tableActor) {
-      coordinateManagerRef.current = createVibeGridXCoordinateManager();
-      console.log('VibeGridX: Coordinate manager created');
-      
-      // Immediately send coordinate manager to selection coordinator
-      tableSend({
-        type: 'COORDINATE_MANAGER_SET',
-        coordinateManager: coordinateManagerRef.current
-      });
-      
-      // Initialize with columns if available
-      if (columns.length > 0) {
-        coordinateManagerRef.current.updateColumns(columns);
-      }
-      
-      // Set up coordinate change listener
-      const unsubscribe = coordinateManagerRef.current.subscribe((event) => {
-        console.log('VibeGridX: Coordinate mapping changed:', event.type);
-        
-        // Notify selection coordinator when coordinates change
-        tableSend({
-          type: 'COORDINATE_MAPPING_CHANGED'
-        });
-      });
-      
-      // Store unsubscribe function
-      return unsubscribe;
-    }
-  }, [tableSend, tableActor, columns]);
+    console.log('VibeGridX: Table state debug:', {
+      tableStateValue: tableState?.value,
+      hasCoordinateManager: !!tableState?.context?.coordinateManager,
+      coordinateManagerColumnCount: tableState?.context?.coordinateManager?.getColumnCount?.() || 0
+    });
+  }, [tableState]);
   
   // Refs object for event handlers
-  const refs: InitializationRefs & { columns: Column[]; coordinateManagerRef: React.RefObject<VibeGridXCoordinateManager | null> } = {
+  const refs: InitializationRefs & { columns: Column[] } = {
     containerRef,
     overlayContainerRef,
     rendererRef,
@@ -193,7 +170,6 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     anchorCellRef,
     subscriptionRef,
     dragStateRef,
-    coordinateManagerRef,
     columns
   };
   
@@ -201,7 +177,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   useEntityIntegration(tableActor, props.entityType, integrationRef, columns);
   
   // State extraction hooks
-  const { hasDataChanged, getChangedRows, hasSelectionChanged } = useChangeDetection();
+  const { getChangedRows } = useChangeDetection();
   const { extractRenderStateFromActor } = useRenderStateExtractor(integrationRef);
   
   // Event callbacks
@@ -280,44 +256,86 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         fillCount: fillCells.size
       });
       
-      // Get the value from the first original cell to use for filling
-      if (originalCells.size > 0 && fillCells.size > 0) {
-        const firstCell = Array.from(originalCells)[0];
-        const [rowId, columnId] = firstCell.split(':');
+      // Check if this is a selection column fill operation
+      const isSelectionColumnFill = Array.from(fillCells).some(cellKey => {
+        const [, columnId] = cellKey.split(':');
+        return columnId === '__selection';
+      });
+      
+      if (isSelectionColumnFill) {
+        // Handle selection column fill - select/deselect rows
+        const rowIdsToSelect = new Set<string>();
         
-        // Find the value in the current data
-        const snapshot = tableActor.getSnapshot();
-        const row = snapshot.context.rows.find((r: any) => r.id === rowId);
-        
-        if (row && row.data[columnId] !== undefined) {
-          const fillValue = row.data[columnId];
-          
-          // For now, we'll use the integration layer to update cells
-          // This is a temporary solution until bulk edit is implemented
-          for (const cellKey of fillCells) {
-            const [targetRowId, targetColumnId] = cellKey.split(':');
-            
-            // Find the target row
-            const targetRow = snapshot.context.rows.find((r: any) => r.id === targetRowId);
-            if (targetRow) {
-              // Create an update for this cell
-              const updatedRow = {
-                ...targetRow,
-                data: {
-                  ...targetRow.data,
-                  [targetColumnId]: fillValue
-                }
-              };
-              
-              // Send update through table machine
-              tableSend({
-                type: 'data.row.update',
-                row: updatedRow
-              });
-            }
+        // Get all row IDs from fill cells
+        fillCells.forEach(cellKey => {
+          const [rowId, columnId] = cellKey.split(':');
+          if (columnId === '__selection') {
+            rowIdsToSelect.add(rowId);
           }
+        });
+        
+        // Also include original selection
+        originalCells.forEach(cellKey => {
+          const [rowId, columnId] = cellKey.split(':');
+          if (columnId === '__selection') {
+            rowIdsToSelect.add(rowId);
+          }
+        });
+        
+        // Send checkbox range selection event
+        if (rowIdsToSelect.size > 0) {
+          const rowIds = Array.from(rowIdsToSelect);
+          const firstRowId = rowIds[0];
+          const lastRowId = rowIds[rowIds.length - 1];
           
-          console.log(`VibeGridX: Filled ${fillCells.size} cells with value:`, fillValue);
+          tableSend({
+            type: 'selection.checkbox.range',
+            startRowId: firstRowId,
+            endRowId: lastRowId
+          });
+          
+          console.log(`VibeGridX: Selected ${rowIdsToSelect.size} rows via fill handle`);
+        }
+      } else {
+        // Regular data fill operation
+        if (originalCells.size > 0 && fillCells.size > 0) {
+          const firstCell = Array.from(originalCells)[0];
+          const [rowId, columnId] = firstCell.split(':');
+          
+          // Find the value in the current data
+          const snapshot = tableActor.getSnapshot();
+          const row = snapshot.context.rows.find((r: any) => r.id === rowId);
+          
+          if (row && row.data[columnId] !== undefined) {
+            const fillValue = row.data[columnId];
+            
+            // For now, we'll use the integration layer to update cells
+            // This is a temporary solution until bulk edit is implemented
+            for (const cellKey of fillCells) {
+              const [targetRowId, targetColumnId] = cellKey.split(':');
+              
+              // Find the target row
+              const targetRow = snapshot.context.rows.find((r: any) => r.id === targetRowId);
+              if (targetRow) {
+                // Create an update for this cell
+                const updatedRow = {
+                  ...targetRow,
+                  data: {
+                    ...targetRow.data,
+                    [targetColumnId]: fillValue
+                  }
+                };
+                
+                // Send update through table machine
+                tableSend({
+                  type: 'data.row.update',
+                  row: updatedRow
+                });
+              }
+            }
+            
+            console.log(`VibeGridX: Filled ${fillCells.size} cells with value:`, fillValue);
+          }
         }
       }
     },
@@ -518,156 +536,56 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     
     let subscriptionCount = 0;
     
-    // XState v5 proper subscription pattern - listen to all state changes
+    // XState v5 proper subscription pattern - listen to version changes
+    let previousVersion: number | undefined;
+    
     const subscription = tableActor.subscribe((snapshot) => {
       subscriptionCount++;
       
-      // Only log significant state changes
-      const stateValue = snapshot.value;
-      const version = snapshot.context?.version;
+      const currentVersion = snapshot.context?.version || 0;
+      const viewCoordinatorState = snapshot.context?.actors?.viewCoordinator?.getSnapshot()?.value;
       
-      // Check if this is a meaningful change that requires re-render
-      const viewCoordinatorSnapshot = snapshot.context.actors?.viewCoordinator?.getSnapshot();
-      const currentSortState = viewCoordinatorSnapshot?.context?.sortBy;
-      const lastSortState = (window as any).__vibegridx_last_sortstate;
-      const sortChanged = JSON.stringify(currentSortState) !== JSON.stringify(lastSortState);
-      
-      const currentColumnVisibility = viewCoordinatorSnapshot?.context?.columnVisibility;
-      const lastColumnVisibility = (window as any).__vibegridx_last_columnvisibility;
-      const columnVisibilityChanged = JSON.stringify(currentColumnVisibility) !== JSON.stringify(lastColumnVisibility);
-      
-      const currentColumnOrder = viewCoordinatorSnapshot?.context?.columnOrder;
-      const lastColumnOrder = (window as any).__vibegridx_last_columnorder;
-      const columnOrderChanged = JSON.stringify(currentColumnOrder) !== JSON.stringify(lastColumnOrder);
-      
-      if (sortChanged) {
-        console.log('VibeGridX: Sort state changed:', currentSortState);
-        (window as any).__vibegridx_last_sortstate = currentSortState;
+      // Simple checks:
+      // 1. Version must change (or be first render)
+      // 2. View coordinator must be ready
+      if (previousVersion !== undefined && currentVersion === previousVersion) {
+        return; // No version change, no render needed
       }
       
-      if (columnVisibilityChanged) {
-        console.log('VibeGridX: Column visibility changed:', currentColumnVisibility);
-        (window as any).__vibegridx_last_columnvisibility = currentColumnVisibility;
+      if (viewCoordinatorState !== 'idle') {
+        return; // View coordinator not ready
       }
       
-      if (columnOrderChanged) {
-        console.log('VibeGridX: Column order changed:', currentColumnOrder);
-        (window as any).__vibegridx_last_columnorder = currentColumnOrder;
-      }
+      // Version changed and view is ready - render!
+      const isFirstRender = previousVersion === undefined;
+      previousVersion = currentVersion;
       
-      // Check if dimensions changed (e.g., column resize)
-      const currentVersion = snapshot.context?.version;
-      const lastVersion = (window as any).__vibegridx_last_version;
-      const dimensionsChanged = currentVersion !== lastVersion && !sortChanged && !columnVisibilityChanged && !columnOrderChanged;
-      if (dimensionsChanged) {
-        console.log('VibeGridX: Dimensions changed, version:', currentVersion);
-        (window as any).__vibegridx_last_version = currentVersion;
-      }
-      
-      // Skip if only selection changed (no data, sort, column visibility, column order, or dimension changes)
-      const isDataChange = hasDataChanged(snapshot);
-      
-      if (!isDataChange && !sortChanged && !columnVisibilityChanged && !columnOrderChanged && !dimensionsChanged) {
-        // Skip expensive processing for selection-only changes
-        return;
-      }
-      
-      console.log('VibeGridX: Processing data change:', {
-        state: stateValue,
-        version: version
+      console.log('VibeGridX: Rendering', {
+        version: currentVersion,
+        isFirstRender
       });
       
+      console.log('[RENDER FLOW 1] Extracting render state from actor');
       const renderState = extractRenderStateFromActor(snapshot);
+      console.log('[RENDER FLOW 2] Render state extracted:', {
+        hasRenderState: !!renderState,
+        rowCount: renderState?.rows.length || 0,
+        firstRowId: renderState?.rows[0]?.id
+      });
+      
       if (renderState) {
-        // Store last render state for canvas initialization
-        (window as any).__vibegridx_last_renderstate = renderState;
-        
-        // Update coordinate manager and canvas overlay with data mappings
-        if (renderState.rows.length > 0 && coordinateManagerRef.current) {
-          const sortBy = (snapshot.context.actors?.viewCoordinator?.getSnapshot()?.context?.sortBy) || [];
-          
-          // IMPORTANT: We need to use the SAME sorted order that the renderer will use
-          // The renderer applies its own sorting, so we need to match that exactly
-          let sortedRows = renderState.rows;
-          if (sortBy.length > 0) {
-            // Apply the same sorting logic as AtomicTableRenderer
-            sortedRows = [...renderState.rows].sort((a, b) => {
-              for (const sort of sortBy) {
-                const aValue = a.data[sort.field];
-                const bValue = b.data[sort.field];
-                
-                if (aValue === bValue) continue;
-                
-                let comparison = 0;
-                
-                if (aValue == null && bValue == null) {
-                  comparison = 0;
-                } else if (aValue == null) {
-                  comparison = 1; // null values go to the end
-                } else if (bValue == null) {
-                  comparison = -1;
-                } else if (typeof aValue === 'number' && typeof bValue === 'number') {
-                  comparison = aValue - bValue;
-                } else if (aValue instanceof Date && bValue instanceof Date) {
-                  comparison = aValue.getTime() - bValue.getTime();
-                } else {
-                  comparison = String(aValue).localeCompare(String(bValue));
-                }
-                
-                if (comparison !== 0) {
-                  return sort.direction === 'desc' ? -comparison : comparison;
-                }
-              }
-              return 0;
-            });
-          }
-          
-          // Update coordinate manager with the SAME sorted data the renderer will use
-          coordinateManagerRef.current.updateRows(sortedRows, sortBy);
-          coordinateManagerRef.current.updateColumns(columns);
-          
-          console.log('VibeGridX: Updated coordinate manager', { 
-            rowCount: sortedRows.length,
-            columnCount: columns.length,
-            sortBy: sortBy,
-            firstRowId: sortedRows[0]?.id,
-            lastRowId: sortedRows[sortedRows.length - 1]?.id
-          });
-          
-          // Notify selection coordinator of coordinate mapping changes
-          tableSend({
-            type: 'COORDINATE_MANAGER_SET',
-            coordinateManager: coordinateManagerRef.current
-          });
-          
-          // Update canvas overlay with sorted row IDs in the correct order
-          if (canvasOverlayRef.current) {
-            const sortedRowIds = sortedRows.map(row => row.id);
-            const columnIds = coordinateManagerRef.current.getColumnIds();
-            
-            console.log('VibeGridX: Updating canvas data mappings', { 
-              sortedRowCount: sortedRowIds.length,
-              visibleRowCount: sortedRows.length,
-              columnCount: columnIds.length,
-              firstRowId: sortedRowIds[0],
-              lastRowId: sortedRowIds[sortedRowIds.length - 1]
-            });
-            
-            // Update coordinate system with sorted rows so overlay positions match table
-            canvasOverlayRef.current.updateDataMappings(sortedRowIds, columnIds);
-          }
-        }
-        
-        // HYBRID RENDERING: Only process data changes
-        
-        // 1. Data changes - use granular updates
+        // Process the render state update
         const { changedRows, newRows, deletedRowIds, isStructuralChange } = getChangedRows(renderState);
         
-        if (isStructuralChange || sortChanged || dimensionsChanged) {
-          // Structural changes, sort changes, or dimension changes need full re-render
-          const reason = sortChanged ? 'SORT CHANGE' : dimensionsChanged ? 'DIMENSION CHANGE' : 'STRUCTURAL CHANGE';
-          console.log(`VibeGridX: ${reason} - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
-          rendererRef.current!.render(renderState);
+        if (isStructuralChange) {
+          // Use initialize for first render, render for subsequent updates
+          if (isFirstRender) {
+            console.log(`VibeGridX: INITIAL LOAD - Initializing table (${renderState.rows.length} rows)`);
+            rendererRef.current!.initialize(renderState);
+          } else {
+            console.log(`VibeGridX: STRUCTURAL CHANGE - Full table re-render (${newRows.length} new, ${deletedRowIds.length} deleted, ${renderState.rows.length} total)`);
+            rendererRef.current!.render(renderState);
+          }
           // Report performance metrics after render
           setTimeout(() => {
             if (rendererRef.current && onPerformanceUpdate) {
@@ -683,11 +601,11 @@ export const VibeGridX = <T extends Record<string, any> = any>(
               }
             }
           }, 50);
-        } else if (columnVisibilityChanged || columnOrderChanged) {
-          // Column visibility or order changes only need renderer column update (no coordinate manager updates)
-          console.log('VibeGridX: COLUMN CHANGE - Lightweight renderer update', {
-            visibilityChanged: columnVisibilityChanged,
-            orderChanged: columnOrderChanged
+        } else if (!isFirstRender && (renderState.columnVisibility || renderState.columnOrder)) {
+          // Column visibility or order changes need renderer updates (skip during first render)
+          console.log('VibeGridX: COLUMN CHANGE - Updating renderer only', {
+            hasVisibility: !!renderState.columnVisibility,
+            hasOrder: !!renderState.columnOrder
           });
           if (renderState.columnVisibility && rendererRef.current) {
             rendererRef.current.setColumnVisibility(renderState.columnVisibility);
@@ -695,7 +613,11 @@ export const VibeGridX = <T extends Record<string, any> = any>(
           if (renderState.columnOrder && rendererRef.current) {
             rendererRef.current.setColumnOrder(renderState.columnOrder);
           }
-          // Skip expensive coordinate manager and canvas updates
+          
+          // Trigger full render to update visible columns
+          rendererRef.current!.render(renderState);
+          
+          // Coordinate updates are handled by the table machine
           return;
         } else if (changedRows.length > 0) {
           // Only specific rows changed - update those rows only
@@ -739,7 +661,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       subscription.unsubscribe();
       subscriptionRef.current = null;
     };
-  }, [tableActor, hasDataChanged, getChangedRows, extractRenderStateFromActor, onPerformanceUpdate]); // Add all dependencies
+  }, [tableActor, getChangedRows, extractRenderStateFromActor, onPerformanceUpdate]); // Simplified dependencies
   
   // ====================================
   // PUBLIC API

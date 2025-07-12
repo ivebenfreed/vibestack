@@ -389,6 +389,23 @@ export const viewCoordinatorMachine = setup({
       version: ({ context }) => context.version + 1
     }),
     
+    // Helper to persist complete view state
+    persistViewState: ({ context }) => {
+      if (context.entityType && typeof window !== 'undefined') {
+        const viewState = {
+          sortBy: context.sortBy,
+          columnVisibility: context.columnVisibility,
+          columnOrder: context.columnOrder,
+          timestamp: Date.now()
+        };
+        
+        localStorage.setItem(
+          `vibegridx-view-${context.entityType}`,
+          JSON.stringify(viewState)
+        );
+      }
+    },
+    
     notifyParentOfSortChange: ({ context }) => {
       // Send event to parent to trigger re-render
       if (context.sortBy && context.sortBy.length >= 0) {
@@ -772,51 +789,74 @@ export const viewCoordinatorMachine = setup({
     // Get entity type from parent context via input
     const entityType = (input as any).entityType || '';
     
-    // Try to restore persisted sort state
-    const persistedSort = typeof window !== 'undefined' && entityType
-      ? localStorage.getItem(`vibegridx-sort-${entityType}`)
-      : null;
-    
-    const initialSortBy = persistedSort ? JSON.parse(persistedSort) : [];
-    
-    if (initialSortBy.length > 0) {
-      console.log(`ViewCoordinator: Restored sort state for ${entityType}:`, initialSortBy);
-    }
-    
-    // Try to restore persisted column visibility state
-    const persistedColumns = typeof window !== 'undefined' && entityType
-      ? localStorage.getItem(`vibegridx-columns-${entityType}`)
-      : null;
-    
-    // Initialize all columns as visible by default
+    // Initialize defaults
     const defaultVisibility = Object.fromEntries(
       input.columns.map(col => [col.id, true])
     );
+    const defaultOrder = input.columns.map(col => col.id);
     
-    const initialColumnVisibility = persistedColumns 
-      ? { ...defaultVisibility, ...JSON.parse(persistedColumns) }
-      : defaultVisibility;
-    
-    const initialHiddenCount = calculateHiddenCount(initialColumnVisibility);
-    
-    if (persistedColumns) {
-      console.log(`ViewCoordinator: Restored column visibility for ${entityType}, ${initialHiddenCount} hidden`);
-    }
-    
-    // Try to restore persisted column order
-    const persistedOrder = typeof window !== 'undefined' && entityType
-      ? localStorage.getItem(`vibegridx-column-order-${entityType}`)
+    // Try to restore complete persisted view state
+    const persistedViewState = typeof window !== 'undefined' && entityType
+      ? localStorage.getItem(`vibegridx-view-${entityType}`)
       : null;
     
-    // Default column order is the order they were defined
-    const defaultOrder = input.columns.map(col => col.id);
-    const initialColumnOrder = persistedOrder 
-      ? JSON.parse(persistedOrder)
-      : defaultOrder;
+    let initialSortBy: SortConfig[] = [];
+    let initialColumnVisibility = defaultVisibility;
+    let initialColumnOrder = defaultOrder;
     
-    if (persistedOrder) {
-      console.log(`ViewCoordinator: Restored column order for ${entityType}`);
+    if (persistedViewState) {
+      try {
+        const viewState = JSON.parse(persistedViewState);
+        initialSortBy = viewState.sortBy || [];
+        initialColumnVisibility = { ...defaultVisibility, ...(viewState.columnVisibility || {}) };
+        initialColumnOrder = viewState.columnOrder || defaultOrder;
+        
+        console.log(`ViewCoordinator: Restored complete view state for ${entityType}:`, {
+          sortBy: initialSortBy.length,
+          hiddenColumns: calculateHiddenCount(initialColumnVisibility),
+          hasCustomOrder: JSON.stringify(initialColumnOrder) !== JSON.stringify(defaultOrder)
+        });
+        
+        // Clean up old individual localStorage keys
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(`vibegridx-sort-${entityType}`);
+          localStorage.removeItem(`vibegridx-columns-${entityType}`);
+          localStorage.removeItem(`vibegridx-column-order-${entityType}`);
+        }
+      } catch (e) {
+        console.error('ViewCoordinator: Failed to parse persisted view state', e);
+      }
+    } else {
+      // Try to migrate from old individual keys
+      const oldSort = typeof window !== 'undefined' ? localStorage.getItem(`vibegridx-sort-${entityType}`) : null;
+      const oldColumns = typeof window !== 'undefined' ? localStorage.getItem(`vibegridx-columns-${entityType}`) : null;
+      const oldOrder = typeof window !== 'undefined' ? localStorage.getItem(`vibegridx-column-order-${entityType}`) : null;
+      
+      if (oldSort || oldColumns || oldOrder) {
+        if (oldSort) initialSortBy = JSON.parse(oldSort);
+        if (oldColumns) initialColumnVisibility = { ...defaultVisibility, ...JSON.parse(oldColumns) };
+        if (oldOrder) initialColumnOrder = JSON.parse(oldOrder);
+        
+        console.log(`ViewCoordinator: Migrated from old localStorage keys for ${entityType}`);
+        
+        // Save in new format and clean up old keys
+        if (typeof window !== 'undefined') {
+          const viewState = {
+            sortBy: initialSortBy,
+            columnVisibility: initialColumnVisibility,
+            columnOrder: initialColumnOrder,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(`vibegridx-view-${entityType}`, JSON.stringify(viewState));
+          
+          localStorage.removeItem(`vibegridx-sort-${entityType}`);
+          localStorage.removeItem(`vibegridx-columns-${entityType}`);
+          localStorage.removeItem(`vibegridx-column-order-${entityType}`);
+        }
+      }
     }
+    
+    const initialHiddenCount = calculateHiddenCount(initialColumnVisibility);
     
     return {
       entityType,
@@ -917,7 +957,7 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.sort.set': {
-          actions: ['setSortBy', 
+          actions: ['setSortBy', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -931,7 +971,7 @@ export const viewCoordinatorMachine = setup({
         
         'view.column.click': {
           target: 'processing',
-          actions: ['handleColumnClick', 'startProcessing',
+          actions: ['handleColumnClick', 'startProcessing', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -978,7 +1018,7 @@ export const viewCoordinatorMachine = setup({
         
         // Column visibility events
         'view.columns.toggle': {
-          actions: ['toggleColumnVisibility',
+          actions: ['toggleColumnVisibility', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -993,7 +1033,7 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.columns.show.all': {
-          actions: ['showAllColumns',
+          actions: ['showAllColumns', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -1008,7 +1048,7 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.columns.hide.all': {
-          actions: ['hideAllColumns',
+          actions: ['hideAllColumns', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -1023,7 +1063,7 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.columns.visibility.set': {
-          actions: ['setColumnVisibility',
+          actions: ['setColumnVisibility', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -1057,7 +1097,7 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.columns.drag.end': {
-          actions: ['endColumnDrag',
+          actions: ['endColumnDrag', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -1199,7 +1239,7 @@ export const viewCoordinatorMachine = setup({
         },
         
         'view.columns.order.set': {
-          actions: ['setColumnOrder',
+          actions: ['setColumnOrder', 'persistViewState',
             sendParent(({ context }) => ({
               type: 'view.state.changed',
               viewState: {
@@ -1261,7 +1301,26 @@ export const viewCoordinatorMachine = setup({
           },
           {
             target: 'idle',
-            actions: ['completeProcessing', 'markPerformance']
+            actions: [
+              'completeProcessing', 
+              'markPerformance',
+              // Send sorted rows to parent for coordinate system update
+              sendParent(({ event }) => {
+                const processedRows = event.output.rows;
+                const sortBy = event.output.sortBy || [];
+                
+                console.log('ViewCoordinator: Sending sorted rows to parent', {
+                  rowCount: processedRows.length,
+                  sortBy
+                });
+                
+                return {
+                  type: 'view.rows.processed',
+                  rows: processedRows,
+                  sortBy: sortBy
+                };
+              })
+            ]
           }
         ],
         onError: {

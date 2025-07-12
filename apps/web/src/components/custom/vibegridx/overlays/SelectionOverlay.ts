@@ -1,6 +1,7 @@
 import Konva from 'konva';
 import type { ViewportInfo } from '../types';
-import { CoordinateSystem } from './CoordinateSystem';
+import type { CoordinateProvider } from './CoordinateProvider';
+import { CoordinateHelper } from './CoordinateProvider';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 
 // ====================================
@@ -17,7 +18,7 @@ export interface SelectionOverlayConfig {
 
 export class SelectionOverlay {
   private layer: Konva.Layer;
-  private coordinateSystem: CoordinateSystem;
+  private coordinateHelper: CoordinateHelper;
   private config: SelectionOverlayConfig;
   
   // Selection shapes
@@ -28,12 +29,18 @@ export class SelectionOverlay {
   
   constructor(
     layer: Konva.Layer,
-    coordinateSystem: CoordinateSystem,
+    coordinateProvider: CoordinateProvider,
     config: SelectionOverlayConfig
   ) {
     this.layer = layer;
-    this.coordinateSystem = coordinateSystem;
+    this.coordinateHelper = new CoordinateHelper(coordinateProvider);
     this.config = config;
+    
+    // Initial layer setup complete
+    console.log('SelectionOverlay: Created', {
+      layer: this.layer,
+      config: this.config
+    });
   }
   
   updateSelection(selectedCells: Set<string>, viewport: ViewportInfo | null): void {
@@ -44,8 +51,8 @@ export class SelectionOverlay {
       selectedCells: selectedCells.size,
       viewport: !!viewport,
       viewportDetails: viewport,
-      coordinateSystemRows: this.coordinateSystem.rowIndexMap.size,
-      coordinateSystemColumns: this.coordinateSystem.columnIndexMap.size
+      layer: this.layer,
+      stage: this.layer.getStage()
     });
     
     if (!viewport) {
@@ -53,55 +60,52 @@ export class SelectionOverlay {
       return;
     }
     
+    // Get visible cells from the coordinate helper
+    const visibleCells = this.coordinateHelper.getVisibleCells(selectedCells, viewport);
+    
+    console.log('SelectionOverlay: Visible cells', {
+      totalSelected: selectedCells.size,
+      visibleCount: visibleCells.size,
+      viewport: {
+        start: viewport.start,
+        end: viewport.end,
+        scrollTop: viewport.scrollTop,
+        scrollLeft: viewport.scrollLeft
+      }
+    });
+    
     // Remove shapes for deselected cells or cells outside viewport
     for (const [cellKey, shapes] of this.selectionShapes) {
-      if (!selectedCells.has(cellKey)) {
-        // Cell is no longer selected
+      if (!selectedCells.has(cellKey) || !visibleCells.has(cellKey)) {
+        // Cell is no longer selected or not visible
         shapes.rect.destroy();
         shapes.border.destroy();
         this.selectionShapes.delete(cellKey);
-      } else {
-        // Check if selected cell is still in viewport
-        const position = this.getPositionForCell(cellKey, viewport);
-        if (!position) {
-          // Cell is selected but not in viewport, hide it
-          shapes.rect.visible(false);
-          shapes.border.visible(false);
-        }
       }
     }
     
-    // Add/update shapes for selected cells
+    // Add/update shapes for visible selected cells only
     let renderedCount = 0;
-    let skippedCount = 0;
     
-    for (const cellKey of selectedCells) {
-      console.log('SelectionOverlay: Attempting to render cell', cellKey);
-      const rendered = this.renderCell(cellKey, viewport);
+    for (const [cellKey, position] of visibleCells) {
+      const rendered = this.renderCellAtPosition(cellKey, position, viewport);
       if (rendered) {
         renderedCount++;
-      } else {
-        skippedCount++;
       }
     }
     
     console.log('SelectionOverlay: Render summary', {
       totalSelected: selectedCells.size,
+      visibleCells: visibleCells.size,
       rendered: renderedCount,
-      skipped: skippedCount,
       shapeCount: this.selectionShapes.size
     });
     
-    // Only log render summary for large selections with issues (avoid scroll spam)
-    if (selectedCells.size > 100 && skippedCount > 0) {
-      console.log('SelectionOverlay: Render summary', {
-        totalSelected: selectedCells.size,
-        rendered: renderedCount,
-        skipped: skippedCount
-      });
-    }
-    
     // Batch draw to update the canvas
+    console.log('SelectionOverlay: About to batchDraw', {
+      layerChildren: this.layer.children.length,
+      hasStage: !!this.layer.getStage()
+    });
     
     this.layer.batchDraw();
     
@@ -117,45 +121,24 @@ export class SelectionOverlay {
     return true;
   }
   
-  private renderCell(cellKey: string, viewport: ViewportInfo): boolean {
-    const position = this.getPositionForCell(cellKey, viewport);
-    if (!position) {
-      console.log('SelectionOverlay.renderCell: No position for cell', cellKey);
-      // Cell is not in current viewport, skip rendering
-      return false;
-    }
-    
-    const parsed = this.coordinateSystem.parseCellKey(cellKey);
+  private renderCellAtPosition(cellKey: string, position: { x: number; y: number }, viewport: ViewportInfo): boolean {
+    const parsed = this.coordinateHelper.parseCellKey(cellKey);
     if (!parsed) {
-      console.log('SelectionOverlay.renderCell: Failed to parse cell key', cellKey);
       return false;
     }
-    
-    console.log('SelectionOverlay.renderCell: Rendering cell', {
-      cellKey,
-      position,
-      parsed,
-      viewport: {
-        start: viewport.start,
-        end: viewport.end,
-        scrollTop: viewport.scrollTop,
-        height: viewport.height
-      },
-      isInViewport: position.y >= viewport.scrollTop && position.y <= (viewport.scrollTop + viewport.height)
-    });
     
     // Get or create shapes
     let shapes = this.selectionShapes.get(cellKey);
     if (!shapes) {
       const rect = new Konva.Rect({
-        fill: this.config.selectionColor,
-        opacity: 0.1,
+        fill: this.config.selectionColor || 'blue',
+        opacity: 0.2, // Lower opacity for cleaner look
         listening: false
       });
       
       const border = new Konva.Rect({
-        stroke: this.config.selectionBorderColor,
-        strokeWidth: this.config.borderWidth,
+        stroke: this.config.selectionBorderColor || 'red',
+        strokeWidth: this.config.borderWidth || 2,
         fill: 'transparent',
         listening: false
       });
@@ -165,43 +148,54 @@ export class SelectionOverlay {
       
       shapes = { rect, border };
       this.selectionShapes.set(cellKey, shapes);
-    } else {
-      // Make sure existing shapes are visible
-      shapes.rect.visible(true);
-      shapes.border.visible(true);
     }
     
     // Update position and size
-    const width = this.config.dimensionManager?.getColumnWidth(parsed.columnId) || 100;
-    const height = this.config.cellHeight;
+    const width = this.coordinateHelper.getColumnWidth(parsed.columnId);
+    const height = this.coordinateHelper.getRowHeight();
     
-    // Shape positioning working correctly
+    console.log('SelectionOverlay: Rendering cell at calculated position', {
+      cellKey,
+      position,
+      width,
+      height
+    });
     
     shapes.rect.position(position);
     shapes.rect.size({ width, height });
     
-    shapes.border.position(position);
-    shapes.border.size({ width, height });
+    // Adjust border position to account for stroke width
+    const borderOffset = this.config.borderWidth / 2;
+    shapes.border.position({ 
+      x: position.x + borderOffset, 
+      y: position.y + borderOffset 
+    });
+    shapes.border.size({ 
+      width: width - this.config.borderWidth, 
+      height: height - this.config.borderWidth 
+    });
+    
+    // Force shapes to front
+    shapes.rect.moveToTop();
+    shapes.border.moveToTop();
     
     return true;
   }
   
+  
   private getPositionForCell(cellKey: string, viewport: ViewportInfo): { x: number; y: number } | null {
-    const parsed = this.coordinateSystem.parseCellKey(cellKey);
+    const parsed = this.coordinateHelper.parseCellKey(cellKey);
     if (!parsed) {
       console.log('SelectionOverlay.getPositionForCell: Failed to parse key', cellKey);
       return null;
     }
     
-    console.log('SelectionOverlay.getPositionForCell: Getting position for', {
-      cellKey,
-      rowId: parsed.rowId,
-      columnId: parsed.columnId
-    });
+    const position = this.coordinateHelper.getCellPositionWithViewport(parsed.rowId, parsed.columnId, viewport);
     
-    const position = this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
-    
-    console.log('SelectionOverlay.getPositionForCell: Got position', position);
+    // Only log failures if we expected to find a position
+    if (!position && viewport) {
+      // This is normal during initialization - coordinate manager may not be ready
+    }
     
     return position;
   }

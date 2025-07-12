@@ -292,6 +292,10 @@
   background-color: hsl(var(--accent));
 }
 
+.vibegridx-row.vibegridx-row-selected {
+  background-color: hsl(var(--primary) / 0.1);
+}
+
 /* Cells */
 .vibegridx-cell {
   border: 1px solid var(--border);
@@ -363,6 +367,10 @@
   pointer-events: none;
   z-index: 10;
   overflow: hidden;
+  top: 0;
+  left: 0;
+  /* Ensure it's above the DOM elements */
+  z-index: 100;
 }
 
 /* Canvas Overlay (for selection visualization) */
@@ -431,11 +439,16 @@
 /* Selection column styles */
 .vibegridx-selection-header,
 .vibegridx-selection-cell {
-  background-color: var(--background);
+  background-color: hsl(var(--background));
   border-right: 1px solid var(--border);
   position: sticky;
   left: 0;
   z-index: 5;
+}
+
+/* Additional styling for selection cells */
+.vibegridx-selection-cell {
+  border-bottom: 1px solid var(--border);
 }
 
 .vibegridx-checkbox-wrapper {
@@ -460,21 +473,27 @@
   display: block;
   width: 16px;
   height: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid #e5e7eb;
   border-radius: 3px;
-  background: var(--background);
+  background: white;
   position: relative;
   transition: all 0.15s ease;
 }
 
+/* Dark mode checkbox */
+.dark .vibegridx-checkbox-custom {
+  border-color: #374151;
+  background: #1f2937;
+}
+
 .vibegridx-checkbox-wrapper:hover .vibegridx-checkbox-custom {
-  border-color: var(--primary);
-  background: var(--accent);
+  border-color: hsl(var(--primary));
+  background: hsl(var(--accent));
 }
 
 .vibegridx-checkbox-wrapper input[type="checkbox"]:checked ~ .vibegridx-checkbox-custom {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
 }
 
 .vibegridx-checkbox-wrapper input[type="checkbox"]:checked ~ .vibegridx-checkbox-custom::after {
@@ -485,14 +504,14 @@
   top: 2px;
   width: 4px;
   height: 8px;
-  border: solid white;
+  border: solid hsl(var(--primary-foreground));
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
 .vibegridx-checkbox-wrapper input[type="checkbox"]:indeterminate ~ .vibegridx-checkbox-custom {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: hsl(var(--primary));
+  border-color: hsl(var(--primary));
 }
 
 .vibegridx-checkbox-wrapper input[type="checkbox"]:indeterminate ~ .vibegridx-checkbox-custom::after {
@@ -503,7 +522,7 @@
   top: 7px;
   width: 10px;
   height: 2px;
-  background: white;
+  background: hsl(var(--primary-foreground));
   transform: none;
   border: none;
 }

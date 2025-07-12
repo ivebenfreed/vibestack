@@ -1,12 +1,34 @@
 // ====================================
 // VIBEGRIDX COORDINATE MANAGER
 // ====================================
+//
+// Central source of truth for all table element positioning.
+// Handles both absolute positions (in full scrollable content) and 
+// viewport-relative positions for virtualized rendering.
+//
+// IMPORTANT: Row order must be updated by the renderer after sorting
+// to ensure canvas overlays match the visual DOM. The renderer calls
+// updateRows() with the sorted row order during initialize() and render().
+//
+// Flow:
+// 1. Table machine initializes with columns
+// 2. Entity data loaded (unsorted)
+// 3. Renderer receives sorted data and updates coordinate manager
+// 4. Canvas overlays use coordinate manager for positioning
+//
+// ====================================
 
-import type { CellRef, TableRow, Column } from '../types';
+import type { CellRef, TableRow, Column, ViewportInfo } from '../types';
 
 export interface CoordinatePosition {
   rowIndex: number;
   columnIndex: number;
+}
+
+export interface ViewportAwarePosition {
+  absolute: { x: number; y: number };      // Position in full content
+  viewport: { x: number; y: number } | null; // Position in viewport (null if not visible)
+  isVisible: boolean;
 }
 
 export interface RowMapping {
@@ -117,6 +139,12 @@ export class VibeGridXCoordinateManager {
       return mapping;
     });
     
+    console.log('VibeGridXCoordinateManager.updateColumns:', {
+      columnCount: columns.length,
+      columnIds: columns.map(c => c.id),
+      columnMappings: newColumns.map(c => ({ id: c.columnId, index: c.index, offset: c.offset }))
+    });
+    
     this.mapping = {
       ...this.mapping,
       columns: newColumns,
@@ -156,6 +184,143 @@ export class VibeGridXCoordinateManager {
     };
   }
   
+  /**
+   * Get column by ID
+   */
+  getColumn(columnId: string): { id: string; width: number } | null {
+    const columnMapping = this.mapping.columns.find(c => c.columnId === columnId);
+    if (!columnMapping) {
+      return null;
+    }
+    
+    return {
+      id: columnMapping.columnId,
+      width: columnMapping.width
+    };
+  }
+
+  /**
+   * Get cell position with x,y coordinates (absolute positioning)
+   */
+  getCellPosition(rowId: string, columnId: string): { x: number; y: number; row: number; column: number } | null {
+    const cellRef = { rowId, columnId };
+    const position = this.cellRefToPosition(cellRef);
+    
+    if (!position) {
+      return null;
+    }
+    
+    // Get column offset
+    const columnMapping = this.mapping.columns[position.columnIndex];
+    if (!columnMapping) {
+      return null;
+    }
+    
+    // Calculate y position (assuming fixed row height of 40px)
+    const rowHeight = 40;
+    const y = position.rowIndex * rowHeight;
+    
+    console.log('getCellPosition: Row mapping check', {
+      rowId,
+      sortedIndex: position.rowIndex,
+      calculatedY: y,
+      totalRows: this.mapping.rows.length,
+      firstFewRows: this.mapping.rows.slice(0, 5).map(r => ({ id: r.rowId, index: r.sortedIndex }))
+    });
+    
+    return {
+      x: columnMapping.offset,
+      y: y,
+      row: position.rowIndex,
+      column: position.columnIndex
+    };
+  }
+
+  /**
+   * Get viewport-aware cell position
+   * Returns both absolute and viewport-relative positions
+   */
+  getCellPositionWithViewport(rowId: string, columnId: string, viewport: ViewportInfo): ViewportAwarePosition | null {
+    const absolutePos = this.getCellPosition(rowId, columnId);
+    if (!absolutePos) {
+      return null;
+    }
+
+    const rowHeight = 40; // TODO: Get from config
+    const absoluteRowIndex = absolutePos.row;
+    
+    // Check if row is in visible range (with buffer)
+    const bufferRows = 5;
+    const visibleStart = Math.max(0, viewport.start - bufferRows);
+    const visibleEnd = viewport.end + bufferRows;
+    
+    const isVisible = absoluteRowIndex >= visibleStart && absoluteRowIndex <= visibleEnd;
+    
+    if (!isVisible) {
+      return {
+        absolute: { x: absolutePos.x, y: absolutePos.y },
+        viewport: null,
+        isVisible: false
+      };
+    }
+    
+    // Calculate viewport-relative position
+    // Since the canvas is transformed with the scroll offset, we should NOT adjust by viewport.start
+    // The canvas moves with scrollTop, so shapes should be positioned at their absolute Y
+    const viewportY = absolutePos.y;
+    const viewportX = absolutePos.x;
+    
+    console.log('getCellPositionWithViewport: Calculating position', {
+      rowId,
+      absoluteRowIndex,
+      absoluteY: absolutePos.y,
+      viewportStart: viewport.start,
+      viewportEnd: viewport.end,
+      scrollTop: viewport.scrollTop,
+      calculatedViewportY: viewportY
+    });
+    
+    return {
+      absolute: { x: absolutePos.x, y: absolutePos.y },
+      viewport: { x: viewportX, y: viewportY },
+      isVisible: true
+    };
+  }
+
+  /**
+   * Get all visible cells from a set of selected cells
+   */
+  getVisibleCells(selectedCells: Set<string>, viewport: ViewportInfo): Map<string, ViewportAwarePosition> {
+    const visibleCells = new Map<string, ViewportAwarePosition>();
+    
+    for (const cellKey of selectedCells) {
+      const [rowId, columnId] = cellKey.split(':');
+      const position = this.getCellPositionWithViewport(rowId, columnId, viewport);
+      
+      if (position && position.isVisible && position.viewport) {
+        visibleCells.set(cellKey, position);
+      }
+    }
+    
+    return visibleCells;
+  }
+
+  /**
+   * Check if a row is visible in the viewport
+   */
+  isRowVisible(rowId: string, viewport: ViewportInfo): boolean {
+    const rowMapping = this.mapping.rows.find(r => r.rowId === rowId);
+    if (!rowMapping) {
+      return false;
+    }
+    
+    const bufferRows = 5;
+    const visibleStart = Math.max(0, viewport.start - bufferRows);
+    const visibleEnd = viewport.end + bufferRows;
+    
+    return rowMapping.sortedIndex >= visibleStart && rowMapping.sortedIndex <= visibleEnd;
+  }
+
   /**
    * Convert logical position to cell reference
    */

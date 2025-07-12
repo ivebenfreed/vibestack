@@ -1,6 +1,7 @@
 import Konva from 'konva';
 import type { ViewportInfo } from '../types';
-import { CoordinateSystem } from './CoordinateSystem';
+import type { CoordinateProvider } from './CoordinateProvider';
+import { CoordinateHelper } from './CoordinateProvider';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 
 // ====================================
@@ -16,7 +17,7 @@ export interface ClipboardOverlayConfig {
 
 export class ClipboardOverlay {
   private layer: Konva.Layer;
-  private coordinateSystem: CoordinateSystem;
+  private coordinateHelper: CoordinateHelper;
   private config: ClipboardOverlayConfig;
   
   // Clipboard indicator
@@ -24,11 +25,11 @@ export class ClipboardOverlay {
   
   constructor(
     layer: Konva.Layer,
-    coordinateSystem: CoordinateSystem,
+    coordinateProvider: CoordinateProvider,
     config: ClipboardOverlayConfig
   ) {
     this.layer = layer;
-    this.coordinateSystem = coordinateSystem;
+    this.coordinateHelper = new CoordinateHelper(coordinateProvider);
     this.config = {
       copyColor: '#10b981',
       cutColor: '#ef4444',
@@ -82,7 +83,7 @@ export class ClipboardOverlay {
       const position = this.getPositionForCell(cellKey, viewport);
       if (!position) continue;
       
-      const parsed = this.coordinateSystem.parseCellKey(cellKey);
+      const parsed = this.coordinateHelper.parseCellKey(cellKey);
       if (!parsed) continue;
       
       const width = this.config.dimensionManager?.getColumnWidth(parsed.columnId) || 100;
@@ -99,10 +100,10 @@ export class ClipboardOverlay {
   }
   
   private getPositionForCell(cellKey: string, viewport: ViewportInfo): { x: number; y: number } | null {
-    const parsed = this.coordinateSystem.parseCellKey(cellKey);
+    const parsed = this.coordinateHelper.parseCellKey(cellKey);
     if (!parsed) return null;
     
-    return this.coordinateSystem.getCellPositionByIds(parsed.rowId, parsed.columnId, viewport);
+    return this.coordinateHelper.getCellPositionWithViewport(parsed.rowId, parsed.columnId, viewport);
   }
   
   clear(): void {

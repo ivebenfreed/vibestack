@@ -8,21 +8,26 @@ import type {
 } from '../types';
 import { createColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import { createRowDimensionManager } from '../dimensions/RowDimensionManager';
+import { createVibeGridXCoordinateManager } from '../coordinates/VibeGridXCoordinateManager';
+import { createVibeGridXSelectionManager } from '../selection/VibeGridXSelectionManager';
 
 // ====================================
 // ACTOR IMPORTS (will implement these next)
 // ====================================
 
-import { selectionCoordinatorMachine } from './selection-coordinator';
+// SelectionCoordinator removed - using SelectionManager instead
 import { editCoordinatorMachine } from './edit-coordinator';
 import { viewCoordinatorMachine } from './view-coordinator';
 import { dragCoordinatorMachine } from './drag-coordinator';
 import { rowActorMachine } from './row-actor';
 import { overlayMachine } from './overlay-machine';
+// Coordinate coordinator removed - coordinate management handled directly in context
 
 // ====================================
 // HELPER FUNCTIONS
 // ====================================
+
+// Coordinate manager is now managed by coordinate-coordinator actor
 
 const createDefaultContext = (input: TableConfig): TableContext => {
   const initialRowCount = input.initialData?.length || 0;
@@ -33,6 +38,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     id: input.id,
     entityType: input.entityType,
     columns: input.columns || [],
+    rows: [], // Processed rows ready for rendering
     visibleRowIds: initialRowIds, // Initially all rows are visible
     allRowIds: initialRowIds, // Store all row IDs
     settings: {
@@ -49,8 +55,28 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     enableSelectionColumn: input.enableSelectionColumn || false,
     
     // Create dimension managers
-    dimensionManager: createColumnDimensionManager(input.columns || []),
+    dimensionManager: (() => {
+      const manager = createColumnDimensionManager(input.columns || []);
+      if (input.enableSelectionColumn) {
+        manager.setSelectionColumnEnabled(true);
+      }
+      return manager;
+    })(),
     rowDimensionManager: createRowDimensionManager(initialRowCount, rowHeight),
+    
+    // Coordinate manager for centralized positioning
+    coordinateManager: (() => {
+      const manager = createVibeGridXCoordinateManager();
+      // Initialize with columns - always include selection column
+      if (input.columns && input.columns.length > 0) {
+        const columns = [{ id: '__selection', name: 'Select', field: '__selection', width: 48 }, ...input.columns];
+        manager.updateColumns(columns);
+      }
+      return manager;
+    })(),
+    
+    // Selection manager for direct selection handling
+    selectionManager: createVibeGridXSelectionManager(),
     
     actors: {
       selectionCoordinator: null,
@@ -150,7 +176,6 @@ export const tableBaseMachine = setup({
   },
   
   actors: {
-    selectionCoordinator: selectionCoordinatorMachine,
     editCoordinator: editCoordinatorMachine,
     viewCoordinator: viewCoordinatorMachine,
     dragCoordinator: dragCoordinatorMachine,
@@ -171,16 +196,17 @@ export const tableBaseMachine = setup({
           columnIds: context.columns.map(c => c.id)
         });
         
+        // Initialize selection manager with dependencies
+        if (context.selectionManager) {
+          context.selectionManager.setCoordinateManager(context.coordinateManager!);
+          context.selectionManager.updateColumns(context.columns);
+          context.selectionManager.updateVisibleRows(context.visibleRowIds);
+          context.selectionManager.updateAllRows(context.allRowIds);
+        }
+        
         return {
           ...context.actors,
-          selectionCoordinator: spawn('selectionCoordinator', {
-            input: { 
-              entityType: context.entityType,
-              visibleRowIds: context.visibleRowIds,
-              columns: context.columns
-            },
-            systemId: 'selection-coordinator'
-          }),
+          // SelectionCoordinator removed - using SelectionManager instead
           editCoordinator: spawn('editCoordinator', {
           input: { columns: context.columns },
           systemId: 'edit-coordinator'
@@ -211,9 +237,12 @@ export const tableBaseMachine = setup({
         event.type === 'SET_ENTITY_TYPE' ? event.entityType : '',
       columns: ({ event }) => 
         event.type === 'SET_ENTITY_TYPE' ? event.columns : [],
-      dimensionManager: ({ event }) => {
+      dimensionManager: ({ event, context }) => {
         if (event.type === 'SET_ENTITY_TYPE') {
           const manager = createColumnDimensionManager(event.columns);
+          if (context.enableSelectionColumn) {
+            manager.setSelectionColumnEnabled(true);
+          }
           return manager;
         }
         return undefined;
@@ -228,13 +257,17 @@ export const tableBaseMachine = setup({
           const newRowCount = event.entityIds.length;
           context.rowDimensionManager?.setRowCount(newRowCount);
           
-          // Send all rows update to selection coordinator
-          if (context.actors?.selectionCoordinator) {
-            context.actors.selectionCoordinator.send({
-              type: 'ALL_ROWS_CHANGED',
-              rowIds: event.entityIds
-            });
+          // NOTE: Coordinate manager row update removed - renderer will update with sorted data
+          // This ensures coordinate manager always matches what's actually rendered
+          
+          // Update selection manager with all rows
+          if (context.selectionManager) {
+            context.selectionManager.updateAllRows(event.entityIds);
+            // Also update visible rows initially (will be refined by viewport updates)
+            context.selectionManager.updateVisibleRows(event.entityIds);
           }
+          
+          // All rows are now managed by SelectionManager
           
           return event.entityIds;
         }
@@ -277,8 +310,7 @@ export const tableBaseMachine = setup({
       context.settings.enableVirtualScrolling === true,
     canPerformOperation: ({ context, event }) => {
       // Guard against operations when coordinators aren't ready
-      return context.actors.selectionCoordinator !== null && 
-             context.actors.editCoordinator !== null;
+      return context.actors.editCoordinator !== null;
     }
   }
   
@@ -292,16 +324,34 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
-        'spawnCoordinators'
+        'spawnCoordinators',
+        ({ context }) => {
+          console.log('TableMachine: Initializing state completed', {
+            hasSelectionCoordinator: !!context.actors.selectionCoordinator,
+            hasViewCoordinator: !!context.actors.viewCoordinator,
+            hasCoordinateManager: !!context.coordinateManager,
+            coordinateManagerColumns: context.coordinateManager?.getColumnCount() || 0
+          });
+        }
       ],
       
-      after: {
-        100: 'ready' // Small delay to ensure coordinators are spawned
-      }
+      always: 'ready'
     },
     
     ready: {
       type: 'parallel',
+      
+      entry: [
+        ({ context }) => {
+          console.log('TableMachine: Entered ready state', {
+            stateValue: 'ready',
+            hasAllCoordinators: !!(context.actors.selectionCoordinator && 
+                                  context.actors.viewCoordinator),
+            viewCoordinatorState: context.actors.viewCoordinator?.getSnapshot?.()?.value || 'unknown',
+            viewCoordinatorChildren: context.actors.viewCoordinator?.getSnapshot?.()?.children || {}
+          });
+        }
+      ],
       
       states: {
         // Entity management
@@ -313,11 +363,13 @@ export const tableBaseMachine = setup({
                 SET_ENTITY_TYPE: {
                   actions: [
                     'setEntityType',
-                    // Notify coordinators of entity type change
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => ({ type: 'ENTITY_TYPE_CHANGED', entityType: event.entityType })),
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => ({ type: 'COLUMNS_CHANGED', columns: event.columns })),
+                    // Update selection manager with new columns
+                    ({ context, event }) => {
+                      if (context.selectionManager && event.type === 'SET_ENTITY_TYPE') {
+                        context.selectionManager.updateColumns(event.columns);
+                      }
+                    },
+                    // Update edit coordinator with columns
                     sendTo(({ context }) => context.actors.editCoordinator!, 
                       ({ event }) => ({ type: 'COLUMNS_CHANGED', columns: event.columns }))
                   ]
@@ -326,7 +378,10 @@ export const tableBaseMachine = setup({
                 SET_VISIBLE_ENTITIES: {
                   target: 'updatingRowActors',
                   actions: 'setVisibleEntities'
-                }
+                },
+                
+                // ROWS_SORTED event removed - coordinate manager is updated directly by renderer
+                // This ensures coordinate manager always matches what's actually displayed
               }
             },
             
@@ -363,64 +418,87 @@ export const tableBaseMachine = setup({
           states: {
             active: {
               on: {
-                // Data events from EntityIntegration
-                'data.entities.updated': {
-                  actions: [
-                    // Update context with new entity data
-                    assign({
-                      version: ({ context }) => context.version + 1,
-                      allRowIds: ({ event }) => Object.keys(event.entities),
-                      // Don't update visibleRowIds here - that should only be updated by viewport events
-                      // visibleRowIds represents what's currently visible in the viewport, not all data
-                    }),
-                    // Log the data update
-                    ({ event }) => {
-                      console.log(`TableMachine: Received ${event.entityType} data update - ${Object.keys(event.entities).length} entities`);
-                    },
-                    // Forward data to view coordinator for processing (sorting/filtering)
-                    ({ context, event }) => {
-                      const viewCoordinator = context.actors.viewCoordinator;
-                      if (viewCoordinator) {
-                        // Convert entities to TableRow format
-                        const rows = Object.values(event.entities).map((entity: any) => ({
-                          id: entity.id,
-                          data: { ...entity },
-                          metadata: {
-                            createdAt: entity.createdAt || new Date(),
-                            updatedAt: entity.updatedAt || new Date(),
-                            version: entity.version || 1,
-                            isNew: entity.isNew || false,
-                            isDirty: entity.isDirty || false
-                          }
-                        }));
-                        
-                        viewCoordinator.send({
-                          type: 'ROWS_UPDATED',
-                          rows
-                        });
-                      }
-                    }
-                  ]
-                },
                 
                 // No-op event (used when view coordinator has no initial state)
                 'noop': {},
                 
+                
                 // View state change from view coordinator
                 'view.state.changed': {
                   actions: [
-                    // Increment version to trigger re-render
+                    // Store filtered visible columns in context for renderer
                     assign({
-                      version: ({ context }) => context.version + 1
+                      visibleColumns: ({ event, context }) => {
+                        // Filter columns to only visible ones
+                        const visibleColumns = context.columns.filter(col => 
+                          event.viewState?.columnVisibility ? event.viewState.columnVisibility[col.id] !== false : true
+                        );
+                        
+                        // Separate selection column from data columns
+                        const selectionColumn = visibleColumns.find(col => col.id === '__selection');
+                        const dataColumns = visibleColumns.filter(col => col.id !== '__selection');
+                        
+                        // Apply column order to data columns only
+                        let orderedDataColumns = dataColumns;
+                        if (event.viewState?.columnOrder && event.viewState.columnOrder.length > 0) {
+                          orderedDataColumns = event.viewState.columnOrder
+                            .filter(colId => colId !== '__selection')
+                            .map(colId => dataColumns.find(col => col.id === colId))
+                            .filter(Boolean);
+                        }
+                        
+                        // Selection column always goes first if it exists
+                        const orderedVisibleColumns = selectionColumn 
+                          ? [selectionColumn, ...orderedDataColumns]
+                          : orderedDataColumns;
+                        
+                        console.log('TableMachine: Storing visible columns in context:', {
+                          totalColumns: context.columns.length,
+                          columnVisibility: event.viewState?.columnVisibility,
+                          visibleAfterFilter: orderedVisibleColumns.length,
+                          columnIds: context.columns.map(c => c.id),
+                          visibleIds: orderedVisibleColumns.map(c => c.id)
+                        });
+                        
+                        return orderedVisibleColumns;
+                      }
                     }),
+                    // Don't increment version yet - wait for data
                     ({ event, context }) => {
-                      console.log('TableMachine: View state changed, triggering re-render', event.viewState);
+                      console.log('TableMachine: View state loaded (not rendering yet)', event.viewState);
+                    },
+                    // Update selection manager with visible columns for arrow navigation
+                    ({ context }) => {
+                      if (context.selectionManager && context.visibleColumns) {
+                        context.selectionManager.updateColumns(context.visibleColumns);
+                      }
+                    },
+                    // Update coordinate manager in context with visible columns
+                    ({ event, context }) => {
+                      // Filter data columns to only visible ones (selection column is always visible)
+                      const visibleDataColumns = context.columns.filter(col => 
+                        event.viewState?.columnVisibility ? event.viewState.columnVisibility[col.id] !== false : true
+                      );
                       
-                      // Persist sort state to localStorage
-                      if (event.viewState?.sortBy && typeof window !== 'undefined') {
-                        const storageKey = `vibegridx-sort-${context.entityType}`;
-                        localStorage.setItem(storageKey, JSON.stringify(event.viewState.sortBy));
-                        console.log(`TableMachine: Persisted sort state for ${context.entityType}`);
+                      // Apply column order to data columns only
+                      let orderedDataColumns = visibleDataColumns;
+                      if (event.viewState?.columnOrder && event.viewState.columnOrder.length > 0) {
+                        orderedDataColumns = event.viewState.columnOrder
+                          .map(colId => visibleDataColumns.find(col => col.id === colId))
+                          .filter(Boolean);
+                      }
+                      
+                      // Selection column always goes first
+                      const selectionColumn = { id: '__selection', name: 'Select', field: '__selection', width: 48 };
+                      const orderedVisibleColumns = [selectionColumn, ...orderedDataColumns];
+                      
+                      // Update coordinate manager with correct visible columns
+                      if (context.coordinateManager) {
+                        console.log('TableMachine: Updating coordinate manager with visible columns', {
+                          columnCount: orderedVisibleColumns.length,
+                          columnIds: orderedVisibleColumns.map(c => c.id)
+                        });
+                        context.coordinateManager.updateColumns(orderedVisibleColumns);
                       }
                     }
                   ]
@@ -440,41 +518,55 @@ export const tableBaseMachine = setup({
                 
                 // Selection events
                 'selection.*': {
-                  guard: 'canPerformOperation',
                   actions: [
                     ({ context, event }) => {
                       console.log('TableMachine: Received selection event', {
                         eventType: event.type,
-                        hasSelectionCoordinator: !!context.actors.selectionCoordinator,
+                        hasSelectionManager: !!context.selectionManager,
                         eventDetails: event
                       });
-                    },
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => {
-                        console.log('TableMachine: Forwarding to selection coordinator', event);
-                        return event;
-                      }),
-                    // Forward to overlay actor for visualization
-                    sendTo(({ context }) => context.actors.overlayActor!, 
-                      ({ event }) => {
-                        // Map selection events to overlay events
-                        if (event.type === 'selection.cell.select') {
-                          return {
-                            type: 'CELL_CLICK',
-                            cellKey: `${event.rowId}:${event.columnId}`,
-                            ctrlKey: event.ctrlKey || false,
-                            shiftKey: event.shiftKey || false,
-                            row: 0, // Will be calculated by overlay
-                            column: 0 // Will be calculated by overlay
-                          };
-                        } else if (event.type === 'selection.bulk.set') {
-                          return {
-                            type: 'SELECTION_UPDATE',
-                            cells: event.selectedCells
-                          };
+                      
+                      // Handle selection events directly through manager
+                      if (context.selectionManager) {
+                        switch (event.type) {
+                          case 'selection.cell.select':
+                            context.selectionManager.selectCell(
+                              event.rowId, 
+                              event.columnId, 
+                              event.ctrlKey || false, 
+                              event.shiftKey || false
+                            );
+                            break;
+                          case 'selection.range.select':
+                            context.selectionManager.selectRange(event.start, event.end);
+                            break;
+                          case 'selection.clear':
+                            context.selectionManager.clearSelection();
+                            break;
+                          case 'selection.checkbox.toggle':
+                            context.selectionManager.toggleRowSelection(event.rowId);
+                            break;
+                          case 'selection.checkbox.all':
+                            context.selectionManager.selectAllRows();
+                            break;
+                          case 'selection.checkbox.none':
+                            context.selectionManager.clearRowSelection();
+                            break;
+                          case 'selection.checkbox.range':
+                            context.selectionManager.selectRowRange(event.startRowId, event.endRowId);
+                            break;
+                          case 'selection.drag.start':
+                            context.selectionManager.startDragSelection(event.startCell.rowId, event.startCell.columnId);
+                            break;
+                          case 'selection.drag.move':
+                            context.selectionManager.updateDragSelection(event.currentCell.rowId, event.currentCell.columnId);
+                            break;
+                          case 'selection.drag.end':
+                            context.selectionManager.endDragSelection();
+                            break;
                         }
-                        return event;
-                      })
+                      }
+                    }
                   ]
                 },
                 
@@ -510,13 +602,12 @@ export const tableBaseMachine = setup({
                         // Get visible row IDs from allRowIds based on viewport indices
                         const visibleIds = context.allRowIds.slice(event.viewport.start, event.viewport.end);
                         
-                        // Send updated visible rows to selection coordinator
-                        if (context.actors.selectionCoordinator) {
-                          context.actors.selectionCoordinator.send({
-                            type: 'VISIBLE_ROWS_CHANGED',
-                            rowIds: visibleIds
-                          });
+                        // Update selection manager with visible rows
+                        if (context.selectionManager) {
+                          context.selectionManager.updateVisibleRows(visibleIds);
                         }
+                        
+                        // Visible rows are now managed by SelectionManager
                         
                         return visibleIds;
                       }
@@ -680,67 +771,38 @@ export const tableBaseMachine = setup({
                     ({ event }) => event)
                 },
                 
-                // Coordinate manager events
-                'COORDINATE_MANAGER_SET': {
-                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                    ({ event }) => event)
-                },
                 
-                'COORDINATE_MAPPING_CHANGED': {
-                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                    ({ event }) => event)
-                },
+                // Note: Selection state changes are now handled directly by SelectionManager
+                // which updates the canvas overlay without going through events
                 
-                // Selection state changes from selection coordinator
-                'selection.state.changed': {
-                  actions: [
-                    ({ context, event }) => {
-                      console.log('TableMachine: Received selection.state.changed from selection coordinator', {
-                        selectedCellsSize: event.selectedCells?.size || 0,
-                        activeCell: event.activeCell,
-                        hasOverlayActor: !!context.actors.overlayActor
-                      });
-                    },
-                    sendTo(({ context }) => context.actors.overlayActor!, 
-                      ({ event }) => {
-                        const overlayEvent = {
-                          type: 'SELECTION_UPDATE',
-                          cells: event.selectedCells
-                        };
-                        console.log('TableMachine: Forwarding to overlay actor', overlayEvent);
-                        return overlayEvent;
-                      })
-                  ]
-                },
-                
-                // Keyboard events (route to appropriate coordinator)
+                // Keyboard events
                 'keyboard.arrow': {
-                  actions: sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                    ({ event }) => event)
+                  actions: ({ context, event }) => {
+                    // Handle arrow navigation through selection manager
+                    if (context.selectionManager && event.type === 'keyboard.arrow') {
+                      context.selectionManager.moveSelection(event.direction, event.shiftKey || false);
+                    }
+                  }
                 },
                 
                 'keyboard.copy': {
                   actions: [
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => event),
-                    // Also send to overlay actor for visual feedback
+                    // Send to overlay actor for visual feedback
                     sendTo(({ context }) => context.actors.overlayActor!, 
                       ({ context }) => ({ 
                         type: 'COPY',
-                        cells: context.actors.selectionCoordinator?.getSnapshot().context.selectedCells || new Set()
+                        cells: context.selectionManager?.getSelectedCells() || new Set()
                       }))
                   ]
                 },
                 
                 'keyboard.cut': {
                   actions: [
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      ({ event }) => event),
-                    // Also send to overlay actor for visual feedback
+                    // Send to overlay actor for visual feedback
                     sendTo(({ context }) => context.actors.overlayActor!, 
                       ({ context }) => ({ 
                         type: 'CUT',
-                        cells: context.actors.selectionCoordinator?.getSnapshot().context.selectedCells || new Set()
+                        cells: context.selectionManager?.getSelectedCells() || new Set()
                       }))
                   ]
                 },
@@ -768,9 +830,12 @@ export const tableBaseMachine = setup({
                     // Then to edit coordinator to cancel any editing
                     sendTo(({ context }) => context.actors.editCoordinator!, 
                       ({ event }) => event),
-                    // Finally to selection coordinator to clear selection if needed
-                    sendTo(({ context }) => context.actors.selectionCoordinator!, 
-                      () => ({ type: 'selection.clear' }))
+                    // Clear selection through manager
+                    ({ context }) => {
+                      if (context.selectionManager) {
+                        context.selectionManager.clearSelection();
+                      }
+                    }
                   ]
                 },
                 

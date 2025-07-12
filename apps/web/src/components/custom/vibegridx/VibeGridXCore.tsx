@@ -60,27 +60,14 @@ export const useTableConfiguration = (props: InitializationProps) => {
     enableSelectionColumn = false,
   } = props;
 
-  // Get entity data directly from atom and memoize the table config
+  // Memoize stable table config (no dynamic data to prevent machine recreation)
   const tableConfig: TableConfig = useMemo(() => {
-    const adapter = createDomainAdapter(entityType);
-    const entities = adapter.getAll();
-    
     return {
       id: tableId,
       entityType,
       columns, // Use columns from props directly
       enableSelectionColumn,
-      initialData: Object.values(entities).map(entity => ({
-        id: entity.id,
-        data: { ...entity },
-        metadata: {
-          createdAt: entity.createdAt || new Date(),
-          updatedAt: entity.updatedAt || new Date(), 
-          version: entity.version || 1,
-          isNew: entity.isNew || false,
-          isDirty: entity.isDirty || false
-        }
-      })),
+      // No initialData - data comes through entity integration
       settings: {
         enableVirtualScrolling,
         enableGrouping,
@@ -151,15 +138,28 @@ export const useRendererInitialization = (
   useEffect(() => {
     if (!refs.containerRef.current) return;
     
-    // Get dimension managers from table state if available
+    // Get managers from table state
     const dimensionManager = tableState?.context?.dimensionManager;
     const rowDimensionManager = tableState?.context?.rowDimensionManager;
+    const coordinateManager = tableState?.context?.coordinateManager;
+    const selectionManager = tableState?.context?.selectionManager;
+    
+    console.log('useRendererInitialization: Initial render debug:', {
+      hasDimensionManager: !!dimensionManager,
+      hasRowDimensionManager: !!rowDimensionManager,
+      hasCoordinateManager: !!coordinateManager,
+      tableStateValue: tableState?.value,
+      contextKeys: tableState?.context ? Object.keys(tableState.context) : [],
+      coordinateManagerColumnCount: coordinateManager?.getColumnCount?.() || 0,
+      coordinateManagerType: coordinateManager ? coordinateManager.constructor.name : 'null'
+    });
     
     // Initialize atomic renderer with canvas container callback
     refs.rendererRef.current = new AtomicTableRenderer({
       container: refs.containerRef.current,
-      dimensionManager,
+      dimensionManager: coordinateManager || dimensionManager, // Use coordinate manager for positioning
       rowDimensionManager,
+      coordinateManager, // Pass coordinate manager for direct updates
       ...rendererOptions,
       onCanvasContainerReady: (canvasContainer: HTMLElement) => {
         console.log('useRendererInitialization: Canvas container ready inside viewport');
@@ -173,11 +173,16 @@ export const useRendererInitialization = (
           actors: tableState?.context?.actors
         });
         
+        // Store canvas container for deferred overlay initialization
+        (refs as any).canvasContainer = canvasContainer;
+        
+        // Defer overlay creation until actually needed
         if (!refs.canvasOverlayRef.current && tableState?.context?.actors?.overlayActor) {
           console.log('useRendererInitialization: Creating CanvasOverlay');
           refs.canvasOverlayRef.current = new CanvasOverlay(canvasContainer, {
             dimensionManager,
             rowDimensionManager,
+            coordinateManager,
             columns: rendererOptions.columns,
             cellWidth: 120,
             cellHeight: rowDimensionManager?.getRowHeight() || 40,
@@ -199,24 +204,14 @@ export const useRendererInitialization = (
           refs.canvasOverlayRef.current.onFillComplete = 
             rendererOptions.onFillComplete || (() => {});
           
-          console.log('VibeGridX: Canvas Overlay initialized inside scrollable viewport');
-          
-          // Update data mappings if we have integration
-          if (refs.integrationRef.current) {
-            const allEntities = refs.integrationRef.current.getAllEntityData();
-            const allRowIds = Object.keys(allEntities);
-            const columnIds = rendererOptions.columns.map((col: any) => col.id);
-            
-            if (allRowIds.length > 0) {
-              console.log('VibeGridXCore: Updating canvas data mappings on init', {
-                rowCount: allRowIds.length,
-                columnCount: columnIds.length
-              });
-              refs.canvasOverlayRef.current!.updateDataMappings(allRowIds, columnIds);
-            }
-          } else {
-            console.log('VibeGridXCore: No integration available for canvas init');
+          // Connect canvas overlay to selection manager
+          if (selectionManager && refs.canvasOverlayRef.current) {
+            selectionManager.setCanvasOverlay(refs.canvasOverlayRef.current);
           }
+          
+          console.log('VibeGridX: Canvas Overlay initialized inside scrollable viewport with coordinate manager');
+        } else {
+          console.log('VibeGridXCore: No overlay actor available for canvas init');
         }
       }
     });
@@ -241,34 +236,31 @@ export const useSelectionStateSync = (
   useEffect(() => {
     if (!tableActor) return;
     
-    // Subscribe to selection coordinator changes
-    let selectionSubscription: any;
+    // Subscribe to selection manager changes
+    let selectionUnsubscribe: (() => void) | null = null;
     
     const setupSelectionSync = () => {
       const snapshot = tableActor.getSnapshot();
-      const selectionCoordinator = snapshot.context.actors?.selectionCoordinator;
+      const selectionManager = snapshot.context?.selectionManager;
       
-      if (selectionCoordinator) {
-        // Subscribe to selection changes from the coordinator
-        selectionSubscription = selectionCoordinator.subscribe((selectionSnapshot: any) => {
-          const selectedCells = selectionSnapshot.context?.selectedCells || new Set();
+      if (selectionManager) {
+        // Subscribe to selection changes from the manager
+        selectionUnsubscribe = selectionManager.onChange((state: any) => {
+          const selectedCells = state.selectedCells || new Set();
           
           // Only update if there's an actual change
           const currentSize = refs.selectedCellsRef.current.size;
           const newSize = selectedCells.size;
           
           if (currentSize !== newSize || !areSetsEqual(refs.selectedCellsRef.current, selectedCells)) {
-            // Selection updated from coordinator
+            // Selection updated from manager
             
-            // Sync our local ref with coordinator state
+            // Sync our local ref with manager state
             refs.selectedCellsRef.current = new Set(selectedCells);
             
-            // Update canvas if it exists
+            // Canvas overlay is updated directly by selection manager,
+            // but we might need to trigger viewport update
             if (refs.canvasOverlayRef.current) {
-              // Update overlay with selection
-              refs.canvasOverlayRef.current.updateSelection(selectedCells);
-              
-              // Also trigger viewport update to ensure selections are positioned correctly after scroll
               // Get current viewport from table machine
               const tableSnapshot = tableActor.getSnapshot();
               const currentViewport = tableSnapshot?.context?.viewport;
@@ -281,13 +273,13 @@ export const useSelectionStateSync = (
       }
     };
     
-    // Setup sync after coordinator is ready
+    // Setup sync after manager is ready
     const timeoutId = setTimeout(setupSelectionSync, 200);
     
     return () => {
       clearTimeout(timeoutId);
-      if (selectionSubscription) {
-        selectionSubscription.unsubscribe();
+      if (selectionUnsubscribe) {
+        selectionUnsubscribe();
       }
     };
   }, [tableActor]);

@@ -4,7 +4,9 @@ import type { CellRef, ViewportInfo, Column } from '../types';
 import type { OverlayConfig } from './OverlayTypes';
 import { DEFAULT_CONFIG } from './OverlayTypes';
 import { overlayMachine, type OverlayMachineActor } from '../machines/overlay-machine';
-import { CoordinateSystem } from './CoordinateSystem';
+// ActorRef import removed - no longer needed
+import type { VibeGridXCoordinateManager } from '../coordinates/VibeGridXCoordinateManager';
+import type { CoordinateProvider } from './CoordinateProvider';
 import { FillHandleLayer } from './FillHandleLayer';
 import { SelectionOverlay } from './SelectionOverlay';
 import { ClipboardOverlay } from './ClipboardOverlay';
@@ -20,7 +22,7 @@ import type { ColumnDragState, ColumnResizeState } from '../types';
 // SIMPLIFIED CANVAS OVERLAY
 // ====================================
 
-export class CanvasOverlay {
+export class CanvasOverlay implements CoordinateProvider {
   private container: HTMLElement;
   private stage: Konva.Stage;
   private layer: Konva.Layer;
@@ -29,8 +31,8 @@ export class CanvasOverlay {
   // XState machine
   private machine: OverlayMachineActor;
   
-  // Coordinate system
-  private coordinateSystem: CoordinateSystem;
+  // Direct reference to coordinate manager
+  private coordinateManager: VibeGridXCoordinateManager | null = null;
   
   // Feature overlays
   private fillHandleLayer: FillHandleLayer;
@@ -52,25 +54,15 @@ export class CanvasOverlay {
     // Initialize Konva stage
     this.initializeStage();
     
-    // Create main layer
-    this.layer = new Konva.Layer({ name: 'main-layer' });
-    this.stage.add(this.layer);
+    // Create main layer - moved after stage initialization
     
-    // Initialize coordinate system
-    this.coordinateSystem = new CoordinateSystem(
-      { cellWidth: this.config.cellWidth, cellHeight: this.config.cellHeight } as any,
-      this.config.dimensionManager as ColumnDimensionManager
-    );
-    // CRITICAL: Set columns on coordinate system
-    if (this.config.columns) {
-      this.coordinateSystem.columns = this.config.columns;
-      console.log('CanvasOverlay: Set columns on coordinate system', this.config.columns.length);
-    }
+    // Coordinate manager from config or will be set via setCoordinateManager method
+    this.coordinateManager = this.config.coordinateManager || null;
     
-    // Initialize feature overlays
+    // Initialize feature overlays - they will get coordinate manager access via getter
     this.fillHandleLayer = new FillHandleLayer(
       this.stage,
-      this.coordinateSystem,
+      this, // Pass canvas overlay reference instead of coordinate system
       {
         cellHeight: this.config.cellHeight,
         dimensionManager: this.config.dimensionManager as ColumnDimensionManager,
@@ -80,7 +72,7 @@ export class CanvasOverlay {
     
     this.selectionOverlay = new SelectionOverlay(
       this.layer,
-      this.coordinateSystem,
+      this, // Pass self as coordinate provider
       {
         selectionColor: this.config.selectionColor,
         selectionBorderColor: this.config.selectionBorderColor,
@@ -92,7 +84,7 @@ export class CanvasOverlay {
     
     this.clipboardOverlay = new ClipboardOverlay(
       this.layer,
-      this.coordinateSystem,
+      this, // Pass self as coordinate provider
       {
         cellHeight: this.config.cellHeight,
         dimensionManager: this.config.dimensionManager as ColumnDimensionManager
@@ -128,7 +120,9 @@ export class CanvasOverlay {
     );
     
     // Initialize selection column overlay if enabled
-    if (this.config.enableSelectionColumn) {
+    // DISABLED: DOM handles checkbox rendering, we don't need canvas overlay for selection column
+    // The regular SelectionOverlay handles visual feedback for selected cells
+    if (false && this.config.enableSelectionColumn) {
       this.selectionColumnOverlay = new SelectionColumnOverlay(
         this.layer,
         {
@@ -176,24 +170,43 @@ export class CanvasOverlay {
   
   private initializeStage(): void {
     const viewportElement = this.container.closest('.vibegridx-viewport');
-    const width = viewportElement?.clientWidth || 800;
-    const height = viewportElement?.clientHeight || 600;
+    // Use the container's own dimensions which should be 100% of parent
+    const width = this.container.offsetWidth || viewportElement?.clientWidth || 800;
+    const height = this.container.offsetHeight || viewportElement?.clientHeight || 600;
     
     // Ensure container doesn't extend scrollable area
     this.container.style.overflow = 'hidden';
-    this.container.style.width = width + 'px';
-    this.container.style.height = height + 'px';
+    // Don't override the width/height since they're set to 100% in the renderer
+    
+    // Stage initialization with viewport dimensions
+    
+    // Ensure container has an ID for Konva
+    if (!this.container.id) {
+      this.container.id = 'vibegridx-canvas-' + Math.random().toString(36).substr(2, 9);
+    }
     
     this.stage = new Konva.Stage({
-      container: this.container,
+      container: this.container.id,
       width,
       height,
       listening: true
     });
     
+    // Stage created successfully
+    
+    // Check if Konva actually created the canvas
+    // No longer need canvas checks - stage initialization is reliable
+    
+    // Create and add the main layer NOW, after stage is created
+    this.layer = new Konva.Layer({ name: 'main-layer' });
+    this.stage.add(this.layer);
+    
     // Enable pointer events for interactive overlays
     this.stage.content.style.pointerEvents = 'auto';
     this.container.style.pointerEvents = 'none';
+    
+    // Force a draw to ensure canvas is properly initialized
+    this.layer.draw();
   }
   
   private setupMachineSubscription(): void {
@@ -202,11 +215,17 @@ export class CanvasOverlay {
     this.machine.subscribe((snapshot) => {
       const context = snapshot.context;
       
-      console.log('CanvasOverlay: Machine state changed', {
-        selectedCells: context.selectedCells.size,
-        viewport: context.viewport ? 'exists' : 'null',
-        viewportDetails: context.viewport
-      });
+      // Only log if there are actually selections or operations to render
+      if (context.selectedCells.size > 0 || 
+          context.shapesVisible.fillHandle || 
+          context.shapesVisible.fillPreview || 
+          context.shapesVisible.copyIndicator || 
+          context.shapesVisible.dragPreview) {
+        console.log('CanvasOverlay: Machine state changed', {
+          selectedCells: context.selectedCells.size,
+          viewport: context.viewport ? 'exists' : 'null'
+        });
+      }
       
       // Always update all overlays - let each overlay decide if it needs to re-render
       this.updateAllOverlays(context);
@@ -214,7 +233,17 @@ export class CanvasOverlay {
   }
   
   private updateAllOverlays(context: any): void {
-    // Log viewport state for debugging
+    // Skip all overlay updates during initialization if there are no selections and no active operations
+    if (context.selectedCells.size === 0 && 
+        !context.shapesVisible.fillHandle && 
+        !context.shapesVisible.fillPreview && 
+        !context.shapesVisible.copyIndicator && 
+        !context.shapesVisible.dragPreview) {
+      // Skip logging too during init
+      return;
+    }
+    
+    // Log viewport state for debugging only when there are selections
     if (!context.viewport && context.selectedCells.size > 0) {
       console.warn('CanvasOverlay: Trying to render selection but viewport is null', {
         selectedCells: context.selectedCells.size,
@@ -222,13 +251,10 @@ export class CanvasOverlay {
       });
     }
     
-    console.log('CanvasOverlay.updateAllOverlays: Updating overlays', {
-      selectedCells: context.selectedCells.size,
-      viewport: !!context.viewport
-    });
-    
-    // Update selection
-    this.selectionOverlay.updateSelection(context.selectedCells, context.viewport);
+    // Update selection only if there are selected cells
+    if (context.selectedCells.size > 0) {
+      this.selectionOverlay.updateSelection(context.selectedCells, context.viewport);
+    }
     
     // Update fill handle
     if (context.shapesVisible.fillHandle && context.selectedCells.size > 0 && context.viewport) {
@@ -279,12 +305,23 @@ export class CanvasOverlay {
   // PUBLIC API
   // ====================================
   
+  // Set the coordinate manager reference directly
+  setCoordinateManager(manager: VibeGridXCoordinateManager): void {
+    this.coordinateManager = manager;
+    console.log('CanvasOverlay: Coordinate manager set');
+  }
+  
+  // Get coordinate manager
+  getCoordinateManager(): VibeGridXCoordinateManager | null {
+    if (!this.coordinateManager) {
+      console.warn('CanvasOverlay.getCoordinateManager: coordinateManager is null');
+    }
+    return this.coordinateManager;
+  }
+  
+  // DEPRECATED: Remove direct data mapping updates
   updateDataMappings(rowIds: string[], columnIds: string[]): void {
-    console.log('CanvasOverlay.updateDataMappings:', {
-      rowCount: rowIds.length,
-      columnCount: columnIds.length
-    });
-    this.coordinateSystem.updateMappings(rowIds, columnIds);
+    console.warn('CanvasOverlay.updateDataMappings is deprecated - coordinate updates should go through coordinator actor');
   }
   
   updateSelection(selectedCells: Set<string>): void {
@@ -324,8 +361,10 @@ export class CanvasOverlay {
   }
   
   updateViewport(viewport: ViewportInfo): void {
-    // Transform both vertically and horizontally to keep canvas in viewport
-    this.container.style.transform = `translate(${viewport.scrollLeft}px, ${viewport.scrollTop}px)`;
+    // Transform the container to follow the scroll position
+    const scrollLeft = viewport.scrollLeft || 0;
+    const scrollTop = viewport.scrollTop || 0;
+    this.container.style.transform = `translate(${scrollLeft}px, ${scrollTop}px)`;
     
     
     // Get actual viewport element dimensions (not from viewport parameter which may be wrong)
@@ -343,20 +382,19 @@ export class CanvasOverlay {
     this.container.style.width = actualWidth + 'px';
     this.container.style.height = actualHeight + 'px';
     
-    console.log('CanvasOverlay.updateViewport:', {
-      transform: `translate(${viewport.scrollLeft}px, ${viewport.scrollTop}px)`,
-      stageSize: { width: actualWidth, height: actualHeight },
+    // Log viewport updates for debugging
+    console.log('CanvasOverlay.updateViewport:', { 
+      containerDimensions: {
+        width: actualWidth,
+        height: actualHeight
+      },
       viewport: {
-        scrollTop: viewport.scrollTop,
-        scrollLeft: viewport.scrollLeft,
         start: viewport.start,
         end: viewport.end,
-        height: viewport.height,
-        width: viewport.width,
-        visibleRows: `${viewport.start}-${viewport.end}`
+        scrollTop: viewport.scrollTop,
+        scrollLeft: viewport.scrollLeft
       },
-      containerBounds: this.container.getBoundingClientRect(),
-      stagePosition: { x: this.stage.x(), y: this.stage.y() }
+      containerFixed: true // No transform applied
     });
     
     this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });

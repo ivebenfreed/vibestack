@@ -273,13 +273,18 @@ export const createScrollHandler = (
     }
     lastScrollTime = now;
     
-    console.log('VibeGridXEvents: Sending viewport update to table machine', viewport);
-    
-    // Update viewport in table machine
-    tableSend({
-      type: 'view.viewport.update',
-      viewport
-    });
+    // Skip table machine update during initial viewport setup (no scroll happened)
+    if (viewport.scrollTop === 0 && viewport.scrollLeft === 0) {
+      // Initial viewport - only update canvas overlay, not table machine
+    } else {
+      console.log('VibeGridXEvents: Sending viewport update to table machine', viewport);
+      
+      // Update viewport in table machine
+      tableSend({
+        type: 'view.viewport.update',
+        viewport
+      });
+    }
     
     // Update canvas overlay viewport for correct selection positioning
     if (refs.canvasOverlayRef.current) {
@@ -297,6 +302,15 @@ export const createRendererStateChangeHandler = (
   callbacks: EventHandlerCallbacks
 ) => {
   return useCallback((event: any) => {
+    console.log('[VibeGridXEvents] Renderer state change event:', {
+      type: event.type,
+      typeofType: typeof event.type,
+      exactType: JSON.stringify(event.type),
+      hasRows: !!event.rows,
+      rowCount: event.rows?.length,
+      isMatchingSortedRowsReady: event.type === 'sorted.rows.ready'
+    });
+    
     // Handle renderer-specific events
     if (event.type === 'render.complete') {
       if (event.renderTime > 100) {
@@ -306,8 +320,18 @@ export const createRendererStateChangeHandler = (
       // Note: We don't need to re-render selection after DOM updates anymore
       // because the canvas is inside the scrollable container and moves with the content.
       // The selection will be automatically updated via the selection coordinator subscription.
+    } else if (event.type === 'rows.sorted') {
+      // Forward the sorted row IDs to the table machine
+      const tableActor = refs.tableActorRef.current;
+      if (tableActor) {
+        tableActor.send({
+          type: 'ROWS_SORTED',
+          rowIds: event.rowIds,
+          sortBy: event.sortBy
+        });
+      }
     }
-  }, []);
+  }, [refs]);
 };
 
 // ====================================
@@ -395,6 +419,11 @@ export const createMouseDownHandler = (
     const rowId = cellElement.dataset.rowId;
     const columnId = cellElement.dataset.columnId;
     if (!rowId || !columnId) return;
+    
+    // Skip if clicking on a checkbox - let the checkbox handler deal with it
+    if (columnId === '__selection' || (event.target as Element).closest('.vibegridx-checkbox-wrapper')) {
+      return;
+    }
     
     // Focus the grid container to enable keyboard events
     const gridContainer = cellElement.closest('.vibegridx-container') as HTMLElement;

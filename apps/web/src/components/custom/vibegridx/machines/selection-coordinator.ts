@@ -12,6 +12,8 @@ import type { VibeGridXCoordinateManager, CoordinatePosition } from '../coordina
 // HELPER FUNCTIONS
 // ====================================
 
+// Helper function removed - no longer needed since we get coordinateManager directly
+
 const createCellKey = (rowId: string, columnId: string): string => `${rowId}:${columnId}`;
 
 const parseCellKey = (cellKey: string): CellRef => {
@@ -176,7 +178,6 @@ type SelectionEvents =
   | { type: 'VISIBLE_ROWS_CHANGED'; rowIds: string[] }
   | { type: 'ALL_ROWS_CHANGED'; rowIds: string[] }
   | { type: 'COLUMNS_CHANGED'; columns: any[] }
-  | { type: 'COORDINATE_MANAGER_SET'; coordinateManager: VibeGridXCoordinateManager }
   | { type: 'COORDINATE_MAPPING_CHANGED' }
   | { type: 'FILL_START'; cellRef: CellRef; value: any }
   | { type: 'FILL_EXTEND'; targetRef: CellRef }
@@ -232,6 +233,7 @@ export const selectionCoordinatorMachine = setup({
       },
       
       selectedPositions: ({ context, event }) => {
+        // Use coordinate manager from context
         if (event.type !== 'selection.cell.select' || !context.coordinateManager) {
           return context.selectedPositions;
         }
@@ -368,6 +370,15 @@ export const selectionCoordinatorMachine = setup({
         return {};
       }
       
+      const currentPosition = context.coordinateManager.cellRefToPosition(context.activeCell);
+      console.log('SelectionCoordinator: Current position before move', {
+        activeCell: context.activeCell,
+        currentPosition,
+        direction: event.direction,
+        totalColumns: context.coordinateManager.getColumnCount(),
+        columnIds: context.coordinateManager.getColumnIds()
+      });
+      
       const newCell = context.coordinateManager.moveCellRef(
         context.activeCell,
         event.direction
@@ -377,6 +388,11 @@ export const selectionCoordinatorMachine = setup({
       
       const cellKey = createCellKey(newCell.rowId, newCell.columnId);
       const newPosition = context.coordinateManager.cellRefToPosition(newCell);
+      
+      console.log('SelectionCoordinator: New position after move', {
+        newCell,
+        newPosition
+      });
       
       if (!newPosition) return {};
       
@@ -443,7 +459,49 @@ export const selectionCoordinatorMachine = setup({
     
     updateColumns: assign({
       columns: ({ event }) => 
-        event.type === 'COLUMNS_CHANGED' ? event.columns : []
+        event.type === 'COLUMNS_CHANGED' ? event.columns : [],
+      
+      // Clear active cell if it's on a hidden column
+      activeCell: ({ context, event }) => {
+        if (event.type !== 'COLUMNS_CHANGED') return context.activeCell;
+        
+        if (!context.activeCell) return null;
+        
+        // Check if the active cell's column is still visible
+        const columnStillVisible = event.columns.some(col => col.id === context.activeCell.columnId);
+        
+        if (!columnStillVisible) {
+          console.log('SelectionCoordinator: Clearing active cell - column is now hidden', context.activeCell.columnId);
+          return null;
+        }
+        
+        return context.activeCell;
+      },
+      
+      // Clear selections on hidden columns
+      selectedCells: ({ context, event }) => {
+        if (event.type !== 'COLUMNS_CHANGED') return context.selectedCells;
+        
+        const visibleColumnIds = new Set(event.columns.map(col => col.id));
+        const newSelectedCells = new Set<string>();
+        
+        // Filter out cells on hidden columns
+        for (const cellKey of context.selectedCells) {
+          const [rowId, columnId] = cellKey.split(':');
+          if (visibleColumnIds.has(columnId)) {
+            newSelectedCells.add(cellKey);
+          }
+        }
+        
+        if (newSelectedCells.size !== context.selectedCells.size) {
+          console.log('SelectionCoordinator: Filtered out cells on hidden columns', {
+            before: context.selectedCells.size,
+            after: newSelectedCells.size
+          });
+        }
+        
+        return newSelectedCells;
+      }
     }),
     
     updateAllRows: assign({
@@ -459,15 +517,11 @@ export const selectionCoordinatorMachine = setup({
       }
     }),
     
-    // Coordinate manager actions
-    setCoordinateManager: assign({
-      coordinateManager: ({ event }) => {
-        if (event.type === 'COORDINATE_MANAGER_SET') {
-          console.log('SelectionCoordinator: Setting coordinate manager', {
-            hasManager: !!event.coordinateManager,
-            managerType: event.coordinateManager?.constructor?.name
-          });
-          return event.coordinateManager;
+    // Coordinate coordinator actions
+    setCoordinateCoordinator: assign({
+      coordinateCoordinator: ({ event }) => {
+        if (event.type === 'COORDINATE_COORDINATOR_SET') {
+          return event.coordinator;
         }
         return null;
       }
@@ -531,7 +585,7 @@ export const selectionCoordinatorMachine = setup({
     visibleRowIds: input.visibleRowIds || [],
     allRowIds: input.allRowIds || [],
     columns: input.columns || [],
-    coordinateManager: null,
+    coordinateManager: input.coordinateManager || null,
     selectedCells: new Set(),
     selectedRows: new Set(),
     selectedPositions: new Set(),
@@ -620,11 +674,42 @@ export const selectionCoordinatorMachine = setup({
                 }
                 return newSelectedRows;
               },
+              selectedCells: ({ context, event }) => {
+                const newSelectedCells = new Set(context.selectedCells);
+                const rowId = event.rowId;
+                
+                // Get all column IDs (excluding __selection)
+                const columnIds = context.columns
+                  .filter(col => col.id !== '__selection')
+                  .map(col => col.id);
+                
+                // Check if row is currently selected
+                const isRowSelected = context.selectedRows.has(rowId);
+                
+                if (!isRowSelected) {
+                  // Select all cells in the row
+                  columnIds.forEach(columnId => {
+                    newSelectedCells.add(`${rowId}:${columnId}`);
+                  });
+                } else {
+                  // Deselect all cells in the row
+                  columnIds.forEach(columnId => {
+                    newSelectedCells.delete(`${rowId}:${columnId}`);
+                  });
+                }
+                
+                return newSelectedCells;
+              },
               lastSelectedRowId: ({ event }) => event.rowId
             }),
             sendParent(({ context }) => ({
               type: 'selection.rows.changed',
               selectedRows: context.selectedRows
+            })),
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
             }))
           ]
         },
@@ -633,11 +718,31 @@ export const selectionCoordinatorMachine = setup({
           actions: [
             assign({
               selectedRows: ({ context }) => new Set(context.visibleRowIds),
+              selectedCells: ({ context }) => {
+                const newSelectedCells = new Set<string>();
+                const columnIds = context.columns
+                  .filter(col => col.id !== '__selection')
+                  .map(col => col.id);
+                
+                // Select all cells for all visible rows
+                context.visibleRowIds.forEach(rowId => {
+                  columnIds.forEach(columnId => {
+                    newSelectedCells.add(`${rowId}:${columnId}`);
+                  });
+                });
+                
+                return newSelectedCells;
+              },
               lastSelectedRowId: ({ context }) => context.visibleRowIds[context.visibleRowIds.length - 1] || null
             }),
             sendParent(({ context }) => ({
               type: 'selection.rows.changed',
               selectedRows: context.selectedRows
+            })),
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
             }))
           ]
         },
@@ -646,11 +751,17 @@ export const selectionCoordinatorMachine = setup({
           actions: [
             assign({
               selectedRows: () => new Set(),
+              selectedCells: () => new Set(),
               lastSelectedRowId: () => null
             }),
             sendParent(() => ({
               type: 'selection.rows.changed',
               selectedRows: new Set()
+            })),
+            sendParent(({ context }) => ({
+              type: 'selection.state.changed',
+              selectedCells: context.selectedCells,
+              activeCell: context.activeCell
             }))
           ]
         },
@@ -747,18 +858,12 @@ export const selectionCoordinatorMachine = setup({
           actions: 'updateColumns'
         },
         
-        // Coordinate manager events
-        COORDINATE_MANAGER_SET: {
+        // Coordinate coordinator events
+        COORDINATE_COORDINATOR_SET: {
           actions: [
-            'setCoordinateManager', 
+            'setCoordinateCoordinator', 
             'syncSelectionToPositions',
-            ({ event, context }) => {
-              console.log('SelectionCoordinator: COORDINATE_MANAGER_SET', {
-                hasCoordinateManager: !!event.coordinateManager,
-                coordinateManagerMethods: event.coordinateManager ? Object.getOwnPropertyNames(Object.getPrototypeOf(event.coordinateManager)) : [],
-                contextHasManager: !!context.coordinateManager
-              });
-            }
+            // Silent coordinator binding
           ]
         },
         

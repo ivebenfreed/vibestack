@@ -183,6 +183,8 @@ export class EntityIntegrationLayer {
     if (columns) {
       this.columns = columns;
     }
+    
+    
     // No need to initialize - table machine already has config from input
     this.setupEntityDataSubscription();
   }
@@ -209,6 +211,21 @@ export class EntityIntegrationLayer {
       case 'task':
         console.log('EntityIntegration: Setting up task domain subscription');
         
+        // Get initial data and send it
+        const initialTasks = tasksAtom.get();
+        const taskCount = Object.keys(initialTasks).length;
+        
+        // Send initial entity IDs to table machine
+        if (this.tableActor && taskCount > 0) {
+          const entityIds = Object.keys(initialTasks);
+          this.tableActor.send({
+            type: 'SET_VISIBLE_ENTITIES',
+            entityIds
+          });
+        }
+        
+        this.handleEntityDataChange(initialTasks);
+        
         // Subscribe to tasksAtom changes using XState store subscription
         const taskUnsubscribe = tasksAtom.subscribe((newTasks) => {
           this.handleEntityDataChange(newTasks);
@@ -221,6 +238,10 @@ export class EntityIntegrationLayer {
       case 'project':
         console.log('EntityIntegration: Setting up project domain subscription');
         
+        // Get initial data and send it
+        const initialProjects = projectsAtom.get();
+        this.handleEntityDataChange(initialProjects);
+        
         // Subscribe to projectsAtom changes
         const projectUnsubscribe = projectsAtom.subscribe((newProjects) => {
           this.handleEntityDataChange(newProjects);
@@ -230,6 +251,10 @@ export class EntityIntegrationLayer {
         
       case 'user':
         console.log('EntityIntegration: Setting up user domain subscription');
+        
+        // Get initial data and send it
+        const initialUsers = usersAtom.get();
+        this.handleEntityDataChange(initialUsers);
         
         // Subscribe to usersAtom changes
         const userUnsubscribe = usersAtom.subscribe((newUsers) => {
@@ -243,19 +268,11 @@ export class EntityIntegrationLayer {
     }
   }
   
-  // Handle entity data changes from domain layer using proper XState events
+  // Handle entity data changes from domain layer - data flows directly to renderer via useSelector
   private handleEntityDataChange(entities: Record<string, any>) {
-    if (!this.tableActor) return;
-    
-    const entityType = this.adapter.getEntityType();
-    
-    // Send single event for data update - machine will handle render internally
-    this.tableActor.send({
-      type: 'data.entities.updated',
-      entityType,
-      entities,
-      timestamp: Date.now()
-    });
+    // No XState events needed - renderer subscribes directly to atoms
+    const entityCount = Object.keys(entities).length;
+    console.log(`EntityIntegration: ${entityCount} ${this.adapter.getEntityType()} entities updated in atoms`);
   }
   
   // Convert domain entity to table row

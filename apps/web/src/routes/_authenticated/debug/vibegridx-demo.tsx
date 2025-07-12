@@ -17,6 +17,7 @@ import {
   getRelationshipColumns,
   type VibeGridXColumn 
 } from '@repo/dataforge/vibegridx-columns';
+import { createOptimizedLoader } from '@/domain/ensure-loaded';
 
 // Import actual domain atoms
 import { useTaskAtoms, taskUtils, updateTaskUI, createTaskUI, deleteTaskUI } from '@/domain/task';
@@ -24,6 +25,7 @@ import { useProjectAtoms, projectUtils, updateProjectUI, createProjectUI, delete
 import { useUserAtoms, userUtils, updateUserUI, createUserUI, deleteUserUI } from '@/domain/user';
 
 export const Route = createFileRoute('/_authenticated/debug/vibegridx-demo')({
+  loader: createOptimizedLoader(['tasks', 'projects', 'users']),
   component: VibeGridXDemoPage,
 });
 
@@ -222,6 +224,7 @@ function VibeGridXDemoGrid({
 }: VibeGridXDemoGridProps) {
   // Original VibeGridX doesn't have a useVibeGridX hook, we'll manage state locally
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<CellRef | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
   
@@ -254,10 +257,11 @@ function VibeGridXDemoGrid({
             <Badge variant="outline" className="text-xs">Atomic Render</Badge>
             <Badge variant="outline" className="text-xs">Virtual Scroll</Badge>
             <Badge variant="outline" className="text-xs">Canvas Overlays</Badge>
+            <Badge variant="outline" className="text-xs bg-primary/10">Row Selection</Badge>
           </div>
         </div>
         <div className="text-xs text-muted-foreground">
-          {data.length} rows • {selectedCells.size} selected • {editingCell ? 'Editing' : 'Ready'}
+          {data.length} rows • {selectedCells.size} cells • {selectedRows.size} rows selected • {editingCell ? 'Editing' : 'Ready'}
         </div>
       </div>
       
@@ -274,6 +278,7 @@ function VibeGridXDemoGrid({
           enableFiltering={true}
           enableSorting={true}
           enableDragAndDrop={true}
+          enableSelectionColumn={true}
           bufferSize={10}
           onSelectionChange={setSelectedCells}
           onEditingChange={setEditingCell}
@@ -359,13 +364,7 @@ function VibeGridXDemoPage() {
     };
   }, [projects, users]);
   
-  // Ensure data is loaded on mount
-  useEffect(() => {
-    entityOperations.refreshData();
-    // Also ensure projects and users are loaded
-    projectUtils.ensureLoaded();
-    userUtils.ensureLoaded();
-  }, [entityOperations.refreshData]);
+  // Data is now loaded in the route loader, no need to load here
   
   
   // ====================================
@@ -755,6 +754,7 @@ function VibeGridXDemoPage() {
                 <li>✅ Direct DOM Performance</li>
                 <li>✅ Entity Integration Layer</li>
                 <li>✅ Hybrid React + Direct DOM</li>
+                <li>✅ Checkbox Selection Column</li>
               </ul>
             </div>
             <div className="space-y-2">

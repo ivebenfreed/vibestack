@@ -7,6 +7,7 @@ import type { CellRef, ViewportInfo } from '../types';
 export interface OverlayConfig {
   dimensionManager?: any; // Will be typed as ColumnDimensionManager
   rowDimensionManager?: any; // Will be typed as RowDimensionManager
+  coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager
   columns?: any[]; // Column array for coordinate calculations
   overlayActor: any; // REQUIRED: Overlay machine actor from table machine (single source of truth)
   enableSelectionColumn?: boolean; // Enable selection column with checkboxes

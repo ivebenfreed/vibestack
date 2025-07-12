@@ -56,14 +56,13 @@ export class SelectionColumnOverlay {
   
   private initialize(): void {
     // Create background rectangle for the selection column
+    // Remove stroke since DOM already handles borders
     this.backgroundRect = new Konva.Rect({
       x: 0,
       y: 0,
       width: this.config.columnWidth!,
       height: 2000, // Will be updated based on viewport
-      fill: this.config.backgroundColor,
-      stroke: this.config.borderColor,
-      strokeWidth: 1,
+      fill: 'transparent', // Make transparent since DOM handles background
       listening: false
     });
     

@@ -146,6 +146,7 @@ export class AtomicTableRenderer {
   private columnVisibility: Record<string, boolean> = {};
   private visibleColumns: Column[] = [];
   private dimensionManager: ColumnDimensionManager | null = null;
+  private coordinateManager: any = null; // VibeGridXCoordinateManager
   private rowHeight = 40; // Default row height
   private relationshipData: any = {}; // Relationship data for lookups
   private enableSelectionColumn = false; // Whether to show selection column
@@ -157,6 +158,7 @@ export class AtomicTableRenderer {
   constructor(options: RendererOptions) {
     this.options = options;
     this.dimensionManager = options.dimensionManager || null;
+    this.coordinateManager = options.coordinateManager || null;
     this.relationshipData = options.relationshipData || {};
     this.enableSelectionColumn = options.enableSelectionColumn || false;
     
@@ -226,9 +228,10 @@ export class AtomicTableRenderer {
     canvasOverlay.style.position = 'absolute';
     canvasOverlay.style.top = '0';
     canvasOverlay.style.left = '0';
-    // Don't set width/height - let Konva handle it based on viewport
+    canvasOverlay.style.width = '100%';  // Cover the full content width
+    canvasOverlay.style.height = '100%'; // Cover the full content height
     canvasOverlay.style.pointerEvents = 'none'; // Canvas is display only, DOM cells handle events
-    canvasOverlay.style.zIndex = '10';
+    canvasOverlay.style.zIndex = '100';  // Higher z-index to ensure it's on top
     this.body.appendChild(canvasOverlay);
     
     // Canvas overlay will be added to body after it has content
@@ -261,21 +264,79 @@ export class AtomicTableRenderer {
     this.updateHeaderDimensions();
   }
   
-  setColumnOrder(order: string[]): void {
-    console.log('[AtomicTableRenderer] Setting column order:', order);
+  // Initialize renderer with complete configuration - single render
+  initialize(state: RenderState): void {
+    // Initialize with render state
     
-    // Reorder columns based on the provided order
+    try {
+      // Set all configuration at once without triggering updates
+      if (state.columnVisibility) {
+        this.columnVisibility = state.columnVisibility;
+      }
+      
+      if (state.columnOrder && state.columnOrder.length > 0) {
+        this.applyColumnOrder(state.columnOrder);
+      }
+      
+      if (state.columns && state.columns.length > 0) {
+        this.columns = state.columns;
+      }
+      
+      // Update virtual grid with row count first
+      if (this.virtualGrid && typeof this.virtualGrid.setRowCount === 'function') {
+        this.virtualGrid.setRowCount(state.rows.length);
+      }
+      
+      // Update coordinate manager with actual row order being rendered
+      if (this.coordinateManager && state.rows.length > 0) {
+        // IMPORTANT: Update coordinate manager to match rendered row order
+        // This is the single source of truth for row positions in the table
+        // The coordinate manager is used by canvas overlays to position selection shapes
+        // We update it here after sorting to ensure overlays match the visual DOM
+        const rows = state.rows.map((row, index) => ({ id: row.id }));
+        this.coordinateManager.updateRows(rows, state.sortBy || []);
+      }
+      
+      // Single update and direct render without column reconfiguration
+      this.updateVisibleColumns();
+      this.renderDirectly(state);
+    } catch (error) {
+      console.error('[AtomicTableRenderer] Initialize error:', error);
+    }
+  }
+  
+  // Direct render without column configuration updates
+  private renderDirectly(state: RenderState): void {
+    this.lastRenderState = state;
+    
+    try {
+      // Batch all DOM writes together before reading dimensions
+      this.renderHeader(state);
+      
+      // Use requestAnimationFrame to defer dimension reading until after browser paint
+      requestAnimationFrame(() => {
+        this.updateViewport(state);
+        this.renderVisibleRows(state);
+        this.applyOptimisticOperations(state.optimisticOperations);
+      });
+    } catch (error) {
+      console.error('[AtomicTableRenderer] Render error:', error);
+    }
+  }
+  
+  // Apply column order without triggering updates (for batch operations)
+  private applyColumnOrder(order: string[]): void {
     const orderedColumns: Column[] = [];
     
-    // First add columns in the specified order
+    // First pass: add columns in the specified order
     for (const columnId of order) {
-      const column = this.columns.find(col => col.id === columnId);
+      const column = this.columns.find(c => c.id === columnId);
       if (column) {
         orderedColumns.push(column);
       }
     }
     
-    // Then add any columns not in the order (in case of mismatch)
+    // Second pass: add any remaining columns not in the order
     for (const column of this.columns) {
       if (!order.includes(column.id)) {
         orderedColumns.push(column);
@@ -283,16 +344,13 @@ export class AtomicTableRenderer {
     }
     
     this.columns = orderedColumns;
+  }
+  
+  setColumnOrder(order: string[]): void {
+    console.log('[AtomicTableRenderer] Setting column order:', order);
+    this.applyColumnOrder(order);
     this.updateVisibleColumns();
-    
-    // Update header dimensions and trigger re-render
     this.updateHeaderDimensions();
-    
-    // Re-render the header with new order
-    const currentState = this.getLastRenderState();
-    if (currentState) {
-      this.renderHeader(currentState);
-    }
   }
 
   private getLastRenderState(): RenderState | null {
@@ -304,12 +362,6 @@ export class AtomicTableRenderer {
     this.visibleColumns = this.columns.filter(column => {
       // Column is visible if not explicitly hidden
       return this.columnVisibility[column.id] !== false;
-    });
-    
-    console.log('[AtomicTableRenderer] Updated visible columns:', {
-      totalColumns: this.columns.length,
-      visibleColumns: this.visibleColumns.length,
-      hiddenColumns: this.columns.length - this.visibleColumns.length
     });
   }
 
@@ -346,8 +398,26 @@ export class AtomicTableRenderer {
   setDimensionManager(manager: ColumnDimensionManager): void {
     this.dimensionManager = manager;
     
+    // If this is a coordinate manager, sync visible columns
+    if (manager && typeof manager.getColumnIds === 'function') {
+      const coordinateColumnIds = manager.getColumnIds();
+      console.log('AtomicTableRenderer: Syncing visible columns with coordinate manager', {
+        coordinateManagerColumns: coordinateColumnIds,
+        rendererColumns: this.visibleColumns.map(c => c.id)
+      });
+      
+      // Update renderer's visible columns to match coordinate manager
+      this.visibleColumns = coordinateColumnIds.map(id => {
+        return this.columns.find(col => col.id === id) || { id, name: id, field: id, width: 120 };
+      }).filter(Boolean);
+      
+      console.log('AtomicTableRenderer: Updated visible columns', {
+        newVisibleColumns: this.visibleColumns.map(c => c.id)
+      });
+    }
+    
     // Subscribe to dimension changes
-    manager.subscribe((event) => {
+    manager.subscribe?.((event) => {
       // Handle dimension changes - could trigger re-render of affected cells
       console.log('AtomicTableRenderer: Column dimension changed', event);
       
@@ -365,10 +435,8 @@ export class AtomicTableRenderer {
     // Calculate total width based on visible columns only
     let totalWidth = 0;
     
-    // Add selection column width if enabled
-    if (this.enableSelectionColumn) {
-      totalWidth += 48; // Fixed width for selection column
-    }
+    // Selection column is always included
+    totalWidth += 48; // Fixed width for selection column
     
     this.visibleColumns.forEach(column => {
       totalWidth += this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
@@ -384,17 +452,17 @@ export class AtomicTableRenderer {
     // Calculate offset based on visible columns that come before this column
     let offset = 0;
     
-    // Add selection column width if enabled
-    if (this.enableSelectionColumn) {
-      offset += 48; // Fixed width for selection column
-    }
+    // Selection column is always included and goes first
+    offset += 48; // Fixed width for selection column
     
     for (const column of this.visibleColumns) {
       if (column.id === columnId) {
         break;
       }
-      offset += this.dimensionManager.getColumnWidth(column.id) || column.width || 120;
+      const columnWidth = this.dimensionManager.getColumnWidth(column.id) || column.width || 120;
+      offset += columnWidth;
     }
+    
     
     return offset;
   }
@@ -526,43 +594,36 @@ export class AtomicTableRenderer {
     console.log('[AtomicTableRenderer] render called with state version:', state.version);
     this.renderStartTime = performance.now();
     
-    // Apply sorting to rows if sort configuration exists
-    let sortedState = state;
-    if (state.sortBy && state.sortBy.length > 0) {
-      console.log('[AtomicTableRenderer] Applying sort:', state.sortBy);
-      const sortedRows = this.applySorting(state.rows, state.sortBy);
-      sortedState = {
-        ...state,
-        rows: sortedRows
-      };
-    }
-    
-    this.lastRenderState = sortedState; // Store sorted state for scroll updates
+    // Rows are already pre-sorted by render state extractor
+    this.lastRenderState = state;
     
     // Update columns if provided in state
-    if (sortedState.columns && sortedState.columns.length > 0) {
-      this.setColumns(sortedState.columns);
+    if (state.columns && state.columns.length > 0) {
+      this.setColumns(state.columns);
     }
     
-    // Update column visibility if provided in state
-    if (sortedState.columnVisibility) {
-      this.setColumnVisibility(sortedState.columnVisibility);
+    // Update coordinate manager with actual row order being rendered
+    if (this.coordinateManager && state.rows.length > 0) {
+      // IMPORTANT: Update coordinate manager to match rendered row order
+      // This is the single source of truth for row positions in the table
+      // The coordinate manager is used by canvas overlays to position selection shapes
+      // We update it here after sorting to ensure overlays match the visual DOM
+      const rows = state.rows.map((row, index) => ({ id: row.id }));
+      this.coordinateManager.updateRows(rows, state.sortBy || []);
     }
     
-    // Apply column order from render state
-    if (sortedState.columnOrder && sortedState.columnOrder.length > 0) {
-      this.setColumnOrder(sortedState.columnOrder);
-    }
+    // Skip column configuration updates in render - should use initialize() instead
+    // Column visibility and order are set during initialization or via dedicated methods
     
     try {
       // Batch all DOM writes together before reading dimensions
-      this.renderHeader(sortedState);
+      this.renderHeader(state);
       
       // Use requestAnimationFrame to defer dimension reading until after browser paint
       requestAnimationFrame(() => {
-        this.updateViewport(sortedState);
-        this.renderVisibleRows(sortedState);
-        this.applyOptimisticOperations(sortedState.optimisticOperations);
+        this.updateViewport(state);
+        this.renderVisibleRows(state);
+        this.applyOptimisticOperations(state.optimisticOperations);
         
         // Move performance timing to RAF callback
         this.lastRenderTime = performance.now() - this.renderStartTime;
@@ -701,11 +762,21 @@ export class AtomicTableRenderer {
   setSelectedRows(selectedRows: Set<string>): void {
     this.selectedRows = new Set(selectedRows);
     
-    // Update all visible row checkboxes
+    // Update all visible row checkboxes and row styles
     this.rowElements.forEach((rowElement, rowId) => {
+      const isSelected = this.selectedRows.has(rowId);
+      
+      // Update checkbox
       const checkbox = rowElement.querySelector('.vibegridx-row-checkbox') as HTMLInputElement;
       if (checkbox) {
-        checkbox.checked = this.selectedRows.has(rowId);
+        checkbox.checked = isSelected;
+      }
+      
+      // Update row style
+      if (isSelected) {
+        rowElement.classList.add('vibegridx-row-selected');
+      } else {
+        rowElement.classList.remove('vibegridx-row-selected');
       }
     });
     
@@ -760,7 +831,6 @@ export class AtomicTableRenderer {
   }
   
   private renderHeader(state: RenderState): void {
-    console.log('[AtomicTableRenderer] renderHeader called');
     if (!state.rows.length) return;
     
     // Use visible columns from configuration if available, otherwise generate from data
@@ -775,9 +845,11 @@ export class AtomicTableRenderer {
           sortable: true
         }));
     
+    
     // Calculate total width for header
     const totalWidth = this.getTotalColumnsWidth();
     this.header.style.width = `${totalWidth}px`;
+    
     
     // Get current sort state from render state (if available)
     const sortState = (state as any).sortBy || [];
@@ -785,8 +857,8 @@ export class AtomicTableRenderer {
     // Build header HTML
     let headerHTML = '';
     
-    // Add selection column header if enabled
-    if (this.enableSelectionColumn) {
+    // Add selection column header (always included)
+    {
       const allSelected = this.selectedRows.size === state.rows.length && state.rows.length > 0;
       const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
       
@@ -805,18 +877,17 @@ export class AtomicTableRenderer {
     }
     
     // Header rendered with columns
-    headerHTML += columnsToRender.map(column => {
+    headerHTML += columnsToRender.map((column, index) => {
       const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
       const field = column.field || column.id;
+      const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
+      
       
       // Find sort info for this column
       const sortInfo = sortState.find((s: any) => s.field === field);
       const sortIndex = sortInfo ? sortState.indexOf(sortInfo) : -1;
       
-      // Debug log
-      if (sortInfo) {
-        console.log(`[AtomicTableRenderer] Column ${column.id} has sort:`, sortInfo);
-      }
+      // Sort info available for styling
       
       // Add sort class if column is sorted
       let sortClass = '';
@@ -944,6 +1015,7 @@ export class AtomicTableRenderer {
     rowElement.style.borderBottom = '1px solid var(--border)';
     rowElement.style.boxSizing = 'border-box';
     
+    
     // Render cells
     this.renderRowCells(row, rowElement);
     
@@ -975,8 +1047,8 @@ export class AtomicTableRenderer {
     // Create cells with proper positioning
     let cellsHTML = '';
     
-    // Add selection checkbox cell if enabled
-    if (this.enableSelectionColumn) {
+    // Add selection checkbox cell (always included)
+    {
       const isRowSelected = this.selectedRows.has(row.id);
       cellsHTML += `
         <div class="vibegridx-cell vibegridx-selection-cell" 
@@ -997,11 +1069,12 @@ export class AtomicTableRenderer {
         </div>`;
     }
     
-    columnsToRender.forEach(column => {
+    columnsToRender.forEach((column, index) => {
       const cellKey = `${row.id}:${column.id}`;
       const value = row.data[column.field || column.id];
       const width = this.dimensionManager?.getColumnWidth(column.id) || column.width || 120;
-      const xOffset = this.dimensionManager?.getColumnOffset(column.id) || 0;
+      const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
+      
       
       // Fast path: Skip complex state for normal cells (95% of cases)
       const isSelected = this.selectedCells.has(cellKey);
@@ -1041,8 +1114,16 @@ export class AtomicTableRenderer {
       }
     });
     
-    // Add checkbox event listeners if selection column is enabled
-    if (this.enableSelectionColumn) {
+    // Add checkbox event listeners (selection column is always enabled)
+    {
+      // Prevent cell selection on checkbox wrapper click
+      const checkboxWrapper = rowElement.querySelector('.vibegridx-checkbox-wrapper') as HTMLElement;
+      if (checkboxWrapper) {
+        checkboxWrapper.addEventListener('click', (event) => {
+          event.stopPropagation();
+        });
+      }
+      
       const rowCheckbox = rowElement.querySelector('.vibegridx-row-checkbox') as HTMLInputElement;
       if (rowCheckbox) {
         rowCheckbox.addEventListener('click', (event) => {
@@ -1132,11 +1213,23 @@ export class AtomicTableRenderer {
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
     
+    // Get the row element to find its position
+    const rowElement = cellElement.closest(`.${CSS_CLASSES.ROW}`) as HTMLElement;
+    const rowTop = rowElement ? parseInt(rowElement.style.top || '0', 10) : -1;
+    const rowIndex = rowTop >= 0 ? Math.floor(rowTop / 40) : -1; // 40px row height
+    
     console.log('[AtomicTableRenderer] Cell clicked:', {
       rowId,
       columnId,
       element: cellElement,
-      cellText: cellElement.textContent?.trim()
+      cellText: cellElement.textContent?.trim(),
+      rowElement,
+      rowTop,
+      calculatedRowIndex: rowIndex,
+      viewport: {
+        scrollTop: this.viewport.scrollTop,
+        visibleRange: this.virtualGrid.getVisibleRange()
+      }
     });
     
     // Ensure viewport has focus for keyboard events

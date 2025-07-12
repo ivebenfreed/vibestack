@@ -30,28 +30,6 @@ export const useChangeDetection = () => {
     rowData: new Map()
   });
 
-  const hasDataChanged = useCallback((snapshot: any): boolean => {
-    const currentVersion = snapshot.context?.version || 0;
-    const previousVersion = previousState.current.version;
-    
-    // Only log on actual data changes, not on every scroll event
-    if (previousVersion === undefined || currentVersion !== previousVersion) {
-      console.log('VibeGridX.hasDataChanged:', {
-        currentVersion,
-        previousVersion,
-        isFirstRender: previousVersion === undefined,
-        willRender: true
-      });
-    }
-    
-    // First render or version changed
-    if (previousVersion === undefined || currentVersion !== previousVersion) {
-      previousState.current.version = currentVersion;
-      return true;
-    }
-    return false;
-  }, []);
-
   const getChangedRows = useCallback((renderState: RenderState): { 
     changedRows: TableRow[],
     newRows: TableRow[],
@@ -101,35 +79,8 @@ export const useChangeDetection = () => {
     return { changedRows, newRows, deletedRowIds, isStructuralChange };
   }, []);
 
-  const hasSelectionChanged = useCallback((renderState: RenderState): boolean => {
-    const currentSelectedSize = renderState.selectedCells.size;
-    const currentEditingId = renderState.editingCell?.rowId + ':' + renderState.editingCell?.columnId;
-    
-    const previousSelectedSize = previousState.current.selectedCellsSize || 0;
-    const previousEditingId = previousState.current.editingCellId || '';
-    
-    const hasChanged = currentSelectedSize !== previousSelectedSize || currentEditingId !== previousEditingId;
-    
-    if (hasChanged) {
-      console.log('VibeGridX.hasSelectionChanged: Selection changed', {
-        previousSize: previousSelectedSize,
-        currentSize: currentSelectedSize,
-        previousEditingId,
-        currentEditingId,
-        selectedCells: Array.from(renderState.selectedCells).slice(0, 5)
-      });
-      previousState.current.selectedCellsSize = currentSelectedSize;
-      previousState.current.editingCellId = currentEditingId;
-      return true;
-    }
-    return false;
-  }, []);
-
   return {
-    hasDataChanged,
-    getChangedRows,
-    hasSelectionChanged,
-    previousState
+    getChangedRows
   };
 };
 
@@ -137,135 +88,107 @@ export const useChangeDetection = () => {
 // RENDER STATE EXTRACTION
 // ====================================
 
-export const useRenderStateExtractor = (
-  integrationRef: React.MutableRefObject<EntityIntegrationLayer | null>
-) => {
+export const useRenderStateExtractor = (integrationRef: React.MutableRefObject<EntityIntegrationLayer | null>) => {
   const extractRenderStateFromActor = useCallback((snapshot: any, providedColumns?: Column[]): RenderState | null => {
-    if (!integrationRef.current) {
-      console.warn('extractRenderStateFromActor: No integration layer available');
-      return null;
-    }
-    
     try {
-      // Get entity data from integration layer
+      // Get state from table machine context
+      const context = snapshot.context;
+      if (!context) {
+        console.warn('getRenderState: No context available');
+        return null;
+      }
+      
+      // Get fresh data directly from integration (atoms)
+      if (!integrationRef.current) {
+        console.warn('getRenderState: No integration layer available');
+        return null;
+      }
+      
+      // Get fresh entity data from atoms
       const entityData = integrationRef.current.getAllEntityData();
-      // Use provided columns if available, otherwise get from integration
-      const columns = providedColumns || integrationRef.current.getColumns();
       
-      // Only log during initial render or when entity count changes
-      const entityCount = Object.keys(entityData).length;
-      console.log(`extractRenderStateFromActor: ${entityCount} entities, ${columns.length} columns`, {
-        columnIds: columns.map(c => c.id),
-        firstEntity: Object.values(entityData)[0]
-      });
+      // Use visible columns from context if available, otherwise use all columns
+      let columns = context.visibleColumns || providedColumns || context.columns || [];
       
-      // Convert to table rows with proper structure for AtomicTableRenderer
-      const rows = Object.values(entityData).map((entity: any) => {
-        const tableRow = {
-          id: entity.id,
-          data: { ...entity }, // Spread all entity fields into data
-          metadata: {
-            createdAt: entity.createdAt || new Date(),
-            updatedAt: entity.updatedAt || new Date(),
-            version: entity.version || 1,
-            isNew: entity.isNew || false,
-            isDirty: entity.isDirty || false
-          }
-        };
-        
-        return tableRow;
-      });
+      // Column selection priority: visibleColumns > providedColumns > contextColumns
       
-      // Extract state from coordinators (when available)
-      const selectionCoordinator = snapshot.context.actors?.selectionCoordinator;
-      const editCoordinator = snapshot.context.actors?.editCoordinator;
-      const viewCoordinator = snapshot.context.actors?.viewCoordinator;
-      
-      let selectedCells = new Set<string>();
-      let editingCell = null;
-      let groupedData = [];
-      let optimisticOperations = new Map<string, OptimisticOperation>();
-      
-      // Safely extract selection state
-      if (selectionCoordinator) {
-        try {
-          const selectionSnapshot = selectionCoordinator.getSnapshot();
-          selectedCells = selectionSnapshot.context?.selectedCells || new Set();
-          console.log('Extracted selection state:', {
-            hasCoordinator: true,
-            selectedCellsSize: selectedCells.size,
-            selectedCells: Array.from(selectedCells).slice(0, 5)
-          });
-        } catch (error) {
-          console.warn('Failed to get selection coordinator snapshot:', error);
+      // Convert entity data to table rows - UNSORTED for now
+      let rows = Object.values(entityData).map((entity: any) => ({
+        id: entity.id,
+        data: { ...entity },
+        metadata: {
+          createdAt: entity.createdAt || new Date(),
+          updatedAt: entity.updatedAt || new Date(),
+          version: entity.version || 1,
+          isNew: entity.isNew || false,
+          isDirty: entity.isDirty || false
         }
-      } else {
-        console.log('Selection coordinator not available yet');
-      }
+      }));
       
-      // Safely extract edit state
-      if (editCoordinator) {
-        try {
-          const editSnapshot = editCoordinator.getSnapshot();
-          editingCell = editSnapshot.context?.editingCell || null;
-          optimisticOperations = editSnapshot.context?.optimisticOperations || new Map();
-        } catch (error) {
-          console.warn('Failed to get edit coordinator snapshot:', error);
-        }
-      }
-      
-      // Safely extract view state
+      // Get view state from coordinator if available (but don't depend on it)
       let sortBy = [];
       let columnVisibility = {};
       let columnOrder = [];
-      if (viewCoordinator) {
+      
+      if (context.actors?.viewCoordinator) {
         try {
-          const viewSnapshot = viewCoordinator.getSnapshot();
-          groupedData = viewSnapshot.context?.groupedData || [];
-          sortBy = viewSnapshot.context?.sortBy || [];
-          columnVisibility = viewSnapshot.context?.columnVisibility || {};
-          columnOrder = viewSnapshot.context?.columnOrder || [];
-          
-          // Debug log
-          if (sortBy.length > 0) {
-            console.log('[RenderStateExtractor] Extracted sortBy:', sortBy);
+          const viewSnapshot = context.actors.viewCoordinator.getSnapshot();
+          const viewContext = viewSnapshot.context;
+          if (viewContext) {
+            sortBy = viewContext.sortBy || [];
+            columnVisibility = viewContext.columnVisibility || {};
+            columnOrder = viewContext.columnOrder || [];
+            // Successfully retrieved view state
           }
-          if (Object.keys(columnVisibility).length > 0) {
-            const hiddenCount = Object.values(columnVisibility).filter(visible => !visible).length;
-            console.log('[RenderStateExtractor] Extracted columnVisibility:', { hiddenCount });
-          }
-          if (columnOrder.length > 0) {
-            console.log('[RenderStateExtractor] Extracted columnOrder:', columnOrder.length);
-          }
-        } catch (error) {
-          console.warn('Failed to get view coordinator snapshot:', error);
+        } catch (e) {
+          console.warn('[RENDER STATE] Could not get view state from coordinator:', e);
         }
       }
       
-      const renderState = {
-        rows,
-        columns,
-        selectedCells,
-        editingCell,
-        groupedData,
-        optimisticOperations,
-        version: snapshot.context.version || 0,
-        sortBy, // Add sort state to render state
-        columnVisibility, // Add column visibility state to render state
-        columnOrder // Add column order to render state
-      };
+      // Apply sort if we have it
+      if (sortBy && sortBy.length > 0) {
+        // Apply sort to rows
+        rows = rows.sort((a, b) => {
+          for (const sort of sortBy) {
+            const aValue = a.data[sort.field];
+            const bValue = b.data[sort.field];
+            
+            if (aValue === bValue) continue;
+            
+            let comparison = 0;
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
+              comparison = aValue - bValue;
+            } else if (aValue instanceof Date && bValue instanceof Date) {
+              comparison = aValue.getTime() - bValue.getTime();
+            } else {
+              comparison = String(aValue).localeCompare(String(bValue));
+            }
+            
+            return sort.direction === 'desc' ? -comparison : comparison;
+          }
+          return 0;
+        });
+        
+        // Rows sorted successfully
+      }
       
-      console.log('Final render state:', {
-        rowCount: renderState.rows.length,
-        selectedCells: renderState.selectedCells.size,
-        version: renderState.version,
-        firstRowData: renderState.rows[0]?.data
-      });
+      // Build render state
+      const renderState: RenderState = {
+        rows, // May be sorted
+        columns,
+        selectedCells: new Set<string>(), // Empty by default
+        editingCell: null, // No editing by default
+        groupedData: [],
+        optimisticOperations: new Map(),
+        version: context.version || 0,
+        sortBy, // Include for renderer awareness
+        columnVisibility,
+        columnOrder
+      };
       
       return renderState;
     } catch (error) {
       console.error('Error extracting render state:', error);
-      console.error('Snapshot context:', snapshot.context);
       return null;
     }
   }, [integrationRef]);
