@@ -9,23 +9,28 @@ import type { TableContext, TableEvents, TableConfig } from '../../types';
 import { createInitialDimensionsState, dimensionActions } from './slices/dimensions-slice';
 import { createInitialSelectionState, selectionActions } from './slices/selection-slice';
 import { createInitialViewState, viewActions } from './slices/view-slice';
+import { createInitialEditState, editActions } from './slices/edit-slice';
+import { createInitialDragState, dragActions } from './slices/drag-slice';
+import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
 
 // Import event handlers
 import { selectionHandlers } from './event-handlers/selection-handlers';
 import { viewHandlers } from './event-handlers/view-handlers';
 import { keyboardHandlers } from './event-handlers/keyboard-handlers';
+import { editHandlers } from './event-handlers/edit-handlers';
+import { dragHandlers } from './event-handlers/drag-handlers';
 
 // Import helpers
 import { createViewportFromScroll } from './helpers/visual-position-helpers';
 
 // Import actors
-import { editCoordinatorMachine } from '../edit-coordinator';
 import { viewActor, createViewActorInput } from '../view-actor';
-import { dragCoordinatorMachine } from '../drag-coordinator';
 import { rowActorMachine } from '../row-actor';
-import { overlayMachine } from '../overlay-machine';
 import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
+import { editActor } from '../../actors/edit-actor';
+import { dragActor } from '../../actors/drag-actor';
+import { overlayActor } from '../../actors/overlay-actor';
 
 // Import managers (for backward compatibility)
 import { createVibeGridXCoordinateManager } from '../../coordinates/VibeGridXCoordinateManager';
@@ -57,6 +62,15 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     input.settings?.initialViewport
   );
   
+  // Create edit state
+  const editState = createInitialEditState();
+  
+  // Create drag state
+  const dragState = createInitialDragState();
+  
+  // Create overlay state
+  const overlayState = createInitialOverlayState(input.settings?.initialViewport);
+  
   return {
     id: input.id,
     entityType: input.entityType,
@@ -85,6 +99,15 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Spread view state
     ...viewState,
+    
+    // Spread edit state
+    ...editState,
+    
+    // Spread drag state
+    ...dragState,
+    
+    // Spread overlay state
+    ...overlayState,
     
     // Coordinate manager for backward compatibility
     coordinateManager: (() => {
@@ -198,9 +221,9 @@ export const tableBaseMachine = setup({
     rendererActor,
     canvasActor,
     viewActor,
-    editCoordinator: editCoordinatorMachine,
-    dragCoordinator: dragCoordinatorMachine,
-    overlayActor: overlayMachine,
+    editActor,
+    dragActor,
+    overlayActor,
     rowActor: rowActorMachine,
     spawnRowActors,
     updatePerformanceMetrics
@@ -215,6 +238,15 @@ export const tableBaseMachine = setup({
     
     // View actions
     ...viewActions,
+    
+    // Edit actions
+    ...editActions,
+    
+    // Drag actions
+    ...dragActions,
+    
+    // Overlay actions
+    ...overlayActions,
     
     // Additional actions
     logError: ({ event }) => {
@@ -269,13 +301,13 @@ export const tableBaseMachine = setup({
                 coordinateManager: context.coordinateManager
               }
             }),
-            editCoordinator: spawn('editCoordinator', { 
-              id: 'editCoordinator',
+            editActor: spawn('editActor', { 
+              id: 'edit',
               input: {
                 columns: context.columns
               }
             }),
-            dragCoordinator: spawn('dragCoordinator', { id: 'dragCoordinator' })
+            dragActor: spawn('dragActor', { id: 'drag' })
             // viewActor is invoked as needed, not spawned
           })
         })
@@ -307,7 +339,9 @@ export const tableBaseMachine = setup({
             // Include all common event handlers in idle state
             ...selectionHandlers,
             ...viewHandlers,
-            ...keyboardHandlers
+            ...keyboardHandlers,
+            ...editHandlers,
+            ...dragHandlers
           }
         },
         
@@ -316,7 +350,9 @@ export const tableBaseMachine = setup({
           on: {
             // Selection events should be queued or handled
             ...selectionHandlers,
-            ...keyboardHandlers
+            ...keyboardHandlers,
+            ...editHandlers,
+            ...dragHandlers
           },
           
           invoke: {
@@ -406,17 +442,23 @@ export const tableBaseMachine = setup({
       ...keyboardHandlers,
       
       // Edit events
-      'edit.*': {
+      ...editHandlers,
+      
+      // Drag events
+      ...dragHandlers,
+      
+      // Legacy edit events (now handled by edit slice)
+      'edit.legacy.*': {
         actions: sendTo(
-          ({ context }) => context.actors.editCoordinator!,
+          ({ context }) => context.actors.editActor!,
           ({ event }) => event
         )
       },
       
-      // Drag events
-      'drag.*': {
+      // Legacy drag events (now handled by drag slice)
+      'drag.legacy.*': {
         actions: sendTo(
-          ({ context }) => context.actors.dragCoordinator!,
+          ({ context }) => context.actors.dragActor!,
           ({ event }) => event
         )
       },
@@ -446,15 +488,15 @@ export const tableBaseMachine = setup({
           // Update dimension manager
           dimensionActions.resetColumnDimensions,
           
-          // Send to edit coordinator
+          // Send to edit actor
           sendTo(
-            ({ context }) => context.actors.editCoordinator!,
+            ({ context }) => context.actors.editActor!,
             ({ event }) => ({ type: 'COLUMNS_CHANGED', columns: event.columns })
           ),
           
-          // Send entity type to edit coordinator
+          // Send entity type to edit actor
           sendTo(
-            ({ context }) => context.actors.editCoordinator!,
+            ({ context }) => context.actors.editActor!,
             ({ event }) => ({ type: 'ENTITY_TYPE_CHANGED', entityType: event.entityType })
           )
         ]

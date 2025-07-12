@@ -169,20 +169,8 @@ export interface OptimisticOperation {
 // VIEW TYPES
 // ====================================
 
-export interface SortConfig {
-  field: string;
-  direction: 'asc' | 'desc';
-}
-
-export interface FilterConfig {
-  id: string;
-  field: string;
-  operator: FilterOperator;
-  value: any;
-  dataType: 'string' | 'number' | 'date' | 'boolean' | 'select';
-  caseSensitive?: boolean;
-  negate?: boolean;
-}
+// Removed duplicate SortConfig and FilterConfig interfaces
+// Using the type definitions from the top of the file
 
 export type FilterOperator = 
   | 'equals' | 'not_equals'
@@ -208,13 +196,14 @@ export interface GroupNode {
 // ====================================
 
 export interface DraggedItem {
-  type: 'row' | 'column' | 'group';
+  type: 'row' | 'column' | 'group' | 'cell';
   id: string;
+  index?: number;
   data?: any;
 }
 
 export interface DropTarget {
-  type: 'row' | 'column' | 'group';
+  type: 'row' | 'column' | 'group' | 'cell' | 'selection';
   id: string;
   position: 'above' | 'below' | 'left' | 'right';
   valid: boolean;
