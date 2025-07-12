@@ -98,83 +98,35 @@ export const useRenderStateExtractor = (integrationRef: React.MutableRefObject<E
         return null;
       }
       
-      // Get fresh data directly from integration (atoms)
-      if (!integrationRef.current) {
-        console.warn('getRenderState: No integration layer available');
+      // Use processed rows from ViewActor (Strategic Hybrid Approach)
+      // ViewActor has already processed, sorted, and filtered the data
+      let rows = context.rows || [];
+      
+      if (rows.length === 0) {
+        console.log('getRenderState: No processed rows from ViewActor yet');
         return null;
       }
-      
-      // Get fresh entity data from atoms
-      const entityData = integrationRef.current.getAllEntityData();
       
       // Use visible columns from context if available, otherwise use all columns
       let columns = context.visibleColumns || providedColumns || context.columns || [];
       
-      // Column selection priority: visibleColumns > providedColumns > contextColumns
+      console.log('getRenderState: Using processed rows from ViewActor', {
+        rowCount: rows.length,
+        columnsCount: columns.length,
+        hasCoordinateMapping: !!context.coordinateMapping
+      });
       
-      // Convert entity data to table rows - UNSORTED for now
-      let rows = Object.values(entityData).map((entity: any) => ({
-        id: entity.id,
-        data: { ...entity },
-        metadata: {
-          createdAt: entity.createdAt || new Date(),
-          updatedAt: entity.updatedAt || new Date(),
-          version: entity.version || 1,
-          isNew: entity.isNew || false,
-          isDirty: entity.isDirty || false
-        }
-      }));
+      // Get view state directly from TableMachine context
+      const sortBy = context.sortBy || [];
+      const columnVisibility = context.columnVisibility || {};
+      const columnOrder = context.columnOrder || [];
       
-      // Get view state from coordinator if available (but don't depend on it)
-      let sortBy = [];
-      let columnVisibility = {};
-      let columnOrder = [];
-      
-      if (context.actors?.viewCoordinator) {
-        try {
-          const viewSnapshot = context.actors.viewCoordinator.getSnapshot();
-          const viewContext = viewSnapshot.context;
-          if (viewContext) {
-            sortBy = viewContext.sortBy || [];
-            columnVisibility = viewContext.columnVisibility || {};
-            columnOrder = viewContext.columnOrder || [];
-            // Successfully retrieved view state
-          }
-        } catch (e) {
-          console.warn('[RENDER STATE] Could not get view state from coordinator:', e);
-        }
-      }
-      
-      // Apply sort if we have it
-      if (sortBy && sortBy.length > 0) {
-        // Apply sort to rows
-        rows = rows.sort((a, b) => {
-          for (const sort of sortBy) {
-            const aValue = a.data[sort.field];
-            const bValue = b.data[sort.field];
-            
-            if (aValue === bValue) continue;
-            
-            let comparison = 0;
-            if (typeof aValue === 'number' && typeof bValue === 'number') {
-              comparison = aValue - bValue;
-            } else if (aValue instanceof Date && bValue instanceof Date) {
-              comparison = aValue.getTime() - bValue.getTime();
-            } else {
-              comparison = String(aValue).localeCompare(String(bValue));
-            }
-            
-            return sort.direction === 'desc' ? -comparison : comparison;
-          }
-          return 0;
-        });
-        
-        // Rows sorted successfully
-      }
+      // Note: ViewActor has already processed and sorted the rows
+      // No need to apply sorting here - use rows as-is from ViewActor
       
       // Build render state
       const renderState: RenderState = {
-        rows, // May be sorted
+        rows, // Processed and sorted by ViewActor
         columns,
         selectedCells: new Set<string>(), // Empty by default
         editingCell: null, // No editing by default

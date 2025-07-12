@@ -257,7 +257,7 @@ export const coordinateCoordinatorMachine = setup({
           ]
         },
         onError: {
-          target: 'error',
+          target: '#coordinateCoordinator.error',
           actions: ({ event }) => {
             console.error('CoordinateCoordinator: Failed to initialize', event.error);
           }
@@ -356,7 +356,7 @@ export const coordinateCoordinatorMachine = setup({
           ]
         },
         onError: {
-          target: 'error',
+          target: '#coordinateCoordinator.error',
           actions: ({ event }) => {
             console.error('CoordinateCoordinator: Failed to update rows', event.error);
           }

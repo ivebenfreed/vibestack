@@ -132,6 +132,7 @@ export class AtomicTableRenderer {
   private renderStartTime = 0;
   private lastRenderTime = 0;
   private frameId = 0;
+  private lastDimensions = { height: 0, width: 0 };
   
   // State caches
   private rowElements = new Map<string, HTMLElement>();
@@ -287,15 +288,10 @@ export class AtomicTableRenderer {
         this.virtualGrid.setRowCount(state.rows.length);
       }
       
-      // Update coordinate manager with actual row order being rendered
-      if (this.coordinateManager && state.rows.length > 0) {
-        // IMPORTANT: Update coordinate manager to match rendered row order
-        // This is the single source of truth for row positions in the table
-        // The coordinate manager is used by canvas overlays to position selection shapes
-        // We update it here after sorting to ensure overlays match the visual DOM
-        const rows = state.rows.map((row, index) => ({ id: row.id }));
-        this.coordinateManager.updateRows(rows, state.sortBy || []);
-      }
+      // NOTE: Coordinate manager updates removed - now handled by coordinate actor
+      // The TableMachine receives coordinate mappings from the coordinate actor
+      // and provides them to the renderer via render state. This eliminates
+      // the "hackery" of direct method calls and follows proper XState patterns.
       
       // Single update and direct render without column reconfiguration
       this.updateVisibleColumns();
@@ -511,13 +507,14 @@ export class AtomicTableRenderer {
           if (hasViewportChanged) {
             this.renderVisibleRows(this.lastRenderState);
             
-            // Notify that render is complete after scroll
-            this.options.onStateChange?.({
-              type: 'render.complete',
-              renderTime: 0,
-              rowCount: this.lastRenderState.rows.length,
-              visibleRange: this.virtualGrid.getVisibleRange()
-            });
+            // Don't notify render.complete here - let the main render handle it
+            // This prevents duplicate render events during scroll
+            // this.options.onStateChange?.({
+            //   type: 'render.complete',
+            //   renderTime: 0,
+            //   rowCount: this.lastRenderState.rows.length,
+            //   visibleRange: this.virtualGrid.getVisibleRange()
+            // });
           }
         }
         
@@ -602,15 +599,10 @@ export class AtomicTableRenderer {
       this.setColumns(state.columns);
     }
     
-    // Update coordinate manager with actual row order being rendered
-    if (this.coordinateManager && state.rows.length > 0) {
-      // IMPORTANT: Update coordinate manager to match rendered row order
-      // This is the single source of truth for row positions in the table
-      // The coordinate manager is used by canvas overlays to position selection shapes
-      // We update it here after sorting to ensure overlays match the visual DOM
-      const rows = state.rows.map((row, index) => ({ id: row.id }));
-      this.coordinateManager.updateRows(rows, state.sortBy || []);
-    }
+    // NOTE: Coordinate manager updates removed - now handled by coordinate actor
+    // The TableMachine receives coordinate mappings from the coordinate actor
+    // and provides them to the renderer via render state. This eliminates
+    // the "hackery" of direct method calls and follows proper XState patterns.
     
     // Skip column configuration updates in render - should use initialize() instead
     // Column visibility and order are set during initialization or via dedicated methods
@@ -964,18 +956,19 @@ export class AtomicTableRenderer {
       }
     });
     
-    console.log('[AtomicTableRenderer] Virtual dimensions set:', {
-      totalHeight,
-      totalWidth,
-      rowCount: state.rows.length,
-      rowHeight: this.virtualGrid.getRowHeight(),
-      viewportHeight: this.viewport.clientHeight,
-      maxScrollTop: totalHeight - this.viewport.clientHeight,
-      containerHeight: this.container.clientHeight,
-      tableHeight: this.table.clientHeight,
-      viewportScrollHeight: this.viewport.scrollHeight,
-      bodyOffsetHeight: this.body.offsetHeight
-    });
+    // Only log when dimensions actually change
+    if (totalHeight !== this.lastDimensions.height || totalWidth !== this.lastDimensions.width) {
+      console.log('[AtomicTableRenderer] Virtual dimensions changed:', {
+        totalHeight,
+        totalWidth,
+        rowCount: state.rows.length,
+        rowHeight: this.virtualGrid.getRowHeight(),
+        viewportHeight: this.viewport.clientHeight,
+        previousHeight: this.lastDimensions.height,
+        previousWidth: this.lastDimensions.width
+      });
+      this.lastDimensions = { height: totalHeight, width: totalWidth };
+    }
     
     // Canvas overlay is already created in initializeDOM, no need to update its size
     // It will use viewport-based sizing instead of full scrollable area

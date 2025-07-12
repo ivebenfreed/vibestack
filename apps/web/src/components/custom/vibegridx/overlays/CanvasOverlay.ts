@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { createActor } from 'xstate';
 import type { CellRef, ViewportInfo, Column } from '../types';
-import type { OverlayConfig } from './OverlayTypes';
+import type { OverlayConfig, VisualCellPosition } from './OverlayTypes';
 import { DEFAULT_CONFIG } from './OverlayTypes';
 import { overlayMachine, type OverlayMachineActor } from '../machines/overlay-machine';
 // ActorRef import removed - no longer needed
@@ -174,11 +174,36 @@ export class CanvasOverlay implements CoordinateProvider {
     const width = this.container.offsetWidth || viewportElement?.clientWidth || 800;
     const height = this.container.offsetHeight || viewportElement?.clientHeight || 600;
     
-    // Ensure container doesn't extend scrollable area
-    this.container.style.overflow = 'hidden';
-    // Don't override the width/height since they're set to 100% in the renderer
+    console.log('CanvasOverlay.initializeStage:', {
+      containerParent: this.container.parentElement?.className,
+      useFixedPositioning: this.config.useFixedPositioning,
+      containerDimensions: {
+        offsetWidth: this.container.offsetWidth,
+        offsetHeight: this.container.offsetHeight,
+        clientWidth: this.container.clientWidth,
+        clientHeight: this.container.clientHeight
+      },
+      viewportDimensions: viewportElement ? {
+        offsetWidth: viewportElement.offsetWidth,
+        offsetHeight: viewportElement.offsetHeight,
+        scrollWidth: viewportElement.scrollWidth,
+        scrollHeight: viewportElement.scrollHeight
+      } : null,
+      computedWidth: width,
+      computedHeight: height
+    });
     
-    // Stage initialization with viewport dimensions
+    // Configure container based on positioning mode
+    if (this.config.useFixedPositioning) {
+      // For fixed positioning, container should fill its portal parent
+      this.container.style.overflow = 'hidden';
+      this.container.style.position = 'relative';
+      this.container.style.width = '100%';
+      this.container.style.height = '100%';
+    } else {
+      // Legacy behavior for backward compatibility
+      this.container.style.overflow = 'hidden';
+    }
     
     // Ensure container has an ID for Konva
     if (!this.container.id) {
@@ -192,18 +217,38 @@ export class CanvasOverlay implements CoordinateProvider {
       listening: true
     });
     
-    // Stage created successfully
-    
-    // Check if Konva actually created the canvas
-    // No longer need canvas checks - stage initialization is reliable
-    
     // Create and add the main layer NOW, after stage is created
     this.layer = new Konva.Layer({ name: 'main-layer' });
     this.stage.add(this.layer);
     
-    // Enable pointer events for interactive overlays
-    this.stage.content.style.pointerEvents = 'auto';
-    this.container.style.pointerEvents = 'none';
+    // DEBUG: Add a semi-transparent background to visualize canvas bounds
+    const debugColor = this.config.useFixedPositioning ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+    const debugBackground = new Konva.Rect({
+      x: 0,
+      y: 0,
+      width: width,
+      height: height,
+      fill: debugColor, // Green for portal mode, red for legacy
+      listening: false
+    });
+    this.layer.add(debugBackground);
+    // Store reference so we can update it when viewport changes
+    (this as any).debugBackground = debugBackground;
+    
+    // Configure pointer events based on positioning mode
+    if (this.config.useFixedPositioning) {
+      // In portal mode, canvas should not block cell clicks by default
+      // Only enable pointer events on specific interactive elements
+      this.stage.content.style.pointerEvents = 'none';
+      this.container.style.pointerEvents = 'none';
+      
+      // Interactive elements will override this with pointer-events: auto
+      this.stage.listening(false); // Disable global stage listening by default
+    } else {
+      // Legacy behavior
+      this.stage.content.style.pointerEvents = 'auto';
+      this.container.style.pointerEvents = 'none';
+    }
     
     // Force a draw to ensure canvas is properly initialized
     this.layer.draw();
@@ -253,7 +298,18 @@ export class CanvasOverlay implements CoordinateProvider {
     
     // Update selection only if there are selected cells
     if (context.selectedCells.size > 0) {
-      this.selectionOverlay.updateSelection(context.selectedCells, context.viewport);
+      console.log('CanvasOverlay: Updating selection with coordinate mapping from overlay machine', {
+        selectedCells: context.selectedCells.size,
+        hasCoordinateMapping: !!context.coordinateMapping,
+        coordinateVersion: context.coordinateMapping?.version
+      });
+      
+      // Pass coordinate mapping directly to selection overlay - no coordinate manager needed!
+      this.selectionOverlay.updateSelectionWithMapping(
+        context.selectedCells, 
+        context.viewport, 
+        context.coordinateMapping
+      );
     }
     
     // Update fill handle
@@ -319,6 +375,56 @@ export class CanvasOverlay implements CoordinateProvider {
     return this.coordinateManager;
   }
   
+  /**
+   * Update coordinate mapping from coordinate actor (event-driven approach)
+   * This replaces direct coordinate manager updates
+   */
+  updateCoordinates(mapping: any): void {
+    console.log('CanvasOverlay: Received coordinate mapping update:', {
+      version: mapping.version,
+      rowCount: mapping.rows?.length || 0,
+      columnCount: mapping.columns?.length || 0
+    });
+    
+    // Update legacy coordinate manager for now (will remove this)
+    if (this.coordinateManager && mapping) {
+      if (mapping.rows && mapping.rows.length > 0) {
+        // Transform coordinate mapping format to coordinate manager format
+        const transformedRows = mapping.rows.map((row: any) => ({
+          id: row.rowId, // Transform rowId to id
+          data: {} // Minimal data object for coordinate manager
+        }));
+        this.coordinateManager.updateRows(transformedRows, mapping.sortBy || []);
+        console.log('CanvasOverlay: Updated coordinate manager rows', {
+          originalCount: mapping.rows.length,
+          transformedCount: transformedRows.length
+        });
+      }
+      if (mapping.columns && mapping.columns.length > 0) {
+        // Transform coordinate mapping format to coordinate manager format  
+        const transformedColumns = mapping.columns.map((col: any) => ({
+          id: col.columnId, // Transform columnId to id
+          name: col.columnId,
+          field: col.columnId,
+          width: col.width || 120
+        }));
+        this.coordinateManager.updateColumns(transformedColumns);
+        console.log('CanvasOverlay: Updated coordinate manager columns', {
+          originalCount: mapping.columns.length,
+          transformedCount: transformedColumns.length
+        });
+      }
+      console.log('CanvasOverlay: Updated coordinate manager with transformed mapping');
+    }
+    
+    // Force overlay updates with new coordinates
+    // Get current context from machine to update overlays
+    if (this.machine) {
+      const context = this.machine.getSnapshot().context;
+      this.updateAllOverlays(context);
+    }
+  }
+  
   // DEPRECATED: Remove direct data mapping updates
   updateDataMappings(rowIds: string[], columnIds: string[]): void {
     console.warn('CanvasOverlay.updateDataMappings is deprecated - coordinate updates should go through coordinator actor');
@@ -326,6 +432,14 @@ export class CanvasOverlay implements CoordinateProvider {
   
   updateSelection(selectedCells: Set<string>): void {
     this.machine.send({ type: 'SELECTION_UPDATE', cells: selectedCells });
+  }
+  
+  updateSelectionVisual(visualCells: VisualCellPosition[]): void {
+    // Update selection overlay with pre-calculated visual positions
+    this.selectionOverlay.updateWithVisualPositions(visualCells);
+    
+    // Redraw the layer
+    this.layer.batchDraw();
   }
   
   updateColumnDrag(dragState: ColumnDragState | null, mouseX: number, mouseY: number): void {
@@ -361,11 +475,14 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   updateViewport(viewport: ViewportInfo): void {
-    // Transform the container to follow the scroll position
-    const scrollLeft = viewport.scrollLeft || 0;
-    const scrollTop = viewport.scrollTop || 0;
-    this.container.style.transform = `translate(${scrollLeft}px, ${scrollTop}px)`;
+    // Transform with scroll to keep canvas positioned relative to table content
+    this.container.style.transform = `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`;
     
+    console.log('CanvasOverlay.updateViewport with transform:', {
+      scrollTop: viewport.scrollTop,
+      scrollLeft: viewport.scrollLeft || 0,
+      transform: `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`
+    });
     
     // Get actual viewport element dimensions (not from viewport parameter which may be wrong)
     const viewportElement = this.container.closest('.vibegridx-viewport') as HTMLElement;
@@ -378,24 +495,18 @@ export class CanvasOverlay implements CoordinateProvider {
       height: actualHeight
     });
     
-    // Update container size
+    // Update container size to match viewport
     this.container.style.width = actualWidth + 'px';
     this.container.style.height = actualHeight + 'px';
     
-    // Log viewport updates for debugging
-    console.log('CanvasOverlay.updateViewport:', { 
-      containerDimensions: {
+    // DEBUG: Update the background rectangle to match new size
+    if ((this as any).debugBackground) {
+      (this as any).debugBackground.size({
         width: actualWidth,
         height: actualHeight
-      },
-      viewport: {
-        start: viewport.start,
-        end: viewport.end,
-        scrollTop: viewport.scrollTop,
-        scrollLeft: viewport.scrollLeft
-      },
-      containerFixed: true // No transform applied
-    });
+      });
+      this.layer.batchDraw();
+    }
     
     this.machine.send({ type: 'VIEWPORT_UPDATE', viewport });
     

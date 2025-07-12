@@ -1,6 +1,18 @@
 import type { CellRef, ViewportInfo } from '../types';
 
 // ====================================
+// VISUAL POSITION TYPES
+// ====================================
+
+export interface VisualCellPosition {
+  cellKey: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// ====================================
 // OVERLAY CONFIGURATION
 // ====================================
 
@@ -29,6 +41,10 @@ export interface OverlayConfig {
   // Performance
   enableLayerCaching: boolean;
   maxSelectableCells: number;
+  
+  // Portal positioning
+  useFixedPositioning?: boolean; // Use fixed positioning for portal-based overlays
+  documentViewportOffset?: { top: number; left: number }; // Offset from document viewport
 }
 
 export interface OverlayState {

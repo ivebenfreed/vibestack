@@ -364,13 +364,16 @@
 /* Canvas Overlay Container - positioned over data area only */
 .vibegridx-canvas-overlay-container {
   position: absolute;
+  top: 0;
+  left: 0;
   pointer-events: none;
   z-index: 10;
   overflow: hidden;
-  top: 0;
-  left: 0;
   /* Ensure it's above the DOM elements */
   z-index: 100;
+  /* DEBUG: Add border to see canvas bounds */
+  border: 2px solid blue;
+  box-sizing: border-box;
 }
 
 /* Canvas Overlay (for selection visualization) */
@@ -397,6 +400,9 @@
   top: 0;
   left: 0;
   pointer-events: none !important;
+  /* DEBUG: Add green border to see actual canvas element */
+  border: 2px solid green;
+  box-sizing: border-box;
 }
 
 /* Scrollbar Styling */

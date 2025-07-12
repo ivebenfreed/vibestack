@@ -30,15 +30,12 @@ export function VibeGridXHeader({
     
     const subscription = tableActor.subscribe((snapshot) => {
       try {
-        const viewCoordinator = snapshot.context.actors?.viewCoordinator;
-        if (viewCoordinator) {
-          const viewSnapshot = viewCoordinator.getSnapshot();
-          const newColumnVisibility = viewSnapshot.context?.columnVisibility || {};
-          const newHiddenColumnCount = viewSnapshot.context?.hiddenColumnCount || 0;
-          
-          setColumnVisibility(newColumnVisibility);
-          setHiddenColumnCount(newHiddenColumnCount);
-        }
+        // Read column visibility directly from TableMachine context
+        const newColumnVisibility = snapshot.context.columnVisibility || {};
+        const newHiddenColumnCount = snapshot.context.hiddenColumnCount || 0;
+        
+        setColumnVisibility(newColumnVisibility);
+        setHiddenColumnCount(newHiddenColumnCount);
       } catch (error) {
         console.warn('Failed to get column visibility state:', error);
       }

@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useMachine } from '@xstate/react';
+import { tableBaseMachine } from './machines/table-machine';
 import { 
-  useTableConfiguration, 
-  useTableMachine, 
   useEntityIntegration, 
   useRendererInitialization,
   useSelectionStateSync,
   type InitializationRefs 
 } from './VibeGridXCore';
+// PortalCanvasOverlayProvider removed - using embedded canvas approach
 import {
   createCellClickHandler,
   createCellDoubleClickHandler,
@@ -147,17 +148,47 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // CORE INITIALIZATION
   // ====================================
   
-  const { tableConfig, tableId } = useTableConfiguration(props);
-  const { tableState, tableSend, tableActor } = useTableMachine(tableConfig);
+  // Generate stable table ID that persists across renders
+  const tableId = useRef(`vibegridx-${props.entityType}-${Date.now()}`).current;
   
-  // Debug table state for initial render
+  // Create machine with props directly - machine will handle its own state
+  const [tableState, tableSend, tableActor] = useMachine(tableBaseMachine, {
+    input: {
+      id: tableId,
+      entityType: props.entityType,
+      columns: props.columns,
+      enableSelectionColumn: enableSelectionColumn,
+      settings: {
+        enableVirtualScrolling: props.enableVirtualScrolling ?? true,
+        enableGrouping: props.enableGrouping ?? true,
+        enableFiltering: props.enableFiltering ?? true,
+        bufferSize: props.bufferSize ?? 10,
+        initialViewport: {
+          start: 0,
+          end: Math.ceil((typeof height === 'number' ? height : 600) / 40),
+          height: typeof height === 'number' ? height : 600,
+          width: typeof width === 'number' ? width : 800,
+          scrollTop: 0,
+          scrollLeft: 0,
+          itemHeight: 40
+        }
+      }
+    }
+  });
+  
+  // Debug table state only on state transitions, not every update
   useEffect(() => {
-    console.log('VibeGridX: Table state debug:', {
-      tableStateValue: tableState?.value,
-      hasCoordinateManager: !!tableState?.context?.coordinateManager,
-      coordinateManagerColumnCount: tableState?.context?.coordinateManager?.getColumnCount?.() || 0
-    });
-  }, [tableState]);
+    const stateValue = tableState?.value;
+    
+    // Only log on actual state transitions or initial mount
+    if (typeof stateValue === 'string') {
+      console.log('VibeGridX: Table state transition:', {
+        state: stateValue,
+        hasCoordinateManager: !!tableState?.context?.coordinateManager,
+        coordinateManagerColumnCount: tableState?.context?.coordinateManager?.getColumnCount?.() || 0
+      });
+    }
+  }, [tableState?.value]); // Only when state value changes, not context
   
   // Refs object for event handlers
   const refs: InitializationRefs & { columns: Column[] } = {
@@ -223,7 +254,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // Remove wheel event debugging - not needed anymore
   
   useRendererInitialization(refs, {
-    columns: tableConfig.columns,
+    columns: columns,
     relationshipData: relationshipData,
     enableSelectionColumn: enableSelectionColumn,
     onCellClick: handleCellClick,
@@ -543,17 +574,17 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       subscriptionCount++;
       
       const currentVersion = snapshot.context?.version || 0;
-      const viewCoordinatorState = snapshot.context?.actors?.viewCoordinator?.getSnapshot()?.value;
+      const hasProcessedRows = snapshot.context?.rows && snapshot.context.rows.length > 0;
       
       // Simple checks:
-      // 1. Version must change (or be first render)
-      // 2. View coordinator must be ready
+      // 1. Version must change (or be first render)  
+      // 2. Must have processed rows from ViewActor
       if (previousVersion !== undefined && currentVersion === previousVersion) {
         return; // No version change, no render needed
       }
       
-      if (viewCoordinatorState !== 'idle') {
-        return; // View coordinator not ready
+      if (!hasProcessedRows) {
+        return; // No processed rows from ViewActor yet
       }
       
       // Version changed and view is ready - render!
@@ -748,7 +779,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         style={{ width: '100%', height: 'calc(100% - 48px)' }} // Subtract header height
       />
       
-      {/* Canvas Overlay Container will be created inside the viewport by AtomicTableRenderer */}
+      {/* Canvas overlay handled by embedded approach in AtomicTableRenderer */}
+      
+      {/* Legacy Canvas Overlay Container - hidden, kept for backward compatibility */}
       <div
         ref={overlayContainerRef}
         style={{ display: 'none' }}

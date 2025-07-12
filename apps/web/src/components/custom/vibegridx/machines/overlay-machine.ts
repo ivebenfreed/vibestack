@@ -10,6 +10,9 @@ export interface OverlayContext {
   // Viewport information
   viewport: ViewportInfo | null;
   
+  // Coordinate mapping from table machine (single source of truth)
+  coordinateMapping: any | null;
+  
   // Selection state
   selectedCells: Set<string>;
   selectionBounds: { minX: number; minY: number; maxX: number; maxY: number } | null;
@@ -59,7 +62,7 @@ export interface OverlayContext {
 
 export type OverlayEvent =
   | { type: 'VIEWPORT_UPDATE'; viewport: ViewportInfo }
-  | { type: 'CELL_CLICK'; cellKey: string; ctrlKey: boolean; shiftKey: boolean; row: number; column: number }
+  | { type: 'CELL_CLICK'; cellKey: string; ctrlKey: boolean; shiftKey: boolean; row: number; column: number; coordinateMapping?: any }
   | { type: 'RANGE_SELECT'; cells: Set<string>; anchorKey: string; anchorRow: number; anchorColumn: number }
   | { type: 'SELECTION_UPDATE'; cells: Set<string> }
   | { type: 'DRAG_START'; startPos: { x: number; y: number }; startCell: { row: number; column: number } }
@@ -104,6 +107,8 @@ export const overlayMachine = createMachine({
       scrollLeft: 0,
       itemHeight: 40
     } as ViewportInfo,
+    // Coordinate mapping from table machine (single source of truth)
+    coordinateMapping: null,
     selectedCells: new Set(),
     selectionBounds: null,
     anchorCell: null,
@@ -348,6 +353,22 @@ export const overlayMachine = createMachine({
   actions: {
     // Selection actions
     handleCellClick: assign({
+      // Update coordinate mapping from table machine (single source of truth)
+      coordinateMapping: ({ context, event }) => {
+        if (event.type !== 'CELL_CLICK') return context.coordinateMapping;
+        
+        // Store coordinate mapping if provided with the event
+        if (event.coordinateMapping) {
+          console.log('OverlayMachine: Updated coordinate mapping from CELL_CLICK', {
+            version: event.coordinateMapping.version,
+            rowCount: event.coordinateMapping.rows?.length || 0,
+            columnCount: event.coordinateMapping.columns?.length || 0
+          });
+          return event.coordinateMapping;
+        }
+        
+        return context.coordinateMapping;
+      },
       selectedCells: ({ context, event }, params) => {
         if (event.type !== 'CELL_CLICK') return context.selectedCells;
         

@@ -262,34 +262,12 @@ export const createScrollHandler = (
   refs: EventHandlerRefs,
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
-  // Throttle scroll updates to prevent infinite loops
-  let lastScrollTime = 0;
-  const THROTTLE_MS = 16; // ~60fps
-  
   return useCallback((viewport: ViewportInfo) => {
-    const now = performance.now();
-    if (now - lastScrollTime < THROTTLE_MS) {
-      return; // Skip this update
-    }
-    lastScrollTime = now;
-    
-    // Skip table machine update during initial viewport setup (no scroll happened)
-    if (viewport.scrollTop === 0 && viewport.scrollLeft === 0) {
-      // Initial viewport - only update canvas overlay, not table machine
-    } else {
-      console.log('VibeGridXEvents: Sending viewport update to table machine', viewport);
-      
-      // Update viewport in table machine
-      tableSend({
-        type: 'view.viewport.update',
-        viewport
-      });
-    }
-    
-    // Update canvas overlay viewport for correct selection positioning
-    if (refs.canvasOverlayRef.current) {
-      refs.canvasOverlayRef.current.updateViewport(viewport);
-    }
+    // Send viewport update to table machine, which will route to canvas actor for smooth scrolling
+    tableSend({
+      type: 'view.viewport.update',
+      viewport
+    });
   }, [tableSend]);
 };
 
@@ -412,12 +390,18 @@ export const createMouseDownHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((event: MouseEvent) => {
+    console.log('[VibeGridXEvents] Mouse down event triggered', event.target);
+    
     // Find the cell under the mouse
     const cellElement = (event.target as Element).closest('.vibegridx-cell') as HTMLElement;
-    if (!cellElement) return;
+    if (!cellElement) {
+      console.log('[VibeGridXEvents] No cell element found');
+      return;
+    }
     
     const rowId = cellElement.dataset.rowId;
     const columnId = cellElement.dataset.columnId;
+    console.log('[VibeGridXEvents] Cell data:', { rowId, columnId });
     if (!rowId || !columnId) return;
     
     // Skip if clicking on a checkbox - let the checkbox handler deal with it
@@ -451,6 +435,12 @@ export const createMouseDownHandler = (
         ctrlKey: false,
         shiftKey: false
       });
+      
+      // Also send drag start for potential drag selection
+      tableSend({
+        type: 'selection.drag.start',
+        startCell: { rowId, columnId }
+      });
     }
     // For ctrl/shift clicks, let the click handler deal with it
     
@@ -479,11 +469,7 @@ export const createMouseMoveHandler = (
         // Start drag selection
         dragState.isDragging = true;
         lastCellKey = `${dragState.startCell.rowId}:${dragState.startCell.columnId}`;
-        
-        tableSend({
-          type: 'selection.drag.start',
-          startCell: dragState.startCell
-        });
+        // Don't send drag.start here - already sent in mousedown
       }
     }
     
@@ -501,6 +487,7 @@ export const createMouseMoveHandler = (
           
           // Only send update if we've moved to a different cell
           if (currentCellKey !== lastCellKey) {
+            console.log('[VibeGridXEvents] Sending drag move event', { from: lastCellKey, to: currentCellKey });
             lastCellKey = currentCellKey;
             
             // Just send the current cell - let selection coordinator calculate the range

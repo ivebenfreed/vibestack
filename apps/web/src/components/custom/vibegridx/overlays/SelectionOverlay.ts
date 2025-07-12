@@ -3,6 +3,7 @@ import type { ViewportInfo } from '../types';
 import type { CoordinateProvider } from './CoordinateProvider';
 import { CoordinateHelper } from './CoordinateProvider';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import type { VisualCellPosition } from './OverlayTypes';
 
 // ====================================
 // SELECTION OVERLAY
@@ -43,6 +44,145 @@ export class SelectionOverlay {
     });
   }
   
+  /**
+   * Update selection using coordinate mapping directly (pure XState approach)
+   */
+  updateSelectionWithMapping(selectedCells: Set<string>, viewport: ViewportInfo | null, coordinateMapping: any): void {
+    console.log('SelectionOverlay.updateSelectionWithMapping called', {
+      selectedCells: selectedCells.size,
+      viewport: !!viewport,
+      hasCoordinateMapping: !!coordinateMapping,
+      coordinateVersion: coordinateMapping?.version
+    });
+
+    if (selectedCells.size === 0) {
+      this.clearSelection();
+      return;
+    }
+
+    if (!viewport || !coordinateMapping) {
+      console.warn('SelectionOverlay: Missing viewport or coordinate mapping for selection render', {
+        hasViewport: !!viewport,
+        hasCoordinateMapping: !!coordinateMapping
+      });
+      return;
+    }
+
+    // Calculate visible selected cells using coordinate mapping directly
+    const visibleCells = new Set<string>();
+    for (const cellKey of selectedCells) {
+      const [rowId, columnId] = cellKey.split(':');
+      
+      // Find row and column in coordinate mapping
+      const rowIndex = coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
+      const colIndex = coordinateMapping.columns.findIndex((c: any) => c.columnId === columnId);
+      
+      console.log('SelectionOverlay: Checking cell visibility', {
+        cellKey,
+        rowId,
+        columnId,
+        rowIndex,
+        colIndex,
+        viewport: {
+          start: viewport.start,
+          end: viewport.end
+        },
+        isInViewport: rowIndex >= viewport.start && rowIndex <= viewport.end,
+        isValidIndices: rowIndex !== -1 && colIndex !== -1
+      });
+      
+      // Check if cell is in viewport
+      if (rowIndex >= viewport.start && rowIndex <= viewport.end && rowIndex !== -1 && colIndex !== -1) {
+        visibleCells.add(cellKey);
+      }
+    }
+
+    console.log('SelectionOverlay: Visible cells calculated', {
+      totalSelected: selectedCells.size,
+      visibleCount: visibleCells.size,
+      viewport: {
+        start: viewport.start,
+        end: viewport.end
+      }
+    });
+
+    // Remove shapes for deselected cells or cells outside viewport
+    for (const [cellKey, shapes] of this.selectionShapes) {
+      if (!selectedCells.has(cellKey) || !visibleCells.has(cellKey)) {
+        shapes.rect.destroy();
+        shapes.border.destroy();
+        this.selectionShapes.delete(cellKey);
+      }
+    }
+
+    // Add/update shapes for visible selected cells
+    let renderedCount = 0;
+    for (const cellKey of visibleCells) {
+      if (!this.selectionShapes.has(cellKey)) {
+        const [rowId, columnId] = cellKey.split(':');
+        
+        // Calculate position using coordinate mapping
+        const rowIndex = coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
+        const colData = coordinateMapping.columns.find((c: any) => c.columnId === columnId);
+        
+        if (rowIndex !== -1 && colData) {
+          const x = colData.offset || 0;
+          // Use visual row position directly (already adjusted by TableMachine)
+          const y = rowIndex * this.config.cellHeight;
+          const width = colData.width || 120;
+          const height = this.config.cellHeight;
+
+          // Create selection shapes (using same pattern as existing code)
+          const rect = new Konva.Rect({
+            x,
+            y,
+            width,
+            height,
+            fill: this.config.selectionColor || '#3b82f6',
+            opacity: 0.2,
+            listening: false
+          });
+          
+          const border = new Konva.Rect({
+            x,
+            y,
+            width,
+            height,
+            stroke: this.config.selectionBorderColor || '#1d4ed8',
+            strokeWidth: this.config.borderWidth || 2,
+            fill: 'transparent',
+            listening: false
+          });
+          
+          this.layer.add(rect);
+          this.layer.add(border);
+          
+          this.selectionShapes.set(cellKey, { rect, border });
+          renderedCount++;
+          
+          console.log('SelectionOverlay: Created selection shape for cell', {
+            cellKey,
+            position: { x, y, width, height },
+            rowIndex,
+            columnId: colData.columnId
+          });
+        }
+      }
+    }
+
+    console.log('SelectionOverlay: Render summary', {
+      totalSelected: selectedCells.size,
+      visibleCells: visibleCells.size,
+      rendered: renderedCount,
+      shapeCount: this.selectionShapes.size
+    });
+
+    this.layer.batchDraw();
+  }
+
+  /**
+   * Legacy method that uses coordinate manager (will be removed)
+   */
   updateSelection(selectedCells: Set<string>, viewport: ViewportInfo | null): void {
     // Always update when viewport changes, even if selection hasn't
     // This ensures cells become visible when scrolling
@@ -211,5 +351,84 @@ export class SelectionOverlay {
   
   destroy(): void {
     this.clear();
+  }
+  
+  /**
+   * Update selection with pre-calculated visual positions (stateless approach)
+   */
+  updateWithVisualPositions(visualCells: VisualCellPosition[]): void {
+    console.log('SelectionOverlay.updateWithVisualPositions called', {
+      cellCount: visualCells.length
+    });
+    
+    // Build a set of current cell keys for efficient lookup
+    const currentCellKeys = new Set(visualCells.map(vc => vc.cellKey));
+    
+    // Remove shapes for cells no longer selected
+    for (const [cellKey, shapes] of this.selectionShapes) {
+      if (!currentCellKeys.has(cellKey)) {
+        shapes.rect.destroy();
+        shapes.border.destroy();
+        this.selectionShapes.delete(cellKey);
+      }
+    }
+    
+    // Add/update shapes for each visual cell
+    for (const visualCell of visualCells) {
+      // DEBUG: Log the visual position being drawn
+      console.log('SelectionOverlay: Drawing cell at position', {
+        cellKey: visualCell.cellKey,
+        x: visualCell.x,
+        y: visualCell.y,
+        width: visualCell.width,
+        height: visualCell.height
+      });
+      
+      let shapes = this.selectionShapes.get(visualCell.cellKey);
+      
+      if (!shapes) {
+        // Create new shapes
+        const rect = new Konva.Rect({
+          x: visualCell.x,
+          y: visualCell.y,
+          width: visualCell.width,
+          height: visualCell.height,
+          fill: this.config.selectionColor || '#3b82f6',
+          opacity: 0.2,
+          listening: false
+        });
+        
+        const border = new Konva.Rect({
+          x: visualCell.x,
+          y: visualCell.y,
+          width: visualCell.width,
+          height: visualCell.height,
+          stroke: this.config.selectionBorderColor || '#1d4ed8',
+          strokeWidth: this.config.borderWidth || 2,
+          fill: 'transparent',
+          listening: false
+        });
+        
+        this.layer.add(rect);
+        this.layer.add(border);
+        
+        shapes = { rect, border };
+        this.selectionShapes.set(visualCell.cellKey, shapes);
+      } else {
+        // Update existing shapes position and size
+        shapes.rect.position({ x: visualCell.x, y: visualCell.y });
+        shapes.rect.size({ width: visualCell.width, height: visualCell.height });
+        
+        shapes.border.position({ x: visualCell.x, y: visualCell.y });
+        shapes.border.size({ width: visualCell.width, height: visualCell.height });
+      }
+    }
+    
+    console.log('SelectionOverlay: Updated with visual positions', {
+      totalShapes: this.selectionShapes.size,
+      visualCells: visualCells.length
+    });
+    
+    this.layer.batchDraw();
   }
 }

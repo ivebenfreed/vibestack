@@ -42,65 +42,8 @@ export interface InitializationProps {
   enableSelectionColumn?: boolean;
 }
 
-// ====================================
-// TABLE CONFIGURATION HOOK
-// ====================================
-
-export const useTableConfiguration = (props: InitializationProps) => {
-  const {
-    entityType,
-    columns,
-    tableId = `vibegridx-${entityType}-${Date.now()}`,
-    height = 600,
-    width = 800,
-    enableVirtualScrolling = true,
-    enableGrouping = true,
-    enableFiltering = true,
-    bufferSize = 10,
-    enableSelectionColumn = false,
-  } = props;
-
-  // Memoize stable table config (no dynamic data to prevent machine recreation)
-  const tableConfig: TableConfig = useMemo(() => {
-    return {
-      id: tableId,
-      entityType,
-      columns, // Use columns from props directly
-      enableSelectionColumn,
-      // No initialData - data comes through entity integration
-      settings: {
-        enableVirtualScrolling,
-        enableGrouping,
-        enableFiltering,
-        bufferSize,
-        // Calculate initial viewport based on height
-        initialViewport: {
-          start: 0,
-          end: Math.ceil((typeof height === 'number' ? height : 600) / 40), // Assuming 40px row height
-          height: typeof height === 'number' ? height : 600,
-          width: typeof width === 'number' ? width : 800,
-          scrollTop: 0,
-          scrollLeft: 0,
-          itemHeight: 40
-        }
-      }
-    };
-  }, [entityType, tableId, columns, height, width, enableVirtualScrolling, enableGrouping, enableFiltering, bufferSize, enableSelectionColumn]);
-
-  return { tableConfig, tableId };
-};
-
-// ====================================
-// XSTATE MACHINE HOOK
-// ====================================
-
-export const useTableMachine = (tableConfig: TableConfig) => {
-  const [tableState, tableSend, tableActor] = useMachine(tableBaseMachine, {
-    input: tableConfig
-  });
-
-  return { tableState, tableSend, tableActor };
-};
+// Removed useTableConfiguration and useTableMachine hooks - 
+// these were unnecessary abstractions that caused recreation issues
 
 // ====================================
 // ENTITY INTEGRATION HOOK
@@ -176,42 +119,36 @@ export const useRendererInitialization = (
         // Store canvas container for deferred overlay initialization
         (refs as any).canvasContainer = canvasContainer;
         
-        // Defer overlay creation until actually needed
-        if (!refs.canvasOverlayRef.current && tableState?.context?.actors?.overlayActor) {
-          console.log('useRendererInitialization: Creating CanvasOverlay');
-          refs.canvasOverlayRef.current = new CanvasOverlay(canvasContainer, {
-            dimensionManager,
-            rowDimensionManager,
-            coordinateManager,
-            columns: rendererOptions.columns,
-            cellWidth: 120,
-            cellHeight: rowDimensionManager?.getRowHeight() || 40,
-            selectionColor: '#3b82f6',
-            selectionBorderColor: '#1d4ed8',
-            editingColor: '#10b981',
-            editingBorderColor: '#059669',
-            enableAnimations: false,
-            animationDuration: 0,
-            borderWidth: 2,
-            overlayActor: tableState.context.actors.overlayActor // Required: Use shared actor from table machine
+        // Initialize canvas actor with embedded canvas container
+        if (!refs.canvasOverlayRef.current && tableState?.context?.actors?.canvasActor) {
+          console.log('useRendererInitialization: Initializing canvas actor with embedded container');
+          
+          // Send INITIALIZE event to canvas actor
+          tableState.context.actors.canvasActor.send({
+            type: 'INITIALIZE',
+            container: canvasContainer,
+            config: {
+              dimensionManager,
+              rowDimensionManager,
+              coordinateManager,
+              columns: rendererOptions.columns,
+              cellWidth: 120,
+              cellHeight: rowDimensionManager?.getRowHeight() || 40,
+              selectionColor: '#3b82f6',
+              selectionBorderColor: '#1d4ed8',
+              editingColor: '#10b981',
+              editingBorderColor: '#059669',
+              enableAnimations: false,
+              animationDuration: 0,
+              borderWidth: 2,
+              overlayActor: tableState.context.actors.overlayActor // Required: Use shared actor from table machine
+            }
           });
           
-          // Set selection change callback
-          refs.canvasOverlayRef.current.onSelectionChange = 
-            rendererOptions.onSelectionChange || (() => {});
+          // Mark as initialized so we don't send INITIALIZE again
+          (refs as any).canvasActorInitialized = true;
           
-          // Set fill complete callback
-          refs.canvasOverlayRef.current.onFillComplete = 
-            rendererOptions.onFillComplete || (() => {});
-          
-          // Connect canvas overlay to selection manager
-          if (selectionManager && refs.canvasOverlayRef.current) {
-            selectionManager.setCanvasOverlay(refs.canvasOverlayRef.current);
-          }
-          
-          console.log('VibeGridX: Canvas Overlay initialized inside scrollable viewport with coordinate manager');
-        } else {
-          console.log('VibeGridXCore: No overlay actor available for canvas init');
+          console.log('VibeGridX: Canvas Overlay initialized with embedded container');
         }
       }
     });

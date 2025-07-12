@@ -1,5 +1,19 @@
 // Core types for VibeGridX XState v5 architecture
 import type { ActorRefFrom } from 'xstate';
+
+// View state management types
+export type SortConfig = {
+  field: string;
+  direction: 'asc' | 'desc';
+};
+
+export type FilterConfig = {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'in' | 'not_in' | 'regex';
+  value: any;
+  caseSensitive?: boolean;
+  negate?: boolean;
+};
 import type { EnumOption, VibeGridXColumn } from '@repo/dataforge/vibegridx-columns';
 
 // ====================================
@@ -239,13 +253,36 @@ export interface TableContext {
   dimensionManager?: any; // Will be typed as ColumnDimensionManager after import
   rowDimensionManager?: any; // Will be typed as RowDimensionManager after import
   coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager after import
-  selectionManager?: any; // Will be typed as VibeGridXSelectionManager after import
+  // selectionManager removed - selection state now managed directly in TableMachine
+  
+  // Coordinate mapping from coordinate actor
+  coordinateMapping?: any; // Will be typed as CoordinateMapping after import
+  
+  // Entities from parent component (via EntityIntegration/domain atoms)
+  entities: any[]; // Raw entity data provided by parent
+  
+  // View state management (moved from viewCoordinator)
+  sortBy: SortConfig[];
+  filters: FilterConfig[];
+  groupBy: string[];
+  columnVisibility: Record<string, boolean>;
+  columnOrder: string[];
+  hiddenColumnCount: number;
+  
+  // Current viewport for coordinate calculations
+  viewport: ViewportInfo | null;
+  
+  // Selection state (for stateless canvas rendering)
+  selectedCells: Set<string>;
   
   // Actor references
   actors: {
+    rendererActor: ActorRefFrom<any> | null;
+    canvasActor: ActorRefFrom<any> | null;
+    coordinateActor: ActorRefFrom<any> | null;
     selectionCoordinator: ActorRefFrom<any> | null;
     editCoordinator: ActorRefFrom<any> | null;
-    viewCoordinator: ActorRefFrom<any> | null;
+    // viewCoordinator removed - view state now managed directly in TableMachine
     dragCoordinator: ActorRefFrom<any> | null;
     overlayActor: ActorRefFrom<any> | null;
     rowActors: Map<string, ActorRefFrom<any>>;

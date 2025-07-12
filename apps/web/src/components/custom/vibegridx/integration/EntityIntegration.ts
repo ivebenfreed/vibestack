@@ -215,12 +215,14 @@ export class EntityIntegrationLayer {
         const initialTasks = tasksAtom.get();
         const taskCount = Object.keys(initialTasks).length;
         
-        // Send initial entity IDs to table machine
+        // Send initial entity data to table machine for ViewActor processing
         if (this.tableActor && taskCount > 0) {
           const entityIds = Object.keys(initialTasks);
+          const entities = Object.values(initialTasks);
           this.tableActor.send({
             type: 'SET_VISIBLE_ENTITIES',
-            entityIds
+            entityIds,
+            entities  // Entity data from parent component domain atoms
           });
         }
         
