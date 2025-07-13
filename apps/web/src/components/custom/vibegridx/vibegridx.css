@@ -44,6 +44,9 @@
   flex-direction: column;
   min-height: 0; /* Allow flex child to shrink */
   position: relative; /* For resize preview positioning */
+  /* PERFORMANCE: Hardware acceleration and containment */
+  transform: translate3d(0, 0, 0);
+  contain: layout style;
   /* DEBUG: Orange outline for table wrapper - REMOVE AFTER DEBUGGING */
   /* box-shadow: inset 0 0 0 2px orange; */
 }
@@ -297,6 +300,8 @@
   overflow: auto;
   background: hsl(var(--background));
   outline: none;
+  /* PERFORMANCE: CSS containment to prevent layout cascading */
+  contain: layout style paint;
   /* DEBUG: Blue outline for viewport - REMOVE AFTER DEBUGGING */
   /* box-shadow: inset 0 0 0 2px blue; */
 }

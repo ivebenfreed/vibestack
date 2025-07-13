@@ -12,6 +12,7 @@ export const selectionHandlers = {
       // Update selection state
       selectionActions.selectCell,
       
+      
       // Send visual positions to canvas
       ({ context, self }) => {
         console.log('SelectionHandler: Preparing canvas update', {
@@ -21,8 +22,15 @@ export const selectionHandlers = {
         });
         
         // Only proceed if we have valid context
-        if (!context.coordinateMapping || !context.actors?.canvasActor) {
-          console.warn('SelectionHandler: Missing required context for canvas update');
+        if (!context.coordinateMapping) {
+          console.warn('SelectionHandler: Missing coordinate mapping');
+          return;
+        }
+        
+        // PERFORMANCE: Spawn canvas actor on first selection if needed
+        if (!context.actors?.canvasActor) {
+          console.log('SelectionHandler: No canvas actor, sending spawn event');
+          self.send({ type: 'SPAWN_CANVAS_ACTOR_FOR_SELECTION' });
           return;
         }
         
@@ -154,6 +162,7 @@ export const selectionHandlers = {
       assign({
         anchor: ({ event }) => event.startCell
       }),
+      
       
       ({ event }) => {
         console.log('TableMachine: Selection drag started', {

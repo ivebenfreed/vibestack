@@ -225,6 +225,7 @@ function VibeGridXDemoGrid({
   relationshipData,
   onPerformanceUpdate
 }: VibeGridXDemoGridProps) {
+  // Clean API: VibeGridX handles useSelector internally
   // Original VibeGridX doesn't have a useVibeGridX hook, we'll manage state locally
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -274,12 +275,10 @@ function VibeGridXDemoGrid({
           entityType={entityType}
           columns={columns}
           height={550}
-          atomConfig={{
-            primaryAtom: tasksAtom as any,
-            relationshipAtoms: {
-              projects: projectsAtom as any,
-              users: usersAtom as any
-            }
+          primaryAtom={tasksAtom as any}
+          relationshipAtoms={{
+            projects: projectsAtom as any,
+            users: usersAtom as any
           }}
           relationshipData={relationshipData}
           enableVirtualScrolling={true}

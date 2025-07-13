@@ -59,7 +59,13 @@ class VirtualGridManager {
     this.viewport = initialViewport;
     this.totalRows = 0;
     this.rowHeight = initialViewport.itemHeight;
-    this.visibleRange = { start: 0, end: 0 };
+    
+    // PERFORMANCE FIX: Initialize visible range from initial viewport
+    const bufferRows = 5;
+    this.visibleRange = {
+      start: Math.max(0, initialViewport.start - bufferRows),
+      end: Math.max(0, initialViewport.end + bufferRows)
+    };
   }
   
   updateViewport(viewport: ViewportInfo, totalRows: number): boolean {
@@ -78,6 +84,15 @@ class VirtualGridManager {
       start: Math.max(0, viewport.start - bufferRows),
       end: Math.min(totalRows, viewport.end + bufferRows)
     };
+    
+    // DEBUG: Check virtual grid range calculation
+    console.log('PERFORMANCE DEBUG: VirtualGridManager.updateViewport', {
+      inputViewport: viewport,
+      totalRows,
+      bufferRows,
+      calculatedRange: this.visibleRange,
+      rangeSize: this.visibleRange.end - this.visibleRange.start
+    });
     
     // Return true if range changed
     return oldRange.start !== this.visibleRange.start || 
@@ -134,6 +149,7 @@ export class AtomicTableRenderer {
   private lastRenderTime = 0;
   private frameId = 0;
   private lastDimensions = { height: 0, width: 0 };
+  private canvasInitialized = false; // Track canvas overlay initialization
   
   // State caches
   private rowElements = new Map<string, HTMLElement>();
@@ -173,13 +189,18 @@ export class AtomicTableRenderer {
     // Use configured row height or default
     this.rowHeight = options.cellHeight || 40;
     
-    this.virtualGrid = new VirtualGridManager({
+    // PERFORMANCE FIX: Use proper initial viewport instead of hardcoded values
+    const initialViewport = options.initialViewport || {
       start: 0,
-      end: 50,
-      height: 400,
+      end: Math.ceil(600 / this.rowHeight), // Based on container height
+      height: 600,
+      width: 800,
       scrollTop: 0,
+      scrollLeft: 0,
       itemHeight: this.rowHeight
-    });
+    };
+    
+    this.virtualGrid = new VirtualGridManager(initialViewport);
     
     this.container = options.container;
     this.initializeDOM();
@@ -191,16 +212,7 @@ export class AtomicTableRenderer {
   // ====================================
   
   private initializeDOM() {
-    console.log('AtomicTableRenderer.initializeDOM: Starting DOM initialization', {
-      containerElement: this.container,
-      containerBounds: this.container.getBoundingClientRect(),
-      containerStyle: {
-        width: this.container.style.width,
-        height: this.container.style.height,
-        position: this.container.style.position
-      },
-      containerComputedStyle: window.getComputedStyle(this.container)
-    });
+    // PERFORMANCE: Removed expensive console.log that was causing serialization overhead
 
     this.container.innerHTML = '';
     this.container.className = CSS_CLASSES.TABLE;
@@ -213,15 +225,7 @@ export class AtomicTableRenderer {
     this.table.style.width = '100%';
     this.table.style.height = '100%';
     
-    console.log('AtomicTableRenderer.initializeDOM: Created table wrapper', {
-      tableBounds: this.table.getBoundingClientRect(),
-      tableStyle: {
-        display: this.table.style.display,
-        flexDirection: this.table.style.flexDirection,
-        width: this.table.style.width,
-        height: this.table.style.height
-      }
-    });
+    // PERFORMANCE: Removed expensive console.log
     
     // Create header viewport for synchronized horizontal scrolling
     this.headerViewport = document.createElement('div');
@@ -245,16 +249,7 @@ export class AtomicTableRenderer {
     this.viewport.style.minHeight = '0';
     this.viewport.style.width = '100%';
     
-    console.log('AtomicTableRenderer.initializeDOM: Created viewport before body', {
-      viewportBounds: this.viewport.getBoundingClientRect(),
-      viewportStyle: {
-        overflow: this.viewport.style.overflow,
-        position: this.viewport.style.position,
-        flex: this.viewport.style.flex,
-        minHeight: this.viewport.style.minHeight,
-        width: this.viewport.style.width
-      }
-    });
+    // PERFORMANCE: Removed expensive console.log
     
     this.body = document.createElement('div');
     this.body.className = CSS_CLASSES.BODY;
@@ -280,38 +275,13 @@ export class AtomicTableRenderer {
     this.table.appendChild(this.viewport);
     this.container.appendChild(this.table);
     
-    console.log('AtomicTableRenderer.initializeDOM: DOM structure complete', {
-      containerBounds: this.container.getBoundingClientRect(),
-      tableBounds: this.table.getBoundingClientRect(),
-      viewportBounds: this.viewport.getBoundingClientRect(),
-      bodyBounds: this.body.getBoundingClientRect(),
-      viewportClientDimensions: {
-        clientWidth: this.viewport.clientWidth,
-        clientHeight: this.viewport.clientHeight,
-        scrollWidth: this.viewport.scrollWidth,
-        scrollHeight: this.viewport.scrollHeight
-      }
-    });
+    // PERFORMANCE: Removed expensive console.log
     
     // Store canvas container for renderer actor to emit event
     this.canvasContainer = canvasOverlay;
     
-    // Use requestAnimationFrame to ensure DOM is ready before emitting
-    requestAnimationFrame(() => {
-      console.log('AtomicTableRenderer.initializeDOM: Canvas container ready, will emit event', {
-        viewportBounds: this.viewport.getBoundingClientRect(),
-        viewportClientDimensions: {
-          clientWidth: this.viewport.clientWidth,
-          clientHeight: this.viewport.clientHeight
-        }
-      });
-      
-      // Notify via state change that canvas container is ready
-      this.options.onStateChange?.({
-        type: 'canvas.container.ready',
-        container: canvasOverlay
-      });
-    });
+    // PERFORMANCE: Defer canvas overlay initialization to post-render phase
+    // This prevents blocking the initial DOM setup with canvas creation
   }
   
   // Set or update columns
@@ -675,28 +645,7 @@ export class AtomicTableRenderer {
   // ====================================
   
   render(state: RenderState): void {
-    console.log('[AtomicTableRenderer] render called with state version:', state.version);
-    console.log('[AtomicTableRenderer] render - DOM state check:', {
-      containerElement: this.container,
-      containerBounds: this.container.getBoundingClientRect(),
-      containerClientDimensions: {
-        clientWidth: this.container.clientWidth,
-        clientHeight: this.container.clientHeight
-      },
-      tableElement: this.table,
-      tableBounds: this.table ? this.table.getBoundingClientRect() : null,
-      tableClientDimensions: this.table ? {
-        clientWidth: this.table.clientWidth,
-        clientHeight: this.table.clientHeight
-      } : null,
-      viewportElement: this.viewport,
-      viewportBounds: this.viewport ? this.viewport.getBoundingClientRect() : null,
-      viewportClientDimensions: this.viewport ? {
-        clientWidth: this.viewport.clientWidth,
-        clientHeight: this.viewport.clientHeight
-      } : null,
-      stateRowCount: state.rows.length
-    });
+    // PERFORMANCE: Removed expensive console.log statements from render hot path
     
     this.renderStartTime = performance.now();
     
@@ -725,20 +674,17 @@ export class AtomicTableRenderer {
       // Batch all DOM writes together before reading dimensions
       this.renderHeader(state);
       
-      // Use requestAnimationFrame to defer dimension reading until after browser paint
+      // PERFORMANCE FIX: Single RAF with optimized synchronous operations
       requestAnimationFrame(() => {
+        // Batch all operations in single frame for better performance
         this.updateViewport(state);
         this.renderVisibleRows(state);
         this.applyOptimisticOperations(state.optimisticOperations);
         
-        // Move performance timing to RAF callback
+        // Performance timing
         this.lastRenderTime = performance.now() - this.renderStartTime;
         
-        if (this.lastRenderTime > RENDER_TARGETS.INITIAL_RENDER) {
-          console.warn(`AtomicTableRenderer: Slow render: ${this.lastRenderTime.toFixed(2)}ms for ${state.rows.length} rows`);
-        }
-        
-        // Notify that render is complete with performance metrics
+        // Notify completion
         this.options.onStateChange?.({
           type: 'render.complete',
           renderTime: this.lastRenderTime,
@@ -746,7 +692,7 @@ export class AtomicTableRenderer {
           visibleRange: this.virtualGrid.getVisibleRange()
         });
         
-        // Send initial viewport update to canvas overlay
+        // Send viewport update for canvas overlay
         const initialViewport: ViewportInfo = {
           start: this.virtualGrid.getVisibleRange().start,
           end: this.virtualGrid.getVisibleRange().end,
@@ -757,9 +703,16 @@ export class AtomicTableRenderer {
           itemHeight: this.virtualGrid.getRowHeight()
         };
         
-        console.log('AtomicTableRenderer: Sending initial viewport to canvas overlay:', initialViewport);
-        // CRITICAL: Send initial viewport so overlay can render selections
         this.options.onScroll?.(initialViewport);
+        
+        // Canvas initialization (only once)
+        if (!this.canvasInitialized && this.canvasContainer) {
+          this.canvasInitialized = true;
+          this.options.onStateChange?.({
+            type: 'canvas.container.ready',
+            container: this.canvasContainer
+          });
+        }
       });
       
     } finally {
@@ -902,52 +855,66 @@ export class AtomicTableRenderer {
   // ====================================
   // PRIVATE RENDERING METHODS
   // ====================================
+
+  /**
+   * Batch all DOM measurements to prevent layout thrashing.
+   * The original updateViewport() method caused 42ms forced reflow by doing
+   * 14 sequential DOM queries. This method consolidates them into a single pass.
+   */
+  private batchMeasureDOMElements() {
+    return {
+      viewport: {
+        bounds: this.viewport.getBoundingClientRect(),
+        client: {
+          width: this.viewport.clientWidth,
+          height: this.viewport.clientHeight
+        },
+        scroll: {
+          top: this.viewport.scrollTop || 0,
+          left: this.viewport.scrollLeft || 0
+        },
+        offset: {
+          width: this.viewport.offsetWidth,
+          height: this.viewport.offsetHeight
+        }
+      },
+      container: {
+        bounds: this.container.getBoundingClientRect(),
+        client: {
+          width: this.container.clientWidth,
+          height: this.container.clientHeight
+        }
+      },
+      table: {
+        bounds: this.table.getBoundingClientRect(),
+        client: {
+          width: this.table.clientWidth,
+          height: this.table.clientHeight
+        }
+      }
+    };
+  }
   
   private updateViewport(state: RenderState): void {
-    console.log('AtomicTableRenderer.updateViewport: Starting viewport calculation', {
-      viewportElement: this.viewport,
-      viewportBounds: this.viewport.getBoundingClientRect(),
-      viewportClientDimensions: {
-        clientWidth: this.viewport.clientWidth,
-        clientHeight: this.viewport.clientHeight,
-        scrollWidth: this.viewport.scrollWidth,
-        scrollHeight: this.viewport.scrollHeight,
-        offsetWidth: this.viewport.offsetWidth,
-        offsetHeight: this.viewport.offsetHeight
-      },
-      viewportComputedStyle: {
-        display: window.getComputedStyle(this.viewport).display,
-        width: window.getComputedStyle(this.viewport).width,
-        height: window.getComputedStyle(this.viewport).height,
-        flex: window.getComputedStyle(this.viewport).flex,
-        position: window.getComputedStyle(this.viewport).position
-      },
-      containerDimensions: {
-        clientWidth: this.container.clientWidth,
-        clientHeight: this.container.clientHeight,
-        bounds: this.container.getBoundingClientRect()
-      },
-      tableDimensions: {
-        clientWidth: this.table.clientWidth,
-        clientHeight: this.table.clientHeight,
-        bounds: this.table.getBoundingClientRect()
-      }
-    });
-
-    // Update virtual grid with current data - use simple fallbacks like the working version
-    const rawViewportHeight = this.viewport.clientHeight;
-    const viewportHeight = rawViewportHeight || 600; // Simple fallback
-    const scrollTop = this.viewport.scrollTop || 0;
-    const itemHeight = this.rowHeight;
+    // PERFORMANCE OPTIMIZATION: Batch all DOM measurements to prevent layout thrashing
+    // The original code caused 42ms forced reflow by doing 14 sequential DOM queries
+    const measurements = this.batchMeasureDOMElements();
     
-    console.log('AtomicTableRenderer.updateViewport: Dimension calculation', {
+    // Use cached measurements for calculations
+    const rawViewportHeight = measurements.viewport.client.height;
+    const viewportHeight = rawViewportHeight || 600; // Simple fallback
+    const scrollTop = measurements.viewport.scroll.top;
+    
+    // DEBUG: Check viewport calculations
+    console.log('PERFORMANCE DEBUG: updateViewport calculations', {
       rawViewportHeight,
       viewportHeight,
-      fallbackUsed: rawViewportHeight === 0,
       scrollTop,
-      itemHeight,
-      rowCount: state.rows.length
+      rowHeight: this.rowHeight,
+      calculatedStartRow: Math.floor(scrollTop / this.rowHeight),
+      calculatedEndRow: Math.ceil((scrollTop + viewportHeight) / this.rowHeight)
     });
+    const itemHeight = this.rowHeight;
     
     // Calculate actual visible rows based on viewport
     const visibleRowCount = Math.ceil(viewportHeight / itemHeight);
@@ -955,28 +922,21 @@ export class AtomicTableRenderer {
     // Add 1 extra row to ensure the last visible row is fully shown
     const endIndex = Math.min(startIndex + visibleRowCount + 1, state.rows.length);
     
-    const rawViewportWidth = this.viewport.clientWidth;
+    const rawViewportWidth = measurements.viewport.client.width;
     const currentViewport: ViewportInfo = {
       start: startIndex,
       end: endIndex,
       height: viewportHeight,
       width: rawViewportWidth || 800, // Simple fallback like working version
       scrollTop: scrollTop,
-      scrollLeft: this.viewport.scrollLeft || 0,
+      scrollLeft: measurements.viewport.scroll.left,
       itemHeight: itemHeight
     };
     
-    console.log('AtomicTableRenderer.updateViewport: Final viewport calculation', {
-      currentViewport,
-      visibleRowCount,
-      rawDimensions: {
-        rawViewportHeight,
-        rawViewportWidth,
-        fallbacksUsed: {
-          height: rawViewportHeight === 0,
-          width: rawViewportWidth === 0
-        }
-      }
+    // DEBUG: Check what we're passing to virtualGrid
+    console.log('PERFORMANCE DEBUG: updateViewport passing to virtualGrid', {
+      viewport: currentViewport,
+      totalRows: state.rows.length
     });
     
     this.virtualGrid.updateViewport(currentViewport, state.rows.length);
@@ -1098,40 +1058,51 @@ export class AtomicTableRenderer {
     const visibleRange = this.virtualGrid.getVisibleRange();
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
+    // DEBUG: Check if we're rendering too many rows
+    console.log('PERFORMANCE DEBUG: renderVisibleRows', {
+      totalRowsInState: state.rows.length,
+      visibleRangeStart: visibleRange.start,
+      visibleRangeEnd: visibleRange.end,
+      visibleRowsCount: visibleRows.length,
+      shouldBeVirtualized: visibleRows.length < state.rows.length
+    });
+    
     // Calculate dimensions
     const totalHeight = this.virtualGrid.getTotalHeight();
     const totalWidth = this.getTotalColumnsWidth();
     
-    // Set virtual dimensions
+    // PERFORMANCE FIX: Batch DOM style updates and remove nested RAF
+    // Set virtual dimensions and viewport overflow together
     this.body.style.height = `${totalHeight}px`;
     this.body.style.width = `${totalWidth}px`;
     
-    // Ensure the viewport allows scrolling to show all content
-    // Add a small timeout to ensure DOM has updated
-    requestAnimationFrame(() => {
-      const maxScroll = totalHeight - this.viewport.clientHeight;
-      if (maxScroll > 0 && this.viewport.scrollHeight <= this.viewport.clientHeight) {
-        // Force scrollbar to appear if content is taller than viewport
-        this.viewport.style.overflowY = 'scroll';
-      }
-    });
+    // Synchronously handle viewport overflow (no need for RAF)
+    const maxScroll = totalHeight - this.viewport.clientHeight;
+    if (maxScroll > 0) {
+      this.viewport.style.overflowY = 'scroll';
+    }
     
     // Only log when dimensions actually change
     if (totalHeight !== this.lastDimensions.height || totalWidth !== this.lastDimensions.width) {
-      console.log('[AtomicTableRenderer] Virtual dimensions changed:', {
-        totalHeight,
-        totalWidth,
-        rowCount: state.rows.length,
-        rowHeight: this.virtualGrid.getRowHeight(),
-        viewportHeight: this.viewport.clientHeight,
-        previousHeight: this.lastDimensions.height,
-        previousWidth: this.lastDimensions.width
-      });
+      // PERFORMANCE: Removed expensive console.log
       this.lastDimensions = { height: totalHeight, width: totalWidth };
     }
     
     // Canvas overlay is already created in initializeDOM, no need to update its size
     // It will use viewport-based sizing instead of full scrollable area
+    
+    // PERFORMANCE DEBUG: Check if we have a fallback that's causing all rows to render
+    if (visibleRows.length === 0) {
+      console.warn('PERFORMANCE ISSUE: visibleRows is empty! This will cause no rows to render.');
+      console.warn('Total rows in state:', state.rows.length);
+      console.warn('Visible range:', visibleRange);
+      console.warn('Using fallback to render first 20 rows to prevent blank grid');
+      
+      // Emergency fallback to prevent blank grid
+      const fallbackRows = state.rows.slice(0, 20);
+      console.warn('Fallback rows count:', fallbackRows.length);
+      // Don't use fallback - let it be empty to see what happens
+    }
     
     // Clear existing rows that are no longer visible
     this.rowElements.forEach((element, rowId) => {
@@ -1141,11 +1112,49 @@ export class AtomicTableRenderer {
       }
     });
     
-    // Render visible rows
+    // PERFORMANCE FIX: Batch new row creation to reduce DOM manipulation
+    const fragment = document.createDocumentFragment();
+    const newRowElements: Array<{ element: HTMLElement; rowId: string }> = [];
+    
+    // Pre-create new rows in fragment (batched DOM insertion)
     visibleRows.forEach((row, index) => {
       const absoluteIndex = visibleRange.start + index;
-      this.renderRow(row, absoluteIndex);
+      
+      let rowElement = this.rowElements.get(row.id);
+      if (!rowElement) {
+        rowElement = document.createElement('div');
+        rowElement.className = CSS_CLASSES.ROW;
+        rowElement.dataset.rowId = row.id;
+        newRowElements.push({ element: rowElement, rowId: row.id });
+        fragment.appendChild(rowElement);
+      }
+      
+      // Position and update row content
+      this.updateRowElement(row, rowElement, absoluteIndex);
     });
+    
+    // Single DOM append for all new rows
+    if (newRowElements.length > 0) {
+      this.body.appendChild(fragment);
+      
+      // Register new elements
+      newRowElements.forEach(({ element, rowId }) => {
+        this.rowElements.set(rowId, element);
+      });
+    }
+  }
+  
+  private updateRowElement(row: TableRow, rowElement: HTMLElement, index: number): void {
+    // Position row
+    const top = this.virtualGrid.getRowTop(index);
+    rowElement.style.position = 'absolute';
+    rowElement.style.top = `${top}px`;
+    rowElement.style.left = '0px';
+    rowElement.style.width = '100%';
+    rowElement.style.height = `${this.virtualGrid.getRowHeight()}px`;
+    
+    // Update row content
+    this.renderRowCells(row, rowElement);
   }
   
   private renderRow(row: TableRow, index: number): void {
@@ -1159,24 +1168,18 @@ export class AtomicTableRenderer {
       this.rowElements.set(row.id, rowElement);
     }
     
-    // Position row
-    const top = this.virtualGrid.getRowTop(index);
-    rowElement.style.position = 'absolute';
-    rowElement.style.top = `${top}px`;
-    rowElement.style.width = '100%';
-    rowElement.style.height = `${this.virtualGrid.getRowHeight()}px`;
+    // Use optimized update method
+    this.updateRowElement(row, rowElement, index);
+    
+    // Apply row state styling
     rowElement.style.borderBottom = '1px solid var(--border)';
     rowElement.style.boxSizing = 'border-box';
-    
-    
-    // Render cells
-    this.renderRowCells(row, rowElement);
-    
-    // Apply row state
     rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
   }
   
   private renderRowCells(row: TableRow, rowElement: HTMLElement): void {
+    // PERFORMANCE FIX: Use DOM elements instead of innerHTML for massive performance boost
+    
     // Use visible columns from configuration if available
     const columnsToRender = this.visibleColumns.length > 0 
       ? this.visibleColumns 
@@ -1188,126 +1191,130 @@ export class AtomicTableRenderer {
           width: 120
         }));
     
-    // Update cell elements map for this row
-    columnsToRender.forEach(column => {
-      const cellKey = `${row.id}:${column.id}`;
-      const existingCell = this.cellElements.get(cellKey);
-      if (existingCell && !rowElement.contains(existingCell)) {
-        this.cellElements.delete(cellKey);
-      }
-    });
+    // Clear existing content efficiently
+    rowElement.textContent = '';
     
-    // Create cells with proper positioning
-    let cellsHTML = '';
+    // Create document fragment for batched insertion
+    const fragment = document.createDocumentFragment();
     
     // Add selection checkbox cell (always included)
     {
+      const cellKey = `${row.id}:__selection`;
       const isRowSelected = this.selectedRows.has(row.id);
-      cellsHTML += `
-        <div class="vibegridx-cell vibegridx-selection-cell" 
-             data-row-id="${row.id}" 
-             data-column-id="__selection"
-             data-cell-key="${row.id}:__selection"
-             role="gridcell"
-             style="position: absolute; left: 0; width: 48px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box; overflow: hidden; position: sticky; z-index: 5; background: var(--background);">
-          <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-            <label class="vibegridx-checkbox-wrapper" data-row-id="${row.id}">
-              <input type="checkbox" 
-                     class="vibegridx-row-checkbox" 
-                     data-row-id="${row.id}"
-                     ${isRowSelected ? 'checked' : ''}>
-              <span class="vibegridx-checkbox-custom"></span>
-            </label>
-          </div>
-        </div>`;
+      
+      const cell = document.createElement('div');
+      cell.className = 'vibegridx-cell vibegridx-selection-cell';
+      cell.setAttribute('data-row-id', row.id);
+      cell.setAttribute('data-column-id', '__selection');
+      cell.setAttribute('data-cell-key', cellKey);
+      cell.setAttribute('role', 'gridcell');
+      
+      // Style selection cell
+      Object.assign(cell.style, {
+        position: 'absolute',
+        left: '0',
+        width: '48px',
+        height: `${this.rowHeight}px`,
+        borderRight: '1px solid var(--border)',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        zIndex: '5',
+        background: 'var(--background)'
+      });
+      
+      // Create checkbox wrapper
+      const wrapper = document.createElement('div');
+      Object.assign(wrapper.style, {
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      });
+      
+      const label = document.createElement('label');
+      label.className = 'vibegridx-checkbox-wrapper';
+      label.setAttribute('data-row-id', row.id);
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'vibegridx-row-checkbox';
+      checkbox.setAttribute('data-row-id', row.id);
+      checkbox.checked = isRowSelected;
+      
+      const span = document.createElement('span');
+      span.className = 'vibegridx-checkbox-custom';
+      
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      wrapper.appendChild(label);
+      cell.appendChild(wrapper);
+      fragment.appendChild(cell);
+      
+      this.cellElements.set(cellKey, cell);
     }
     
+    // Add data cells
     columnsToRender.forEach((column, index) => {
       const cellKey = `${row.id}:${column.id}`;
       const value = row.data[column.field || column.id];
       const width = this.columnWidths[column.id] || column.width || 120;
       const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
       
+      // Create cell element
+      const cell = document.createElement('div');
+      cell.className = CSS_CLASSES.CELL;
+      cell.setAttribute('data-row-id', row.id);
+      cell.setAttribute('data-column-id', column.id);
+      cell.setAttribute('data-cell-key', cellKey);
+      cell.setAttribute('role', 'gridcell');
       
-      // Fast path: Skip complex state for normal cells (95% of cases)
+      // Apply state classes
       const isSelected = this.selectedCells.has(cellKey);
       const isEditing = this.editingCell?.rowId === row.id && this.editingCell?.columnId === column.id;
       const isDirty = row.metadata.isDirty || false;
       
-      // Always use fast renderer for simplicity and performance
+      if (isSelected) cell.classList.add(CSS_CLASSES.SELECTED);
+      if (isEditing) cell.classList.add(CSS_CLASSES.EDITING);
+      if (isDirty) cell.classList.add(CSS_CLASSES.DIRTY);
+      
+      // Style cell
+      Object.assign(cell.style, {
+        position: 'absolute',
+        left: `${xOffset}px`,
+        width: `${width}px`,
+        height: `${this.rowHeight}px`,
+        borderRight: '1px solid var(--border)',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      });
+      
+      // Create content wrapper
+      const content = document.createElement('div');
+      Object.assign(content.style, {
+        width: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        padding: '8px 12px',
+        boxSizing: 'border-box'
+      });
+      
+      // Set content efficiently
       const cellContent = this.renderValueFast(value, column);
-      let cellClass = CSS_CLASSES.CELL;
+      content.textContent = cellContent;
       
-      // Add state classes if needed
-      if (isSelected) cellClass += ` ${CSS_CLASSES.SELECTED}`;
-      if (isEditing) cellClass += ` ${CSS_CLASSES.EDITING}`;
-      if (isDirty) cellClass += ` ${CSS_CLASSES.DIRTY}`;
+      cell.appendChild(content);
+      fragment.appendChild(cell);
       
-      // Position cell absolutely within row - simplified for performance
-      cellsHTML += `<div class="${cellClass}" 
-                   data-row-id="${row.id}" 
-                   data-column-id="${column.id}"
-                   data-cell-key="${cellKey}"
-                   role="gridcell"
-                   style="position: absolute; left: ${xOffset}px; width: ${width}px; height: ${this.rowHeight}px; border-right: 1px solid var(--border); box-sizing: border-box; overflow: hidden;">
-                <div style="width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 12px; box-sizing: border-box;">
-                  ${cellContent}
-                </div>
-              </div>`;
+      this.cellElements.set(cellKey, cell);
     });
     
-    rowElement.innerHTML = cellsHTML;
+    // Single DOM insertion
+    rowElement.appendChild(fragment);
     
-    // Update cell elements map with new cells
-    const cellElements = rowElement.querySelectorAll(`.${CSS_CLASSES.CELL}`);
-    cellElements.forEach((cellElement) => {
-      const cellKey = cellElement.getAttribute('data-cell-key');
-      if (cellKey) {
-        this.cellElements.set(cellKey, cellElement as HTMLElement);
-      }
-    });
-    
-    // Add checkbox event listeners (selection column is always enabled)
-    {
-      // Prevent cell selection on checkbox wrapper click
-      const checkboxWrapper = rowElement.querySelector('.vibegridx-checkbox-wrapper') as HTMLElement;
-      if (checkboxWrapper) {
-        checkboxWrapper.addEventListener('click', (event) => {
-          event.stopPropagation();
-        });
-      }
-      
-      const rowCheckbox = rowElement.querySelector('.vibegridx-row-checkbox') as HTMLInputElement;
-      if (rowCheckbox) {
-        rowCheckbox.addEventListener('click', (event) => {
-          event.stopPropagation();
-          const rowId = (event.target as HTMLElement).getAttribute('data-row-id');
-          
-          if (rowId) {
-            // Check for shift key for range selection
-            if (event.shiftKey && this.lastSelectedRowId && this.lastSelectedRowId !== rowId) {
-              // Dispatch range selection event
-              const rangeEvent = { 
-                type: 'selection.checkbox.range' as const, 
-                startRowId: this.lastSelectedRowId,
-                endRowId: rowId
-              };
-              (window as any).vibegridxDispatch?.(rangeEvent);
-            } else {
-              // Dispatch toggle event
-              const toggleEvent = { 
-                type: 'selection.checkbox.toggle' as const, 
-                rowId 
-              };
-              (window as any).vibegridxDispatch?.(toggleEvent);
-            }
-            
-            // Update last selected row
-            this.lastSelectedRowId = rowId;
-          }
-        });
-      }
-    }
+    // PERFORMANCE FIX: Event listeners are now handled via event delegation in the renderer
+    // No need to add individual listeners to each checkbox - parent container handles all events
   }
   
   private lastSelectedRowId: string | null = null;

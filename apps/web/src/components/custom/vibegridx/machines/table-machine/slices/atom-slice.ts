@@ -68,21 +68,9 @@ export const atomActions = {
 
       console.log('AtomSlice: Setting up primary atom subscription');
       
-      // Get initial data
-      const initialData = atomConfig.primaryAtom.get();
-      const dataArray = Object.values(initialData);
-      console.log('AtomSlice: Initial data:', dataArray.length);
-      
-      // Delay initial update to ensure machine is in active state
-      if (dataArray.length > 0) {
-        setTimeout(() => {
-          console.log('AtomSlice: Sending initial data update');
-          self.send({
-            type: 'ATOM_DATA_UPDATED',
-            entities: dataArray
-          });
-        }, 150); // After the 100ms timeout for active state transition
-      }
+      // PERFORMANCE FIX: Don't call atom.get() immediately - it triggers DB queries!
+      // Instead, only subscribe to changes and let the loader populate the atoms first
+      console.log('AtomSlice: Skipping initial atom.get() to avoid DB queries');
       
       // Subscribe to changes
       const unsubscribe = atomConfig.primaryAtom.subscribe((dataRecord) => {

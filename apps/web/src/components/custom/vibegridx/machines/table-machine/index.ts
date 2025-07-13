@@ -22,7 +22,7 @@ import { editHandlers } from './event-handlers/edit-handlers';
 import { dragHandlers } from './event-handlers/drag-handlers';
 
 // Import helpers
-import { createViewportFromScroll } from './helpers/visual-position-helpers';
+import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
 
 // Import actors
 import { viewActor, createViewActorInput } from '../view-actor';
@@ -130,8 +130,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Coordinate mapping from coordinate actor
     coordinateMapping: null,
     
-    // Entities from parent component
-    entities: [],
+    // Entities from parent component (via useSelector)
+    entities: input.entities || [],
     
     actors: {
       rendererActor: null,
@@ -149,7 +149,10 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       totalRows: initialRowCount,
       visibleRows: 0,
       activeActors: 0
-    }
+    },
+    
+    // Canvas container reference (stored for lazy initialization)
+    canvasContainer: null
   };
 };
 
@@ -289,11 +292,10 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
-        // Set up atom subscriptions
-        atomActions.setupPrimaryAtomSubscription,
-        atomActions.setupRelationshipAtoms,
+        // CLEAN API: Skip atom subscriptions - entities come from props via useSelector
+        // Entities will be sent via useEffect in React component
         
-        // Spawn core actors
+        // Spawn essential actors including canvas (it will init after render)
         assign({
           actors: ({ context, spawn }) => ({
             ...context.actors,
@@ -304,15 +306,10 @@ export const tableBaseMachine = setup({
                 enableSelectionColumn: context.enableSelectionColumn
               }
             }),
-            canvasActor: spawn('canvasActor', { id: 'canvas' }),
-            overlayActor: null, // Canvas subscribes directly to table machine
-            editActor: spawn('editActor', { 
-              id: 'edit',
-              input: {
-                columns: context.columns
-              }
-            }),
-            dragActor: spawn('dragActor', { id: 'drag' })
+            // PERFORMANCE: Don't spawn canvas actor until needed
+            canvasActor: null
+            // editActor: spawn as needed for editing
+            // dragActor: spawn as needed for drag operations
             // viewActor is invoked as needed, not spawned
           })
         }),
@@ -328,34 +325,15 @@ export const tableBaseMachine = setup({
         
         CANVAS_CONTAINER_READY: {
           actions: [
-            // Initialize canvas actor with the embedded container
-            ({ context, event }) => {
-              console.log('TableMachine: Canvas container ready, initializing canvas actor', {
-                hasCanvasActor: !!context.actors.canvasActor,
-                container: event.container,
-                containerBounds: event.container.getBoundingClientRect()
+            // PERFORMANCE: Store container for later canvas initialization
+            assign({
+              canvasContainer: ({ event }) => event.container
+            }),
+            ({ event }) => {
+              console.log('TableMachine: Canvas container ready during initialization', {
+                container: event.container
               });
-              
-              if (context.actors.canvasActor) {
-                context.actors.canvasActor.send({
-                  type: 'INITIALIZE',
-                  container: event.container,
-                  config: {
-                    cellHeight: context.settings.rowHeight,
-                    cellWidth: 120,
-                    selectionColor: '#3b82f6',
-                    selectionBorderColor: '#1d4ed8',
-                    editingColor: '#10b981',
-                    editingBorderColor: '#059669',
-                    enableAnimations: false,
-                    animationDuration: 0,
-                    borderWidth: 2,
-                    // No machine needed - canvas will be updated directly via actor events
-                    dimensionManager: context.dimensionManager,
-                    coordinateManager: context.coordinateManager
-                  }
-                });
-              }
+              // Canvas will be auto-spawned when we reach active state
             }
           ]
         }
@@ -498,7 +476,16 @@ export const tableBaseMachine = setup({
                     },
                     coordinateMapping: event.output.coordinateMapping
                   })
-                )
+                ),
+                
+                // PERFORMANCE: Log when first render completes
+                ({ context }) => {
+                  console.log('TableMachine: First render complete', {
+                    version: context.version,
+                    hasCanvasActor: !!context.actors.canvasActor,
+                    hasCanvasContainer: !!context.canvasContainer
+                  });
+                }
               ]
             }
           }
@@ -507,36 +494,168 @@ export const tableBaseMachine = setup({
       
       // Handle these events at the active state level
       on: {
+      // PERFORMANCE: Spawn canvas actor on first selection
+      SPAWN_CANVAS_ACTOR_FOR_SELECTION: {
+        actions: [
+          assign({
+            actors: ({ context, spawn, self }) => {
+              if (!context.actors.canvasActor && context.canvasContainer) {
+                console.log('TableMachine: Spawning canvas actor on first selection');
+                const canvasActor = spawn('canvasActor', { id: 'canvas' });
+                
+                // Initialize immediately with stored container
+                setTimeout(() => {
+                  canvasActor.send({
+                    type: 'INITIALIZE',
+                    container: context.canvasContainer,
+                    config: {
+                      cellHeight: context.settings.rowHeight,
+                      cellWidth: 120,
+                      selectionColor: '#3b82f6',
+                      selectionBorderColor: '#1d4ed8',
+                      editingColor: '#10b981',
+                      editingBorderColor: '#059669',
+                      enableAnimations: false,
+                      animationDuration: 0,
+                      borderWidth: 2,
+                      dimensionManager: context.dimensionManager,
+                      coordinateManager: context.coordinateManager
+                    }
+                  });
+                  
+                  // Send coordinate mapping to the canvas
+                  if (context.coordinateMapping) {
+                    canvasActor.send({
+                      type: 'UPDATE_COORDINATES',
+                      mapping: context.coordinateMapping
+                    });
+                  }
+                  
+                  // Send current selection to canvas after initialization
+                  // Use requestIdleCallback for truly non-blocking init
+                  const sendSelection = () => {
+                    // Calculate visual positions for current selection
+                    const visualPositions = calculateVisualPositions(
+                      context.selectedCells,
+                      context.coordinateMapping,
+                      context.viewport,
+                      context.settings.rowHeight
+                    );
+                    
+                    if (visualPositions.length > 0) {
+                      canvasActor.send({
+                        type: 'UPDATE_SELECTION_VISUAL',
+                        visualCells: visualPositions
+                      });
+                    }
+                  };
+                  
+                  if ('requestIdleCallback' in window) {
+                    (window as any).requestIdleCallback(sendSelection, { timeout: 100 });
+                  } else {
+                    setTimeout(sendSelection, 50);
+                  }
+                }, 10); // Small delay for actor to fully initialize
+                
+                return {
+                  ...context.actors,
+                  canvasActor
+                };
+              }
+              return context.actors;
+            }
+          })
+        ]
+      },
+      
+      // Spawn canvas actor on demand when needed
+      SPAWN_CANVAS_ACTOR: {
+        actions: [
+          assign({
+            actors: ({ context, spawn }) => {
+              if (!context.actors.canvasActor) {
+                console.log('TableMachine: Spawning canvas actor on demand');
+                return {
+                  ...context.actors,
+                  canvasActor: spawn('canvasActor', { id: 'canvas' })
+                };
+              }
+              return context.actors;
+            }
+          })
+        ]
+      },
+      
+      // Spawn canvas actor after initial render
+      SPAWN_CANVAS_AFTER_RENDER: {
+        actions: [
+          assign({
+            actors: ({ context, spawn }) => {
+              if (!context.actors.canvasActor && context.canvasContainer) {
+                console.log('TableMachine: Spawning canvas actor after render (non-blocking)');
+                const canvasActor = spawn('canvasActor', { id: 'canvas' });
+                
+                // Initialize with stored container
+                canvasActor.send({
+                  type: 'INITIALIZE',
+                  container: context.canvasContainer,
+                  config: {
+                    cellHeight: context.settings.rowHeight,
+                    cellWidth: 120,
+                    selectionColor: '#3b82f6',
+                    selectionBorderColor: '#1d4ed8',
+                    editingColor: '#10b981',
+                    editingBorderColor: '#059669',
+                    enableAnimations: false,
+                    animationDuration: 0,
+                    borderWidth: 2,
+                    dimensionManager: context.dimensionManager,
+                    coordinateManager: context.coordinateManager
+                  }
+                });
+                
+                // PERFORMANCE: Don't send coordinates on init - canvas starts at 0,0
+                // Coordinates will be sent when first selection happens
+                
+                return {
+                  ...context.actors,
+                  canvasActor
+                };
+              }
+              return context.actors;
+            }
+          })
+        ]
+      },
+      
       // Canvas initialization
       CANVAS_CONTAINER_READY: {
         actions: [
-          // Initialize canvas actor with the embedded container
-          ({ context, event }) => {
-            console.log('TableMachine: Canvas container ready in active state, initializing canvas actor', {
-              hasCanvasActor: !!context.actors.canvasActor,
+          // PERFORMANCE: Store container for later canvas initialization
+          assign({
+            canvasContainer: ({ event }) => event.container
+          }),
+          ({ context, event, self }) => {
+            console.log('TableMachine: Canvas container ready in active state', {
               container: event.container,
-              containerBounds: event.container.getBoundingClientRect()
+              version: context.version,
+              hasCanvasActor: !!context.actors.canvasActor
             });
             
-            if (context.actors.canvasActor) {
-              context.actors.canvasActor.send({
-                type: 'INITIALIZE',
-                container: event.container,
-                config: {
-                  cellHeight: context.settings.rowHeight,
-                  cellWidth: 120,
-                  selectionColor: '#3b82f6',
-                  selectionBorderColor: '#1d4ed8',
-                  editingColor: '#10b981',
-                  editingBorderColor: '#059669',
-                  enableAnimations: false,
-                  animationDuration: 0,
-                  borderWidth: 2,
-                  // No machine needed - canvas will be updated directly via actor events
-                  dimensionManager: context.dimensionManager,
-                  coordinateManager: context.coordinateManager
-                }
-              });
+            // Always spawn canvas when container is ready (if not already spawned)
+            if (!context.actors.canvasActor) {
+              console.log('TableMachine: Auto-spawning canvas now that container is ready');
+              
+              const spawnCanvas = () => {
+                self.send({ type: 'SPAWN_CANVAS_AFTER_RENDER' });
+              };
+              
+              // Use requestIdleCallback for non-blocking spawn
+              if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(spawnCanvas, { timeout: 200 });
+              } else {
+                setTimeout(spawnCanvas, 50);
+              }
             }
           }
         ]

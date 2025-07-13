@@ -33,13 +33,16 @@ export class CanvasOverlay implements CoordinateProvider {
   // Direct reference to coordinate manager
   private coordinateManager: VibeGridXCoordinateManager | null = null;
   
-  // Feature overlays
-  private fillHandleLayer: FillHandleLayer;
-  private selectionOverlay: SelectionOverlay;
-  private clipboardOverlay: ClipboardOverlay;
-  private dragPreviewOverlay: DragPreviewOverlay;
-  private columnDragOverlay: ColumnDragOverlay;
-  private columnResizeOverlay: ColumnResizeOverlay;
+  // Stored coordinate mapping for lazy processing
+  private coordinateMapping: any = null;
+  
+  // Feature overlays - LAZY LOADED
+  private fillHandleLayer: FillHandleLayer | null = null;
+  private selectionOverlay: SelectionOverlay | null = null;
+  private clipboardOverlay: ClipboardOverlay | null = null;
+  private dragPreviewOverlay: DragPreviewOverlay | null = null;
+  private columnDragOverlay: ColumnDragOverlay | null = null;
+  private columnResizeOverlay: ColumnResizeOverlay | null = null;
   private selectionColumnOverlay: SelectionColumnOverlay | null = null;
   
   // Callbacks
@@ -50,133 +53,139 @@ export class CanvasOverlay implements CoordinateProvider {
     this.container = container;
     this.config = { ...DEFAULT_CONFIG, ...config };
     
-    // Initialize Konva stage
-    this.initializeStage();
-    
-    // Create main layer - moved after stage initialization
+    // PERFORMANCE: Defer everything except storing references
+    // Stage will be initialized on first use
     
     // Coordinate manager from config or will be set via setCoordinateManager method
     this.coordinateManager = this.config.coordinateManager || null;
     
-    // Initialize feature overlays - they will get coordinate manager access via getter
-    this.fillHandleLayer = new FillHandleLayer(
-      this.stage,
-      this, // Pass canvas overlay reference instead of coordinate system
-      {
-        cellHeight: this.config.cellHeight,
-        dimensionManager: this.config.dimensionManager as ColumnDimensionManager,
-        selectionBorderColor: this.config.selectionBorderColor
-      }
-    );
-    
-    this.selectionOverlay = new SelectionOverlay(
-      this.layer,
-      this, // Pass self as coordinate provider
-      {
-        selectionColor: this.config.selectionColor,
-        selectionBorderColor: this.config.selectionBorderColor,
-        borderWidth: this.config.borderWidth,
-        cellHeight: this.config.cellHeight,
-        dimensionManager: this.config.dimensionManager as ColumnDimensionManager
-      }
-    );
-    
-    this.clipboardOverlay = new ClipboardOverlay(
-      this.layer,
-      this, // Pass self as coordinate provider
-      {
-        cellHeight: this.config.cellHeight,
-        dimensionManager: this.config.dimensionManager as ColumnDimensionManager
-      }
-    );
-    
-    this.dragPreviewOverlay = new DragPreviewOverlay(
-      this.layer,
-      {
-        selectionColor: this.config.selectionColor,
-        selectionBorderColor: this.config.selectionBorderColor,
-        cellWidth: this.config.cellWidth,
-        cellHeight: this.config.cellHeight
-      }
-    );
-    
-    this.columnDragOverlay = new ColumnDragOverlay(
-      this.layer,
-      this.config.dimensionManager as ColumnDimensionManager,
-      {
-        cellHeight: this.config.cellHeight,
-        headerHeight: 40 // Standard header height
-      }
-    );
-    
-    this.columnResizeOverlay = new ColumnResizeOverlay(
-      this.layer,
-      this.config.dimensionManager as ColumnDimensionManager,
-      {
-        cellHeight: this.config.cellHeight,
-        headerHeight: 40 // Standard header height
-      }
-    );
-    
-    // Initialize selection column overlay if enabled
-    // DISABLED: DOM handles checkbox rendering, we don't need canvas overlay for selection column
-    // The regular SelectionOverlay handles visual feedback for selected cells
-    if (false && this.config.enableSelectionColumn) {
-      this.selectionColumnOverlay = new SelectionColumnOverlay(
-        this.layer,
-        {
-          cellHeight: this.config.cellHeight,
-          headerHeight: 40
-        },
-        (event) => {
-          // Dispatch events to the parent through window for now
-          // TODO: Replace with proper event system
-          (window as any).vibegridxDispatch?.(event);
-        }
-      );
-    }
-    
-    // Send initial viewport if available
-    const viewportElement = this.container.closest('.vibegridx-viewport');
-    if (viewportElement) {
-      const initialViewport: ViewportInfo = {
-        start: 0,
-        end: Math.ceil(viewportElement.clientHeight / this.config.cellHeight),
-        height: viewportElement.clientHeight,
-        width: viewportElement.clientWidth,
-        scrollTop: 0,
-        itemHeight: this.config.cellHeight
-      };
-      
-      this.columnResizeOverlay.updateViewport(initialViewport);
-      this.updateViewport(initialViewport);
+    // PERFORMANCE FIX: Don't create anything until needed
+  }
+  
+  // Lazy stage initialization
+  private ensureStageInitialized(): void {
+    if (!this.stage) {
+      console.log('CanvasOverlay: Lazily initializing stage');
+      this.initializeStage();
     }
   }
   
+  // LAZY OVERLAY GETTERS - Create overlays only when needed
+  private getSelectionOverlay(): SelectionOverlay {
+    if (!this.selectionOverlay) {
+      console.log('CanvasOverlay: Lazily creating SelectionOverlay');
+      
+      // Ensure stage exists
+      this.ensureStageInitialized();
+      
+      // PERFORMANCE: Enable listening when we first need selection
+      if (!this.stage.listening()) {
+        console.log('CanvasOverlay: Enabling stage listening for selection');
+        this.stage.listening(true);
+        this.layer.listening(true);
+      }
+      
+      this.selectionOverlay = new SelectionOverlay(
+        this.layer,
+        this, // Pass self as coordinate provider
+        {
+          selectionColor: this.config.selectionColor,
+          selectionBorderColor: this.config.selectionBorderColor,
+          borderWidth: this.config.borderWidth,
+          cellHeight: this.config.cellHeight,
+          dimensionManager: this.config.dimensionManager as ColumnDimensionManager
+        }
+      );
+    }
+    return this.selectionOverlay;
+  }
+  
+  private getFillHandleLayer(): FillHandleLayer {
+    if (!this.fillHandleLayer) {
+      console.log('CanvasOverlay: Lazily creating FillHandleLayer');
+      this.ensureStageInitialized();
+      this.fillHandleLayer = new FillHandleLayer(
+        this.stage,
+        this, // Pass canvas overlay reference instead of coordinate system
+        {
+          cellHeight: this.config.cellHeight,
+          dimensionManager: this.config.dimensionManager as ColumnDimensionManager,
+          selectionBorderColor: this.config.selectionBorderColor
+        }
+      );
+    }
+    return this.fillHandleLayer;
+  }
+  
+  private getClipboardOverlay(): ClipboardOverlay {
+    if (!this.clipboardOverlay) {
+      console.log('CanvasOverlay: Lazily creating ClipboardOverlay');
+      this.ensureStageInitialized();
+      this.clipboardOverlay = new ClipboardOverlay(
+        this.layer,
+        this, // Pass self as coordinate provider
+        {
+          cellHeight: this.config.cellHeight,
+          dimensionManager: this.config.dimensionManager as ColumnDimensionManager
+        }
+      );
+    }
+    return this.clipboardOverlay;
+  }
+  
+  private getDragPreviewOverlay(): DragPreviewOverlay {
+    if (!this.dragPreviewOverlay) {
+      console.log('CanvasOverlay: Lazily creating DragPreviewOverlay');
+      this.ensureStageInitialized();
+      this.dragPreviewOverlay = new DragPreviewOverlay(
+        this.layer,
+        {
+          selectionColor: this.config.selectionColor,
+          selectionBorderColor: this.config.selectionBorderColor,
+          cellWidth: this.config.cellWidth,
+          cellHeight: this.config.cellHeight
+        }
+      );
+    }
+    return this.dragPreviewOverlay;
+  }
+  
+  private getColumnDragOverlay(): ColumnDragOverlay {
+    if (!this.columnDragOverlay) {
+      console.log('CanvasOverlay: Lazily creating ColumnDragOverlay');
+      this.ensureStageInitialized();
+      this.columnDragOverlay = new ColumnDragOverlay(
+        this.layer,
+        this.config.dimensionManager as ColumnDimensionManager,
+        {
+          cellHeight: this.config.cellHeight,
+          headerHeight: 40 // Standard header height
+        }
+      );
+    }
+    return this.columnDragOverlay;
+  }
+  
+  private getColumnResizeOverlay(): ColumnResizeOverlay {
+    if (!this.columnResizeOverlay) {
+      console.log('CanvasOverlay: Lazily creating ColumnResizeOverlay');
+      this.ensureStageInitialized();
+      this.columnResizeOverlay = new ColumnResizeOverlay(
+        this.layer,
+        this.config.dimensionManager as ColumnDimensionManager,
+        {
+          cellHeight: this.config.cellHeight,
+          headerHeight: 40 // Standard header height
+        }
+      );
+    }
+    return this.columnResizeOverlay;
+  }
+  
   private initializeStage(): void {
-    const viewportElement = this.container.closest('.vibegridx-viewport');
-    // Use the container's own dimensions which should be 100% of parent
-    const width = this.container.offsetWidth || viewportElement?.clientWidth || 800;
-    const height = this.container.offsetHeight || viewportElement?.clientHeight || 600;
-    
-    console.log('CanvasOverlay.initializeStage:', {
-      containerParent: this.container.parentElement?.className,
-      useFixedPositioning: this.config.useFixedPositioning,
-      containerDimensions: {
-        offsetWidth: this.container.offsetWidth,
-        offsetHeight: this.container.offsetHeight,
-        clientWidth: this.container.clientWidth,
-        clientHeight: this.container.clientHeight
-      },
-      viewportDimensions: viewportElement ? {
-        offsetWidth: viewportElement.offsetWidth,
-        offsetHeight: viewportElement.offsetHeight,
-        scrollWidth: viewportElement.scrollWidth,
-        scrollHeight: viewportElement.scrollHeight
-      } : null,
-      computedWidth: width,
-      computedHeight: height
-    });
+    // PERFORMANCE: Minimal initialization - just basics
+    const width = this.container.offsetWidth || 800;
+    const height = this.container.offsetHeight || 600;
     
     // Configure container based on positioning mode
     if (this.config.useFixedPositioning) {
@@ -190,35 +199,41 @@ export class CanvasOverlay implements CoordinateProvider {
       this.container.style.overflow = 'hidden';
     }
     
-    // Ensure container has an ID for Konva
+    // PERFORMANCE FIX: Use stable container ID to prevent initialization failures
     if (!this.container.id) {
-      this.container.id = 'vibegridx-canvas-' + Math.random().toString(36).substr(2, 9);
+      // Simple ID generation without DOM queries
+      this.container.id = `vibegridx-canvas-${Math.random().toString(36).substring(2, 9)}`;
     }
     
     this.stage = new Konva.Stage({
       container: this.container.id,
       width,
       height,
-      listening: true
+      listening: false // PERFORMANCE: Start with listening off
     });
     
     // Create and add the main layer NOW, after stage is created
-    this.layer = new Konva.Layer({ name: 'main-layer' });
+    this.layer = new Konva.Layer({ 
+      name: 'main-layer',
+      listening: false // PERFORMANCE: Start with listening off
+    });
     this.stage.add(this.layer);
     
-    // DEBUG: Add a semi-transparent background to visualize canvas bounds
-    const debugColor = this.config.useFixedPositioning ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
-    const debugBackground = new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: width,
-      height: height,
-      fill: debugColor, // Green for portal mode, red for legacy
-      listening: false
-    });
-    this.layer.add(debugBackground);
-    // Store reference so we can update it when viewport changes
-    (this as any).debugBackground = debugBackground;
+    // PERFORMANCE: Skip debug background unless explicitly enabled
+    if ((window as any).__VIBEGRIDX_DEBUG_CANVAS) {
+      const debugColor = this.config.useFixedPositioning ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+      const debugBackground = new Konva.Rect({
+        x: 0,
+        y: 0,
+        width: width,
+        height: height,
+        fill: debugColor, // Green for portal mode, red for legacy
+        listening: false
+      });
+      this.layer.add(debugBackground);
+      // Store reference so we can update it when viewport changes
+      (this as any).debugBackground = debugBackground;
+    }
     
     // Configure pointer events based on positioning mode
     if (this.config.useFixedPositioning) {
@@ -235,8 +250,8 @@ export class CanvasOverlay implements CoordinateProvider {
       this.container.style.pointerEvents = 'none';
     }
     
-    // Force a draw to ensure canvas is properly initialized
-    this.layer.draw();
+    // PERFORMANCE: Skip initial draw - let first selection trigger it
+    // this.layer.draw();
   }
   
   // Machine subscription removed - viewport updates come via canvas actor directly
@@ -269,7 +284,7 @@ export class CanvasOverlay implements CoordinateProvider {
       });
       
       // Pass coordinate mapping directly to selection overlay - no coordinate manager needed!
-      this.selectionOverlay.updateSelectionWithMapping(
+      this.getSelectionOverlay().updateSelectionWithMapping(
         context.selectedCells, 
         context.viewport, 
         context.coordinateMapping
@@ -278,26 +293,26 @@ export class CanvasOverlay implements CoordinateProvider {
     
     // Update fill handle
     if (context.shapesVisible.fillHandle && context.selectedCells.size > 0 && context.viewport) {
-      this.fillHandleLayer.renderFillHandle(context.selectedCells, context.viewport);
+      this.getFillHandleLayer().renderFillHandle(context.selectedCells, context.viewport);
     } else {
-      this.fillHandleLayer.hideFillHandle();
+      this.getFillHandleLayer().hideFillHandle();
     }
     
     // Update fill preview
     if (context.shapesVisible.fillPreview && context.fillState?.previewCells.size) {
-      this.fillHandleLayer.renderFillPreview(context.fillState.previewCells, context.viewport!);
+      this.getFillHandleLayer().renderFillPreview(context.fillState.previewCells, context.viewport!);
     } else {
-      this.fillHandleLayer.clearFillPreview();
+      this.getFillHandleLayer().clearFillPreview();
     }
     
     // Update clipboard indicator
-    this.clipboardOverlay.updateIndicator(
+    this.getClipboardOverlay().updateIndicator(
       context.shapesVisible.copyIndicator ? context.clipboardState : null,
       context.viewport
     );
     
     // Update drag preview
-    this.dragPreviewOverlay.updatePreview(
+    this.getDragPreviewOverlay().updatePreview(
       context.shapesVisible.dragPreview ? context.dragState : null,
       context.viewport
     );
@@ -336,43 +351,10 @@ export class CanvasOverlay implements CoordinateProvider {
       columnCount: mapping.columns?.length || 0
     });
     
-    // Update legacy coordinate manager for now (will remove this)
-    if (this.coordinateManager && mapping) {
-      if (mapping.rows && mapping.rows.length > 0) {
-        // Transform coordinate mapping format to coordinate manager format
-        const transformedRows = mapping.rows.map((row: any) => ({
-          id: row.rowId, // Transform rowId to id
-          data: {} // Minimal data object for coordinate manager
-        }));
-        this.coordinateManager.updateRows(transformedRows, mapping.sortBy || []);
-        console.log('CanvasOverlay: Updated coordinate manager rows', {
-          originalCount: mapping.rows.length,
-          transformedCount: transformedRows.length
-        });
-      }
-      if (mapping.columns && mapping.columns.length > 0) {
-        // Transform coordinate mapping format to coordinate manager format  
-        const transformedColumns = mapping.columns.map((col: any) => ({
-          id: col.columnId, // Transform columnId to id
-          name: col.columnId,
-          field: col.columnId,
-          width: col.width || 120
-        }));
-        this.coordinateManager.updateColumns(transformedColumns);
-        console.log('CanvasOverlay: Updated coordinate manager columns', {
-          originalCount: mapping.columns.length,
-          transformedCount: transformedColumns.length
-        });
-      }
-      console.log('CanvasOverlay: Updated coordinate manager with transformed mapping');
-    }
+    // PERFORMANCE: Store mapping for later use, don't process now
+    this.coordinateMapping = mapping;
     
-    // Force overlay updates with new coordinates
-    // Get current context from machine to update overlays
-    if (this.machine) {
-      const context = this.machine.getSnapshot().context;
-      this.updateAllOverlays(context);
-    }
+    // Legacy coordinate manager update will happen when actually needed
   }
   
   // DEPRECATED: Remove direct data mapping updates
@@ -387,7 +369,7 @@ export class CanvasOverlay implements CoordinateProvider {
   
   updateSelectionVisual(visualCells: VisualCellPosition[]): void {
     // Update selection overlay with pre-calculated visual positions
-    this.selectionOverlay.updateWithVisualPositions(visualCells);
+    this.getSelectionOverlay().updateWithVisualPositions(visualCells);
     
     // Redraw the layer
     this.layer.batchDraw();
@@ -395,18 +377,18 @@ export class CanvasOverlay implements CoordinateProvider {
   
   updateColumnDrag(dragState: ColumnDragState | null, mouseX: number, mouseY: number): void {
     if (dragState && dragState.isDragging) {
-      this.columnDragOverlay.updateDragPreview(dragState, mouseX, mouseY);
+      this.getColumnDragOverlay().updateDragPreview(dragState, mouseX, mouseY);
     } else {
-      this.columnDragOverlay.clear();
+      this.getColumnDragOverlay().clear();
     }
   }
   
   updateColumnResize(resizeState: ColumnResizeState | null): void {
-    this.columnResizeOverlay.updateResizePreview(resizeState);
+    this.getColumnResizeOverlay().updateResizePreview(resizeState);
   }
   
   getColumnDropIndex(mouseX: number): number {
-    return this.columnDragOverlay.getDropIndex(mouseX);
+    return this.getColumnDragOverlay().getDropIndex(mouseX);
   }
   
   updateSelectionColumn(params: {
@@ -429,13 +411,10 @@ export class CanvasOverlay implements CoordinateProvider {
     // Canvas MUST move with scroll to stay aligned with table content
     this.container.style.transform = `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`;
     
-    console.log('CanvasOverlay.updateViewport with transform:', {
-      scrollTop: viewport.scrollTop,
-      scrollLeft: viewport.scrollLeft || 0,
-      transform: `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`,
-      containerBounds: this.container.getBoundingClientRect(),
-      stageBounds: this.stage ? { x: this.stage.x(), y: this.stage.y(), width: this.stage.width(), height: this.stage.height() } : null
-    });
+    // PERFORMANCE: Skip all stage operations if stage doesn't exist yet
+    if (!this.stage) {
+      return;
+    }
     
     // Get actual viewport element dimensions (not from viewport parameter which may be wrong)
     const viewportElement = this.container.closest('.vibegridx-viewport') as HTMLElement;
@@ -461,10 +440,10 @@ export class CanvasOverlay implements CoordinateProvider {
       this.layer.batchDraw();
     }
     
-    // No machine to send to - viewport updates come via canvas actor directly
-    
-    // Update resize overlay with viewport info
-    this.columnResizeOverlay.updateViewport(viewport);
+    // Update resize overlay with viewport info only if it exists
+    if (this.columnResizeOverlay) {
+      this.columnResizeOverlay.updateViewport(viewport);
+    }
   }
   
   // Expose methods for event handlers
@@ -511,18 +490,20 @@ export class CanvasOverlay implements CoordinateProvider {
   
   destroy(): void {
     // Only stop machine if we created it
-    if (!this.config.overlayActor) {
+    if (!this.config.overlayActor && this.machine) {
       this.machine.stop();
     }
     
-    // Destroy feature overlays
-    this.selectionOverlay.destroy();
-    this.clipboardOverlay.destroy();
-    this.dragPreviewOverlay.destroy();
-    this.columnDragOverlay.destroy();
+    // Destroy feature overlays only if they were created
+    if (this.selectionOverlay) this.selectionOverlay.destroy();
+    if (this.clipboardOverlay) this.clipboardOverlay.destroy();
+    if (this.dragPreviewOverlay) this.dragPreviewOverlay.destroy();
+    if (this.columnDragOverlay) this.columnDragOverlay.destroy();
+    if (this.columnResizeOverlay) this.columnResizeOverlay.destroy();
+    if (this.selectionColumnOverlay) this.selectionColumnOverlay.destroy();
     
     // Destroy layers
-    this.fillHandleLayer.destroy();
+    if (this.fillHandleLayer) this.fillHandleLayer.destroy();
     this.layer.destroy();
     this.stage.destroy();
   }

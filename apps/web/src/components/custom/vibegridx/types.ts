@@ -441,7 +441,7 @@ export interface TableConfig {
   id: string;
   entityType: string;
   columns: Column<any>[];
-  atomConfig: import('./machines/table-machine/slices/atom-slice').AtomSliceConfig; // Required
+  entities?: any[]; // CLEAN API: Pass entities directly instead of atomConfig
   initialData?: TableRow[];
   settings?: TableSettings;
   enableSelectionColumn?: boolean;
@@ -497,6 +497,9 @@ export interface RendererOptions {
   enableAnimations?: boolean;
   animationDuration?: number;
   borderWidth?: number;
+  
+  // Performance: Initial viewport for virtual scrolling
+  initialViewport?: ViewportInfo;
 }
 
 export interface RenderState {

@@ -46,6 +46,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
   let renderState: RenderState | null = null;
   let isInitializing = false;
   let isInitialized = false;
+  let lastRenderedVersion = -1; // Track last rendered version to prevent duplicates
   let pendingRenderEvents: Array<{ type: string; state?: RenderState; coordinateMapping?: any }> = [];
   
   console.log('RendererActor: Created callback actor');
@@ -87,6 +88,17 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                   sendBack({
                     type: 'CANVAS_CONTAINER_READY',
                     container: state.container
+                  });
+                }
+                
+                // Handle render complete event
+                if (state.type === 'render.complete') {
+                  console.log('RendererActor: Render complete, emitting RENDER_COMPLETE');
+                  sendBack({
+                    type: 'RENDER_COMPLETE',
+                    renderTime: state.renderTime,
+                    rowCount: state.rowCount,
+                    visibleRange: state.visibleRange
                   });
                 }
                 
@@ -304,6 +316,15 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             return;
           }
           
+          // PERFORMANCE: Skip duplicate render events with same version
+          if (event.state.version && event.state.version <= lastRenderedVersion) {
+            console.log('RendererActor: Skipping duplicate render - version already processed', {
+              currentVersion: event.state.version,
+              lastRenderedVersion
+            });
+            return;
+          }
+          
           console.log('RendererActor: Rendering with state:', {
             rows: event.state.rows?.length,
             columns: event.state.columns?.length,
@@ -318,6 +339,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             console.log('RendererActor: About to call renderer.render()');
             renderer.render(event.state);
             console.log('RendererActor: renderer.render() completed successfully');
+            
+            // PERFORMANCE: Update version tracking after successful render
+            if (event.state.version) {
+              lastRenderedVersion = event.state.version;
+            }
           } catch (renderError) {
             console.error('RendererActor: Error in renderer.render():', renderError);
             throw renderError;
