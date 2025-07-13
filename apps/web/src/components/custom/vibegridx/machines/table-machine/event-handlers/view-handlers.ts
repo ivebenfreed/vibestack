@@ -146,6 +146,11 @@ export const viewHandlers = {
           from: event.fromIndex,
           to: event.toIndex
         });
+      },
+      
+      // Need to reprocess view data to update coordinate mappings
+      ({ self }) => {
+        self.send({ type: 'VIEW_DATA_UPDATED' });
       }
     ]
   },
@@ -156,6 +161,11 @@ export const viewHandlers = {
       
       () => {
         console.log('TableMachine: Column order reset to default');
+      },
+      
+      // Need to reprocess view data to update coordinate mappings
+      ({ self }) => {
+        self.send({ type: 'VIEW_DATA_UPDATED' });
       }
     ]
   },

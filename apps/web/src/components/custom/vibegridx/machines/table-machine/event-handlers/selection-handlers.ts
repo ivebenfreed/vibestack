@@ -56,17 +56,14 @@ export const selectionHandlers = {
             }
           });
           
-          // Also render fill handle for selected cells
-          if (context.viewport) {
-            self.send({
-              type: 'FORWARD_TO_CANVAS',
-              event: {
-                type: 'RENDER_FILL_HANDLE',
-                selectedCells: context.selectedCells,
-                viewport: context.viewport
-              }
-            });
-          }
+          // Also render fill handle using the same visual positions
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'RENDER_FILL_HANDLE',
+              visualCells: visualPositions
+            }
+          });
         }
       },
       

@@ -31,7 +31,7 @@ export type CanvasActorEvent =
   | { type: 'UPDATE_COLUMN_RESIZE'; resizeState: any }
   | { type: 'SHOW_COPY_INDICATOR'; isCut: boolean }
   | { type: 'HIDE_COPY_INDICATOR' }
-  | { type: 'RENDER_FILL_HANDLE'; selectedCells: Set<string>; viewport: ViewportInfo }
+  | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[] }
   | { type: 'RENDER_FILL_PREVIEW'; previewCells: Set<string>; viewport: ViewportInfo }
   | { type: 'CLEAR_FILL_PREVIEW' }
   | { type: 'HIDE_FILL_HANDLE' }
@@ -204,9 +204,11 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             return;
           }
           
-          console.log('CanvasActor: Rendering fill handle');
+          console.log('CanvasActor: Rendering fill handle with visual positions:', {
+            cellCount: event.visualCells.length
+          });
           const fillHandleLayer = (canvas as any).getFillHandleLayer();
-          fillHandleLayer.renderFillHandle(event.selectedCells, event.viewport);
+          fillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells);
           break;
           
         case 'RENDER_FILL_PREVIEW':

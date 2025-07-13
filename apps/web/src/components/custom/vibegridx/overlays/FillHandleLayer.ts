@@ -4,6 +4,7 @@ import type { ViewportInfo } from '../types';
 import type { CoordinateProvider } from './CoordinateProvider';
 import { CoordinateHelper } from './CoordinateProvider';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import type { VisualCellPosition } from './OverlayTypes';
 
 // ====================================
 // FILL HANDLE LAYER - Modular Implementation
@@ -76,6 +77,48 @@ export class FillHandleLayer {
   
   // setMachine removed - using direct canvas actor approach
   
+  /**
+   * Render fill handle using pre-calculated visual positions (pure actors approach)
+   */
+  renderFillHandleWithVisualPositions(visualCells: VisualCellPosition[]): void {
+    if (visualCells.length === 0) {
+      this.hideFillHandle();
+      return;
+    }
+    
+    // Calculate bounds from visual positions
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    for (const cell of visualCells) {
+      const cellRight = cell.x + cell.width;
+      const cellBottom = cell.y + cell.height;
+      
+      minX = Math.min(minX, cell.x);
+      minY = Math.min(minY, cell.y);
+      maxX = Math.max(maxX, cellRight);
+      maxY = Math.max(maxY, cellBottom);
+    }
+    
+    if (minX === Infinity) {
+      this.hideFillHandle();
+      return;
+    }
+    
+    // Position fill handle at bottom-right of selection
+    const handleX = maxX;
+    const handleY = maxY;
+    
+    // Create or update fill handle
+    if (!this.activeFillHandle) {
+      this.createFillHandle(handleX, handleY);
+    } else {
+      this.updateFillHandlePosition(handleX, handleY);
+    }
+  }
+  
+  /**
+   * @deprecated Use renderFillHandleWithVisualPositions instead
+   */
   renderFillHandle(selectedCells: Set<string>, viewport: ViewportInfo): void {
     if (selectedCells.size === 0) {
       this.hideFillHandle();
