@@ -508,6 +508,7 @@ export const tableBaseMachine = setup({
                   columnVisibility: context.columnVisibility,
                   columnOrder: context.columnOrder
                 },
+                columnWidths: context.columnWidths,
                 viewport: context.viewport,
                 rowHeight: context.rowHeight,
                 enableSelectionColumn: context.enableSelectionColumn,

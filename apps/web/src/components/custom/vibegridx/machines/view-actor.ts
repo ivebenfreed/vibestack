@@ -49,6 +49,7 @@ export interface ViewActorInput {
   columns: Column[];
   columnVisibility: Record<string, boolean>;
   columnOrder: string[];
+  columnWidths?: Record<string, number>; // Actual column widths (including resized)
   
   // Viewport info for coordinate calculation
   viewport?: ViewportInfo;
@@ -254,7 +255,8 @@ const applyFilters = (rows: TableRow[], filters: FilterConfig[]): TableRow[] => 
 const calculateCoordinateMapping = (
   processedRows: TableRow[],
   visibleColumns: Column[],
-  rowHeight: number = 40
+  rowHeight: number = 40,
+  columnWidths?: Record<string, number>
 ) => {
   const startTime = performance.now();
   
@@ -275,14 +277,18 @@ const calculateCoordinateMapping = (
   
   let currentOffset = 0;
   const columnMapping = visibleColumns.map((column, index) => {
-    const width = column.width || 120;
+    // Use actual column width if available, otherwise fall back to column definition
+    const width = columnWidths?.[column.id] || column.width || 120;
     const mapping = {
       columnId: column.id,
       index,
       offset: currentOffset,
       width
     };
-    console.log(`calculateCoordinateMapping: Column ${column.id} at visual index ${index}, offset ${currentOffset}, width ${width}`);
+    console.log(`calculateCoordinateMapping: Column ${column.id} at visual index ${index}, offset ${currentOffset}, width ${width}`, {
+      actualWidth: columnWidths?.[column.id],
+      defaultWidth: column.width
+    });
     currentOffset += width;
     return mapping;
   });
@@ -423,7 +429,8 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
   const coordinateMapping = calculateCoordinateMapping(
     sortedRows,
     visibleColumns,
-    input.rowHeight || 40
+    input.rowHeight || 40,
+    input.columnWidths
   );
   coordinateMapping.sortBy = input.sortBy; // Set the actual sortBy configuration
   
@@ -484,12 +491,13 @@ export const createViewActorInput = (config: {
     columnVisibility?: Record<string, boolean>;
     columnOrder?: string[];
   };
+  columnWidths?: Record<string, number>;
   viewport?: ViewportInfo;
   rowHeight?: number;
   enableSelectionColumn?: boolean;
   relationshipResolvers?: Record<string, (id: string | string[]) => string>;
 }): ViewActorInput => {
-  const { entities, columns, viewState = {}, viewport, rowHeight = 40, enableSelectionColumn = false, relationshipResolvers } = config;
+  const { entities, columns, viewState = {}, columnWidths, viewport, rowHeight = 40, enableSelectionColumn = false, relationshipResolvers } = config;
   
   return {
     entities,
@@ -499,6 +507,7 @@ export const createViewActorInput = (config: {
     columns,
     columnVisibility: viewState.columnVisibility || Object.fromEntries(columns.map(col => [col.id, true])),
     columnOrder: viewState.columnOrder || columns.map(col => col.id),
+    columnWidths,
     viewport,
     rowHeight,
     enableSelectionColumn,
