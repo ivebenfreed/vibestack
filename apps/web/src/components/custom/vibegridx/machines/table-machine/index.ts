@@ -433,46 +433,188 @@ export const tableBaseMachine = setup({
             },
             assign({
               entities: ({ event }) => event.entities || [],
-              allRowIds: ({ event }) => event.entities?.map((e: any) => e.id) || []
+              allRowIds: ({ event }) => event.entities?.map((e: any) => e.id) || [],
+              // FAST PATH: Mark that entities are ready for fast path
+              entitiesReady: true
             })
           ]
         },
         
         RENDERER_READY: {
-          target: 'active',
           actions: [
+            // Mark renderer as ready for fast path check
+            assign({ rendererReady: true }),
             ({ context }) => {
-              console.log('🟢 STEP 2: RENDERER_READY received, transitioning to active state', {
+              console.log('🔍 RENDERER_READY received', {
+                hasEntities: context.entities?.length > 0,
                 entityCount: context.entities?.length || 0,
-                hasEntities: !!(context.entities?.length)
+                willUseFastPath: context.entities?.length > 0
               });
-            },
-            ({ self }) => {
-              console.log('🟢 STEP 2a: RENDERER_READY action completed, transition should execute now');
-              
-              // Check state after a brief delay to see if transition happened
-              setTimeout(() => {
-                try {
-                  const snapshot = self.getSnapshot();
-                  console.log('🟢 STEP 2b: State check after RENDERER_READY', {
-                    currentState: snapshot.value,
-                    machineStatus: snapshot.status,
-                    contextKeys: Object.keys(snapshot.context || {}),
-                    hasError: snapshot.status === 'error'
-                  });
-                  
-                  if (snapshot.status === 'error') {
-                    console.error('🔴 STEP 2c: Machine is in error state! Checking error details...');
-                  }
-                } catch (error) {
-                  console.error('🔴 STEP 2b: Error getting snapshot:', error);
+            }
+          ],
+          // Check if we can use fast path immediately
+          target: [
+            {
+              guard: ({ context }) => context.entities?.length > 0,
+              target: 'processingInitialData',
+              actions: [
+                () => {
+                  console.log('🚀 FAST PATH: Both renderer and entities ready, skipping to processingInitialData');
                 }
-              }, 1);
+              ]
+            },
+            {
+              // Otherwise go to normal flow
+              target: '#tableBaseMachine.active'
             }
           ]
         },
         
         // CANVAS_CONTAINER_READY: Deferred to post-render in active state
+      },
+      
+      // Additional states for initializing
+      states: {
+        waitingForData: {
+          // Renderer is ready but no entities yet
+          entry: [
+            () => {
+              console.log('⏳ FAST PATH: Renderer ready, waiting for entities...');
+            }
+          ],
+          on: {
+            SET_VISIBLE_ENTITIES: {
+              target: 'processingInitialData',
+              actions: [
+                ({ event }) => {
+                  console.log('🚀 FAST PATH: Entities received while waiting, processing immediately', {
+                    entityCount: event.entities?.length || 0
+                  });
+                },
+                assign({
+                  entities: ({ event }) => event.entities || [],
+                  allRowIds: ({ event }) => event.entities?.map((e: any) => e.id) || []
+                })
+              ]
+            }
+          }
+        },
+        
+        processingInitialData: {
+          entry: [
+            ({ context }) => {
+              console.log('🚀 FAST PATH: Processing initial data directly', {
+                entityCount: context.entities?.length || 0,
+                timestamp: performance.now()
+              });
+            }
+          ],
+          
+          invoke: {
+            src: 'viewActor',
+            input: ({ context }) => {
+              // Same input as processingViewData state
+              return createViewActorInput({
+                entities: context.entities || [],
+                columns: context.columns,
+                viewState: {
+                  sortBy: context.sortBy,
+                  filters: context.filters,
+                  groupBy: context.groupBy,
+                  columnVisibility: context.columnVisibility,
+                  columnOrder: context.columnOrder
+                },
+                columnWidths: context.columnWidths,
+                viewport: context.viewport,
+                rowHeight: context.rowHeight,
+                enableSelectionColumn: context.enableSelectionColumn,
+                relationshipResolvers: context.relationshipResolvers
+              });
+            },
+            onDone: {
+              // Transition directly to active.idle with render complete
+              target: '#tableBaseMachine.active.idle',
+              actions: [
+                ({ event }) => {
+                  console.log('🚀 FAST PATH: ViewActor completed, transitioning to active.idle', {
+                    processedRowCount: event.output.processedRows?.length || 0,
+                    timestamp: performance.now()
+                  });
+                },
+                
+                // Same actions as processingViewData onDone
+                // Update processed rows
+                assign({
+                  rows: ({ event }) => event.output.processedRows,
+                  visibleRowIds: ({ event }) => event.output.processedRows.map((r: any) => r.id),
+                  version: ({ context }) => context.version + 1
+                }),
+                
+                // Update coordinate mapping
+                assign({
+                  coordinateMapping: ({ event }) => event.output.coordinateMapping
+                }),
+                
+                // Send coordinate update to canvas (will be created post-render)
+                ({ context, event }) => {
+                  if (context.actors.canvasActor) {
+                    context.actors.canvasActor.send({
+                      type: 'UPDATE_COORDINATES',
+                      mapping: event.output.coordinateMapping
+                    });
+                  }
+                },
+                
+                // Send processed data to renderer
+                sendTo(
+                  ({ context }) => context.actors.rendererActor!,
+                  ({ event, context }) => ({
+                    type: 'RENDER',
+                    state: {
+                      rows: event.output.processedRows,
+                      columns: event.output.visibleColumns,
+                      selectedCells: context.selectedCells,
+                      editingCell: null,
+                      groupedData: [],
+                      optimisticOperations: new Map(),
+                      version: context.version + 1,
+                      sortBy: context.sortBy,
+                      columnVisibility: context.columnVisibility,
+                      columnOrder: context.columnOrder,
+                      columnWidths: context.columnWidths,
+                      columnOffsets: context.columnOffsets,
+                      totalWidth: context.totalWidth,
+                      totalHeight: context.totalHeight
+                    },
+                    coordinateMapping: event.output.coordinateMapping
+                  })
+                ),
+                
+                // PERFORMANCE: Log fast path completion
+                ({ context }) => {
+                  console.log('🚀 FAST PATH: Initial render sent', {
+                    version: context.version,
+                    timestamp: performance.now()
+                  });
+                },
+                
+                // Spawn canvas actor post-render (same as normal path)
+                assign({
+                  actors: ({ context, spawn }) => {
+                    if (!context.actors.canvasActor) {
+                      console.log('🚀 FAST PATH: Spawning canvas actor post-render');
+                      return {
+                        ...context.actors,
+                        canvasActor: spawn('canvasActor', { id: 'canvas' })
+                      };
+                    }
+                    return context.actors;
+                  }
+                })
+              ]
+            }
+          }
+        }
       }
     },
     

@@ -274,21 +274,22 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
   const tableSend = tableActor.send;
   
-  // Simple entities flow: atoms → machine → view → render
-  // PERFORMANCE FIX: Send entities immediately - machine will handle timing
-  useEffect(() => {
-    if (entities && entities.length > 0) {
-      const sendStartTime = performance.now();
-      console.log('🚀 VibeGridX: Sending entities to machine for processing:', {
-        entityCount: entities.length,
-        timestamp: sendStartTime
-      });
-      tableSend({
-        type: 'SET_VISIBLE_ENTITIES',
-        entities: entities
-      });
-    }
-  }, [entities.length]); // Only depend on entities, not machine state
+  // PERFORMANCE: Track if entities have been sent to avoid duplicates
+  const entitiesSentRef = useRef(false);
+  
+  // PERFORMANCE: Send entities synchronously on first render with data
+  if (entities && entities.length > 0 && !entitiesSentRef.current) {
+    const sendStartTime = performance.now();
+    console.log('🚀 VibeGridX: Sending entities synchronously to machine:', {
+      entityCount: entities.length,
+      timestamp: sendStartTime
+    });
+    tableSend({
+      type: 'SET_VISIBLE_ENTITIES',
+      entities: entities
+    });
+    entitiesSentRef.current = true;
+  }
   
   // PERFORMANCE: Remove excessive debug logging to reduce useEffect cascade
   
@@ -346,50 +347,61 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const handleColumnResizeEnd = createColumnResizeEndHandler(tableSend);
   
   // ====================================
-  // MINIMAL RENDERER INITIALIZATION
+  // SYNCHRONOUS RENDERER INITIALIZATION
   // ====================================
   
-  // PERFORMANCE FIX: Initialize renderer when container is ready
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // PERFORMANCE: Track renderer initialization state
+  const rendererInitializedRef = useRef(false);
+  const pendingRendererOptionsRef = useRef<any>(null);
+  
+  // PERFORMANCE: Create renderer options synchronously (no useEffect delay)
+  const rendererOptions = useMemo(() => ({
+    // Don't pass container yet - will be set when ref is attached
+    enableSelectionColumn: enableSelectionColumn,
+    cellHeight: 40,
+    // Add event handlers
+    onColumnClick: handleColumnClick,
+    onColumnDragStart: handleColumnDragStart,
+    onColumnDragEnd: handleColumnDragEnd,
+    onColumnResizeStart: handleColumnResizeStart,
+    onColumnResizeMove: handleColumnResizeMove,
+    onColumnResizeEnd: handleColumnResizeEnd
+  }), [enableSelectionColumn, handleColumnClick, handleColumnDragStart, handleColumnDragEnd, handleColumnResizeStart, handleColumnResizeMove, handleColumnResizeEnd]);
+  
+  // Store pending options for when container is ready
+  pendingRendererOptionsRef.current = rendererOptions;
+  
+  // PERFORMANCE: Initialize renderer synchronously when container ref is attached
+  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    if (node && !rendererInitializedRef.current) {
+      const initStartTime = performance.now();
+      console.log('🚀 VibeGridX: Container attached, initializing renderer synchronously:', {
+        timestamp: initStartTime
+      });
+      
+      // Add container to options
+      const optionsWithContainer = {
+        ...pendingRendererOptionsRef.current,
+        container: node
+      };
+      
+      (window as any).__vibegridx_renderer_options = optionsWithContainer;
+      
+      // Send initialize immediately - no useEffect delay
+      console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER synchronously:', {
+        timestamp: performance.now()
+      });
+      tableSend({
+        type: 'INITIALIZE_RENDERER',
+        options: optionsWithContainer
+      });
+      
+      rendererInitializedRef.current = true;
+    }
     
-    const initStartTime = performance.now();
-    console.log('🚀 VibeGridX: Starting renderer initialization:', {
-      timestamp: initStartTime
-    });
-    
-    // PERFORMANCE: Minimal initialization - just basics
-    const rendererOptions = {
-      container: containerRef.current,
-      // Don't pass columns during init - wait for properly ordered columns from view actor
-      // columns: columns,
-      enableSelectionColumn: enableSelectionColumn,
-      cellHeight: 40,
-      // Add event handlers
-      onColumnClick: handleColumnClick,
-      onColumnDragStart: handleColumnDragStart,
-      // onColumnDragMove: handleColumnDragMove, // Not needed - visual feedback is handled in DOM
-      onColumnDragEnd: handleColumnDragEnd,
-      onColumnResizeStart: handleColumnResizeStart,
-      onColumnResizeMove: handleColumnResizeMove,
-      onColumnResizeEnd: handleColumnResizeEnd
-    };
-    
-    (window as any).__vibegridx_renderer_options = rendererOptions;
-    
-    // Send initialize to machine - it will forward to renderer actor when ready
-    console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER to machine:', {
-      timestamp: performance.now()
-    });
-    tableSend({
-      type: 'INITIALIZE_RENDERER',
-      options: rendererOptions
-    });
-    
-    return () => {
-      delete (window as any).__vibegridx_renderer_options;
-    };
-  }, []); // Only run once when component mounts
+    // Still store ref for other uses
+    containerRef.current = node;
+  }, [tableSend]);
   
   // Selection state sync - REMOVED: Now handled reactively through XState event flow
   // useSelectionStateSync(tableActor, refs);
@@ -417,17 +429,15 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // is handled by AtomicTableRenderer (direct DOM) and CanvasOverlay (Konva).
   // No React re-renders needed after initial mount.
   
-  // Track container attachment
-  useEffect(() => {
-    if (containerRef.current) {
-      console.log('🎯 VibeGridX: Container ref attached', {
-        container: containerRef.current,
-        timestamp: performance.now()
-      });
-    }
-  }, []);
-  
   // No state watching needed - machine handles all rendering internally
+  // Container tracking moved to synchronous callback ref
+  
+  // Cleanup window variable on unmount
+  useEffect(() => {
+    return () => {
+      delete (window as any).__vibegridx_renderer_options;
+    };
+  }, []);
   
   // ====================================
   // PUBLIC API
@@ -464,10 +474,12 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   // Attach drag handlers to the viewport after renderer is ready
   useEffect(() => {
-    // Attach handlers after short delay to allow renderer to create viewport
+    if (!containerRef.current) return;
     
-    // PERFORMANCE FIX: Use a ref to prevent duplicate event handler attachment
+    // PERFORMANCE: Retry logic to find viewport after renderer creates it
     let attached = false;
+    let retryCount = 0;
+    const maxRetries = 20;
     
     const attachHandlers = (viewport: HTMLElement) => {
       if (attached) return; // Prevent duplicates
@@ -476,32 +488,52 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       attached = true;
+      console.log('VibeGridX: Drag handlers attached successfully');
     };
     
-    // Get the viewport element from the container
-    const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
-    if (!viewport) {
-      // Renderer might not have created viewport yet, wait a bit
-      const timer = setTimeout(() => {
-        const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
-        if (viewport) {
-          attachHandlers(viewport);
-        }
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
+    const tryAttach = () => {
+      const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
+      if (viewport) {
+        attachHandlers(viewport);
+        return true;
+      }
+      return false;
+    };
     
-    attachHandlers(viewport);
+    // Try immediately
+    if (!tryAttach() && retryCount < maxRetries) {
+      // Retry with exponential backoff
+      const retryTimer = setInterval(() => {
+        retryCount++;
+        if (tryAttach() || retryCount >= maxRetries) {
+          clearInterval(retryTimer);
+        }
+      }, 10); // Check every 10ms
+      
+      return () => {
+        clearInterval(retryTimer);
+        if (attached) {
+          const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
+          if (viewport) {
+            viewport.removeEventListener('mousedown', handleMouseDown);
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+          }
+        }
+      };
+    }
     
     return () => {
       if (attached) {
-        viewport.removeEventListener('mousedown', handleMouseDown);
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
+        if (viewport) {
+          viewport.removeEventListener('mousedown', handleMouseDown);
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+        }
       }
     };
-  }, []); // Only run once on mount
+  }, [handleMouseDown, handleMouseMove, handleMouseUp]);
   
   // ====================================
   // RENDER
@@ -533,7 +565,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       
       {/* Atomic Renderer Container */}
       <div
-        ref={containerRef}
+        ref={containerRefCallback}
         className="vibegridx-renderer"
         style={{ width: '100%', height: 'calc(100% - 48px)' }} // Subtract header height
       />
