@@ -34,9 +34,6 @@ import { editActor } from '../../actors/edit-actor';
 import { dragActor } from '../../actors/drag-actor';
 // No overlay actor needed - canvas subscribes directly to table machine context
 
-// Import managers (for backward compatibility)
-import { createVibeGridXCoordinateManager } from '../../coordinates/VibeGridXCoordinateManager';
-
 // ====================================
 // CONTEXT CREATION
 // ====================================
@@ -122,30 +119,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Spread atom state
     ...atomState,
     
-    // Coordinate manager for backward compatibility
-    coordinateManager: (() => {
-      const manager = createVibeGridXCoordinateManager();
-      // Initialize with columns - always include selection column
-      if (input.columns && input.columns.length > 0) {
-        // Use persisted column order if available
-        const columnOrder = persistedData?.columnOrder || input.columns.map(col => col.id);
-        
-        // Reorder columns based on persisted order
-        const orderedColumns = columnOrder
-          .filter(colId => colId !== '__selection')
-          .map(colId => input.columns.find(col => col.id === colId))
-          .filter(Boolean);
-        
-        const columns = [{ id: '__selection', name: 'Select', field: '__selection', width: 48 }, ...orderedColumns];
-        manager.updateColumns(columns);
-        
-        console.log('TableMachine: Initialized coordinate manager with column order:', {
-          persistedOrder: columnOrder,
-          finalOrder: columns.map(c => c.id)
-        });
-      }
-      return manager;
-    })(),
+    // DEPRECATED: Legacy coordinate manager - disabled in favor of unified coordinateMapping
+    coordinateManager: null,
     
     // Coordinate mapping from coordinate actor
     coordinateMapping: null,
@@ -629,8 +604,7 @@ export const tableBaseMachine = setup({
                       enableAnimations: false,
                       animationDuration: 0,
                       borderWidth: 2,
-                      dimensionManager: context.dimensionManager,
-                      coordinateManager: context.coordinateManager
+                      dimensionManager: context.dimensionManager
                     }
                   });
                   
@@ -720,8 +694,7 @@ export const tableBaseMachine = setup({
                     enableAnimations: false,
                     animationDuration: 0,
                     borderWidth: 2,
-                    dimensionManager: context.dimensionManager,
-                    coordinateManager: context.coordinateManager
+                    dimensionManager: context.dimensionManager
                   }
                 });
                 

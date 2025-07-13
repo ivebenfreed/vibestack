@@ -363,24 +363,6 @@ export const viewHandlers = {
       // Clear drag state
       viewActions.clearColumnDrag,
       
-      // Update coordinate manager with new column order
-      ({ context }) => {
-        if (context.coordinateManager && context.columns) {
-          // Reorder columns based on new order
-          const orderedColumns = context.columnOrder
-            .filter(colId => colId !== '__selection')
-            .map(colId => context.columns.find(col => col.id === colId))
-            .filter(Boolean);
-          
-          const columns = [{ id: '__selection', name: 'Select', field: '__selection', width: 48 }, ...orderedColumns];
-          context.coordinateManager.updateColumns(columns);
-          
-          console.log('TableMachine: Updated coordinate manager after column drag', {
-            newOrder: columns.map(c => c.id)
-          });
-        }
-      },
-      
       // Persist the state
       'persistSnapshot',
       
