@@ -96,7 +96,7 @@ export const createInitialViewState = (
 export const viewActions = {
   // Sorting actions
   setSortBy: assign({
-    sortBy: ({ context }, event: { sortBy: SortConfig[] }) => {
+    sortBy: ({ context, event }) => {
       saveToStorage(context.entityType, 'sortBy', event.sortBy);
       return event.sortBy;
     }
@@ -142,7 +142,7 @@ export const viewActions = {
   
   // Filter actions
   setFilters: assign({
-    filters: ({ context }, event: { filters: FilterConfig[] }) => {
+    filters: ({ context, event }) => {
       saveToStorage(context.entityType, 'filters', event.filters);
       return event.filters;
     }
@@ -150,7 +150,7 @@ export const viewActions = {
   
   // Grouping actions
   setGroupBy: assign({
-    groupBy: ({ context }, event: { groupBy: string[] }) => {
+    groupBy: ({ context, event }) => {
       saveToStorage(context.entityType, 'groupBy', event.groupBy);
       return event.groupBy;
     }
@@ -158,15 +158,28 @@ export const viewActions = {
   
   // Column visibility actions
   toggleColumnVisibility: assign({
-    columnVisibility: ({ context }, event: { columnId: string }) => {
+    columnVisibility: ({ context, event }) => {
+      if (!event || !event.columnId) {
+        console.warn('toggleColumnVisibility: Invalid event', event);
+        return context.columnVisibility;
+      }
+      
+      const currentValue = context.columnVisibility[event.columnId];
+      const newValue = currentValue === false ? true : false;
+      
       const newVisibility = {
         ...context.columnVisibility,
-        [event.columnId]: !context.columnVisibility[event.columnId]
+        [event.columnId]: newValue
       };
+      
       saveToStorage(context.entityType, 'columnVisibility', newVisibility);
       return newVisibility;
     },
-    hiddenColumnCount: ({ context }, event: { columnId: string }) => {
+    hiddenColumnCount: ({ context, event }) => {
+      if (!event || !event.columnId) {
+        return context.hiddenColumnCount;
+      }
+      
       const willBeHidden = context.columnVisibility[event.columnId] !== false;
       return willBeHidden
         ? context.hiddenColumnCount + 1
@@ -175,11 +188,11 @@ export const viewActions = {
   }),
   
   setColumnVisibility: assign({
-    columnVisibility: ({ context }, event: { visibility: Record<string, boolean> }) => {
+    columnVisibility: ({ context, event }) => {
       saveToStorage(context.entityType, 'columnVisibility', event.visibility);
       return event.visibility;
     },
-    hiddenColumnCount: (_, event: { visibility: Record<string, boolean> }) => {
+    hiddenColumnCount: ({ event }) => {
       return Object.values(event.visibility).filter(v => !v).length;
     }
   }),
@@ -208,14 +221,14 @@ export const viewActions = {
   
   // Column order actions
   setColumnOrder: assign({
-    columnOrder: ({ context }, event: { order: string[] }) => {
+    columnOrder: ({ context, event }) => {
       saveToStorage(context.entityType, 'columnOrder', event.order);
       return event.order;
     }
   }),
   
   reorderColumns: assign({
-    columnOrder: ({ context }, event: { fromIndex: number; toIndex: number }) => {
+    columnOrder: ({ context, event }) => {
       const newOrder = [...context.columnOrder];
       const [removed] = newOrder.splice(event.fromIndex, 1);
       newOrder.splice(event.toIndex, 0, removed);

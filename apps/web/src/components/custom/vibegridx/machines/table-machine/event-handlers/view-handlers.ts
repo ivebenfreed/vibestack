@@ -52,7 +52,10 @@ export const viewHandlers = {
           isVisible: context.columnVisibility[event.columnId] !== false,
           hiddenCount: context.hiddenColumnCount
         });
-      }
+      },
+      
+      // Trigger view processing to update visible columns
+      raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
   },
   
@@ -65,7 +68,10 @@ export const viewHandlers = {
           hiddenCount: context.hiddenColumnCount,
           totalColumns: Object.keys(context.columnVisibility).length
         });
-      }
+      },
+      
+      // Trigger view processing to update visible columns
+      raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
   },
   
@@ -75,7 +81,10 @@ export const viewHandlers = {
       
       () => {
         console.log('TableMachine: All columns shown');
-      }
+      },
+      
+      // Trigger view processing to update visible columns
+      raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
   },
   
@@ -85,7 +94,10 @@ export const viewHandlers = {
       
       () => {
         console.log('TableMachine: All columns hidden');
-      }
+      },
+      
+      // Trigger view processing to update visible columns
+      raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
   },
   

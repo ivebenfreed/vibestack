@@ -158,66 +158,82 @@ export const useVibeGridXApi = (
   tableActor: ActorRefFrom<typeof tableBaseMachine>,
   rendererRef?: React.MutableRefObject<any> // Make optional for renderer actor pattern
 ) => {
+  // Safe send that checks if actor is still alive
+  const safeSend = useCallback((event: any) => {
+    if (!tableActor) {
+      console.warn('Table actor not available');
+      return;
+    }
+    
+    const snapshot = tableActor.getSnapshot();
+    if (snapshot?.status === 'done' || snapshot?.status === 'error') {
+      console.warn(`Cannot send event to ${snapshot.status} actor:`, event.type);
+      return;
+    }
+    
+    tableSend(event);
+  }, [tableSend, tableActor]);
+  
   return useMemo(() => ({
     // Selection API
     selectCell: (rowId: string, columnId: string) => {
-      tableSend({ type: 'selection.cell.select', rowId, columnId });
+      safeSend({ type: 'selection.cell.select', rowId, columnId });
     },
     
     selectRange: (start: CellRef, end: CellRef) => {
-      tableSend({ type: 'selection.range.select', start, end });
+      safeSend({ type: 'selection.range.select', start, end });
     },
     
     clearSelection: () => {
-      tableSend({ type: 'selection.clear' });
+      safeSend({ type: 'selection.clear' });
     },
     
     // Edit API
     startEditing: (rowId: string, columnId: string) => {
-      tableSend({ type: 'edit.cell.start', rowId, columnId });
+      safeSend({ type: 'edit.cell.start', rowId, columnId });
     },
     
     commitEdit: () => {
-      tableSend({ type: 'edit.commit' });
+      safeSend({ type: 'edit.commit' });
     },
     
     cancelEdit: () => {
-      tableSend({ type: 'edit.cancel' });
+      safeSend({ type: 'edit.cancel' });
     },
     
     // View API
     setGroupBy: (groupBy: string[]) => {
-      tableSend({ type: 'view.group.set', groupBy });
+      safeSend({ type: 'view.group.set', groupBy });
     },
     
     setSortBy: (sortBy: any[]) => {
-      tableSend({ type: 'view.sort.set', sortBy });
+      safeSend({ type: 'view.sort.set', sortBy });
     },
     
     setFilters: (filters: any[]) => {
-      tableSend({ type: 'view.filter.set', filters });
+      safeSend({ type: 'view.filter.set', filters });
     },
     
     // Column visibility API
     toggleColumnVisibility: (columnId: string) => {
-      tableSend({ type: 'view.columns.toggle', columnId });
+      safeSend({ type: 'view.columns.toggle', columnId });
     },
     
     showAllColumns: () => {
-      tableSend({ type: 'view.columns.show.all' });
+      safeSend({ type: 'view.columns.show.all' });
     },
     
     hideAllColumns: () => {
-      tableSend({ type: 'view.columns.hide.all' });
+      safeSend({ type: 'view.columns.hide.all' });
     },
     
     setColumnVisibility: (visibility: Record<string, boolean>) => {
-      tableSend({ type: 'view.columns.visibility.set', visibility });
+      safeSend({ type: 'view.columns.visibility.set', visibility });
     },
     
     // Data API
     createRow: (insertAfter?: string) => {
-      tableSend({ type: 'edit.row.create', insertAfter });
+      safeSend({ type: 'edit.row.create', insertAfter });
     },
     
     // Performance API
@@ -234,7 +250,7 @@ export const useVibeGridXApi = (
     // Debug API
     getState: () => tableState,
     getActor: () => tableActor
-  }), [tableSend, tableState, tableActor]);
+  }), [safeSend, tableState, tableActor, rendererRef]);
 };
 
 // ====================================
