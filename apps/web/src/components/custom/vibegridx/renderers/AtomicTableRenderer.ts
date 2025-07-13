@@ -945,17 +945,20 @@ export class AtomicTableRenderer {
   private renderHeader(state: RenderState): void {
     if (!state.rows.length) return;
     
-    // Use visible columns from configuration if available, otherwise generate from data
-    const columnsToRender = this.visibleColumns.length > 0 
-      ? this.visibleColumns 
-      : Object.keys(state.rows[0].data).map(key => ({
-          id: key,
-          name: key,
-          field: key,
-          type: 'text' as const,
-          width: 120,
-          sortable: true
-        }));
+    // IMPORTANT: Use columns from render state if available to ensure correct order
+    const columnsToRender = state.columns && state.columns.length > 0
+      ? state.columns
+      : this.visibleColumns.length > 0 
+        ? this.visibleColumns 
+        : Object.keys(state.rows[0].data).map(key => ({
+            id: key,
+            name: key,
+            field: key,
+            type: 'text' as const,
+            width: 120,
+            sortable: true
+          }));
+    
     
     
     // Calculate total width for header
@@ -988,39 +991,50 @@ export class AtomicTableRenderer {
         </div>`;
     }
     
-    // Header rendered with columns
-    headerHTML += columnsToRender.map((column, index) => {
-      const width = this.columnWidths[column.id] || column.width || 120;
-      const field = column.field || column.id;
-      const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
-      
-      
-      // Find sort info for this column
-      const sortInfo = sortState.find((s: any) => s.field === field);
-      const sortIndex = sortInfo ? sortState.indexOf(sortInfo) : -1;
-      
-      // Sort info available for styling
-      
-      // Add sort class if column is sorted
-      let sortClass = '';
-      if (sortInfo) {
-        sortClass = sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc';
-      }
-      
-      // Add sortable class if column is sortable
-      const sortableClass = column.sortable !== false ? 'vibegridx-sortable' : '';
-      
-      return `<div class="vibegridx-header-cell ${sortableClass} ${sortClass}" data-column="${column.id}" data-field="${field}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
-        <span class="vibegridx-header-text">${column.name || column.id}</span>
-        <span class="vibegridx-sort-icon">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'asc' ? '1' : '0.3'}"/>
-            <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/>
-          </svg>
-        </span>
-        <div class="vibegridx-resize-handle" data-column="${column.id}"></div>
-      </div>`;
-    }).join('');
+    // Header rendered with columns (excluding selection column which was already added)
+    headerHTML += columnsToRender
+      .filter(column => column.id !== '__selection') // Skip selection column as it's already added
+      .map((column, index) => {
+        const width = this.columnWidths[column.id] || column.width || 120;
+        const field = column.field || column.id;
+        
+        // Calculate offset based on columns being rendered
+        const filteredColumns = columnsToRender.filter(c => c.id !== '__selection');
+        let calculatedOffset = 48; // Start after selection column
+        for (let i = 0; i < index; i++) {
+          const prevColumn = filteredColumns[i];
+          const prevWidth = this.columnWidths[prevColumn.id] || prevColumn.width || 120;
+          calculatedOffset += prevWidth;
+        }
+        const xOffset = calculatedOffset;
+        
+        
+        // Find sort info for this column
+        const sortInfo = sortState.find((s: any) => s.field === field);
+        const sortIndex = sortInfo ? sortState.indexOf(sortInfo) : -1;
+        
+        // Sort info available for styling
+        
+        // Add sort class if column is sorted
+        let sortClass = '';
+        if (sortInfo) {
+          sortClass = sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc';
+        }
+        
+        // Add sortable class if column is sortable
+        const sortableClass = column.sortable !== false ? 'vibegridx-sortable' : '';
+        
+        return `<div class="vibegridx-header-cell ${sortableClass} ${sortClass}" data-column="${column.id}" data-field="${field}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
+          <span class="vibegridx-header-text">${column.name || column.id}</span>
+          <span class="vibegridx-sort-icon">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'asc' ? '1' : '0.3'}"/>
+              <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/>
+            </svg>
+          </span>
+          <div class="vibegridx-resize-handle" data-column="${column.id}"></div>
+        </div>`;
+      }).join('');
     
     this.header.innerHTML = headerHTML;
     
@@ -1064,7 +1078,8 @@ export class AtomicTableRenderer {
       visibleRangeStart: visibleRange.start,
       visibleRangeEnd: visibleRange.end,
       visibleRowsCount: visibleRows.length,
-      shouldBeVirtualized: visibleRows.length < state.rows.length
+      shouldBeVirtualized: visibleRows.length < state.rows.length,
+      firstRowId: visibleRows[0]?.id
     });
     
     // Calculate dimensions
@@ -1120,6 +1135,7 @@ export class AtomicTableRenderer {
     visibleRows.forEach((row, index) => {
       const absoluteIndex = visibleRange.start + index;
       
+      
       let rowElement = this.rowElements.get(row.id);
       if (!rowElement) {
         rowElement = document.createElement('div');
@@ -1153,6 +1169,7 @@ export class AtomicTableRenderer {
     rowElement.style.width = '100%';
     rowElement.style.height = `${this.virtualGrid.getRowHeight()}px`;
     
+    
     // Update row content
     this.renderRowCells(row, rowElement);
   }
@@ -1180,16 +1197,21 @@ export class AtomicTableRenderer {
   private renderRowCells(row: TableRow, rowElement: HTMLElement): void {
     // PERFORMANCE FIX: Use DOM elements instead of innerHTML for massive performance boost
     
-    // Use visible columns from configuration if available
-    const columnsToRender = this.visibleColumns.length > 0 
-      ? this.visibleColumns 
-      : Object.keys(row.data).map(key => ({
-          id: key,
-          name: key,
-          field: key,
-          type: 'text' as const,
-          width: 120
-        }));
+    
+    // IMPORTANT: Use columns from render state if available to ensure correct order
+    const stateColumns = this.lastRenderState?.columns;
+    const columnsToRender = stateColumns && stateColumns.length > 0
+      ? stateColumns.filter(col => col.id !== '__selection')
+      : this.visibleColumns.length > 0 
+        ? this.visibleColumns.filter(col => col.id !== '__selection')
+        : Object.keys(row.data).map(key => ({
+            id: key,
+            name: key,
+            field: key,
+            type: 'text' as const,
+            width: 120
+          }));
+    
     
     // Clear existing content efficiently
     rowElement.textContent = '';
@@ -1259,7 +1281,16 @@ export class AtomicTableRenderer {
       const cellKey = `${row.id}:${column.id}`;
       const value = row.data[column.field || column.id];
       const width = this.columnWidths[column.id] || column.width || 120;
-      const xOffset = this.dimensionManager?.getColumnOffset?.(column.id) || this.getColumnOffset(column.id);
+      
+      // Calculate offset based on columns being rendered, not internal state
+      let calculatedOffset = 48; // Start after selection column
+      for (let i = 0; i < index; i++) {
+        const prevColumn = columnsToRender[i];
+        const prevWidth = this.columnWidths[prevColumn.id] || prevColumn.width || 120;
+        calculatedOffset += prevWidth;
+      }
+      const xOffset = calculatedOffset;
+      
       
       // Create cell element
       const cell = document.createElement('div');
@@ -1479,11 +1510,17 @@ export class AtomicTableRenderer {
       return;
     }
     
-    // Don't start drag if clicking on sort icon
+    // Don't start drag if clicking on sort icon or selection column
     if (headerCell && !sortIcon && !resizeHandle) {
       event.preventDefault();
       
       const columnId = headerCell.dataset.column;
+      
+      // Don't allow dragging the selection column
+      if (columnId === '__selection') {
+        return;
+      }
+      
       if (columnId) {
         // Calculate offset from click position to header cell position
         const headerRect = headerCell.getBoundingClientRect();
@@ -1595,7 +1632,8 @@ export class AtomicTableRenderer {
       this.dragState.dropIndicator.style.left = `${dropX}px`;
     }
     
-    this.options.onColumnDragMove?.(event.clientX, event.clientY);
+    // Don't send drag move events to XState - visual feedback is handled entirely in DOM
+    // this.options.onColumnDragMove?.(event.clientX, event.clientY);
   }
   
   private handleDragEnd(event: MouseEvent): void {
@@ -1627,16 +1665,29 @@ export class AtomicTableRenderer {
     const headerRect = this.header.getBoundingClientRect();
     const relativeX = event.clientX - headerRect.left + this.viewport.scrollLeft;
     
-    // Find target column index
+    // Find target column index, excluding selection column
     let targetIndex = 0;
-    let accumulatedWidth = 0;
-    for (let i = 0; i < this.visibleColumns.length; i++) {
-      const columnWidth = this.columnWidths[this.visibleColumns[i].id] || 120;
+    let accumulatedWidth = 48; // Start with selection column width
+    
+    // Get data columns only (excluding selection column)
+    const dataColumns = this.visibleColumns.filter(col => col.id !== '__selection');
+    
+    for (let i = 0; i < dataColumns.length; i++) {
+      const columnWidth = this.columnWidths[dataColumns[i].id] || 120;
       if (relativeX > accumulatedWidth + columnWidth / 2) {
         targetIndex = i + 1;
       }
       accumulatedWidth += columnWidth;
     }
+    
+    console.log('[AtomicTableRenderer] Drag end calculation:', {
+      draggedColumnId: this.dragState.draggedColumnId,
+      mouseX: event.clientX,
+      relativeX,
+      targetIndex,
+      dataColumns: dataColumns.map(c => c.id),
+      visibleColumns: this.visibleColumns.map(c => c.id)
+    });
     
     // Reset drag state
     this.dragState = {

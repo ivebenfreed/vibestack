@@ -319,7 +319,16 @@ export const createColumnDragStartHandler = (
 export const createColumnDragMoveHandler = (
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
+  const lastUpdateRef = useRef(0);
+  const throttleMs = 16; // ~60fps for smooth visual updates
+  
   return useCallback((x: number, y: number) => {
+    const now = Date.now();
+    if (now - lastUpdateRef.current < throttleMs) {
+      return; // Skip this update
+    }
+    lastUpdateRef.current = now;
+    
     tableSend({ type: 'view.columns.drag.move', x, y });
   }, [tableSend]);
 };

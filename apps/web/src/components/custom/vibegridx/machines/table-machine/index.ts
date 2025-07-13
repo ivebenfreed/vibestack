@@ -459,7 +459,7 @@ export const tableBaseMachine = setup({
                     type: 'RENDER',
                     state: {
                       rows: event.output.processedRows,
-                      columns: context.columns,
+                      columns: event.output.visibleColumns, // Use ordered columns from view actor
                       selectedCells: context.selectedCells,
                       editingCell: null,
                       groupedData: [],

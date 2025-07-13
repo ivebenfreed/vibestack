@@ -258,11 +258,15 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     // PERFORMANCE: Minimal initialization - just basics
     const rendererOptions = {
       container: containerRef.current,
-      columns: columns,
+      // Don't pass columns during init - wait for properly ordered columns from view actor
+      // columns: columns,
       enableSelectionColumn: enableSelectionColumn,
       cellHeight: 40,
       // Add event handlers
       onColumnClick: handleColumnClick,
+      onColumnDragStart: handleColumnDragStart,
+      // onColumnDragMove: handleColumnDragMove, // Not needed - visual feedback is handled in DOM
+      onColumnDragEnd: handleColumnDragEnd,
       onColumnResizeStart: handleColumnResizeStart,
       onColumnResizeMove: handleColumnResizeMove,
       onColumnResizeEnd: handleColumnResizeEnd

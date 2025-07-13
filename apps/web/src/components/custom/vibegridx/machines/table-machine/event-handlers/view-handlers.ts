@@ -244,58 +244,87 @@ export const viewHandlers = {
         columnDragState: context.columnDragState
       })),
       
-      ({ event }) => {
-        console.log('TableMachine: Column drag move', {
-          position: { x: event.x, y: event.y }
-        });
-      }
+      // Remove logging for performance - too many events
+      // ({ event }) => {
+      //   console.log('TableMachine: Column drag move', {
+      //     position: { x: event.x, y: event.y }
+      //   });
+      // }
     ]
   },
   
   'view.columns.drag.end': {
     actions: [
-      viewActions.endColumnDrag,
-      
-      // Reorder columns if valid drop
-      ({ context, event }) => {
-        if (event.targetIndex !== undefined && context.columnDragState?.columnId) {
-          const columns = context.columns;
-          const draggedColumn = columns.find(c => c.id === context.columnDragState.columnId);
-          const currentIndex = columns.indexOf(draggedColumn!);
-          
-          if (currentIndex !== -1 && currentIndex !== event.targetIndex) {
-            // Update column order
-            const newOrder = [...context.columnOrder];
-            const [removed] = newOrder.splice(currentIndex, 1);
-            newOrder.splice(event.targetIndex, 0, removed);
-            
-            // Save to storage
-            saveToStorage(context.entityType, 'columnOrder', newOrder);
-          }
-        }
-      },
-      
       // Update column order in context
       assign({
         columnOrder: ({ context, event }) => {
           if (event.targetIndex !== undefined && context.columnDragState?.columnId) {
-            const columns = context.columns;
-            const draggedColumn = columns.find(c => c.id === context.columnDragState.columnId);
-            const currentIndex = columns.indexOf(draggedColumn!);
+            const draggedColumnId = context.columnDragState.columnId;
             
-            if (currentIndex !== -1 && currentIndex !== event.targetIndex) {
-              const newOrder = [...context.columnOrder];
-              const [removed] = newOrder.splice(currentIndex, 1);
-              newOrder.splice(event.targetIndex, 0, removed);
-              return newOrder;
+            // Work with data columns only (exclude selection column)
+            const dataColumnOrder = context.columnOrder.filter(id => id !== '__selection');
+            
+            // Find current index in data columns
+            const currentIndex = dataColumnOrder.indexOf(draggedColumnId);
+            
+            if (currentIndex === -1) {
+              console.error('Dragged column not found in columnOrder:', draggedColumnId);
+              return context.columnOrder;
             }
+            
+            // Don't move if dropping in same position
+            if (currentIndex === event.targetIndex || 
+                (currentIndex === event.targetIndex - 1 && event.targetIndex > currentIndex)) {
+              console.log('Column dropped in same position, no change needed');
+              return context.columnOrder;
+            }
+            
+            // Create new order array for data columns
+            const newDataOrder = [...dataColumnOrder];
+            
+            // Remove from current position
+            const [removed] = newDataOrder.splice(currentIndex, 1);
+            
+            // Adjust target index if needed (when dragging from left to right)
+            let adjustedTargetIndex = event.targetIndex;
+            if (currentIndex < event.targetIndex) {
+              adjustedTargetIndex = event.targetIndex - 1;
+            }
+            
+            // Insert at new position
+            newDataOrder.splice(adjustedTargetIndex, 0, removed);
+            
+            // Reconstruct full column order with selection column first
+            const newOrder = context.columnOrder.includes('__selection') 
+              ? ['__selection', ...newDataOrder]
+              : newDataOrder;
+            
+            console.log('Column order updated:', {
+              draggedColumnId,
+              currentIndex,
+              targetIndex: event.targetIndex,
+              adjustedTargetIndex,
+              dataColumnOrder,
+              newDataOrder,
+              fullNewOrder: newOrder
+            });
+            
+            // Save to storage
+            saveToStorage(context.entityType, 'columnOrder', newOrder);
+            
+            return newOrder;
           }
           return context.columnOrder;
-        }
+        },
+        // Increment version to trigger re-render
+        version: ({ context }) => context.version + 1
       }),
       
       // Clear drag state
       viewActions.clearColumnDrag,
+      
+      // Trigger view processing to apply new column order
+      raise({ type: 'INVOKE_VIEW_ACTOR' }),
       
       // Emit event for UI feedback
       emit({ type: 'view.drag.ended' }),

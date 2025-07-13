@@ -64,6 +64,9 @@ export interface ViewActorOutput {
   groupTree: GroupNode[];
   totalRowCount: number;
   
+  // Ordered visible columns
+  visibleColumns: Column[];
+  
   // Coordinate mapping
   coordinateMapping: {
     rows: Array<{
@@ -383,6 +386,7 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     processedRows: sortedRows,
     groupTree,
     totalRowCount: filteredRows.length,
+    visibleColumns, // Include ordered visible columns
     coordinateMapping,
     viewState,
     metrics: {
@@ -397,7 +401,9 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     processingTime: processingTime.toFixed(2) + 'ms',
     outputRowCount: output.processedRows.length,
     outputColumnCount: output.coordinateMapping.columns.length,
-    coordinateMappingVersion: output.coordinateMapping.version
+    coordinateMappingVersion: output.coordinateMapping.version,
+    visibleColumnOrder: output.visibleColumns.map(c => c.id),
+    columnOrderFromInput: input.columnOrder
   });
   
   return output;
