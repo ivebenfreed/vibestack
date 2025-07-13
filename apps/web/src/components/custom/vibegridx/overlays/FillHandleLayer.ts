@@ -62,8 +62,7 @@ export class FillHandleLayer {
     // Create dedicated interactive layer for specialized controls
     this.fillHandleLayer = new Konva.Layer({
       name: 'interactive-controls-layer',
-      listening: true, // Enable events for interactive controls only
-      hitGraphEnabled: true // Enable hit detection
+      listening: true // Enable events for interactive controls only
     });
     this.stage.add(this.fillHandleLayer);
     this.fillHandleLayer.moveToTop(); // Above visual-only layers
@@ -108,12 +107,22 @@ export class FillHandleLayer {
     const handleX = maxX;
     const handleY = maxY;
     
+    console.log('FillHandleLayer: Positioning fill handle at', {
+      handleX,
+      handleY,
+      bounds: { minX, minY, maxX, maxY },
+      visualCells
+    });
+    
     // Create or update fill handle
     if (!this.activeFillHandle) {
       this.createFillHandle(handleX, handleY);
     } else {
       this.updateFillHandlePosition(handleX, handleY);
     }
+    
+    // Force redraw to ensure fill handle is visible
+    this.fillHandleLayer.batchDraw();
   }
   
   /**
@@ -311,6 +320,7 @@ export class FillHandleLayer {
   // ====================================
   
   private createFillHandle(x: number, y: number): void {
+    console.log('FillHandleLayer: Creating fill handle at', { x, y });
     
     // Create fill handle with Konva events enabled
     this.activeFillHandle = new Konva.Rect({

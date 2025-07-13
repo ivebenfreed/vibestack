@@ -150,7 +150,7 @@ export const viewHandlers = {
       
       // Need to reprocess view data to update coordinate mappings
       ({ self }) => {
-        self.send({ type: 'VIEW_DATA_UPDATED' });
+        self.send({ type: 'INVOKE_VIEW_ACTOR' });
       }
     ]
   },
@@ -165,7 +165,7 @@ export const viewHandlers = {
       
       // Need to reprocess view data to update coordinate mappings
       ({ self }) => {
-        self.send({ type: 'VIEW_DATA_UPDATED' });
+        self.send({ type: 'INVOKE_VIEW_ACTOR' });
       }
     ]
   },

@@ -266,6 +266,13 @@ const calculateCoordinateMapping = (
   }));
   
   // Calculate column mapping with offsets and widths
+  console.log('calculateCoordinateMapping: Creating column mapping for columns:', {
+    columnCount: visibleColumns.length,
+    columnOrder: visibleColumns.map(c => c.id),
+    firstColumn: visibleColumns[0],
+    allColumns: visibleColumns.map(c => ({ id: c.id, name: c.name, width: c.width }))
+  });
+  
   let currentOffset = 0;
   const columnMapping = visibleColumns.map((column, index) => {
     const width = column.width || 120;
@@ -275,6 +282,7 @@ const calculateCoordinateMapping = (
       offset: currentOffset,
       width
     };
+    console.log(`calculateCoordinateMapping: Column ${column.id} at visual index ${index}, offset ${currentOffset}, width ${width}`);
     currentOffset += width;
     return mapping;
   });
@@ -306,7 +314,9 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     hasFilters: input.filters.length > 0,
     hasGrouping: input.groupBy.length > 0,
     columnCount: input.columns.length,
-    visibleColumns: Object.values(input.columnVisibility).filter(visible => visible).length
+    visibleColumns: Object.values(input.columnVisibility).filter(visible => visible).length,
+    columnOrder: input.columnOrder,
+    hasColumnOrder: !!input.columnOrder && input.columnOrder.length > 0
   });
   
   // Step 1: Convert entities to TableRows with resolved relationships
@@ -362,13 +372,35 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     input.columnVisibility[col.id] !== false && col.id !== '__selection'
   );
   
+  console.log('[ViewActor] Visible columns before ordering:', {
+    count: visibleDataColumns.length,
+    columnIds: visibleDataColumns.map(c => c.id)
+  });
+  
   // Apply column order
   let orderedDataColumns = visibleDataColumns;
   if (input.columnOrder && input.columnOrder.length > 0) {
+    console.log('[ViewActor] Applying column order:', {
+      inputOrder: input.columnOrder,
+      visibleDataColumnIds: visibleDataColumns.map(c => c.id)
+    });
     orderedDataColumns = input.columnOrder
       .filter(colId => colId !== '__selection')
-      .map(colId => visibleDataColumns.find(col => col.id === colId))
+      .map(colId => {
+        const col = visibleDataColumns.find(col => col.id === colId);
+        if (!col) {
+          console.warn(`[ViewActor] Column ${colId} in columnOrder not found in visible columns`);
+        }
+        return col;
+      })
       .filter(Boolean) as Column[];
+    console.log('[ViewActor] Columns after ordering:', {
+      count: orderedDataColumns.length,
+      columnIds: orderedDataColumns.map(c => c.id),
+      fullColumns: orderedDataColumns.map(c => ({ id: c.id, name: c.name }))
+    });
+  } else {
+    console.log('[ViewActor] No column order provided, using default order');
   }
   
   // Add selection column if enabled

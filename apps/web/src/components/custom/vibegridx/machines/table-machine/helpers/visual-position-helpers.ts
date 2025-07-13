@@ -48,9 +48,24 @@ export const calculateVisualPositions = (
     // Find column in coordinate mapping
     const colData = coordinateMapping.columns.find((c: any) => c.columnId === columnId);
     if (!colData) {
-      console.log('Column not found in coordinate mapping:', columnId);
+      console.log('Column not found in coordinate mapping:', {
+        searchingFor: columnId,
+        availableColumns: coordinateMapping.columns.map((c: any) => ({ id: c.columnId, offset: c.offset }))
+      });
       continue;
     }
+    
+    // Debug: Log what we found
+    console.log('Column found in coordinate mapping:', {
+      columnId,
+      colData,
+      allColumnsWithOffsets: coordinateMapping.columns.map((c: any) => ({ 
+        id: c.columnId, 
+        index: c.index,
+        offset: c.offset,
+        width: c.width 
+      }))
+    });
     
     const absoluteRowIndex = rowData.sortedIndex;
     console.log('Row found:', { rowId, absoluteRowIndex, viewport });

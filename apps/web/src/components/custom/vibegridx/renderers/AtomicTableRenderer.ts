@@ -972,6 +972,11 @@ export class AtomicTableRenderer {
             sortable: true
           }));
     
+    console.log('Renderer: renderHeader columnsToRender', {
+      columnIds: columnsToRender.map(c => c.id),
+      source: state.columns ? 'state.columns' : 'visibleColumns'
+    });
+    
     
     
     // Calculate total width for header
@@ -1306,6 +1311,14 @@ export class AtomicTableRenderer {
         calculatedOffset += prevWidth;
       }
       const xOffset = calculatedOffset;
+      
+      // Debug logging for first row only
+      if (row.id === this.lastRenderState?.rows[0]?.id && index < 3) {
+        console.log(`Renderer: Column ${column.id} rendered at offset ${xOffset}`, {
+          columnIndex: index,
+          columnsBeforeThis: columnsToRender.slice(0, index).map(c => ({ id: c.id, width: this.columnWidths[c.id] || c.width || 120 }))
+        });
+      }
       
       
       // Create cell element

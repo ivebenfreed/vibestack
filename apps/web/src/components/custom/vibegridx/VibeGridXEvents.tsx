@@ -402,7 +402,32 @@ export const createMouseDownHandler = (
     
     const rowId = cellElement.dataset.rowId;
     const columnId = cellElement.dataset.columnId;
-    console.log('[VibeGridXEvents] Cell data:', { rowId, columnId });
+    const cellRect = cellElement.getBoundingClientRect();
+    const container = event.currentTarget as HTMLElement;
+    const containerRect = container.getBoundingClientRect();
+    const viewport = container.querySelector('.vibegridx-viewport') as HTMLElement;
+    const viewportRect = viewport?.getBoundingClientRect();
+    
+    console.log('[VibeGridXEvents] Cell data:', { 
+      rowId, 
+      columnId,
+      cellPosition: {
+        left: cellRect.left - containerRect.left,
+        top: cellRect.top - containerRect.top,
+        width: cellRect.width,
+        height: cellRect.height
+      },
+      actualDOMPosition: {
+        cellLeft: cellRect.left,
+        viewportLeft: viewportRect?.left,
+        relativeToViewport: cellRect.left - (viewportRect?.left || 0),
+        cellStyle: {
+          left: cellElement.style.left,
+          computedLeft: window.getComputedStyle(cellElement).left
+        }
+      },
+      cellElement
+    });
     if (!rowId || !columnId) return;
     
     // Skip if clicking on a checkbox - let the checkbox handler deal with it

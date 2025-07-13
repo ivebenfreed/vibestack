@@ -55,6 +55,14 @@ export const createInitialViewState = (
   // Calculate hidden column count from column visibility
   const hiddenColumnCount = Object.values(columnVisibility).filter(visible => !visible).length;
   
+  console.log('[ViewSlice] createInitialViewState:', {
+    entityType,
+    hasPersistedData: !!persistedData,
+    persistedColumnOrder: persistedData?.columnOrder,
+    defaultColumnOrder: columns.map(col => col.id),
+    finalColumnOrder: columnOrder
+  });
+  
   return {
     sortBy,
     filters,
