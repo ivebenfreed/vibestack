@@ -1656,21 +1656,23 @@ export class AtomicTableRenderer {
   
   private handleHeaderClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
-    const sortIcon = target.closest('.vibegridx-sort-icon');
     const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
     const resizeHandle = target.closest('.vibegridx-resize-handle');
     
+    // Don't process clicks on resize handles or if no header cell found
     if (!headerCell || resizeHandle) return;
     
     const columnId = headerCell.dataset.column;
     
-    // Only handle clicks on the sort icon itself
-    if (sortIcon && columnId) {
-      // Handle sort icon click
-      console.log('[AtomicTableRenderer] Sort icon clicked for column:', columnId);
+    // Skip selection column
+    if (columnId === '__selection') return;
+    
+    // Check if column is sortable
+    if (headerCell.classList.contains('vibegridx-sortable') && columnId) {
+      // Handle column click for sorting
+      console.log('[AtomicTableRenderer] Column header clicked for sorting:', columnId);
       this.options.onColumnClick?.(columnId, event);
     }
-    // Remove the else clause - no sorting on general header clicks
   }
 
   // Column resize handlers

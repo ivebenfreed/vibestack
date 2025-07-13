@@ -103,28 +103,38 @@ export const viewActions = {
   }),
   
   toggleSort: assign({
-    sortBy: ({ context }, event: { field: string; shiftKey: boolean }) => {
-      const existingSort = context.sortBy.find(s => s.field === event.field);
+    sortBy: ({ context, event }) => {
+      // Safely access event properties with defaults
+      const field = (event as any).field;
+      const shiftKey = (event as any).shiftKey || false;
+      
+      if (!field) {
+        console.error('toggleSort: No field provided in event', event);
+        return context.sortBy;
+      }
+      
+      const existingSort = context.sortBy.find(s => s.field === field);
       let newSortBy: SortConfig[];
       
       if (existingSort) {
         // Toggle direction or remove
         if (existingSort.direction === 'asc') {
-          newSortBy = event.shiftKey
-            ? context.sortBy.map(s => s.field === event.field ? { ...s, direction: 'desc' } : s)
-            : [{ field: event.field, direction: 'desc' }];
+          newSortBy = shiftKey
+            ? context.sortBy.map(s => s.field === field ? { ...s, direction: 'desc' } : s)
+            : [{ field: field, direction: 'desc' }];
         } else {
-          newSortBy = event.shiftKey
-            ? context.sortBy.filter(s => s.field !== event.field)
+          newSortBy = shiftKey
+            ? context.sortBy.filter(s => s.field !== field)
             : [];
         }
       } else {
         // Add new sort
-        newSortBy = event.shiftKey
-          ? [...context.sortBy, { field: event.field, direction: 'asc' }]
-          : [{ field: event.field, direction: 'asc' }];
+        newSortBy = shiftKey
+          ? [...context.sortBy, { field: field, direction: 'asc' }]
+          : [{ field: field, direction: 'asc' }];
       }
       
+      console.log('toggleSort: Updating sort', { field, shiftKey, newSortBy });
       saveToStorage(context.entityType, 'sortBy', newSortBy);
       return newSortBy;
     }

@@ -260,7 +260,12 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       container: containerRef.current,
       columns: columns,
       enableSelectionColumn: enableSelectionColumn,
-      cellHeight: 40
+      cellHeight: 40,
+      // Add event handlers
+      onColumnClick: handleColumnClick,
+      onColumnResizeStart: handleColumnResizeStart,
+      onColumnResizeMove: handleColumnResizeMove,
+      onColumnResizeEnd: handleColumnResizeEnd
     };
     
     (window as any).__vibegridx_renderer_options = rendererOptions;
