@@ -4,6 +4,7 @@
 
 import { sendTo, assign, raise, emit } from 'xstate';
 import { viewActions } from '../slices/view-slice';
+import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 export const viewHandlers = {
   'view.sort.set': {
@@ -450,17 +451,64 @@ export const viewHandlers = {
         })
       ),
       
+      // Update coordinate mapping with new column width
+      ({ context, self }) => {
+        if (context.coordinateMapping && context.columnResizeState) {
+          const { columnId, currentWidth } = context.columnResizeState;
+          
+          // Find and update the column in the coordinate mapping
+          const columnIndex = context.coordinateMapping.columns.findIndex((c: any) => c.columnId === columnId);
+          if (columnIndex !== -1) {
+            const oldWidth = context.coordinateMapping.columns[columnIndex].width;
+            const widthDiff = currentWidth - oldWidth;
+            
+            // Update the column width
+            context.coordinateMapping.columns[columnIndex].width = currentWidth;
+            
+            // Update offsets for all columns after the resized one
+            for (let i = columnIndex + 1; i < context.coordinateMapping.columns.length; i++) {
+              context.coordinateMapping.columns[i].offset += widthDiff;
+            }
+            
+            // If there's a selection, update the overlay
+            if (context.selectedCells && context.selectedCells.size > 0 && context.actors.canvasActor) {
+              const visualPositions = calculateVisualPositions(
+                context.selectedCells,
+                context.coordinateMapping,
+                context.viewport,
+                context.rowHeight || context.settings?.rowHeight || 40
+              );
+              
+              if (visualPositions.length > 0) {
+                self.send({
+                  type: 'FORWARD_TO_CANVAS',
+                  event: {
+                    type: 'UPDATE_SELECTION_VISUAL',
+                    visualCells: visualPositions
+                  }
+                });
+                
+                // Also update fill handle position
+                self.send({
+                  type: 'FORWARD_TO_CANVAS',
+                  event: {
+                    type: 'RENDER_FILL_HANDLE',
+                    visualCells: visualPositions
+                  }
+                });
+              }
+            }
+          }
+        }
+      },
+      
       // Emit event for UI feedback  
       emit(({ context }) => ({
         type: 'view.resize.updated',
         columnResizeState: context.columnResizeState
       })),
       
-      ({ event }) => {
-        console.log('TableMachine: Column resize move', {
-          x: event.x
-        });
-      }
+      // Column resize move handled
     ]
   },
   
