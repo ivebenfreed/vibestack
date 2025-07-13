@@ -213,7 +213,6 @@ interface VibeGridXDemoGridProps {
   data: any[];
   columns: Column[];
   isLoading: boolean;
-  relationshipData?: any;
   onPerformanceUpdate?: (metrics: any) => void;
 }
 
@@ -222,7 +221,6 @@ function VibeGridXDemoGrid({
   data, 
   columns,
   isLoading,
-  relationshipData,
   onPerformanceUpdate
 }: VibeGridXDemoGridProps) {
   // Clean API: VibeGridX handles useSelector internally
@@ -280,7 +278,6 @@ function VibeGridXDemoGrid({
             projects: projectsAtom as any,
             users: usersAtom as any
           }}
-          relationshipData={relationshipData}
           enableVirtualScrolling={true}
           enableCanvasOverlays={true}
           enableGrouping={true}
@@ -349,29 +346,6 @@ function VibeGridXDemoPage() {
   const entityData = useEntityData('tasks');
   const entityOperations = useEntityOperations('tasks');
   
-  // Get projects and users for relationship data
-  const projects = useProjectAtoms.allProjects();
-  const users = useUserAtoms.allUsers();
-  
-  // Create relationship data structure - convert array to lookup object
-  // Match the table names from generated columns
-  const relationshipData = useMemo(() => {
-    const projectLookup = projects.reduce((acc, project) => {
-      acc[project.id] = project;
-      return acc;
-    }, {} as Record<string, any>);
-    
-    const userLookup = users.reduce((acc, user) => {
-      acc[user.id] = user;
-      return acc;
-    }, {} as Record<string, any>);
-    
-    return {
-      // Match the relationshipTable values from generated columns
-      project: projectLookup,
-      assignee: userLookup
-    };
-  }, [projects, users]);
   
   // Data is now loaded in the route loader, no need to load here
   
@@ -666,8 +640,7 @@ function VibeGridXDemoPage() {
                   data={entityData.data}
                   columns={taskColumns}
                   isLoading={isLoading}
-                  relationshipData={relationshipData}
-                  onPerformanceUpdate={handlePerformanceUpdate}
+                          onPerformanceUpdate={handlePerformanceUpdate}
                 />
               </div>
             </CardContent>

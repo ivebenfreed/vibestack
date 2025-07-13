@@ -16,6 +16,8 @@ import {
   renderBoolean, 
   renderEnum,
   renderRelationship,
+  renderRelationshipSingle,
+  renderRelationshipMulti,
   type RelationshipData
 } from './fast-renderers';
 
@@ -167,7 +169,6 @@ export class AtomicTableRenderer {
   private dimensionManager: ColumnDimensionManager | null = null;
   private coordinateManager: any = null; // VibeGridXCoordinateManager
   private rowHeight = 40; // Default row height
-  private relationshipData: any = {}; // Relationship data for lookups
   private enableSelectionColumn = false; // Whether to show selection column
   
   // Batch update queue
@@ -178,7 +179,6 @@ export class AtomicTableRenderer {
     this.options = options;
     this.dimensionManager = options.dimensionManager || null;
     this.coordinateManager = options.coordinateManager || null;
-    this.relationshipData = options.relationshipData || {};
     this.enableSelectionColumn = options.enableSelectionColumn || false;
     
     // Set columns if provided
@@ -416,14 +416,6 @@ export class AtomicTableRenderer {
     }
   }
   
-  // Set or update relationship data
-  setRelationshipData(relationshipData: any): void {
-    this.relationshipData = relationshipData || {};
-    // Trigger re-render if we have existing data
-    if (this.lastRenderState) {
-      this.render(this.lastRenderState);
-    }
-  }
   
   // Set dimension manager (called by parent component)
   setDimensionManager(manager: ColumnDimensionManager): void {
@@ -1331,9 +1323,16 @@ export class AtomicTableRenderer {
         boxSizing: 'border-box'
       });
       
-      // Set content efficiently
-      const cellContent = this.renderValueFast(value, column);
-      content.textContent = cellContent;
+      // Set content efficiently - pass row.data for relationship resolution
+      const cellContent = this.renderValueFast(value, column, row.data);
+      
+      // Check if this is an enum type that returns HTML
+      const cellType = column.cellType || column.type;
+      if (cellType === 'enum') {
+        content.innerHTML = cellContent;
+      } else {
+        content.textContent = cellContent;
+      }
       
       cell.appendChild(content);
       fragment.appendChild(cell);
@@ -1765,20 +1764,20 @@ export class AtomicTableRenderer {
     select: renderText, // Reuse text renderer for select
     uuid: renderText, // UUID is text-based
     json: renderText, // JSON displayed as text (could be enhanced later)
-    relationship: renderRelationship,
-    'relationship-single': renderRelationship,
-    'relationship-multi': renderRelationship,
-    'relationship-collection': renderRelationship,
+    relationship: renderRelationshipSingle, // Default to single
+    'relationship-single': renderRelationshipSingle,
+    'relationship-multi': renderRelationshipMulti,
+    'relationship-collection': renderRelationshipMulti, // Collections use multi renderer
   };
   
-  private renderValueFast(value: any, column: Column): string {
+  private renderValueFast(value: any, column: Column, rowData?: any): string {
     // Check column cellType first, then fall back to type
     const cellType = column.cellType || column.type;
     const renderer = AtomicTableRenderer.renderers[cellType] || renderText;
     
-    // For relationship types, pass the relationship data
+    // For relationship types, pass row data for pre-resolved values
     if (cellType?.startsWith('relationship')) {
-      return (renderer as any)(value, column, this.relationshipData);
+      return (renderer as any)(value, column, rowData);
     }
     
     return renderer(value, column);

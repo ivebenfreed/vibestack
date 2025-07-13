@@ -133,6 +133,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Entities from parent component (via useSelector)
     entities: input.entities || [],
     
+    // Relationship resolvers
+    relationshipResolvers: input.relationshipResolvers || {},
+    
     actors: {
       rendererActor: null,
       canvasActor: null,
@@ -425,7 +428,8 @@ export const tableBaseMachine = setup({
                 },
                 viewport: context.viewport,
                 rowHeight: context.rowHeight,
-                enableSelectionColumn: context.enableSelectionColumn
+                enableSelectionColumn: context.enableSelectionColumn,
+                relationshipResolvers: context.relationshipResolvers
               });
             },
             onDone: {

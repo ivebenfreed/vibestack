@@ -52,8 +52,6 @@ interface VibeGridXProps<T = any> {
   height?: number;
   width?: number;
   
-  // Optional relationship data
-  relationshipData?: any;
   
   // Event handlers
   onCellClick?: (rowId: string, columnId: string) => void;
@@ -87,7 +85,6 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     className = '',
     height = 600,
     width = '100%',
-    relationshipData,
     enableSelectionColumn = false,
     primaryAtom,
     relationshipAtoms = {},
@@ -104,6 +101,68 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     // PERFORMANCE FIX: Only log when entity count actually changes
     return values;
   }, shallowEqual);
+  
+  // Subscribe to relationship atoms and create resolvers
+  // We need to dynamically subscribe based on which columns need relationship data
+  const relationshipColumns = useMemo(() => {
+    return columns.filter(column => {
+      const cellType = column.cellType || column.type;
+      return cellType?.startsWith('relationship') && column.relationshipTable;
+    });
+  }, [columns]);
+  
+  // Subscribe to project atom if needed
+  const projectsData = useAtomSelector(
+    relationshipColumns.some(col => col.relationshipTable === 'project') ? relationshipAtoms.projects : null,
+    (atomData) => atomData || {},
+    shallowEqual
+  );
+  
+  // Subscribe to user atom if needed  
+  const usersData = useAtomSelector(
+    relationshipColumns.some(col => col.relationshipTable === 'assignee' || col.relationshipTable === 'user') ? relationshipAtoms.users : null,
+    (atomData) => atomData || {},
+    shallowEqual
+  );
+  
+  // Create resolvers based on subscribed data
+  const relationshipResolvers = useMemo(() => {
+    const resolvers: Record<string, (id: string | string[]) => string> = {};
+    
+    relationshipColumns.forEach(column => {
+      const tableKey = column.relationshipTable!;
+      const displayField = column.relationshipDisplayField;
+      
+      // Create resolver based on the table
+      if (tableKey === 'project' && projectsData) {
+        resolvers[column.id] = (id: string | string[]) => {
+          if (Array.isArray(id)) {
+            const names = id.map(i => {
+              const entity = projectsData[i];
+              return entity ? (entity[displayField || 'name'] || entity.name || i) : i;
+            });
+            return names.join(', ');
+          }
+          const entity = projectsData[id];
+          return entity ? (entity[displayField || 'name'] || entity.name || id) : id;
+        };
+      } else if ((tableKey === 'assignee' || tableKey === 'user') && usersData) {
+        resolvers[column.id] = (id: string | string[]) => {
+          if (Array.isArray(id)) {
+            const names = id.map(i => {
+              const entity = usersData[i];
+              return entity ? (entity[displayField || 'displayName'] || entity.name || i) : i;
+            });
+            return names.join(', ');
+          }
+          const entity = usersData[id];
+          return entity ? (entity[displayField || 'displayName'] || entity.name || id) : id;
+        };
+      }
+    });
+    
+    return resolvers;
+  }, [relationshipColumns, projectsData, usersData]);
   
   // Track entities length to detect actual changes
   const entitiesLengthRef = useRef(0);
@@ -155,6 +214,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       columns: props.columns,
       enableSelectionColumn: enableSelectionColumn,
       entities: entities, // Pass reactive entities directly
+      relationshipResolvers: relationshipResolvers, // Pass resolvers for relationship columns
       settings: {
         enableVirtualScrolling: props.enableVirtualScrolling ?? true,
         enableGrouping: props.enableGrouping ?? true,
@@ -171,7 +231,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         }
       }
     }
-  }), [tableId, props.entityType, props.columns, enableSelectionColumn, entities, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
+  }), [tableId, props.entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
 
   // Create machine with stable configuration
   const [tableState, tableSend, tableActor] = useMachine(tableBaseMachine, machineConfig);

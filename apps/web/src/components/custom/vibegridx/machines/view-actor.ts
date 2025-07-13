@@ -56,6 +56,9 @@ export interface ViewActorInput {
   // Settings
   rowHeight?: number;
   enableSelectionColumn?: boolean;
+  
+  // Relationship resolvers for foreign key lookups
+  relationshipResolvers?: Record<string, (id: string | string[]) => string>;
 }
 
 export interface ViewActorOutput {
@@ -306,18 +309,41 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     visibleColumns: Object.values(input.columnVisibility).filter(visible => visible).length
   });
   
-  // Step 1: Convert entities to TableRows
-  const allRows: TableRow[] = input.entities.map(entity => ({
-    id: entity.id,
-    data: entity,
-    metadata: {
-      createdAt: entity.createdAt || new Date(),
-      updatedAt: entity.updatedAt || new Date(),
-      version: entity.version || 1,
-      isNew: false,
-      isDirty: false
+  // Step 1: Convert entities to TableRows with resolved relationships
+  const allRows: TableRow[] = input.entities.map(entity => {
+    // Create a copy of entity data with resolved relationship values
+    const resolvedData = { ...entity };
+    
+    // Resolve relationship values if resolvers are provided
+    if (input.relationshipResolvers) {
+      input.columns.forEach(column => {
+        const cellType = column.cellType || column.type;
+        
+        // Check if this is a relationship column with a resolver
+        if (cellType?.startsWith('relationship') && input.relationshipResolvers[column.id]) {
+          const resolver = input.relationshipResolvers[column.id];
+          const foreignKeyValue = entity[column.field || column.id];
+          
+          if (foreignKeyValue !== null && foreignKeyValue !== undefined) {
+            // Store the resolved value with a special key
+            resolvedData[`__resolved_${column.id}`] = resolver(foreignKeyValue);
+          }
+        }
+      });
     }
-  }));
+    
+    return {
+      id: entity.id,
+      data: resolvedData,
+      metadata: {
+        createdAt: entity.createdAt || new Date(),
+        updatedAt: entity.updatedAt || new Date(),
+        version: entity.version || 1,
+        isNew: false,
+        isDirty: false
+      }
+    };
+  });
   
   // Step 2: Apply data transformations
   const filteredRows = applyFilters(allRows, input.filters);
@@ -429,8 +455,9 @@ export const createViewActorInput = (config: {
   viewport?: ViewportInfo;
   rowHeight?: number;
   enableSelectionColumn?: boolean;
+  relationshipResolvers?: Record<string, (id: string | string[]) => string>;
 }): ViewActorInput => {
-  const { entities, columns, viewState = {}, viewport, rowHeight = 40, enableSelectionColumn = false } = config;
+  const { entities, columns, viewState = {}, viewport, rowHeight = 40, enableSelectionColumn = false, relationshipResolvers } = config;
   
   return {
     entities,
@@ -442,7 +469,8 @@ export const createViewActorInput = (config: {
     columnOrder: viewState.columnOrder || columns.map(col => col.id),
     viewport,
     rowHeight,
-    enableSelectionColumn
+    enableSelectionColumn,
+    relationshipResolvers
   };
 };
 

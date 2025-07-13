@@ -16,8 +16,14 @@ export interface RelationshipData {
 export function renderRelationship(
   value: any,
   column: Column,
-  relationshipData?: RelationshipData
+  relationshipData?: RelationshipData,
+  rowData?: any
 ): string {
+  // Check if we have a pre-resolved value from ViewActor
+  if (rowData && rowData[`__resolved_${column.id}`]) {
+    return rowData[`__resolved_${column.id}`];
+  }
+  
   // Handle null/undefined values
   if (value == null) {
     return column.placeholder || '';

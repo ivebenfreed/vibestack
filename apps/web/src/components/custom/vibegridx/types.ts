@@ -250,6 +250,9 @@ export interface TableContext {
   // Entities from parent component (via EntityIntegration/domain atoms)
   entities: any[]; // Raw entity data provided by parent
   
+  // Relationship resolvers for foreign key lookups
+  relationshipResolvers: Record<string, (id: string | string[]) => string>;
+  
   // View state management (moved from viewCoordinator)
   sortBy: SortConfig[];
   filters: FilterConfig[];
@@ -442,6 +445,7 @@ export interface TableConfig {
   entityType: string;
   columns: Column<any>[];
   entities?: any[]; // CLEAN API: Pass entities directly instead of atomConfig
+  relationshipResolvers?: Record<string, (id: string | string[]) => string>; // Resolvers for relationship columns
   initialData?: TableRow[];
   settings?: TableSettings;
   enableSelectionColumn?: boolean;

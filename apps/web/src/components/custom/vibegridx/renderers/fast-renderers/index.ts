@@ -9,6 +9,8 @@ export { renderDate } from './renderDate';
 export { renderBoolean } from './renderBoolean';
 export { renderEnum } from './renderEnum';
 export { renderRelationship } from './renderRelationship';
+export { renderRelationshipSingle } from './renderRelationshipSingle';
+export { renderRelationshipMulti } from './renderRelationshipMulti';
 export type { RelationshipData } from './renderRelationship';
 
 // Re-export the renderer type for convenience
