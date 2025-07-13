@@ -45,9 +45,20 @@ export class CanvasOverlay implements CoordinateProvider {
   private columnResizeOverlay: ColumnResizeOverlay | null = null;
   private selectionColumnOverlay: SelectionColumnOverlay | null = null;
   
-  // Callbacks
+  // Callbacks for parent communication (pure actors approach)
   public onSelectionChange?: (selectedCells: Set<string>) => void;
-  public onFillComplete?: (originalCells: Set<string>, fillCells: Set<string>) => void;
+  public onFillStart?: (direction: 'vertical' | 'horizontal') => void;
+  public onFillPreview?: (previewCells: Set<string>) => void;
+  public onFillComplete?: (fillCells: Set<string>) => void;
+  public onFillCancel?: () => void;
+  public onCopy?: (cells: Set<string>) => void;
+  public onCut?: (cells: Set<string>) => void;
+  public onPaste?: () => void;
+  public onClearClipboard?: () => void;
+  
+  // State access for overlays (passed from table machine)
+  private currentSelectedCells: Set<string> = new Set();
+  private currentViewport: ViewportInfo | null = null;
 
   constructor(container: HTMLElement, config: Partial<OverlayConfig> = {}) {
     this.container = container;
@@ -106,11 +117,19 @@ export class CanvasOverlay implements CoordinateProvider {
       this.ensureStageInitialized();
       this.fillHandleLayer = new FillHandleLayer(
         this.stage,
-        this, // Pass canvas overlay reference instead of coordinate system
+        this, // Pass canvas overlay reference as coordinate provider
         {
           cellHeight: this.config.cellHeight,
           dimensionManager: this.config.dimensionManager as ColumnDimensionManager,
           selectionBorderColor: this.config.selectionBorderColor
+        },
+        {
+          onFillStart: (direction) => this.onFillStart?.(direction),
+          onFillPreview: (previewCells) => this.onFillPreview?.(previewCells),
+          onFillComplete: (fillCells) => this.onFillComplete?.(fillCells),
+          onFillCancel: () => this.onFillCancel?.(),
+          getSelectedCells: () => this.currentSelectedCells,
+          getViewport: () => this.currentViewport
         }
       );
     }
@@ -363,7 +382,8 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   updateSelection(selectedCells: Set<string>): void {
-    // No machine to send to - selection updates come via canvas actor
+    // Store current selection for overlay access
+    this.currentSelectedCells = selectedCells;
     console.log('CanvasOverlay: updateSelection called directly', { cellCount: selectedCells.size });
   }
   
@@ -397,7 +417,7 @@ export class CanvasOverlay implements CoordinateProvider {
     allRowIds: string[];
   }): void {
     if (this.selectionColumnOverlay) {
-      const viewport = this.machine.getSnapshot().context.viewport;
+      const viewport = this.currentViewport;
       this.selectionColumnOverlay.update({
         selectedRows: params.selectedRows,
         visibleRowIds: params.visibleRowIds,
@@ -408,6 +428,9 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   updateViewport(viewport: ViewportInfo): void {
+    // Store viewport for overlay access
+    this.currentViewport = viewport;
+    
     // Canvas MUST move with scroll to stay aligned with table content
     this.container.style.transform = `translate(${viewport.scrollLeft || 0}px, ${viewport.scrollTop}px)`;
     
@@ -446,54 +469,51 @@ export class CanvasOverlay implements CoordinateProvider {
     }
   }
   
-  // Expose methods for event handlers
+  // Event handlers for overlay interactions (pure actors approach)
   get overlayRenderer() {
     return {
       handleCopy: (cells: Set<string>) => {
-        this.machine.send({ type: 'COPY', cells });
+        this.onCopy?.(cells);
       },
       handleCut: (cells: Set<string>) => {
-        this.machine.send({ type: 'CUT', cells });
+        this.onCut?.(cells);
       },
       handlePaste: () => {
-        this.machine.send({ type: 'PASTE' });
+        this.onPaste?.();
       },
       cancelFill: () => {
-        this.machine.send({ type: 'FILL_CANCEL' });
+        this.onFillCancel?.();
       }
     };
   }
   
   showCopyIndicator(isCut: boolean): void {
-    const selectedCells = this.machine.getSnapshot().context.selectedCells;
-    this.machine.send({
-      type: isCut ? 'CUT' : 'COPY',
-      cells: selectedCells
-    });
+    // Use current selected cells from state
+    const selectedCells = this.currentSelectedCells;
+    if (isCut) {
+      this.onCut?.(selectedCells);
+    } else {
+      this.onCopy?.(selectedCells);
+    }
   }
   
   hideCopyIndicator(): void {
-    this.machine.send({ type: 'CLEAR_CLIPBOARD' });
+    this.onClearClipboard?.();
   }
   
   hasClipboardOutline(): boolean {
-    const snapshot = this.machine.getSnapshot();
-    return snapshot.context.shapesVisible.copyIndicator && 
-           snapshot.context.clipboardState !== null;
+    // This should be determined by the parent component passing clipboard state
+    // For now, return false until parent provides this information
+    return false;
   }
   
   hasFillOperation(): boolean {
-    const snapshot = this.machine.getSnapshot();
-    return snapshot.context.fillState !== null || 
-           snapshot.context.shapesVisible.fillPreview;
+    // This should be determined by the parent component passing fill state
+    // For now, return false until parent provides this information
+    return false;
   }
   
   destroy(): void {
-    // Only stop machine if we created it
-    if (!this.config.overlayActor && this.machine) {
-      this.machine.stop();
-    }
-    
     // Destroy feature overlays only if they were created
     if (this.selectionOverlay) this.selectionOverlay.destroy();
     if (this.clipboardOverlay) this.clipboardOverlay.destroy();
@@ -506,5 +526,7 @@ export class CanvasOverlay implements CoordinateProvider {
     if (this.fillHandleLayer) this.fillHandleLayer.destroy();
     this.layer.destroy();
     this.stage.destroy();
+    
+    console.log('CanvasOverlay: Destroyed');
   }
 }

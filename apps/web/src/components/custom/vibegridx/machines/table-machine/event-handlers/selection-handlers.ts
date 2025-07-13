@@ -55,6 +55,18 @@ export const selectionHandlers = {
               visualCells: visualPositions
             }
           });
+          
+          // Also render fill handle for selected cells
+          if (context.viewport) {
+            self.send({
+              type: 'FORWARD_TO_CANVAS',
+              event: {
+                type: 'RENDER_FILL_HANDLE',
+                selectedCells: context.selectedCells,
+                viewport: context.viewport
+              }
+            });
+          }
         }
       },
       
@@ -100,6 +112,12 @@ export const selectionHandlers = {
       sendTo(
         ({ context }) => context.actors.canvasActor!,
         () => ({ type: 'UPDATE_SELECTION_VISUAL', visualCells: [] })
+      ),
+      
+      // Hide fill handle when selection is cleared
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({ type: 'HIDE_FILL_HANDLE' })
       )
     ]
   },

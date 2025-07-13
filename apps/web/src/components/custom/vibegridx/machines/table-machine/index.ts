@@ -20,6 +20,7 @@ import { viewHandlers } from './event-handlers/view-handlers';
 import { keyboardHandlers } from './event-handlers/keyboard-handlers';
 import { editHandlers } from './event-handlers/edit-handlers';
 import { dragHandlers } from './event-handlers/drag-handlers';
+import { fillHandlers } from './event-handlers/fill-handlers';
 
 // Import helpers
 import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
@@ -45,22 +46,27 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   const rowHeight = input.settings?.rowHeight || 40;
   const initialRowIds = input.initialData?.map(row => row.id) || [];
   
-  // Create dimension state
+  // Load persisted data if available (sync machine pattern)
+  const persistedData = input.persistedData;
+  
+  // Create dimension state with persisted column widths
   const dimensionState = createInitialDimensionsState(
     input.columns || [],
     initialRowCount,
     rowHeight,
-    input.enableSelectionColumn || false
+    input.enableSelectionColumn || false,
+    persistedData?.columnWidths // Pass persisted column widths
   );
   
   // Create selection state
   const selectionState = createInitialSelectionState();
   
-  // Create view state
+  // Create view state with persisted view settings
   const viewState = createInitialViewState(
     input.entityType,
     input.columns || [],
-    input.settings?.initialViewport
+    input.settings?.initialViewport,
+    persistedData // Pass all persisted data for view state initialization
   );
   
   // Create edit state
@@ -225,6 +231,7 @@ export const tableBaseMachine = setup({
       | { type: 'vibegridx.cell.click'; rowId: string; columnId: string }
       | { type: 'vibegridx.cell.edit'; rowId: string; columnId: string; value: any }
       | { type: 'vibegridx.selection.change'; selectedCells: Set<string> }
+      | { type: 'vibegridx.fill.start'; originalCells: Set<string>; direction: 'vertical' | 'horizontal' }
       | { type: 'vibegridx.fill.complete'; originalCells: Set<string>; fillCells: Set<string> }
       | { type: 'vibegridx.perf.render'; duration: number; cellCount: number }
       | { type: 'vibegridx.error'; error: Error; context: string }
@@ -284,11 +291,95 @@ export const tableBaseMachine = setup({
       } else {
         console.error('TableMachine: No canvas actor available for forwarding');
       }
+    },
+    
+    // Persistence action
+    persistSnapshot: ({ context, self }) => {
+      if (typeof window === 'undefined') return;
+      
+      const key = `vibegridx-${context.id}-state`;
+      try {
+        // Don't use getPersistedSnapshot - just save what we need
+        const currentState = self.getSnapshot();
+        
+        const stateToPersist = {
+          value: currentState.value,
+          context: {
+            // Only persist the UI state fields we care about
+            columnWidths: context.columnWidths,
+            columnOffsets: context.columnOffsets,
+            rowHeight: context.rowHeight,
+            sortBy: context.sortBy,
+            filters: context.filters,
+            groupBy: context.groupBy,
+            columnVisibility: context.columnVisibility,
+            columnOrder: context.columnOrder,
+            hiddenColumnCount: context.hiddenColumnCount,
+            settings: context.settings,
+            viewport: context.viewport
+          }
+        };
+        
+        const serialized = JSON.stringify(stateToPersist);
+        localStorage.setItem(key, serialized);
+        
+        // Enhanced logging to show what's being saved
+        console.log('🔵 TableMachine: SAVING state to localStorage', {
+          key,
+          tableId: context.id,
+          entityType: context.entityType,
+          snapshotSize: serialized.length,
+          persistedFields: stateToPersist.context,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('🔴 TableMachine: FAILED to persist snapshot:', error);
+        console.error('Error details:', error.message);
+      }
     }
   }
 }).createMachine({
   id: 'tableBaseMachine',
-  context: ({ input }) => createDefaultContext(input),
+  context: ({ input }) => {
+    try {
+      return createDefaultContext(input);
+    } catch (error) {
+      console.error('TableMachine: Error creating context:', error);
+      // Return a minimal valid context
+      return {
+        id: input.id,
+        entityType: input.entityType || 'unknown',
+        columns: input.columns || [],
+        rows: [],
+        visibleRowIds: [],
+        allRowIds: [],
+        settings: input.settings || {},
+        version: 0,
+        enableSelectionColumn: input.enableSelectionColumn || false,
+        entities: [],
+        relationshipResolvers: {},
+        actors: {},
+        coordinateManager: null,
+        coordinateMapping: null,
+        // Add other required fields with defaults
+        columnWidths: {},
+        columnOffsets: {},
+        rowHeight: 40,
+        totalWidth: 0,
+        totalRows: 0,
+        totalHeight: 0,
+        selectedCells: new Set(),
+        anchorCell: null,
+        sortBy: [],
+        filters: [],
+        groupBy: [],
+        columnVisibility: {},
+        columnOrder: [],
+        hiddenColumnCount: 0,
+        viewport: null
+      };
+    }
+  },
   
   initial: 'initializing',
   
@@ -387,7 +478,8 @@ export const tableBaseMachine = setup({
             ...viewHandlers,
             ...keyboardHandlers,
             ...editHandlers,
-            ...dragHandlers
+            ...dragHandlers,
+            ...fillHandlers
           }
         },
         
@@ -403,7 +495,8 @@ export const tableBaseMachine = setup({
             ...selectionHandlers,
             ...keyboardHandlers,
             ...editHandlers,
-            ...dragHandlers
+            ...dragHandlers,
+            ...fillHandlers
           },
           
           invoke: {
@@ -679,6 +772,9 @@ export const tableBaseMachine = setup({
       
       // Drag events
       ...dragHandlers,
+      
+      // Fill events (from canvas actor)
+      ...fillHandlers,
       
       // Legacy edit events (now handled by edit slice)
       'edit.legacy.*': {

@@ -270,6 +270,7 @@ function VibeGridXDemoGrid({
       {/* Grid Component */}
       <div className="flex-1">
         <VibeGridX<any>
+          tableId="vibegridx-demo-v2"
           entityType={entityType}
           columns={columns}
           height={550}

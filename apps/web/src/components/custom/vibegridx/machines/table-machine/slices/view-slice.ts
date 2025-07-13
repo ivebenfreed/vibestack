@@ -33,30 +33,6 @@ export interface ViewState {
 // HELPERS
 // ====================================
 
-const getStorageKey = (entityType: string, key: string) => `vibegridx-${entityType}-${key}`;
-
-const loadFromStorage = <T>(entityType: string, key: string, defaultValue: T): T => {
-  if (typeof window === 'undefined') return defaultValue;
-  
-  try {
-    const stored = localStorage.getItem(getStorageKey(entityType, key));
-    return stored ? JSON.parse(stored) : defaultValue;
-  } catch (error) {
-    console.warn(`Failed to load ${key} from localStorage:`, error);
-    return defaultValue;
-  }
-};
-
-const saveToStorage = (entityType: string, key: string, value: any): void => {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    localStorage.setItem(getStorageKey(entityType, key), JSON.stringify(value));
-  } catch (error) {
-    console.warn(`Failed to save ${key} to localStorage:`, error);
-  }
-};
-
 // ====================================
 // INITIAL STATE
 // ====================================
@@ -64,30 +40,31 @@ const saveToStorage = (entityType: string, key: string, value: any): void => {
 export const createInitialViewState = (
   entityType: string,
   columns: Column[],
-  initialViewport?: ViewportInfo
-): ViewState => ({
-  sortBy: loadFromStorage(entityType, 'sortBy', []),
-  filters: loadFromStorage(entityType, 'filters', []),
-  groupBy: loadFromStorage(entityType, 'groupBy', []),
-  columnVisibility: loadFromStorage(
-    entityType,
-    'columnVisibility',
-    Object.fromEntries(columns.map(col => [col.id, true]))
-  ),
-  columnOrder: loadFromStorage(
-    entityType,
-    'columnOrder',
-    columns.map(col => col.id)
-  ),
-  hiddenColumnCount: Object.values(
-    loadFromStorage(
-      entityType,
-      'columnVisibility',
-      Object.fromEntries(columns.map(col => [col.id, true]))
-    )
-  ).filter(visible => !visible).length,
-  viewport: initialViewport || null
-});
+  initialViewport?: ViewportInfo,
+  persistedData?: any
+): ViewState => {
+  const defaultVisibility = Object.fromEntries(columns.map(col => [col.id, true]));
+  
+  // Use persisted state if available, otherwise use defaults
+  const sortBy = persistedData?.sortBy || [];
+  const filters = persistedData?.filters || [];
+  const groupBy = persistedData?.groupBy || [];
+  const columnVisibility = persistedData?.columnVisibility || defaultVisibility;
+  const columnOrder = persistedData?.columnOrder || columns.map(col => col.id);
+  
+  // Calculate hidden column count from column visibility
+  const hiddenColumnCount = Object.values(columnVisibility).filter(visible => !visible).length;
+  
+  return {
+    sortBy,
+    filters,
+    groupBy,
+    columnVisibility,
+    columnOrder,
+    hiddenColumnCount,
+    viewport: initialViewport || null
+  };
+};
 
 // ====================================
 // ACTIONS
@@ -96,10 +73,7 @@ export const createInitialViewState = (
 export const viewActions = {
   // Sorting actions
   setSortBy: assign({
-    sortBy: ({ context, event }) => {
-      saveToStorage(context.entityType, 'sortBy', event.sortBy);
-      return event.sortBy;
-    }
+    sortBy: ({ context, event }) => event.sortBy
   }),
   
   toggleSort: assign({
@@ -135,25 +109,18 @@ export const viewActions = {
       }
       
       console.log('toggleSort: Updating sort', { field, shiftKey, newSortBy });
-      saveToStorage(context.entityType, 'sortBy', newSortBy);
       return newSortBy;
     }
   }),
   
   // Filter actions
   setFilters: assign({
-    filters: ({ context, event }) => {
-      saveToStorage(context.entityType, 'filters', event.filters);
-      return event.filters;
-    }
+    filters: ({ context, event }) => event.filters
   }),
   
   // Grouping actions
   setGroupBy: assign({
-    groupBy: ({ context, event }) => {
-      saveToStorage(context.entityType, 'groupBy', event.groupBy);
-      return event.groupBy;
-    }
+    groupBy: ({ context, event }) => event.groupBy
   }),
   
   // Column visibility actions
@@ -172,7 +139,6 @@ export const viewActions = {
         [event.columnId]: newValue
       };
       
-      saveToStorage(context.entityType, 'columnVisibility', newVisibility);
       return newVisibility;
     },
     hiddenColumnCount: ({ context, event }) => {
@@ -188,10 +154,7 @@ export const viewActions = {
   }),
   
   setColumnVisibility: assign({
-    columnVisibility: ({ context, event }) => {
-      saveToStorage(context.entityType, 'columnVisibility', event.visibility);
-      return event.visibility;
-    },
+    columnVisibility: ({ context, event }) => event.visibility,
     hiddenColumnCount: ({ event }) => {
       return Object.values(event.visibility).filter(v => !v).length;
     }
@@ -202,7 +165,6 @@ export const viewActions = {
       const allVisible = Object.fromEntries(
         Object.keys(context.columnVisibility).map(id => [id, true])
       );
-      saveToStorage(context.entityType, 'columnVisibility', allVisible);
       return allVisible;
     },
     hiddenColumnCount: () => 0
@@ -213,7 +175,6 @@ export const viewActions = {
       const allHidden = Object.fromEntries(
         Object.keys(context.columnVisibility).map(id => [id, false])
       );
-      saveToStorage(context.entityType, 'columnVisibility', allHidden);
       return allHidden;
     },
     hiddenColumnCount: ({ context }) => Object.keys(context.columnVisibility).length
@@ -221,10 +182,7 @@ export const viewActions = {
   
   // Column order actions
   setColumnOrder: assign({
-    columnOrder: ({ context, event }) => {
-      saveToStorage(context.entityType, 'columnOrder', event.order);
-      return event.order;
-    }
+    columnOrder: ({ context, event }) => event.order
   }),
   
   reorderColumns: assign({
@@ -232,7 +190,6 @@ export const viewActions = {
       const newOrder = [...context.columnOrder];
       const [removed] = newOrder.splice(event.fromIndex, 1);
       newOrder.splice(event.toIndex, 0, removed);
-      saveToStorage(context.entityType, 'columnOrder', newOrder);
       return newOrder;
     }
   }),
@@ -240,7 +197,6 @@ export const viewActions = {
   resetColumnOrder: assign({
     columnOrder: ({ context }) => {
       const defaultOrder = context.columns.map((col: Column) => col.id);
-      saveToStorage(context.entityType, 'columnOrder', defaultOrder);
       return defaultOrder;
     }
   }),

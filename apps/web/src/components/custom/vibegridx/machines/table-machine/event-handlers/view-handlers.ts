@@ -10,6 +10,9 @@ export const viewHandlers = {
     actions: [
       viewActions.setSortBy,
       
+      // Persist the state
+      'persistSnapshot',
+      
       // Trigger view processing
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -18,6 +21,9 @@ export const viewHandlers = {
   'view.column.click': {
     actions: [
       viewActions.toggleSort,
+      
+      // Persist the state
+      'persistSnapshot',
       
       // Trigger view processing
       raise({ type: 'INVOKE_VIEW_ACTOR' })
@@ -28,6 +34,9 @@ export const viewHandlers = {
     actions: [
       viewActions.setFilters,
       
+      // Persist the state
+      'persistSnapshot',
+      
       // Trigger view processing
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -36,6 +45,9 @@ export const viewHandlers = {
   'view.group.set': {
     actions: [
       viewActions.setGroupBy,
+      
+      // Persist the state
+      'persistSnapshot',
       
       // Trigger view processing
       raise({ type: 'INVOKE_VIEW_ACTOR' })
@@ -54,6 +66,9 @@ export const viewHandlers = {
         });
       },
       
+      // Persist the state
+      'persistSnapshot',
+      
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -70,6 +85,9 @@ export const viewHandlers = {
         });
       },
       
+      // Persist the state
+      'persistSnapshot',
+      
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -83,6 +101,9 @@ export const viewHandlers = {
         console.log('TableMachine: All columns shown');
       },
       
+      // Persist the state
+      'persistSnapshot',
+      
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -95,6 +116,9 @@ export const viewHandlers = {
       () => {
         console.log('TableMachine: All columns hidden');
       },
+      
+      // Persist the state
+      'persistSnapshot',
       
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
@@ -204,12 +228,7 @@ export const viewHandlers = {
         })
       }),
       
-      // Persist to localStorage
-      ({ context, event }) => {
-        const columnWidths = loadFromStorage(context.entityType, 'columnWidths', {});
-        columnWidths[event.columnId] = event.width;
-        saveToStorage(context.entityType, 'columnWidths', columnWidths);
-      },
+      // Persistence will be handled by persistSnapshot action
       
       ({ event }) => {
         console.log('TableMachine: Column resized', {
@@ -321,8 +340,7 @@ export const viewHandlers = {
               fullNewOrder: newOrder
             });
             
-            // Save to storage
-            saveToStorage(context.entityType, 'columnOrder', newOrder);
+            // Persistence will be handled by persistSnapshot action
             
             return newOrder;
           }
@@ -334,6 +352,9 @@ export const viewHandlers = {
       
       // Clear drag state
       viewActions.clearColumnDrag,
+      
+      // Persist the state
+      'persistSnapshot',
       
       // Trigger view processing to apply new column order
       raise({ type: 'INVOKE_VIEW_ACTOR' }),
@@ -458,15 +479,8 @@ export const viewHandlers = {
         }
       }),
       
-      // Persist to localStorage
-      ({ context }) => {
-        if (context.columnResizeState) {
-          const { columnId, currentWidth } = context.columnResizeState;
-          const columnWidths = loadFromStorage(context.entityType, 'columnWidths', {});
-          columnWidths[columnId] = currentWidth;
-          saveToStorage(context.entityType, 'columnWidths', columnWidths);
-        }
-      },
+      // Persist the state
+      'persistSnapshot',
       
       // Increment version to trigger re-render
       assign({
@@ -498,27 +512,3 @@ export const viewHandlers = {
 // Import helpers
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
-// Storage helpers (should be in a separate file but including here for completeness)
-const getStorageKey = (entityType: string, key: string) => `vibegridx-${entityType}-${key}`;
-
-const loadFromStorage = <T>(entityType: string, key: string, defaultValue: T): T => {
-  if (typeof window === 'undefined') return defaultValue;
-  
-  try {
-    const stored = localStorage.getItem(getStorageKey(entityType, key));
-    return stored ? JSON.parse(stored) : defaultValue;
-  } catch (error) {
-    console.warn(`Failed to load ${key} from localStorage:`, error);
-    return defaultValue;
-  }
-};
-
-const saveToStorage = (entityType: string, key: string, value: any): void => {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    localStorage.setItem(getStorageKey(entityType, key), JSON.stringify(value));
-  } catch (error) {
-    console.warn(`Failed to save ${key} to localStorage:`, error);
-  }
-};

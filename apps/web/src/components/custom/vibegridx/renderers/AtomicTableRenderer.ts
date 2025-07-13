@@ -175,6 +175,14 @@ export class AtomicTableRenderer {
   private updateQueue = new Set<string>();
   private batchTimeoutId = 0;
   
+  // Bound handlers for resize events
+  private boundHandleResizeMove: (event: MouseEvent) => void;
+  private boundHandleResizeEnd: (event: MouseEvent) => void;
+  
+  // Bound handlers for drag events
+  private boundHandleDragMove: (event: MouseEvent) => void;
+  private boundHandleDragEnd: (event: MouseEvent) => void;
+  
   constructor(options: RendererOptions) {
     this.options = options;
     this.dimensionManager = options.dimensionManager || null;
@@ -203,6 +211,15 @@ export class AtomicTableRenderer {
     this.virtualGrid = new VirtualGridManager(initialViewport);
     
     this.container = options.container;
+    
+    // Bind resize handlers before setting up event listeners
+    this.boundHandleResizeMove = this.handleResizeMove.bind(this);
+    this.boundHandleResizeEnd = this.handleResizeEnd.bind(this);
+    
+    // Bind drag handlers
+    this.boundHandleDragMove = this.handleDragMove.bind(this);
+    this.boundHandleDragEnd = this.handleDragEnd.bind(this);
+    
     this.initializeDOM();
     this.setupEventListeners();
   }
@@ -585,10 +602,9 @@ export class AtomicTableRenderer {
     // Header interaction handlers
     this.header.addEventListener('click', this.handleHeaderClick.bind(this));
     
-    // Column drag handlers
+    // Column drag handlers - only the mousedown on header, not global listeners
+    // Global listeners will be added dynamically when drag/resize starts
     this.header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
-    document.addEventListener('mousemove', this.handleDragMove.bind(this));
-    document.addEventListener('mouseup', this.handleDragEnd.bind(this));
     
     // Make viewport focusable but don't add keyboard listener here
     // Keyboard events are handled at the VibeGridX component level to avoid duplication
@@ -640,6 +656,11 @@ export class AtomicTableRenderer {
     // PERFORMANCE: Removed expensive console.log statements from render hot path
     
     this.renderStartTime = performance.now();
+    
+    // Update column widths from render state
+    if (state.columnWidths) {
+      this.columnWidths = state.columnWidths;
+    }
     
     // Rows are already pre-sorted by render state extractor
     this.lastRenderState = state;
@@ -1158,7 +1179,10 @@ export class AtomicTableRenderer {
     rowElement.style.position = 'absolute';
     rowElement.style.top = `${top}px`;
     rowElement.style.left = '0px';
-    rowElement.style.width = '100%';
+    
+    // Calculate total width from columns
+    const totalWidth = this.getTotalColumnsWidth();
+    rowElement.style.width = `${totalWidth}px`;
     rowElement.style.height = `${this.virtualGrid.getRowHeight()}px`;
     
     
@@ -1476,22 +1500,13 @@ export class AtomicTableRenderer {
     const sortIcon = target.closest('.vibegridx-sort-icon');
     const resizeHandle = target.closest('.vibegridx-resize-handle');
     
-    console.log('[AtomicTableRenderer] handleHeaderMouseDown', {
-      target: target.className,
-      hasResizeHandle: !!resizeHandle,
-      hasSortIcon: !!sortIcon,
-      hasHeaderCell: !!headerCell
-    });
-    
     // Handle resize
     if (resizeHandle) {
       event.preventDefault();
       const columnId = (resizeHandle as HTMLElement).dataset.column;
-      console.log('[AtomicTableRenderer] Resize handle clicked', { columnId });
       
-      if (columnId && this.dimensionManager) {
+      if (columnId) {
         const currentWidth = this.columnWidths[columnId] || 120;
-        console.log('[AtomicTableRenderer] Sending resize start event', { columnId, currentWidth });
         
         // Send resize start event to XState
         this.options.onColumnResizeStart?.(columnId, event.clientX, currentWidth);
@@ -1502,9 +1517,9 @@ export class AtomicTableRenderer {
         // Add resizing class to container
         this.container.classList.add('vibegridx-resizing');
         
-        // Add global mouse event listeners
-        document.addEventListener('mousemove', this.handleResizeMove);
-        document.addEventListener('mouseup', this.handleResizeEnd);
+        // Add global mouse event listeners using bound handlers
+        document.addEventListener('mousemove', this.boundHandleResizeMove);
+        document.addEventListener('mouseup', this.boundHandleResizeEnd);
       }
       return;
     }
@@ -1554,6 +1569,10 @@ export class AtomicTableRenderer {
         
         // Add dragging class to header cell
         headerCell.classList.add('vibegridx-dragging');
+        
+        // Add drag event listeners
+        document.addEventListener('mousemove', this.boundHandleDragMove);
+        document.addEventListener('mouseup', this.boundHandleDragEnd);
         
         // Notify parent component
         this.options.onColumnDragStart?.(columnId, event.clientX, event.clientY);
@@ -1700,6 +1719,10 @@ export class AtomicTableRenderer {
       dropIndicator: null
     };
     
+    // Remove drag event listeners
+    document.removeEventListener('mousemove', this.boundHandleDragMove);
+    document.removeEventListener('mouseup', this.boundHandleDragEnd);
+    
     // Notify parent component
     this.options.onColumnDragEnd?.(targetIndex);
   }
@@ -1725,15 +1748,24 @@ export class AtomicTableRenderer {
     }
   }
 
-  // Column resize handlers
-  private handleResizeMove = (event: MouseEvent): void => {
-    console.log('[AtomicTableRenderer] handleResizeMove', { clientX: event.clientX });
-    // Send move event to XState
+  // Column resize handlers - Defined as regular methods and bound in constructor
+  private handleResizeMove(event: MouseEvent): void {
+    console.log('[AtomicTableRenderer] handleResizeMove called', {
+      clientX: event.clientX,
+      isResizing: this.isResizing
+    });
+    
+    if (!this.isResizing) {
+      console.warn('[AtomicTableRenderer] Not in resizing state, skipping');
+      return;
+    }
+    
+    // Send move event to XState which will handle throttling
     this.options.onColumnResizeMove?.(event.clientX);
-  };
+  }
 
-  private handleResizeEnd = (event: MouseEvent): void => {
-    console.log('[AtomicTableRenderer] handleResizeEnd');
+  private handleResizeEnd(event: MouseEvent): void {
+    console.log('[AtomicTableRenderer] handleResizeEnd called');
     
     // Clear resizing state
     this.isResizing = false;
@@ -1742,12 +1774,12 @@ export class AtomicTableRenderer {
     this.container.classList.remove('vibegridx-resizing');
     
     // Remove global listeners
-    document.removeEventListener('mousemove', this.handleResizeMove);
-    document.removeEventListener('mouseup', this.handleResizeEnd);
+    document.removeEventListener('mousemove', this.boundHandleResizeMove);
+    document.removeEventListener('mouseup', this.boundHandleResizeEnd);
     
     // Send end event to XState
     this.options.onColumnResizeEnd?.();
-  };
+  }
 
   
   // ====================================
@@ -1818,26 +1850,79 @@ export class AtomicTableRenderer {
       headerCell.style.width = `${width}px`;
       headerCell.style.minWidth = `${width}px`;
       headerCell.style.maxWidth = `${width}px`;
+      // Force flex-shrink to prevent overlapping
+      headerCell.style.flexShrink = '0';
     }
     
-    // Update all visible body cells for this column
-    const cells = this.body.querySelectorAll(`[data-column-id="${columnId}"]`) as NodeListOf<HTMLElement>;
-    cells.forEach(cell => {
-      cell.style.width = `${width}px`;
-      cell.style.minWidth = `${width}px`;
-      cell.style.maxWidth = `${width}px`;
+    // Find the column index to know which cells need position updates
+    const columnIndex = this.visibleColumns.findIndex(col => col.id === columnId);
+    if (columnIndex === -1) return;
+    
+    // Calculate new offsets for all columns
+    let currentOffset = 0;
+    const columnOffsets: Record<string, number> = {};
+    
+    console.log('[AtomicTableRenderer] Calculating offsets:', {
+      enableSelectionColumn: this.enableSelectionColumn,
+      startingOffset: currentOffset,
+      visibleColumns: this.visibleColumns.map(c => c.id)
     });
     
-    // Update total header width
-    let totalWidth = 48; // Selection column width
-    this.visibleColumns.forEach(col => {
-      if (col.id === columnId) {
-        totalWidth += width;
-      } else {
-        totalWidth += this.columnWidths[col.id] || col.width || 120;
-      }
+    // Handle selection column specially if it exists
+    if (this.visibleColumns.some(col => col.id === '__selection')) {
+      columnOffsets['__selection'] = 0;
+      currentOffset = 48; // Selection column is always 48px wide
+      console.log('[AtomicTableRenderer] Selection column found, positioned at 0, next offset: 48');
+    } else {
+      // If no selection column in visibleColumns but cells expect it, start at 48
+      currentOffset = 48;
+      console.log('[AtomicTableRenderer] No selection column in visibleColumns, but starting at 48 for cell compatibility');
+    }
+    
+    // Position data columns
+    this.visibleColumns.forEach((col, index) => {
+      if (col.id === '__selection') return; // Already handled
+      
+      columnOffsets[col.id] = currentOffset;
+      const colWidth = this.columnWidths[col.id] || col.width || 120;
+      console.log(`[AtomicTableRenderer] Column ${col.id}: offset=${currentOffset}, width=${colWidth}`);
+      currentOffset += colWidth;
     });
+    
+    // Update all cells - both width and position
+    this.visibleColumns.forEach((col, index) => {
+      const cells = this.body.querySelectorAll(`[data-column-id="${col.id}"]`) as NodeListOf<HTMLElement>;
+      const colWidth = this.columnWidths[col.id] || col.width || 120;
+      const colOffset = columnOffsets[col.id];
+      
+      cells.forEach(cell => {
+        cell.style.width = `${colWidth}px`;
+        cell.style.left = `${colOffset}px`;
+      });
+    });
+    
+    // Recalculate total width
+    const totalWidth = currentOffset;
+    
+    // Update header total width
     this.header.style.width = `${totalWidth}px`;
+    
+    // Force layout recalculation
+    this.header.offsetHeight; // Force reflow
+    
+    // Update body spacer height if needed
+    if (this.body.firstElementChild) {
+      const spacer = this.body.firstElementChild as HTMLElement;
+      if (spacer.classList.contains('vibegridx-virtual-spacer')) {
+        spacer.style.width = `${totalWidth}px`;
+      }
+    }
+    
+    // Update all visible rows to match the new total width
+    const rows = this.body.querySelectorAll('.vibegridx-row') as NodeListOf<HTMLElement>;
+    rows.forEach(row => {
+      row.style.width = `${totalWidth}px`;
+    });
   }
   
   destroy(): void {

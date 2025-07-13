@@ -15,12 +15,21 @@ export interface FillHandleConfig {
   selectionBorderColor: string;
 }
 
+export interface FillHandleCallbacks {
+  onFillStart: (direction: 'vertical' | 'horizontal') => void;
+  onFillPreview: (previewCells: Set<string>) => void;
+  onFillComplete: (fillCells: Set<string>) => void;
+  onFillCancel: () => void;
+  getSelectedCells: () => Set<string>;
+  getViewport: () => ViewportInfo | null;
+}
+
 export class FillHandleLayer {
   private stage: Konva.Stage;
   private layer: Konva.Layer;
   private fillHandleLayer: Konva.Layer; // Dedicated interactive layer
-  // Machine removed - using direct canvas actor approach
   private config: FillHandleConfig;
+  private callbacks: FillHandleCallbacks;
   private coordinateHelper: CoordinateHelper;
   
   // Fill handle state
@@ -33,11 +42,13 @@ export class FillHandleLayer {
   constructor(
     stage: Konva.Stage,
     coordinateProvider: CoordinateProvider,
-    config: FillHandleConfig
+    config: FillHandleConfig,
+    callbacks: FillHandleCallbacks
   ) {
     this.stage = stage;
     this.coordinateHelper = new CoordinateHelper(coordinateProvider);
     this.config = config;
+    this.callbacks = callbacks;
     
     // Create main layer for preview shapes
     this.layer = new Konva.Layer({
@@ -420,7 +431,7 @@ export class FillHandleLayer {
     
     // Drag start
     this.activeFillHandle.on('dragstart', () => {
-      this.machine.send({ type: 'FILL_START', direction: 'vertical' });
+      this.callbacks.onFillStart('vertical');
     });
     
     // Drag move - show preview
@@ -430,17 +441,19 @@ export class FillHandleLayer {
       const pos = this.stage.getPointerPosition();
       if (!pos) return;
       
-      const context = this.machine.getSnapshot().context;
-      if (!context.viewport) return;
+      const selectedCells = this.callbacks.getSelectedCells();
+      const viewport = this.callbacks.getViewport();
+      if (!viewport) return;
       
       // Calculate and render fill preview
       const previewCells = this.calculateFillPreviewCells(
         pos,
-        context.selectedCells,
-        context.viewport
+        selectedCells,
+        viewport
       );
       
-      this.renderFillPreview(previewCells, context.viewport);
+      this.renderFillPreview(previewCells, viewport);
+      this.callbacks.onFillPreview(previewCells);
     });
     
     // Drag end - complete fill
@@ -450,21 +463,20 @@ export class FillHandleLayer {
       const pos = this.stage.getPointerPosition();
       if (!pos) return;
       
-      const context = this.machine.getSnapshot().context;
-      if (!context.viewport) return;
+      const selectedCells = this.callbacks.getSelectedCells();
+      const viewport = this.callbacks.getViewport();
+      if (!viewport) return;
       
       // Calculate final fill cells
       const fillCells = this.calculateFillPreviewCells(
         pos,
-        context.selectedCells,
-        context.viewport
+        selectedCells,
+        viewport
       );
       
       // Clear preview and complete fill
       this.clearFillPreview();
-      if (this.machine) {
-        this.machine.send({ type: 'FILL_COMPLETE', fillCells });
-      }
+      this.callbacks.onFillComplete(fillCells);
       
       // Restore cursor
       this.stage.content.style.cursor = 'default';
@@ -536,7 +548,7 @@ export class FillHandleLayer {
       startY = e.clientY;
       
       // Start fill operation
-      this.machine.send({ type: 'FILL_START', direction: 'vertical' });
+      this.callbacks.onFillStart('vertical');
     });
     
     // Global mouse events for dragging
@@ -551,14 +563,16 @@ export class FillHandleLayer {
       const canvasY = e.clientY - containerRect.top;
       
       // Calculate fill preview
-      const context = this.machine.getSnapshot().context;
-      if (context.viewport && context.selectedCells.size > 0) {
+      const selectedCells = this.callbacks.getSelectedCells();
+      const viewport = this.callbacks.getViewport();
+      if (viewport && selectedCells.size > 0) {
         const previewCells = this.calculateFillPreviewCells(
           { x: canvasX, y: canvasY },
-          context.selectedCells,
-          context.viewport
+          selectedCells,
+          viewport
         );
-        this.renderFillPreview(previewCells, context.viewport);
+        this.renderFillPreview(previewCells, viewport);
+        this.callbacks.onFillPreview(previewCells);
       }
     };
     
@@ -574,18 +588,17 @@ export class FillHandleLayer {
       const canvasY = e.clientY - containerRect.top;
       
       // Complete fill operation
-      const context = this.machine.getSnapshot().context;
-      if (context.viewport && context.selectedCells.size > 0) {
+      const selectedCells = this.callbacks.getSelectedCells();
+      const viewport = this.callbacks.getViewport();
+      if (viewport && selectedCells.size > 0) {
         const fillCells = this.calculateFillPreviewCells(
           { x: canvasX, y: canvasY },
-          context.selectedCells,
-          context.viewport
+          selectedCells,
+          viewport
         );
         
         this.clearFillPreview();
-        if (this.machine) {
-        this.machine.send({ type: 'FILL_COMPLETE', fillCells });
-      }
+        this.callbacks.onFillComplete(fillCells);
       }
       
       // Remove global listeners

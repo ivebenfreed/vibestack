@@ -43,11 +43,11 @@ import './vibegridx.css';
 // ====================================
 
 interface VibeGridXProps<T = any> {
-  entityType: string;  // Any entity type, not just hardcoded ones
+  tableId: string;  // Unique identifier for this table instance (required for persistence)
+  entityType?: string;  // Entity type for data operations (optional)
   columns: Column<T>[];  // Required typed columns
   primaryAtom: any; // XState atom for primary data
   relationshipAtoms?: Record<string, any>; // XState atoms for relationship data
-  tableId?: string;
   className?: string;
   height?: number;
   width?: number;
@@ -201,20 +201,56 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // CORE INITIALIZATION
   // ====================================
   
-  // PERFORMANCE FIX: Generate stable table ID that persists across renders
-  const tableId = useMemo(() => `vibegridx-${props.entityType}-${Math.random().toString(36).substring(2, 9)}`, [props.entityType]);
+  // Use the stable tableId from props
+  const { tableId, entityType } = props;
   
   // No atomConfig needed - we use useSelector internally
   
+  // Load persisted state before creating machine config
+  const persistenceKey = `vibegridx-${tableId}-state`;
+  const persistedData = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(persistenceKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          
+          // Enhanced logging to show what's being loaded
+          console.log('🟢 VibeGridX: LOADING persisted state from localStorage', {
+            key: persistenceKey,
+            tableId: tableId,
+            entityType: entityType,
+            snapshotSize: stored.length,
+            loadedData: parsed.context,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Return the context data for machine initialization
+          return parsed.context;
+        } else {
+          console.log('🟡 VibeGridX: No persisted state found for', persistenceKey);
+          return null;
+        }
+      } catch (error) {
+        console.error('🔴 VibeGridX: FAILED to restore persisted state:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [persistenceKey]);
+
   // PERFORMANCE FIX: Stabilize machine configuration to prevent recreation
+  // Include persisted data in the input configuration (sync machine pattern)
   const machineConfig = useMemo(() => ({
     input: {
       id: tableId,
-      entityType: props.entityType,
+      entityType: entityType || 'unknown',
       columns: props.columns,
       enableSelectionColumn: enableSelectionColumn,
       entities: entities, // Pass reactive entities directly
       relationshipResolvers: relationshipResolvers, // Pass resolvers for relationship columns
+      // Include persisted data in input for context initialization
+      persistedData: persistedData,
       settings: {
         enableVirtualScrolling: props.enableVirtualScrolling ?? true,
         enableGrouping: props.enableGrouping ?? true,
@@ -231,9 +267,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         }
       }
     }
-  }), [tableId, props.entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
-
-  // Create machine with stable configuration
+  }), [tableId, entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, persistedData, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
+  
+  // Create machine with persisted data in input (sync machine pattern)
   const [tableState, tableSend, tableActor] = useMachine(tableBaseMachine, machineConfig);
   
   // Simple entities flow: atoms → machine → view → render

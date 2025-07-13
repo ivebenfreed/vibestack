@@ -434,7 +434,13 @@ export type TableEvents =
   | { type: 'view.resize.started'; columnResizeState: ColumnResizeState }
   | { type: 'view.resize.updated'; columnResizeState: ColumnResizeState }
   | { type: 'view.resize.ended' }
-  | { type: 'view.resize.cancelled' };
+  | { type: 'view.resize.cancelled' }
+  
+  // Fill events (responses from canvas actor)
+  | { type: 'FILL_START'; direction: 'vertical' | 'horizontal' }
+  | { type: 'FILL_PREVIEW'; previewCells: Set<string> }
+  | { type: 'FILL_COMPLETE'; fillCells: Set<string> }
+  | { type: 'FILL_CANCEL' };
 
 // ====================================
 // CONFIGURATION TYPES
@@ -449,6 +455,7 @@ export interface TableConfig {
   initialData?: TableRow[];
   settings?: TableSettings;
   enableSelectionColumn?: boolean;
+  persistedData?: any; // Persisted UI state from localStorage (sync machine pattern)
 }
 
 // ====================================

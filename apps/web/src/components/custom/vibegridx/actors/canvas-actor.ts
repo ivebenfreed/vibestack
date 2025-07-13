@@ -31,6 +31,10 @@ export type CanvasActorEvent =
   | { type: 'UPDATE_COLUMN_RESIZE'; resizeState: any }
   | { type: 'SHOW_COPY_INDICATOR'; isCut: boolean }
   | { type: 'HIDE_COPY_INDICATOR' }
+  | { type: 'RENDER_FILL_HANDLE'; selectedCells: Set<string>; viewport: ViewportInfo }
+  | { type: 'RENDER_FILL_PREVIEW'; previewCells: Set<string>; viewport: ViewportInfo }
+  | { type: 'CLEAR_FILL_PREVIEW' }
+  | { type: 'HIDE_FILL_HANDLE' }
   | { type: 'DESTROY' };
 
 export type CanvasActorResponse =
@@ -38,6 +42,14 @@ export type CanvasActorResponse =
   | { type: 'SELECTION_UPDATED' }
   | { type: 'CANVAS_COORDINATES_UPDATED' }
   | { type: 'VIEWPORT_UPDATED' }
+  | { type: 'FILL_START'; direction: 'vertical' | 'horizontal' }
+  | { type: 'FILL_PREVIEW'; previewCells: Set<string> }
+  | { type: 'FILL_COMPLETE'; fillCells: Set<string> }
+  | { type: 'FILL_CANCEL' }
+  | { type: 'COPY'; cells: Set<string> }
+  | { type: 'CUT'; cells: Set<string> }
+  | { type: 'PASTE' }
+  | { type: 'CLEAR_CLIPBOARD' }
   | { type: 'CANVAS_ERROR'; error: string };
 
 // ====================================
@@ -71,8 +83,18 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
           try {
             canvas = new CanvasOverlay(event.container, event.config);
-            console.log('CanvasActor: Canvas overlay created successfully');
             
+            // Set up callbacks for pure actors approach
+            canvas.onFillStart = (direction) => sendBack({ type: 'FILL_START', direction });
+            canvas.onFillPreview = (previewCells) => sendBack({ type: 'FILL_PREVIEW', previewCells });
+            canvas.onFillComplete = (fillCells) => sendBack({ type: 'FILL_COMPLETE', fillCells });
+            canvas.onFillCancel = () => sendBack({ type: 'FILL_CANCEL' });
+            canvas.onCopy = (cells) => sendBack({ type: 'COPY', cells });
+            canvas.onCut = (cells) => sendBack({ type: 'CUT', cells });
+            canvas.onPaste = () => sendBack({ type: 'PASTE' });
+            canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
+            
+            console.log('CanvasActor: Canvas overlay created successfully with callbacks');
             sendBack({ type: 'CANVAS_READY' });
           } catch (error) {
             console.error('CanvasActor: Failed to create canvas overlay:', error);
@@ -176,6 +198,50 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           canvas.hideCopyIndicator();
           break;
           
+        case 'RENDER_FILL_HANDLE':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot render fill handle - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Rendering fill handle');
+          const fillHandleLayer = (canvas as any).getFillHandleLayer();
+          fillHandleLayer.renderFillHandle(event.selectedCells, event.viewport);
+          break;
+          
+        case 'RENDER_FILL_PREVIEW':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot render fill preview - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Rendering fill preview');
+          const fillLayer = (canvas as any).getFillHandleLayer();
+          fillLayer.renderFillPreview(event.previewCells, event.viewport);
+          break;
+          
+        case 'CLEAR_FILL_PREVIEW':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot clear fill preview - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Clearing fill preview');
+          const clearFillLayer = (canvas as any).getFillHandleLayer();
+          clearFillLayer.clearFillPreview();
+          break;
+          
+        case 'HIDE_FILL_HANDLE':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot hide fill handle - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Hiding fill handle');
+          const hideFillLayer = (canvas as any).getFillHandleLayer();
+          hideFillLayer.hideFillHandle();
+          break;
+          
         case 'DESTROY':
           console.log('CanvasActor: Destroying canvas overlay');
           
@@ -218,9 +284,10 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
 export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
   return event && typeof event.type === 'string' && 
     [
-      'INITIALIZE', 'UPDATE_SELECTION', 'UPDATE_COORDINATES', 'UPDATE_VIEWPORT',
+      'INITIALIZE', 'UPDATE_SELECTION', 'UPDATE_SELECTION_VISUAL', 'UPDATE_COORDINATES', 'UPDATE_VIEWPORT',
       'UPDATE_COLUMN_DRAG', 'UPDATE_COLUMN_RESIZE', 'SHOW_COPY_INDICATOR', 
-      'HIDE_COPY_INDICATOR', 'DESTROY'
+      'HIDE_COPY_INDICATOR', 'RENDER_FILL_HANDLE', 'RENDER_FILL_PREVIEW',
+      'CLEAR_FILL_PREVIEW', 'HIDE_FILL_HANDLE', 'DESTROY'
     ].includes(event.type);
 }
 
@@ -229,5 +296,9 @@ export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
  */
 export function isCanvasActorResponse(response: any): response is CanvasActorResponse {
   return response && typeof response.type === 'string' && 
-    ['CANVAS_READY', 'SELECTION_UPDATED', 'CANVAS_COORDINATES_UPDATED', 'VIEWPORT_UPDATED', 'CANVAS_ERROR'].includes(response.type);
+    [
+      'CANVAS_READY', 'SELECTION_UPDATED', 'CANVAS_COORDINATES_UPDATED', 'VIEWPORT_UPDATED',
+      'FILL_START', 'FILL_PREVIEW', 'FILL_COMPLETE', 'FILL_CANCEL',
+      'COPY', 'CUT', 'PASTE', 'CLEAR_CLIPBOARD', 'CANVAS_ERROR'
+    ].includes(response.type);
 }

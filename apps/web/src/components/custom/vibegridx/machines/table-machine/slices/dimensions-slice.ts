@@ -41,7 +41,8 @@ export const createInitialDimensionsState = (
   columns: Column[],
   rowCount: number,
   rowHeight: number = 40,
-  enableSelectionColumn: boolean = false
+  enableSelectionColumn: boolean = false,
+  persistedColumnWidths?: Record<string, number>
 ): DimensionsState => {
   // Create managers for backward compatibility
   const dimensionManager = createColumnDimensionManager(columns || []);
@@ -63,7 +64,8 @@ export const createInitialDimensionsState = (
   }
   
   columns.forEach((col, index) => {
-    const width = col.width || 120;
+    // Use persisted width if available, otherwise use default column width
+    const width = persistedColumnWidths?.[col.id] || col.width || 120;
     columnWidths[col.id] = width;
     columnOffsets[col.id] = totalWidth;
     totalWidth += width;
