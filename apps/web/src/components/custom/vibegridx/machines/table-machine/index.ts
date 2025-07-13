@@ -127,8 +127,22 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       const manager = createVibeGridXCoordinateManager();
       // Initialize with columns - always include selection column
       if (input.columns && input.columns.length > 0) {
-        const columns = [{ id: '__selection', name: 'Select', field: '__selection', width: 48 }, ...input.columns];
+        // Use persisted column order if available
+        const columnOrder = persistedData?.columnOrder || input.columns.map(col => col.id);
+        
+        // Reorder columns based on persisted order
+        const orderedColumns = columnOrder
+          .filter(colId => colId !== '__selection')
+          .map(colId => input.columns.find(col => col.id === colId))
+          .filter(Boolean);
+        
+        const columns = [{ id: '__selection', name: 'Select', field: '__selection', width: 48 }, ...orderedColumns];
         manager.updateColumns(columns);
+        
+        console.log('TableMachine: Initialized coordinate manager with column order:', {
+          persistedOrder: columnOrder,
+          finalOrder: columns.map(c => c.id)
+        });
       }
       return manager;
     })(),
