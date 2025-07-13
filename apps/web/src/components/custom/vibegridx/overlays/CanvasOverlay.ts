@@ -64,13 +64,31 @@ export class CanvasOverlay implements CoordinateProvider {
     this.container = container;
     this.config = { ...DEFAULT_CONFIG, ...config };
     
-    // PERFORMANCE: Defer everything except storing references
-    // Stage will be initialized on first use
-    
     // Coordinate manager from config or will be set via setCoordinateManager method
     this.coordinateManager = this.config.coordinateManager || null;
     
-    // PERFORMANCE FIX: Don't create anything until needed
+    // PERFORMANCE: Pre-calculate dimensions but defer Stage creation
+    this.cachedDimensions = {
+      width: this.container.offsetWidth || 800,
+      height: this.container.offsetHeight || 600,
+      rect: this.container.getBoundingClientRect()
+    };
+    
+    // Pre-assign container ID to avoid DOM queries later
+    if (!this.container.id) {
+      this.container.id = `vgx-canvas-${Date.now()}`;
+    }
+  }
+  
+  // Cached dimensions for faster initialization
+  private cachedDimensions: { width: number; height: number; rect: DOMRect };
+  
+  // PERFORMANCE: Initialize Stage synchronously to eliminate blank container delay
+  public preInitializeAsync(): void {
+    if (!this.stage) {
+      // Create Stage immediately to avoid 58ms RAF delay that causes blank container
+      this.initializeStage();
+    }
   }
   
   // Lazy stage initialization
@@ -202,75 +220,69 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   private initializeStage(): void {
-    // PERFORMANCE: Minimal initialization - just basics
-    const width = this.container.offsetWidth || 800;
-    const height = this.container.offsetHeight || 600;
+    // PERFORMANCE: Use cached dimensions from constructor
+    const width = this.cachedDimensions.width;
+    const height = this.cachedDimensions.height;
     
-    // Configure container based on positioning mode
+    // PERFORMANCE: Batch style updates
+    const styles: Partial<CSSStyleDeclaration> = {
+      overflow: 'hidden'
+    };
+    
     if (this.config.useFixedPositioning) {
-      // For fixed positioning, container should fill its portal parent
-      this.container.style.overflow = 'hidden';
-      this.container.style.position = 'relative';
-      this.container.style.width = '100%';
-      this.container.style.height = '100%';
-    } else {
-      // Legacy behavior for backward compatibility
-      this.container.style.overflow = 'hidden';
+      styles.position = 'relative';
+      styles.width = '100%';
+      styles.height = '100%';
     }
     
-    // PERFORMANCE FIX: Use stable container ID to prevent initialization failures
+    Object.assign(this.container.style, styles);
+    
+    // PERFORMANCE: Ensure container has ID for Konva without DOM queries
     if (!this.container.id) {
-      // Simple ID generation without DOM queries
-      this.container.id = `vibegridx-canvas-${Math.random().toString(36).substring(2, 9)}`;
+      this.container.id = `vgx-canvas-${Date.now()}`;
     }
     
+    // PERFORMANCE: Create stage with minimal configuration
     this.stage = new Konva.Stage({
       container: this.container.id,
       width,
       height,
-      listening: false // PERFORMANCE: Start with listening off
+      listening: false // Critical: Start with listening off
     });
     
-    // Create and add the main layer NOW, after stage is created
+    // PERFORMANCE: Create layer with listening disabled
     this.layer = new Konva.Layer({ 
       name: 'main-layer',
-      listening: false // PERFORMANCE: Start with listening off
+      listening: false
     });
     this.stage.add(this.layer);
     
-    // PERFORMANCE: Skip debug background unless explicitly enabled
+    // PERFORMANCE: Only defer debug background setup to avoid blocking Stage creation
     if ((window as any).__VIBEGRIDX_DEBUG_CANVAS) {
-      const debugColor = this.config.useFixedPositioning ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
-      const debugBackground = new Konva.Rect({
-        x: 0,
-        y: 0,
-        width: width,
-        height: height,
-        fill: debugColor, // Green for portal mode, red for legacy
-        listening: false
+      requestAnimationFrame(() => {
+        const debugColor = this.config.useFixedPositioning ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+        const debugBackground = new Konva.Rect({
+          x: 0,
+          y: 0,
+          width: width,
+          height: height,
+          fill: debugColor,
+          listening: false
+        });
+        this.layer.add(debugBackground);
+        (this as any).debugBackground = debugBackground;
+        this.layer.batchDraw();
       });
-      this.layer.add(debugBackground);
-      // Store reference so we can update it when viewport changes
-      (this as any).debugBackground = debugBackground;
     }
     
-    // Configure pointer events based on positioning mode
+    // PERFORMANCE: Set pointer events immediately
     if (this.config.useFixedPositioning) {
-      // In portal mode, canvas should not block cell clicks by default
-      // Only enable pointer events on specific interactive elements
       this.stage.content.style.pointerEvents = 'none';
       this.container.style.pointerEvents = 'none';
-      
-      // Interactive elements will override this with pointer-events: auto
-      this.stage.listening(false); // Disable global stage listening by default
     } else {
-      // Legacy behavior
       this.stage.content.style.pointerEvents = 'auto';
       this.container.style.pointerEvents = 'none';
     }
-    
-    // PERFORMANCE: Skip initial draw - let first selection trigger it
-    // this.layer.draw();
   }
   
   // Machine subscription removed - viewport updates come via canvas actor directly

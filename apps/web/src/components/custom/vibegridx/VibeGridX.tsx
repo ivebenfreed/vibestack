@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
-import { useMachine, useSelector } from '@xstate/react';
+import { useActorRef } from '@xstate/react';
 import { useSelector as useAtomSelector } from '@xstate/store/react';
 import { shallowEqual } from '@xstate/store';
 import { tableBaseMachine } from './machines/table-machine';
@@ -269,24 +269,26 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     }
   }), [tableId, entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, persistedData, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
   
-  // Create machine with persisted data in input (sync machine pattern)
-  const [tableState, tableSend, tableActor] = useMachine(tableBaseMachine, machineConfig);
+  // PERFORMANCE: Use useActorRef instead of useMachine to avoid re-renders
+  // All actual rendering is done via direct DOM manipulation, not React
+  const tableActor = useActorRef(tableBaseMachine, machineConfig);
+  const tableSend = tableActor.send;
   
   // Simple entities flow: atoms → machine → view → render
-  // PERFORMANCE FIX: Only send entities once when machine is active
-  const entitiesSentRef = useRef(false);
+  // PERFORMANCE FIX: Send entities immediately - machine will handle timing
   useEffect(() => {
-    const isActive = tableState?.value && typeof tableState.value === 'object';
-    
-    if (entities && entities.length > 0 && !entitiesSentRef.current && isActive) {
-      console.log('VibeGridX: Sending entities to machine for processing:', entities.length);
+    if (entities && entities.length > 0) {
+      const sendStartTime = performance.now();
+      console.log('🚀 VibeGridX: Sending entities to machine for processing:', {
+        entityCount: entities.length,
+        timestamp: sendStartTime
+      });
       tableSend({
         type: 'SET_VISIBLE_ENTITIES',
         entities: entities
       });
-      entitiesSentRef.current = true;
     }
-  }, [entities.length, tableState?.value]); // Need state dependency to know when active
+  }, [entities.length]); // Only depend on entities, not machine state
   
   // PERFORMANCE: Remove excessive debug logging to reduce useEffect cascade
   
@@ -347,9 +349,14 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // MINIMAL RENDERER INITIALIZATION
   // ====================================
   
-  // PERFORMANCE FIX: Minimal initialization - just send INITIALIZE when ready
+  // PERFORMANCE FIX: Initialize renderer when container is ready
   useEffect(() => {
-    if (!containerRef.current || !tableState?.context?.actors?.rendererActor) return;
+    if (!containerRef.current) return;
+    
+    const initStartTime = performance.now();
+    console.log('🚀 VibeGridX: Starting renderer initialization:', {
+      timestamp: initStartTime
+    });
     
     // PERFORMANCE: Minimal initialization - just basics
     const rendererOptions = {
@@ -370,15 +377,19 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     
     (window as any).__vibegridx_renderer_options = rendererOptions;
     
-    tableState.context.actors.rendererActor.send({
-      type: 'INITIALIZE',
+    // Send initialize to machine - it will forward to renderer actor when ready
+    console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER to machine:', {
+      timestamp: performance.now()
+    });
+    tableSend({
+      type: 'INITIALIZE_RENDERER',
       options: rendererOptions
     });
     
     return () => {
       delete (window as any).__vibegridx_renderer_options;
     };
-  }, [tableState?.context?.actors?.rendererActor]);
+  }, []); // Only run once when component mounts
   
   // Selection state sync - REMOVED: Now handled reactively through XState event flow
   // useSelectionStateSync(tableActor, refs);
@@ -399,63 +410,30 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // ====================================
   
   // ====================================
-  // XSTATE V5 PATTERN - USE USESELECTOR FOR STATE TRACKING
+  // MINIMAL REACT SHELL - NO STATE WATCHING
   // ====================================
+  // 
+  // This component is just a container shell. All actual rendering
+  // is handled by AtomicTableRenderer (direct DOM) and CanvasOverlay (Konva).
+  // No React re-renders needed after initial mount.
   
-  // PERFORMANCE FIX: Stabilize useSelector to prevent infinite re-renders
-  const renderTrigger = useSelector(tableActor, (snapshot) => {
-    const version = snapshot.context?.version || 0;
-    const hasProcessedRows = snapshot.context?.rows && snapshot.context.rows.length > 0;
-    const machineState = snapshot.value;
-    
-    // Only return stable references to prevent infinite re-renders
-    return {
-      version,
-      hasProcessedRows,
-      machineState
-    };
-  }, (prev, next) => {
-    // Strict comparison - prevent cascading updates
-    return prev.version === next.version && 
-           prev.hasProcessedRows === next.hasProcessedRows && 
-           prev.machineState === next.machineState;
-  });
-  
-  // Track previous version to detect changes
-  const previousVersionRef = useRef<number | undefined>();
-  
-  // PERFORMANCE FIX: Table machine now handles all rendering
-  // This useEffect is only for tracking version changes and canvas updates
+  // Track container attachment
   useEffect(() => {
-    if (!renderTrigger.hasProcessedRows || renderTrigger.machineState === 'initializing') {
-      return;
+    if (containerRef.current) {
+      console.log('🎯 VibeGridX: Container ref attached', {
+        container: containerRef.current,
+        timestamp: performance.now()
+      });
     }
-    
-    const currentVersion = renderTrigger.version;
-    const isFirstRender = previousVersionRef.current === undefined;
-    
-    // Skip if no version change (unless first render)
-    if (!isFirstRender && previousVersionRef.current === currentVersion) {
-      return;
-    }
-    
-    previousVersionRef.current = currentVersion;
-    
-    // NOTE: Rendering is now handled entirely by the table machine in processingViewData.onDone
-    // This component only needs to track version changes
-    
-    // Update canvas overlay if needed (legacy support)
-    const snapshot = tableActor.getSnapshot();
-    if (snapshot.context?.editingCell && canvasOverlayRef.current) {
-      canvasOverlayRef.current.updateEditingCell(snapshot.context.editingCell);
-    }
-  }, [renderTrigger.version, renderTrigger.hasProcessedRows, renderTrigger.machineState]); // FIXED: Stable primitive dependencies only
+  }, []);
+  
+  // No state watching needed - machine handles all rendering internally
   
   // ====================================
   // PUBLIC API
   // ====================================
   
-  const vibeGridXApi = useVibeGridXApi(tableSend, tableState, tableActor, rendererRef);
+  const vibeGridXApi = useVibeGridXApi(tableSend, null, tableActor, rendererRef);
   
   // ====================================
   // COLUMN VISIBILITY HANDLERS (Pure XState Events)
@@ -486,8 +464,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   // Attach drag handlers to the viewport after renderer is ready
   useEffect(() => {
-    // Wait for renderer to be ready
-    if (tableState?.value === 'initializing') return;
+    // Attach handlers after short delay to allow renderer to create viewport
     
     // PERFORMANCE FIX: Use a ref to prevent duplicate event handler attachment
     let attached = false;
@@ -524,12 +501,20 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         document.removeEventListener('mouseup', handleMouseUp);
       }
     };
-  }, [tableState?.value]);
+  }, []); // Only run once on mount
   
   // ====================================
   // RENDER
   // ====================================
   
+  // DEBUG: Track rendering - should only happen on prop changes, not XState transitions
+  console.log('🎯 VibeGridX: Rendering component (container shell only)', {
+    hasEntities: entities.length > 0,
+    entitiesLength: entities.length,
+    renderReason: 'prop_change_or_mount',
+    timestamp: performance.now()
+  });
+
   return (
     <div
       className={`vibegridx-container ${className}`}

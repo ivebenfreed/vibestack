@@ -260,8 +260,15 @@ export const tableBaseMachine = setup({
     ...atomActions,
     
     // Additional actions
-    logError: ({ event }) => {
-      console.error('TableMachine Error:', event);
+    logError: ({ event, context }) => {
+      console.error('🔴 TableMachine ERROR detected:', {
+        event,
+        errorType: event?.type,
+        errorMessage: event?.error?.message || event?.error,
+        errorStack: event?.error?.stack,
+        contextKeys: Object.keys(context || {}),
+        contextSize: JSON.stringify(context || {}).length
+      });
     },
     
     updateCoordinateMapping: assign({
@@ -378,7 +385,7 @@ export const tableBaseMachine = setup({
         // CLEAN API: Skip atom subscriptions - entities come from props via useSelector
         // Entities will be sent via useEffect in React component
         
-        // Spawn essential actors including canvas (it will init after render)
+        // Spawn essential actors (canvas deferred to post-render)
         assign({
           actors: ({ context, spawn }) => ({
             ...context.actors,
@@ -388,9 +395,8 @@ export const tableBaseMachine = setup({
                 containerId: context.id,
                 enableSelectionColumn: context.enableSelectionColumn
               }
-            }),
-            // PERFORMANCE: Don't spawn canvas actor until needed
-            canvasActor: null
+            })
+            // canvasActor: deferred to post-render to avoid blocking critical path
             // editActor: spawn as needed for editing
             // dragActor: spawn as needed for drag operations
             // viewActor is invoked as needed, not spawned
@@ -402,40 +408,116 @@ export const tableBaseMachine = setup({
       ],
       
       on: {
-        RENDERER_READY: {
-          target: 'active'
+        INITIALIZE_RENDERER: {
+          actions: ({ context, event }) => {
+            console.log('TableMachine: INITIALIZE_RENDERER event received', {
+              hasRendererActor: !!context.actors.rendererActor,
+              optionsKeys: Object.keys(event.options || {})
+            });
+            
+            if (context.actors.rendererActor) {
+              context.actors.rendererActor.send({
+                type: 'INITIALIZE',
+                options: event.options
+              });
+            }
+          }
         },
         
-        CANVAS_CONTAINER_READY: {
+        SET_VISIBLE_ENTITIES: {
           actions: [
-            // PERFORMANCE: Store container for later canvas initialization
-            assign({
-              canvasContainer: ({ event }) => event.container
-            }),
             ({ event }) => {
-              console.log('TableMachine: Canvas container ready during initialization', {
-                container: event.container
+              console.log('🟢 STEP 1: SET_VISIBLE_ENTITIES received in initializing state', {
+                entityCount: event.entities?.length || 0
               });
-              // Canvas will be auto-spawned when we reach active state
+            },
+            assign({
+              entities: ({ event }) => event.entities || [],
+              allRowIds: ({ event }) => event.entities?.map((e: any) => e.id) || []
+            })
+          ]
+        },
+        
+        RENDERER_READY: {
+          target: 'active',
+          actions: [
+            ({ context }) => {
+              console.log('🟢 STEP 2: RENDERER_READY received, transitioning to active state', {
+                entityCount: context.entities?.length || 0,
+                hasEntities: !!(context.entities?.length)
+              });
+            },
+            ({ self }) => {
+              console.log('🟢 STEP 2a: RENDERER_READY action completed, transition should execute now');
+              
+              // Check state after a brief delay to see if transition happened
+              setTimeout(() => {
+                try {
+                  const snapshot = self.getSnapshot();
+                  console.log('🟢 STEP 2b: State check after RENDERER_READY', {
+                    currentState: snapshot.value,
+                    machineStatus: snapshot.status,
+                    contextKeys: Object.keys(snapshot.context || {}),
+                    hasError: snapshot.status === 'error'
+                  });
+                  
+                  if (snapshot.status === 'error') {
+                    console.error('🔴 STEP 2c: Machine is in error state! Checking error details...');
+                  }
+                } catch (error) {
+                  console.error('🔴 STEP 2b: Error getting snapshot:', error);
+                }
+              }, 1);
             }
           ]
-        }
-      },
-      
-      after: {
-        100: {
-          target: 'active'
-        }
+        },
+        
+        // CANVAS_CONTAINER_READY: Deferred to post-render in active state
       }
     },
     
     active: {
-      initial: 'idle',
+      entry: [
+        ({ context }) => {
+          const hasEntities = !!(context.entities?.length);
+          const targetState = hasEntities ? 'processingViewData' : 'idle';
+          console.log('🟢 STEP 3a: Entering active state', {
+            entityCount: context.entities?.length || 0,
+            hasEntities,
+            targetState,
+            entitiesIsArray: Array.isArray(context.entities)
+          });
+        }
+      ],
+      
+      initial: 'checkingEntities',
       
       // Cleanup atom subscriptions when leaving active state
       exit: atomActions.cleanupAtomSubscriptions,
       
       states: {
+        checkingEntities: {
+          always: [
+            {
+              guard: ({ context }) => !!(context.entities?.length),
+              target: 'processingViewData',
+              actions: ({ context }) => {
+                console.log('🟢 STEP 3b: Has entities, transitioning to processingViewData', {
+                  entityCount: context.entities?.length || 0
+                });
+              }
+            },
+            {
+              target: 'idle',
+              actions: ({ context }) => {
+                console.log('🟢 STEP 3b: No entities, transitioning to idle', {
+                  entityCount: context.entities?.length || 0
+                });
+              }
+            }
+          ]
+        },
+        
         idle: {
           on: {
             // Handle atom data updates
@@ -473,6 +555,15 @@ export const tableBaseMachine = setup({
         },
         
         processingViewData: {
+          entry: [
+            ({ context }) => {
+              console.log('🟢 STEP 4: Entered processingViewData state - invoking ViewActor', {
+                entityCount: context.entities?.length || 0,
+                hasEntities: !!context.entities
+              });
+            }
+          ],
+          
           // Allow handling events while processing
           on: {
             // Handle atom updates even while processing
@@ -493,9 +584,10 @@ export const tableBaseMachine = setup({
             input: ({ context }) => {
               const entities = context.entities || [];
               
-              console.log('TableMachine: Creating ViewActor input from parent-provided entities:', {
+              console.log('🟢 STEP 4a: Creating ViewActor input', {
                 entityCount: entities.length,
-                hasEntities: entities.length > 0
+                hasEntities: entities.length > 0,
+                columnsCount: context.columns?.length || 0
               });
               
               return createViewActorInput({
@@ -518,6 +610,13 @@ export const tableBaseMachine = setup({
             onDone: {
               target: 'idle',
               actions: [
+                ({ event }) => {
+                  console.log('🟢 STEP 5: ViewActor completed successfully', {
+                    processedRowCount: event.output.processedRows?.length || 0,
+                    coordinateVersion: event.output.coordinateMapping?.version
+                  });
+                },
+                
                 // Update processed rows
                 assign({
                   rows: ({ event }) => event.output.processedRows,
@@ -565,14 +664,22 @@ export const tableBaseMachine = setup({
                   })
                 ),
                 
-                // PERFORMANCE: Log when first render completes
-                ({ context }) => {
-                  console.log('TableMachine: First render complete', {
-                    version: context.version,
-                    hasCanvasActor: !!context.actors.canvasActor,
-                    hasCanvasContainer: !!context.canvasContainer
-                  });
-                }
+                // PERFORMANCE: Log when first render completes and spawn canvas post-render
+                assign({
+                  actors: ({ context, spawn }) => {
+                    console.log('TableMachine: First render complete, spawning canvas actor post-render', {
+                      version: context.version,
+                      hasCanvasActor: !!context.actors.canvasActor,
+                      hasCanvasContainer: !!context.canvasContainer
+                    });
+                    
+                    // Spawn canvas actor post-render to avoid blocking critical path
+                    return {
+                      ...context.actors,
+                      canvasActor: context.actors.canvasActor || spawn('canvasActor', { id: 'canvas' })
+                    };
+                  }
+                })
               ]
             }
           }
@@ -581,86 +688,14 @@ export const tableBaseMachine = setup({
       
       // Handle these events at the active state level
       on: {
-      // PERFORMANCE: Spawn canvas actor on first selection
+      // PERFORMANCE: Initialize canvas actor for selection (post-render spawning)
       SPAWN_CANVAS_ACTOR_FOR_SELECTION: {
         actions: [
           assign({
-            actors: ({ context, spawn, self }) => {
-              if (!context.actors.canvasActor && context.canvasContainer) {
-                console.log('TableMachine: Spawning canvas actor on first selection');
-                const canvasActor = spawn('canvasActor', { id: 'canvas' });
-                
-                // Initialize immediately with stored container
-                setTimeout(() => {
-                  canvasActor.send({
-                    type: 'INITIALIZE',
-                    container: context.canvasContainer,
-                    config: {
-                      cellHeight: context.settings.rowHeight,
-                      cellWidth: 120,
-                      selectionColor: '#3b82f6',
-                      selectionBorderColor: '#1d4ed8',
-                      editingColor: '#10b981',
-                      editingBorderColor: '#059669',
-                      enableAnimations: false,
-                      animationDuration: 0,
-                      borderWidth: 2,
-                      dimensionManager: context.dimensionManager
-                    }
-                  });
-                  
-                  // Send coordinate mapping to the canvas
-                  if (context.coordinateMapping) {
-                    canvasActor.send({
-                      type: 'UPDATE_COORDINATES',
-                      mapping: context.coordinateMapping
-                    });
-                  }
-                  
-                  // Send current selection to canvas after initialization
-                  // Use requestIdleCallback for truly non-blocking init
-                  const sendSelection = () => {
-                    // Calculate visual positions for current selection
-                    const visualPositions = calculateVisualPositions(
-                      context.selectedCells,
-                      context.coordinateMapping,
-                      context.viewport,
-                      context.settings.rowHeight
-                    );
-                    
-                    if (visualPositions.length > 0) {
-                      canvasActor.send({
-                        type: 'UPDATE_SELECTION_VISUAL',
-                        visualCells: visualPositions
-                      });
-                    }
-                  };
-                  
-                  if ('requestIdleCallback' in window) {
-                    (window as any).requestIdleCallback(sendSelection, { timeout: 100 });
-                  } else {
-                    setTimeout(sendSelection, 50);
-                  }
-                }, 10); // Small delay for actor to fully initialize
-                
-                return {
-                  ...context.actors,
-                  canvasActor
-                };
-              }
-              return context.actors;
-            }
-          })
-        ]
-      },
-      
-      // Spawn canvas actor on demand when needed
-      SPAWN_CANVAS_ACTOR: {
-        actions: [
-          assign({
             actors: ({ context, spawn }) => {
+              // Spawn canvas actor if it doesn't exist yet (post-render spawning)
               if (!context.actors.canvasActor) {
-                console.log('TableMachine: Spawning canvas actor on demand');
+                console.log('TableMachine: Spawning canvas actor for selection');
                 return {
                   ...context.actors,
                   canvasActor: spawn('canvasActor', { id: 'canvas' })
@@ -668,79 +703,115 @@ export const tableBaseMachine = setup({
               }
               return context.actors;
             }
-          })
+          }),
+          ({ context }) => {
+            // Ensure canvas actor is initialized with container
+            if (context.actors.canvasActor && context.canvasContainer) {
+              console.log('TableMachine: Ensuring canvas actor is initialized for selection');
+              
+              // Initialize if not already done
+              context.actors.canvasActor.send({
+                type: 'INITIALIZE',
+                container: context.canvasContainer,
+                config: {
+                  cellHeight: context.settings.rowHeight,
+                  cellWidth: 120,
+                  selectionColor: '#3b82f6',
+                  selectionBorderColor: '#1d4ed8',
+                  editingColor: '#10b981',
+                  editingBorderColor: '#059669',
+                  enableAnimations: false,
+                  animationDuration: 0,
+                  borderWidth: 2,
+                  dimensionManager: context.dimensionManager
+                }
+              });
+              
+              // Send coordinate mapping to the canvas
+              if (context.coordinateMapping) {
+                context.actors.canvasActor.send({
+                  type: 'UPDATE_COORDINATES',
+                  mapping: context.coordinateMapping
+                });
+              }
+              
+              // Send current selection to canvas after initialization
+              setTimeout(() => {
+                const visualPositions = calculateVisualPositions(
+                  context.selectedCells,
+                  context.coordinateMapping,
+                  context.viewport,
+                  context.settings.rowHeight
+                );
+                
+                if (visualPositions.length > 0) {
+                  context.actors.canvasActor!.send({
+                    type: 'UPDATE_SELECTION_VISUAL',
+                    visualCells: visualPositions
+                  });
+                }
+              }, 10);
+            }
+          }
         ]
       },
       
-      // Spawn canvas actor after initial render
+      // Canvas actor is now pre-created, these actions are no longer needed
+      SPAWN_CANVAS_ACTOR: {
+        actions: [
+          ({ context }) => {
+            console.log('TableMachine: SPAWN_CANVAS_ACTOR called but canvas is pre-created', {
+              hasCanvasActor: !!context.actors.canvasActor
+            });
+          }
+        ]
+      },
+      
+      // Canvas actor is now pre-created, these actions are no longer needed
       SPAWN_CANVAS_AFTER_RENDER: {
         actions: [
-          assign({
-            actors: ({ context, spawn }) => {
-              if (!context.actors.canvasActor && context.canvasContainer) {
-                console.log('TableMachine: Spawning canvas actor after render (non-blocking)');
-                const canvasActor = spawn('canvasActor', { id: 'canvas' });
-                
-                // Initialize with stored container
-                canvasActor.send({
-                  type: 'INITIALIZE',
-                  container: context.canvasContainer,
-                  config: {
-                    cellHeight: context.settings.rowHeight,
-                    cellWidth: 120,
-                    selectionColor: '#3b82f6',
-                    selectionBorderColor: '#1d4ed8',
-                    editingColor: '#10b981',
-                    editingBorderColor: '#059669',
-                    enableAnimations: false,
-                    animationDuration: 0,
-                    borderWidth: 2,
-                    dimensionManager: context.dimensionManager
-                  }
-                });
-                
-                // PERFORMANCE: Don't send coordinates on init - canvas starts at 0,0
-                // Coordinates will be sent when first selection happens
-                
-                return {
-                  ...context.actors,
-                  canvasActor
-                };
-              }
-              return context.actors;
-            }
-          })
+          ({ context }) => {
+            console.log('TableMachine: SPAWN_CANVAS_AFTER_RENDER called but canvas is pre-created', {
+              hasCanvasActor: !!context.actors.canvasActor
+            });
+          }
         ]
       },
       
-      // Canvas initialization
+      // Canvas initialization (post-render)
       CANVAS_CONTAINER_READY: {
         actions: [
-          // PERFORMANCE: Store container for later canvas initialization
+          // PERFORMANCE: Store container for canvas initialization
           assign({
             canvasContainer: ({ event }) => event.container
           }),
-          ({ context, event, self }) => {
-            console.log('TableMachine: Canvas container ready in active state', {
+          ({ context, event }) => {
+            console.log('TableMachine: Canvas container ready post-render', {
               container: event.container,
               version: context.version,
               hasCanvasActor: !!context.actors.canvasActor
             });
             
-            // Always spawn canvas when container is ready (if not already spawned)
-            if (!context.actors.canvasActor) {
-              console.log('TableMachine: Auto-spawning canvas now that container is ready');
+            // Initialize canvas actor if it exists (spawned post-render)
+            if (context.actors.canvasActor && event.container) {
+              console.log('TableMachine: Initializing canvas actor post-render');
               
-              const spawnCanvas = () => {
-                self.send({ type: 'SPAWN_CANVAS_AFTER_RENDER' });
-              };
-              
-              // Use requestIdleCallback for non-blocking spawn
-              if ('requestIdleCallback' in window) {
-                (window as any).requestIdleCallback(spawnCanvas, { timeout: 200 });
-              } else {
-                setTimeout(spawnCanvas, 50);
-              }
+              context.actors.canvasActor.send({
+                type: 'INITIALIZE',
+                container: event.container,
+                config: {
+                  cellHeight: context.settings.rowHeight,
+                  cellWidth: 120,
+                  selectionColor: '#3b82f6',
+                  selectionBorderColor: '#1d4ed8',
+                  editingColor: '#10b981',
+                  editingBorderColor: '#059669',
+                  enableAnimations: false,
+                  animationDuration: 0,
+                  borderWidth: 2,
+                  dimensionManager: context.dimensionManager
+                }
+              });
             }
           }
         ]

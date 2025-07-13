@@ -152,6 +152,7 @@ export class AtomicTableRenderer {
   private frameId = 0;
   private lastDimensions = { height: 0, width: 0 };
   private canvasInitialized = false; // Track canvas overlay initialization
+  private isFirstRender = true; // Track if this is the first render
   
   // State caches
   private rowElements = new Map<string, HTMLElement>();
@@ -229,6 +230,7 @@ export class AtomicTableRenderer {
   // ====================================
   
   private initializeDOM() {
+    console.log('🔧 AtomicTableRenderer: Starting DOM initialization');
     // PERFORMANCE: Removed expensive console.log that was causing serialization overhead
 
     this.container.innerHTML = '';
@@ -297,8 +299,23 @@ export class AtomicTableRenderer {
     // Store canvas container for renderer actor to emit event
     this.canvasContainer = canvasOverlay;
     
-    // PERFORMANCE: Defer canvas overlay initialization to post-render phase
+    console.log('🔧 AtomicTableRenderer: DOM initialization complete, container structure created');
+    
+    // PERFORMANCE: Canvas initialization deferred to post-render to avoid blocking critical path
+    // Canvas container ready will be emitted after first table render completes
     // This prevents blocking the initial DOM setup with canvas creation
+  }
+  
+  // Initialize canvas overlay post-render (non-blocking)
+  initializeCanvasPostRender(): void {
+    if (this.canvasContainer && this.options.onStateChange && !this.canvasInitialized) {
+      console.log('🔧 AtomicTableRenderer: Emitting canvas.container.ready event post-render');
+      this.options.onStateChange({
+        type: 'canvas.container.ready',
+        container: this.canvasContainer
+      });
+      this.canvasInitialized = true;
+    }
   }
   
   // Set or update columns
@@ -653,7 +670,11 @@ export class AtomicTableRenderer {
   // ====================================
   
   render(state: RenderState): void {
-    // PERFORMANCE: Removed expensive console.log statements from render hot path
+    console.log('🎨 AtomicTableRenderer: Starting render', {
+      isFirstRender: this.isFirstRender,
+      rows: state.rows.length,
+      timestamp: performance.now()
+    });
     
     this.renderStartTime = performance.now();
     
@@ -684,18 +705,50 @@ export class AtomicTableRenderer {
     // Column visibility and order are set during initialization or via dedicated methods
     
     try {
-      // Batch all DOM writes together before reading dimensions
+      // STEP 1: Render header
+      const headerOnlyStart = performance.now();
       this.renderHeader(state);
+      const headerOnlyTime = performance.now() - headerOnlyStart;
       
-      // PERFORMANCE FIX: Single RAF with optimized synchronous operations
-      requestAnimationFrame(() => {
-        // Batch all operations in single frame for better performance
+      // Check if this is the first render
+      if (this.isFirstRender) {
+        console.log('🎨 AtomicTableRenderer: First render - executing synchronously');
+        this.isFirstRender = false;
+        
+        // STEP 2: Update viewport
+        const viewportStart = performance.now();
         this.updateViewport(state);
+        const viewportTime = performance.now() - viewportStart;
+        
+        // STEP 3: Render visible rows
+        console.log('🎨 AtomicTableRenderer: About to render visible rows synchronously');
+        const rowsStart = performance.now();
         this.renderVisibleRows(state);
+        const rowsTime = performance.now() - rowsStart;
+        console.log('🎨 AtomicTableRenderer: Visible rows rendered synchronously');
+        
+        // STEP 4: Apply optimistic operations
+        const optimisticStart = performance.now();
         this.applyOptimisticOperations(state.optimisticOperations);
+        const optimisticTime = performance.now() - optimisticStart;
+        
         
         // Performance timing
         this.lastRenderTime = performance.now() - this.renderStartTime;
+        
+        console.log('🔍 RENDER PIPELINE BREAKDOWN:', {
+          'Header only': `${headerOnlyTime.toFixed(2)}ms`,
+          'Viewport update': `${viewportTime.toFixed(2)}ms`,
+          'Visible rows': `${rowsTime.toFixed(2)}ms`, 
+          'Optimistic ops': `${optimisticTime.toFixed(2)}ms`,
+          'TOTAL': `${this.lastRenderTime.toFixed(2)}ms`
+        });
+        
+        console.log('🎨 AtomicTableRenderer: First render complete synchronously', {
+          renderTime: this.lastRenderTime,
+          rowCount: state.rows.length,
+          timestamp: performance.now()
+        });
         
         // Notify completion
         this.options.onStateChange?.({
@@ -717,22 +770,46 @@ export class AtomicTableRenderer {
         };
         
         this.options.onScroll?.(initialViewport);
-        
-        // Canvas initialization (only once)
-        if (!this.canvasInitialized && this.canvasContainer) {
-          this.canvasInitialized = true;
+      } else {
+        // Subsequent renders: use RAF for better performance
+        requestAnimationFrame(() => {
+          // Batch all operations in single frame for better performance
+          this.updateViewport(state);
+          this.renderVisibleRows(state);
+          this.applyOptimisticOperations(state.optimisticOperations);
+          
+          
+          // Performance timing
+          this.lastRenderTime = performance.now() - this.renderStartTime;
+          
+          // Notify completion
           this.options.onStateChange?.({
-            type: 'canvas.container.ready',
-            container: this.canvasContainer
+            type: 'render.complete',
+            renderTime: this.lastRenderTime,
+            rowCount: state.rows.length,
+            visibleRange: this.virtualGrid.getVisibleRange()
           });
-        }
-      });
+          
+          // Send viewport update for canvas overlay
+          const viewport: ViewportInfo = {
+            start: this.virtualGrid.getVisibleRange().start,
+            end: this.virtualGrid.getVisibleRange().end,
+            height: this.viewport.clientHeight,
+            width: this.viewport.clientWidth,
+            scrollTop: this.viewport.scrollTop,
+            scrollLeft: this.viewport.scrollLeft,
+            itemHeight: this.virtualGrid.getRowHeight()
+          };
+          
+          this.options.onScroll?.(viewport);
+        });
+      }
       
     } finally {
-      // Initial render phase timing (header only)
-      const headerRenderTime = performance.now() - this.renderStartTime;
-      if (headerRenderTime > 10) {
-        console.warn(`AtomicTableRenderer: Header render phase took ${headerRenderTime.toFixed(2)}ms`);
+      // CORRECTED: This measures the entire render pipeline, not just header
+      const totalRenderTime = performance.now() - this.renderStartTime;
+      if (totalRenderTime > 10) {
+        console.warn(`AtomicTableRenderer: Total render pipeline took ${totalRenderTime.toFixed(2)}ms`);
       }
     }
   }
@@ -956,9 +1033,11 @@ export class AtomicTableRenderer {
   }
   
   private renderHeader(state: RenderState): void {
+    const headerStartTime = performance.now();
     if (!state.rows.length) return;
     
-    // IMPORTANT: Use columns from render state if available to ensure correct order
+    // STEP 1: Column preparation
+    const step1Start = performance.now();
     const columnsToRender = state.columns && state.columns.length > 0
       ? state.columns
       : this.visibleColumns.length > 0 
@@ -971,119 +1050,136 @@ export class AtomicTableRenderer {
             width: 120,
             sortable: true
           }));
+    const step1Time = performance.now() - step1Start;
     
     console.log('Renderer: renderHeader columnsToRender', {
       columnIds: columnsToRender.map(c => c.id),
       source: state.columns ? 'state.columns' : 'visibleColumns'
     });
     
-    
-    
-    // Calculate total width for header
+    // STEP 2: Width calculation
+    const step2Start = performance.now();
     const totalWidth = this.getTotalColumnsWidth();
     this.header.style.width = `${totalWidth}px`;
+    const step2Time = performance.now() - step2Start;
     
-    
-    // Get current sort state from render state (if available)
+    // STEP 3: Sort lookup creation
+    const step3Start = performance.now();
     const sortState = (state as any).sortBy || [];
+    const sortLookup = new Map();
+    sortState.forEach((sort: any, index: number) => {
+      sortLookup.set(sort.field, { direction: sort.direction, index });
+    });
+    const step3Time = performance.now() - step3Start;
     
-    // Build header HTML
-    let headerHTML = '';
+    // STEP 4: Column filtering and offset calculation
+    const step4Start = performance.now();
+    const dataColumns = columnsToRender.filter(col => col.id !== '__selection');
+    const columnOffsets: number[] = [];
+    let runningOffset = 48; // Start after selection column
+    dataColumns.forEach((column, index) => {
+      columnOffsets[index] = runningOffset;
+      const width = this.columnWidths[column.id] || column.width || 120;
+      runningOffset += width;
+    });
+    const step4Time = performance.now() - step4Start;
     
-    // Add selection column header (always included)
-    {
-      const allSelected = this.selectedRows.size === state.rows.length && state.rows.length > 0;
-      const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
+    // STEP 5: Clear existing header
+    const step5Start = performance.now();
+    this.header.innerHTML = '';
+    const step5Time = performance.now() - step5Start;
+    
+    // STEP 6: Create selection header
+    const step6Start = performance.now();
+    const allSelected = this.selectedRows.size === state.rows.length && state.rows.length > 0;
+    const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
+    
+    const selectionHeader = document.createElement('div');
+    selectionHeader.className = 'vibegridx-header-cell vibegridx-selection-header';
+    selectionHeader.setAttribute('data-column', '__selection');
+    selectionHeader.style.cssText = 'width: 48px; min-width: 48px; max-width: 48px; position: sticky; left: 0; z-index: 10; background: var(--background);';
+    
+    const checkboxWrapper = document.createElement('label');
+    checkboxWrapper.className = 'vibegridx-checkbox-wrapper';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'vibegridx-header-checkbox';
+    checkbox.checked = allSelected;
+    checkbox.indeterminate = someSelected;
+    
+    const checkboxCustom = document.createElement('span');
+    checkboxCustom.className = 'vibegridx-checkbox-custom';
+    
+    checkboxWrapper.appendChild(checkbox);
+    checkboxWrapper.appendChild(checkboxCustom);
+    selectionHeader.appendChild(checkboxWrapper);
+    this.header.appendChild(selectionHeader);
+    const step6Time = performance.now() - step6Start;
+    
+    // STEP 7: Create fragment and data columns
+    const step7Start = performance.now();
+    const fragment = document.createDocumentFragment();
+    const step7aTime = performance.now() - step7Start;
+    
+    const step7bStart = performance.now();
+    dataColumns.forEach((column, index) => {
+      const columnStartTime = performance.now();
       
-      headerHTML += `
-        <div class="vibegridx-header-cell vibegridx-selection-header" 
-             data-column="__selection" 
-             style="width: 48px; min-width: 48px; max-width: 48px; position: sticky; left: 0; z-index: 10; background: var(--background);">
-          <label class="vibegridx-checkbox-wrapper">
-            <input type="checkbox" 
-                   class="vibegridx-header-checkbox" 
-                   ${allSelected ? 'checked' : ''}
-                   ${someSelected ? 'indeterminate' : ''}>
-            <span class="vibegridx-checkbox-custom"></span>
-          </label>
-        </div>`;
-    }
-    
-    // Header rendered with columns (excluding selection column which was already added)
-    headerHTML += columnsToRender
-      .filter(column => column.id !== '__selection') // Skip selection column as it's already added
-      .map((column, index) => {
-        const width = this.columnWidths[column.id] || column.width || 120;
-        const field = column.field || column.id;
-        
-        // Calculate offset based on columns being rendered
-        const filteredColumns = columnsToRender.filter(c => c.id !== '__selection');
-        let calculatedOffset = 48; // Start after selection column
-        for (let i = 0; i < index; i++) {
-          const prevColumn = filteredColumns[i];
-          const prevWidth = this.columnWidths[prevColumn.id] || prevColumn.width || 120;
-          calculatedOffset += prevWidth;
-        }
-        const xOffset = calculatedOffset;
-        
-        
-        // Find sort info for this column
-        const sortInfo = sortState.find((s: any) => s.field === field);
-        const sortIndex = sortInfo ? sortState.indexOf(sortInfo) : -1;
-        
-        // Sort info available for styling
-        
-        // Add sort class if column is sorted
-        let sortClass = '';
-        if (sortInfo) {
-          sortClass = sortInfo.direction === 'asc' ? 'sort-asc' : 'sort-desc';
-        }
-        
-        // Add sortable class if column is sortable
-        const sortableClass = column.sortable !== false ? 'vibegridx-sortable' : '';
-        
-        return `<div class="vibegridx-header-cell ${sortableClass} ${sortClass}" data-column="${column.id}" data-field="${field}" style="width: ${width}px; min-width: ${width}px; max-width: ${width}px;">
-          <span class="vibegridx-header-text">${column.name || column.id}</span>
-          <span class="vibegridx-sort-icon">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'asc' ? '1' : '0.3'}"/>
-              <path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/>
-            </svg>
-          </span>
-          <div class="vibegridx-resize-handle" data-column="${column.id}"></div>
-        </div>`;
-      }).join('');
-    
-    this.header.innerHTML = headerHTML;
-    
-    // Add event listener to header checkbox if selection column is enabled
-    if (this.enableSelectionColumn) {
-      const headerCheckbox = this.header.querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
-      if (headerCheckbox) {
-        // Update indeterminate state
-        const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
-        headerCheckbox.indeterminate = someSelected;
-        
-        // Add click handler
-        headerCheckbox.addEventListener('click', (event) => {
-          event.stopPropagation();
-          const checked = (event.target as HTMLInputElement).checked;
-          
-          // Dispatch XState event for select all/none
-          if (checked) {
-            this.options.onSelectionChange?.(new Set()); // Clear first
-            // Then dispatch select all event
-            const selectAllEvent = { type: 'selection.checkbox.all' as const };
-            (window as any).vibegridxDispatch?.(selectAllEvent);
-          } else {
-            this.options.onSelectionChange?.(new Set());
-            // Dispatch select none event
-            const selectNoneEvent = { type: 'selection.checkbox.none' as const };
-            (window as any).vibegridxDispatch?.(selectNoneEvent);
-          }
-        });
+      const width = this.columnWidths[column.id] || column.width || 120;
+      const field = column.field || column.id;
+      const sortInfo = sortLookup.get(field);
+      
+      const headerCell = document.createElement('div');
+      headerCell.className = `vibegridx-header-cell${column.sortable !== false ? ' vibegridx-sortable' : ''}${sortInfo ? (sortInfo.direction === 'asc' ? ' sort-asc' : ' sort-desc') : ''}`;
+      headerCell.setAttribute('data-column', column.id);
+      headerCell.setAttribute('data-field', field);
+      headerCell.style.cssText = `width: ${width}px; min-width: ${width}px; max-width: ${width}px;`;
+      
+      const headerText = document.createElement('span');
+      headerText.className = 'vibegridx-header-text';
+      headerText.textContent = column.name || column.id;
+      
+      const sortIcon = document.createElement('span');
+      sortIcon.className = 'vibegridx-sort-icon';
+      sortIcon.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'asc' ? '1' : '0.3'}"/><path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/></svg>`;
+      
+      const resizeHandle = document.createElement('div');
+      resizeHandle.className = 'vibegridx-resize-handle';
+      resizeHandle.setAttribute('data-column', column.id);
+      
+      headerCell.appendChild(headerText);
+      headerCell.appendChild(sortIcon);
+      headerCell.appendChild(resizeHandle);
+      fragment.appendChild(headerCell);
+      
+      const columnTime = performance.now() - columnStartTime;
+      if (columnTime > 1) {
+        console.log(`🐌 SLOW column creation: ${column.id} took ${columnTime.toFixed(2)}ms`);
       }
-    }
+    });
+    const step7bTime = performance.now() - step7bStart;
+    
+    // STEP 8: Append fragment to header
+    const step8Start = performance.now();
+    this.header.appendChild(fragment);
+    const step8Time = performance.now() - step8Start;
+    
+    const totalHeaderTime = performance.now() - headerStartTime;
+    
+    console.log('🔍 HEADER RENDER BREAKDOWN:', {
+      'Step 1 - Column prep': `${step1Time.toFixed(2)}ms`,
+      'Step 2 - Width calc': `${step2Time.toFixed(2)}ms`, 
+      'Step 3 - Sort lookup': `${step3Time.toFixed(2)}ms`,
+      'Step 4 - Filter/offsets': `${step4Time.toFixed(2)}ms`,
+      'Step 5 - Clear header': `${step5Time.toFixed(2)}ms`,
+      'Step 6 - Selection header': `${step6Time.toFixed(2)}ms`,
+      'Step 7a - Create fragment': `${step7aTime.toFixed(2)}ms`,
+      'Step 7b - Create columns': `${step7bTime.toFixed(2)}ms`,
+      'Step 8 - Append fragment': `${step8Time.toFixed(2)}ms`,
+      'TOTAL': `${totalHeaderTime.toFixed(2)}ms`,
+      'Column count': dataColumns.length
+    });
   }
   
   private renderVisibleRows(state: RenderState): void {

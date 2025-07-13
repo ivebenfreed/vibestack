@@ -100,6 +100,12 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                     rowCount: state.rowCount,
                     visibleRange: state.visibleRange
                   });
+                  
+                  // PERFORMANCE: Initialize canvas post-render to avoid blocking critical path
+                  if (renderer && typeof renderer.initializeCanvasPostRender === 'function') {
+                    console.log('RendererActor: Triggering canvas initialization post-render');
+                    renderer.initializeCanvasPostRender();
+                  }
                 }
                 
                 // Forward other state changes if there was an original handler

@@ -70,6 +70,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
     try {
       switch (event.type) {
         case 'INITIALIZE':
+          const initStartTime = performance.now();
           console.log('CanvasActor: Initializing with container and config', {
             container: event.container,
             containerClass: event.container.className,
@@ -94,7 +95,15 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             canvas.onPaste = () => sendBack({ type: 'PASTE' });
             canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
             
-            console.log('CanvasActor: Canvas overlay created successfully with callbacks');
+            // Pre-initialize Stage asynchronously to avoid blocking
+            canvas.preInitializeAsync();
+            
+            const initTime = performance.now() - initStartTime;
+            console.log('🔥 CanvasActor: Canvas overlay created successfully', {
+              initTime: `${initTime.toFixed(2)}ms`,
+              containerSize: event.container.getBoundingClientRect(),
+              timestamp: performance.now()
+            });
             sendBack({ type: 'CANVAS_READY' });
           } catch (error) {
             console.error('CanvasActor: Failed to create canvas overlay:', error);

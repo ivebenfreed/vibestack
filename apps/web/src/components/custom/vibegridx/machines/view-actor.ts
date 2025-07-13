@@ -162,90 +162,172 @@ const createGroupTree = (
 const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
   if (sortBy.length === 0) return rows;
   
-  return [...rows].sort((a, b) => {
-    for (const sort of sortBy) {
-      const aValue = a.data[sort.field];
-      const bValue = b.data[sort.field];
-      
-      if (aValue === bValue) continue;
-      
-      let comparison = 0;
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        comparison = aValue - bValue;
-      } else if (aValue instanceof Date && bValue instanceof Date) {
-        comparison = aValue.getTime() - bValue.getTime();
-      } else {
-        comparison = String(aValue).localeCompare(String(bValue));
+  const sortStartTime = performance.now();
+  
+  // OPTIMIZATION: Pre-compute sort keys and comparators for better performance
+  const sortConfigs = sortBy.map(sort => {
+    // Pre-determine the comparison function based on first non-null value
+    let compareFn: (a: any, b: any) => number;
+    let sampleValue: any = null;
+    
+    // Find first non-null value to determine type
+    for (const row of rows) {
+      const value = row.data[sort.field];
+      if (value != null) {
+        sampleValue = value;
+        break;
       }
-      
-      return sort.direction === 'desc' ? -comparison : comparison;
     }
     
+    // Pre-select optimized comparator
+    if (typeof sampleValue === 'number') {
+      compareFn = (a: number, b: number) => a - b;
+    } else if (sampleValue instanceof Date) {
+      compareFn = (a: Date, b: Date) => a.getTime() - b.getTime();
+    } else {
+      // Cache string conversion and use fast comparison
+      compareFn = (a: any, b: any) => {
+        const aStr = String(a);
+        const bStr = String(b);
+        return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+      };
+    }
+    
+    return {
+      field: sort.field,
+      direction: sort.direction,
+      compareFn
+    };
+  });
+  
+  // OPTIMIZATION: Use in-place sort with pre-computed comparators
+  const sortedRows = rows.slice(); // Single slice instead of spread
+  
+  sortedRows.sort((a, b) => {
+    for (const { field, direction, compareFn } of sortConfigs) {
+      const aValue = a.data[field];
+      const bValue = b.data[field];
+      
+      // Handle null/undefined quickly
+      if (aValue === bValue) continue;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+      
+      const comparison = compareFn(aValue, bValue);
+      if (comparison !== 0) {
+        return direction === 'desc' ? -comparison : comparison;
+      }
+    }
     return 0;
   });
+  
+  const sortTime = performance.now() - sortStartTime;
+  console.log('🔥 ViewActor: Sorting optimized', { 
+    sortTime: `${sortTime.toFixed(2)}ms`,
+    rowsSorted: rows.length,
+    sortFields: sortBy.length
+  });
+  
+  return sortedRows;
 };
 
 const applyFilters = (rows: TableRow[], filters: FilterConfig[]): TableRow[] => {
   if (filters.length === 0) return rows;
   
-  return rows.filter(row => {
-    return filters.every(filter => {
-      const value = row.data[filter.field];
-      let matches = false;
-      
-      switch (filter.operator) {
-        case 'equals':
-          matches = value === filter.value;
-          break;
-        case 'not_equals':
-          matches = value !== filter.value;
-          break;
-        case 'contains':
-          matches = String(value).toLowerCase().includes(String(filter.value).toLowerCase());
-          break;
-        case 'not_contains':
-          matches = !String(value).toLowerCase().includes(String(filter.value).toLowerCase());
-          break;
-        case 'starts_with':
-          matches = String(value).toLowerCase().startsWith(String(filter.value).toLowerCase());
-          break;
-        case 'ends_with':
-          matches = String(value).toLowerCase().endsWith(String(filter.value).toLowerCase());
-          break;
-        case 'greater_than':
-          matches = Number(value) > Number(filter.value);
-          break;
-        case 'less_than':
-          matches = Number(value) < Number(filter.value);
-          break;
-        case 'is_empty':
-          matches = value === null || value === undefined || value === '';
-          break;
-        case 'is_not_empty':
-          matches = value !== null && value !== undefined && value !== '';
-          break;
-        case 'in':
-          matches = Array.isArray(filter.value) && filter.value.includes(value);
-          break;
-        case 'not_in':
-          matches = Array.isArray(filter.value) && !filter.value.includes(value);
-          break;
-        case 'regex':
+  const filterStartTime = performance.now();
+  
+  // OPTIMIZATION: Pre-compute filter operations to avoid repeated string operations
+  const filterConfigs = filters.map(filter => {
+    const operator = filter.operator;
+    const field = filter.field;
+    let filterValue = filter.value;
+    let filterFn: (value: any) => boolean;
+    
+    // Pre-process filter values for string operations
+    if (operator === 'contains' || operator === 'not_contains' || 
+        operator === 'starts_with' || operator === 'ends_with') {
+      filterValue = String(filter.value).toLowerCase();
+    } else if (operator === 'greater_than' || operator === 'less_than') {
+      filterValue = Number(filter.value);
+    }
+    
+    // Pre-compile filter function
+    switch (operator) {
+      case 'equals':
+        filterFn = (value: any) => value === filter.value;
+        break;
+      case 'not_equals':
+        filterFn = (value: any) => value !== filter.value;
+        break;
+      case 'contains':
+        filterFn = (value: any) => String(value).toLowerCase().includes(filterValue as string);
+        break;
+      case 'not_contains':
+        filterFn = (value: any) => !String(value).toLowerCase().includes(filterValue as string);
+        break;
+      case 'starts_with':
+        filterFn = (value: any) => String(value).toLowerCase().startsWith(filterValue as string);
+        break;
+      case 'ends_with':
+        filterFn = (value: any) => String(value).toLowerCase().endsWith(filterValue as string);
+        break;
+      case 'greater_than':
+        filterFn = (value: any) => Number(value) > (filterValue as number);
+        break;
+      case 'less_than':
+        filterFn = (value: any) => Number(value) < (filterValue as number);
+        break;
+      case 'is_empty':
+        filterFn = (value: any) => value === null || value === undefined || value === '';
+        break;
+      case 'is_not_empty':
+        filterFn = (value: any) => value !== null && value !== undefined && value !== '';
+        break;
+      case 'in':
+        filterFn = (value: any) => Array.isArray(filter.value) && filter.value.includes(value);
+        break;
+      case 'not_in':
+        filterFn = (value: any) => Array.isArray(filter.value) && !filter.value.includes(value);
+        break;
+      case 'regex':
+        const regex = (() => {
           try {
-            const regex = new RegExp(filter.value, filter.caseSensitive ? 'g' : 'gi');
-            matches = regex.test(String(value));
+            return new RegExp(filter.value, filter.caseSensitive ? 'g' : 'gi');
           } catch {
-            matches = false;
+            return null;
           }
-          break;
-        default:
-          matches = true;
-      }
-      
-      return filter.negate ? !matches : matches;
+        })();
+        filterFn = regex ? (value: any) => regex.test(String(value)) : () => false;
+        break;
+      default:
+        filterFn = () => true;
+    }
+    
+    return {
+      field,
+      filterFn,
+      negate: filter.negate || false
+    };
+  });
+  
+  // OPTIMIZATION: Use pre-compiled filter functions
+  const filteredRows = rows.filter(row => {
+    return filterConfigs.every(({ field, filterFn, negate }) => {
+      const value = row.data[field];
+      const matches = filterFn(value);
+      return negate ? !matches : matches;
     });
   });
+  
+  const filterTime = performance.now() - filterStartTime;
+  console.log('🔥 ViewActor: Filtering optimized', { 
+    filterTime: `${filterTime.toFixed(2)}ms`,
+    rowsFiltered: rows.length,
+    resultCount: filteredRows.length,
+    filterCount: filters.length
+  });
+  
+  return filteredRows;
 };
 
 // ====================================
@@ -268,12 +350,7 @@ const calculateCoordinateMapping = (
   }));
   
   // Calculate column mapping with offsets and widths
-  console.log('calculateCoordinateMapping: Creating column mapping for columns:', {
-    columnCount: visibleColumns.length,
-    columnOrder: visibleColumns.map(c => c.id),
-    firstColumn: visibleColumns[0],
-    allColumns: visibleColumns.map(c => ({ id: c.id, name: c.name, width: c.width }))
-  });
+  // Column mapping calculation started
   
   let currentOffset = 0;
   const columnMapping = visibleColumns.map((column, index) => {
@@ -285,19 +362,13 @@ const calculateCoordinateMapping = (
       offset: currentOffset,
       width
     };
-    console.log(`calculateCoordinateMapping: Column ${column.id} at visual index ${index}, offset ${currentOffset}, width ${width}`, {
-      actualWidth: columnWidths?.[column.id],
-      defaultWidth: column.width
-    });
+    // Column position calculated
     currentOffset += width;
     return mapping;
   });
   
   const calculationTime = performance.now() - startTime;
-  console.log(`ViewActor: Coordinate calculation completed in ${calculationTime.toFixed(2)}ms`, {
-    rowCount: rowMapping.length,
-    columnCount: columnMapping.length
-  });
+  // Coordinate calculation completed
   
   return {
     rows: rowMapping,
@@ -307,6 +378,7 @@ const calculateCoordinateMapping = (
   };
 };
 
+
 // ====================================
 // VIEW ACTOR
 // ====================================
@@ -314,51 +386,55 @@ const calculateCoordinateMapping = (
 export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }): Promise<ViewActorOutput> => {
   const startTime = performance.now();
   
-  console.log('[ViewActor] Starting processing with input:', {
-    entityCount: input.entities.length,
-    sortBy: input.sortBy,
-    hasFilters: input.filters.length > 0,
-    hasGrouping: input.groupBy.length > 0,
-    columnCount: input.columns.length,
-    visibleColumns: Object.values(input.columnVisibility).filter(visible => visible).length,
-    columnOrder: input.columnOrder,
-    hasColumnOrder: !!input.columnOrder && input.columnOrder.length > 0
+  console.log('🔥 ViewActor: Processing entities with optimized pipeline');
+  
+  // OPTIMIZATION: Pre-compute relationship columns outside the entity loop
+  const relationshipColumns = input.relationshipResolvers ? 
+    input.columns.filter(col => {
+      const cellType = col.cellType || col.type;
+      return cellType?.startsWith('relationship') && input.relationshipResolvers![col.id];
+    }).map(col => ({
+      field: col.field || col.id,
+      resolver: input.relationshipResolvers![col.id],
+      resolvedKey: `__resolved_${col.id}`
+    })) : [];
+  
+  console.log('🔥 ViewActor: Pre-computed relationship columns', { 
+    totalColumns: input.columns.length, 
+    relationshipColumns: relationshipColumns.length 
   });
   
-  // Step 1: Convert entities to TableRows with resolved relationships
+  // Step 1: Convert entities to TableRows with optimized relationship resolution
+  const relationshipStartTime = performance.now();
   const allRows: TableRow[] = input.entities.map(entity => {
-    // Create a copy of entity data with resolved relationship values
-    const resolvedData = { ...entity };
-    
-    // Resolve relationship values if resolvers are provided
-    if (input.relationshipResolvers) {
-      input.columns.forEach(column => {
-        const cellType = column.cellType || column.type;
-        
-        // Check if this is a relationship column with a resolver
-        if (cellType?.startsWith('relationship') && input.relationshipResolvers[column.id]) {
-          const resolver = input.relationshipResolvers[column.id];
-          const foreignKeyValue = entity[column.field || column.id];
-          
-          if (foreignKeyValue !== null && foreignKeyValue !== undefined) {
-            // Store the resolved value with a special key
-            resolvedData[`__resolved_${column.id}`] = resolver(foreignKeyValue);
-          }
+    // OPTIMIZATION: Single-pass relationship resolution using reduce
+    const resolvedData = relationshipColumns.length > 0 ? 
+      relationshipColumns.reduce((data, { field, resolver, resolvedKey }) => {
+        const value = entity[field];
+        if (value != null) {
+          data[resolvedKey] = resolver(value);
         }
-      });
-    }
+        return data;
+      }, { ...entity }) : 
+      entity;
     
     return {
       id: entity.id,
       data: resolvedData,
       metadata: {
-        createdAt: entity.createdAt || new Date(),
-        updatedAt: entity.updatedAt || new Date(),
-        version: entity.version || 1,
-        isNew: false,
-        isDirty: false
+        isSelected: false,
+        isDirty: false,
+        isGroup: false,
+        level: 0
       }
     };
+  });
+  
+  const relationshipTime = performance.now() - relationshipStartTime;
+  console.log('🔥 ViewActor: Relationship resolution optimized', { 
+    relationshipTime: `${relationshipTime.toFixed(2)}ms`,
+    entitiesProcessed: input.entities.length,
+    relationshipColumns: relationshipColumns.length
   });
   
   // Step 2: Apply data transformations
@@ -366,30 +442,19 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
   const sortedRows = applySorting(filteredRows, input.sortBy);
   const groupTree = createGroupTree(sortedRows, input.groupBy, input.columns);
   
-  console.log('[ViewActor] Data transformation completed:', {
-    originalCount: allRows.length,
-    filteredCount: filteredRows.length,
-    sortedCount: sortedRows.length,
-    groupCount: groupTree.length
-  });
+  // Data transformation completed
   
   // Step 3: Calculate visible columns based on visibility and order
   const visibleDataColumns = input.columns.filter(col => 
     input.columnVisibility[col.id] !== false && col.id !== '__selection'
   );
   
-  console.log('[ViewActor] Visible columns before ordering:', {
-    count: visibleDataColumns.length,
-    columnIds: visibleDataColumns.map(c => c.id)
-  });
+  // Calculated visible columns
   
   // Apply column order
   let orderedDataColumns = visibleDataColumns;
   if (input.columnOrder && input.columnOrder.length > 0) {
-    console.log('[ViewActor] Applying column order:', {
-      inputOrder: input.columnOrder,
-      visibleDataColumnIds: visibleDataColumns.map(c => c.id)
-    });
+    // Applying column order
     orderedDataColumns = input.columnOrder
       .filter(colId => colId !== '__selection')
       .map(colId => {
@@ -400,13 +465,9 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
         return col;
       })
       .filter(Boolean) as Column[];
-    console.log('[ViewActor] Columns after ordering:', {
-      count: orderedDataColumns.length,
-      columnIds: orderedDataColumns.map(c => c.id),
-      fullColumns: orderedDataColumns.map(c => ({ id: c.id, name: c.name }))
-    });
+    // Column ordering applied
   } else {
-    console.log('[ViewActor] No column order provided, using default order');
+    // Using default column order
   }
   
   // Add selection column if enabled
@@ -462,14 +523,17 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     }
   };
   
-  console.log('[ViewActor] Processing completed:', {
-    processingTime: processingTime.toFixed(2) + 'ms',
-    outputRowCount: output.processedRows.length,
-    outputColumnCount: output.coordinateMapping.columns.length,
-    coordinateMappingVersion: output.coordinateMapping.version,
-    visibleColumnOrder: output.visibleColumns.map(c => c.id),
-    columnOrderFromInput: input.columnOrder
-  });
+  // Processing completed - performance info available in debug mode
+  if ((window as any).__VIBEGRIDX_DEBUG) {
+    console.log('[ViewActor] Processing completed:', {
+      processingTime: processingTime.toFixed(2) + 'ms',
+      outputRowCount: output.processedRows.length,
+      outputColumnCount: output.coordinateMapping.columns.length,
+      coordinateMappingVersion: output.coordinateMapping.version,
+      visibleColumnOrder: output.visibleColumns.map(c => c.id),
+      columnOrderFromInput: input.columnOrder
+    });
+  }
   
   return output;
 });
