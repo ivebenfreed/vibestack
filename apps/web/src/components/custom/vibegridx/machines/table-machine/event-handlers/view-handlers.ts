@@ -567,6 +567,3 @@ export const viewHandlers = {
   }
 };
 
-// Import helpers
-import { calculateVisualPositions } from '../helpers/visual-position-helpers';
-
