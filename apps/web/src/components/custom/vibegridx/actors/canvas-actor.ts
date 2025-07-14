@@ -58,6 +58,7 @@ export type CanvasActorResponse =
 
 export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>(({ sendBack, receive }) => {
   let canvas: CanvasOverlay | null = null;
+  let queuedCoordinateUpdate: any = null;
   
   console.log('CanvasActor: Created for embedded mode');
   
@@ -71,47 +72,68 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
       switch (event.type) {
         case 'INITIALIZE':
           const initStartTime = performance.now();
-          console.log('CanvasActor: Initializing with container and config', {
+          console.log('CanvasActor: Deferring canvas initialization', {
             container: event.container,
             containerClass: event.container.className,
-            containerBounds: event.container.getBoundingClientRect(),
-            config: event.config,
-            currentCanvasState: {
-              hasCanvas: !!canvas,
-              canvasType: canvas?.constructor?.name
-            }
+            config: event.config
           });
           
-          try {
-            canvas = new CanvasOverlay(event.container, event.config);
-            
-            // Set up callbacks for pure actors approach
-            canvas.onFillStart = (direction) => sendBack({ type: 'FILL_START', direction });
-            canvas.onFillPreview = (previewCells) => sendBack({ type: 'FILL_PREVIEW', previewCells });
-            canvas.onFillComplete = (fillCells) => sendBack({ type: 'FILL_COMPLETE', fillCells });
-            canvas.onFillCancel = () => sendBack({ type: 'FILL_CANCEL' });
-            canvas.onCopy = (cells) => sendBack({ type: 'COPY', cells });
-            canvas.onCut = (cells) => sendBack({ type: 'CUT', cells });
-            canvas.onPaste = () => sendBack({ type: 'PASTE' });
-            canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
-            
-            // Pre-initialize Stage asynchronously to avoid blocking
-            canvas.preInitializeAsync();
-            
-            const initTime = performance.now() - initStartTime;
-            console.log('🔥 CanvasActor: Canvas overlay created successfully', {
-              initTime: `${initTime.toFixed(2)}ms`,
-              containerSize: event.container.getBoundingClientRect(),
-              timestamp: performance.now()
-            });
-            sendBack({ type: 'CANVAS_READY' });
-          } catch (error) {
-            console.error('CanvasActor: Failed to create canvas overlay:', error);
-            console.error('CanvasActor: Error stack:', error.stack);
-            sendBack({ 
-              type: 'CANVAS_ERROR', 
-              error: `Failed to initialize canvas: ${error.message}` 
-            });
+          // Store config for deferred initialization
+          const storedConfig = event.config;
+          const storedContainer = event.container;
+          
+          // Send ready immediately to unblock table rendering
+          sendBack({ type: 'CANVAS_READY' });
+          
+          // Initialize canvas when browser is idle
+          const initializeCanvas = async () => {
+            try {
+              console.log('CanvasActor: Starting deferred canvas initialization');
+              const deferredStartTime = performance.now();
+              
+              canvas = new CanvasOverlay(storedContainer, storedConfig);
+              
+              // Set up callbacks for pure actors approach
+              canvas.onFillStart = (direction) => sendBack({ type: 'FILL_START', direction });
+              canvas.onFillPreview = (previewCells) => sendBack({ type: 'FILL_PREVIEW', previewCells });
+              canvas.onFillComplete = (fillCells) => sendBack({ type: 'FILL_COMPLETE', fillCells });
+              canvas.onFillCancel = () => sendBack({ type: 'FILL_CANCEL' });
+              canvas.onCopy = (cells) => sendBack({ type: 'COPY', cells });
+              canvas.onCut = (cells) => sendBack({ type: 'CUT', cells });
+              canvas.onPaste = () => sendBack({ type: 'PASTE' });
+              canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
+              
+              // Pre-initialize Stage progressively
+              await canvas.preInitializeAsync();
+              
+              const deferredInitTime = performance.now() - deferredStartTime;
+              console.log('🔥 CanvasActor: Deferred canvas initialization complete', {
+                initTime: `${deferredInitTime.toFixed(2)}ms`,
+                totalTimeFromInitialize: `${(performance.now() - initStartTime).toFixed(2)}ms`
+              });
+              
+              // Process any queued events
+              if (queuedCoordinateUpdate) {
+                console.log('CanvasActor: Processing queued coordinate update');
+                canvas.updateCoordinates(queuedCoordinateUpdate);
+                queuedCoordinateUpdate = null;
+              }
+              
+              sendBack({ type: 'CANVAS_DEFERRED_READY' });
+            } catch (error) {
+              console.error('CanvasActor: Failed to create canvas overlay:', error);
+              sendBack({ 
+                type: 'CANVAS_ERROR', 
+                error: `Failed to initialize canvas: ${error.message}` 
+              });
+            }
+          };
+          
+          // Use requestIdleCallback if available, otherwise fall back to setTimeout
+          if ('requestIdleCallback' in window) {
+            requestIdleCallback(initializeCanvas, { timeout: 100 });
+          } else {
+            setTimeout(initializeCanvas, 16); // ~1 frame
           }
           break;
           
@@ -155,6 +177,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           if (!canvas) {
             // Queue this event to be processed after initialization
             console.log('CanvasActor: Queuing UPDATE_COORDINATES event until canvas is initialized');
+            queuedCoordinateUpdate = event.mapping;
             return;
           }
           

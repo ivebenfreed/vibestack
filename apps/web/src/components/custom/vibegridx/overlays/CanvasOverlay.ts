@@ -83,12 +83,23 @@ export class CanvasOverlay implements CoordinateProvider {
   // Cached dimensions for faster initialization
   private cachedDimensions: { width: number; height: number; rect: DOMRect };
   
-  // PERFORMANCE: Initialize Stage synchronously to eliminate blank container delay
-  public preInitializeAsync(): void {
+  // PERFORMANCE: Initialize Stage in chunks to avoid blocking
+  public async preInitializeAsync(): Promise<void> {
     if (!this.stage) {
-      // Create Stage immediately to avoid 58ms RAF delay that causes blank container
-      this.initializeStage();
+      // Initialize stage in microtasks to avoid blocking
+      await this.initializeStageProgressive();
     }
+  }
+  
+  private async initializeStageProgressive(): Promise<void> {
+    // Step 1: Basic stage setup (minimal work)
+    await this.initializeStageMinimal();
+    
+    // Yield to browser
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    // Step 2: Add layer and finalize
+    await this.finalizeStageSetup();
   }
   
   // Lazy stage initialization
@@ -217,6 +228,58 @@ export class CanvasOverlay implements CoordinateProvider {
       );
     }
     return this.columnResizeOverlay;
+  }
+  
+  private async initializeStageMinimal(): Promise<void> {
+    // PERFORMANCE: Minimal stage creation
+    const width = this.cachedDimensions.width;
+    const height = this.cachedDimensions.height;
+    
+    // Ensure container has ID
+    if (!this.container.id) {
+      this.container.id = `vgx-canvas-${Date.now()}`;
+    }
+    
+    // Apply container styles first
+    const styles: Partial<CSSStyleDeclaration> = {
+      overflow: 'hidden'
+    };
+    
+    if (this.config.useFixedPositioning) {
+      styles.position = 'relative';
+      styles.width = '100%';
+      styles.height = '100%';
+    }
+    
+    Object.assign(this.container.style, styles);
+    
+    // Create stage with actual dimensions to avoid drawImage errors
+    this.stage = new Konva.Stage({
+      container: this.container.id,
+      width: width,
+      height: height,
+      listening: false
+    });
+  }
+  
+  private async finalizeStageSetup(): Promise<void> {
+    if (!this.stage) return;
+    
+    // Create and add layer
+    this.layer = new Konva.Layer({ 
+      name: 'main-layer',
+      listening: false
+    });
+    this.stage.add(this.layer);
+    
+    // Set pointer events
+    if (this.config.useFixedPositioning) {
+      this.stage.content.style.pointerEvents = 'none';
+      this.container.style.pointerEvents = 'none';
+    } else {
+      this.stage.content.style.pointerEvents = 'auto';
+      this.container.style.pointerEvents = 'none';
+    }
   }
   
   private initializeStage(): void {

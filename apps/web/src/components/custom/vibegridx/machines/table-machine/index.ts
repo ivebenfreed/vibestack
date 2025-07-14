@@ -767,17 +767,23 @@ export const tableBaseMachine = setup({
       // Canvas initialization (post-render)
       CANVAS_CONTAINER_READY: {
         actions: [
-          // Store container for canvas initialization
-          assign({
-            canvasContainer: ({ event }) => event.container
-          }),
           ({ context, event }) => {
             console.log('TableMachine: Canvas container ready post-render', {
               container: event.container,
               version: context.version,
               hasCanvasActor: !!context.actors.canvasActor,
-              hasCoordinateMapping: !!context.coordinateMapping
+              hasCoordinateMapping: !!context.coordinateMapping,
+              hasCanvasContainer: !!context.canvasContainer
             });
+            
+            // Check if canvas was already initialized
+            if (context.canvasContainer) {
+              console.log('TableMachine: Canvas already initialized, skipping duplicate initialization');
+              return;
+            }
+            
+            // Store container for canvas initialization
+            context.canvasContainer = event.container;
             
             // Initialize canvas actor if it exists (spawned post-render)
             if (context.actors.canvasActor && event.container) {
