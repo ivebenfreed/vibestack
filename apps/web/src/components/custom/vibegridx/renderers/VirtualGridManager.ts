@@ -42,13 +42,6 @@ export class VirtualGridManager {
       end: Math.min(totalRows, viewport.end)
     };
     
-    console.log('VirtualGridManager: updateViewport', {
-      viewport,
-      totalRows,
-      oldRange,
-      newRange: this.visibleRange
-    });
-    
     // Return true if range changed
     return oldRange.start !== this.visibleRange.start || 
            oldRange.end !== this.visibleRange.end;
@@ -107,16 +100,6 @@ export class VirtualGridManager {
     // Cap to actual row count
     const cappedEnd = Math.min(calculatedEnd, this.totalRows);
     
-    console.log('VirtualGridManager: calculateViewportFromScroll', {
-      scrollTop,
-      viewportHeight,
-      rowHeight: this.rowHeight,
-      visibleRowCount,
-      calculatedStart,
-      calculatedEnd,
-      cappedEnd,
-      totalRows: this.totalRows
-    });
     
     return {
       start: calculatedStart,

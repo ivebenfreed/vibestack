@@ -107,11 +107,12 @@ export class AtomicTableRenderer {
     this.rowHeight = options.cellHeight || 40;
     
     // PERFORMANCE FIX: Use proper initial viewport instead of hardcoded values
+    // Create a minimal initial viewport - will be properly updated on first render
     const initialViewport = options.initialViewport || {
       start: 0,
-      end: Math.ceil(600 / this.rowHeight), // Based on container height
-      height: 600,
-      width: 800,
+      end: 0, // Don't try to guess - will be calculated properly in updateViewport
+      height: 0,
+      width: 0,
       scrollTop: 0,
       scrollLeft: 0,
       itemHeight: this.rowHeight
@@ -599,13 +600,16 @@ export class AtomicTableRenderer {
         console.log('🎨 AtomicTableRenderer: First render - executing synchronously');
         this.isFirstRender = false;
         
+        // CRITICAL: Set row count BEFORE updating viewport
+        this.virtualGrid.setRowCount(state.rows.length);
+        
         // STEP 2: Update viewport
         const viewportStart = performance.now();
         this.updateViewport(state);
         const viewportTime = performance.now() - viewportStart;
         
         // Log viewport info for debugging
-        console.log('🎨 AtomicTableRenderer: First render viewport info', {
+        console.log('🎨 AtomicTableRenderer: First render viewport info AFTER updateViewport', {
           visibleRange: this.virtualGrid.getVisibleRange(),
           metrics: this.virtualGrid.getMetrics()
         });
@@ -699,7 +703,7 @@ export class AtomicTableRenderer {
       // CORRECTED: This measures the entire render pipeline, not just header
       const totalRenderTime = performance.now() - this.renderStartTime;
       if (totalRenderTime > 10) {
-        console.warn(`AtomicTableRenderer: Total render pipeline took ${totalRenderTime.toFixed(2)}ms`);
+        console.log(`AtomicTableRenderer: Total render pipeline took ${totalRenderTime.toFixed(2)}ms`);
       }
     }
   }
@@ -735,7 +739,7 @@ export class AtomicTableRenderer {
     
     const duration = performance.now() - startTime;
     if (duration > RENDER_TARGETS.CELL_UPDATE * 10) { // Warn if row update is slow
-      console.warn(`AtomicTableRenderer: Slow row update ${row.id} took ${duration.toFixed(2)}ms`);
+      console.log(`AtomicTableRenderer: Slow row update ${row.id} took ${duration.toFixed(2)}ms`);
     }
   }
 
@@ -753,7 +757,7 @@ export class AtomicTableRenderer {
     
     const duration = performance.now() - startTime;
     if (duration > RENDER_TARGETS.CELL_UPDATE * rows.length) { // Warn if updates are slow
-      console.warn(`AtomicTableRenderer: Slow batch update - ${rows.length} rows took ${duration.toFixed(2)}ms`);
+      console.log(`AtomicTableRenderer: Slow batch update - ${rows.length} rows took ${duration.toFixed(2)}ms`);
     }
   }
   
