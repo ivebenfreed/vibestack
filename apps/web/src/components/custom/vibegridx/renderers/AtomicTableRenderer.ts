@@ -13,6 +13,7 @@ import { CellRenderingPipeline } from './CellRenderingPipeline';
 import { VirtualGridManager } from './VirtualGridManager';
 import { ColumnManager } from './ColumnManager';
 import { DOMStructureManager } from './DOMStructureManager';
+import { SelectionManager } from './SelectionManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -48,6 +49,7 @@ export class AtomicTableRenderer {
   private virtualGrid: VirtualGridManager;
   private columnManager: ColumnManager;
   private domManager: DOMStructureManager;
+  private selectionManager: SelectionManager;
   private options: RendererOptions;
   
   // Performance tracking
@@ -59,9 +61,6 @@ export class AtomicTableRenderer {
   private isFirstRender = true; // Track if this is the first render
   
   // State caches
-  private selectedCells = new Set<string>();
-  private selectedRows = new Set<string>(); // For checkbox selection
-  private editingCell: CellRef | null = null;
   private lastRenderState: RenderState | null = null;
   
   // External managers
@@ -95,6 +94,14 @@ export class AtomicTableRenderer {
     });
     
     this.domManager = new DOMStructureManager(options.container);
+    
+    // Initialize selection manager with DOM dependencies
+    this.selectionManager = new SelectionManager({
+      getCellElement: (rowId: string, columnId: string) => this.getCellElement(rowId, columnId),
+      forEachRowElement: (callback) => this.domManager.forEachRowElement(callback),
+      getHeaderElement: () => this.domManager.getElement('header'),
+      isSelectionColumnEnabled: () => this.columnManager.isSelectionColumnEnabled()
+    });
     
     // Use configured row height or default
     this.rowHeight = options.cellHeight || 40;
@@ -647,78 +654,67 @@ export class AtomicTableRenderer {
   }
   
   setEditingCell(cellRef: CellRef | null): void {
-    const oldEditing = this.editingCell;
-    this.editingCell = cellRef;
-    
-    // Update old editing cell
-    if (oldEditing) {
-      const oldElement = this.getCellElement(oldEditing.rowId, oldEditing.columnId);
-      if (oldElement) {
-        oldElement.classList.remove(CSS_CLASSES.EDITING);
-        oldElement.contentEditable = 'false';
-      }
-    }
-    
-    // Update new editing cell
-    if (cellRef) {
-      const newElement = this.getCellElement(cellRef.rowId, cellRef.columnId);
-      if (newElement) {
-        newElement.classList.add(CSS_CLASSES.EDITING);
-        newElement.contentEditable = 'true';
-        newElement.focus();
-      }
-    }
+    this.selectionManager.setEditingCell(cellRef);
   }
   
   setSelectedCells(selectedCells: Set<string>): void {
-    // Remove old selections
-    this.selectedCells.forEach(cellKey => {
-      const [rowId, columnId] = cellKey.split(':');
-      const element = this.getCellElement(rowId, columnId);
-      element?.classList.remove(CSS_CLASSES.SELECTED);
-    });
-    
-    // Add new selections
-    this.selectedCells = new Set(selectedCells);
-    this.selectedCells.forEach(cellKey => {
-      const [rowId, columnId] = cellKey.split(':');
-      const element = this.getCellElement(rowId, columnId);
-      element?.classList.add(CSS_CLASSES.SELECTED);
-    });
+    this.selectionManager.setSelectedCells(selectedCells);
   }
   
   setSelectedRows(selectedRows: Set<string>): void {
-    this.selectedRows = new Set(selectedRows);
-    
-    // Update all visible row checkboxes and row styles
-    this.domManager.forEachRowElement((rowElement, rowId) => {
-      const isSelected = this.selectedRows.has(rowId);
-      
-      // Update checkbox
-      const checkbox = rowElement.querySelector('.vibegridx-row-checkbox') as HTMLInputElement;
-      if (checkbox) {
-        checkbox.checked = isSelected;
-      }
-      
-      // Update row style
-      if (isSelected) {
-        rowElement.classList.add('vibegridx-row-selected');
-      } else {
-        rowElement.classList.remove('vibegridx-row-selected');
-      }
-    });
-    
-    // Update header checkbox state if selection column is enabled
-    if (this.columnManager.isSelectionColumnEnabled() && this.lastRenderState) {
-      const headerCheckbox = this.domManager.getElement('header').querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
-      if (headerCheckbox) {
-        const allSelected = this.selectedRows.size === this.lastRenderState.rows.length && this.lastRenderState.rows.length > 0;
-        const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < this.lastRenderState.rows.length;
-        
-        headerCheckbox.checked = allSelected;
-        headerCheckbox.indeterminate = someSelected;
-      }
-    }
+    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    this.selectionManager.setSelectedRows(selectedRows, allRows);
+  }
+  
+  // ====================================
+  // SELECTION API
+  // ====================================
+  
+  getSelectedCells(): Set<string> {
+    return this.selectionManager.getSelectedCells();
+  }
+  
+  getSelectedRows(): Set<string> {
+    return this.selectionManager.getSelectedRows();
+  }
+  
+  getEditingCell(): CellRef | null {
+    return this.selectionManager.getEditingCell();
+  }
+  
+  isCellSelected(rowId: string, columnId: string): boolean {
+    return this.selectionManager.isCellSelected(rowId, columnId);
+  }
+  
+  isRowSelected(rowId: string): boolean {
+    return this.selectionManager.isRowSelected(rowId);
+  }
+  
+  isCellEditing(rowId: string, columnId: string): boolean {
+    return this.selectionManager.isCellEditing(rowId, columnId);
+  }
+  
+  toggleCellSelection(rowId: string, columnId: string): boolean {
+    return this.selectionManager.toggleCellSelection(rowId, columnId);
+  }
+  
+  toggleRowSelection(rowId: string): boolean {
+    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    return this.selectionManager.toggleRowSelection(rowId, allRows);
+  }
+  
+  selectAllRows(): void {
+    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    this.selectionManager.selectAllRows(allRows);
+  }
+  
+  clearAllSelections(): void {
+    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    this.selectionManager.clearAllSelections(allRows);
+  }
+  
+  getSelectionStats() {
+    return this.selectionManager.getSelectionStats();
   }
   
   // ====================================
@@ -872,8 +868,9 @@ export class AtomicTableRenderer {
     
     // STEP 6: Create selection header
     const step6Start = performance.now();
-    const allSelected = this.selectedRows.size === state.rows.length && state.rows.length > 0;
-    const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < state.rows.length;
+    const selectedRows = this.selectionManager.getSelectedRows();
+    const allSelected = selectedRows.size === state.rows.length && state.rows.length > 0;
+    const someSelected = selectedRows.size > 0 && selectedRows.size < state.rows.length;
     
     const selectionHeader = document.createElement('div');
     selectionHeader.className = 'vibegridx-header-cell vibegridx-selection-header';
@@ -1103,7 +1100,7 @@ export class AtomicTableRenderer {
     // Add selection checkbox cell (always included)
     {
       const cellKey = `${row.id}:__selection`;
-      const isRowSelected = this.selectedRows.has(row.id);
+      const isRowSelected = this.selectionManager.isRowSelected(row.id);
       
       const cell = document.createElement('div');
       cell.className = 'vibegridx-cell vibegridx-selection-cell';
@@ -1183,8 +1180,8 @@ export class AtomicTableRenderer {
       cell.setAttribute('role', 'gridcell');
       
       // Apply state classes
-      const isSelected = this.selectedCells.has(cellKey);
-      const isEditing = this.editingCell?.rowId === row.id && this.editingCell?.columnId === column.id;
+      const isSelected = this.selectionManager.isCellSelected(row.id, column.id);
+      const isEditing = this.selectionManager.isCellEditing(row.id, column.id);
       const isDirty = row.metadata.isDirty || false;
       
       if (isSelected) cell.classList.add(CSS_CLASSES.SELECTED);
@@ -1794,7 +1791,7 @@ export class AtomicTableRenderer {
     }
     
     this.domManager.clearAllCaches();
-    this.selectedCells.clear();
+    this.selectionManager.clearAllSelections();
     this.updateQueue.clear();
     
     this.domManager.getElement('container').innerHTML = '';
