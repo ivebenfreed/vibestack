@@ -4,6 +4,7 @@
 
 import { sendTo, assign } from 'xstate';
 import { selectionActions } from '../slices/selection-slice';
+import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 export const keyboardHandlers = {
   'keyboard.arrow': {
@@ -25,6 +26,15 @@ export const keyboardHandlers = {
             type: 'FORWARD_TO_CANVAS',
             event: {
               type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: visualPositions
+            }
+          });
+          
+          // Also update fill handle position
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'RENDER_FILL_HANDLE',
               visualCells: visualPositions
             }
           });

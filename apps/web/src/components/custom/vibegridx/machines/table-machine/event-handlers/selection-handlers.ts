@@ -96,6 +96,15 @@ export const selectionHandlers = {
               visualCells: visualPositions
             }
           });
+          
+          // Also render fill handle for range selection
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'RENDER_FILL_HANDLE',
+              visualCells: visualPositions
+            }
+          });
         }
       }
     ]
@@ -272,6 +281,17 @@ export const selectionHandlers = {
               visualCells: visualPositions
             }
           });
+          
+          // Also update fill handle position during drag
+          if (visualPositions.length > 0) {
+            self.send({
+              type: 'FORWARD_TO_CANVAS',
+              event: {
+                type: 'RENDER_FILL_HANDLE',
+                visualCells: visualPositions
+              }
+            });
+          }
         }
       }
     ]
