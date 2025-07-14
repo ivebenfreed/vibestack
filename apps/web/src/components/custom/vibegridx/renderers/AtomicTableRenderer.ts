@@ -17,6 +17,7 @@ import { SelectionManager } from './SelectionManager';
 import { EventDelegationSystem, type EventCallbacks } from './EventDelegationSystem';
 import { RowRenderingEngine } from './RowRenderingEngine';
 import { HeaderRenderer } from './HeaderRenderer';
+import { PerformanceMonitor } from './PerformanceMonitor';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -56,12 +57,10 @@ export class AtomicTableRenderer {
   private eventSystem: EventDelegationSystem;
   private rowRenderingEngine: RowRenderingEngine;
   private headerRenderer: HeaderRenderer;
+  private performanceMonitor: PerformanceMonitor;
   private options: RendererOptions;
   
-  // Performance tracking
-  private renderStartTime = 0;
-  private lastRenderTime = 0;
-  private frameId = 0;
+  // State tracking
   private lastDimensions = { height: 0, width: 0 };
   private canvasInitialized = false; // Track canvas overlay initialization
   private isFirstRender = true; // Track if this is the first render
@@ -168,6 +167,27 @@ export class AtomicTableRenderer {
       enableSelectionColumn: options.enableSelectionColumn || false,
       getTotalColumnsWidth: () => this.getTotalColumnsWidth()
     });
+    
+    // Initialize performance monitor
+    this.performanceMonitor = new PerformanceMonitor(
+      {
+        initialRender: RENDER_TARGETS.INITIAL_RENDER,
+        cellUpdate: RENDER_TARGETS.CELL_UPDATE,
+        scrollFPS: RENDER_TARGETS.SCROLL_FPS,
+        batchSize: RENDER_TARGETS.BATCH_SIZE
+      },
+      (event) => {
+        // Forward performance events to parent
+        if (event.type === 'render.complete') {
+          options.onStateChange?.({
+            type: 'render.complete',
+            renderTime: event.duration,
+            rowCount: event.details?.rowCount || 0,
+            visibleRange: this.virtualGrid.getVisibleRange()
+          });
+        }
+      }
+    );
     
     // Event handlers now managed by EventDelegationSystem
     
@@ -406,11 +426,8 @@ export class AtomicTableRenderer {
       this.batchTimeoutId = 0;
     }
     
-    // Cancel any pending animation frames
-    if (this.frameId) {
-      cancelAnimationFrame(this.frameId);
-      this.frameId = 0;
-    }
+    // Cancel performance monitoring
+    this.performanceMonitor.cancelFrameTracking();
   }
   
   // ====================================
@@ -456,7 +473,7 @@ export class AtomicTableRenderer {
   
   render(state: RenderState): void {
     
-    this.renderStartTime = performance.now();
+    this.performanceMonitor.startRender();
     
     // Update column widths from render state
     if (state.columnWidths) {
@@ -492,9 +509,8 @@ export class AtomicTableRenderer {
     
     try {
       // STEP 1: Render header
-      const headerOnlyStart = performance.now();
       const headerMetrics = this.headerRenderer.renderHeader(state);
-      const headerOnlyTime = headerMetrics.renderTime;
+      this.performanceMonitor.recordPhase('header', headerMetrics.renderTime);
       
       // Check if this is the first render
       if (this.isFirstRender) {
@@ -508,6 +524,7 @@ export class AtomicTableRenderer {
         const viewportStart = performance.now();
         this.updateViewport(state);
         const viewportTime = performance.now() - viewportStart;
+        this.performanceMonitor.recordPhase('viewport', viewportTime);
         
         // Log viewport info for debugging
         console.log('🎨 AtomicTableRenderer: First render viewport info AFTER updateViewport', {
@@ -517,40 +534,26 @@ export class AtomicTableRenderer {
         
         // STEP 3: Render visible rows
         console.log('🎨 AtomicTableRenderer: About to render visible rows synchronously');
-        const rowsStart = performance.now();
         const metrics = this.rowRenderingEngine.renderVisibleRows(state);
-        const rowsTime = performance.now() - rowsStart;
+        this.performanceMonitor.recordPhase('visibleRows', metrics.renderTime);
         console.log('🎨 AtomicTableRenderer: Visible rows rendered synchronously', metrics);
         
         // STEP 4: Apply optimistic operations
         const optimisticStart = performance.now();
         this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
         const optimisticTime = performance.now() - optimisticStart;
+        this.performanceMonitor.recordPhase('optimisticOps', optimisticTime);
         
         
         // Performance timing
-        this.lastRenderTime = performance.now() - this.renderStartTime;
-        
-        console.log('🔍 RENDER PIPELINE BREAKDOWN:', {
-          'Header only': `${headerOnlyTime.toFixed(2)}ms`,
-          'Viewport update': `${viewportTime.toFixed(2)}ms`,
-          'Visible rows': `${rowsTime.toFixed(2)}ms`, 
-          'Optimistic ops': `${optimisticTime.toFixed(2)}ms`,
-          'TOTAL': `${this.lastRenderTime.toFixed(2)}ms`
-        });
+        const totalTime = this.performanceMonitor.endRender(state.rows.length);
+        this.performanceMonitor.recordPhase('total', totalTime);
+        this.performanceMonitor.logBreakdown();
         
         console.log('🎨 AtomicTableRenderer: First render complete synchronously', {
-          renderTime: this.lastRenderTime,
+          renderTime: totalTime,
           rowCount: state.rows.length,
           timestamp: performance.now()
-        });
-        
-        // Notify completion
-        this.options.onStateChange?.({
-          type: 'render.complete',
-          renderTime: this.lastRenderTime,
-          rowCount: state.rows.length,
-          visibleRange: this.virtualGrid.getVisibleRange()
         });
         
         // Send viewport update for canvas overlay
@@ -575,15 +578,8 @@ export class AtomicTableRenderer {
           
           
           // Performance timing
-          this.lastRenderTime = performance.now() - this.renderStartTime;
-          
-          // Notify completion
-          this.options.onStateChange?.({
-            type: 'render.complete',
-            renderTime: this.lastRenderTime,
-            rowCount: state.rows.length,
-            visibleRange: this.virtualGrid.getVisibleRange()
-          });
+          const renderTime = this.performanceMonitor.endRender(state.rows.length);
+          this.performanceMonitor.recordPhase('total', renderTime);
           
           // Send viewport update for canvas overlay
           const viewport: ViewportInfo = {
@@ -601,11 +597,7 @@ export class AtomicTableRenderer {
       }
       
     } finally {
-      // CORRECTED: This measures the entire render pipeline, not just header
-      const totalRenderTime = performance.now() - this.renderStartTime;
-      if (totalRenderTime > 10) {
-        console.log(`AtomicTableRenderer: Total render pipeline took ${totalRenderTime.toFixed(2)}ms`);
-      }
+      // Performance metrics are tracked by PerformanceMonitor
     }
   }
   
@@ -812,6 +804,7 @@ export class AtomicTableRenderer {
   
   private processBatchUpdates(): void {
     const startTime = performance.now();
+    const updateCount = this.updateQueue.size;
     
     this.updateQueue.forEach(cellKey => {
       const [rowId, columnId] = cellKey.split(':');
@@ -832,9 +825,7 @@ export class AtomicTableRenderer {
     this.batchTimeoutId = 0;
     
     const duration = performance.now() - startTime;
-    if (duration > RENDER_TARGETS.CELL_UPDATE && this.updateQueue.size > 0) {
-      console.warn(`Slow batch update: ${duration.toFixed(2)}ms for ${this.updateQueue.size} cells`);
-    }
+    this.performanceMonitor.trackBatchUpdate(updateCount, duration);
   }
   
   // ====================================
@@ -888,8 +879,9 @@ export class AtomicTableRenderer {
   }
   
   getPerformanceMetrics() {
+    const metrics = this.performanceMonitor.getMetrics();
     return {
-      lastRenderTime: this.lastRenderTime,
+      ...metrics,
       visibleRows: this.virtualGrid.getVisibleRange(),
       cacheSize: {
         rows: this.domManager.getCacheMetrics().rowElements,
@@ -988,9 +980,7 @@ export class AtomicTableRenderer {
   }
   
   destroy(): void {
-    if (this.frameId) {
-      cancelAnimationFrame(this.frameId);
-    }
+    this.performanceMonitor.cancelFrameTracking();
     
     if (this.batchTimeoutId) {
       clearTimeout(this.batchTimeoutId);
