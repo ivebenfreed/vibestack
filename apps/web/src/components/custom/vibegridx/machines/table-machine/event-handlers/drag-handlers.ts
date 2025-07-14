@@ -34,14 +34,8 @@ export const dragHandlers = {
     actions: [
       dragActions.updateDragPosition,
       
-      // Send position update to overlay
-      sendTo(
-        ({ context }) => context.actors.overlayActor!,
-        ({ event }) => ({
-          type: 'DRAG_MOVE',
-          position: { x: event.x, y: event.y }
-        })
-      ),
+      // TODO: Drag position visualization not implemented
+      // overlayActor was supposed to handle this but was never spawned
       
       ({ event }) => {
         console.log('TableMachine: Drag position updated', {

@@ -12,7 +12,6 @@ import { createInitialViewState, viewActions } from './slices/view-slice';
 import { createInitialEditState, editActions } from './slices/edit-slice';
 import { createInitialDragState, dragActions } from './slices/drag-slice';
 import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
-import { createInitialAtomState, atomActions } from './slices/atom-slice';
 
 // Import event handlers
 import { selectionHandlers } from './event-handlers/selection-handlers';
@@ -27,7 +26,6 @@ import { createViewportFromScroll, calculateVisualPositions } from './helpers/vi
 
 // Import actors
 import { viewActor, createViewActorInput } from '../view-actor';
-import { rowActorMachine } from '../row-actor';
 import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
 import { editActor } from '../../actors/edit-actor';
@@ -78,7 +76,6 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
   
   // Create atom state with config
-  const atomState = createInitialAtomState(input.atomConfig);
   
   return {
     id: input.id,
@@ -122,7 +119,6 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     ...overlayState,
     
     // Spread atom state
-    ...atomState,
     
     // DEPRECATED: Legacy coordinate manager - disabled in favor of unified coordinateMapping
     coordinateManager: null,
@@ -141,9 +137,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       canvasActor: null,
       viewActor: null,
       selectionCoordinator: null,
-      editCoordinator: null,
       dragCoordinator: null,
-      overlayActor: null,
       rowActors: new Map()
     },
     
@@ -159,58 +153,6 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   };
 };
 
-// ====================================
-// ASYNC ACTORS
-// ====================================
-
-const spawnRowActors = fromPromise(async ({ input }: { 
-  input: { rowIds: string[]; spawn: any; existingActors: Map<string, any> }
-}) => {
-  const { rowIds, spawn, existingActors } = input;
-  const newActors = new Map(existingActors);
-  
-  // Spawn actors for visible rows that don't exist yet
-  for (const rowId of rowIds) {
-    if (!newActors.has(rowId)) {
-      const actor = spawnChild('rowActor', {
-        input: { id: rowId },
-        systemId: `row-${rowId}`
-      });
-      newActors.set(rowId, actor);
-    }
-  }
-  
-  // Cleanup actors for rows no longer visible
-  for (const [rowId, actor] of existingActors) {
-    if (!rowIds.includes(rowId)) {
-      actor.stop?.();
-      newActors.delete(rowId);
-    }
-  }
-  
-  return { actors: newActors };
-});
-
-const updatePerformanceMetrics = fromPromise(async ({ input }: {
-  input: { operation: string; startTime: number; context: TableContext }
-}) => {
-  const { operation, startTime, context } = input;
-  const duration = performance.now() - startTime;
-  
-  // Log performance if slow
-  if (duration > 16) {
-    console.warn(`Slow ${operation}: ${duration.toFixed(2)}ms`);
-  }
-  
-  return {
-    operation,
-    duration,
-    timestamp: Date.now(),
-    totalRows: context.performance.totalRows,
-    visibleRows: context.visibleRowIds.length,
-    activeActors: context.actors.rowActors.size
-  };
-});
 
 // ====================================
 // MAIN TABLE MACHINE
@@ -237,9 +179,6 @@ export const tableBaseMachine = setup({
     viewActor,
     editActor,
     dragActor,
-    rowActor: rowActorMachine,
-    spawnRowActors,
-    updatePerformanceMetrics
   },
   
   actions: {
@@ -262,7 +201,6 @@ export const tableBaseMachine = setup({
     ...overlayActions,
     
     // Atom actions
-    ...atomActions,
     
     // Additional actions
     logError: ({ event, context }) => {
@@ -492,43 +430,14 @@ export const tableBaseMachine = setup({
       
       initial: 'idle',
       
-      // Cleanup atom subscriptions when leaving active state
-      exit: atomActions.cleanupAtomSubscriptions,
       
       states: {
         idle: {
-          entry: [
-            // Subscribe to atom changes for dynamic updates AFTER initial render
-            ({ context, self }) => {
-              // Only setup atom subscriptions if we have atom config
-              if (context.atomConfig) {
-                // Delay atom subscription to prevent immediate trigger with same data
-                setTimeout(() => {
-                  // Setup primary atom subscription
-                  atomActions.setupPrimaryAtomSubscription({ context, self });
-                  // Setup relationship atom subscriptions
-                  atomActions.setupRelationshipAtoms({ context, self });
-                }, 100);
-              }
-            }
-          ],
+          entry: [],
           
           on: {
-            // Handle atom updates for dynamic data changes
-            ATOM_DATA_UPDATED: {
-              target: 'processingViewData',
-              actions: [
-                atomActions.updateEntitiesFromAtom
-              ]
-            },
-            
             // Handle view updates (sorting, column reorder, etc)
             INVOKE_VIEW_ACTOR: {
-              target: 'processingViewData'
-            },
-            
-            // Handle relationship data updates
-            RELATIONSHIP_DATA_UPDATED: {
               target: 'processingViewData'
             },
             

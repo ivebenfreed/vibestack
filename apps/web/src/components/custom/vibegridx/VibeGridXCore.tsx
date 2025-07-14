@@ -87,7 +87,7 @@ export const useRendererInitialization = (
           hasTableState: !!tableState,
           hasContext: !!tableState?.context,
           hasActors: !!tableState?.context?.actors,
-          hasOverlayActor: !!tableState?.context?.actors?.overlayActor,
+          hasCanvasActor: !!tableState?.context?.actors?.canvasActor,
           actors: tableState?.context?.actors
         });
         

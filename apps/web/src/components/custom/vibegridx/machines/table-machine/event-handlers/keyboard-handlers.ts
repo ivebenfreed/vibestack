@@ -52,14 +52,9 @@ export const keyboardHandlers = {
   
   'keyboard.copy': {
     actions: [
-      // Send copy event to overlay actor
-      sendTo(
-        ({ context }) => context.actors.overlayActor!,
-        ({ context }) => ({
-          type: 'COPY',
-          cells: context.selectedCells
-        })
-      ),
+      // TODO: Copy functionality not implemented
+      // overlayActor was supposed to handle this but was never spawned
+      // The ClipboardOverlay.ts exists but is not integrated
       
       ({ context }) => {
         console.log('TableMachine: Copy operation', {
@@ -71,11 +66,9 @@ export const keyboardHandlers = {
   
   'keyboard.paste': {
     actions: [
-      // Send paste event to overlay actor
-      sendTo(
-        ({ context }) => context.actors.overlayActor!,
-        () => ({ type: 'PASTE' })
-      ),
+      // TODO: Paste functionality not implemented
+      // overlayActor was supposed to handle this but was never spawned
+      // The ClipboardOverlay.ts exists but is not integrated
       
       () => {
         console.log('TableMachine: Paste operation');
@@ -85,14 +78,9 @@ export const keyboardHandlers = {
   
   'keyboard.delete': {
     actions: [
-      // Send delete event to edit coordinator
-      sendTo(
-        ({ context }) => context.actors.editCoordinator!,
-        ({ context }) => ({
-          type: 'DELETE_CELLS',
-          cells: context.selectedCells
-        })
-      ),
+      // TODO: Delete functionality not implemented
+      // editCoordinator was supposed to handle this but was never created
+      // Need to implement cell deletion logic
       
       ({ context }) => {
         console.log('TableMachine: Delete operation', {

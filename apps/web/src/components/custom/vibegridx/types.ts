@@ -271,12 +271,9 @@ export interface TableContext {
   actors: {
     rendererActor: ActorRefFrom<any> | null;
     canvasActor: ActorRefFrom<any> | null;
-    coordinateActor: ActorRefFrom<any> | null;
     selectionCoordinator: ActorRefFrom<any> | null;
-    editCoordinator: ActorRefFrom<any> | null;
     // viewCoordinator removed - view state now managed directly in TableMachine
     dragCoordinator: ActorRefFrom<any> | null;
-    overlayActor: ActorRefFrom<any> | null;
     rowActors: Map<string, ActorRefFrom<any>>;
   };
   
