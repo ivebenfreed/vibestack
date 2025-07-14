@@ -8,7 +8,6 @@ import {
 } from './VibeGridXCore';
 // PortalCanvasOverlayProvider removed - using embedded canvas approach
 import {
-  createCellClickHandler,
   createCellDoubleClickHandler,
   createColumnClickHandler,
   createKeyboardHandler,
@@ -325,7 +324,10 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // ====================================
   
   // Cell click is now handled by mousedown/mouseup to avoid duplicate events
-  const handleCellClick = createCellClickHandler(refs, tableSend, eventCallbacks);
+  // Cell clicks are now handled by mousedown/mouseup for better drag selection support
+  const handleCellClick = useCallback(() => {
+    // No-op - handled by mousedown/mouseup events
+  }, []);
   const handleCellDoubleClick = createCellDoubleClickHandler(tableSend, eventCallbacks);
   const handleColumnClick = createColumnClickHandler(refs, tableSend);
   const handleKeyDown = createKeyboardHandler(refs, tableSend);
