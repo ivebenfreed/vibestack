@@ -371,6 +371,46 @@ export class DOMStructureManager {
   }
   
   /**
+   * Iterate over cached row elements
+   */
+  forEachRowElement(callback: (element: HTMLElement, rowId: string) => void): void {
+    this.rowElements.forEach(callback);
+  }
+  
+  /**
+   * Iterate over cached cell elements
+   */
+  forEachCellElement(callback: (element: HTMLElement, cellKey: string) => void): void {
+    this.cellElements.forEach(callback);
+  }
+  
+  /**
+   * Remove row element from cache and DOM
+   */
+  removeRowElement(rowId: string): void {
+    const element = this.rowElements.get(rowId);
+    if (element) {
+      element.remove();
+      this.clearRowCache(rowId);
+    }
+  }
+  
+  /**
+   * Set row element in cache
+   */
+  setRowElement(rowId: string, element: HTMLElement): void {
+    this.rowElements.set(rowId, element);
+  }
+  
+  /**
+   * Set cell element in cache
+   */
+  setCellElement(rowId: string, columnId: string, element: HTMLElement): void {
+    const cellKey = `${rowId}:${columnId}`;
+    this.cellElements.set(cellKey, element);
+  }
+  
+  /**
    * Update row element styles
    */
   updateRowStyles(rowId: string, styles: Partial<CSSStyleDeclaration>): void {

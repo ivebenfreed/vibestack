@@ -691,7 +691,7 @@ export class AtomicTableRenderer {
     this.selectedRows = new Set(selectedRows);
     
     // Update all visible row checkboxes and row styles
-    this.rowElements.forEach((rowElement, rowId) => {
+    this.domManager.forEachRowElement((rowElement, rowId) => {
       const isSelected = this.selectedRows.has(rowId);
       
       // Update checkbox
@@ -999,10 +999,9 @@ export class AtomicTableRenderer {
     }
     
     // Clear existing rows that are no longer visible
-    this.rowElements.forEach((element, rowId) => {
+    this.domManager.forEachRowElement((element, rowId) => {
       if (!rowsToRender.find(row => row.id === rowId)) {
-        element.remove();
-        this.rowElements.delete(rowId);
+        this.domManager.removeRowElement(rowId);
       }
     });
     
@@ -1034,7 +1033,7 @@ export class AtomicTableRenderer {
       
       // Register new elements
       newRowElements.forEach(({ element, rowId }) => {
-        this.rowElements.set(rowId, element);
+        this.domManager.setRowElement(rowId, element);
       });
     }
   }
@@ -1064,7 +1063,7 @@ export class AtomicTableRenderer {
       rowElement.className = CSS_CLASSES.ROW;
       rowElement.dataset.rowId = row.id;
       this.domManager.getElement('body').appendChild(rowElement);
-      this.rowElements.set(row.id, rowElement);
+      this.domManager.setRowElement(row.id, rowElement);
     }
     
     // Use optimized update method
@@ -1155,7 +1154,7 @@ export class AtomicTableRenderer {
       cell.appendChild(wrapper);
       fragment.appendChild(cell);
       
-      this.cellElements.set(cellKey, cell);
+      this.domManager.setCellElement(rowId, column.id, cell);
     }
     
     // Add data cells
@@ -1208,7 +1207,7 @@ export class AtomicTableRenderer {
       cell.appendChild(content);
       fragment.appendChild(cell);
       
-      this.cellElements.set(cellKey, cell);
+      this.domManager.setCellElement(rowId, column.id, cell);
     });
     
     // Single DOM insertion
@@ -1690,8 +1689,8 @@ export class AtomicTableRenderer {
       lastRenderTime: this.lastRenderTime,
       visibleRows: this.virtualGrid.getVisibleRange(),
       cacheSize: {
-        rows: this.rowElements.size,
-        cells: this.cellElements.size
+        rows: this.domManager.getCacheMetrics().rowElements,
+        cells: this.domManager.getCacheMetrics().cellElements
       },
       updateQueueSize: this.updateQueue.size
     };
@@ -1794,8 +1793,7 @@ export class AtomicTableRenderer {
       clearTimeout(this.batchTimeoutId);
     }
     
-    this.rowElements.clear();
-    this.cellElements.clear();
+    this.domManager.clearAllCaches();
     this.selectedCells.clear();
     this.updateQueue.clear();
     
