@@ -2,29 +2,23 @@
 // RENDERER EXPORTS
 // ====================================
 
-export { AtomicTableRenderer } from './AtomicTableRenderer';
+export { TableRenderer } from './core/TableRenderer';
 
-// Type alias for compatibility
-export type ModularTableRenderer = AtomicTableRenderer;
 
-// Re-export fast renderers
-export * from './fast-renderers';
+// Re-export cell renderers
+export * from './cell-renderers';
 
 // ====================================
 // RENDERER FACTORY
 // ====================================
 
 import type { RendererOptions } from '../types';
-import { AtomicTableRenderer } from './AtomicTableRenderer';
+import { TableRenderer } from './core/TableRenderer';
 
 /**
- * Create an atomic table renderer
+ * Create a table renderer
  */
-export function createAtomicTableRenderer(options: RendererOptions): AtomicTableRenderer {
-  return new AtomicTableRenderer(options);
+export function createTableRenderer(options: RendererOptions): TableRenderer {
+  return new TableRenderer(options);
 }
 
-/**
- * Alias for createAtomicTableRenderer for backward compatibility
- */
-export const createModularTableRenderer = createAtomicTableRenderer;

@@ -1,10 +1,10 @@
-import type { Column } from '../../types';
+import type { Column } from '../../../types';
 
 /**
  * Fast multi-relationship renderer
  * Optimized for many-to-many relationships (e.g., task.tags -> tag names)
  */
-export function renderRelationshipMulti(
+export function relationshipMulti(
   value: any,
   column: Column,
   rowData?: any

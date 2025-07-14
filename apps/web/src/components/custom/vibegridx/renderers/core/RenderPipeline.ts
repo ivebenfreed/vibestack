@@ -1,26 +1,26 @@
 // ====================================
-// RENDER ORCHESTRATOR
+// RENDER PIPELINE
 // ====================================
 
-import type { RenderState, ViewportInfo } from '../types';
-import type { VirtualGridManager } from './VirtualGridManager';
-import type { ColumnManager } from './ColumnManager';
-import type { DOMStructureManager } from './DOMStructureManager';
-import type { HeaderRenderer } from './HeaderRenderer';
-import type { RowRenderingEngine } from './RowRenderingEngine';
-import type { PerformanceMonitor } from './PerformanceMonitor';
+import type { RenderState, ViewportInfo } from '../../types';
+import type { VirtualScrollManager } from '../managers/VirtualScrollManager';
+import type { ColumnManager } from '../managers/ColumnManager';
+import type { DOMSystem } from '../systems/DOMSystem';
+import type { HeaderEngine } from '../engines/HeaderEngine';
+import type { RowEngine } from '../engines/RowEngine';
+import type { PerformanceSystem } from '../systems/PerformanceSystem';
 
 // ====================================
 // TYPES
 // ====================================
 
-export interface RenderOrchestratorConfig {
-  virtualGrid: VirtualGridManager;
+export interface RenderPipelineConfig {
+  virtualGrid: VirtualScrollManager;
   columnManager: ColumnManager;
-  domManager: DOMStructureManager;
-  headerRenderer: HeaderRenderer;
-  rowRenderingEngine: RowRenderingEngine;
-  performanceMonitor: PerformanceMonitor;
+  domManager: DOMSystem;
+  headerRenderer: HeaderEngine;
+  rowRenderingEngine: RowEngine;
+  performanceMonitor: PerformanceSystem;
   rowHeight: number;
   onScroll?: (viewport: ViewportInfo) => void;
 }
@@ -31,18 +31,18 @@ export interface RenderContext {
 }
 
 // ====================================
-// RENDER ORCHESTRATOR
+// RENDER PIPELINE
 // ====================================
 
 /**
  * Orchestrates the rendering pipeline for the table
  * Manages render timing, viewport updates, and performance monitoring
  */
-export class RenderOrchestrator {
-  private config: RenderOrchestratorConfig;
+export class RenderPipeline {
+  private config: RenderPipelineConfig;
   private isFirstRender = true;
   
-  constructor(config: RenderOrchestratorConfig) {
+  constructor(config: RenderPipelineConfig) {
     this.config = config;
   }
   

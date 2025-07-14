@@ -31,7 +31,7 @@ import {
   useVibeGridXApi
 } from './VibeGridXHooks';
 import type { RenderState, TableRow, CellRef, Column } from './types';
-import type { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
+import type { TableRenderer } from './renderers/core/TableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
 import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
 import { VibeGridXHeader } from './components/VibeGridXHeader';
@@ -190,7 +190,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<AtomicTableRenderer | null>(null);
+  const rendererRef = useRef<TableRenderer | null>(null);
   const canvasOverlayRef = useRef<CanvasOverlay | null>(null);
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
@@ -432,7 +432,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // ====================================
   // 
   // This component is just a container shell. All actual rendering
-  // is handled by AtomicTableRenderer (direct DOM) and CanvasOverlay (Konva).
+  // is handled by TableRenderer (direct DOM) and CanvasOverlay (Konva).
   // No React re-renders needed after initial mount.
   
   // No state watching needed - machine handles all rendering internally
@@ -581,7 +581,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         style={{ width: '100%', height: 'calc(100% - 48px)' }} // Subtract header height
       />
       
-      {/* Canvas overlay handled by embedded approach in AtomicTableRenderer */}
+      {/* Canvas overlay handled by embedded approach in TableRenderer */}
       
       {/* Legacy Canvas Overlay Container - hidden, kept for backward compatibility */}
       <div

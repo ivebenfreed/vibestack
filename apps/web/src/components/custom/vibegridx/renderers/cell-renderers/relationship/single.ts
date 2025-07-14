@@ -1,10 +1,10 @@
-import type { Column } from '../../types';
+import type { Column } from '../../../types';
 
 /**
  * Fast single relationship renderer
  * Optimized for foreign key lookups (e.g., task.projectId -> project.name)
  */
-export function renderRelationshipSingle(
+export function relationshipSingle(
   value: any,
   column: Column,
   rowData?: any

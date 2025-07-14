@@ -52,7 +52,7 @@ const DEFAULT_TARGETS: PerformanceTargets = {
 // PERFORMANCE MONITOR
 // ====================================
 
-export class PerformanceMonitor {
+export class PerformanceSystem {
   private targets: PerformanceTargets;
   private renderHistory: number[] = [];
   private renderStartTime: number = 0;

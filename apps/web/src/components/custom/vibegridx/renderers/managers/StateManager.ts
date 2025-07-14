@@ -8,14 +8,14 @@ import type {
   SortConfig, 
   TableRow,
   RendererOptions 
-} from '../types';
+} from '../../types';
 import type { ColumnManager } from './ColumnManager';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
-import type { DOMStructureManager } from './DOMStructureManager';
-import type { VirtualGridManager } from './VirtualGridManager';
+import type { ColumnDimensionManager } from '../../dimensions/ColumnDimensionManager';
+import type { DOMSystem } from '../systems/DOMSystem';
+import type { VirtualScrollManager } from './VirtualScrollManager';
 import type { SelectionManager } from './SelectionManager';
-import type { HeaderRenderer } from './HeaderRenderer';
-import type { RowRenderingEngine } from './RowRenderingEngine';
+import type { HeaderEngine } from '../engines/HeaderEngine';
+import type { RowEngine } from '../engines/RowEngine';
 import type { PerformanceMonitor } from './PerformanceMonitor';
 import type { RenderOrchestrator } from './RenderOrchestrator';
 
@@ -23,15 +23,15 @@ import type { RenderOrchestrator } from './RenderOrchestrator';
 // TYPES
 // ====================================
 
-export interface RendererStateManagerConfig {
+export interface StateManagerConfig {
   columnManager: ColumnManager;
-  virtualGrid: VirtualGridManager;
+  virtualGrid: VirtualScrollManager;
   selectionManager: SelectionManager;
-  headerRenderer: HeaderRenderer;
-  rowRenderingEngine: RowRenderingEngine;
+  headerRenderer: HeaderEngine;
+  rowRenderingEngine: RowEngine;
   performanceMonitor: PerformanceMonitor;
   renderOrchestrator: RenderOrchestrator;
-  domManager: DOMStructureManager;
+  domManager: DOMSystem;
   options: RendererOptions;
 }
 
@@ -50,8 +50,8 @@ export interface BatchUpdate {
  * Manages renderer state, configuration, and batch updates
  * Handles initialization, sorting, and state synchronization
  */
-export class RendererStateManager {
-  private config: RendererStateManagerConfig;
+export class StateManager {
+  private config: StateManagerConfig;
   private lastRenderState: RenderState | null = null;
   private dimensionManager: ColumnDimensionManager | null = null;
   private canvasInitialized = false;
@@ -60,7 +60,7 @@ export class RendererStateManager {
   private updateQueue = new Set<string>();
   private batchTimeoutId = 0;
   
-  constructor(config: RendererStateManagerConfig) {
+  constructor(config: StateManagerConfig) {
     this.config = config;
     this.dimensionManager = config.options.dimensionManager || null;
   }
@@ -98,7 +98,7 @@ export class RendererStateManager {
       // Direct render without column reconfiguration
       this.renderDirectly(state);
     } catch (error) {
-      console.error('[RendererStateManager] Initialize error:', error);
+      console.error('[StateManager] Initialize error:', error);
     }
   }
   
@@ -108,7 +108,7 @@ export class RendererStateManager {
   initializeCanvasPostRender(): void {
     const canvasContainer = this.config.domManager.getElement('canvasContainer');
     if (canvasContainer && this.config.options.onStateChange && !this.canvasInitialized) {
-      console.log('🔧 RendererStateManager: Emitting canvas.container.ready event post-render');
+      console.log('🔧 StateManager: Emitting canvas.container.ready event post-render');
       this.config.options.onStateChange({
         type: 'canvas.container.ready',
         container: canvasContainer
@@ -143,7 +143,7 @@ export class RendererStateManager {
    * Set column order
    */
   setColumnOrder(order: string[]): void {
-    console.log('[RendererStateManager] Setting column order:', order);
+    console.log('[StateManager] Setting column order:', order);
     this.config.columnManager.setColumnOrder(order);
     this.updateHeaderDimensions();
   }
@@ -157,7 +157,7 @@ export class RendererStateManager {
     // If this is a coordinate manager, sync visible columns
     if (manager && typeof manager.getColumnIds === 'function') {
       const coordinateColumnIds = manager.getColumnIds();
-      console.log('RendererStateManager: Syncing visible columns with coordinate manager', {
+      console.log('StateManager: Syncing visible columns with coordinate manager', {
         coordinateManagerColumns: coordinateColumnIds,
         rendererColumns: this.config.columnManager.getVisibleColumns().map(c => c.id)
       });
@@ -165,7 +165,7 @@ export class RendererStateManager {
       // Update column order to match coordinate manager
       this.config.columnManager.setColumnOrder(coordinateColumnIds);
       
-      console.log('RendererStateManager: Updated visible columns', {
+      console.log('StateManager: Updated visible columns', {
         newVisibleColumns: this.config.columnManager.getVisibleColumns().map(c => c.id)
       });
     }
@@ -173,7 +173,7 @@ export class RendererStateManager {
     // Subscribe to dimension changes
     manager.subscribe?.((event) => {
       // Handle dimension changes - could trigger re-render of affected cells
-      console.log('RendererStateManager: Column dimension changed', event);
+      console.log('StateManager: Column dimension changed', event);
       
       // Re-render header to reflect new widths
       if (this.lastRenderState) {
@@ -210,7 +210,7 @@ export class RendererStateManager {
       // Delegate to render orchestrator
       this.config.renderOrchestrator.render(state);
     } catch (error) {
-      console.error('[RendererStateManager] Render error:', error);
+      console.error('[StateManager] Render error:', error);
     }
   }
   

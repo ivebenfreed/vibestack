@@ -1,5 +1,5 @@
 // Fast relationship renderer for VibeGridX
-import type { Column } from '../../types';
+import type { Column } from '../../../types';
 
 export interface RelationshipData {
   [tableName: string]: {
@@ -13,7 +13,7 @@ export interface RelationshipData {
   };
 }
 
-export function renderRelationship(
+export function relationship(
   value: any,
   column: Column,
   relationshipData?: RelationshipData,

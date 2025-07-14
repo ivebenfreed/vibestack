@@ -2,7 +2,7 @@
 // VIBEGRIDX RENDERER ACTOR
 // ====================================
 //
-// XState callback actor that wraps the AtomicTableRenderer
+// XState callback actor that wraps the TableRenderer
 // for proper actor model integration. Handles DOM rendering
 // lifecycle and reports back actual rendered state.
 //
@@ -12,7 +12,7 @@
 // ====================================
 
 import { fromCallback } from 'xstate';
-import type { AtomicTableRenderer } from '../renderers/AtomicTableRenderer';
+import type { TableRenderer } from '../renderers/core/TableRenderer';
 import type { RenderState, RendererOptions, ViewportInfo } from '../types';
 
 // ====================================
@@ -42,7 +42,7 @@ export type RendererActorResponse =
 // ====================================
 
 export const rendererActor = fromCallback<RendererActorEvent, RendererActorResponse>(({ sendBack, receive }) => {
-  let renderer: AtomicTableRenderer | null = null;
+  let renderer: TableRenderer | null = null;
   let renderState: RenderState | null = null;
   let isInitializing = false;
   let isInitialized = false;
@@ -72,15 +72,15 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           isInitializing = true;
           
-          // Import AtomicTableRenderer dynamically to avoid circular imports
-          import('../renderers/AtomicTableRenderer').then(({ AtomicTableRenderer }) => {
+          // Import TableRenderer dynamically to avoid circular imports
+          import('../renderers/core/TableRenderer').then(({ TableRenderer }) => {
             // Merge stored options from window with event options
             const storedOptions = (window as any).__vibegridx_renderer_options || {};
             const mergedOptions = {
               ...storedOptions,
               ...event.options,
               onStateChange: (state: any) => {
-                console.log('RendererActor: Received state change from AtomicTableRenderer:', state);
+                console.log('RendererActor: Received state change from TableRenderer:', state);
                 
                 // Handle canvas container ready event
                 if (state.type === 'canvas.container.ready') {
@@ -134,7 +134,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               } : null
             });
             
-            renderer = new AtomicTableRenderer(mergedOptions);
+            renderer = new TableRenderer(mergedOptions);
             isInitializing = false;
             isInitialized = true;
             

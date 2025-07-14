@@ -1,4 +1,4 @@
-import type { CellRef, TableRow } from '../types';
+import type { CellRef, TableRow } from '../../types';
 
 // ====================================
 // SELECTION MANAGER
@@ -18,7 +18,7 @@ interface SelectionState {
 
 /**
  * Manages cell and row selection state and visual updates
- * Extracted from AtomicTableRenderer for better separation of concerns
+ * Extracted from TableRenderer for better separation of concerns
  */
 export class SelectionManager {
   private selectedCells = new Set<string>();

@@ -1,10 +1,10 @@
-import type { Column } from '../../types';
+import type { Column } from '../types';
 
 /**
  * Fast text rendering function for table cells
  * Handles strings, objects (as JSON), and null/undefined values
  */
-export function renderText(value: any, column: Column): string {
+export function text(value: any, column: Column): string {
   if (value === null || value === undefined) return '';
   
   if (typeof value === 'object') {

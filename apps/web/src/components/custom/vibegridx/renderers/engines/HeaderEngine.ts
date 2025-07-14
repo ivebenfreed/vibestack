@@ -2,18 +2,18 @@
 // HEADER RENDERER
 // ====================================
 
-import type { Column, RenderState, SortConfig } from '../types';
-import type { ColumnManager } from './ColumnManager';
-import type { DOMStructureManager } from './DOMStructureManager';
-import type { SelectionManager } from './SelectionManager';
+import type { Column, RenderState, SortConfig } from '../../types';
+import type { ColumnManager } from '../managers/ColumnManager';
+import type { DOMSystem } from '../systems/DOMSystem';
+import type { SelectionManager } from '../managers/SelectionManager';
 
 // ====================================
 // TYPES
 // ====================================
 
-export interface HeaderRendererConfig {
+export interface HeaderEngineConfig {
   columnManager: ColumnManager;
-  domManager: DOMStructureManager;
+  domManager: DOMSystem;
   selectionManager: SelectionManager;
   enableSelectionColumn: boolean;
   getTotalColumnsWidth: () => number;
@@ -38,10 +38,10 @@ export interface HeaderRenderMetrics {
 // HEADER RENDERER
 // ====================================
 
-export class HeaderRenderer {
-  private config: HeaderRendererConfig;
+export class HeaderEngine {
+  private config: HeaderEngineConfig;
   
-  constructor(config: HeaderRendererConfig) {
+  constructor(config: HeaderEngineConfig) {
     this.config = config;
   }
   

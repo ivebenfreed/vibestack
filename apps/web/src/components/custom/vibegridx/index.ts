@@ -51,7 +51,7 @@ export { rowActorMachine } from './machines/row-actor';
 // HYBRID RENDERING
 // ====================================
 
-export { AtomicTableRenderer } from './renderers/AtomicTableRenderer';
+export { TableRenderer } from './renderers';
 
 // Entity integration removed - table machine now subscribes directly to atoms
 

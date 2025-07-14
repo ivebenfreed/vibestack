@@ -2,7 +2,7 @@
 // EVENT DELEGATION SYSTEM
 // ====================================
 
-import { ViewportInfo } from '../types';
+import { ViewportInfo } from '../../types';
 
 // ====================================
 // TYPES
@@ -21,9 +21,9 @@ export interface EventCallbacks {
   onScroll?: (viewport: ViewportInfo) => void;
 }
 
-export interface EventDelegationSystemConfig {
-  domManager: any; // DOMStructureManager
-  virtualGrid: any; // VirtualGridManager
+export interface EventSystemConfig {
+  domManager: any; // DOMSystem
+  virtualGrid: any; // VirtualScrollManager
   columnManager: any; // ColumnManager
   callbacks: EventCallbacks;
 }
@@ -45,8 +45,8 @@ const CSS_CLASSES = {
 // EVENT DELEGATION SYSTEM
 // ====================================
 
-export class EventDelegationSystem {
-  private config: EventDelegationSystemConfig;
+export class EventSystem {
+  private config: EventSystemConfig;
   private isScrolling = false;
   private isResizing = false;
   
@@ -69,7 +69,7 @@ export class EventDelegationSystem {
   private boundHandleDragEnd: (event: MouseEvent) => void;
   private boundHandleScroll: () => void;
 
-  constructor(config: EventDelegationSystemConfig) {
+  constructor(config: EventSystemConfig) {
     this.config = config;
     
     // Bind handlers for cleanup
@@ -149,7 +149,7 @@ export class EventDelegationSystem {
       const viewportWidth = viewport.clientWidth;
       const scrollLeft = viewport.scrollLeft;
 
-      // Use VirtualGridManager to calculate viewport
+      // Use VirtualScrollManager to calculate viewport
       const newViewport = virtualGrid.calculateViewportFromScroll(
         scrollTop,
         viewportHeight,

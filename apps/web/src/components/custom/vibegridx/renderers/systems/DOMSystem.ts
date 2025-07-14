@@ -1,4 +1,4 @@
-import type { Column } from '../types';
+import type { Column } from '../../types';
 
 // ====================================
 // DOM STRUCTURE MANAGER
@@ -28,9 +28,9 @@ interface DOMElements {
 
 /**
  * Manages DOM structure creation and element management
- * Extracted from AtomicTableRenderer for better separation of concerns
+ * Extracted from TableRenderer for better separation of concerns
  */
-export class DOMStructureManager {
+export class DOMSystem {
   private elements: DOMElements;
   private rowElements = new Map<string, HTMLElement>();
   private cellElements = new Map<string, HTMLElement>(); // "rowId:columnId" -> element
@@ -43,7 +43,7 @@ export class DOMStructureManager {
    * Initialize the complete DOM structure
    */
   private initializeDOM(container: HTMLElement): DOMElements {
-    console.log('🔧 DOMStructureManager: Starting DOM initialization');
+    console.log('🔧 DOMSystem: Starting DOM initialization');
     
     // Clear and setup container
     container.innerHTML = '';
@@ -115,7 +115,7 @@ export class DOMStructureManager {
     table.appendChild(viewport);
     container.appendChild(table);
     
-    console.log('🔧 DOMStructureManager: DOM initialization complete');
+    console.log('🔧 DOMSystem: DOM initialization complete');
     
     return {
       container,

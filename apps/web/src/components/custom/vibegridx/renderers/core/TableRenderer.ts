@@ -7,19 +7,19 @@ import type {
   ViewportInfo,
   OptimisticOperation,
   SortConfig 
-} from '../types';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
-import { CellRenderingPipeline } from './CellRenderingPipeline';
-import { VirtualGridManager } from './VirtualGridManager';
-import { ColumnManager } from './ColumnManager';
-import { DOMStructureManager } from './DOMStructureManager';
-import { SelectionManager } from './SelectionManager';
-import { EventDelegationSystem, type EventCallbacks } from './EventDelegationSystem';
-import { RowRenderingEngine } from './RowRenderingEngine';
-import { HeaderRenderer } from './HeaderRenderer';
-import { PerformanceMonitor } from './PerformanceMonitor';
-import { RenderOrchestrator } from './RenderOrchestrator';
-import { RendererStateManager } from './RendererStateManager';
+} from '../../types';
+import type { ColumnDimensionManager } from '../../dimensions/ColumnDimensionManager';
+import { CellPipeline } from '../engines/CellPipeline';
+import { VirtualScrollManager } from '../managers/VirtualScrollManager';
+import { ColumnManager } from '../managers/ColumnManager';
+import { DOMSystem } from '../systems/DOMSystem';
+import { SelectionManager } from '../managers/SelectionManager';
+import { EventSystem, type EventCallbacks } from '../systems/EventSystem';
+import { RowEngine } from '../engines/RowEngine';
+import { HeaderEngine } from '../engines/HeaderEngine';
+import { PerformanceSystem } from '../systems/PerformanceSystem';
+import { RenderPipeline } from './RenderPipeline';
+import { StateManager } from '../managers/StateManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -48,20 +48,20 @@ const CSS_CLASSES = {
 // This provides better type safety, extensibility, and consistent formatting
 
 // ====================================
-// ATOMIC TABLE RENDERER
+// TABLE RENDERER
 // ====================================
 
-export class AtomicTableRenderer {
-  private virtualGrid: VirtualGridManager;
+export class TableRenderer {
+  private virtualGrid: VirtualScrollManager;
   private columnManager: ColumnManager;
-  private domManager: DOMStructureManager;
+  private domManager: DOMSystem;
   private selectionManager: SelectionManager;
-  private eventSystem: EventDelegationSystem;
-  private rowRenderingEngine: RowRenderingEngine;
-  private headerRenderer: HeaderRenderer;
-  private performanceMonitor: PerformanceMonitor;
-  private renderOrchestrator: RenderOrchestrator;
-  private stateManager: RendererStateManager;
+  private eventSystem: EventSystem;
+  private rowRenderingEngine: RowEngine;
+  private headerRenderer: HeaderEngine;
+  private performanceMonitor: PerformanceSystem;
+  private renderOrchestrator: RenderPipeline;
+  private stateManager: StateManager;
   private options: RendererOptions;
   
   // State tracking
@@ -85,7 +85,7 @@ export class AtomicTableRenderer {
       columnWidths: options.columnWidths
     });
     
-    this.domManager = new DOMStructureManager(options.container);
+    this.domManager = new DOMSystem(options.container);
     
     // Initialize selection manager with DOM dependencies
     this.selectionManager = new SelectionManager({
@@ -110,7 +110,7 @@ export class AtomicTableRenderer {
       itemHeight: this.rowHeight
     };
     
-    this.virtualGrid = new VirtualGridManager(initialViewport);
+    this.virtualGrid = new VirtualScrollManager(initialViewport);
     
     // Initialize event delegation system
     const eventCallbacks: EventCallbacks = {
@@ -135,7 +135,7 @@ export class AtomicTableRenderer {
       }
     };
 
-    this.eventSystem = new EventDelegationSystem({
+    this.eventSystem = new EventSystem({
       domManager: this.domManager,
       virtualGrid: this.virtualGrid,
       columnManager: this.columnManager,
@@ -143,7 +143,7 @@ export class AtomicTableRenderer {
     });
     
     // Initialize row rendering engine
-    this.rowRenderingEngine = new RowRenderingEngine({
+    this.rowRenderingEngine = new RowEngine({
       virtualGrid: this.virtualGrid,
       columnManager: this.columnManager,
       domManager: this.domManager,
@@ -153,7 +153,7 @@ export class AtomicTableRenderer {
     });
     
     // Initialize header renderer
-    this.headerRenderer = new HeaderRenderer({
+    this.headerRenderer = new HeaderEngine({
       columnManager: this.columnManager,
       domManager: this.domManager,
       selectionManager: this.selectionManager,
@@ -162,7 +162,7 @@ export class AtomicTableRenderer {
     });
     
     // Initialize performance monitor
-    this.performanceMonitor = new PerformanceMonitor(
+    this.performanceMonitor = new PerformanceSystem(
       {
         initialRender: RENDER_TARGETS.INITIAL_RENDER,
         cellUpdate: RENDER_TARGETS.CELL_UPDATE,
@@ -183,7 +183,7 @@ export class AtomicTableRenderer {
     );
     
     // Initialize render orchestrator
-    this.renderOrchestrator = new RenderOrchestrator({
+    this.renderOrchestrator = new RenderPipeline({
       virtualGrid: this.virtualGrid,
       columnManager: this.columnManager,
       domManager: this.domManager,
@@ -195,7 +195,7 @@ export class AtomicTableRenderer {
     });
     
     // Initialize state manager
-    this.stateManager = new RendererStateManager({
+    this.stateManager = new StateManager({
       columnManager: this.columnManager,
       virtualGrid: this.virtualGrid,
       selectionManager: this.selectionManager,
@@ -452,7 +452,7 @@ export class AtomicTableRenderer {
   // ====================================
   
   private renderValueFast(value: any, column: Column, rowData?: any): string {
-    return CellRenderingPipeline.renderValue(value, column, rowData);
+    return CellPipeline.renderValue(value, column, rowData);
   }
 
   // ====================================

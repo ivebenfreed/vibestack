@@ -1,4 +1,4 @@
-import type { ViewportInfo } from '../types';
+import type { ViewportInfo } from '../../types';
 
 // ====================================
 // VIRTUAL GRID MANAGER
@@ -6,9 +6,9 @@ import type { ViewportInfo } from '../types';
 
 /**
  * Manages virtual scrolling calculations and viewport state
- * Extracted from AtomicTableRenderer for better separation of concerns
+ * Extracted from TableRenderer for better separation of concerns
  */
-export class VirtualGridManager {
+export class VirtualScrollManager {
   private viewport: ViewportInfo;
   private totalRows: number;
   private rowHeight: number;

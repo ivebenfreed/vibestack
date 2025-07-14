@@ -1,10 +1,10 @@
-import type { Column } from '../../types';
+import type { Column } from '../types';
 
 /**
  * Fast date rendering function for table cells
  * Converts dates to locale-specific date strings
  */
-export function renderDate(value: any, column: Column): string {
+export function date(value: any, column: Column): string {
   if (value === null || value === undefined) return '';
   
   try {

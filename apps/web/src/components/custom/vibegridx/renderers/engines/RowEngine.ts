@@ -2,12 +2,12 @@
 // ROW RENDERING ENGINE
 // ====================================
 
-import type { TableRow, Column, RenderState, OptimisticOperation } from '../types';
-import { CellRenderingPipeline } from './CellRenderingPipeline';
-import type { VirtualGridManager } from './VirtualGridManager';
-import type { ColumnManager } from './ColumnManager';
-import type { DOMStructureManager } from './DOMStructureManager';
-import type { SelectionManager } from './SelectionManager';
+import type { TableRow, Column, RenderState, OptimisticOperation } from '../../types';
+import { CellPipeline } from './CellPipeline';
+import type { VirtualScrollManager } from '../managers/VirtualScrollManager';
+import type { ColumnManager } from '../managers/ColumnManager';
+import type { DOMSystem } from '../systems/DOMSystem';
+import type { SelectionManager } from '../managers/SelectionManager';
 
 // ====================================
 // CONSTANTS
@@ -26,10 +26,10 @@ const CSS_CLASSES = {
 // TYPES
 // ====================================
 
-export interface RowRenderingEngineConfig {
-  virtualGrid: VirtualGridManager;
+export interface RowEngineConfig {
+  virtualGrid: VirtualScrollManager;
   columnManager: ColumnManager;
-  domManager: DOMStructureManager;
+  domManager: DOMSystem;
   selectionManager: SelectionManager;
   rowHeight: number;
   enableSelectionColumn: boolean;
@@ -45,11 +45,11 @@ export interface RowRenderMetrics {
 // ROW RENDERING ENGINE
 // ====================================
 
-export class RowRenderingEngine {
-  private config: RowRenderingEngineConfig;
+export class RowEngine {
+  private config: RowEngineConfig;
   private lastDimensions = { height: 0, width: 0 };
   
-  constructor(config: RowRenderingEngineConfig) {
+  constructor(config: RowEngineConfig) {
     this.config = config;
   }
   
@@ -64,7 +64,7 @@ export class RowRenderingEngine {
     const startTime = performance.now();
     
     const visibleRange = this.config.virtualGrid.getVisibleRange();
-    console.log('🎨 RowRenderingEngine: renderVisibleRows', {
+    console.log('🎨 RowEngine: renderVisibleRows', {
       visibleRange,
       stateRowsLength: state.rows.length,
       sliceResult: state.rows.slice(visibleRange.start, visibleRange.end).length
@@ -116,7 +116,7 @@ export class RowRenderingEngine {
     
     const duration = performance.now() - startTime;
     if (duration > 0.5 * 10) { // Warn if row update is slow
-      console.log(`RowRenderingEngine: Slow row update ${row.id} took ${duration.toFixed(2)}ms`);
+      console.log(`RowEngine: Slow row update ${row.id} took ${duration.toFixed(2)}ms`);
     }
   }
   
@@ -136,7 +136,7 @@ export class RowRenderingEngine {
     
     const duration = performance.now() - startTime;
     if (duration > 0.5 * rows.length) { // Warn if updates are slow
-      console.log(`RowRenderingEngine: Slow batch update - ${rows.length} rows took ${duration.toFixed(2)}ms`);
+      console.log(`RowEngine: Slow batch update - ${rows.length} rows took ${duration.toFixed(2)}ms`);
     }
   }
   
@@ -373,8 +373,8 @@ export class RowRenderingEngine {
       overflow: 'hidden'
     });
     
-    // Create content using CellRenderingPipeline
-    const content = CellRenderingPipeline.createCellContent(value, column, row.data);
+    // Create content using CellPipeline
+    const content = CellPipeline.createCellContent(value, column, row.data);
     cell.appendChild(content);
     
     this.config.domManager.setCellElement(row.id, column.id, cell);

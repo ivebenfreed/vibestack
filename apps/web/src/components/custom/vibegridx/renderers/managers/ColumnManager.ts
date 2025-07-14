@@ -1,4 +1,4 @@
-import type { Column } from '../types';
+import type { Column } from '../../types';
 
 // ====================================
 // COLUMN MANAGER
@@ -6,7 +6,7 @@ import type { Column } from '../types';
 
 /**
  * Manages column configuration, visibility, ordering, and widths
- * Extracted from AtomicTableRenderer for better separation of concerns
+ * Provides centralized column state management
  */
 export class ColumnManager {
   private columns: Column[] = [];

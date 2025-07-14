@@ -1,13 +1,13 @@
-import type { Column } from '../types';
+import type { Column } from '../../types';
 import { 
-  renderText, 
-  renderNumber, 
-  renderDate, 
-  renderBoolean, 
-  renderEnum,
-  renderRelationshipSingle,
-  renderRelationshipMulti,
-} from './fast-renderers';
+  text, 
+  number, 
+  date, 
+  boolean, 
+  enumValue,
+  relationshipSingle,
+  relationshipMulti,
+} from '../cell-renderers';
 
 // ====================================
 // CELL RENDERING PIPELINE
@@ -17,21 +17,21 @@ import {
  * High-performance cell rendering pipeline
  * Centralizes all cell value rendering logic
  */
-export class CellRenderingPipeline {
+export class CellPipeline {
   // Map of renderers for quick lookup
   private static readonly renderers: Record<string, (value: any, column: Column, relationshipData?: any) => string> = {
-    text: renderText,
-    number: renderNumber,
-    date: renderDate,
-    boolean: renderBoolean,
-    enum: renderEnum,
-    select: renderText, // Reuse text renderer for select
-    uuid: renderText, // UUID is text-based
-    json: renderText, // JSON displayed as text (could be enhanced later)
-    relationship: renderRelationshipSingle, // Default to single
-    'relationship-single': renderRelationshipSingle,
-    'relationship-multi': renderRelationshipMulti,
-    'relationship-collection': renderRelationshipMulti, // Collections use multi renderer
+    text: text,
+    number: number,
+    date: date,
+    boolean: boolean,
+    enum: enumValue,
+    select: text, // Reuse text renderer for select
+    uuid: text, // UUID is text-based
+    json: text, // JSON displayed as text (could be enhanced later)
+    relationship: relationshipSingle, // Default to single
+    'relationship-single': relationshipSingle,
+    'relationship-multi': relationshipMulti,
+    'relationship-collection': relationshipMulti, // Collections use multi renderer
   };
 
   /**
@@ -44,7 +44,7 @@ export class CellRenderingPipeline {
   static renderValue(value: any, column: Column, rowData?: any): string {
     // Check column cellType first, then fall back to type
     const cellType = column.cellType || column.type;
-    const renderer = CellRenderingPipeline.renderers[cellType] || renderText;
+    const renderer = CellPipeline.renderers[cellType] || text;
     
     // For relationship types, pass row data for pre-resolved values
     if (cellType?.startsWith('relationship')) {
@@ -92,7 +92,7 @@ export class CellRenderingPipeline {
    * @returns The renderer function or default text renderer
    */
   static getRenderer(columnType: string): (value: any, column: Column, relationshipData?: any) => string {
-    return CellRenderingPipeline.renderers[columnType] || renderText;
+    return CellPipeline.renderers[columnType] || text;
   }
 
   /**
@@ -104,6 +104,6 @@ export class CellRenderingPipeline {
     columnType: string, 
     renderer: (value: any, column: Column, relationshipData?: any) => string
   ): void {
-    CellRenderingPipeline.renderers[columnType] = renderer;
+    CellPipeline.renderers[columnType] = renderer;
   }
 }
