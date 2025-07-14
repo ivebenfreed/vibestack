@@ -15,6 +15,7 @@ import { ColumnManager } from './ColumnManager';
 import { DOMStructureManager } from './DOMStructureManager';
 import { SelectionManager } from './SelectionManager';
 import { EventDelegationSystem, type EventCallbacks } from './EventDelegationSystem';
+import { RowRenderingEngine } from './RowRenderingEngine';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -52,6 +53,7 @@ export class AtomicTableRenderer {
   private domManager: DOMStructureManager;
   private selectionManager: SelectionManager;
   private eventSystem: EventDelegationSystem;
+  private rowRenderingEngine: RowRenderingEngine;
   private options: RendererOptions;
   
   // Performance tracking
@@ -132,7 +134,7 @@ export class AtomicTableRenderer {
         if (this.lastRenderState) {
           const hasViewportChanged = this.virtualGrid.updateViewport(viewport, this.lastRenderState.rows.length);
           if (hasViewportChanged) {
-            this.renderVisibleRows(this.lastRenderState);
+            this.rowRenderingEngine.renderVisibleRows(this.lastRenderState);
           }
         }
         options.onScroll?.(viewport);
@@ -144,6 +146,16 @@ export class AtomicTableRenderer {
       virtualGrid: this.virtualGrid,
       columnManager: this.columnManager,
       callbacks: eventCallbacks
+    });
+    
+    // Initialize row rendering engine
+    this.rowRenderingEngine = new RowRenderingEngine({
+      virtualGrid: this.virtualGrid,
+      columnManager: this.columnManager,
+      domManager: this.domManager,
+      selectionManager: this.selectionManager,
+      rowHeight: this.rowHeight,
+      enableSelectionColumn: options.enableSelectionColumn || false
     });
     
     // Event handlers now managed by EventDelegationSystem
@@ -229,8 +241,8 @@ export class AtomicTableRenderer {
       // Use requestAnimationFrame to defer dimension reading until after browser paint
       requestAnimationFrame(() => {
         this.updateViewport(state);
-        this.renderVisibleRows(state);
-        this.applyOptimisticOperations(state.optimisticOperations);
+        this.rowRenderingEngine.renderVisibleRows(state);
+        this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
       });
     } catch (error) {
       console.error('[AtomicTableRenderer] Render error:', error);
@@ -262,7 +274,7 @@ export class AtomicTableRenderer {
       if (this.lastRenderState) {
         this.renderHeader(this.lastRenderState);
         // Also re-render visible rows to update cell positions
-        this.renderVisibleRows(this.lastRenderState);
+        this.rowRenderingEngine.renderVisibleRows(this.lastRenderState);
       }
     }
   }
@@ -495,13 +507,13 @@ export class AtomicTableRenderer {
         // STEP 3: Render visible rows
         console.log('🎨 AtomicTableRenderer: About to render visible rows synchronously');
         const rowsStart = performance.now();
-        this.renderVisibleRows(state);
+        const metrics = this.rowRenderingEngine.renderVisibleRows(state);
         const rowsTime = performance.now() - rowsStart;
-        console.log('🎨 AtomicTableRenderer: Visible rows rendered synchronously');
+        console.log('🎨 AtomicTableRenderer: Visible rows rendered synchronously', metrics);
         
         // STEP 4: Apply optimistic operations
         const optimisticStart = performance.now();
-        this.applyOptimisticOperations(state.optimisticOperations);
+        this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
         const optimisticTime = performance.now() - optimisticStart;
         
         
@@ -547,8 +559,8 @@ export class AtomicTableRenderer {
         requestAnimationFrame(() => {
           // Batch all operations in single frame for better performance
           this.updateViewport(state);
-          this.renderVisibleRows(state);
-          this.applyOptimisticOperations(state.optimisticOperations);
+          this.rowRenderingEngine.renderVisibleRows(state);
+          this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
           
           
           // Performance timing
@@ -602,41 +614,12 @@ export class AtomicTableRenderer {
 
   // NEW: Update a single row without full table re-render
   updateRow(row: TableRow): void {
-    const rowElement = this.domManager.getRowElement(row.id);
-    if (!rowElement) {
-      return;
-    }
-    
-    const startTime = performance.now();
-    
-    // Update row content
-    this.renderRowCells(row, rowElement);
-    
-    // Update row state
-    rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
-    
-    const duration = performance.now() - startTime;
-    if (duration > RENDER_TARGETS.CELL_UPDATE * 10) { // Warn if row update is slow
-      console.log(`AtomicTableRenderer: Slow row update ${row.id} took ${duration.toFixed(2)}ms`);
-    }
+    this.rowRenderingEngine.updateRow(row, this.lastRenderState);
   }
 
   // NEW: Update multiple rows (but not the entire table)
   updateRows(rows: TableRow[]): void {
-    const startTime = performance.now();
-    
-    rows.forEach(row => {
-      const rowElement = this.domManager.getRowElement(row.id);
-      if (rowElement) {
-        this.renderRowCells(row, rowElement);
-        rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
-      }
-    });
-    
-    const duration = performance.now() - startTime;
-    if (duration > RENDER_TARGETS.CELL_UPDATE * rows.length) { // Warn if updates are slow
-      console.log(`AtomicTableRenderer: Slow batch update - ${rows.length} rows took ${duration.toFixed(2)}ms`);
-    }
+    this.rowRenderingEngine.updateRows(rows, this.lastRenderState);
   }
   
   setEditingCell(cellRef: CellRef | null): void {
@@ -933,293 +916,17 @@ export class AtomicTableRenderer {
     
   }
   
-  private renderVisibleRows(state: RenderState): void {
-    const visibleRange = this.virtualGrid.getVisibleRange();
-    console.log('🎨 AtomicTableRenderer: renderVisibleRows', {
-      visibleRange,
-      stateRowsLength: state.rows.length,
-      sliceResult: state.rows.slice(visibleRange.start, visibleRange.end).length
-    });
-    const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
-    
-    
-    // Calculate dimensions
-    const totalHeight = this.virtualGrid.getTotalHeight();
-    const totalWidth = this.getTotalColumnsWidth();
-    
-    // PERFORMANCE FIX: Batch DOM style updates and remove nested RAF
-    // Set virtual dimensions and viewport overflow together
-    this.domManager.getElement('body').style.height = `${totalHeight}px`;
-    this.domManager.getElement('body').style.width = `${totalWidth}px`;
-    
-    // Synchronously handle viewport overflow (no need for RAF)
-    const maxScroll = totalHeight - this.domManager.getElement('viewport').clientHeight;
-    if (maxScroll > 0) {
-      this.domManager.getElement('viewport').style.overflowY = 'scroll';
-    }
-    
-    // Only log when dimensions actually change
-    if (totalHeight !== this.lastDimensions.height || totalWidth !== this.lastDimensions.width) {
-      // PERFORMANCE: Removed expensive console.log
-      this.lastDimensions = { height: totalHeight, width: totalWidth };
-    }
-    
-    // Canvas overlay is already created in initializeDOM, no need to update its size
-    // It will use viewport-based sizing instead of full scrollable area
-    
-    // PERFORMANCE DEBUG: Check if we have a fallback that's causing all rows to render
-    let rowsToRender = visibleRows;
-    if (visibleRows.length === 0 && state.rows.length > 0) {
-      console.warn('PERFORMANCE ISSUE: visibleRows is empty! This will cause no rows to render.');
-      console.warn('Total rows in state:', state.rows.length);
-      console.warn('Visible range:', visibleRange);
-      console.warn('VirtualGrid metrics:', this.virtualGrid.getMetrics());
-      console.warn('Using fallback to render first 20 rows to prevent blank grid');
-      
-      // Emergency fallback to prevent blank grid
-      rowsToRender = state.rows.slice(0, Math.min(20, state.rows.length));
-      console.warn('Fallback rows count:', rowsToRender.length);
-    }
-    
-    // Clear existing rows that are no longer visible
-    this.domManager.forEachRowElement((element, rowId) => {
-      if (!rowsToRender.find(row => row.id === rowId)) {
-        this.domManager.removeRowElement(rowId);
-      }
-    });
-    
-    // PERFORMANCE FIX: Batch new row creation to reduce DOM manipulation
-    const fragment = document.createDocumentFragment();
-    const newRowElements: Array<{ element: HTMLElement; rowId: string }> = [];
-    
-    // Pre-create new rows in fragment (batched DOM insertion)
-    rowsToRender.forEach((row, index) => {
-      const absoluteIndex = visibleRange.start + index;
-      
-      
-      let rowElement = this.domManager.getRowElement(row.id);
-      if (!rowElement) {
-        rowElement = document.createElement('div');
-        rowElement.className = CSS_CLASSES.ROW;
-        rowElement.dataset.rowId = row.id;
-        newRowElements.push({ element: rowElement, rowId: row.id });
-        fragment.appendChild(rowElement);
-      }
-      
-      // Position and update row content
-      this.updateRowElement(row, rowElement, absoluteIndex);
-    });
-    
-    // Single DOM append for all new rows
-    if (newRowElements.length > 0) {
-      this.domManager.getElement('body').appendChild(fragment);
-      
-      // Register new elements
-      newRowElements.forEach(({ element, rowId }) => {
-        this.domManager.setRowElement(rowId, element);
-      });
-    }
-  }
+  // Row rendering is now handled by RowRenderingEngine
   
-  private updateRowElement(row: TableRow, rowElement: HTMLElement, index: number): void {
-    // Position row
-    const top = this.virtualGrid.getRowTop(index);
-    rowElement.style.position = 'absolute';
-    rowElement.style.top = `${top}px`;
-    rowElement.style.left = '0px';
-    
-    // Calculate total width from columns
-    const totalWidth = this.getTotalColumnsWidth();
-    rowElement.style.width = `${totalWidth}px`;
-    rowElement.style.height = `${this.virtualGrid.getRowHeight()}px`;
-    
-    
-    // Update row content
-    this.renderRowCells(row, rowElement);
-  }
+  // Individual row rendering methods removed - now handled by RowRenderingEngine
   
-  private renderRow(row: TableRow, index: number): void {
-    let rowElement = this.domManager.getRowElement(row.id);
-    
-    if (!rowElement) {
-      rowElement = document.createElement('div');
-      rowElement.className = CSS_CLASSES.ROW;
-      rowElement.dataset.rowId = row.id;
-      this.domManager.getElement('body').appendChild(rowElement);
-      this.domManager.setRowElement(row.id, rowElement);
-    }
-    
-    // Use optimized update method
-    this.updateRowElement(row, rowElement, index);
-    
-    // Apply row state styling
-    rowElement.style.borderBottom = '1px solid var(--border)';
-    rowElement.style.boxSizing = 'border-box';
-    rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
-  }
-  
-  private renderRowCells(row: TableRow, rowElement: HTMLElement): void {
-    // PERFORMANCE FIX: Use DOM elements instead of innerHTML for massive performance boost
-    
-    
-    // IMPORTANT: Use columns from render state if available to ensure correct order
-    const stateColumns = this.lastRenderState?.columns;
-    const columnsToRender = stateColumns && stateColumns.length > 0
-      ? stateColumns.filter(col => col.id !== '__selection')
-      : this.columnManager.getVisibleColumns().length > 0 
-        ? this.columnManager.getDataColumns()
-        : Object.keys(row.data).map(key => ({
-            id: key,
-            name: key,
-            field: key,
-            type: 'text' as const,
-            width: 120
-          }));
-    
-    
-    // Clear existing content efficiently
-    rowElement.textContent = '';
-    
-    // Create document fragment for batched insertion
-    const fragment = document.createDocumentFragment();
-    
-    // Add selection checkbox cell (always included)
-    {
-      const cellKey = `${row.id}:__selection`;
-      const isRowSelected = this.selectionManager.isRowSelected(row.id);
-      
-      const cell = document.createElement('div');
-      cell.className = 'vibegridx-cell vibegridx-selection-cell';
-      cell.setAttribute('data-row-id', row.id);
-      cell.setAttribute('data-column-id', '__selection');
-      cell.setAttribute('data-cell-key', cellKey);
-      cell.setAttribute('role', 'gridcell');
-      
-      // Style selection cell
-      Object.assign(cell.style, {
-        position: 'absolute',
-        left: '0',
-        width: '48px',
-        height: `${this.rowHeight}px`,
-        borderRight: '1px solid var(--border)',
-        boxSizing: 'border-box',
-        overflow: 'hidden',
-        zIndex: '5',
-        background: 'var(--background)'
-      });
-      
-      // Create checkbox wrapper
-      const wrapper = document.createElement('div');
-      Object.assign(wrapper.style, {
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      });
-      
-      const label = document.createElement('label');
-      label.className = 'vibegridx-checkbox-wrapper';
-      label.setAttribute('data-row-id', row.id);
-      
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'vibegridx-row-checkbox';
-      checkbox.setAttribute('data-row-id', row.id);
-      checkbox.checked = isRowSelected;
-      
-      const span = document.createElement('span');
-      span.className = 'vibegridx-checkbox-custom';
-      
-      label.appendChild(checkbox);
-      label.appendChild(span);
-      wrapper.appendChild(label);
-      cell.appendChild(wrapper);
-      fragment.appendChild(cell);
-      
-      this.domManager.setCellElement(row.id, '__selection', cell);
-    }
-    
-    // Add data cells
-    columnsToRender.forEach((column, index) => {
-      const cellKey = `${row.id}:${column.id}`;
-      const value = row.data[column.field || column.id];
-      const width = this.columnManager.getColumnWidth(column.id);
-      
-      // Calculate offset based on columns being rendered, not internal state
-      let calculatedOffset = 48; // Start after selection column
-      for (let i = 0; i < index; i++) {
-        const prevColumn = columnsToRender[i];
-        const prevWidth = this.columnManager.getColumnWidth(prevColumn.id);
-        calculatedOffset += prevWidth;
-      }
-      const xOffset = calculatedOffset;
-      
-      
-      
-      // Create cell element
-      const cell = document.createElement('div');
-      cell.className = CSS_CLASSES.CELL;
-      cell.setAttribute('data-row-id', row.id);
-      cell.setAttribute('data-column-id', column.id);
-      cell.setAttribute('data-cell-key', cellKey);
-      cell.setAttribute('role', 'gridcell');
-      
-      // Apply state classes
-      const isSelected = this.selectionManager.isCellSelected(row.id, column.id);
-      const isEditing = this.selectionManager.isCellEditing(row.id, column.id);
-      const isDirty = row.metadata.isDirty || false;
-      
-      if (isSelected) cell.classList.add(CSS_CLASSES.SELECTED);
-      if (isEditing) cell.classList.add(CSS_CLASSES.EDITING);
-      if (isDirty) cell.classList.add(CSS_CLASSES.DIRTY);
-      
-      // Style cell
-      Object.assign(cell.style, {
-        position: 'absolute',
-        left: `${xOffset}px`,
-        width: `${width}px`,
-        height: `${this.rowHeight}px`,
-        borderRight: '1px solid var(--border)',
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      });
-      
-      // Create content using CellRenderingPipeline
-      const content = CellRenderingPipeline.createCellContent(value, column, row.data);
-      cell.appendChild(content);
-      fragment.appendChild(cell);
-      
-      this.domManager.setCellElement(row.id, column.id, cell);
-    });
-    
-    // Single DOM insertion
-    rowElement.appendChild(fragment);
-    
-    // PERFORMANCE FIX: Event listeners are now handled via event delegation in the renderer
-    // No need to add individual listeners to each checkbox - parent container handles all events
-  }
+  // Cell rendering methods removed - now handled by RowRenderingEngine
   
   private lastSelectedRowId: string | null = null;
   
   // REMOVED: updateSelections - handled by Canvas Overlay Manager
-  
-  private applyOptimisticOperations(operations: Map<string, OptimisticOperation> | undefined): void {
-    if (!operations || operations.size === 0) {
-      return;
-    }
-    
-    operations.forEach(operation => {
-      const cellElement = this.getCellElement(operation.entityId, operation.field);
-      if (cellElement) {
-        cellElement.classList.add(CSS_CLASSES.OPTIMISTIC);
-        
-        // Visual feedback for optimistic updates
-        cellElement.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-        cellElement.style.borderLeft = '3px solid rgb(59, 130, 246)';
-      }
-    });
-  }
+  // REMOVED: renderRowCells - handled by RowRenderingEngine
+  // REMOVED: applyOptimisticOperations - handled by RowRenderingEngine
   
   private processBatchUpdates(): void {
     const startTime = performance.now();
