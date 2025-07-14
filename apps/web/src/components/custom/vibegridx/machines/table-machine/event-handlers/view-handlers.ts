@@ -267,12 +267,6 @@ export const viewHandlers = {
         }
       })),
       
-      ({ event }) => {
-        console.log('TableMachine: Column drag started', {
-          columnId: event.columnId,
-          position: { x: event.x, y: event.y }
-        });
-      }
     ]
   },
   
@@ -341,15 +335,6 @@ export const viewHandlers = {
               ? ['__selection', ...newDataOrder]
               : newDataOrder;
             
-            console.log('Column order updated:', {
-              draggedColumnId,
-              currentIndex,
-              targetIndex: event.targetIndex,
-              adjustedTargetIndex,
-              dataColumnOrder,
-              newDataOrder,
-              fullNewOrder: newOrder
-            });
             
             // Persistence will be handled by persistSnapshot action
             
@@ -373,11 +358,6 @@ export const viewHandlers = {
       // Emit event for UI feedback
       emit({ type: 'view.drag.ended' }),
       
-      ({ event }) => {
-        console.log('TableMachine: Column drag ended', {
-          targetIndex: event.targetIndex
-        });
-      }
     ]
   },
   
@@ -388,9 +368,6 @@ export const viewHandlers = {
       // Emit event for UI feedback
       emit({ type: 'view.drag.cancelled' }),
       
-      () => {
-        console.log('TableMachine: Column drag cancelled');
-      }
     ]
   },
   

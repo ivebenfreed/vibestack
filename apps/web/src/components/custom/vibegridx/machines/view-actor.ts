@@ -222,11 +222,6 @@ const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
   });
   
   const sortTime = performance.now() - sortStartTime;
-  console.log('🔥 ViewActor: Sorting optimized', { 
-    sortTime: `${sortTime.toFixed(2)}ms`,
-    rowsSorted: rows.length,
-    sortFields: sortBy.length
-  });
   
   return sortedRows;
 };
@@ -386,8 +381,6 @@ const calculateCoordinateMapping = (
 export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }): Promise<ViewActorOutput> => {
   const startTime = performance.now();
   
-  console.log('🔥 ViewActor: Processing entities with optimized pipeline');
-  
   // OPTIMIZATION: Pre-compute relationship columns outside the entity loop
   const relationshipColumns = input.relationshipResolvers ? 
     input.columns.filter(col => {
@@ -398,11 +391,6 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
       resolver: input.relationshipResolvers![col.id],
       resolvedKey: `__resolved_${col.id}`
     })) : [];
-  
-  console.log('🔥 ViewActor: Pre-computed relationship columns', { 
-    totalColumns: input.columns.length, 
-    relationshipColumns: relationshipColumns.length 
-  });
   
   // Step 1: Convert entities to TableRows with optimized relationship resolution
   const relationshipStartTime = performance.now();
@@ -431,11 +419,6 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
   });
   
   const relationshipTime = performance.now() - relationshipStartTime;
-  console.log('🔥 ViewActor: Relationship resolution optimized', { 
-    relationshipTime: `${relationshipTime.toFixed(2)}ms`,
-    entitiesProcessed: input.entities.length,
-    relationshipColumns: relationshipColumns.length
-  });
   
   // Step 2: Apply data transformations
   const filteredRows = applyFilters(allRows, input.filters);

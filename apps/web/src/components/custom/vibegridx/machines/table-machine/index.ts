@@ -435,13 +435,6 @@ export const tableBaseMachine = setup({
           // Single path: Always use pre-processed data from route loader
           target: 'active.idle',
           actions: [
-            ({ context }) => {
-              console.log('🚀 RENDERER_READY: Using pre-processed data from route loader', {
-                hasInitialData: !!context.initialData,
-                processedRowCount: context.initialData?.processedRows?.length || 0,
-                visibleColumnCount: context.initialData?.visibleColumns?.length || 0
-              });
-            },
             // Update context with pre-processed data
             assign({
               rows: ({ context }) => context.initialData?.processedRows || [],
@@ -495,15 +488,7 @@ export const tableBaseMachine = setup({
     },
     
     active: {
-      entry: [
-        ({ context }) => {
-          console.log('🟢 Entering active state with pre-loaded data', {
-            rowCount: context.rows?.length || 0,
-            hasCoordinateMapping: !!context.coordinateMapping,
-            version: context.version
-          });
-        }
-      ],
+      entry: [],
       
       initial: 'idle',
       
@@ -515,8 +500,6 @@ export const tableBaseMachine = setup({
           entry: [
             // Subscribe to atom changes for dynamic updates AFTER initial render
             ({ context, self }) => {
-              console.log('🟢 Setting up atom subscriptions for dynamic updates');
-              
               // Only setup atom subscriptions if we have atom config
               if (context.atomConfig) {
                 // Delay atom subscription to prevent immediate trigger with same data
@@ -535,40 +518,18 @@ export const tableBaseMachine = setup({
             ATOM_DATA_UPDATED: {
               target: 'processingViewData',
               actions: [
-                ({ context, event }) => {
-                  console.log('🟢 ATOM_DATA_UPDATED: Processing dynamic update', {
-                    entityCount: event.entities?.length || 0,
-                    version: context.version
-                  });
-                },
                 atomActions.updateEntitiesFromAtom
               ]
             },
             
             // Handle view updates (sorting, column reorder, etc)
             INVOKE_VIEW_ACTOR: {
-              target: 'processingViewData',
-              actions: [
-                ({ context }) => {
-                  console.log('🔄 INVOKE_VIEW_ACTOR: Reprocessing view data', {
-                    reason: 'user interaction',
-                    version: context.version
-                  });
-                }
-              ]
+              target: 'processingViewData'
             },
             
             // Handle relationship data updates
             RELATIONSHIP_DATA_UPDATED: {
-              target: 'processingViewData',
-              actions: [
-                ({ context }) => {
-                  console.log('🔄 RELATIONSHIP_DATA_UPDATED: Reprocessing view data', {
-                    reason: 'relationship update',
-                    version: context.version
-                  });
-                }
-              ]
+              target: 'processingViewData'
             },
             
             // Include all common event handlers in idle state
@@ -582,14 +543,6 @@ export const tableBaseMachine = setup({
         },
         
         processingViewData: {
-          entry: [
-            ({ context }) => {
-              console.log('🟢 STEP 4: Entered processingViewData state - invoking ViewActor', {
-                entityCount: context.entities?.length || 0,
-                hasEntities: !!context.entities
-              });
-            }
-          ],
           
           // Allow handling events while processing
           on: {
@@ -611,12 +564,6 @@ export const tableBaseMachine = setup({
             input: ({ context }) => {
               const entities = context.entities || [];
               
-              console.log('🟢 STEP 4a: Creating ViewActor input', {
-                entityCount: entities.length,
-                hasEntities: entities.length > 0,
-                columnsCount: context.columns?.length || 0
-              });
-              
               return createViewActorInput({
                 entities,
                 columns: context.columns,
@@ -637,13 +584,6 @@ export const tableBaseMachine = setup({
             onDone: {
               target: 'idle',
               actions: [
-                ({ event }) => {
-                  console.log('🟢 STEP 5: ViewActor completed successfully', {
-                    processedRowCount: event.output.processedRows?.length || 0,
-                    coordinateVersion: event.output.coordinateMapping?.version
-                  });
-                },
-                
                 // Update processed rows
                 assign({
                   rows: ({ event }) => event.output.processedRows,
@@ -691,15 +631,9 @@ export const tableBaseMachine = setup({
                   })
                 ),
                 
-                // PERFORMANCE: Log when first render completes and spawn canvas post-render
+                // PERFORMANCE: Spawn canvas post-render
                 assign({
                   actors: ({ context, spawn }) => {
-                    console.log('TableMachine: First render complete, spawning canvas actor post-render', {
-                      version: context.version,
-                      hasCanvasActor: !!context.actors.canvasActor,
-                      hasCanvasContainer: !!context.canvasContainer
-                    });
-                    
                     // Spawn canvas actor post-render to avoid blocking critical path
                     return {
                       ...context.actors,

@@ -87,15 +87,6 @@ class VirtualGridManager {
       end: Math.min(totalRows, viewport.end + bufferRows)
     };
     
-    // DEBUG: Check virtual grid range calculation
-    console.log('PERFORMANCE DEBUG: VirtualGridManager.updateViewport', {
-      inputViewport: viewport,
-      totalRows,
-      bufferRows,
-      calculatedRange: this.visibleRange,
-      rangeSize: this.visibleRange.end - this.visibleRange.start
-    });
-    
     // Return true if range changed
     return oldRange.start !== this.visibleRange.start || 
            oldRange.end !== this.visibleRange.end;
@@ -670,11 +661,6 @@ export class AtomicTableRenderer {
   // ====================================
   
   render(state: RenderState): void {
-    console.log('🎨 AtomicTableRenderer: Starting render', {
-      isFirstRender: this.isFirstRender,
-      rows: state.rows.length,
-      timestamp: performance.now()
-    });
     
     this.renderStartTime = performance.now();
     
@@ -996,14 +982,6 @@ export class AtomicTableRenderer {
     const scrollTop = measurements.viewport.scroll.top;
     
     // DEBUG: Check viewport calculations
-    console.log('PERFORMANCE DEBUG: updateViewport calculations', {
-      rawViewportHeight,
-      viewportHeight,
-      scrollTop,
-      rowHeight: this.rowHeight,
-      calculatedStartRow: Math.floor(scrollTop / this.rowHeight),
-      calculatedEndRow: Math.ceil((scrollTop + viewportHeight) / this.rowHeight)
-    });
     const itemHeight = this.rowHeight;
     
     // Calculate actual visible rows based on viewport
@@ -1022,12 +1000,6 @@ export class AtomicTableRenderer {
       scrollLeft: measurements.viewport.scroll.left,
       itemHeight: itemHeight
     };
-    
-    // DEBUG: Check what we're passing to virtualGrid
-    console.log('PERFORMANCE DEBUG: updateViewport passing to virtualGrid', {
-      viewport: currentViewport,
-      totalRows: state.rows.length
-    });
     
     this.virtualGrid.updateViewport(currentViewport, state.rows.length);
   }
@@ -1052,10 +1024,6 @@ export class AtomicTableRenderer {
           }));
     const step1Time = performance.now() - step1Start;
     
-    console.log('Renderer: renderHeader columnsToRender', {
-      columnIds: columnsToRender.map(c => c.id),
-      source: state.columns ? 'state.columns' : 'visibleColumns'
-    });
     
     // STEP 2: Width calculation
     const step2Start = performance.now();
@@ -1167,34 +1135,12 @@ export class AtomicTableRenderer {
     
     const totalHeaderTime = performance.now() - headerStartTime;
     
-    console.log('🔍 HEADER RENDER BREAKDOWN:', {
-      'Step 1 - Column prep': `${step1Time.toFixed(2)}ms`,
-      'Step 2 - Width calc': `${step2Time.toFixed(2)}ms`, 
-      'Step 3 - Sort lookup': `${step3Time.toFixed(2)}ms`,
-      'Step 4 - Filter/offsets': `${step4Time.toFixed(2)}ms`,
-      'Step 5 - Clear header': `${step5Time.toFixed(2)}ms`,
-      'Step 6 - Selection header': `${step6Time.toFixed(2)}ms`,
-      'Step 7a - Create fragment': `${step7aTime.toFixed(2)}ms`,
-      'Step 7b - Create columns': `${step7bTime.toFixed(2)}ms`,
-      'Step 8 - Append fragment': `${step8Time.toFixed(2)}ms`,
-      'TOTAL': `${totalHeaderTime.toFixed(2)}ms`,
-      'Column count': dataColumns.length
-    });
   }
   
   private renderVisibleRows(state: RenderState): void {
     const visibleRange = this.virtualGrid.getVisibleRange();
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
-    // DEBUG: Check if we're rendering too many rows
-    console.log('PERFORMANCE DEBUG: renderVisibleRows', {
-      totalRowsInState: state.rows.length,
-      visibleRangeStart: visibleRange.start,
-      visibleRangeEnd: visibleRange.end,
-      visibleRowsCount: visibleRows.length,
-      shouldBeVirtualized: visibleRows.length < state.rows.length,
-      firstRowId: visibleRows[0]?.id
-    });
     
     // Calculate dimensions
     const totalHeight = this.virtualGrid.getTotalHeight();
@@ -1408,13 +1354,6 @@ export class AtomicTableRenderer {
       }
       const xOffset = calculatedOffset;
       
-      // Debug logging for first row only
-      if (row.id === this.lastRenderState?.rows[0]?.id && index < 3) {
-        console.log(`Renderer: Column ${column.id} rendered at offset ${xOffset}`, {
-          columnIndex: index,
-          columnsBeforeThis: columnsToRender.slice(0, index).map(c => ({ id: c.id, width: this.columnWidths[c.id] || c.width || 120 }))
-        });
-      }
       
       
       // Create cell element
