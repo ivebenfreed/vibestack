@@ -45,7 +45,7 @@ export type {
 // ====================================
 
 export { tableBaseMachine, createTableEvent, measurePerformance } from './machines/table-machine';
-export { rowActorMachine } from './machines/row-actor';
+// export { rowActorMachine } from './machines/row-actor'; // Moved to _archive - unused
 
 // ====================================
 // HYBRID RENDERING
@@ -59,11 +59,12 @@ export { TableRenderer } from './renderers';
 // VIRTUALIZATION
 // ====================================
 
-export {
-  VirtualScrollManager,
-  createVirtualScrollManager,
-  useVirtualScrollManager
-} from './virtualization/VirtualScrollManager';
+// Virtualization exports removed - using renderer's internal VirtualScrollManager
+// export {
+//   VirtualScrollManager,
+//   createVirtualScrollManager,
+//   useVirtualScrollManager
+// } from './virtualization/VirtualScrollManager';
 
 // ====================================
 // CANVAS OVERLAYS
