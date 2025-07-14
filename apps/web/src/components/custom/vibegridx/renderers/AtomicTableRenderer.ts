@@ -609,7 +609,7 @@ export class AtomicTableRenderer {
 
   // NEW: Update a single row without full table re-render
   updateRow(row: TableRow): void {
-    const rowElement = this.rowElements.get(row.id);
+    const rowElement = this.domManager.getRowElement(row.id);
     if (!rowElement) {
       return;
     }
@@ -633,7 +633,7 @@ export class AtomicTableRenderer {
     const startTime = performance.now();
     
     rows.forEach(row => {
-      const rowElement = this.rowElements.get(row.id);
+      const rowElement = this.domManager.getRowElement(row.id);
       if (rowElement) {
         this.renderRowCells(row, rowElement);
         rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
@@ -710,7 +710,7 @@ export class AtomicTableRenderer {
     
     // Update header checkbox state if selection column is enabled
     if (this.columnManager.isSelectionColumnEnabled() && this.lastRenderState) {
-      const headerCheckbox = this.header.querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
+      const headerCheckbox = this.domManager.getElement('header').querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
       if (headerCheckbox) {
         const allSelected = this.selectedRows.size === this.lastRenderState.rows.length && this.lastRenderState.rows.length > 0;
         const someSelected = this.selectedRows.size > 0 && this.selectedRows.size < this.lastRenderState.rows.length;
@@ -733,32 +733,32 @@ export class AtomicTableRenderer {
   private batchMeasureDOMElements() {
     return {
       viewport: {
-        bounds: this.viewport.getBoundingClientRect(),
+        bounds: this.domManager.getElement('viewport').getBoundingClientRect(),
         client: {
           width: this.domManager.getElement('viewport').clientWidth,
-          height: this.viewport.clientHeight
+          height: this.domManager.getElement('viewport').clientHeight
         },
         scroll: {
-          top: this.viewport.scrollTop || 0,
-          left: this.viewport.scrollLeft || 0
+          top: this.domManager.getElement('viewport').scrollTop || 0,
+          left: this.domManager.getElement('viewport').scrollLeft || 0
         },
         offset: {
-          width: this.viewport.offsetWidth,
-          height: this.viewport.offsetHeight
+          width: this.domManager.getElement('viewport').offsetWidth,
+          height: this.domManager.getElement('viewport').offsetHeight
         }
       },
       container: {
-        bounds: this.container.getBoundingClientRect(),
+        bounds: this.domManager.getElement('container').getBoundingClientRect(),
         client: {
-          width: this.container.clientWidth,
-          height: this.container.clientHeight
+          width: this.domManager.getElement('container').clientWidth,
+          height: this.domManager.getElement('container').clientHeight
         }
       },
       table: {
-        bounds: this.table.getBoundingClientRect(),
+        bounds: this.domManager.getElement('table').getBoundingClientRect(),
         client: {
-          width: this.table.clientWidth,
-          height: this.table.clientHeight
+          width: this.domManager.getElement('table').clientWidth,
+          height: this.domManager.getElement('table').clientHeight
         }
       }
     };
@@ -841,7 +841,7 @@ export class AtomicTableRenderer {
     // STEP 2: Width calculation
     const step2Start = performance.now();
     const totalWidth = this.getTotalColumnsWidth();
-    this.header.style.width = `${totalWidth}px`;
+    this.domManager.getElement('header').style.width = `${totalWidth}px`;
     const step2Time = performance.now() - step2Start;
     
     // STEP 3: Sort lookup creation
@@ -867,7 +867,7 @@ export class AtomicTableRenderer {
     
     // STEP 5: Clear existing header
     const step5Start = performance.now();
-    this.header.innerHTML = '';
+    this.domManager.getElement('header').innerHTML = '';
     const step5Time = performance.now() - step5Start;
     
     // STEP 6: Create selection header
@@ -895,7 +895,7 @@ export class AtomicTableRenderer {
     checkboxWrapper.appendChild(checkbox);
     checkboxWrapper.appendChild(checkboxCustom);
     selectionHeader.appendChild(checkboxWrapper);
-    this.header.appendChild(selectionHeader);
+    this.domManager.getElement('header').appendChild(selectionHeader);
     const step6Time = performance.now() - step6Start;
     
     // STEP 7: Create fragment and data columns
@@ -943,7 +943,7 @@ export class AtomicTableRenderer {
     
     // STEP 8: Append fragment to header
     const step8Start = performance.now();
-    this.header.appendChild(fragment);
+    this.domManager.getElement('header').appendChild(fragment);
     const step8Time = performance.now() - step8Start;
     
     const totalHeaderTime = performance.now() - headerStartTime;
@@ -966,13 +966,13 @@ export class AtomicTableRenderer {
     
     // PERFORMANCE FIX: Batch DOM style updates and remove nested RAF
     // Set virtual dimensions and viewport overflow together
-    this.body.style.height = `${totalHeight}px`;
-    this.body.style.width = `${totalWidth}px`;
+    this.domManager.getElement('body').style.height = `${totalHeight}px`;
+    this.domManager.getElement('body').style.width = `${totalWidth}px`;
     
     // Synchronously handle viewport overflow (no need for RAF)
-    const maxScroll = totalHeight - this.viewport.clientHeight;
+    const maxScroll = totalHeight - this.domManager.getElement('viewport').clientHeight;
     if (maxScroll > 0) {
-      this.viewport.style.overflowY = 'scroll';
+      this.domManager.getElement('viewport').style.overflowY = 'scroll';
     }
     
     // Only log when dimensions actually change
@@ -1015,7 +1015,7 @@ export class AtomicTableRenderer {
       const absoluteIndex = visibleRange.start + index;
       
       
-      let rowElement = this.rowElements.get(row.id);
+      let rowElement = this.domManager.getRowElement(row.id);
       if (!rowElement) {
         rowElement = document.createElement('div');
         rowElement.className = CSS_CLASSES.ROW;
@@ -1030,7 +1030,7 @@ export class AtomicTableRenderer {
     
     // Single DOM append for all new rows
     if (newRowElements.length > 0) {
-      this.body.appendChild(fragment);
+      this.domManager.getElement('body').appendChild(fragment);
       
       // Register new elements
       newRowElements.forEach(({ element, rowId }) => {
@@ -1057,13 +1057,13 @@ export class AtomicTableRenderer {
   }
   
   private renderRow(row: TableRow, index: number): void {
-    let rowElement = this.rowElements.get(row.id);
+    let rowElement = this.domManager.getRowElement(row.id);
     
     if (!rowElement) {
       rowElement = document.createElement('div');
       rowElement.className = CSS_CLASSES.ROW;
       rowElement.dataset.rowId = row.id;
-      this.body.appendChild(rowElement);
+      this.domManager.getElement('body').appendChild(rowElement);
       this.rowElements.set(row.id, rowElement);
     }
     
@@ -1292,13 +1292,13 @@ export class AtomicTableRenderer {
       rowTop,
       calculatedRowIndex: rowIndex,
       viewport: {
-        scrollTop: this.viewport.scrollTop,
+        scrollTop: this.domManager.getElement('viewport').scrollTop,
         visibleRange: this.virtualGrid.getVisibleRange()
       }
     });
     
     // Ensure viewport has focus for keyboard events
-    this.viewport.focus();
+    this.domManager.getElement('viewport').focus();
     
     this.options.onCellClick?.(rowId, columnId, event);
   }
@@ -1366,7 +1366,7 @@ export class AtomicTableRenderer {
         this.isResizing = true;
         
         // Add resizing class to container
-        this.container.classList.add('vibegridx-resizing');
+        this.domManager.getElement('container').classList.add('vibegridx-resizing');
         
         // Add global mouse event listeners using bound handlers
         document.addEventListener('mousemove', this.boundHandleResizeMove);
@@ -1406,7 +1406,7 @@ export class AtomicTableRenderer {
         const dropIndicator = document.createElement('div');
         dropIndicator.className = 'vibegridx-drop-indicator';
         // Append to header so it scrolls with columns
-        this.header.appendChild(dropIndicator);
+        this.domManager.getElement('header').appendChild(dropIndicator);
         
         this.dragState = {
           isDragging: true,
@@ -1446,14 +1446,14 @@ export class AtomicTableRenderer {
     this.dragState.dragPreview.style.top = `${event.clientY - this.dragState.offsetY}px`;
     
     // Calculate drop position and update displacement
-    const headerRect = this.header.getBoundingClientRect();
-    const headerViewportRect = this.headerViewport.getBoundingClientRect();
+    const headerRect = this.domManager.getElement('header').getBoundingClientRect();
+    const headerViewportRect = this.domManager.getElement('headerViewport').getBoundingClientRect();
     
     // Since the header is transformed, we need to calculate the position differently
     // The header's getBoundingClientRect() gives us the transformed position
     // We need to get the mouse position relative to the header viewport, then add scroll
     const relativeToViewport = event.clientX - headerViewportRect.left;
-    const relativeX = relativeToViewport + this.viewport.scrollLeft;
+    const relativeX = relativeToViewport + this.domManager.getElement('viewport').scrollLeft;
     
     // Find target position and update column displacement
     let targetIndex = 0;
@@ -1461,7 +1461,7 @@ export class AtomicTableRenderer {
     let dropX = 48; // Initial drop position after selection column
     
     // Clear all displacement classes
-    this.header.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
+    this.domManager.getElement('header').querySelectorAll('.vibegridx-header-cell').forEach(cell => {
       const htmlCell = cell as HTMLElement;
       htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right');
       htmlCell.style.removeProperty('--drag-offset');
@@ -1520,7 +1520,7 @@ export class AtomicTableRenderer {
     
     // Apply displacement classes with proper offset (only to data columns, not selection column)
     dataColumns.forEach((column, index) => {
-      const cell = this.header.querySelector(`[data-column="${column.id}"]`) as HTMLElement;
+      const cell = this.domManager.getElement('header').querySelector(`[data-column="${column.id}"]`) as HTMLElement;
       if (cell && column.id !== this.dragState.draggedColumnId) {
         // Moving right: columns between old and new position shift left
         if (draggedIndex < adjustedTargetIndex && index > draggedIndex && index <= adjustedTargetIndex) {
@@ -1563,19 +1563,19 @@ export class AtomicTableRenderer {
     }
     
     // Remove all displacement classes
-    this.header.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
+    this.domManager.getElement('header').querySelectorAll('.vibegridx-header-cell').forEach(cell => {
       const htmlCell = cell as HTMLElement;
       htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-dragging');
       htmlCell.style.removeProperty('--drag-offset');
     });
     
     // Calculate target index based on mouse position
-    const headerRect = this.header.getBoundingClientRect();
-    const headerViewportRect = this.headerViewport.getBoundingClientRect();
+    const headerRect = this.domManager.getElement('header').getBoundingClientRect();
+    const headerViewportRect = this.domManager.getElement('headerViewport').getBoundingClientRect();
     
     // Same calculation as in handleDragMove
     const relativeToViewport = event.clientX - headerViewportRect.left;
-    const relativeX = relativeToViewport + this.viewport.scrollLeft;
+    const relativeX = relativeToViewport + this.domManager.getElement('viewport').scrollLeft;
     
     // Find target column index, excluding selection column
     let targetIndex = 0;
@@ -1656,7 +1656,7 @@ export class AtomicTableRenderer {
     this.isResizing = false;
     
     // Remove resizing class
-    this.container.classList.remove('vibegridx-resizing');
+    this.domManager.getElement('container').classList.remove('vibegridx-resizing');
     
     // Remove global listeners
     document.removeEventListener('mousemove', this.boundHandleResizeMove);
@@ -1680,7 +1680,7 @@ export class AtomicTableRenderer {
   // ====================================
   
   private getCellElement(rowId: string, columnId: string): HTMLElement | null {
-    return this.body.querySelector(
+    return this.domManager.getElement('body').querySelector(
       `[data-row-id="${rowId}"][data-column-id="${columnId}"]`
     ) as HTMLElement;
   }
@@ -1705,7 +1705,7 @@ export class AtomicTableRenderer {
     this.columnManager.setColumnWidth(columnId, width);
     
     // Update the header cell width
-    const headerCell = this.header.querySelector(`[data-column="${columnId}"]`) as HTMLElement;
+    const headerCell = this.domManager.getElement('header').querySelector(`[data-column="${columnId}"]`) as HTMLElement;
     if (headerCell) {
       headerCell.style.width = `${width}px`;
       headerCell.style.minWidth = `${width}px`;
@@ -1751,7 +1751,7 @@ export class AtomicTableRenderer {
     
     // Update all cells - both width and position
     this.columnManager.getVisibleColumns().forEach((col, index) => {
-      const cells = this.body.querySelectorAll(`[data-column-id="${col.id}"]`) as NodeListOf<HTMLElement>;
+      const cells = this.domManager.getElement('body').querySelectorAll(`[data-column-id="${col.id}"]`) as NodeListOf<HTMLElement>;
       const colWidth = this.columnManager.getColumnWidth(col.id);
       const colOffset = columnOffsets[col.id];
       
@@ -1765,21 +1765,21 @@ export class AtomicTableRenderer {
     const totalWidth = currentOffset;
     
     // Update header total width
-    this.header.style.width = `${totalWidth}px`;
+    this.domManager.getElement('header').style.width = `${totalWidth}px`;
     
     // Force layout recalculation
-    this.header.offsetHeight; // Force reflow
+    this.domManager.getElement('header').offsetHeight; // Force reflow
     
     // Update body spacer height if needed
-    if (this.body.firstElementChild) {
-      const spacer = this.body.firstElementChild as HTMLElement;
+    if (this.domManager.getElement('body').firstElementChild) {
+      const spacer = this.domManager.getElement('body').firstElementChild as HTMLElement;
       if (spacer.classList.contains('vibegridx-virtual-spacer')) {
         spacer.style.width = `${totalWidth}px`;
       }
     }
     
     // Update all visible rows to match the new total width
-    const rows = this.body.querySelectorAll('.vibegridx-row') as NodeListOf<HTMLElement>;
+    const rows = this.domManager.getElement('body').querySelectorAll('.vibegridx-row') as NodeListOf<HTMLElement>;
     rows.forEach(row => {
       row.style.width = `${totalWidth}px`;
     });
@@ -1799,6 +1799,6 @@ export class AtomicTableRenderer {
     this.selectedCells.clear();
     this.updateQueue.clear();
     
-    this.container.innerHTML = '';
+    this.domManager.getElement('container').innerHTML = '';
   }
 }
