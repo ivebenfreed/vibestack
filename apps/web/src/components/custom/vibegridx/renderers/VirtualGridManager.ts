@@ -95,11 +95,23 @@ export class VirtualGridManager {
     const calculatedStart = Math.floor(scrollTop / this.rowHeight);
     // Calculate how many rows fit in viewport, ensuring we always show enough
     const visibleRowCount = Math.ceil(viewportHeight / this.rowHeight);
-    // Add 1 extra row to ensure smooth scrolling and full visibility
-    const calculatedEnd = calculatedStart + visibleRowCount + 1;
+    // Add buffer rows for smooth scrolling
+    const bufferRows = 5;
+    const calculatedEnd = calculatedStart + visibleRowCount + bufferRows;
     
     // Cap to actual row count
     const cappedEnd = Math.min(calculatedEnd, this.totalRows);
+    
+    console.log('VirtualGridManager: calculateViewportFromScroll', {
+      scrollTop,
+      viewportHeight,
+      rowHeight: this.rowHeight,
+      visibleRowCount,
+      calculatedStart,
+      calculatedEnd,
+      cappedEnd,
+      totalRows: this.totalRows
+    });
     
     return {
       start: calculatedStart,

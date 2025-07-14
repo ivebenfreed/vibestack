@@ -604,6 +604,12 @@ export class AtomicTableRenderer {
         this.updateViewport(state);
         const viewportTime = performance.now() - viewportStart;
         
+        // Log viewport info for debugging
+        console.log('🎨 AtomicTableRenderer: First render viewport info', {
+          visibleRange: this.virtualGrid.getVisibleRange(),
+          metrics: this.virtualGrid.getMetrics()
+        });
+        
         // STEP 3: Render visible rows
         console.log('🎨 AtomicTableRenderer: About to render visible rows synchronously');
         const rowsStart = performance.now();
@@ -874,9 +880,28 @@ export class AtomicTableRenderer {
     // The original code caused 42ms forced reflow by doing 14 sequential DOM queries
     const measurements = this.batchMeasureDOMElements();
     
-    // Use cached measurements for calculations
-    const viewportHeight = measurements.viewport.client.height || 600; // Simple fallback
-    const viewportWidth = measurements.viewport.client.width || 800; // Simple fallback
+    // Use cached measurements for calculations - but check container if viewport is 0
+    let viewportHeight = measurements.viewport.client.height;
+    let viewportWidth = measurements.viewport.client.width;
+    
+    // If viewport has no height yet, try container measurements
+    if (!viewportHeight || viewportHeight === 0) {
+      viewportHeight = measurements.container.client.height || 
+                       measurements.table.client.height || 
+                       600; // Ultimate fallback
+      console.log('🎨 AtomicTableRenderer: Using container height as viewport had no height', {
+        viewportHeight,
+        containerHeight: measurements.container.client.height,
+        tableHeight: measurements.table.client.height
+      });
+    }
+    
+    if (!viewportWidth || viewportWidth === 0) {
+      viewportWidth = measurements.container.client.width || 
+                      measurements.table.client.width || 
+                      800; // Ultimate fallback
+    }
+    
     const scrollTop = measurements.viewport.scroll.top;
     const scrollLeft = measurements.viewport.scroll.left;
     
