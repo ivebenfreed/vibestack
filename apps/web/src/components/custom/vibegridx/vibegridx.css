@@ -217,6 +217,7 @@
   transition: left 0.2s ease-out;
 }
 
+
 /* Column resize handle */
 .vibegridx-resize-handle {
   position: absolute;

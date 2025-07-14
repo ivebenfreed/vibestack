@@ -1667,7 +1667,8 @@ export class AtomicTableRenderer {
         // Create drop indicator
         const dropIndicator = document.createElement('div');
         dropIndicator.className = 'vibegridx-drop-indicator';
-        this.headerViewport.appendChild(dropIndicator);
+        // Append to header so it scrolls with columns
+        this.header.appendChild(dropIndicator);
         
         this.dragState = {
           isDragging: true,
@@ -1693,6 +1694,7 @@ export class AtomicTableRenderer {
     }
   }
   
+
   private handleDragMove(event: MouseEvent): void {
     // Skip if we're resizing
     if (this.isResizing) return;
@@ -1707,12 +1709,18 @@ export class AtomicTableRenderer {
     
     // Calculate drop position and update displacement
     const headerRect = this.header.getBoundingClientRect();
-    const relativeX = event.clientX - headerRect.left + this.viewport.scrollLeft;
+    const headerViewportRect = this.headerViewport.getBoundingClientRect();
+    
+    // Since the header is transformed, we need to calculate the position differently
+    // The header's getBoundingClientRect() gives us the transformed position
+    // We need to get the mouse position relative to the header viewport, then add scroll
+    const relativeToViewport = event.clientX - headerViewportRect.left;
+    const relativeX = relativeToViewport + this.viewport.scrollLeft;
     
     // Find target position and update column displacement
     let targetIndex = 0;
-    let accumulatedWidth = 0;
-    let dropX = 0;
+    let accumulatedWidth = 48; // Start after selection column (48px)
+    let dropX = 48; // Initial drop position after selection column
     
     // Clear all displacement classes
     this.header.querySelectorAll('.vibegridx-header-cell').forEach(cell => {
@@ -1721,37 +1729,68 @@ export class AtomicTableRenderer {
       htmlCell.style.removeProperty('--drag-offset');
     });
     
-    // Find current position of dragged column
-    const draggedIndex = this.visibleColumns.findIndex(col => col.id === this.dragState.draggedColumnId);
+    // Find current position of dragged column (excluding selection column)
+    const dataColumns = this.visibleColumns.filter(col => col.id !== '__selection');
+    const draggedIndex = dataColumns.findIndex(col => col.id === this.dragState.draggedColumnId);
     
-    for (let i = 0; i < this.visibleColumns.length; i++) {
-      const column = this.visibleColumns[i];
-      const columnWidth = this.columnWidths[column.id] || 120;
-      const midPoint = accumulatedWidth + columnWidth / 2;
+    // Find where the mouse is in relation to columns
+    let foundColumn = false;
+    for (let i = 0; i < dataColumns.length; i++) {
+      const column = dataColumns[i];
+      const columnWidth = this.columnWidths[column.id] || column.width || 120;
+      const columnStart = accumulatedWidth;
+      const columnEnd = accumulatedWidth + columnWidth;
       
-      if (relativeX < midPoint) {
-        targetIndex = i;
-        dropX = accumulatedWidth;
+      // Check if mouse is within this column's bounds
+      if (relativeX >= columnStart && relativeX < columnEnd) {
+        // Determine if we're in the left or right half of the column
+        const columnMidPoint = columnStart + columnWidth / 2;
+        
+        if (relativeX < columnMidPoint) {
+          // Mouse is in left half - drop before this column
+          targetIndex = i;
+          dropX = columnStart;
+        } else {
+          // Mouse is in right half - drop after this column
+          targetIndex = i + 1;
+          dropX = columnEnd;
+        }
+        
+        foundColumn = true;
         break;
       }
       
-      targetIndex = i + 1;
-      dropX = accumulatedWidth + columnWidth;
       accumulatedWidth += columnWidth;
     }
     
-    // Get the width of the dragged column
-    const draggedColumn = this.visibleColumns[draggedIndex];
-    const draggedWidth = this.columnWidths[draggedColumn.id] || 120;
+    // Handle case where mouse is beyond all columns
+    if (!foundColumn) {
+      // Mouse is past all columns
+      targetIndex = dataColumns.length;
+      dropX = accumulatedWidth;
+    }
     
-    // Apply displacement classes with proper offset
-    this.visibleColumns.forEach((column, index) => {
+    // Get the width of the dragged column
+    const draggedColumn = dataColumns[draggedIndex];
+    const draggedWidth = this.columnWidths[draggedColumn.id] || draggedColumn.width || 120;
+    
+    // Adjust target index to account for removing the dragged column
+    let adjustedTargetIndex = targetIndex;
+    if (draggedIndex < targetIndex) {
+      adjustedTargetIndex = targetIndex - 1;
+    }
+    
+    // Apply displacement classes with proper offset (only to data columns, not selection column)
+    dataColumns.forEach((column, index) => {
       const cell = this.header.querySelector(`[data-column="${column.id}"]`) as HTMLElement;
       if (cell && column.id !== this.dragState.draggedColumnId) {
-        if (draggedIndex < targetIndex && index >= draggedIndex && index < targetIndex) {
+        // Moving right: columns between old and new position shift left
+        if (draggedIndex < adjustedTargetIndex && index > draggedIndex && index <= adjustedTargetIndex) {
           cell.classList.add('vibegridx-will-move-left');
           cell.style.setProperty('--drag-offset', `-${draggedWidth}px`);
-        } else if (draggedIndex > targetIndex && index >= targetIndex && index < draggedIndex) {
+        } 
+        // Moving left: columns between new and old position shift right
+        else if (draggedIndex > targetIndex && index >= targetIndex && index < draggedIndex) {
           cell.classList.add('vibegridx-will-move-right');
           cell.style.setProperty('--drag-offset', `${draggedWidth}px`);
         }
@@ -1794,7 +1833,11 @@ export class AtomicTableRenderer {
     
     // Calculate target index based on mouse position
     const headerRect = this.header.getBoundingClientRect();
-    const relativeX = event.clientX - headerRect.left + this.viewport.scrollLeft;
+    const headerViewportRect = this.headerViewport.getBoundingClientRect();
+    
+    // Same calculation as in handleDragMove
+    const relativeToViewport = event.clientX - headerViewportRect.left;
+    const relativeX = relativeToViewport + this.viewport.scrollLeft;
     
     // Find target column index, excluding selection column
     let targetIndex = 0;
@@ -1810,15 +1853,6 @@ export class AtomicTableRenderer {
       }
       accumulatedWidth += columnWidth;
     }
-    
-    console.log('[AtomicTableRenderer] Drag end calculation:', {
-      draggedColumnId: this.dragState.draggedColumnId,
-      mouseX: event.clientX,
-      relativeX,
-      targetIndex,
-      dataColumns: dataColumns.map(c => c.id),
-      visibleColumns: this.visibleColumns.map(c => c.id)
-    });
     
     // Reset drag state
     this.dragState = {
