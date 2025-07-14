@@ -86,6 +86,8 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           sendBack({ type: 'CANVAS_READY' });
           
           // Initialize canvas when browser is idle
+          // Note: This may show a 50ms+ warning in console but it's acceptable
+          // since it runs in idle time and doesn't block the initial table render
           const initializeCanvas = async () => {
             try {
               console.log('CanvasActor: Starting deferred canvas initialization');

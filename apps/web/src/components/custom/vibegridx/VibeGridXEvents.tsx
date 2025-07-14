@@ -416,10 +416,11 @@ export const createMouseDownHandler = (
       return;
     }
     
-    // Focus the grid container to enable keyboard events
+    // Focus the grid container for keyboard events, but prevent scrolling
     const gridContainer = cellElement.closest('.vibegridx-container') as HTMLElement;
     if (gridContainer && document.activeElement !== gridContainer) {
-      gridContainer.focus();
+      // Use preventScroll option to avoid jumping
+      gridContainer.focus({ preventScroll: true });
     }
     
     // Store drag start state
@@ -451,8 +452,13 @@ export const createMouseDownHandler = (
     }
     // For ctrl/shift clicks, let the click handler deal with it
     
-    // Prevent text selection
+    // Prevent text selection and default focus behavior that causes scrolling
     event.preventDefault();
+    
+    // Prevent focus which can cause unwanted scrolling
+    if (event.target instanceof HTMLElement && event.target !== document.body) {
+      event.target.blur();
+    }
   }, [tableSend]);
 };
 

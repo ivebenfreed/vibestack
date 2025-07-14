@@ -554,7 +554,12 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   return (
     <div
       className={`vibegridx-container ${className}`}
-      style={{ width, height, position: 'relative' }}
+      style={{ 
+        width, 
+        height, 
+        position: 'relative',
+        outline: 'none' // Remove focus outline that can cause scroll
+      }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >

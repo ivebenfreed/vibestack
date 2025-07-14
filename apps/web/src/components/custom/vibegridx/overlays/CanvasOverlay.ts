@@ -92,13 +92,31 @@ export class CanvasOverlay implements CoordinateProvider {
   }
   
   private async initializeStageProgressive(): Promise<void> {
-    // Step 1: Basic stage setup (minimal work)
-    await this.initializeStageMinimal();
+    // Step 1: Pre-setup work
+    await this.prepareContainer();
     
     // Yield to browser
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(resolve as any, { timeout: 50 });
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
     
-    // Step 2: Add layer and finalize
+    // Step 2: Create stage
+    await this.createStageMinimal();
+    
+    // Yield to browser again
+    await new Promise(resolve => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(resolve as any, { timeout: 50 });
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+    
+    // Step 3: Add layer and finalize
     await this.finalizeStageSetup();
   }
   
@@ -230,17 +248,13 @@ export class CanvasOverlay implements CoordinateProvider {
     return this.columnResizeOverlay;
   }
   
-  private async initializeStageMinimal(): Promise<void> {
-    // PERFORMANCE: Minimal stage creation
-    const width = this.cachedDimensions.width;
-    const height = this.cachedDimensions.height;
-    
+  private async prepareContainer(): Promise<void> {
     // Ensure container has ID
     if (!this.container.id) {
       this.container.id = `vgx-canvas-${Date.now()}`;
     }
     
-    // Apply container styles first
+    // Apply container styles
     const styles: Partial<CSSStyleDeclaration> = {
       overflow: 'hidden'
     };
@@ -252,6 +266,11 @@ export class CanvasOverlay implements CoordinateProvider {
     }
     
     Object.assign(this.container.style, styles);
+  }
+  
+  private async createStageMinimal(): Promise<void> {
+    const width = this.cachedDimensions.width;
+    const height = this.cachedDimensions.height;
     
     // Create stage with actual dimensions to avoid drawImage errors
     this.stage = new Konva.Stage({
@@ -260,6 +279,12 @@ export class CanvasOverlay implements CoordinateProvider {
       height: height,
       listening: false
     });
+  }
+  
+  private async initializeStageMinimal(): Promise<void> {
+    // Legacy method - now split into prepareContainer and createStageMinimal
+    await this.prepareContainer();
+    await this.createStageMinimal();
   }
   
   private async finalizeStageSetup(): Promise<void> {
@@ -280,6 +305,22 @@ export class CanvasOverlay implements CoordinateProvider {
       this.stage.content.style.pointerEvents = 'auto';
       this.container.style.pointerEvents = 'none';
     }
+    
+    // Pre-create commonly used overlays to avoid delay on first interaction
+    await this.preCreateOverlays();
+  }
+  
+  private async preCreateOverlays(): Promise<void> {
+    // Pre-create selection overlay since it's needed on first click
+    console.log('CanvasOverlay: Pre-creating selection overlay');
+    this.getSelectionOverlay();
+    
+    // Yield to browser
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
+    // Pre-create fill handle layer since it's shown with selection
+    console.log('CanvasOverlay: Pre-creating fill handle layer');
+    this.getFillHandleLayer();
   }
   
   private initializeStage(): void {
