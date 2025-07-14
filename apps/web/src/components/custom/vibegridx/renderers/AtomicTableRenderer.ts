@@ -222,9 +222,9 @@ export class AtomicTableRenderer {
 
   // Update header dimensions without full re-render
   private updateHeaderDimensions(): void {
-    if (this.header && this.columnManager.getVisibleColumns().length > 0) {
+    if (this.columnManager.getVisibleColumns().length > 0) {
       const totalWidth = this.getTotalColumnsWidth();
-      this.header.style.width = `${totalWidth}px`;
+      this.domManager.getElement('header').style.width = `${totalWidth}px`;
       
       // Update dimension manager with visible columns
       if (this.dimensionManager) {
@@ -541,10 +541,10 @@ export class AtomicTableRenderer {
         const initialViewport: ViewportInfo = {
           start: this.virtualGrid.getVisibleRange().start,
           end: this.virtualGrid.getVisibleRange().end,
-          height: this.viewport.clientHeight,
-          width: this.viewport.clientWidth,
-          scrollTop: this.viewport.scrollTop,
-          scrollLeft: this.viewport.scrollLeft,
+          height: this.domManager.getElement('viewport').clientHeight,
+          width: this.domManager.getElement('viewport').clientWidth,
+          scrollTop: this.domManager.getElement('viewport').scrollTop,
+          scrollLeft: this.domManager.getElement('viewport').scrollLeft,
           itemHeight: this.virtualGrid.getRowHeight()
         };
         
@@ -573,10 +573,10 @@ export class AtomicTableRenderer {
           const viewport: ViewportInfo = {
             start: this.virtualGrid.getVisibleRange().start,
             end: this.virtualGrid.getVisibleRange().end,
-            height: this.viewport.clientHeight,
-            width: this.viewport.clientWidth,
-            scrollTop: this.viewport.scrollTop,
-            scrollLeft: this.viewport.scrollLeft,
+            height: this.domManager.getElement('viewport').clientHeight,
+            width: this.domManager.getElement('viewport').clientWidth,
+            scrollTop: this.domManager.getElement('viewport').scrollTop,
+            scrollLeft: this.domManager.getElement('viewport').scrollLeft,
             itemHeight: this.virtualGrid.getRowHeight()
           };
           
@@ -735,7 +735,7 @@ export class AtomicTableRenderer {
       viewport: {
         bounds: this.viewport.getBoundingClientRect(),
         client: {
-          width: this.viewport.clientWidth,
+          width: this.domManager.getElement('viewport').clientWidth,
           height: this.viewport.clientHeight
         },
         scroll: {
