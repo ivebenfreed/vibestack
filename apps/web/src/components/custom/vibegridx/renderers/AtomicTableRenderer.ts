@@ -1484,7 +1484,11 @@ export class AtomicTableRenderer {
   
   // REMOVED: updateSelections - handled by Canvas Overlay Manager
   
-  private applyOptimisticOperations(operations: Map<string, OptimisticOperation>): void {
+  private applyOptimisticOperations(operations: Map<string, OptimisticOperation> | undefined): void {
+    if (!operations || operations.size === 0) {
+      return;
+    }
+    
     operations.forEach(operation => {
       const cellElement = this.getCellElement(operation.entityId, operation.field);
       if (cellElement) {

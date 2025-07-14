@@ -39,9 +39,11 @@ import { dragActor } from '../../actors/drag-actor';
 // ====================================
 
 const createDefaultContext = (input: TableConfig): TableContext => {
-  const initialRowCount = input.initialData?.length || 0;
+  // Check if we have pre-processed initial data from route loader
+  const hasInitialData = !!input.initialData;
+  const initialRowCount = hasInitialData ? input.initialData.processedRows?.length || 0 : 0;
   const rowHeight = input.settings?.rowHeight || 40;
-  const initialRowIds = input.initialData?.map(row => row.id) || [];
+  const initialRowIds = hasInitialData ? input.initialData.processedRows?.map(row => row.id) || [] : [];
   
   // Load persisted data if available (sync machine pattern)
   const persistedData = input.persistedData;
@@ -82,7 +84,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     id: input.id,
     entityType: input.entityType,
     columns: input.columns || [],
-    rows: [], // Processed rows ready for rendering
+    rows: hasInitialData ? input.initialData.processedRows : [], // Use pre-processed rows if available
     visibleRowIds: initialRowIds,
     allRowIds: initialRowIds,
     settings: {
@@ -97,6 +99,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     },
     version: 0,
     enableSelectionColumn: input.enableSelectionColumn || false,
+    
+    // Store initial data for immediate rendering
+    initialData: hasInitialData ? input.initialData : null,
     
     // Spread dimension state
     ...dimensionState,
@@ -122,8 +127,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // DEPRECATED: Legacy coordinate manager - disabled in favor of unified coordinateMapping
     coordinateManager: null,
     
-    // Coordinate mapping from coordinate actor
-    coordinateMapping: null,
+    // Coordinate mapping from coordinate actor - use initial data if available
+    coordinateMapping: hasInitialData ? input.initialData.coordinateMapping : null,
     
     // Entities from parent component (via useSelector)
     entities: input.entities || [],
@@ -424,56 +429,64 @@ export const tableBaseMachine = setup({
           }
         },
         
-        SET_VISIBLE_ENTITIES: {
+// SET_VISIBLE_ENTITIES removed - we always use pre-loaded data from route loader
+        
+        RENDERER_READY: {
+          // Single path: Always use pre-processed data from route loader
+          target: 'active.idle',
           actions: [
-            ({ event }) => {
-              console.log('🟢 STEP 1: SET_VISIBLE_ENTITIES received in initializing state', {
-                entityCount: event.entities?.length || 0
+            ({ context }) => {
+              console.log('🚀 RENDERER_READY: Using pre-processed data from route loader', {
+                hasInitialData: !!context.initialData,
+                processedRowCount: context.initialData?.processedRows?.length || 0,
+                visibleColumnCount: context.initialData?.visibleColumns?.length || 0
               });
             },
+            // Update context with pre-processed data
             assign({
-              entities: ({ event }) => event.entities || [],
-              allRowIds: ({ event }) => event.entities?.map((e: any) => e.id) || [],
-              // FAST PATH: Mark that entities are ready for fast path
-              entitiesReady: true
+              rows: ({ context }) => context.initialData?.processedRows || [],
+              visibleRowIds: ({ context }) => context.initialData?.processedRows?.map((r: any) => r.id) || [],
+              coordinateMapping: ({ context }) => context.initialData?.coordinateMapping || null,
+              version: ({ context }) => context.version + 1
+            }),
+            // Send initial data directly to renderer
+            sendTo(
+              ({ context }) => context.actors.rendererActor!,
+              ({ context }) => ({
+                type: 'RENDER',
+                state: {
+                  rows: context.initialData?.processedRows || [],
+                  columns: context.initialData?.visibleColumns || context.columns,
+                  selectedCells: context.selectedCells,
+                  editingCell: null,
+                  groupedData: [],
+                  optimisticOperations: new Map(),
+                  version: context.version + 1,
+                  sortBy: context.sortBy,
+                  columnVisibility: context.columnVisibility,
+                  columnOrder: context.columnOrder,
+                  // Include dimensions from table machine context
+                  columnWidths: context.columnWidths,
+                  columnOffsets: context.columnOffsets,
+                  totalWidth: context.totalWidth,
+                  totalHeight: context.totalHeight,
+                  viewport: context.viewport
+                },
+                coordinateMapping: context.initialData?.coordinateMapping || null
+              })
+            ),
+            // Spawn canvas actor post-render for selection handling
+            assign({
+              actors: ({ context, spawn }) => {
+                console.log('TableMachine: Spawning canvas actor post-render');
+                return {
+                  ...context.actors,
+                  canvasActor: spawn('canvasActor', { id: 'canvas' })
+                };
+              }
             })
           ]
         },
-        
-        RENDERER_READY: [
-          {
-            // FAST PATH: When entities are already loaded, skip to processingViewData
-            guard: ({ context }) => {
-              const hasEntities = context.entities?.length > 0;
-              console.log('🔍 FAST PATH CHECK: RENDERER_READY', {
-                hasEntities,
-                entityCount: context.entities?.length || 0
-              });
-              return hasEntities;
-            },
-            // Skip checkingEntities and go directly to processingViewData
-            target: 'active.processingViewData',
-            actions: [
-              ({ context }) => {
-                console.log('🚀 FAST PATH: Skipping to processingViewData', {
-                  entityCount: context.entities.length,
-                  skipStates: ['active entry', 'active.checkingEntities']
-                });
-              }
-            ]
-          },
-          {
-            // NORMAL PATH: No entities yet, transition to active state
-            target: 'active',
-            actions: [
-              ({ context }) => {
-                console.log('🟢 NORMAL PATH: RENDERER_READY without entities, transitioning to active state', {
-                  entityCount: context.entities?.length || 0
-                });
-              }
-            ]
-          }
-        ],
         
         // CANVAS_CONTAINER_READY: Deferred to post-render in active state
       },
@@ -484,45 +497,20 @@ export const tableBaseMachine = setup({
     active: {
       entry: [
         ({ context }) => {
-          const hasEntities = !!(context.entities?.length);
-          const targetState = hasEntities ? 'processingViewData' : 'idle';
-          console.log('🟢 STEP 3a: Entering active state', {
-            entityCount: context.entities?.length || 0,
-            hasEntities,
-            targetState,
-            entitiesIsArray: Array.isArray(context.entities)
+          console.log('🟢 Entering active state with pre-loaded data', {
+            rowCount: context.rows?.length || 0,
+            hasCoordinateMapping: !!context.coordinateMapping,
+            version: context.version
           });
         }
       ],
       
-      initial: 'checkingEntities',
+      initial: 'idle',
       
       // Cleanup atom subscriptions when leaving active state
       exit: atomActions.cleanupAtomSubscriptions,
       
       states: {
-        checkingEntities: {
-          always: [
-            {
-              guard: ({ context }) => !!(context.entities?.length),
-              target: 'processingViewData',
-              actions: ({ context }) => {
-                console.log('🟢 STEP 3b: Has entities, transitioning to processingViewData', {
-                  entityCount: context.entities?.length || 0
-                });
-              }
-            },
-            {
-              target: 'idle',
-              actions: ({ context }) => {
-                console.log('🟢 STEP 3b: No entities, transitioning to idle', {
-                  entityCount: context.entities?.length || 0
-                });
-              }
-            }
-          ]
-        },
-        
         idle: {
           on: {
             // Handle atom data updates
@@ -536,14 +524,7 @@ export const tableBaseMachine = setup({
               target: 'processingViewData'
             },
             
-            // Legacy event for backward compatibility
-            SET_VISIBLE_ENTITIES: {
-              target: 'processingViewData',
-              actions: assign({
-                entities: ({ event }) => event.entities || [],
-                allRowIds: ({ event }) => event.entities?.map((e: any) => e.id) || []
-              })
-            },
+            // SET_VISIBLE_ENTITIES removed - using route loader pattern
             
             INVOKE_VIEW_ACTOR: {
               target: 'processingViewData'
@@ -786,7 +767,7 @@ export const tableBaseMachine = setup({
       // Canvas initialization (post-render)
       CANVAS_CONTAINER_READY: {
         actions: [
-          // PERFORMANCE: Store container for canvas initialization
+          // Store container for canvas initialization
           assign({
             canvasContainer: ({ event }) => event.container
           }),
@@ -794,13 +775,15 @@ export const tableBaseMachine = setup({
             console.log('TableMachine: Canvas container ready post-render', {
               container: event.container,
               version: context.version,
-              hasCanvasActor: !!context.actors.canvasActor
+              hasCanvasActor: !!context.actors.canvasActor,
+              hasCoordinateMapping: !!context.coordinateMapping
             });
             
             // Initialize canvas actor if it exists (spawned post-render)
             if (context.actors.canvasActor && event.container) {
-              console.log('TableMachine: Initializing canvas actor post-render');
+              console.log('TableMachine: Initializing canvas actor with coordinate mapping');
               
+              // Initialize canvas
               context.actors.canvasActor.send({
                 type: 'INITIALIZE',
                 container: event.container,
@@ -817,6 +800,15 @@ export const tableBaseMachine = setup({
                   dimensionManager: context.dimensionManager
                 }
               });
+              
+              // Send coordinate mapping immediately
+              if (context.coordinateMapping) {
+                console.log('TableMachine: Sending coordinate mapping to canvas');
+                context.actors.canvasActor.send({
+                  type: 'UPDATE_COORDINATES',
+                  mapping: context.coordinateMapping
+                });
+              }
             }
           }
         ]

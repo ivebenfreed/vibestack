@@ -275,7 +275,8 @@ export const createScrollHandler = (
 
 export const createRendererStateChangeHandler = (
   refs: EventHandlerRefs,
-  callbacks: EventHandlerCallbacks
+  callbacks: EventHandlerCallbacks,
+  tableSend?: ActorRefFrom<typeof tableBaseMachine>['send']
 ) => {
   return useCallback((event: any) => {
     console.log('[VibeGridXEvents] Renderer state change event:', {
@@ -296,12 +297,21 @@ export const createRendererStateChangeHandler = (
       // Note: We don't need to re-render selection after DOM updates anymore
       // because the canvas is inside the scrollable container and moves with the content.
       // The selection will be automatically updated via the selection coordinator subscription.
+    } else if (event.type === 'canvas.container.ready') {
+      // Forward canvas container ready event to table machine
+      console.log('[VibeGridXEvents] Canvas container ready, forwarding to table machine');
+      if (tableSend) {
+        tableSend({
+          type: 'CANVAS_CONTAINER_READY',
+          container: event.container
+        });
+      }
     } else if (event.type === 'rows.sorted') {
       // Forward the sorted row IDs to the table machine
       // This event is no longer needed - sorting is handled by the table machine
       console.log('Rows sorted event (deprecated):', event);
     }
-  }, [refs]);
+  }, [refs, tableSend]);
 };
 
 // ====================================
@@ -511,17 +521,14 @@ export const createMouseUpHandler = (
       tableSend({
         type: 'selection.drag.end'
       });
-    } else if (dragState.startCell && (event.ctrlKey || event.shiftKey)) {
-      // It was a ctrl/shift click, handle special selection
+    } else if (dragState.startCell) {
+      // It was a click (not a drag), handle selection
       const cellElement = (event.target as Element).closest('.vibegridx-cell') as HTMLElement;
       if (cellElement) {
         const rowId = cellElement.dataset.rowId;
         const columnId = cellElement.dataset.columnId;
         
         if (rowId && columnId) {
-          // Handle ctrl/shift click
-          const cellKey = `${rowId}:${columnId}`;
-          
           // Send selection event - let XState handle all selection logic
           tableSend({
             type: 'selection.cell.select',

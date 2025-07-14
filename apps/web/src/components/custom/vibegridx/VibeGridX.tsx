@@ -52,6 +52,12 @@ interface VibeGridXProps<T = any> {
   height?: number;
   width?: number;
   
+  // Initial data from route loader (for synchronous rendering)
+  initialData?: {
+    processedRows: any[];
+    visibleColumns: Column[];
+    coordinateMapping: any;
+  };
   
   // Event handlers
   onCellClick?: (rowId: string, columnId: string) => void;
@@ -251,6 +257,8 @@ export const VibeGridX = <T extends Record<string, any> = any>(
       relationshipResolvers: relationshipResolvers, // Pass resolvers for relationship columns
       // Include persisted data in input for context initialization
       persistedData: persistedData,
+      // Pass initial processed data from route loader
+      initialData: props.initialData,
       settings: {
         enableVirtualScrolling: props.enableVirtualScrolling ?? true,
         enableGrouping: props.enableGrouping ?? true,
@@ -267,7 +275,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         }
       }
     }
-  }), [tableId, entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, persistedData, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
+  }), [tableId, entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, persistedData, props.initialData, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
   
   // PERFORMANCE: Use useActorRef instead of useMachine to avoid re-renders
   // All actual rendering is done via direct DOM manipulation, not React
@@ -280,14 +288,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // PERFORMANCE: Send entities synchronously on first render with data
   if (entities && entities.length > 0 && !entitiesSentRef.current) {
     const sendStartTime = performance.now();
-    console.log('🚀 VibeGridX: Sending entities synchronously to machine:', {
-      entityCount: entities.length,
-      timestamp: sendStartTime
-    });
-    tableSend({
-      type: 'SET_VISIBLE_ENTITIES',
-      entities: entities
-    });
+    // Entities are now pre-loaded by route loader - no need to send them
     entitiesSentRef.current = true;
   }
   
@@ -329,7 +330,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const handleColumnClick = createColumnClickHandler(refs, tableSend);
   const handleKeyDown = createKeyboardHandler(refs, tableSend);
   const handleScroll = createScrollHandler(refs, tableSend);
-  const handleRendererStateChange = createRendererStateChangeHandler(refs, eventCallbacks);
+  const handleRendererStateChange = createRendererStateChangeHandler(refs, eventCallbacks, tableSend);
   
   // Cell selection drag handlers
   const handleMouseDown = createMouseDownHandler(refs, tableSend);
@@ -360,13 +361,16 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     enableSelectionColumn: enableSelectionColumn,
     cellHeight: 40,
     // Add event handlers
+    onCellClick: handleCellClick,
+    onCellDoubleClick: handleCellDoubleClick,
     onColumnClick: handleColumnClick,
     onColumnDragStart: handleColumnDragStart,
     onColumnDragEnd: handleColumnDragEnd,
     onColumnResizeStart: handleColumnResizeStart,
     onColumnResizeMove: handleColumnResizeMove,
-    onColumnResizeEnd: handleColumnResizeEnd
-  }), [enableSelectionColumn, handleColumnClick, handleColumnDragStart, handleColumnDragEnd, handleColumnResizeStart, handleColumnResizeMove, handleColumnResizeEnd]);
+    onColumnResizeEnd: handleColumnResizeEnd,
+    onStateChange: handleRendererStateChange
+  }), [enableSelectionColumn, handleCellClick, handleCellDoubleClick, handleColumnClick, handleColumnDragStart, handleColumnDragEnd, handleColumnResizeStart, handleColumnResizeMove, handleColumnResizeEnd, handleRendererStateChange]);
   
   // Store pending options for when container is ready
   pendingRendererOptionsRef.current = rendererOptions;
