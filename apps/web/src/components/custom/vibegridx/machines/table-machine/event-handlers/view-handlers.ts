@@ -4,12 +4,37 @@
 
 import { sendTo, assign, raise, emit } from 'xstate';
 import { viewActions } from '../slices/view-slice';
+import { selectionActions } from '../slices/selection-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 export const viewHandlers = {
   'view.sort.set': {
     actions: [
       viewActions.setSortBy,
+      
+      // Clear selection when sorting changes
+      selectionActions.clearSelection,
+      
+      // Clear canvas selection visual
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          // Also hide fill handle
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
+      },
       
       // Persist the state
       'persistSnapshot',
@@ -22,6 +47,30 @@ export const viewHandlers = {
   'view.column.click': {
     actions: [
       viewActions.toggleSort,
+      
+      // Clear selection when sorting changes
+      selectionActions.clearSelection,
+      
+      // Clear canvas selection visual
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          // Also hide fill handle
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
+      },
       
       // Persist the state
       'persistSnapshot',
@@ -149,6 +198,30 @@ export const viewHandlers = {
         });
       },
       
+      // Clear selection when columns are reordered
+      selectionActions.clearSelection,
+      
+      // Clear canvas selection visual
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          // Also hide fill handle
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
+      },
+      
       // Need to reprocess view data to update coordinate mappings
       ({ self }) => {
         self.send({ type: 'INVOKE_VIEW_ACTOR' });
@@ -162,6 +235,30 @@ export const viewHandlers = {
       
       () => {
         console.log('TableMachine: Column order reset to default');
+      },
+      
+      // Clear selection when column order is reset
+      selectionActions.clearSelection,
+      
+      // Clear canvas selection visual
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          // Also hide fill handle
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
       },
       
       // Need to reprocess view data to update coordinate mappings
@@ -348,6 +445,30 @@ export const viewHandlers = {
       
       // Clear drag state
       viewActions.clearColumnDrag,
+      
+      // Clear selection when columns are reordered via drag
+      selectionActions.clearSelection,
+      
+      // Clear canvas selection visual
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          // Also hide fill handle
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
+      },
       
       // Persist the state
       'persistSnapshot',
