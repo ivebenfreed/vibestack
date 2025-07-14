@@ -196,6 +196,3 @@ export const keyboardHandlers = {
     ]
   }
 };
-
-// Import helpers
-import { calculateVisualPositions } from '../helpers/visual-position-helpers';
