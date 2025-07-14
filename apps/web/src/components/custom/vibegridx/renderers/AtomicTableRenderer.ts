@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import { CellRenderingPipeline } from './CellRenderingPipeline';
+import { VirtualGridManager } from './VirtualGridManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -36,80 +37,6 @@ const CSS_CLASSES = {
 
 // NOTE: CellRendererFactory removed - now using modular CellRendererRegistry
 // This provides better type safety, extensibility, and consistent formatting
-
-// ====================================
-// VIRTUAL GRID MANAGER
-// ====================================
-
-class VirtualGridManager {
-  private viewport: ViewportInfo;
-  private totalRows: number;
-  private rowHeight: number;
-  private visibleRange: { start: number; end: number };
-  
-  constructor(initialViewport: ViewportInfo) {
-    this.viewport = initialViewport;
-    this.totalRows = 0;
-    this.rowHeight = initialViewport.itemHeight;
-    
-    // PERFORMANCE FIX: Initialize visible range from initial viewport
-    const bufferRows = 5;
-    this.visibleRange = {
-      start: Math.max(0, initialViewport.start - bufferRows),
-      end: Math.max(0, initialViewport.end + bufferRows)
-    };
-  }
-  
-  updateViewport(viewport: ViewportInfo, totalRows: number): boolean {
-    const oldRange = { ...this.visibleRange };
-    
-    this.viewport = viewport;
-    this.totalRows = totalRows;
-    this.rowHeight = viewport.itemHeight;
-    
-    // Calculate visible range with buffer
-    const bufferRows = 5;
-    
-    // Always try to render a few extra rows for smooth scrolling
-    // But ensure we don't go beyond the actual data
-    this.visibleRange = {
-      start: Math.max(0, viewport.start - bufferRows),
-      end: Math.min(totalRows, viewport.end + bufferRows)
-    };
-    
-    // Return true if range changed
-    return oldRange.start !== this.visibleRange.start || 
-           oldRange.end !== this.visibleRange.end;
-  }
-  
-  isRowVisible(index: number): boolean {
-    return index >= this.visibleRange.start && index < this.visibleRange.end;
-  }
-  
-  getVisibleRange(): { start: number; end: number } {
-    return { ...this.visibleRange };
-  }
-  
-  getRowTop(index: number): number {
-    // Since we use box-sizing: border-box, borders are included in row height
-    return index * this.rowHeight;
-  }
-  
-  getTotalHeight(): number {
-    // Calculate base height for all rows
-    const baseHeight = this.totalRows * this.rowHeight;
-    
-    // Add extra space at the bottom to ensure the last row is never cut off
-    // This needs to be at least one row height to guarantee full visibility
-    const bottomPadding = this.rowHeight;
-    
-    return Math.max(0, baseHeight + bottomPadding);
-  }
-  
-  getRowHeight(): number {
-    return this.rowHeight;
-  }
-}
 
 // ====================================
 // ATOMIC TABLE RENDERER
@@ -334,9 +261,7 @@ export class AtomicTableRenderer {
       }
       
       // Update virtual grid with row count first
-      if (this.virtualGrid && typeof this.virtualGrid.setRowCount === 'function') {
-        this.virtualGrid.setRowCount(state.rows.length);
-      }
+      this.virtualGrid.setRowCount(state.rows.length);
       
       // NOTE: Coordinate manager updates removed - now handled by coordinate actor
       // The TableMachine receives coordinate mappings from the coordinate actor
@@ -541,29 +466,18 @@ export class AtomicTableRenderer {
       isScrolling = true;
       
       requestAnimationFrame(() => {
-        const rowHeight = this.virtualGrid.getRowHeight();
         const scrollTop = this.viewport.scrollTop;
         const viewportHeight = this.viewport.clientHeight;
+        const viewportWidth = this.viewport.clientWidth;
+        const scrollLeft = this.viewport.scrollLeft;
         
-        // Calculate visible rows more accurately
-        const calculatedStart = Math.floor(scrollTop / rowHeight);
-        // Calculate how many rows fit in viewport, ensuring we always show enough
-        const visibleRowCount = Math.ceil(viewportHeight / rowHeight);
-        // Add 1 extra row to ensure smooth scrolling and full visibility
-        const calculatedEnd = calculatedStart + visibleRowCount + 1;
-        
-        // Cap to actual row count
-        const cappedEnd = this.lastRenderState ? Math.min(calculatedEnd, this.lastRenderState.rows.length) : calculatedEnd;
-        
-        const newViewport: ViewportInfo = {
-          start: calculatedStart,
-          end: cappedEnd,
-          height: viewportHeight,
-          width: this.viewport.clientWidth,
-          scrollTop: scrollTop,
-          scrollLeft: this.viewport.scrollLeft,
-          itemHeight: rowHeight
-        };
+        // Use VirtualGridManager to calculate viewport
+        const newViewport = this.virtualGrid.calculateViewportFromScroll(
+          scrollTop, 
+          viewportHeight, 
+          viewportWidth,
+          scrollLeft
+        );
         
         // Update our own viewport and re-render visible rows immediately
         if (this.lastRenderState) {
@@ -573,12 +487,6 @@ export class AtomicTableRenderer {
             
             // Don't notify render.complete here - let the main render handle it
             // This prevents duplicate render events during scroll
-            // this.options.onStateChange?.({
-            //   type: 'render.complete',
-            //   renderTime: 0,
-            //   rowCount: this.lastRenderState.rows.length,
-            //   visibleRange: this.virtualGrid.getVisibleRange()
-            // });
           }
         }
         
@@ -967,29 +875,18 @@ export class AtomicTableRenderer {
     const measurements = this.batchMeasureDOMElements();
     
     // Use cached measurements for calculations
-    const rawViewportHeight = measurements.viewport.client.height;
-    const viewportHeight = rawViewportHeight || 600; // Simple fallback
+    const viewportHeight = measurements.viewport.client.height || 600; // Simple fallback
+    const viewportWidth = measurements.viewport.client.width || 800; // Simple fallback
     const scrollTop = measurements.viewport.scroll.top;
+    const scrollLeft = measurements.viewport.scroll.left;
     
-    // DEBUG: Check viewport calculations
-    const itemHeight = this.rowHeight;
-    
-    // Calculate actual visible rows based on viewport
-    const visibleRowCount = Math.ceil(viewportHeight / itemHeight);
-    const startIndex = Math.floor(scrollTop / itemHeight);
-    // Add 1 extra row to ensure the last visible row is fully shown
-    const endIndex = Math.min(startIndex + visibleRowCount + 1, state.rows.length);
-    
-    const rawViewportWidth = measurements.viewport.client.width;
-    const currentViewport: ViewportInfo = {
-      start: startIndex,
-      end: endIndex,
-      height: viewportHeight,
-      width: rawViewportWidth || 800, // Simple fallback like working version
-      scrollTop: scrollTop,
-      scrollLeft: measurements.viewport.scroll.left,
-      itemHeight: itemHeight
-    };
+    // Use VirtualGridManager to calculate viewport
+    const currentViewport = this.virtualGrid.calculateViewportFromScroll(
+      scrollTop,
+      viewportHeight,
+      viewportWidth,
+      scrollLeft
+    );
     
     this.virtualGrid.updateViewport(currentViewport, state.rows.length);
   }
