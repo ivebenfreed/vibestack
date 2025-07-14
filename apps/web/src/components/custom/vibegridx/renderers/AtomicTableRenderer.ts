@@ -14,6 +14,7 @@ import { VirtualGridManager } from './VirtualGridManager';
 import { ColumnManager } from './ColumnManager';
 import { DOMStructureManager } from './DOMStructureManager';
 import { SelectionManager } from './SelectionManager';
+import { EventDelegationSystem, type EventCallbacks } from './EventDelegationSystem';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -50,6 +51,7 @@ export class AtomicTableRenderer {
   private columnManager: ColumnManager;
   private domManager: DOMStructureManager;
   private selectionManager: SelectionManager;
+  private eventSystem: EventDelegationSystem;
   private options: RendererOptions;
   
   // Performance tracking
@@ -72,13 +74,7 @@ export class AtomicTableRenderer {
   private updateQueue = new Set<string>();
   private batchTimeoutId = 0;
   
-  // Bound handlers for resize events
-  private boundHandleResizeMove: (event: MouseEvent) => void;
-  private boundHandleResizeEnd: (event: MouseEvent) => void;
-  
-  // Bound handlers for drag events
-  private boundHandleDragMove: (event: MouseEvent) => void;
-  private boundHandleDragEnd: (event: MouseEvent) => void;
+  // Legacy event handlers removed - now handled by EventDelegationSystem
   
   constructor(options: RendererOptions) {
     this.options = options;
@@ -120,13 +116,37 @@ export class AtomicTableRenderer {
     
     this.virtualGrid = new VirtualGridManager(initialViewport);
     
-    // Bind resize handlers before setting up event listeners
-    this.boundHandleResizeMove = this.handleResizeMove.bind(this);
-    this.boundHandleResizeEnd = this.handleResizeEnd.bind(this);
+    // Initialize event delegation system
+    const eventCallbacks: EventCallbacks = {
+      onCellClick: options.onCellClick,
+      onCellDoubleClick: options.onCellDoubleClick,
+      onHeaderClick: options.onColumnClick,
+      onColumnResizeStart: options.onColumnResizeStart,
+      onColumnResizeMove: options.onColumnResizeMove,
+      onColumnResizeEnd: options.onColumnResizeEnd,
+      onColumnDragStart: options.onColumnDragStart,
+      onColumnDragMove: options.onColumnDragMove,
+      onColumnDragEnd: options.onColumnDragEnd,
+      onScroll: (viewport: ViewportInfo) => {
+        // Update virtual grid and re-render if needed
+        if (this.lastRenderState) {
+          const hasViewportChanged = this.virtualGrid.updateViewport(viewport, this.lastRenderState.rows.length);
+          if (hasViewportChanged) {
+            this.renderVisibleRows(this.lastRenderState);
+          }
+        }
+        options.onScroll?.(viewport);
+      }
+    };
+
+    this.eventSystem = new EventDelegationSystem({
+      domManager: this.domManager,
+      virtualGrid: this.virtualGrid,
+      columnManager: this.columnManager,
+      callbacks: eventCallbacks
+    });
     
-    // Bind drag handlers
-    this.boundHandleDragMove = this.handleDragMove.bind(this);
-    this.boundHandleDragEnd = this.handleDragEnd.bind(this);
+    // Event handlers now managed by EventDelegationSystem
     
     // DOM is already initialized by DOMStructureManager
     this.setupEventListeners();
@@ -342,72 +362,32 @@ export class AtomicTableRenderer {
   }
   
   private setupEventListeners() {
+    // Setup event delegation system
+    this.eventSystem.setupEventListeners();
+    
+    // Make viewport focusable for keyboard events (handled at component level)
     const viewport = this.domManager.getElement('viewport');
-    const header = this.domManager.getElement('header');
-    const body = this.domManager.getElement('body');
-    
-    // Scroll handling with simple throttling
-    let isScrolling = false;
-    
-    viewport.addEventListener('scroll', () => {
-      // Always sync header immediately for smooth horizontal scrolling
-      header.style.transform = `translateX(-${viewport.scrollLeft}px)`;
-      
-      // Prevent multiple simultaneous updates
-      if (isScrolling) return;
-      
-      isScrolling = true;
-      
-      requestAnimationFrame(() => {
-        const scrollTop = viewport.scrollTop;
-        const viewportHeight = viewport.clientHeight;
-        const viewportWidth = viewport.clientWidth;
-        const scrollLeft = viewport.scrollLeft;
-        
-        // Use VirtualGridManager to calculate viewport
-        const newViewport = this.virtualGrid.calculateViewportFromScroll(
-          scrollTop, 
-          viewportHeight, 
-          viewportWidth,
-          scrollLeft
-        );
-        
-        // Update our own viewport and re-render visible rows immediately
-        if (this.lastRenderState) {
-          const hasViewportChanged = this.virtualGrid.updateViewport(newViewport, this.lastRenderState.rows.length);
-          if (hasViewportChanged) {
-            this.renderVisibleRows(this.lastRenderState);
-            
-            // Don't notify render.complete here - let the main render handle it
-            // This prevents duplicate render events during scroll
-          }
-        }
-        
-        this.options.onScroll?.(newViewport);
-        
-        // Allow next update
-        isScrolling = false;
-      });
-    });
-    
-    // Let native scrolling handle wheel events - it naturally bubbles at boundaries
-    
-    // Cell interaction handlers - REMOVED to prevent duplicate events
-    // All mouse events are now handled at the VibeGridX level
-    // body.addEventListener('click', this.handleCellClick.bind(this));
-    body.addEventListener('dblclick', this.handleCellDoubleClick.bind(this));
-    // body.addEventListener('mousedown', this.handleMouseDown.bind(this));
-    
-    // Header interaction handlers
-    header.addEventListener('click', this.handleHeaderClick.bind(this));
-    
-    // Column drag handlers - only the mousedown on header, not global listeners
-    // Global listeners will be added dynamically when drag/resize starts
-    header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
-    
-    // Make viewport focusable but don't add keyboard listener here
-    // Keyboard events are handled at the VibeGridX component level to avoid duplication
     viewport.tabIndex = 0;
+  }
+  
+  cleanup(): void {
+    // Cleanup event delegation system
+    this.eventSystem.cleanup();
+    
+    // Clear update queue
+    this.updateQueue.clear();
+    
+    // Cancel any pending batch timeouts
+    if (this.batchTimeoutId) {
+      clearTimeout(this.batchTimeoutId);
+      this.batchTimeoutId = 0;
+    }
+    
+    // Cancel any pending animation frames
+    if (this.frameId) {
+      cancelAnimationFrame(this.frameId);
+      this.frameId = 0;
+    }
   }
   
   // ====================================
@@ -1269,404 +1249,35 @@ export class AtomicTableRenderer {
   }
   
   // ====================================
-  // EVENT HANDLERS
+  // LEGACY EVENT HANDLERS (MOVED TO EventDelegationSystem)
+  // These methods are kept for compatibility but are no longer used
   // ====================================
   
-  private handleCellClick(event: MouseEvent): void {
-    const cellElement = (event.target as Element).closest(`.${CSS_CLASSES.CELL}`) as HTMLElement;
-    
-    if (!cellElement) return;
-    
-    const rowId = cellElement.dataset.rowId!;
-    const columnId = cellElement.dataset.columnId!;
-    
-    // Get the row element to find its position
-    const rowElement = cellElement.closest(`.${CSS_CLASSES.ROW}`) as HTMLElement;
-    const rowTop = rowElement ? parseInt(rowElement.style.top || '0', 10) : -1;
-    const rowIndex = rowTop >= 0 ? Math.floor(rowTop / 40) : -1; // 40px row height
-    
-    console.log('[AtomicTableRenderer] Cell clicked:', {
-      rowId,
-      columnId,
-      element: cellElement,
-      cellText: cellElement.textContent?.trim(),
-      rowElement,
-      rowTop,
-      calculatedRowIndex: rowIndex,
-      viewport: {
-        scrollTop: this.domManager.getElement('viewport').scrollTop,
-        visibleRange: this.virtualGrid.getVisibleRange()
-      }
-    });
-    
-    // Ensure viewport has focus for keyboard events
-    this.domManager.getElement('viewport').focus();
-    
-    this.options.onCellClick?.(rowId, columnId, event);
-  }
+  // Event handling is now managed by EventDelegationSystem
+  // All event handlers have been extracted to the delegation system
   
-  private handleCellDoubleClick(event: MouseEvent): void {
-    const cellElement = (event.target as Element).closest(`.${CSS_CLASSES.CELL}`) as HTMLElement;
-    if (!cellElement) return;
-    
-    const rowId = cellElement.dataset.rowId!;
-    const columnId = cellElement.dataset.columnId!;
-    
-    this.options.onCellDoubleClick?.(rowId, columnId, event);
-  }
+  // ====================================
+  // FAST CELL RENDERING
+  // ====================================
   
-  private handleMouseDown(event: MouseEvent): void {
-    // Prevent text selection during drag
-    event.preventDefault();
-    
-    // Let parent component handle drag selection through proper event flow
-    // The renderer should only be responsible for rendering, not selection logic
-  }
+  // Legacy cell double click handler removed - now handled by EventDelegationSystem
   
-  // Column drag state
-  private dragState: {
-    isDragging: boolean;
-    draggedColumnId: string | null;
-    startX: number;
-    startY: number;
-    offsetX: number;
-    offsetY: number;
-    dragPreview: HTMLElement | null;
-    dropIndicator: HTMLElement | null;
-  } = {
-    isDragging: false,
-    draggedColumnId: null,
-    startX: 0,
-    startY: 0,
-    offsetX: 0,
-    offsetY: 0,
-    dragPreview: null,
-    dropIndicator: null
-  };
-
-  // Resize state tracking (preview handled by overlay)
-  private isResizing: boolean = false;
+  // Legacy mouse down handler removed - now handled by EventDelegationSystem
   
-  private handleHeaderMouseDown(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
-    const sortIcon = target.closest('.vibegridx-sort-icon');
-    const resizeHandle = target.closest('.vibegridx-resize-handle');
-    
-    // Handle resize
-    if (resizeHandle) {
-      event.preventDefault();
-      const columnId = (resizeHandle as HTMLElement).dataset.column;
-      
-      if (columnId) {
-        const currentWidth = this.columnManager.getColumnWidth(columnId);
-        
-        // Send resize start event to XState
-        this.options.onColumnResizeStart?.(columnId, event.clientX, currentWidth);
-        
-        // Set resizing state
-        this.isResizing = true;
-        
-        // Add resizing class to container
-        this.domManager.getElement('container').classList.add('vibegridx-resizing');
-        
-        // Add global mouse event listeners using bound handlers
-        document.addEventListener('mousemove', this.boundHandleResizeMove);
-        document.addEventListener('mouseup', this.boundHandleResizeEnd);
-      }
-      return;
-    }
-    
-    // Don't start drag if clicking on sort icon or selection column
-    if (headerCell && !sortIcon && !resizeHandle) {
-      event.preventDefault();
-      
-      const columnId = headerCell.dataset.column;
-      
-      // Don't allow dragging the selection column
-      if (columnId === '__selection') {
-        return;
-      }
-      
-      if (columnId) {
-        // Calculate offset from click position to header cell position
-        const headerRect = headerCell.getBoundingClientRect();
-        const offsetX = event.clientX - headerRect.left;
-        const offsetY = event.clientY - headerRect.top;
-        
-        // Create drag preview
-        const columnText = headerCell.querySelector('.vibegridx-header-text')?.textContent || columnId;
-        const dragPreview = document.createElement('div');
-        dragPreview.className = 'vibegridx-drag-preview';
-        dragPreview.textContent = columnText;
-        // Position preview so text stays under cursor
-        dragPreview.style.left = `${event.clientX - offsetX}px`;
-        dragPreview.style.top = `${event.clientY - offsetY}px`;
-        document.body.appendChild(dragPreview);
-        
-        // Create drop indicator
-        const dropIndicator = document.createElement('div');
-        dropIndicator.className = 'vibegridx-drop-indicator';
-        // Append to header so it scrolls with columns
-        this.domManager.getElement('header').appendChild(dropIndicator);
-        
-        this.dragState = {
-          isDragging: true,
-          draggedColumnId: columnId,
-          startX: event.clientX,
-          startY: event.clientY,
-          offsetX,
-          offsetY,
-          dragPreview,
-          dropIndicator
-        };
-        
-        // Add dragging class to header cell
-        headerCell.classList.add('vibegridx-dragging');
-        
-        // Add drag event listeners
-        document.addEventListener('mousemove', this.boundHandleDragMove);
-        document.addEventListener('mouseup', this.boundHandleDragEnd);
-        
-        // Notify parent component
-        this.options.onColumnDragStart?.(columnId, event.clientX, event.clientY);
-      }
-    }
-  }
+  // Legacy drag and resize state removed - now handled by EventDelegationSystem
+  
+  // Legacy header mouse down handler removed - now handled by EventDelegationSystem
   
 
-  private handleDragMove(event: MouseEvent): void {
-    // Skip if we're resizing
-    if (this.isResizing) return;
-    
-    if (!this.dragState.isDragging || !this.dragState.dragPreview) return;
-    
-    event.preventDefault();
-    
-    // Update drag preview position maintaining the offset
-    this.dragState.dragPreview.style.left = `${event.clientX - this.dragState.offsetX}px`;
-    this.dragState.dragPreview.style.top = `${event.clientY - this.dragState.offsetY}px`;
-    
-    // Calculate drop position and update displacement
-    const headerRect = this.domManager.getElement('header').getBoundingClientRect();
-    const headerViewportRect = this.domManager.getElement('headerViewport').getBoundingClientRect();
-    
-    // Since the header is transformed, we need to calculate the position differently
-    // The header's getBoundingClientRect() gives us the transformed position
-    // We need to get the mouse position relative to the header viewport, then add scroll
-    const relativeToViewport = event.clientX - headerViewportRect.left;
-    const relativeX = relativeToViewport + this.domManager.getElement('viewport').scrollLeft;
-    
-    // Find target position and update column displacement
-    let targetIndex = 0;
-    let accumulatedWidth = 48; // Start after selection column (48px)
-    let dropX = 48; // Initial drop position after selection column
-    
-    // Clear all displacement classes
-    this.domManager.getElement('header').querySelectorAll('.vibegridx-header-cell').forEach(cell => {
-      const htmlCell = cell as HTMLElement;
-      htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right');
-      htmlCell.style.removeProperty('--drag-offset');
-    });
-    
-    // Find current position of dragged column (excluding selection column)
-    const dataColumns = this.columnManager.getDataColumns();
-    const draggedIndex = dataColumns.findIndex(col => col.id === this.dragState.draggedColumnId);
-    
-    // Find where the mouse is in relation to columns
-    let foundColumn = false;
-    for (let i = 0; i < dataColumns.length; i++) {
-      const column = dataColumns[i];
-      const columnWidth = this.columnManager.getColumnWidth(column.id);
-      const columnStart = accumulatedWidth;
-      const columnEnd = accumulatedWidth + columnWidth;
-      
-      // Check if mouse is within this column's bounds
-      if (relativeX >= columnStart && relativeX < columnEnd) {
-        // Determine if we're in the left or right half of the column
-        const columnMidPoint = columnStart + columnWidth / 2;
-        
-        if (relativeX < columnMidPoint) {
-          // Mouse is in left half - drop before this column
-          targetIndex = i;
-          dropX = columnStart;
-        } else {
-          // Mouse is in right half - drop after this column
-          targetIndex = i + 1;
-          dropX = columnEnd;
-        }
-        
-        foundColumn = true;
-        break;
-      }
-      
-      accumulatedWidth += columnWidth;
-    }
-    
-    // Handle case where mouse is beyond all columns
-    if (!foundColumn) {
-      // Mouse is past all columns
-      targetIndex = dataColumns.length;
-      dropX = accumulatedWidth;
-    }
-    
-    // Get the width of the dragged column
-    const draggedColumn = dataColumns[draggedIndex];
-    const draggedWidth = this.columnManager.getColumnWidth(draggedColumn.id);
-    
-    // Adjust target index to account for removing the dragged column
-    let adjustedTargetIndex = targetIndex;
-    if (draggedIndex < targetIndex) {
-      adjustedTargetIndex = targetIndex - 1;
-    }
-    
-    // Apply displacement classes with proper offset (only to data columns, not selection column)
-    dataColumns.forEach((column, index) => {
-      const cell = this.domManager.getElement('header').querySelector(`[data-column="${column.id}"]`) as HTMLElement;
-      if (cell && column.id !== this.dragState.draggedColumnId) {
-        // Moving right: columns between old and new position shift left
-        if (draggedIndex < adjustedTargetIndex && index > draggedIndex && index <= adjustedTargetIndex) {
-          cell.classList.add('vibegridx-will-move-left');
-          cell.style.setProperty('--drag-offset', `-${draggedWidth}px`);
-        } 
-        // Moving left: columns between new and old position shift right
-        else if (draggedIndex > targetIndex && index >= targetIndex && index < draggedIndex) {
-          cell.classList.add('vibegridx-will-move-right');
-          cell.style.setProperty('--drag-offset', `${draggedWidth}px`);
-        }
-      }
-    });
-    
-    // Update drop indicator position
-    if (this.dragState.dropIndicator) {
-      this.dragState.dropIndicator.style.left = `${dropX}px`;
-    }
-    
-    // Don't send drag move events to XState - visual feedback is handled entirely in DOM
-    // this.options.onColumnDragMove?.(event.clientX, event.clientY);
-  }
+  // Legacy drag move handler removed - now handled by EventDelegationSystem
   
-  private handleDragEnd(event: MouseEvent): void {
-    // Skip if we're resizing
-    if (this.isResizing) return;
-    
-    if (!this.dragState.isDragging) return;
-    
-    event.preventDefault();
-    
-    // Remove drag preview
-    if (this.dragState.dragPreview) {
-      this.dragState.dragPreview.remove();
-    }
-    
-    // Remove drop indicator
-    if (this.dragState.dropIndicator) {
-      this.dragState.dropIndicator.remove();
-    }
-    
-    // Remove all displacement classes
-    this.domManager.getElement('header').querySelectorAll('.vibegridx-header-cell').forEach(cell => {
-      const htmlCell = cell as HTMLElement;
-      htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-dragging');
-      htmlCell.style.removeProperty('--drag-offset');
-    });
-    
-    // Calculate target index based on mouse position
-    const headerRect = this.domManager.getElement('header').getBoundingClientRect();
-    const headerViewportRect = this.domManager.getElement('headerViewport').getBoundingClientRect();
-    
-    // Same calculation as in handleDragMove
-    const relativeToViewport = event.clientX - headerViewportRect.left;
-    const relativeX = relativeToViewport + this.domManager.getElement('viewport').scrollLeft;
-    
-    // Find target column index, excluding selection column
-    let targetIndex = 0;
-    let accumulatedWidth = 48; // Start with selection column width
-    
-    // Get data columns only (excluding selection column)
-    const dataColumns = this.columnManager.getDataColumns();
-    
-    for (let i = 0; i < dataColumns.length; i++) {
-      const columnWidth = this.columnManager.getColumnWidth(dataColumns[i].id);
-      if (relativeX > accumulatedWidth + columnWidth / 2) {
-        targetIndex = i + 1;
-      }
-      accumulatedWidth += columnWidth;
-    }
-    
-    // Reset drag state
-    this.dragState = {
-      isDragging: false,
-      draggedColumnId: null,
-      startX: 0,
-      startY: 0,
-      offsetX: 0,
-      offsetY: 0,
-      dragPreview: null,
-      dropIndicator: null
-    };
-    
-    // Remove drag event listeners
-    document.removeEventListener('mousemove', this.boundHandleDragMove);
-    document.removeEventListener('mouseup', this.boundHandleDragEnd);
-    
-    // Notify parent component
-    this.options.onColumnDragEnd?.(targetIndex);
-  }
+  // Legacy drag end handler removed - now handled by EventDelegationSystem
   
-  private handleHeaderClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
-    const resizeHandle = target.closest('.vibegridx-resize-handle');
-    
-    // Don't process clicks on resize handles or if no header cell found
-    if (!headerCell || resizeHandle) return;
-    
-    const columnId = headerCell.dataset.column;
-    
-    // Skip selection column
-    if (columnId === '__selection') return;
-    
-    // Check if column is sortable
-    if (headerCell.classList.contains('vibegridx-sortable') && columnId) {
-      // Handle column click for sorting
-      console.log('[AtomicTableRenderer] Column header clicked for sorting:', columnId);
-      this.options.onColumnClick?.(columnId, event);
-    }
-  }
+  // Legacy header click handler removed - now handled by EventDelegationSystem
 
-  // Column resize handlers - Defined as regular methods and bound in constructor
-  private handleResizeMove(event: MouseEvent): void {
-    console.log('[AtomicTableRenderer] handleResizeMove called', {
-      clientX: event.clientX,
-      isResizing: this.isResizing
-    });
-    
-    if (!this.isResizing) {
-      console.warn('[AtomicTableRenderer] Not in resizing state, skipping');
-      return;
-    }
-    
-    // Send move event to XState which will handle throttling
-    this.options.onColumnResizeMove?.(event.clientX);
-  }
+  // Legacy resize move handler removed - now handled by EventDelegationSystem
 
-  private handleResizeEnd(event: MouseEvent): void {
-    console.log('[AtomicTableRenderer] handleResizeEnd called');
-    
-    // Clear resizing state
-    this.isResizing = false;
-    
-    // Remove resizing class
-    this.domManager.getElement('container').classList.remove('vibegridx-resizing');
-    
-    // Remove global listeners
-    document.removeEventListener('mousemove', this.boundHandleResizeMove);
-    document.removeEventListener('mouseup', this.boundHandleResizeEnd);
-    
-    // Send end event to XState
-    this.options.onColumnResizeEnd?.();
-  }
+  // Legacy resize end handler removed - now handled by EventDelegationSystem
 
   
   // ====================================
