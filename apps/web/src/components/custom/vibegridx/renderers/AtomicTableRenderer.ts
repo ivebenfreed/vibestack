@@ -473,6 +473,12 @@ export class AtomicTableRenderer {
       this.columnManager.setColumnWidths(state.columnWidths);
     }
     
+    // Sync selection state from render state to SelectionManager
+    this.selectionManager.setSelectedCells(state.selectedCells);
+    this.selectionManager.setEditingCell(state.editingCell);
+    
+    // Note: selectedRows is not in RenderState - it's managed separately by setSelectedRows calls
+    
     // NOTE: Coordinate manager updates removed - now handled by coordinate actor
     // The TableMachine receives coordinate mappings from the coordinate actor
     // and provides them to the renderer via render state. This eliminates
