@@ -512,22 +512,63 @@ export const tableBaseMachine = setup({
       
       states: {
         idle: {
+          entry: [
+            // Subscribe to atom changes for dynamic updates AFTER initial render
+            ({ context, self }) => {
+              console.log('🟢 Setting up atom subscriptions for dynamic updates');
+              
+              // Only setup atom subscriptions if we have atom config
+              if (context.atomConfig) {
+                // Delay atom subscription to prevent immediate trigger with same data
+                setTimeout(() => {
+                  // Setup primary atom subscription
+                  atomActions.setupPrimaryAtomSubscription({ context, self });
+                  // Setup relationship atom subscriptions
+                  atomActions.setupRelationshipAtoms({ context, self });
+                }, 100);
+              }
+            }
+          ],
+          
           on: {
-            // Handle atom data updates
+            // Handle atom updates for dynamic data changes
             ATOM_DATA_UPDATED: {
               target: 'processingViewData',
-              actions: atomActions.updateEntitiesFromAtom
+              actions: [
+                ({ context, event }) => {
+                  console.log('🟢 ATOM_DATA_UPDATED: Processing dynamic update', {
+                    entityCount: event.entities?.length || 0,
+                    version: context.version
+                  });
+                },
+                atomActions.updateEntitiesFromAtom
+              ]
             },
             
-            // Handle relationship data updates (just trigger reprocessing)
-            RELATIONSHIP_DATA_UPDATED: {
-              target: 'processingViewData'
-            },
-            
-            // SET_VISIBLE_ENTITIES removed - using route loader pattern
-            
+            // Handle view updates (sorting, column reorder, etc)
             INVOKE_VIEW_ACTOR: {
-              target: 'processingViewData'
+              target: 'processingViewData',
+              actions: [
+                ({ context }) => {
+                  console.log('🔄 INVOKE_VIEW_ACTOR: Reprocessing view data', {
+                    reason: 'user interaction',
+                    version: context.version
+                  });
+                }
+              ]
+            },
+            
+            // Handle relationship data updates
+            RELATIONSHIP_DATA_UPDATED: {
+              target: 'processingViewData',
+              actions: [
+                ({ context }) => {
+                  console.log('🔄 RELATIONSHIP_DATA_UPDATED: Reprocessing view data', {
+                    reason: 'relationship update',
+                    version: context.version
+                  });
+                }
+              ]
             },
             
             // Include all common event handlers in idle state
@@ -787,34 +828,37 @@ export const tableBaseMachine = setup({
             
             // Initialize canvas actor if it exists (spawned post-render)
             if (context.actors.canvasActor && event.container) {
-              console.log('TableMachine: Initializing canvas actor with coordinate mapping');
+              console.log('TableMachine: Scheduling canvas initialization to not block UI');
               
-              // Initialize canvas
-              context.actors.canvasActor.send({
-                type: 'INITIALIZE',
-                container: event.container,
-                config: {
-                  cellHeight: context.settings.rowHeight,
-                  cellWidth: 120,
-                  selectionColor: '#3b82f6',
-                  selectionBorderColor: '#1d4ed8',
-                  editingColor: '#10b981',
-                  editingBorderColor: '#059669',
-                  enableAnimations: false,
-                  animationDuration: 0,
-                  borderWidth: 2,
-                  dimensionManager: context.dimensionManager
+              // Defer canvas initialization to next tick to not block the table
+              requestAnimationFrame(() => {
+                // Initialize canvas
+                context.actors.canvasActor.send({
+                  type: 'INITIALIZE',
+                  container: event.container,
+                  config: {
+                    cellHeight: context.settings.rowHeight,
+                    cellWidth: 120,
+                    selectionColor: '#3b82f6',
+                    selectionBorderColor: '#1d4ed8',
+                    editingColor: '#10b981',
+                    editingBorderColor: '#059669',
+                    enableAnimations: false,
+                    animationDuration: 0,
+                    borderWidth: 2,
+                    dimensionManager: context.dimensionManager
+                  }
+                });
+                
+                // Send coordinate mapping after initialization
+                if (context.coordinateMapping) {
+                  console.log('TableMachine: Sending coordinate mapping to canvas');
+                  context.actors.canvasActor.send({
+                    type: 'UPDATE_COORDINATES',
+                    mapping: context.coordinateMapping
+                  });
                 }
               });
-              
-              // Send coordinate mapping immediately
-              if (context.coordinateMapping) {
-                console.log('TableMachine: Sending coordinate mapping to canvas');
-                context.actors.canvasActor.send({
-                  type: 'UPDATE_COORDINATES',
-                  mapping: context.coordinateMapping
-                });
-              }
             }
           }
         ]
