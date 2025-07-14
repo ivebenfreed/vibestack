@@ -1154,7 +1154,7 @@ export class AtomicTableRenderer {
       cell.appendChild(wrapper);
       fragment.appendChild(cell);
       
-      this.domManager.setCellElement(rowId, column.id, cell);
+      this.domManager.setCellElement(row.id, '__selection', cell);
     }
     
     // Add data cells
@@ -1207,7 +1207,7 @@ export class AtomicTableRenderer {
       cell.appendChild(content);
       fragment.appendChild(cell);
       
-      this.domManager.setCellElement(rowId, column.id, cell);
+      this.domManager.setCellElement(row.id, column.id, cell);
     });
     
     // Single DOM insertion
