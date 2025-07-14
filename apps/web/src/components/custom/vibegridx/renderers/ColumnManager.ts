@@ -57,6 +57,9 @@ export class ColumnManager {
   setColumnVisibility(visibility: Record<string, boolean>): void {
     this.columnVisibility = visibility;
     this.updateVisibleColumns();
+    
+    // Note: Column ordering is maintained separately from visibility
+    // The view-actor.ts handles filtering out hidden columns from the order
   }
   
   /**
@@ -72,12 +75,14 @@ export class ColumnManager {
   setColumnOrder(order: string[]): void {
     const orderedColumns: Column[] = [];
     
-    // First pass: add columns in the specified order
+    // First pass: add columns in the specified order (only if they exist)
     for (const columnId of order) {
       const column = this.columns.find(c => c.id === columnId);
       if (column) {
         orderedColumns.push(column);
       }
+      // Note: Silently skip columns that don't exist in this.columns
+      // This prevents warnings when column order contains hidden columns
     }
     
     // Second pass: add any remaining columns not in the order
@@ -176,6 +181,13 @@ export class ColumnManager {
    */
   getColumnById(columnId: string): Column | undefined {
     return this.columns.find(col => col.id === columnId);
+  }
+  
+  /**
+   * Get visible column order (filters out hidden columns)
+   */
+  getVisibleColumnOrder(): string[] {
+    return this.getVisibleColumns().map(col => col.id);
   }
   
   /**

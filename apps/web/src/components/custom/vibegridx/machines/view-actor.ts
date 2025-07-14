@@ -443,7 +443,12 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
       .map(colId => {
         const col = visibleDataColumns.find(col => col.id === colId);
         if (!col) {
-          console.warn(`[ViewActor] Column ${colId} in columnOrder not found in visible columns`);
+          // This is expected when columns are hidden but still in the order
+          // Only warn if the column doesn't exist at all
+          const columnExists = input.columns.some(c => c.id === colId);
+          if (!columnExists) {
+            console.warn(`[ViewActor] Column ${colId} in columnOrder not found in column definitions`);
+          }
         }
         return col;
       })
