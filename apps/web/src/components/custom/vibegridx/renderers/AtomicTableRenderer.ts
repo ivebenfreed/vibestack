@@ -12,6 +12,7 @@ import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManage
 import { CellRenderingPipeline } from './CellRenderingPipeline';
 import { VirtualGridManager } from './VirtualGridManager';
 import { ColumnManager } from './ColumnManager';
+import { DOMStructureManager } from './DOMStructureManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -44,16 +45,9 @@ const CSS_CLASSES = {
 // ====================================
 
 export class AtomicTableRenderer {
-  private container: HTMLElement;
-  private table: HTMLElement;
-  private headerViewport: HTMLElement;
-  private header: HTMLElement;
-  private body: HTMLElement;
-  private viewport: HTMLElement;
-  private canvasContainer: HTMLElement | null = null;
-  
   private virtualGrid: VirtualGridManager;
   private columnManager: ColumnManager;
+  private domManager: DOMStructureManager;
   private options: RendererOptions;
   
   // Performance tracking
@@ -65,8 +59,6 @@ export class AtomicTableRenderer {
   private isFirstRender = true; // Track if this is the first render
   
   // State caches
-  private rowElements = new Map<string, HTMLElement>();
-  private cellElements = new Map<string, HTMLElement>(); // "rowId:columnId" -> element
   private selectedCells = new Set<string>();
   private selectedRows = new Set<string>(); // For checkbox selection
   private editingCell: CellRef | null = null;
@@ -94,13 +86,15 @@ export class AtomicTableRenderer {
     this.dimensionManager = options.dimensionManager || null;
     this.coordinateManager = options.coordinateManager || null;
     
-    // Initialize column manager
+    // Initialize managers
     this.columnManager = new ColumnManager({
       columns: options.columns,
       enableSelectionColumn: options.enableSelectionColumn || false,
       columnVisibility: options.columnVisibility,
       columnWidths: options.columnWidths
     });
+    
+    this.domManager = new DOMStructureManager(options.container);
     
     // Use configured row height or default
     this.rowHeight = options.cellHeight || 40;
@@ -119,8 +113,6 @@ export class AtomicTableRenderer {
     
     this.virtualGrid = new VirtualGridManager(initialViewport);
     
-    this.container = options.container;
-    
     // Bind resize handlers before setting up event listeners
     this.boundHandleResizeMove = this.handleResizeMove.bind(this);
     this.boundHandleResizeEnd = this.handleResizeEnd.bind(this);
@@ -129,7 +121,7 @@ export class AtomicTableRenderer {
     this.boundHandleDragMove = this.handleDragMove.bind(this);
     this.boundHandleDragEnd = this.handleDragEnd.bind(this);
     
-    this.initializeDOM();
+    // DOM is already initialized by DOMStructureManager
     this.setupEventListeners();
   }
   
@@ -137,90 +129,16 @@ export class AtomicTableRenderer {
   // INITIALIZATION
   // ====================================
   
-  private initializeDOM() {
-    console.log('🔧 AtomicTableRenderer: Starting DOM initialization');
-    // PERFORMANCE: Removed expensive console.log that was causing serialization overhead
-
-    this.container.innerHTML = '';
-    this.container.className = CSS_CLASSES.TABLE;
-    
-    // Create table structure
-    this.table = document.createElement('div');
-    this.table.className = 'vibegridx-table-wrapper';
-    this.table.style.display = 'flex';
-    this.table.style.flexDirection = 'column';
-    this.table.style.width = '100%';
-    this.table.style.height = '100%';
-    
-    // PERFORMANCE: Removed expensive console.log
-    
-    // Create header viewport for synchronized horizontal scrolling
-    this.headerViewport = document.createElement('div');
-    this.headerViewport.className = 'vibegridx-header-viewport';
-    this.headerViewport.style.overflow = 'hidden';
-    this.headerViewport.style.position = 'relative';
-    this.headerViewport.style.flexShrink = '0'; // Don't shrink header
-    
-    this.header = document.createElement('div');
-    this.header.className = CSS_CLASSES.HEADER;
-    this.header.style.position = 'relative';
-    this.header.style.whiteSpace = 'nowrap';
-    
-    this.headerViewport.appendChild(this.header);
-    
-    this.viewport = document.createElement('div');
-    this.viewport.className = 'vibegridx-viewport';
-    this.viewport.style.overflow = 'auto';
-    this.viewport.style.position = 'relative';
-    this.viewport.style.flex = '1 1 auto'; // Grow and shrink
-    this.viewport.style.minHeight = '0';
-    this.viewport.style.width = '100%';
-    
-    // PERFORMANCE: Removed expensive console.log
-    
-    this.body = document.createElement('div');
-    this.body.className = CSS_CLASSES.BODY;
-    this.body.style.position = 'relative';
-    
-    // Create body first
-    this.viewport.appendChild(this.body);
-    
-    // Pre-create canvas overlay container for immediate initialization
-    const canvasOverlay = document.createElement('div');
-    canvasOverlay.className = 'vibegridx-canvas-overlay-container';
-    canvasOverlay.style.position = 'absolute';
-    canvasOverlay.style.top = '0';
-    canvasOverlay.style.left = '0';
-    canvasOverlay.style.width = '100%';  // Cover the full content width
-    canvasOverlay.style.height = '100%'; // Cover the full content height
-    canvasOverlay.style.pointerEvents = 'none'; // Canvas is display only, DOM cells handle events
-    canvasOverlay.style.zIndex = '100';  // Higher z-index to ensure it's on top
-    this.body.appendChild(canvasOverlay);
-    
-    // Canvas overlay will be added to body after it has content
-    this.table.appendChild(this.headerViewport);
-    this.table.appendChild(this.viewport);
-    this.container.appendChild(this.table);
-    
-    // PERFORMANCE: Removed expensive console.log
-    
-    // Store canvas container for renderer actor to emit event
-    this.canvasContainer = canvasOverlay;
-    
-    console.log('🔧 AtomicTableRenderer: DOM initialization complete, container structure created');
-    
-    // PERFORMANCE: Canvas initialization deferred to post-render to avoid blocking critical path
-    // Canvas container ready will be emitted after first table render completes
-    // This prevents blocking the initial DOM setup with canvas creation
-  }
+  // DOM is now handled by DOMStructureManager
   
   // Initialize canvas overlay post-render (non-blocking)
   initializeCanvasPostRender(): void {
-    if (this.canvasContainer && this.options.onStateChange && !this.canvasInitialized) {
+    const canvasContainer = this.domManager.getElement('canvasContainer');
+    if (canvasContainer && this.options.onStateChange && !this.canvasInitialized) {
       console.log('🔧 AtomicTableRenderer: Emitting canvas.container.ready event post-render');
       this.options.onStateChange({
         type: 'canvas.container.ready',
-        container: this.canvasContainer
+        container: canvasContainer
       });
       this.canvasInitialized = true;
     }
@@ -417,12 +335,16 @@ export class AtomicTableRenderer {
   }
   
   private setupEventListeners() {
+    const viewport = this.domManager.getElement('viewport');
+    const header = this.domManager.getElement('header');
+    const body = this.domManager.getElement('body');
+    
     // Scroll handling with simple throttling
     let isScrolling = false;
     
-    this.viewport.addEventListener('scroll', () => {
+    viewport.addEventListener('scroll', () => {
       // Always sync header immediately for smooth horizontal scrolling
-      this.header.style.transform = `translateX(-${this.viewport.scrollLeft}px)`;
+      header.style.transform = `translateX(-${viewport.scrollLeft}px)`;
       
       // Prevent multiple simultaneous updates
       if (isScrolling) return;
@@ -430,10 +352,10 @@ export class AtomicTableRenderer {
       isScrolling = true;
       
       requestAnimationFrame(() => {
-        const scrollTop = this.viewport.scrollTop;
-        const viewportHeight = this.viewport.clientHeight;
-        const viewportWidth = this.viewport.clientWidth;
-        const scrollLeft = this.viewport.scrollLeft;
+        const scrollTop = viewport.scrollTop;
+        const viewportHeight = viewport.clientHeight;
+        const viewportWidth = viewport.clientWidth;
+        const scrollLeft = viewport.scrollLeft;
         
         // Use VirtualGridManager to calculate viewport
         const newViewport = this.virtualGrid.calculateViewportFromScroll(
@@ -465,20 +387,20 @@ export class AtomicTableRenderer {
     
     // Cell interaction handlers - REMOVED to prevent duplicate events
     // All mouse events are now handled at the VibeGridX level
-    // this.body.addEventListener('click', this.handleCellClick.bind(this));
-    this.body.addEventListener('dblclick', this.handleCellDoubleClick.bind(this));
-    // this.body.addEventListener('mousedown', this.handleMouseDown.bind(this));
+    // body.addEventListener('click', this.handleCellClick.bind(this));
+    body.addEventListener('dblclick', this.handleCellDoubleClick.bind(this));
+    // body.addEventListener('mousedown', this.handleMouseDown.bind(this));
     
     // Header interaction handlers
-    this.header.addEventListener('click', this.handleHeaderClick.bind(this));
+    header.addEventListener('click', this.handleHeaderClick.bind(this));
     
     // Column drag handlers - only the mousedown on header, not global listeners
     // Global listeners will be added dynamically when drag/resize starts
-    this.header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
+    header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
     
     // Make viewport focusable but don't add keyboard listener here
     // Keyboard events are handled at the VibeGridX component level to avoid duplication
-    this.viewport.tabIndex = 0;
+    viewport.tabIndex = 0;
   }
   
   // ====================================
