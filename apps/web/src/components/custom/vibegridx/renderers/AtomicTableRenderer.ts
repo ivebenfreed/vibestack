@@ -9,17 +9,7 @@ import type {
   SortConfig 
 } from '../types';
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
-import { 
-  renderText, 
-  renderNumber, 
-  renderDate, 
-  renderBoolean, 
-  renderEnum,
-  renderRelationship,
-  renderRelationshipSingle,
-  renderRelationshipMulti,
-  type RelationshipData
-} from './fast-renderers';
+import { CellRenderingPipeline } from './CellRenderingPipeline';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -1384,28 +1374,8 @@ export class AtomicTableRenderer {
         overflow: 'hidden'
       });
       
-      // Create content wrapper
-      const content = document.createElement('div');
-      Object.assign(content.style, {
-        width: '100%',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        padding: '8px 12px',
-        boxSizing: 'border-box'
-      });
-      
-      // Set content efficiently - pass row.data for relationship resolution
-      const cellContent = this.renderValueFast(value, column, row.data);
-      
-      // Check if this is an enum type that returns HTML
-      const cellType = column.cellType || column.type;
-      if (cellType === 'enum') {
-        content.innerHTML = cellContent;
-      } else {
-        content.textContent = cellContent;
-      }
-      
+      // Create content using CellRenderingPipeline
+      const content = CellRenderingPipeline.createCellContent(value, column, row.data);
       cell.appendChild(content);
       fragment.appendChild(cell);
       
@@ -1872,33 +1842,8 @@ export class AtomicTableRenderer {
   // FAST CELL RENDERING
   // ====================================
   
-  // Map of renderers for quick lookup
-  private static readonly renderers: Record<string, (value: any, column: Column, relationshipData?: any) => string> = {
-    text: renderText,
-    number: renderNumber,
-    date: renderDate,
-    boolean: renderBoolean,
-    enum: renderEnum,
-    select: renderText, // Reuse text renderer for select
-    uuid: renderText, // UUID is text-based
-    json: renderText, // JSON displayed as text (could be enhanced later)
-    relationship: renderRelationshipSingle, // Default to single
-    'relationship-single': renderRelationshipSingle,
-    'relationship-multi': renderRelationshipMulti,
-    'relationship-collection': renderRelationshipMulti, // Collections use multi renderer
-  };
-  
   private renderValueFast(value: any, column: Column, rowData?: any): string {
-    // Check column cellType first, then fall back to type
-    const cellType = column.cellType || column.type;
-    const renderer = AtomicTableRenderer.renderers[cellType] || renderText;
-    
-    // For relationship types, pass row data for pre-resolved values
-    if (cellType?.startsWith('relationship')) {
-      return (renderer as any)(value, column, rowData);
-    }
-    
-    return renderer(value, column);
+    return CellRenderingPipeline.renderValue(value, column, rowData);
   }
 
   // ====================================
