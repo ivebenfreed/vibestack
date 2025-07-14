@@ -19,11 +19,12 @@ export class VirtualGridManager {
     this.totalRows = 0;
     this.rowHeight = initialViewport.itemHeight;
     
-    // PERFORMANCE FIX: Initialize visible range from initial viewport
-    const bufferRows = 5;
+    // Initialize visible range from initial viewport
+    // Don't subtract/add buffer rows here - just use the viewport as-is
+    // The buffer will be applied properly in updateViewport when we have totalRows
     this.visibleRange = {
-      start: Math.max(0, initialViewport.start - bufferRows),
-      end: Math.max(0, initialViewport.end + bufferRows)
+      start: initialViewport.start,
+      end: initialViewport.end
     };
   }
   

@@ -209,9 +209,42 @@ export class AtomicTableRenderer {
     
     console.log('🔧 AtomicTableRenderer: DOM initialization complete, container structure created');
     
+    // Immediately update virtual grid with actual container measurements
+    this.updateInitialViewport();
+    
     // PERFORMANCE: Canvas initialization deferred to post-render to avoid blocking critical path
     // Canvas container ready will be emitted after first table render completes
     // This prevents blocking the initial DOM setup with canvas creation
+  }
+  
+  // Update initial viewport with actual DOM measurements
+  private updateInitialViewport(): void {
+    // Get actual container dimensions after DOM is ready
+    const containerHeight = this.container.clientHeight || this.viewport.clientHeight || 600;
+    const containerWidth = this.container.clientWidth || this.viewport.clientWidth || 800;
+    
+    console.log('🔧 AtomicTableRenderer: Updating initial viewport with actual measurements', {
+      containerHeight,
+      containerWidth,
+      rowHeight: this.rowHeight
+    });
+    
+    // Calculate how many rows actually fit
+    const visibleRowCount = Math.ceil(containerHeight / this.rowHeight);
+    const bufferRows = 5;
+    
+    const initialViewport: ViewportInfo = {
+      start: 0,
+      end: visibleRowCount + bufferRows,
+      height: containerHeight,
+      width: containerWidth,
+      scrollTop: 0,
+      scrollLeft: 0,
+      itemHeight: this.rowHeight
+    };
+    
+    // Update virtual grid with proper viewport
+    this.virtualGrid = new VirtualGridManager(initialViewport);
   }
   
   // Initialize canvas overlay post-render (non-blocking)
