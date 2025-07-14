@@ -16,6 +16,7 @@ import { DOMStructureManager } from './DOMStructureManager';
 import { SelectionManager } from './SelectionManager';
 import { EventDelegationSystem, type EventCallbacks } from './EventDelegationSystem';
 import { RowRenderingEngine } from './RowRenderingEngine';
+import { HeaderRenderer } from './HeaderRenderer';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -54,6 +55,7 @@ export class AtomicTableRenderer {
   private selectionManager: SelectionManager;
   private eventSystem: EventDelegationSystem;
   private rowRenderingEngine: RowRenderingEngine;
+  private headerRenderer: HeaderRenderer;
   private options: RendererOptions;
   
   // Performance tracking
@@ -158,6 +160,15 @@ export class AtomicTableRenderer {
       enableSelectionColumn: options.enableSelectionColumn || false
     });
     
+    // Initialize header renderer
+    this.headerRenderer = new HeaderRenderer({
+      columnManager: this.columnManager,
+      domManager: this.domManager,
+      selectionManager: this.selectionManager,
+      enableSelectionColumn: options.enableSelectionColumn || false,
+      getTotalColumnsWidth: () => this.getTotalColumnsWidth()
+    });
+    
     // Event handlers now managed by EventDelegationSystem
     
     // DOM is already initialized by DOMStructureManager
@@ -236,7 +247,7 @@ export class AtomicTableRenderer {
     
     try {
       // Batch all DOM writes together before reading dimensions
-      this.renderHeader(state);
+      this.headerRenderer.renderHeader(state);
       
       // Use requestAnimationFrame to defer dimension reading until after browser paint
       requestAnimationFrame(() => {
@@ -272,7 +283,7 @@ export class AtomicTableRenderer {
       
       // Re-render header content to show/hide columns
       if (this.lastRenderState) {
-        this.renderHeader(this.lastRenderState);
+        this.headerRenderer.renderHeader(this.lastRenderState);
         // Also re-render visible rows to update cell positions
         this.rowRenderingEngine.renderVisibleRows(this.lastRenderState);
       }
@@ -307,7 +318,7 @@ export class AtomicTableRenderer {
       
       // Re-render header to reflect new widths
       if (this.lastRenderState) {
-        this.renderHeader(this.lastRenderState);
+        this.headerRenderer.renderHeader(this.lastRenderState);
       }
     });
   }
@@ -482,8 +493,8 @@ export class AtomicTableRenderer {
     try {
       // STEP 1: Render header
       const headerOnlyStart = performance.now();
-      this.renderHeader(state);
-      const headerOnlyTime = performance.now() - headerOnlyStart;
+      const headerMetrics = this.headerRenderer.renderHeader(state);
+      const headerOnlyTime = headerMetrics.renderTime;
       
       // Check if this is the first render
       if (this.isFirstRender) {
@@ -633,6 +644,9 @@ export class AtomicTableRenderer {
   setSelectedRows(selectedRows: Set<string>): void {
     const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
     this.selectionManager.setSelectedRows(selectedRows, allRows);
+    
+    // Update header checkbox state
+    this.headerRenderer.updateHeaderCheckbox(allRows.length, selectedRows.size);
   }
   
   // ====================================
@@ -782,139 +796,7 @@ export class AtomicTableRenderer {
     this.virtualGrid.updateViewport(currentViewport, state.rows.length);
   }
   
-  private renderHeader(state: RenderState): void {
-    const headerStartTime = performance.now();
-    if (!state.rows.length) return;
-    
-    // STEP 1: Column preparation
-    const step1Start = performance.now();
-    const columnsToRender = state.columns && state.columns.length > 0
-      ? state.columns
-      : this.columnManager.getVisibleColumns().length > 0 
-        ? this.columnManager.getVisibleColumns() 
-        : Object.keys(state.rows[0].data).map(key => ({
-            id: key,
-            name: key,
-            field: key,
-            type: 'text' as const,
-            width: 120,
-            sortable: true
-          }));
-    const step1Time = performance.now() - step1Start;
-    
-    
-    // STEP 2: Width calculation
-    const step2Start = performance.now();
-    const totalWidth = this.getTotalColumnsWidth();
-    this.domManager.getElement('header').style.width = `${totalWidth}px`;
-    const step2Time = performance.now() - step2Start;
-    
-    // STEP 3: Sort lookup creation
-    const step3Start = performance.now();
-    const sortState = (state as any).sortBy || [];
-    const sortLookup = new Map();
-    sortState.forEach((sort: any, index: number) => {
-      sortLookup.set(sort.field, { direction: sort.direction, index });
-    });
-    const step3Time = performance.now() - step3Start;
-    
-    // STEP 4: Column filtering and offset calculation
-    const step4Start = performance.now();
-    const dataColumns = columnsToRender.filter(col => col.id !== '__selection');
-    const columnOffsets: number[] = [];
-    let runningOffset = 48; // Start after selection column
-    dataColumns.forEach((column, index) => {
-      columnOffsets[index] = runningOffset;
-      const width = this.columnManager.getColumnWidth(column.id);
-      runningOffset += width;
-    });
-    const step4Time = performance.now() - step4Start;
-    
-    // STEP 5: Clear existing header
-    const step5Start = performance.now();
-    this.domManager.getElement('header').innerHTML = '';
-    const step5Time = performance.now() - step5Start;
-    
-    // STEP 6: Create selection header
-    const step6Start = performance.now();
-    const selectedRows = this.selectionManager.getSelectedRows();
-    const allSelected = selectedRows.size === state.rows.length && state.rows.length > 0;
-    const someSelected = selectedRows.size > 0 && selectedRows.size < state.rows.length;
-    
-    const selectionHeader = document.createElement('div');
-    selectionHeader.className = 'vibegridx-header-cell vibegridx-selection-header';
-    selectionHeader.setAttribute('data-column', '__selection');
-    selectionHeader.style.cssText = 'width: 48px; min-width: 48px; max-width: 48px; position: sticky; left: 0; z-index: 10; background: var(--background);';
-    
-    const checkboxWrapper = document.createElement('label');
-    checkboxWrapper.className = 'vibegridx-checkbox-wrapper';
-    
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.className = 'vibegridx-header-checkbox';
-    checkbox.checked = allSelected;
-    checkbox.indeterminate = someSelected;
-    
-    const checkboxCustom = document.createElement('span');
-    checkboxCustom.className = 'vibegridx-checkbox-custom';
-    
-    checkboxWrapper.appendChild(checkbox);
-    checkboxWrapper.appendChild(checkboxCustom);
-    selectionHeader.appendChild(checkboxWrapper);
-    this.domManager.getElement('header').appendChild(selectionHeader);
-    const step6Time = performance.now() - step6Start;
-    
-    // STEP 7: Create fragment and data columns
-    const step7Start = performance.now();
-    const fragment = document.createDocumentFragment();
-    const step7aTime = performance.now() - step7Start;
-    
-    const step7bStart = performance.now();
-    dataColumns.forEach((column, index) => {
-      const columnStartTime = performance.now();
-      
-      const width = this.columnManager.getColumnWidth(column.id);
-      const field = column.field || column.id;
-      const sortInfo = sortLookup.get(field);
-      
-      const headerCell = document.createElement('div');
-      headerCell.className = `vibegridx-header-cell${column.sortable !== false ? ' vibegridx-sortable' : ''}${sortInfo ? (sortInfo.direction === 'asc' ? ' sort-asc' : ' sort-desc') : ''}`;
-      headerCell.setAttribute('data-column', column.id);
-      headerCell.setAttribute('data-field', field);
-      headerCell.style.cssText = `width: ${width}px; min-width: ${width}px; max-width: ${width}px;`;
-      
-      const headerText = document.createElement('span');
-      headerText.className = 'vibegridx-header-text';
-      headerText.textContent = column.name || column.id;
-      
-      const sortIcon = document.createElement('span');
-      sortIcon.className = 'vibegridx-sort-icon';
-      sortIcon.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5L6 2L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'asc' ? '1' : '0.3'}"/><path d="M3 7L6 10L9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="${sortInfo?.direction === 'desc' ? '1' : '0.3'}"/></svg>`;
-      
-      const resizeHandle = document.createElement('div');
-      resizeHandle.className = 'vibegridx-resize-handle';
-      resizeHandle.setAttribute('data-column', column.id);
-      
-      headerCell.appendChild(headerText);
-      headerCell.appendChild(sortIcon);
-      headerCell.appendChild(resizeHandle);
-      fragment.appendChild(headerCell);
-      
-      const columnTime = performance.now() - columnStartTime;
-      if (columnTime > 1) {
-        console.log(`🐌 SLOW column creation: ${column.id} took ${columnTime.toFixed(2)}ms`);
-      }
-    });
-    const step7bTime = performance.now() - step7bStart;
-    
-    // STEP 8: Append fragment to header
-    const step8Start = performance.now();
-    this.domManager.getElement('header').appendChild(fragment);
-    const step8Time = performance.now() - step8Start;
-    
-    const totalHeaderTime = performance.now() - headerStartTime;
-    
-  }
+  // Header rendering is now handled by HeaderRenderer
   
   // Row rendering is now handled by RowRenderingEngine
   
