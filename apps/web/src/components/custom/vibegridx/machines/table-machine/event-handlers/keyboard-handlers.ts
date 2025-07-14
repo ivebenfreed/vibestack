@@ -160,32 +160,17 @@ export const keyboardHandlers = {
   
   'keyboard.escape': {
     actions: [
-      // Send to overlay actor first to clear any visual states
-      sendTo(
-        ({ context }) => context.actors.overlayActor!,
-        () => ({ type: 'ESCAPE' })
-      ),
-      
-      // Then to edit coordinator to cancel any editing
-      sendTo(
-        ({ context }) => context.actors.editCoordinator!,
-        ({ event }) => event
-      ),
-      
       // Clear selection
       assign({
         selectedCells: () => new Set<string>()
       }),
       
-      // Clear visual selection
-      ({ context, self }) => {
+      // Clear visual selection directly to avoid event loops
+      ({ context }) => {
         if (context.actors.canvasActor) {
-          self.send({
-            type: 'FORWARD_TO_CANVAS',
-            event: {
-              type: 'UPDATE_SELECTION_VISUAL',
-              visualCells: []
-            }
+          context.actors.canvasActor.send({
+            type: 'UPDATE_SELECTION_VISUAL',
+            visualCells: []
           });
         }
       },
