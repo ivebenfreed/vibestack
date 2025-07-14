@@ -11,6 +11,7 @@ import type {
 import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import { CellRenderingPipeline } from './CellRenderingPipeline';
 import { VirtualGridManager } from './VirtualGridManager';
+import { ColumnManager } from './ColumnManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -52,6 +53,7 @@ export class AtomicTableRenderer {
   private canvasContainer: HTMLElement | null = null;
   
   private virtualGrid: VirtualGridManager;
+  private columnManager: ColumnManager;
   private options: RendererOptions;
   
   // Performance tracking
@@ -70,15 +72,10 @@ export class AtomicTableRenderer {
   private editingCell: CellRef | null = null;
   private lastRenderState: RenderState | null = null;
   
-  // Column configuration
-  private columns: Column[] = [];
-  private columnVisibility: Record<string, boolean> = {};
-  private visibleColumns: Column[] = [];
-  private columnWidths: Record<string, number> = {};
+  // External managers
   private dimensionManager: ColumnDimensionManager | null = null;
   private coordinateManager: any = null; // VibeGridXCoordinateManager
   private rowHeight = 40; // Default row height
-  private enableSelectionColumn = false; // Whether to show selection column
   
   // Batch update queue
   private updateQueue = new Set<string>();
@@ -96,12 +93,14 @@ export class AtomicTableRenderer {
     this.options = options;
     this.dimensionManager = options.dimensionManager || null;
     this.coordinateManager = options.coordinateManager || null;
-    this.enableSelectionColumn = options.enableSelectionColumn || false;
     
-    // Set columns if provided
-    if (options.columns) {
-      this.setColumns(options.columns);
-    }
+    // Initialize column manager
+    this.columnManager = new ColumnManager({
+      columns: options.columns,
+      enableSelectionColumn: options.enableSelectionColumn || false,
+      columnVisibility: options.columnVisibility,
+      columnWidths: options.columnWidths
+    });
     
     // Use configured row height or default
     this.rowHeight = options.cellHeight || 40;
@@ -229,15 +228,13 @@ export class AtomicTableRenderer {
   
   // Set or update columns
   setColumns(columns: Column[]): void {
-    this.columns = columns;
-    this.updateVisibleColumns();
+    this.columnManager.setColumns(columns);
     // Dimension manager will be set separately via setDimensionManager
   }
 
   // Set or update column visibility
   setColumnVisibility(visibility: Record<string, boolean>): void {
-    this.columnVisibility = visibility;
-    this.updateVisibleColumns();
+    this.columnManager.setColumnVisibility(visibility);
     
     // Update dimensions without triggering full re-render to avoid infinite loop
     this.updateHeaderDimensions();
@@ -250,15 +247,15 @@ export class AtomicTableRenderer {
     try {
       // Set all configuration at once without triggering updates
       if (state.columnVisibility) {
-        this.columnVisibility = state.columnVisibility;
+        this.columnManager.setColumnVisibility(state.columnVisibility);
       }
       
       if (state.columnOrder && state.columnOrder.length > 0) {
-        this.applyColumnOrder(state.columnOrder);
+        this.columnManager.setColumnOrder(state.columnOrder);
       }
       
       if (state.columns && state.columns.length > 0) {
-        this.columns = state.columns;
+        this.columnManager.setColumns(state.columns);
       }
       
       // Update virtual grid with row count first
@@ -269,8 +266,7 @@ export class AtomicTableRenderer {
       // and provides them to the renderer via render state. This eliminates
       // the "hackery" of direct method calls and follows proper XState patterns.
       
-      // Single update and direct render without column reconfiguration
-      this.updateVisibleColumns();
+      // Direct render without column reconfiguration
       this.renderDirectly(state);
     } catch (error) {
       console.error('[AtomicTableRenderer] Initialize error:', error);
@@ -296,56 +292,25 @@ export class AtomicTableRenderer {
     }
   }
   
-  // Apply column order without triggering updates (for batch operations)
-  private applyColumnOrder(order: string[]): void {
-    const orderedColumns: Column[] = [];
-    
-    // First pass: add columns in the specified order
-    for (const columnId of order) {
-      const column = this.columns.find(c => c.id === columnId);
-      if (column) {
-        orderedColumns.push(column);
-      }
-    }
-    
-    // Second pass: add any remaining columns not in the order
-    for (const column of this.columns) {
-      if (!order.includes(column.id)) {
-        orderedColumns.push(column);
-      }
-    }
-    
-    this.columns = orderedColumns;
-  }
-  
   setColumnOrder(order: string[]): void {
     console.log('[AtomicTableRenderer] Setting column order:', order);
-    this.applyColumnOrder(order);
-    this.updateVisibleColumns();
+    this.columnManager.setColumnOrder(order);
     this.updateHeaderDimensions();
   }
 
   private getLastRenderState(): RenderState | null {
     return this.lastRenderState;
   }
-  
-  // Update the list of visible columns based on visibility settings
-  private updateVisibleColumns(): void {
-    this.visibleColumns = this.columns.filter(column => {
-      // Column is visible if not explicitly hidden
-      return this.columnVisibility[column.id] !== false;
-    });
-  }
 
   // Update header dimensions without full re-render
   private updateHeaderDimensions(): void {
-    if (this.header && this.visibleColumns.length > 0) {
+    if (this.header && this.columnManager.getVisibleColumns().length > 0) {
       const totalWidth = this.getTotalColumnsWidth();
       this.header.style.width = `${totalWidth}px`;
       
       // Update dimension manager with visible columns
       if (this.dimensionManager) {
-        this.dimensionManager.setColumns(this.visibleColumns);
+        this.dimensionManager.setColumns(this.columnManager.getVisibleColumns());
       }
       
       // Re-render header content to show/hide columns
@@ -367,16 +332,14 @@ export class AtomicTableRenderer {
       const coordinateColumnIds = manager.getColumnIds();
       console.log('AtomicTableRenderer: Syncing visible columns with coordinate manager', {
         coordinateManagerColumns: coordinateColumnIds,
-        rendererColumns: this.visibleColumns.map(c => c.id)
+        rendererColumns: this.columnManager.getVisibleColumns().map(c => c.id)
       });
       
-      // Update renderer's visible columns to match coordinate manager
-      this.visibleColumns = coordinateColumnIds.map(id => {
-        return this.columns.find(col => col.id === id) || { id, name: id, field: id, width: 120 };
-      }).filter(Boolean);
+      // Update column order to match coordinate manager
+      this.columnManager.setColumnOrder(coordinateColumnIds);
       
       console.log('AtomicTableRenderer: Updated visible columns', {
-        newVisibleColumns: this.visibleColumns.map(c => c.id)
+        newVisibleColumns: this.columnManager.getVisibleColumns().map(c => c.id)
       });
     }
     
@@ -401,7 +364,7 @@ export class AtomicTableRenderer {
       // Selection column is always included
       totalWidth += 48; // Fixed width for selection column
       
-      this.visibleColumns.forEach(column => {
+      this.columnManager.getVisibleColumns().forEach(column => {
         totalWidth += this.lastRenderState.columnWidths[column.id] || column.width || 120;
       });
       
@@ -414,16 +377,16 @@ export class AtomicTableRenderer {
     // Selection column is always included
     totalWidth += 48; // Fixed width for selection column
     
-    this.visibleColumns.forEach(column => {
-      totalWidth += this.columnWidths[column.id] || column.width || 120;
+    this.columnManager.getVisibleColumns().forEach(column => {
+      totalWidth += this.columnManager.getColumnWidth(column.id);
     });
     
     console.log('AtomicTableRenderer: Total width calculation:', {
       totalWidth,
-      visibleColumns: this.visibleColumns.length,
+      visibleColumns: this.columnManager.getVisibleColumns().length,
       hasRenderState: !!this.lastRenderState,
       hasColumnWidths: !!(this.lastRenderState?.columnWidths),
-      columnWidths: this.columnWidths
+      columnWidths: this.columnManager.getColumnWidths()
     });
     
     return totalWidth;
@@ -442,11 +405,11 @@ export class AtomicTableRenderer {
     // Selection column is always included and goes first
     offset += 48; // Fixed width for selection column
     
-    for (const column of this.visibleColumns) {
+    for (const column of this.columnManager.getVisibleColumns()) {
       if (column.id === columnId) {
         break;
       }
-      const width = (this.lastRenderState?.columnWidths?.[column.id]) || this.columnWidths[column.id] || column.width || 120;
+      const width = (this.lastRenderState?.columnWidths?.[column.id]) || this.columnManager.getColumnWidth(column.id);
       offset += width;
     }
     
@@ -565,7 +528,7 @@ export class AtomicTableRenderer {
     
     // Update column widths from render state
     if (state.columnWidths) {
-      this.columnWidths = state.columnWidths;
+      this.columnManager.setColumnWidths(state.columnWidths);
     }
     
     // Rows are already pre-sorted by render state extractor
@@ -578,7 +541,7 @@ export class AtomicTableRenderer {
     
     // Update column widths if provided
     if (state.columnWidths) {
-      this.columnWidths = state.columnWidths;
+      this.columnManager.setColumnWidths(state.columnWidths);
     }
     
     // NOTE: Coordinate manager updates removed - now handled by coordinate actor
@@ -824,7 +787,7 @@ export class AtomicTableRenderer {
     });
     
     // Update header checkbox state if selection column is enabled
-    if (this.enableSelectionColumn && this.lastRenderState) {
+    if (this.columnManager.isSelectionColumnEnabled() && this.lastRenderState) {
       const headerCheckbox = this.header.querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
       if (headerCheckbox) {
         const allSelected = this.selectedRows.size === this.lastRenderState.rows.length && this.lastRenderState.rows.length > 0;
@@ -940,8 +903,8 @@ export class AtomicTableRenderer {
     const step1Start = performance.now();
     const columnsToRender = state.columns && state.columns.length > 0
       ? state.columns
-      : this.visibleColumns.length > 0 
-        ? this.visibleColumns 
+      : this.columnManager.getVisibleColumns().length > 0 
+        ? this.columnManager.getVisibleColumns() 
         : Object.keys(state.rows[0].data).map(key => ({
             id: key,
             name: key,
@@ -975,7 +938,7 @@ export class AtomicTableRenderer {
     let runningOffset = 48; // Start after selection column
     dataColumns.forEach((column, index) => {
       columnOffsets[index] = runningOffset;
-      const width = this.columnWidths[column.id] || column.width || 120;
+      const width = this.columnManager.getColumnWidth(column.id);
       runningOffset += width;
     });
     const step4Time = performance.now() - step4Start;
@@ -1022,7 +985,7 @@ export class AtomicTableRenderer {
     dataColumns.forEach((column, index) => {
       const columnStartTime = performance.now();
       
-      const width = this.columnWidths[column.id] || column.width || 120;
+      const width = this.columnManager.getColumnWidth(column.id);
       const field = column.field || column.id;
       const sortInfo = sortLookup.get(field);
       
@@ -1199,8 +1162,8 @@ export class AtomicTableRenderer {
     const stateColumns = this.lastRenderState?.columns;
     const columnsToRender = stateColumns && stateColumns.length > 0
       ? stateColumns.filter(col => col.id !== '__selection')
-      : this.visibleColumns.length > 0 
-        ? this.visibleColumns.filter(col => col.id !== '__selection')
+      : this.columnManager.getVisibleColumns().length > 0 
+        ? this.columnManager.getDataColumns()
         : Object.keys(row.data).map(key => ({
             id: key,
             name: key,
@@ -1277,13 +1240,13 @@ export class AtomicTableRenderer {
     columnsToRender.forEach((column, index) => {
       const cellKey = `${row.id}:${column.id}`;
       const value = row.data[column.field || column.id];
-      const width = this.columnWidths[column.id] || column.width || 120;
+      const width = this.columnManager.getColumnWidth(column.id);
       
       // Calculate offset based on columns being rendered, not internal state
       let calculatedOffset = 48; // Start after selection column
       for (let i = 0; i < index; i++) {
         const prevColumn = columnsToRender[i];
-        const prevWidth = this.columnWidths[prevColumn.id] || prevColumn.width || 120;
+        const prevWidth = this.columnManager.getColumnWidth(prevColumn.id);
         calculatedOffset += prevWidth;
       }
       const xOffset = calculatedOffset;
@@ -1472,7 +1435,7 @@ export class AtomicTableRenderer {
       const columnId = (resizeHandle as HTMLElement).dataset.column;
       
       if (columnId) {
-        const currentWidth = this.columnWidths[columnId] || 120;
+        const currentWidth = this.columnManager.getColumnWidth(columnId);
         
         // Send resize start event to XState
         this.options.onColumnResizeStart?.(columnId, event.clientX, currentWidth);
@@ -1583,14 +1546,14 @@ export class AtomicTableRenderer {
     });
     
     // Find current position of dragged column (excluding selection column)
-    const dataColumns = this.visibleColumns.filter(col => col.id !== '__selection');
+    const dataColumns = this.columnManager.getDataColumns();
     const draggedIndex = dataColumns.findIndex(col => col.id === this.dragState.draggedColumnId);
     
     // Find where the mouse is in relation to columns
     let foundColumn = false;
     for (let i = 0; i < dataColumns.length; i++) {
       const column = dataColumns[i];
-      const columnWidth = this.columnWidths[column.id] || column.width || 120;
+      const columnWidth = this.columnManager.getColumnWidth(column.id);
       const columnStart = accumulatedWidth;
       const columnEnd = accumulatedWidth + columnWidth;
       
@@ -1625,7 +1588,7 @@ export class AtomicTableRenderer {
     
     // Get the width of the dragged column
     const draggedColumn = dataColumns[draggedIndex];
-    const draggedWidth = this.columnWidths[draggedColumn.id] || draggedColumn.width || 120;
+    const draggedWidth = this.columnManager.getColumnWidth(draggedColumn.id);
     
     // Adjust target index to account for removing the dragged column
     let adjustedTargetIndex = targetIndex;
@@ -1697,10 +1660,10 @@ export class AtomicTableRenderer {
     let accumulatedWidth = 48; // Start with selection column width
     
     // Get data columns only (excluding selection column)
-    const dataColumns = this.visibleColumns.filter(col => col.id !== '__selection');
+    const dataColumns = this.columnManager.getDataColumns();
     
     for (let i = 0; i < dataColumns.length; i++) {
-      const columnWidth = this.columnWidths[dataColumns[i].id] || 120;
+      const columnWidth = this.columnManager.getColumnWidth(dataColumns[i].id);
       if (relativeX > accumulatedWidth + columnWidth / 2) {
         targetIndex = i + 1;
       }
@@ -1817,7 +1780,7 @@ export class AtomicTableRenderer {
     console.log('[AtomicTableRenderer] Updating column width', { columnId, width });
     
     // Update our internal state
-    this.columnWidths[columnId] = width;
+    this.columnManager.setColumnWidth(columnId, width);
     
     // Update the header cell width
     const headerCell = this.header.querySelector(`[data-column="${columnId}"]`) as HTMLElement;
@@ -1830,7 +1793,7 @@ export class AtomicTableRenderer {
     }
     
     // Find the column index to know which cells need position updates
-    const columnIndex = this.visibleColumns.findIndex(col => col.id === columnId);
+    const columnIndex = this.columnManager.getVisibleColumnIndex(columnId);
     if (columnIndex === -1) return;
     
     // Calculate new offsets for all columns
@@ -1838,13 +1801,13 @@ export class AtomicTableRenderer {
     const columnOffsets: Record<string, number> = {};
     
     console.log('[AtomicTableRenderer] Calculating offsets:', {
-      enableSelectionColumn: this.enableSelectionColumn,
+      enableSelectionColumn: this.columnManager.isSelectionColumnEnabled(),
       startingOffset: currentOffset,
-      visibleColumns: this.visibleColumns.map(c => c.id)
+      visibleColumns: this.columnManager.getVisibleColumns().map(c => c.id)
     });
     
     // Handle selection column specially if it exists
-    if (this.visibleColumns.some(col => col.id === '__selection')) {
+    if (this.columnManager.isSelectionColumnEnabled()) {
       columnOffsets['__selection'] = 0;
       currentOffset = 48; // Selection column is always 48px wide
       console.log('[AtomicTableRenderer] Selection column found, positioned at 0, next offset: 48');
@@ -1855,19 +1818,19 @@ export class AtomicTableRenderer {
     }
     
     // Position data columns
-    this.visibleColumns.forEach((col, index) => {
+    this.columnManager.getVisibleColumns().forEach((col, index) => {
       if (col.id === '__selection') return; // Already handled
       
       columnOffsets[col.id] = currentOffset;
-      const colWidth = this.columnWidths[col.id] || col.width || 120;
+      const colWidth = this.columnManager.getColumnWidth(col.id);
       console.log(`[AtomicTableRenderer] Column ${col.id}: offset=${currentOffset}, width=${colWidth}`);
       currentOffset += colWidth;
     });
     
     // Update all cells - both width and position
-    this.visibleColumns.forEach((col, index) => {
+    this.columnManager.getVisibleColumns().forEach((col, index) => {
       const cells = this.body.querySelectorAll(`[data-column-id="${col.id}"]`) as NodeListOf<HTMLElement>;
-      const colWidth = this.columnWidths[col.id] || col.width || 120;
+      const colWidth = this.columnManager.getColumnWidth(col.id);
       const colOffset = columnOffsets[col.id];
       
       cells.forEach(cell => {
