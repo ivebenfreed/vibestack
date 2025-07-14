@@ -455,10 +455,6 @@ export const tableBaseMachine = setup({
           
           // Allow handling events while processing
           on: {
-            // Handle atom updates even while processing
-            ATOM_DATA_UPDATED: {
-              actions: atomActions.updateEntitiesFromAtom
-            },
             
             // Selection events should be queued or handled
             ...selectionHandlers,
