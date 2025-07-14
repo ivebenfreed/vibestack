@@ -206,10 +206,22 @@ export const selectionActions = {
   // Keyboard navigation
   moveSelection: assign({
     selectedCells: ({ context, event }) => {
-      if (!event || event.type !== 'selection.arrow.move') return context.selectedCells;
-      if (!context.activeCell || !context.coordinateMapping) return context.selectedCells;
+      if (!event || event.type !== 'keyboard.arrow') return context.selectedCells;
+      if (!context.coordinateMapping) return context.selectedCells;
       
-      const { rowId, columnId } = context.activeCell;
+      // If no active cell, try to use the first selected cell
+      let currentCell = context.activeCell;
+      if (!currentCell && context.selectedCells.size > 0) {
+        const firstCellKey = context.selectedCells.values().next().value;
+        const parsed = parseCellKey(firstCellKey);
+        if (parsed) {
+          currentCell = { rowId: parsed.rowId, columnId: parsed.columnId };
+        }
+      }
+      
+      if (!currentCell) return context.selectedCells;
+      
+      const { rowId, columnId } = currentCell;
       
       // Find current position
       const rowIndex = context.coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
@@ -243,21 +255,55 @@ export const selectionActions = {
       
       const newCellKey = getCellKey(newRow.rowId, newCol.columnId);
       
+      console.log('moveSelection: Calculated new position', {
+        from: getCellKey(rowId, columnId),
+        to: newCellKey,
+        extend: event.extend,
+        direction: event.direction
+      });
+      
       if (event.extend) {
-        // Extend selection
-        const newSelection = new Set(context.selectedCells);
-        newSelection.add(newCellKey);
-        return newSelection;
+        // Extend selection - for shift+arrow we should calculate range from anchor
+        if (context.anchor) {
+          const rangeSelection = calculateRangeSelection(
+            context.anchor,
+            { rowId: newRow.rowId, columnId: newCol.columnId },
+            context.coordinateMapping
+          );
+          console.log('moveSelection: Extended selection with range', {
+            anchor: context.anchor,
+            newCell: { rowId: newRow.rowId, columnId: newCol.columnId },
+            selectionSize: rangeSelection.size
+          });
+          return rangeSelection;
+        } else {
+          // No anchor, just add the new cell
+          const newSelection = new Set(context.selectedCells);
+          newSelection.add(newCellKey);
+          return newSelection;
+        }
       } else {
         // Move selection
         return new Set([newCellKey]);
       }
     },
     activeCell: ({ context, event }) => {
-      if (!event || event.type !== 'selection.arrow.move') return context.activeCell;
-      if (!context.activeCell || !context.coordinateMapping) return context.activeCell;
+      if (!event || event.type !== 'keyboard.arrow') return context.activeCell;
+      if (!context.coordinateMapping) return context.activeCell;
       
-      const { rowId, columnId } = context.activeCell;
+      // If no active cell, try to use the first selected cell
+      let currentCell = context.activeCell;
+      if (!currentCell && context.selectedCells.size > 0) {
+        const firstCellKey = context.selectedCells.values().next().value;
+        const parsed = parseCellKey(firstCellKey);
+        if (parsed) {
+          currentCell = { rowId: parsed.rowId, columnId: parsed.columnId };
+        }
+      }
+      
+      if (!currentCell) return context.activeCell;
+      
+      const { rowId, columnId } = currentCell;
       
       // Find current position
       const rowIndex = context.coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
@@ -290,6 +336,22 @@ export const selectionActions = {
       if (!newRow || !newCol) return context.activeCell;
       
       return { rowId: newRow.rowId, columnId: newCol.columnId };
+    },
+    anchor: ({ context, event }) => {
+      if (!event || event.type !== 'keyboard.arrow') return context.anchor;
+      
+      // Set anchor on first extend, keep it during extend
+      if (event.extend && !context.anchor && context.activeCell) {
+        return context.activeCell;
+      }
+      
+      // Clear anchor when not extending
+      if (!event.extend) {
+        return null;
+      }
+      
+      // Keep existing anchor during extend
+      return context.anchor;
     }
   })
 };
