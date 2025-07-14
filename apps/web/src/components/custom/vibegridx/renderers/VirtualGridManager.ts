@@ -35,15 +35,19 @@ export class VirtualGridManager {
     this.totalRows = totalRows;
     this.rowHeight = viewport.itemHeight;
     
-    // Calculate visible range with buffer
-    const bufferRows = 5;
-    
-    // Always try to render a few extra rows for smooth scrolling
-    // But ensure we don't go beyond the actual data
+    // The viewport already includes buffer from calculateViewportFromScroll
+    // So we just use it directly without adding more buffer
     this.visibleRange = {
-      start: Math.max(0, viewport.start - bufferRows),
-      end: Math.min(totalRows, viewport.end + bufferRows)
+      start: viewport.start,
+      end: Math.min(totalRows, viewport.end)
     };
+    
+    console.log('VirtualGridManager: updateViewport', {
+      viewport,
+      totalRows,
+      oldRange,
+      newRange: this.visibleRange
+    });
     
     // Return true if range changed
     return oldRange.start !== this.visibleRange.start || 
