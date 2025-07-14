@@ -213,6 +213,174 @@ export class ColumnManager {
   }
   
   /**
+   * Get total width of all visible columns using render state context
+   * @param renderStateWidths Optional column widths from render state
+   */
+  getTotalColumnsWidth(renderStateWidths?: Record<string, number>): number {
+    // Use render state column widths if available (from table machine context)
+    if (renderStateWidths) {
+      let totalWidth = 0;
+      
+      // Selection column is always included
+      if (this.enableSelectionColumn) {
+        totalWidth += 48; // Fixed width for selection column
+      }
+      
+      this.visibleColumns.forEach(column => {
+        totalWidth += renderStateWidths[column.id] || column.width || 120;
+      });
+      
+      return totalWidth;
+    }
+    
+    // Fallback: calculate from column definitions
+    let totalWidth = 0;
+    
+    // Selection column is always included
+    if (this.enableSelectionColumn) {
+      totalWidth += 48; // Fixed width for selection column
+    }
+    
+    this.visibleColumns.forEach(column => {
+      totalWidth += this.getColumnWidth(column.id);
+    });
+    
+    console.log('ColumnManager: Total width calculation:', {
+      totalWidth,
+      visibleColumns: this.visibleColumns.length,
+      hasRenderStateWidths: !!renderStateWidths,
+      columnWidths: this.columnWidths
+    });
+    
+    return totalWidth;
+  }
+  
+  /**
+   * Get column offset position for visible columns only
+   * @param columnId The column ID to get offset for
+   * @param renderStateOffsets Optional column offsets from render state
+   * @param renderStateWidths Optional column widths from render state
+   */
+  getColumnOffset(
+    columnId: string, 
+    renderStateOffsets?: Record<string, number>,
+    renderStateWidths?: Record<string, number>
+  ): number {
+    // Use render state column offsets if available (from table machine context)
+    if (renderStateOffsets && renderStateOffsets[columnId] !== undefined) {
+      return renderStateOffsets[columnId];
+    }
+    
+    // Fallback: calculate offset based on visible columns that come before this column
+    let offset = 0;
+    
+    // Selection column is always included and goes first
+    if (this.enableSelectionColumn) {
+      offset += 48; // Fixed width for selection column
+    }
+    
+    for (const column of this.visibleColumns) {
+      if (column.id === columnId) {
+        break;
+      }
+      const width = renderStateWidths?.[column.id] || this.getColumnWidth(column.id);
+      offset += width;
+    }
+    
+    return offset;
+  }
+  
+  /**
+   * Calculate all column offsets for current visible columns
+   * @returns Map of column ID to offset position
+   */
+  calculateColumnOffsets(): Record<string, number> {
+    const offsets: Record<string, number> = {};
+    let currentOffset = 0;
+    
+    // Handle selection column specially if it exists
+    if (this.enableSelectionColumn) {
+      offsets['__selection'] = 0;
+      currentOffset = 48; // Selection column is always 48px wide
+    }
+    
+    // Position data columns
+    this.visibleColumns.forEach(column => {
+      if (column.id === '__selection') return; // Already handled
+      
+      offsets[column.id] = currentOffset;
+      const width = this.getColumnWidth(column.id);
+      currentOffset += width;
+    });
+    
+    return offsets;
+  }
+  
+  /**
+   * Update column width and calculate new layout information
+   * @param columnId The column to update
+   * @param width The new width
+   * @returns Layout information needed for DOM updates
+   */
+  updateColumnWidthAndCalculateLayout(columnId: string, width: number): {
+    totalWidth: number;
+    columnOffsets: Record<string, number>;
+    columnWidths: Record<string, number>;
+    visibleColumns: Column[];
+    columnIndex: number;
+  } | null {
+    console.log('[ColumnManager] Updating column width', { columnId, width });
+    
+    // Update the width
+    this.setColumnWidth(columnId, width);
+    
+    // Find the column index
+    const columnIndex = this.getVisibleColumnIndex(columnId);
+    if (columnIndex === -1) return null;
+    
+    // Calculate new offsets
+    let currentOffset = 0;
+    const columnOffsets: Record<string, number> = {};
+    const columnWidths: Record<string, number> = {};
+    
+    console.log('[ColumnManager] Calculating offsets:', {
+      enableSelectionColumn: this.enableSelectionColumn,
+      startingOffset: currentOffset,
+      visibleColumns: this.visibleColumns.map(c => c.id)
+    });
+    
+    // Handle selection column specially if it exists
+    if (this.enableSelectionColumn) {
+      columnOffsets['__selection'] = 0;
+      currentOffset = 48; // Selection column is always 48px wide
+      console.log('[ColumnManager] Selection column found, positioned at 0, next offset: 48');
+    } else {
+      // If no selection column in visibleColumns but cells expect it, start at 48
+      currentOffset = 48;
+      console.log('[ColumnManager] No selection column in visibleColumns, but starting at 48 for cell compatibility');
+    }
+    
+    // Position data columns and collect widths
+    this.visibleColumns.forEach(col => {
+      if (col.id === '__selection') return; // Already handled
+      
+      columnOffsets[col.id] = currentOffset;
+      const colWidth = this.getColumnWidth(col.id);
+      columnWidths[col.id] = colWidth;
+      console.log(`[ColumnManager] Column ${col.id}: offset=${currentOffset}, width=${colWidth}`);
+      currentOffset += colWidth;
+    });
+    
+    return {
+      totalWidth: currentOffset,
+      columnOffsets,
+      columnWidths,
+      visibleColumns: this.visibleColumns,
+      columnIndex
+    };
+  }
+  
+  /**
    * Get metrics for debugging
    */
   getMetrics() {

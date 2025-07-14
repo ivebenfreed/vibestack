@@ -18,6 +18,8 @@ import { EventDelegationSystem, type EventCallbacks } from './EventDelegationSys
 import { RowRenderingEngine } from './RowRenderingEngine';
 import { HeaderRenderer } from './HeaderRenderer';
 import { PerformanceMonitor } from './PerformanceMonitor';
+import { RenderOrchestrator } from './RenderOrchestrator';
+import { RendererStateManager } from './RendererStateManager';
 
 // ====================================
 // PERFORMANCE CONSTANTS
@@ -58,30 +60,21 @@ export class AtomicTableRenderer {
   private rowRenderingEngine: RowRenderingEngine;
   private headerRenderer: HeaderRenderer;
   private performanceMonitor: PerformanceMonitor;
+  private renderOrchestrator: RenderOrchestrator;
+  private stateManager: RendererStateManager;
   private options: RendererOptions;
   
   // State tracking
   private lastDimensions = { height: 0, width: 0 };
-  private canvasInitialized = false; // Track canvas overlay initialization
-  private isFirstRender = true; // Track if this is the first render
-  
-  // State caches
-  private lastRenderState: RenderState | null = null;
   
   // External managers
-  private dimensionManager: ColumnDimensionManager | null = null;
   private coordinateManager: any = null; // VibeGridXCoordinateManager
   private rowHeight = 40; // Default row height
-  
-  // Batch update queue
-  private updateQueue = new Set<string>();
-  private batchTimeoutId = 0;
   
   // Legacy event handlers removed - now handled by EventDelegationSystem
   
   constructor(options: RendererOptions) {
     this.options = options;
-    this.dimensionManager = options.dimensionManager || null;
     this.coordinateManager = options.coordinateManager || null;
     
     // Initialize managers
@@ -189,6 +182,31 @@ export class AtomicTableRenderer {
       }
     );
     
+    // Initialize render orchestrator
+    this.renderOrchestrator = new RenderOrchestrator({
+      virtualGrid: this.virtualGrid,
+      columnManager: this.columnManager,
+      domManager: this.domManager,
+      headerRenderer: this.headerRenderer,
+      rowRenderingEngine: this.rowRenderingEngine,
+      performanceMonitor: this.performanceMonitor,
+      rowHeight: this.rowHeight,
+      onScroll: options.onScroll
+    });
+    
+    // Initialize state manager
+    this.stateManager = new RendererStateManager({
+      columnManager: this.columnManager,
+      virtualGrid: this.virtualGrid,
+      selectionManager: this.selectionManager,
+      headerRenderer: this.headerRenderer,
+      rowRenderingEngine: this.rowRenderingEngine,
+      performanceMonitor: this.performanceMonitor,
+      renderOrchestrator: this.renderOrchestrator,
+      domManager: this.domManager,
+      options
+    });
+    
     // Event handlers now managed by EventDelegationSystem
     
     // DOM is already initialized by DOMStructureManager
@@ -203,205 +221,47 @@ export class AtomicTableRenderer {
   
   // Initialize canvas overlay post-render (non-blocking)
   initializeCanvasPostRender(): void {
-    const canvasContainer = this.domManager.getElement('canvasContainer');
-    if (canvasContainer && this.options.onStateChange && !this.canvasInitialized) {
-      console.log('🔧 AtomicTableRenderer: Emitting canvas.container.ready event post-render');
-      this.options.onStateChange({
-        type: 'canvas.container.ready',
-        container: canvasContainer
-      });
-      this.canvasInitialized = true;
-    }
+    this.stateManager.initializeCanvasPostRender();
   }
   
   // Set or update columns
   setColumns(columns: Column[]): void {
-    this.columnManager.setColumns(columns);
-    // Dimension manager will be set separately via setDimensionManager
+    this.stateManager.setColumns(columns);
   }
 
   // Set or update column visibility
   setColumnVisibility(visibility: Record<string, boolean>): void {
-    this.columnManager.setColumnVisibility(visibility);
-    
-    // Update dimensions without triggering full re-render to avoid infinite loop
-    this.updateHeaderDimensions();
+    this.stateManager.setColumnVisibility(visibility);
   }
   
   // Initialize renderer with complete configuration - single render
   initialize(state: RenderState): void {
-    // Initialize with render state
-    
-    try {
-      // Set all configuration at once without triggering updates
-      if (state.columnVisibility) {
-        this.columnManager.setColumnVisibility(state.columnVisibility);
-      }
-      
-      if (state.columnOrder && state.columnOrder.length > 0) {
-        this.columnManager.setColumnOrder(state.columnOrder);
-      }
-      
-      if (state.columns && state.columns.length > 0) {
-        this.columnManager.setColumns(state.columns);
-      }
-      
-      // Update virtual grid with row count first
-      this.virtualGrid.setRowCount(state.rows.length);
-      
-      // NOTE: Coordinate manager updates removed - now handled by coordinate actor
-      // The TableMachine receives coordinate mappings from the coordinate actor
-      // and provides them to the renderer via render state. This eliminates
-      // the "hackery" of direct method calls and follows proper XState patterns.
-      
-      // Direct render without column reconfiguration
-      this.renderDirectly(state);
-    } catch (error) {
-      console.error('[AtomicTableRenderer] Initialize error:', error);
-    }
-  }
-  
-  // Direct render without column configuration updates
-  private renderDirectly(state: RenderState): void {
-    this.lastRenderState = state;
-    
-    try {
-      // Batch all DOM writes together before reading dimensions
-      this.headerRenderer.renderHeader(state);
-      
-      // Use requestAnimationFrame to defer dimension reading until after browser paint
-      requestAnimationFrame(() => {
-        this.updateViewport(state);
-        this.rowRenderingEngine.renderVisibleRows(state);
-        this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
-      });
-    } catch (error) {
-      console.error('[AtomicTableRenderer] Render error:', error);
-    }
+    this.stateManager.initialize(state);
   }
   
   setColumnOrder(order: string[]): void {
-    console.log('[AtomicTableRenderer] Setting column order:', order);
-    this.columnManager.setColumnOrder(order);
-    this.updateHeaderDimensions();
-  }
-
-  private getLastRenderState(): RenderState | null {
-    return this.lastRenderState;
-  }
-
-  // Update header dimensions without full re-render
-  private updateHeaderDimensions(): void {
-    if (this.columnManager.getVisibleColumns().length > 0) {
-      const totalWidth = this.getTotalColumnsWidth();
-      this.domManager.getElement('header').style.width = `${totalWidth}px`;
-      
-      // Update dimension manager with visible columns
-      if (this.dimensionManager) {
-        this.dimensionManager.setColumns(this.columnManager.getVisibleColumns());
-      }
-      
-      // Re-render header content to show/hide columns
-      if (this.lastRenderState) {
-        this.headerRenderer.renderHeader(this.lastRenderState);
-        // Also re-render visible rows to update cell positions
-        this.rowRenderingEngine.renderVisibleRows(this.lastRenderState);
-      }
-    }
+    this.stateManager.setColumnOrder(order);
   }
   
   
   // Set dimension manager (called by parent component)
   setDimensionManager(manager: ColumnDimensionManager): void {
-    this.dimensionManager = manager;
-    
-    // If this is a coordinate manager, sync visible columns
-    if (manager && typeof manager.getColumnIds === 'function') {
-      const coordinateColumnIds = manager.getColumnIds();
-      console.log('AtomicTableRenderer: Syncing visible columns with coordinate manager', {
-        coordinateManagerColumns: coordinateColumnIds,
-        rendererColumns: this.columnManager.getVisibleColumns().map(c => c.id)
-      });
-      
-      // Update column order to match coordinate manager
-      this.columnManager.setColumnOrder(coordinateColumnIds);
-      
-      console.log('AtomicTableRenderer: Updated visible columns', {
-        newVisibleColumns: this.columnManager.getVisibleColumns().map(c => c.id)
-      });
-    }
-    
-    // Subscribe to dimension changes
-    manager.subscribe?.((event) => {
-      // Handle dimension changes - could trigger re-render of affected cells
-      console.log('AtomicTableRenderer: Column dimension changed', event);
-      
-      // Re-render header to reflect new widths
-      if (this.lastRenderState) {
-        this.headerRenderer.renderHeader(this.lastRenderState);
-      }
-    });
+    this.stateManager.setDimensionManager(manager);
   }
   
   // Get total width of all visible columns using table machine context
   private getTotalColumnsWidth(): number {
-    // Use render state column widths if available (from table machine context)
-    if (this.lastRenderState && this.lastRenderState.columnWidths) {
-      let totalWidth = 0;
-      
-      // Selection column is always included
-      totalWidth += 48; // Fixed width for selection column
-      
-      this.columnManager.getVisibleColumns().forEach(column => {
-        totalWidth += this.lastRenderState.columnWidths[column.id] || column.width || 120;
-      });
-      
-      return totalWidth;
-    }
-    
-    // Fallback: calculate from column definitions
-    let totalWidth = 0;
-    
-    // Selection column is always included
-    totalWidth += 48; // Fixed width for selection column
-    
-    this.columnManager.getVisibleColumns().forEach(column => {
-      totalWidth += this.columnManager.getColumnWidth(column.id);
-    });
-    
-    console.log('AtomicTableRenderer: Total width calculation:', {
-      totalWidth,
-      visibleColumns: this.columnManager.getVisibleColumns().length,
-      hasRenderState: !!this.lastRenderState,
-      hasColumnWidths: !!(this.lastRenderState?.columnWidths),
-      columnWidths: this.columnManager.getColumnWidths()
-    });
-    
-    return totalWidth;
+    return this.columnManager.getTotalColumnsWidth(this.stateManager.getLastRenderState()?.columnWidths);
   }
   
   // Get column offset position for visible columns only using table machine context
   private getColumnOffset(columnId: string): number {
-    // Use render state column offsets if available (from table machine context)
-    if (this.lastRenderState && this.lastRenderState.columnOffsets && this.lastRenderState.columnOffsets[columnId] !== undefined) {
-      return this.lastRenderState.columnOffsets[columnId];
-    }
-    
-    // Fallback: calculate offset based on visible columns that come before this column
-    let offset = 0;
-    
-    // Selection column is always included and goes first
-    offset += 48; // Fixed width for selection column
-    
-    for (const column of this.columnManager.getVisibleColumns()) {
-      if (column.id === columnId) {
-        break;
-      }
-      const width = (this.lastRenderState?.columnWidths?.[column.id]) || this.columnManager.getColumnWidth(column.id);
-      offset += width;
-    }
-    
-    return offset;
+    const lastRenderState = this.stateManager.getLastRenderState();
+    return this.columnManager.getColumnOffset(
+      columnId,
+      lastRenderState?.columnOffsets,
+      lastRenderState?.columnWidths
+    );
   }
   
   private setupEventListeners() {
@@ -417,81 +277,21 @@ export class AtomicTableRenderer {
     // Cleanup event delegation system
     this.eventSystem.cleanup();
     
-    // Clear update queue
-    this.updateQueue.clear();
-    
-    // Cancel any pending batch timeouts
-    if (this.batchTimeoutId) {
-      clearTimeout(this.batchTimeoutId);
-      this.batchTimeoutId = 0;
-    }
+    // Cleanup state manager
+    this.stateManager.cleanup();
     
     // Cancel performance monitoring
     this.performanceMonitor.cancelFrameTracking();
   }
   
-  // ====================================
-  // SORTING HELPERS
-  // ====================================
-  
-  private applySorting(rows: TableRow[], sortBy: SortConfig[]): TableRow[] {
-    if (sortBy.length === 0) return rows;
-    
-    return [...rows].sort((a, b) => {
-      for (const sort of sortBy) {
-        const aValue = a.data[sort.field];
-        const bValue = b.data[sort.field];
-        
-        if (aValue === bValue) continue;
-        
-        let comparison = 0;
-        
-        if (aValue == null && bValue == null) {
-          comparison = 0;
-        } else if (aValue == null) {
-          comparison = 1; // null values go to the end
-        } else if (bValue == null) {
-          comparison = -1;
-        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
-          comparison = aValue - bValue;
-        } else if (aValue instanceof Date && bValue instanceof Date) {
-          comparison = aValue.getTime() - bValue.getTime();
-        } else {
-          comparison = String(aValue).localeCompare(String(bValue));
-        }
-        
-        return sort.direction === 'desc' ? -comparison : comparison;
-      }
-      
-      return 0;
-    });
-  }
   
   // ====================================
   // PUBLIC RENDERING API
   // ====================================
   
   render(state: RenderState): void {
-    
-    this.performanceMonitor.startRender();
-    
-    // Update column widths from render state
-    if (state.columnWidths) {
-      this.columnManager.setColumnWidths(state.columnWidths);
-    }
-    
     // Rows are already pre-sorted by render state extractor
-    this.lastRenderState = state;
-    
-    // Update columns if provided in state
-    if (state.columns && state.columns.length > 0) {
-      this.setColumns(state.columns);
-    }
-    
-    // Update column widths if provided
-    if (state.columnWidths) {
-      this.columnManager.setColumnWidths(state.columnWidths);
-    }
+    this.stateManager.setLastRenderState(state);
     
     // Sync selection state from render state to SelectionManager
     this.selectionManager.setSelectedCells(state.selectedCells);
@@ -507,122 +307,22 @@ export class AtomicTableRenderer {
     // Skip column configuration updates in render - should use initialize() instead
     // Column visibility and order are set during initialization or via dedicated methods
     
-    try {
-      // STEP 1: Render header
-      const headerMetrics = this.headerRenderer.renderHeader(state);
-      this.performanceMonitor.recordPhase('header', headerMetrics.renderTime);
-      
-      // Check if this is the first render
-      if (this.isFirstRender) {
-        console.log('🎨 AtomicTableRenderer: First render - executing synchronously');
-        this.isFirstRender = false;
-        
-        // CRITICAL: Set row count BEFORE updating viewport
-        this.virtualGrid.setRowCount(state.rows.length);
-        
-        // STEP 2: Update viewport
-        const viewportStart = performance.now();
-        this.updateViewport(state);
-        const viewportTime = performance.now() - viewportStart;
-        this.performanceMonitor.recordPhase('viewport', viewportTime);
-        
-        // Log viewport info for debugging
-        console.log('🎨 AtomicTableRenderer: First render viewport info AFTER updateViewport', {
-          visibleRange: this.virtualGrid.getVisibleRange(),
-          metrics: this.virtualGrid.getMetrics()
-        });
-        
-        // STEP 3: Render visible rows
-        console.log('🎨 AtomicTableRenderer: About to render visible rows synchronously');
-        const metrics = this.rowRenderingEngine.renderVisibleRows(state);
-        this.performanceMonitor.recordPhase('visibleRows', metrics.renderTime);
-        console.log('🎨 AtomicTableRenderer: Visible rows rendered synchronously', metrics);
-        
-        // STEP 4: Apply optimistic operations
-        const optimisticStart = performance.now();
-        this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
-        const optimisticTime = performance.now() - optimisticStart;
-        this.performanceMonitor.recordPhase('optimisticOps', optimisticTime);
-        
-        
-        // Performance timing
-        const totalTime = this.performanceMonitor.endRender(state.rows.length);
-        this.performanceMonitor.recordPhase('total', totalTime);
-        this.performanceMonitor.logBreakdown();
-        
-        console.log('🎨 AtomicTableRenderer: First render complete synchronously', {
-          renderTime: totalTime,
-          rowCount: state.rows.length,
-          timestamp: performance.now()
-        });
-        
-        // Send viewport update for canvas overlay
-        const initialViewport: ViewportInfo = {
-          start: this.virtualGrid.getVisibleRange().start,
-          end: this.virtualGrid.getVisibleRange().end,
-          height: this.domManager.getElement('viewport').clientHeight,
-          width: this.domManager.getElement('viewport').clientWidth,
-          scrollTop: this.domManager.getElement('viewport').scrollTop,
-          scrollLeft: this.domManager.getElement('viewport').scrollLeft,
-          itemHeight: this.virtualGrid.getRowHeight()
-        };
-        
-        this.options.onScroll?.(initialViewport);
-      } else {
-        // Subsequent renders: use RAF for better performance
-        requestAnimationFrame(() => {
-          // Batch all operations in single frame for better performance
-          this.updateViewport(state);
-          this.rowRenderingEngine.renderVisibleRows(state);
-          this.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
-          
-          
-          // Performance timing
-          const renderTime = this.performanceMonitor.endRender(state.rows.length);
-          this.performanceMonitor.recordPhase('total', renderTime);
-          
-          // Send viewport update for canvas overlay
-          const viewport: ViewportInfo = {
-            start: this.virtualGrid.getVisibleRange().start,
-            end: this.virtualGrid.getVisibleRange().end,
-            height: this.domManager.getElement('viewport').clientHeight,
-            width: this.domManager.getElement('viewport').clientWidth,
-            scrollTop: this.domManager.getElement('viewport').scrollTop,
-            scrollLeft: this.domManager.getElement('viewport').scrollLeft,
-            itemHeight: this.virtualGrid.getRowHeight()
-          };
-          
-          this.options.onScroll?.(viewport);
-        });
-      }
-      
-    } finally {
-      // Performance metrics are tracked by PerformanceMonitor
-    }
+    // Delegate to render orchestrator
+    this.renderOrchestrator.render(state);
   }
   
   updateCell(rowId: string, columnId: string, value: any, column: Column): void {
-    const cellKey = `${rowId}:${columnId}`;
-    this.updateQueue.add(cellKey);
-    
-    // Batch updates for performance
-    if (this.batchTimeoutId) {
-      clearTimeout(this.batchTimeoutId);
-    }
-    
-    this.batchTimeoutId = window.setTimeout(() => {
-      this.processBatchUpdates();
-    }, 0);
+    this.stateManager.queueCellUpdate(rowId, columnId, value);
   }
 
   // NEW: Update a single row without full table re-render
   updateRow(row: TableRow): void {
-    this.rowRenderingEngine.updateRow(row, this.lastRenderState);
+    this.rowRenderingEngine.updateRow(row, this.stateManager.getLastRenderState());
   }
 
   // NEW: Update multiple rows (but not the entire table)
   updateRows(rows: TableRow[]): void {
-    this.rowRenderingEngine.updateRows(rows, this.lastRenderState);
+    this.rowRenderingEngine.updateRows(rows, this.stateManager.getLastRenderState());
   }
   
   setEditingCell(cellRef: CellRef | null): void {
@@ -634,7 +334,8 @@ export class AtomicTableRenderer {
   }
   
   setSelectedRows(selectedRows: Set<string>): void {
-    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    const lastRenderState = this.stateManager.getLastRenderState();
+    const allRows = lastRenderState ? lastRenderState.rows : [];
     this.selectionManager.setSelectedRows(selectedRows, allRows);
     
     // Update header checkbox state
@@ -674,17 +375,20 @@ export class AtomicTableRenderer {
   }
   
   toggleRowSelection(rowId: string): boolean {
-    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    const lastRenderState = this.stateManager.getLastRenderState();
+    const allRows = lastRenderState ? lastRenderState.rows : [];
     return this.selectionManager.toggleRowSelection(rowId, allRows);
   }
   
   selectAllRows(): void {
-    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    const lastRenderState = this.stateManager.getLastRenderState();
+    const allRows = lastRenderState ? lastRenderState.rows : [];
     this.selectionManager.selectAllRows(allRows);
   }
   
   clearAllSelections(): void {
-    const allRows = this.lastRenderState ? this.lastRenderState.rows : [];
+    const lastRenderState = this.stateManager.getLastRenderState();
+    const allRows = lastRenderState ? lastRenderState.rows : [];
     this.selectionManager.clearAllSelections(allRows);
   }
   
@@ -695,98 +399,6 @@ export class AtomicTableRenderer {
   // ====================================
   // PRIVATE RENDERING METHODS
   // ====================================
-
-  /**
-   * Batch all DOM measurements to prevent layout thrashing.
-   * The original updateViewport() method caused 42ms forced reflow by doing
-   * 14 sequential DOM queries. This method consolidates them into a single pass.
-   */
-  private batchMeasureDOMElements() {
-    return {
-      viewport: {
-        bounds: this.domManager.getElement('viewport').getBoundingClientRect(),
-        client: {
-          width: this.domManager.getElement('viewport').clientWidth,
-          height: this.domManager.getElement('viewport').clientHeight
-        },
-        scroll: {
-          top: this.domManager.getElement('viewport').scrollTop || 0,
-          left: this.domManager.getElement('viewport').scrollLeft || 0
-        },
-        offset: {
-          width: this.domManager.getElement('viewport').offsetWidth,
-          height: this.domManager.getElement('viewport').offsetHeight
-        }
-      },
-      container: {
-        bounds: this.domManager.getElement('container').getBoundingClientRect(),
-        client: {
-          width: this.domManager.getElement('container').clientWidth,
-          height: this.domManager.getElement('container').clientHeight
-        }
-      },
-      table: {
-        bounds: this.domManager.getElement('table').getBoundingClientRect(),
-        client: {
-          width: this.domManager.getElement('table').clientWidth,
-          height: this.domManager.getElement('table').clientHeight
-        }
-      }
-    };
-  }
-  
-  private updateViewport(state: RenderState): void {
-    // PERFORMANCE OPTIMIZATION: Batch all DOM measurements to prevent layout thrashing
-    // The original code caused 42ms forced reflow by doing 14 sequential DOM queries
-    const measurements = this.batchMeasureDOMElements();
-    
-    // Use cached measurements for calculations - but check container if viewport is 0
-    let viewportHeight = measurements.viewport.client.height;
-    let viewportWidth = measurements.viewport.client.width;
-    
-    // If viewport has no height yet, try container measurements
-    if (!viewportHeight || viewportHeight === 0) {
-      viewportHeight = measurements.container.client.height || 
-                       measurements.table.client.height || 
-                       600; // Ultimate fallback
-      console.log('🎨 AtomicTableRenderer: Using container height as viewport had no height', {
-        viewportHeight,
-        containerHeight: measurements.container.client.height,
-        tableHeight: measurements.table.client.height
-      });
-    }
-    
-    if (!viewportWidth || viewportWidth === 0) {
-      viewportWidth = measurements.container.client.width || 
-                      measurements.table.client.width || 
-                      800; // Ultimate fallback
-    }
-    
-    const scrollTop = measurements.viewport.scroll.top;
-    const scrollLeft = measurements.viewport.scroll.left;
-    
-    // Debug log actual measurements
-    console.log('🎨 AtomicTableRenderer: updateViewport measurements', {
-      viewportHeight,
-      viewportWidth,
-      containerHeight: measurements.container.client.height,
-      viewportClientHeight: measurements.viewport.client.height,
-      tableHeight: measurements.table.client.height,
-      scrollTop,
-      rowHeight: this.rowHeight,
-      expectedRows: Math.ceil(viewportHeight / this.rowHeight)
-    });
-    
-    // Use VirtualGridManager to calculate viewport
-    const currentViewport = this.virtualGrid.calculateViewportFromScroll(
-      scrollTop,
-      viewportHeight,
-      viewportWidth,
-      scrollLeft
-    );
-    
-    this.virtualGrid.updateViewport(currentViewport, state.rows.length);
-  }
   
   // Header rendering is now handled by HeaderRenderer
   
@@ -801,32 +413,7 @@ export class AtomicTableRenderer {
   // REMOVED: updateSelections - handled by Canvas Overlay Manager
   // REMOVED: renderRowCells - handled by RowRenderingEngine
   // REMOVED: applyOptimisticOperations - handled by RowRenderingEngine
-  
-  private processBatchUpdates(): void {
-    const startTime = performance.now();
-    const updateCount = this.updateQueue.size;
-    
-    this.updateQueue.forEach(cellKey => {
-      const [rowId, columnId] = cellKey.split(':');
-      const element = this.getCellElement(rowId, columnId);
-      
-      if (element) {
-        // Update cell content - would get actual value from state
-        element.classList.add('vibegridx-updated');
-        
-        // Remove update indicator after animation
-        setTimeout(() => {
-          element.classList.remove('vibegridx-updated');
-        }, 300);
-      }
-    });
-    
-    this.updateQueue.clear();
-    this.batchTimeoutId = 0;
-    
-    const duration = performance.now() - startTime;
-    this.performanceMonitor.trackBatchUpdate(updateCount, duration);
-  }
+  // REMOVED: processBatchUpdates - handled by RendererStateManager
   
   // ====================================
   // LEGACY EVENT HANDLERS (MOVED TO EventDelegationSystem)
@@ -887,16 +474,17 @@ export class AtomicTableRenderer {
         rows: this.domManager.getCacheMetrics().rowElements,
         cells: this.domManager.getCacheMetrics().cellElements
       },
-      updateQueueSize: this.updateQueue.size
+      updateQueueSize: this.stateManager.getUpdateQueueSize()
     };
   }
   
   // Update a single column width
   updateColumnWidth(columnId: string, width: number): void {
-    console.log('[AtomicTableRenderer] Updating column width', { columnId, width });
+    // Get layout information from ColumnManager
+    const layoutInfo = this.columnManager.updateColumnWidthAndCalculateLayout(columnId, width);
+    if (!layoutInfo) return;
     
-    // Update our internal state
-    this.columnManager.setColumnWidth(columnId, width);
+    const { totalWidth, columnOffsets, columnWidths, visibleColumns } = layoutInfo;
     
     // Update the header cell width
     const headerCell = this.domManager.getElement('header').querySelector(`[data-column="${columnId}"]`) as HTMLElement;
@@ -908,45 +496,10 @@ export class AtomicTableRenderer {
       headerCell.style.flexShrink = '0';
     }
     
-    // Find the column index to know which cells need position updates
-    const columnIndex = this.columnManager.getVisibleColumnIndex(columnId);
-    if (columnIndex === -1) return;
-    
-    // Calculate new offsets for all columns
-    let currentOffset = 0;
-    const columnOffsets: Record<string, number> = {};
-    
-    console.log('[AtomicTableRenderer] Calculating offsets:', {
-      enableSelectionColumn: this.columnManager.isSelectionColumnEnabled(),
-      startingOffset: currentOffset,
-      visibleColumns: this.columnManager.getVisibleColumns().map(c => c.id)
-    });
-    
-    // Handle selection column specially if it exists
-    if (this.columnManager.isSelectionColumnEnabled()) {
-      columnOffsets['__selection'] = 0;
-      currentOffset = 48; // Selection column is always 48px wide
-      console.log('[AtomicTableRenderer] Selection column found, positioned at 0, next offset: 48');
-    } else {
-      // If no selection column in visibleColumns but cells expect it, start at 48
-      currentOffset = 48;
-      console.log('[AtomicTableRenderer] No selection column in visibleColumns, but starting at 48 for cell compatibility');
-    }
-    
-    // Position data columns
-    this.columnManager.getVisibleColumns().forEach((col, index) => {
-      if (col.id === '__selection') return; // Already handled
-      
-      columnOffsets[col.id] = currentOffset;
-      const colWidth = this.columnManager.getColumnWidth(col.id);
-      console.log(`[AtomicTableRenderer] Column ${col.id}: offset=${currentOffset}, width=${colWidth}`);
-      currentOffset += colWidth;
-    });
-    
     // Update all cells - both width and position
-    this.columnManager.getVisibleColumns().forEach((col, index) => {
+    visibleColumns.forEach(col => {
       const cells = this.domManager.getElement('body').querySelectorAll(`[data-column-id="${col.id}"]`) as NodeListOf<HTMLElement>;
-      const colWidth = this.columnManager.getColumnWidth(col.id);
+      const colWidth = columnWidths[col.id] || this.columnManager.getColumnWidth(col.id);
       const colOffset = columnOffsets[col.id];
       
       cells.forEach(cell => {
@@ -955,16 +508,13 @@ export class AtomicTableRenderer {
       });
     });
     
-    // Recalculate total width
-    const totalWidth = currentOffset;
-    
     // Update header total width
     this.domManager.getElement('header').style.width = `${totalWidth}px`;
     
     // Force layout recalculation
     this.domManager.getElement('header').offsetHeight; // Force reflow
     
-    // Update body spacer height if needed
+    // Update body spacer if needed
     if (this.domManager.getElement('body').firstElementChild) {
       const spacer = this.domManager.getElement('body').firstElementChild as HTMLElement;
       if (spacer.classList.contains('vibegridx-virtual-spacer')) {
@@ -982,13 +532,9 @@ export class AtomicTableRenderer {
   destroy(): void {
     this.performanceMonitor.cancelFrameTracking();
     
-    if (this.batchTimeoutId) {
-      clearTimeout(this.batchTimeoutId);
-    }
-    
+    this.stateManager.cleanup();
     this.domManager.clearAllCaches();
     this.selectionManager.clearAllSelections();
-    this.updateQueue.clear();
     
     this.domManager.getElement('container').innerHTML = '';
   }
