@@ -1063,6 +1063,11 @@ export class AtomicTableRenderer {
   
   private renderVisibleRows(state: RenderState): void {
     const visibleRange = this.virtualGrid.getVisibleRange();
+    console.log('🎨 AtomicTableRenderer: renderVisibleRows', {
+      visibleRange,
+      stateRowsLength: state.rows.length,
+      sliceResult: state.rows.slice(visibleRange.start, visibleRange.end).length
+    });
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
     
@@ -1091,21 +1096,22 @@ export class AtomicTableRenderer {
     // It will use viewport-based sizing instead of full scrollable area
     
     // PERFORMANCE DEBUG: Check if we have a fallback that's causing all rows to render
-    if (visibleRows.length === 0) {
+    let rowsToRender = visibleRows;
+    if (visibleRows.length === 0 && state.rows.length > 0) {
       console.warn('PERFORMANCE ISSUE: visibleRows is empty! This will cause no rows to render.');
       console.warn('Total rows in state:', state.rows.length);
       console.warn('Visible range:', visibleRange);
+      console.warn('VirtualGrid metrics:', this.virtualGrid.getMetrics());
       console.warn('Using fallback to render first 20 rows to prevent blank grid');
       
       // Emergency fallback to prevent blank grid
-      const fallbackRows = state.rows.slice(0, 20);
-      console.warn('Fallback rows count:', fallbackRows.length);
-      // Don't use fallback - let it be empty to see what happens
+      rowsToRender = state.rows.slice(0, Math.min(20, state.rows.length));
+      console.warn('Fallback rows count:', rowsToRender.length);
     }
     
     // Clear existing rows that are no longer visible
     this.rowElements.forEach((element, rowId) => {
-      if (!visibleRows.find(row => row.id === rowId)) {
+      if (!rowsToRender.find(row => row.id === rowId)) {
         element.remove();
         this.rowElements.delete(rowId);
       }
@@ -1116,7 +1122,7 @@ export class AtomicTableRenderer {
     const newRowElements: Array<{ element: HTMLElement; rowId: string }> = [];
     
     // Pre-create new rows in fragment (batched DOM insertion)
-    visibleRows.forEach((row, index) => {
+    rowsToRender.forEach((row, index) => {
       const absoluteIndex = visibleRange.start + index;
       
       
