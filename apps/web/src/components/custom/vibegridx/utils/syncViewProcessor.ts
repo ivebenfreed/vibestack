@@ -201,33 +201,44 @@ function createCoordinateMapping(
   columnWidths: Record<string, number>,
   enableSelectionColumn: boolean
 ) {
-  const selectionColumnWidth = 48;
-  let currentX = enableSelectionColumn ? selectionColumnWidth : 0;
-  
-  const columnPositions = columns.map(col => {
-    const width = columnWidths[col.id] || col.width || 120;
-    const position = {
-      id: col.id,
-      x: currentX,
-      width
-    };
-    currentX += width;
-    return position;
-  });
-  
-  return {
+  const coordinateMapping = {
     version: Date.now(),
     rows: rows.map((row, index) => ({ 
       rowId: row.id,
       originalIndex: index,
       sortedIndex: index
     })),
-    columns: columnPositions.map((col, index) => ({
-      columnId: col.id,
-      index,
-      offset: col.x,
-      width: col.width
-    })),
-    enableSelectionColumn
+    columns: [] as Array<{
+      columnId: string;
+      index: number;
+      offset: number;
+      width: number;
+    }>
   };
+  
+  let totalOffset = 0;
+  
+  // Always add selection column first
+  const selectionWidth = 48;
+  coordinateMapping.columns.push({
+    columnId: '__selection',
+    index: 0,
+    offset: 0,
+    width: selectionWidth
+  });
+  totalOffset = selectionWidth;
+  
+  // Add data columns
+  columns.forEach((col, index) => {
+    const width = columnWidths[col.id] || col.width || 120;
+    coordinateMapping.columns.push({
+      columnId: col.id,
+      index: index + 1, // Always offset by 1 for selection column
+      offset: totalOffset,
+      width: width
+    });
+    totalOffset += width;
+  });
+  
+  return coordinateMapping;
 }

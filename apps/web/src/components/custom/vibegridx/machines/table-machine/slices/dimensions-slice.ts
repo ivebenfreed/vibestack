@@ -151,8 +151,8 @@ export const createInitialDimensionsState = (
 export const dimensionActions = {
   // AUTHORITATIVE coordinate recalculation - called when column order changes
   recalculateCoordinateMapping: assign({
-    coordinateMapping: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number>; enableSelectionColumn: boolean }) => {
-      const { columns, columnOrder, columnWidths, enableSelectionColumn } = event;
+    coordinateMapping: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number> }) => {
+      const { columns, columnOrder, columnWidths } = event;
       
       const newCoordinateMapping = {
         rows: context.coordinateMapping.rows, // Preserve existing row mapping
@@ -167,17 +167,15 @@ export const dimensionActions = {
       
       let totalOffset = 0;
       
-      // Add selection column first if enabled
-      if (enableSelectionColumn) {
-        const selectionWidth = 48;
-        newCoordinateMapping.columns.push({
-          columnId: '__selection',
-          index: 0,
-          offset: 0,
-          width: selectionWidth
-        });
-        totalOffset = selectionWidth;
-      }
+      // Always add selection column first
+      const selectionWidth = 48;
+      newCoordinateMapping.columns.push({
+        columnId: '__selection',
+        index: 0,
+        offset: 0,
+        width: selectionWidth
+      });
+      totalOffset = selectionWidth;
       
       // Order columns according to columnOrder
       const orderedColumns = columnOrder
@@ -192,7 +190,7 @@ export const dimensionActions = {
         const width = columnWidths[col.id] || col.width || 120;
         newCoordinateMapping.columns.push({
           columnId: col.id,
-          index: enableSelectionColumn ? index + 1 : index,
+          index: index + 1, // Always offset by 1 for selection column
           offset: totalOffset,
           width: width
         });
@@ -207,17 +205,15 @@ export const dimensionActions = {
       
       return newCoordinateMapping;
     },
-    columnOffsets: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number>; enableSelectionColumn: boolean }) => {
-      const { columns, columnOrder, columnWidths, enableSelectionColumn } = event;
+    columnOffsets: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number> }) => {
+      const { columns, columnOrder, columnWidths } = event;
       const newOffsets: Record<string, number> = {};
       let totalOffset = 0;
       
-      // Add selection column first if enabled
-      if (enableSelectionColumn) {
-        const selectionWidth = 48;
-        newOffsets['__selection'] = 0;
-        totalOffset = selectionWidth;
-      }
+      // Always add selection column first
+      const selectionWidth = 48;
+      newOffsets['__selection'] = 0;
+      totalOffset = selectionWidth;
       
       // Order columns according to columnOrder
       const orderedColumns = columnOrder
@@ -236,9 +232,9 @@ export const dimensionActions = {
       
       return newOffsets;
     },
-    totalWidth: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number>; enableSelectionColumn: boolean }) => {
-      const { columns, columnWidths, enableSelectionColumn } = event;
-      let totalWidth = enableSelectionColumn ? 48 : 0;
+    totalWidth: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number> }) => {
+      const { columns, columnWidths } = event;
+      let totalWidth = 48; // Always include selection column
       
       columns.forEach(col => {
         totalWidth += columnWidths[col.id] || col.width || 120;

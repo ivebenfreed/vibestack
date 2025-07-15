@@ -452,8 +452,7 @@ export const viewHandlers = {
           type: 'dimensions.recalculate',
           columns: context.columns,
           columnOrder: context.columnOrder,
-          columnWidths: context.columnWidths,
-          enableSelectionColumn: context.enableSelectionColumn
+          columnWidths: context.columnWidths
         });
       },
       
