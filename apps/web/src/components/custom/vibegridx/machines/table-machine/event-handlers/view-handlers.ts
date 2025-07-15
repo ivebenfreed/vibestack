@@ -7,6 +7,7 @@ import { viewActions } from '../slices/view-slice';
 import { selectionActions } from '../slices/selection-slice';
 import { dimensionActions } from '../slices/dimensions-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
+import { calculateDragPreview, applyDragPreview, clearDragPreview } from '../helpers/drag-preview-helpers';
 
 export const viewHandlers = {
   'view.sort.set': {
@@ -372,18 +373,32 @@ export const viewHandlers = {
     actions: [
       viewActions.updateColumnDrag,
       
+      // Calculate and apply drag preview
+      ({ context, event }) => {
+        if (!context.columnDragState || !context.coordinateMapping || !context.actors?.rendererActor) {
+          return;
+        }
+        
+        // Calculate drag preview
+        const dragPreview = calculateDragPreview(
+          event.x,
+          context.columnDragState.columnId,
+          context.coordinateMapping,
+          context.viewport?.scrollLeft || 0
+        );
+        
+        // Send preview data to renderer
+        context.actors.rendererActor.send({
+          type: 'APPLY_DRAG_PREVIEW',
+          dragPreview
+        });
+      },
+      
       // Emit event for UI feedback
       emit(({ context }) => ({
         type: 'view.drag.updated',
         columnDragState: context.columnDragState
-      })),
-      
-      // Remove logging for performance - too many events
-      // ({ event }) => {
-      //   console.log('TableMachine: Column drag move', {
-      //     position: { x: event.x, y: event.y }
-      //   });
-      // }
+      }))
     ]
   },
   
@@ -456,6 +471,15 @@ export const viewHandlers = {
         });
       },
       
+      // Clear drag preview before clearing drag state
+      ({ context }) => {
+        if (context.actors?.rendererActor) {
+          context.actors.rendererActor.send({
+            type: 'CLEAR_DRAG_PREVIEW'
+          });
+        }
+      },
+      
       // Clear drag state
       viewActions.clearColumnDrag,
       
@@ -497,11 +521,19 @@ export const viewHandlers = {
   
   'view.columns.drag.cancel': {
     actions: [
+      // Clear drag preview
+      ({ context }) => {
+        if (context.actors?.rendererActor) {
+          context.actors.rendererActor.send({
+            type: 'CLEAR_DRAG_PREVIEW'
+          });
+        }
+      },
+      
       viewActions.clearColumnDrag,
       
       // Emit event for UI feedback
-      emit({ type: 'view.drag.cancelled' }),
-      
+      emit({ type: 'view.drag.cancelled' })
     ]
   },
   

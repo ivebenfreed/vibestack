@@ -74,12 +74,12 @@ export class RowEngine {
     // Update virtual dimensions
     this.updateVirtualDimensions(state);
     
-    // Handle empty visible rows case
-    let rowsToRender = visibleRows;
+    // Fail fast if visible rows calculation is wrong
     if (visibleRows.length === 0 && state.rows.length > 0) {
-      console.warn('PERFORMANCE ISSUE: visibleRows is empty! Using fallback to render first 20 rows.');
-      rowsToRender = state.rows.slice(0, Math.min(20, state.rows.length));
+      throw new Error('RowEngine: Virtual scrolling returned empty visible rows when data exists - check virtual grid configuration');
     }
+    
+    const rowsToRender = visibleRows;
     
     // Clean up rows that are no longer visible
     this.cleanupInvisibleRows(rowsToRender);
@@ -343,13 +343,18 @@ export class RowEngine {
     const cellKey = `${row.id}:${column.id}`;
     const value = row.data[column.field || column.id];
     
-    // Get width from coordinate mapping (state machine authority)
-    const coordinateColumn = coordinateMapping?.columns.find((c: any) => c.columnId === column.id);
-    const width = coordinateColumn?.width || column.width || 120;
+    if (!coordinateMapping) {
+      throw new Error(`RowEngine: Missing coordinate mapping for cell ${cellKey}`);
+    }
     
-    // Get offset from coordinate mapping (authoritative source)
-    // The coordinate mapping already includes the selection column offset
-    const xOffset = coordinateColumn?.offset || 0;
+    // Get width from coordinate mapping (state machine authority)
+    const coordinateColumn = coordinateMapping.columns.find((c: any) => c.columnId === column.id);
+    if (!coordinateColumn) {
+      throw new Error(`RowEngine: Column ${column.id} not found in coordinate mapping`);
+    }
+    
+    const width = coordinateColumn.width;
+    const xOffset = coordinateColumn.offset;
     
     // DEBUG: Log DOM position calculation
     if (column.id === 'project' && row.id === '03097812-7cc9-4d3d-87d3-e0626ee2cfd8') {
@@ -403,47 +408,31 @@ export class RowEngine {
   }
   
   private getColumnsToRender(row: TableRow, state?: RenderState): Column[] {
+    if (!state) {
+      throw new Error('RowEngine: Missing render state for column rendering');
+    }
+    
     // Use columns from render state if available
-    const stateColumns = state?.columns;
+    const stateColumns = state.columns;
     if (stateColumns && stateColumns.length > 0) {
       return stateColumns.filter(col => col.id !== '__selection');
     }
     
-    // Use coordinate mapping from state machine if available
-    if (state?.coordinateMapping?.columns) {
-      const coordinateColumns = state.coordinateMapping.columns;
-      return coordinateColumns.map((coord: any) => ({
+    // Use coordinate mapping from state machine as authoritative source
+    if (!state.coordinateMapping?.columns) {
+      throw new Error('RowEngine: Missing coordinate mapping for column rendering');
+    }
+    
+    const coordinateColumns = state.coordinateMapping.columns;
+    return coordinateColumns
+      .filter((coord: any) => coord.columnId !== '__selection')
+      .map((coord: any) => ({
         id: coord.columnId,
         name: coord.columnId,
         field: coord.columnId,
         type: 'text' as const,
         width: coord.width
       }));
-    }
-    
-    // Fall back to visible columns from state data
-    if (state?.columns && state?.columnVisibility) {
-      const visibleColumns = state.columns.filter(col => {
-        if (!state.columnVisibility || Object.keys(state.columnVisibility).length === 0) {
-          return true;
-        }
-        return state.columnVisibility[col.id] !== false;
-      });
-      
-      // Filter out selection column
-      return this.config.enableSelectionColumn 
-        ? visibleColumns.filter(col => col.id !== '__selection')
-        : visibleColumns;
-    }
-    
-    // Last resort: create columns from row data
-    return Object.keys(row.data).map(key => ({
-      id: key,
-      name: key,
-      field: key,
-      type: 'text' as const,
-      width: 120
-    }));
   }
   
   private calculateCellOffset(index: number, columns: Column[]): number {
@@ -478,39 +467,13 @@ export class RowEngine {
   }
   
   private getTotalColumnsWidth(state?: RenderState): number {
-    // Use coordinate mapping from state machine if available
-    if (state?.coordinateMapping) {
-      const coordinateColumns = state.coordinateMapping.columns;
-      // The coordinate mapping already includes the selection column width
-      return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
+    if (!state?.coordinateMapping) {
+      throw new Error('RowEngine: Missing coordinate mapping for total width calculation');
     }
     
-    // Fallback to render state totalWidth
-    if (state?.totalWidth) {
-      return state.totalWidth;
-    }
-    
-    // Last resort: calculate from column data
-    if (state?.columns) {
-      let totalWidth = this.config.enableSelectionColumn ? 48 : 0; // Selection column
-      
-      const visibleColumns = state.columns.filter(col => {
-        if (!state.columnVisibility || Object.keys(state.columnVisibility).length === 0) {
-          return true;
-        }
-        return state.columnVisibility[col.id] !== false;
-      });
-      
-      visibleColumns.forEach(column => {
-        const width = state.columnWidths?.[column.id] || column.width || 120;
-        totalWidth += width;
-      });
-      
-      return totalWidth;
-    }
-    
-    // Default fallback
-    return 800;
+    const coordinateColumns = state.coordinateMapping.columns;
+    // The coordinate mapping already includes the selection column width
+    return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
   }
   
   private resolveRelationships(row: TableRow, columns: Column[], resolvers: Record<string, (id: string | string[]) => string>): TableRow {
@@ -536,15 +499,12 @@ export class RowEngine {
   }
   
   private getColumnCount(state?: RenderState): number {
-    if (state?.coordinateMapping?.columns) {
-      return state.coordinateMapping.columns.length + (this.config.enableSelectionColumn ? 1 : 0);
+    if (!state?.coordinateMapping?.columns) {
+      throw new Error('RowEngine: Missing coordinate mapping for column count calculation');
     }
     
-    const dataColumns = state?.columns 
-      ? state.columns.filter(col => col.id !== '__selection').length
-      : 0;
-    
-    return dataColumns + (this.config.enableSelectionColumn ? 1 : 0);
+    // The coordinate mapping already includes the selection column
+    return state.coordinateMapping.columns.length;
   }
   
   private getCellElement(rowId: string, columnId: string): HTMLElement | null {

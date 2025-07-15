@@ -341,27 +341,8 @@ export class EventSystem {
     this.dragState.dragPreview.style.left = `${event.clientX - this.dragState.offsetX}px`;
     this.dragState.dragPreview.style.top = `${event.clientY - this.dragState.offsetY}px`;
     
-    // Calculate drop position and update displacement
-    const headerViewportRect = this.config.domManager.getElement('headerViewport').getBoundingClientRect();
-    
-    // Since the header is transformed, we need to calculate the position differently
-    const relativeToViewport = event.clientX - headerViewportRect.left;
-    const relativeX = relativeToViewport + this.config.domManager.getElement('viewport').scrollLeft;
-    
-    // Find target position and update column displacement
-    let targetIndex = 0;
-    let accumulatedWidth = 48; // Start after selection column (48px)
-    let dropX = 48; // Initial drop position after selection column
-    
-    // Clear all displacement classes
-    this.config.domManager.getElement('header').querySelectorAll('.vibegridx-header-cell').forEach(cell => {
-      const htmlCell = cell as HTMLElement;
-      htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right');
-      htmlCell.style.removeProperty('--drag-offset');
-    });
-    
     // Just forward the raw event to the state machine
-    // The state machine will calculate the target position and handle all the logic
+    // The state machine will calculate preview positions and handle all animations
     this.config.callbacks.onColumnDragMove?.(event.clientX, event.clientY);
   }
 
@@ -383,12 +364,11 @@ export class EventSystem {
       this.dragState.dropIndicator.remove();
     }
     
-    // Remove all displacement classes
-    this.config.domManager.getElement('header').querySelectorAll('.vibegridx-header-cell').forEach(cell => {
-      const htmlCell = cell as HTMLElement;
-      htmlCell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-dragging');
-      htmlCell.style.removeProperty('--drag-offset');
-    });
+    // Remove dragging class only - preview animations are handled by state machine
+    const draggedCell = this.config.domManager.getElement('header').querySelector('.vibegridx-dragging');
+    if (draggedCell) {
+      draggedCell.classList.remove('vibegridx-dragging');
+    }
 
     // Just forward the raw event to the state machine with the dragged column
     // The state machine will calculate the target position based on current coordinate mapping

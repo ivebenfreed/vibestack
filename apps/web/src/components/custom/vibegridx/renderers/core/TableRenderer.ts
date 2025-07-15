@@ -239,24 +239,28 @@ export class TableRenderer {
   // Get total width from STATE MACHINE coordinate mapping
   private getTotalColumnsWidth(): number {
     const lastRenderState = this.stateManager.getLastRenderState();
-    if (lastRenderState?.coordinateMapping) {
-      const coordinateColumns = lastRenderState.coordinateMapping.columns;
-      // The coordinate mapping already includes the selection column width
-      return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
+    if (!lastRenderState?.coordinateMapping) {
+      throw new Error('TableRenderer: Missing coordinate mapping for total width calculation');
     }
-    // Fallback to render state totalWidth if coordinate mapping not available
-    return lastRenderState?.totalWidth || 0;
+    
+    const coordinateColumns = lastRenderState.coordinateMapping.columns;
+    // The coordinate mapping already includes the selection column width
+    return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
   }
   
   // Get column offset from STATE MACHINE coordinate mapping
   private getColumnOffset(columnId: string): number {
     const lastRenderState = this.stateManager.getLastRenderState();
-    if (lastRenderState?.coordinateMapping) {
-      const coordinateColumn = lastRenderState.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
-      return coordinateColumn?.offset || 0;
+    if (!lastRenderState?.coordinateMapping) {
+      throw new Error('TableRenderer: Missing coordinate mapping for column offset calculation');
     }
-    // Fallback to render state offsets if coordinate mapping not available
-    return lastRenderState?.columnOffsets?.[columnId] || 0;
+    
+    const coordinateColumn = lastRenderState.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
+    if (!coordinateColumn) {
+      throw new Error(`TableRenderer: Column ${columnId} not found in coordinate mapping`);
+    }
+    
+    return coordinateColumn.offset;
   }
   
   private setupEventListeners() {

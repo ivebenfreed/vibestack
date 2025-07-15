@@ -470,6 +470,38 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           });
           break;
           
+        case 'APPLY_DRAG_PREVIEW':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot apply drag preview - renderer not initialized');
+            return;
+          }
+          
+          // Import and use the drag preview helper
+          const { applyDragPreview } = await import('../machines/table-machine/helpers/drag-preview-helpers');
+          
+          // Get DOM manager from renderer
+          const domManager = (renderer as any).domManager;
+          if (domManager && event.dragPreview) {
+            applyDragPreview(event.dragPreview, domManager);
+          }
+          break;
+          
+        case 'CLEAR_DRAG_PREVIEW':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot clear drag preview - renderer not initialized');
+            return;
+          }
+          
+          // Import and use the drag preview helper
+          const { clearDragPreview } = await import('../machines/table-machine/helpers/drag-preview-helpers');
+          
+          // Get DOM manager from renderer
+          const domManagerClear = (renderer as any).domManager;
+          if (domManagerClear) {
+            clearDragPreview(domManagerClear);
+          }
+          break;
+          
         case 'DESTROY':
           console.log('RendererActor: Destroying renderer');
           

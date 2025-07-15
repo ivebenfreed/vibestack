@@ -210,7 +210,11 @@ export class HeaderEngine {
   }
   
   private createSortLookup(state: RenderState): Map<string, { direction: 'asc' | 'desc'; index: number }> {
-    const sortState = (state as any).sortBy || [];
+    const sortState = (state as any).sortBy;
+    if (!sortState) {
+      throw new Error('HeaderEngine: Missing sortBy state for header rendering');
+    }
+    
     const sortLookup = new Map<string, { direction: 'asc' | 'desc'; index: number }>();
     
     sortState.forEach((sort: SortConfig, index: number) => {
@@ -270,8 +274,16 @@ export class HeaderEngine {
     coordinateMapping: any
   ): HTMLElement {
     // Get width from coordinate mapping (state machine authority)
-    const coordinateColumn = coordinateMapping?.columns.find((c: any) => c.columnId === column.id);
-    const width = coordinateColumn?.width || column.width || 120;
+    if (!coordinateMapping?.columns) {
+      throw new Error('HeaderEngine: Missing coordinate mapping for header cell creation');
+    }
+    
+    const coordinateColumn = coordinateMapping.columns.find((c: any) => c.columnId === column.id);
+    if (!coordinateColumn) {
+      throw new Error(`HeaderEngine: Column ${column.id} not found in coordinate mapping`);
+    }
+    
+    const width = coordinateColumn.width;
     
     const field = column.field || column.id;
     const sortInfo = sortLookup.get(field);
