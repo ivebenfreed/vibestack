@@ -17,7 +17,7 @@ export interface EventCallbacks {
   onColumnResizeEnd?: () => void;
   onColumnDragStart?: (columnId: string, x: number, y: number) => void;
   onColumnDragMove?: (x: number, y: number) => void;
-  onColumnDragEnd?: (targetIndex: number) => void;
+  onColumnDragEnd?: (clientX: number) => void;
   onScroll?: (viewport: ViewportInfo) => void;
 }
 
@@ -236,10 +236,9 @@ export class EventSystem {
     const columnId = resizeHandle.dataset.column;
 
     if (columnId) {
-      const currentWidth = this.config.columnManager.getColumnWidth(columnId);
-
-      // Send resize start event
-      this.config.callbacks.onColumnResizeStart?.(columnId, event.clientX, currentWidth);
+      // Just forward the raw event to the state machine 
+      // The state machine will get the current width from coordinate mapping
+      this.config.callbacks.onColumnResizeStart?.(columnId, event.clientX, 0);
 
       // Set resizing state
       this.isResizing = true;
@@ -361,80 +360,9 @@ export class EventSystem {
       htmlCell.style.removeProperty('--drag-offset');
     });
     
-    // Find current position of dragged column (excluding selection column)
-    const dataColumns = this.config.columnManager.getDataColumns();
-    const draggedIndex = dataColumns.findIndex(col => col.id === this.dragState.draggedColumnId);
-    
-    // Find where the mouse is in relation to columns
-    let foundColumn = false;
-    for (let i = 0; i < dataColumns.length; i++) {
-      const column = dataColumns[i];
-      const columnWidth = this.config.columnManager.getColumnWidth(column.id);
-      const columnStart = accumulatedWidth;
-      const columnEnd = accumulatedWidth + columnWidth;
-      
-      // Check if mouse is within this column's bounds
-      if (relativeX >= columnStart && relativeX < columnEnd) {
-        // Determine if we're in the left or right half of the column
-        const columnMidPoint = columnStart + columnWidth / 2;
-        
-        if (relativeX < columnMidPoint) {
-          // Mouse is in left half - drop before this column
-          targetIndex = i;
-          dropX = columnStart;
-        } else {
-          // Mouse is in right half - drop after this column
-          targetIndex = i + 1;
-          dropX = columnEnd;
-        }
-        
-        foundColumn = true;
-        break;
-      }
-      
-      accumulatedWidth += columnWidth;
-    }
-    
-    // Handle case where mouse is beyond all columns
-    if (!foundColumn) {
-      // Mouse is past all columns
-      targetIndex = dataColumns.length;
-      dropX = accumulatedWidth;
-    }
-    
-    // Get the width of the dragged column
-    const draggedColumn = dataColumns[draggedIndex];
-    const draggedWidth = this.config.columnManager.getColumnWidth(draggedColumn.id);
-    
-    // Adjust target index to account for removing the dragged column
-    let adjustedTargetIndex = targetIndex;
-    if (draggedIndex < targetIndex) {
-      adjustedTargetIndex = targetIndex - 1;
-    }
-    
-    // Apply displacement classes with proper offset (only to data columns, not selection column)
-    dataColumns.forEach((column, index) => {
-      const cell = this.config.domManager.getElement('header').querySelector(`[data-column="${column.id}"]`) as HTMLElement;
-      if (cell && column.id !== this.dragState.draggedColumnId) {
-        // Moving right: columns between old and new position shift left
-        if (draggedIndex < adjustedTargetIndex && index > draggedIndex && index <= adjustedTargetIndex) {
-          cell.classList.add('vibegridx-will-move-left');
-          cell.style.setProperty('--drag-offset', `-${draggedWidth}px`);
-        } 
-        // Moving left: columns between new and old position shift right
-        else if (draggedIndex > targetIndex && index >= targetIndex && index < draggedIndex) {
-          cell.classList.add('vibegridx-will-move-right');
-          cell.style.setProperty('--drag-offset', `${draggedWidth}px`);
-        }
-      }
-    });
-    
-    // Update drop indicator position
-    if (this.dragState.dropIndicator) {
-      this.dragState.dropIndicator.style.left = `${dropX}px`;
-    }
-
-    // Don't send drag move events to parent - visual feedback is handled entirely here
+    // Just forward the raw event to the state machine
+    // The state machine will calculate the target position and handle all the logic
+    this.config.callbacks.onColumnDragMove?.(event.clientX, event.clientY);
   }
 
   private handleDragEnd(event: MouseEvent): void {
@@ -462,11 +390,9 @@ export class EventSystem {
       htmlCell.style.removeProperty('--drag-offset');
     });
 
-    // Calculate target index based on final position
-    const targetIndex = this.calculateDropTargetIndex(event.clientX);
-
-    // Send drag end event
-    this.config.callbacks.onColumnDragEnd?.(targetIndex);
+    // Just forward the raw event to the state machine with the dragged column
+    // The state machine will calculate the target position based on current coordinate mapping
+    this.config.callbacks.onColumnDragEnd?.(event.clientX);
 
     // Reset drag state
     this.dragState = {
@@ -489,31 +415,6 @@ export class EventSystem {
     document.removeEventListener('mouseup', this.boundHandleDragEnd);
   }
 
-  private calculateDropTargetIndex(clientX: number): number {
-    // Get header viewport position
-    const headerViewportRect = this.config.domManager.getElement('headerViewport').getBoundingClientRect();
-
-    // Calculate position relative to viewport accounting for scroll
-    const relativeToViewport = clientX - headerViewportRect.left;
-    const relativeX = relativeToViewport + this.config.domManager.getElement('viewport').scrollLeft;
-
-    // Find target column index, excluding selection column
-    let targetIndex = 0;
-    let accumulatedWidth = 48; // Start with selection column width
-    
-    // Get data columns only (excluding selection column)
-    const dataColumns = this.config.columnManager.getDataColumns();
-    
-    for (let i = 0; i < dataColumns.length; i++) {
-      const columnWidth = this.config.columnManager.getColumnWidth(dataColumns[i].id);
-      if (relativeX > accumulatedWidth + columnWidth / 2) {
-        targetIndex = i + 1;
-      }
-      accumulatedWidth += columnWidth;
-    }
-    
-    return targetIndex;
-  }
 
   // ====================================
   // PUBLIC METHODS

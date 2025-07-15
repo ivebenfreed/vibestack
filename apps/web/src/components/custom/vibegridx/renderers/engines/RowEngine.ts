@@ -347,8 +347,13 @@ export class RowEngine {
     const coordinateColumn = coordinateMapping?.columns.find((c: any) => c.columnId === column.id);
     const width = coordinateColumn?.width || column.width || 120;
     
-    // Calculate offset using coordinate mapping
-    const xOffset = coordinateColumn?.offset || this.calculateCellOffset(index, allColumns);
+    // Get offset from coordinate mapping (authoritative source)
+    let xOffset = coordinateColumn?.offset || 0;
+    
+    // Add selection column offset if enabled
+    if (this.config.enableSelectionColumn) {
+      xOffset += 48;
+    }
     
     // DEBUG: Log DOM position calculation
     if (column.id === 'project' && row.id === '03097812-7cc9-4d3d-87d3-e0626ee2cfd8') {
