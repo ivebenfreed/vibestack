@@ -57,7 +57,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
   
   console.log('RendererActor: Created callback actor');
   
-  receive((event) => {
+  receive(async (event) => {
     console.log('RendererActor: Received event:', event.type, event);
     
     try {
