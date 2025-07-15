@@ -121,6 +121,9 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
+      
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -140,6 +143,9 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
+      
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -155,6 +161,9 @@ export const viewHandlers = {
       
       // Persist the state
       'persistSnapshot',
+      
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
@@ -172,6 +181,9 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
+      
       // Trigger view processing to update visible columns
       raise({ type: 'INVOKE_VIEW_ACTOR' })
     ]
@@ -185,7 +197,10 @@ export const viewHandlers = {
         console.log('TableMachine: Column order updated', {
           newOrder: event.order
         });
-      }
+      },
+      
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' })
     ]
   },
   
@@ -198,6 +213,22 @@ export const viewHandlers = {
           from: event.fromIndex,
           to: event.toIndex
         });
+      },
+      
+      // Clear drag state and remove dragging class
+      ({ context }) => {
+        if (context.actors?.rendererActor) {
+          const domManager = (context.actors.rendererActor.getSnapshot().context as any)?.renderer?.domManager;
+          if (domManager) {
+            const header = domManager.getElement('header');
+            // Remove dragging class from all columns
+            header.querySelectorAll('.vibegridx-dragging').forEach((el: HTMLElement) => {
+              el.classList.remove('vibegridx-dragging');
+            });
+            // Clear drag preview classes
+            clearDragPreview(domManager);
+          }
+        }
       },
       
       // Clear selection when columns are reordered
@@ -262,6 +293,9 @@ export const viewHandlers = {
           });
         }
       },
+      
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
       // Need to reprocess view data to update coordinate mappings
       ({ self }) => {
@@ -354,6 +388,20 @@ export const viewHandlers = {
     actions: [
       viewActions.startColumnDrag,
       
+      // Add dragging class to the column
+      ({ context, event }) => {
+        if (context.actors?.rendererActor) {
+          const domManager = (context.actors.rendererActor.getSnapshot().context as any)?.renderer?.domManager;
+          if (domManager) {
+            const header = domManager.getElement('header');
+            const draggingColumn = header.querySelector(`[data-column="${event.columnId}"]`);
+            if (draggingColumn) {
+              draggingColumn.classList.add('vibegridx-dragging');
+            }
+          }
+        }
+      },
+      
       // Emit event for UI feedback
       emit(({ event }) => ({
         type: 'view.drag.started',
@@ -373,25 +421,46 @@ export const viewHandlers = {
     actions: [
       viewActions.updateColumnDrag,
       
-      // Calculate and apply drag preview
+      // Calculate and apply drag preview only when preview is active
       ({ context, event }) => {
         if (!context.columnDragState || !context.coordinateMapping || !context.actors?.rendererActor) {
           return;
         }
         
+        // Only calculate preview if it's active (mouse has left the original column)
+        if (!context.columnDragState.previewActive) {
+          console.log('🎯 ViewHandler: Preview not active yet');
+          return;
+        }
+        
+        // Store last preview state on context to detect changes
+        const lastTargetIndex = (context as any)._lastDragTargetIndex;
+        
         // Calculate drag preview
         const dragPreview = calculateDragPreview(
           event.x,
           context.columnDragState.columnId,
-          context.coordinateMapping,
-          context.viewport?.scrollLeft || 0
+          context.coordinateMapping
         );
         
-        // Send preview data to renderer
-        context.actors.rendererActor.send({
-          type: 'APPLY_DRAG_PREVIEW',
-          dragPreview
-        });
+        // Only send update if target has actually changed
+        if (lastTargetIndex !== dragPreview.targetIndex) {
+          console.log('🎯 ViewHandler: Drag target changed', {
+            from: lastTargetIndex,
+            to: dragPreview.targetIndex,
+            mouseX: event.x,
+            previewActive: context.columnDragState.previewActive
+          });
+          
+          // Store new target
+          (context as any)._lastDragTargetIndex = dragPreview.targetIndex;
+          
+          // Send preview data to renderer
+          context.actors.rendererActor.send({
+            type: 'APPLY_DRAG_PREVIEW',
+            dragPreview
+          });
+        }
       },
       
       // Emit event for UI feedback
@@ -404,17 +473,75 @@ export const viewHandlers = {
   
   'view.columns.drag.end': {
     actions: [
-      // Update column order in context
+      // Calculate target column based on mouse coordinates
+      ({ context, event }) => {
+        console.log('🎯 ViewHandler: Column drag end - calculating target from coordinates', {
+          columnId: event.columnId,
+          mouseX: event.x,
+          mouseY: event.y,
+          coordinateMapping: context.coordinateMapping
+        });
+        
+        // Use drag preview helper to calculate target
+        const dragPreview = calculateDragPreview(
+          event.x,
+          event.columnId,
+          context.coordinateMapping
+        );
+        
+        // Double-check the current index from drag preview matches our calculation
+        const dataColumnOrder = context.columnOrder.filter(id => id !== '__selection');
+        const currentIndexFromOrder = dataColumnOrder.indexOf(event.columnId);
+        
+        console.log('🎯 ViewHandler: Calculated drag target', {
+          currentColumn: event.columnId,
+          targetIndex: dragPreview.targetIndex,
+          debugInfo: dragPreview.debugInfo,
+          currentIndexFromDragPreview: dragPreview.debugInfo?.currentIndex,
+          currentIndexFromColumnOrder: currentIndexFromOrder,
+          indexMismatch: dragPreview.debugInfo?.currentIndex !== currentIndexFromOrder
+        });
+        
+        // Store calculated target on context for next action
+        (context as any)._calculatedTargetIndex = dragPreview.targetIndex;
+      },
+      
+      // Update column order in context using calculated target
       assign({
         columnOrder: ({ context, event }) => {
-          if (event.targetIndex !== undefined && context.columnDragState?.columnId) {
+          const targetIndex = (context as any)._calculatedTargetIndex;
+          
+          if (targetIndex !== undefined && context.columnDragState?.columnId) {
             const draggedColumnId = context.columnDragState.columnId;
             
-            // Work with data columns only (exclude selection column)
-            const dataColumnOrder = context.columnOrder.filter(id => id !== '__selection');
+            // Work with visible data columns only (exclude selection column AND hidden columns)
+            const dataColumnOrder = context.columnOrder.filter(id => {
+              if (id === '__selection') return false;
+              // Check if column is visible
+              return context.columnVisibility[id] !== false;
+            });
             
-            // Find current index in data columns
+            // Find current index in visible data columns
             const currentIndex = dataColumnOrder.indexOf(draggedColumnId);
+            
+            // Also find the index in coordinate mapping for debugging
+            const coordMappingColumns = context.coordinateMapping?.columns || [];
+            const coordMappingDataColumns = coordMappingColumns
+              .filter((col: any) => col.columnId !== '__selection')
+              .sort((a: any, b: any) => a.index - b.index);
+            const coordMappingIndex = coordMappingDataColumns.findIndex((col: any) => col.columnId === draggedColumnId);
+            
+            console.log('🎯 ViewHandler: Finding dragged column position', {
+              draggedColumnId,
+              dataColumnOrder,
+              currentIndex,
+              columnOrderFull: context.columnOrder,
+              hiddenColumns: context.columnOrder.filter(id => context.columnVisibility[id] === false),
+              columnVisibility: context.columnVisibility,
+              coordinateMappingColumns: coordMappingColumns.map((c: any) => ({ id: c.columnId, index: c.index })),
+              coordinateMappingDataColumns: coordMappingDataColumns.map((c: any) => ({ id: c.columnId, index: c.index })),
+              coordMappingIndex
+            });
             
             if (currentIndex === -1) {
               console.error('Dragged column not found in columnOrder:', draggedColumnId);
@@ -422,34 +549,85 @@ export const viewHandlers = {
             }
             
             // Don't move if dropping in same position
-            if (currentIndex === event.targetIndex || 
-                (currentIndex === event.targetIndex - 1 && event.targetIndex > currentIndex)) {
+            if (currentIndex === targetIndex) {
               console.log('Column dropped in same position, no change needed');
               return context.columnOrder;
             }
+            
+            console.log('🎯 ViewHandler: Before adjustment', {
+              currentIndex,
+              targetIndex,
+              draggedColumn: draggedColumnId,
+              dataColumnOrder
+            });
             
             // Create new order array for data columns
             const newDataOrder = [...dataColumnOrder];
             
             // Remove from current position
             const [removed] = newDataOrder.splice(currentIndex, 1);
+            console.log('🎯 ViewHandler: After removal', {
+              removed,
+              newDataOrder,
+              originalLength: dataColumnOrder.length,
+              newLength: newDataOrder.length
+            });
             
-            // Adjust target index if needed (when dragging from left to right)
-            let adjustedTargetIndex = event.targetIndex;
-            if (currentIndex < event.targetIndex) {
-              adjustedTargetIndex = event.targetIndex - 1;
+            // The targetIndex from drag preview is where we want to insert in the original array
+            // We need to use it directly for insertion
+            let insertionIndex = targetIndex;
+            
+            // Only adjust if we're moving right and the target is after the current position
+            // because removing the element shifts indices down
+            if (targetIndex > currentIndex) {
+              insertionIndex = targetIndex - 1;
             }
             
-            // Insert at new position
-            newDataOrder.splice(adjustedTargetIndex, 0, removed);
+            console.log('🎯 ViewHandler: Insertion calculation', {
+              targetIndex,
+              currentIndex,
+              insertionIndex,
+              isMovingLeft: targetIndex < currentIndex,
+              isMovingRight: targetIndex > currentIndex
+            });
             
-            // Reconstruct full column order with selection column first
-            const newOrder = context.columnOrder.includes('__selection') 
-              ? ['__selection', ...newDataOrder]
-              : newDataOrder;
+            // Insert at calculated position
+            newDataOrder.splice(insertionIndex, 0, removed);
             
+            // Reconstruct full column order preserving hidden columns
+            // We need to update the positions of visible columns while keeping hidden ones in place
+            const newFullOrder: string[] = [];
+            let visibleIndex = 0;
             
-            // Persistence will be handled by persistSnapshot action
+            // Go through the original order and place columns appropriately
+            context.columnOrder.forEach(colId => {
+              if (colId === '__selection') {
+                // Selection column always goes first
+                newFullOrder.push(colId);
+              } else if (context.columnVisibility[colId] === false) {
+                // Hidden column - keep in same position
+                newFullOrder.push(colId);
+              } else {
+                // Visible column - use the new order
+                if (visibleIndex < newDataOrder.length) {
+                  newFullOrder.push(newDataOrder[visibleIndex]);
+                  visibleIndex++;
+                }
+              }
+            });
+            
+            const newOrder = newFullOrder;
+            
+            console.log('🎯 ViewHandler: Column order updated', {
+              from: currentIndex,
+              to: insertionIndex,
+              originalTarget: targetIndex,
+              draggedColumn: draggedColumnId,
+              visibleColumnsNewOrder: newDataOrder,
+              fullNewOrder: newOrder,
+              hiddenColumns: context.columnOrder.filter(id => context.columnVisibility[id] === false),
+              originalOrder: context.columnOrder
+            });
             
             return newOrder;
           }
@@ -459,17 +637,8 @@ export const viewHandlers = {
         version: ({ context }) => context.version + 1
       }),
       
-      // CRITICAL: Recalculate coordinate mapping immediately after column reorder
-      // This ensures the state machine remains the single source of truth
-      ({ context, self }) => {
-        console.log('ViewHandlers: Recalculating coordinates after column drag end');
-        self.send({
-          type: 'dimensions.recalculate',
-          columns: context.columns,
-          columnOrder: context.columnOrder,
-          columnWidths: context.columnWidths
-        });
-      },
+      // Trigger coordinate recalculation
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
       // Clear drag preview before clearing drag state
       ({ context }) => {
@@ -482,6 +651,12 @@ export const viewHandlers = {
       
       // Clear drag state
       viewActions.clearColumnDrag,
+      
+      // Clear stored drag target indices
+      ({ context }) => {
+        delete (context as any)._lastDragTargetIndex;
+        delete (context as any)._calculatedTargetIndex;
+      },
       
       // Clear selection when columns are reordered via drag
       selectionActions.clearSelection,
@@ -531,6 +706,12 @@ export const viewHandlers = {
       },
       
       viewActions.clearColumnDrag,
+      
+      // Clear stored drag target indices
+      ({ context }) => {
+        delete (context as any)._lastDragTargetIndex;
+        delete (context as any)._calculatedTargetIndex;
+      },
       
       // Emit event for UI feedback
       emit({ type: 'view.drag.cancelled' })
@@ -731,6 +912,9 @@ export const viewHandlers = {
         version: ({ context }) => context.version + 1
       }),
       
+      // Trigger coordinate recalculation for layout changes
+      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
+      
       // Clear the resize state (do this last)
       viewActions.endColumnResize,
       
@@ -748,6 +932,89 @@ export const viewHandlers = {
       
       () => {
         console.log('TableMachine: Column resize cancelled');
+      }
+    ]
+  },
+  
+  // ====================================
+  // CATCHALL: COLUMN LAYOUT CHANGED
+  // ====================================
+  
+  'COLUMN_LAYOUT_CHANGED': {
+    actions: [
+      // Recalculate coordinate mapping whenever column layout changes
+      assign({
+        coordinateMapping: ({ context }) => {
+          const { columns, columnOrder, columnWidths } = context;
+          
+          const newCoordinateMapping = {
+            rows: context.coordinateMapping.rows, // Preserve existing row mapping
+            columns: [] as Array<{
+              columnId: string;
+              index: number;
+              offset: number;
+              width: number;
+            }>,
+            version: Date.now() // Update version to trigger re-render
+          };
+          
+          // Recalculate column positions based on new order
+          let currentOffset = 0;
+          
+          // Process columns in the specified order
+          columnOrder.forEach((columnId, orderIndex) => {
+            const column = columns.find(c => c.id === columnId);
+            if (column) {
+              const width = columnWidths[columnId] || column.width || 120;
+              
+              newCoordinateMapping.columns.push({
+                columnId,
+                index: orderIndex,
+                offset: currentOffset,
+                width
+              });
+              
+              currentOffset += width;
+            }
+          });
+          
+          console.log('🔄 COLUMN_LAYOUT_CHANGED: Coordinate mapping recalculated', {
+            version: newCoordinateMapping.version,
+            columnCount: newCoordinateMapping.columns.length,
+            columnOrder: columnOrder.slice(0, 5) // Log first 5 for debugging
+          });
+          
+          return newCoordinateMapping;
+        }
+      }),
+      
+      // Forward updated coordinates to canvas for overlay sync
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          console.log('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to canvas');
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_COORDINATES',
+              mapping: context.coordinateMapping
+            }
+          });
+        }
+      },
+      
+      // Forward updated coordinates to renderer for passive consumption
+      ({ context, self }) => {
+        if (context.actors?.rendererActor) {
+          console.log('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to renderer');
+          self.send({
+            type: 'FORWARD_TO_RENDERER', 
+            event: {
+              type: 'UPDATE_COORDINATES',
+              mapping: context.coordinateMapping,
+              version: context.coordinateMapping.version
+            }
+          });
+        }
       }
     ]
   }

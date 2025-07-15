@@ -51,6 +51,11 @@ export class EventDelegationManager {
     startX: 0
   };
   
+  // Throttling for drag move events
+  private dragMoveThrottleId: number | null = null;
+  private lastDragMoveTime = 0;
+  private readonly DRAG_MOVE_THROTTLE_MS = 16; // ~60fps
+  
   // Bound handlers for cleanup
   private boundHandlers = {
     handleMouseDown: this.handleMouseDown.bind(this),
@@ -68,6 +73,22 @@ export class EventDelegationManager {
     this.config = config;
     this.setupEventListeners();
     console.log('🎯 EventDelegationManager: Initialized unified event system');
+  }
+  
+  // ====================================
+  // COORDINATE CONVERSION UTILITIES
+  // ====================================
+  
+  /**
+   * Convert viewport-relative mouse coordinates to container-relative coordinates
+   * This ensures all coordinates are in the same system as the coordinate mapping
+   */
+  private convertToContainerCoordinates(event: MouseEvent): { x: number; y: number } {
+    const containerRect = this.config.container.getBoundingClientRect();
+    return {
+      x: event.clientX - containerRect.left,
+      y: event.clientY - containerRect.top
+    };
   }
 
   // ====================================
@@ -297,11 +318,12 @@ export class EventDelegationManager {
     // Only prepare for drag if it's a basic click (no modifiers)
     if (!event.ctrlKey && !event.shiftKey) {
       // Prepare for potential drag selection
+      const containerCoords = this.convertToContainerCoordinates(event);
       this.dragState = {
         isDragging: false, // Will become true in mousemove if movement detected
         dragType: 'selection',
         startCell: { rowId, columnId },
-        startPos: { x: event.clientX, y: event.clientY },
+        startPos: { x: containerCoords.x, y: containerCoords.y },
         startColumnId: null,
         startWidth: 0,
         startX: 0
@@ -327,11 +349,12 @@ export class EventDelegationManager {
     }
     
     // Column drag start
+    const containerCoords = this.convertToContainerCoordinates(event);
     this.dragState = {
       isDragging: false,
       dragType: 'column',
       startCell: null,
-      startPos: { x: event.clientX, y: event.clientY },
+      startPos: { x: containerCoords.x, y: containerCoords.y },
       startColumnId: columnId,
       startWidth: 0,
       startX: event.clientX
@@ -362,10 +385,11 @@ export class EventDelegationManager {
       startX: event.clientX
     };
     
+    const containerCoords = this.convertToContainerCoordinates(event);
     this.config.tableSend({
       type: 'view.columns.resize.start',
       columnId,
-      x: event.clientX,
+      x: containerCoords.x,
       width: currentWidth
     });
     
@@ -374,11 +398,12 @@ export class EventDelegationManager {
   }
 
   private handleFillStart(event: MouseEvent): void {
+    const containerCoords = this.convertToContainerCoordinates(event);
     this.dragState = {
       isDragging: true,
       dragType: 'fill',
       startCell: null,
-      startPos: { x: event.clientX, y: event.clientY },
+      startPos: { x: containerCoords.x, y: containerCoords.y },
       startColumnId: null,
       startWidth: 0,
       startX: 0
@@ -453,11 +478,12 @@ export class EventDelegationManager {
       
       if (deltaX > 5 || deltaY > 5) {
         this.dragState.isDragging = true;
+        const containerCoords = this.convertToContainerCoordinates(event);
         this.config.tableSend({
           type: 'view.columns.drag.start',
           columnId: this.dragState.startColumnId!,
-          x: event.clientX,
-          y: event.clientY
+          x: containerCoords.x,
+          y: containerCoords.y
         });
       }
     }
@@ -475,18 +501,44 @@ export class EventDelegationManager {
         }
       }
       
+      // FIXED: Proper throttling - only send if enough time has passed
+      const now = Date.now();
+      if (now - this.lastDragMoveTime < this.DRAG_MOVE_THROTTLE_MS) {
+        // Cancel any existing scheduled update
+        if (this.dragMoveThrottleId) {
+          cancelAnimationFrame(this.dragMoveThrottleId);
+        }
+        
+        // Schedule a single update for the next frame
+        this.dragMoveThrottleId = requestAnimationFrame(() => {
+          this.lastDragMoveTime = Date.now();
+          const containerCoords = this.convertToContainerCoordinates(event);
+          this.config.tableSend({
+            type: 'view.columns.drag.move',
+            x: containerCoords.x,
+            y: containerCoords.y
+          });
+          this.dragMoveThrottleId = null;
+        });
+        return; // CRITICAL: Return early - don't send event now
+      }
+      
+      // Enough time has passed, send immediately and update timestamp
+      this.lastDragMoveTime = now;
+      const containerCoords = this.convertToContainerCoordinates(event);
       this.config.tableSend({
         type: 'view.columns.drag.move',
-        x: event.clientX,
-        y: event.clientY
+        x: containerCoords.x,
+        y: containerCoords.y
       });
     }
   }
 
   private handleResizeDrag(event: MouseEvent): void {
+    const containerCoords = this.convertToContainerCoordinates(event);
     this.config.tableSend({
       type: 'view.columns.resize.move',
-      x: event.clientX
+      x: containerCoords.x
     });
   }
 
@@ -500,69 +552,23 @@ export class EventDelegationManager {
   }
 
   private handleColumnDragEnd(event: MouseEvent): void {
-    // Find the element under the mouse to determine target column
-    const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
+    // Send raw coordinates to XState - let the state machine handle all the logic
+    const containerCoords = this.convertToContainerCoordinates(event);
     
-    console.log('🎯 EventDelegationManager: Finding drop target', {
-      elementUnderMouse,
-      className: elementUnderMouse?.className,
-      tagName: elementUnderMouse?.tagName,
+    console.log('🎯 EventDelegationManager: Column drag end - sending coordinates to XState', {
+      startColumn: this.dragState.startColumnId,
+      mouseX: containerCoords.x,
+      mouseY: containerCoords.y,
       clientX: event.clientX,
       clientY: event.clientY
     });
     
-    const targetHeaderCell = elementUnderMouse?.closest('.vibegridx-header-cell') as HTMLElement;
-    
-    let targetColumnId: string | null = null;
-    let targetIndex = 0;
-    
-    if (targetHeaderCell) {
-      targetColumnId = targetHeaderCell.dataset.column || null;
-    } else if (this.lastDragOverColumn) {
-      // Fall back to the last column we were dragging over
-      targetColumnId = this.lastDragOverColumn;
-      console.log('🎯 EventDelegationManager: Using last drag over column', targetColumnId);
-    }
-    
-    // Get the current column order from the table machine context
-    // This is a temporary solution - ideally we'd get this from the table machine
-    const headerCells = Array.from(
-      this.config.container.querySelectorAll('.vibegridx-header-cell')
-    ) as HTMLElement[];
-    
-    const columnOrder = headerCells
-      .map(cell => cell.dataset.column)
-      .filter(Boolean) as string[];
-    
-    const fromIndex = columnOrder.indexOf(this.dragState.startColumnId!);
-    
-    if (targetColumnId && targetColumnId !== this.dragState.startColumnId) {
-      targetIndex = columnOrder.indexOf(targetColumnId);
-      
-      // If dragging from left to right, insert after the target
-      if (fromIndex < targetIndex) {
-        targetIndex = Math.max(0, targetIndex);
-      }
-    } else {
-      // If no valid target, don't reorder
-      targetIndex = fromIndex;
-    }
-    
-    console.log('🎯 EventDelegationManager: Column drag end', {
-      startColumn: this.dragState.startColumnId,
-      targetColumn: targetColumnId,
-      fromIndex,
-      targetIndex,
-      columnOrder
+    this.config.tableSend({
+      type: 'view.columns.drag.end',
+      columnId: this.dragState.startColumnId!,
+      x: containerCoords.x,
+      y: containerCoords.y
     });
-    
-    if (fromIndex !== targetIndex && fromIndex >= 0) {
-      this.config.tableSend({
-        type: 'view.columns.reorder',
-        fromIndex,
-        toIndex: targetIndex
-      });
-    }
   }
 
   // ====================================
@@ -699,6 +705,12 @@ export class EventDelegationManager {
   // ====================================
 
   private resetDragState(): void {
+    // Cancel any pending drag move updates
+    if (this.dragMoveThrottleId) {
+      cancelAnimationFrame(this.dragMoveThrottleId);
+      this.dragMoveThrottleId = null;
+    }
+    
     this.dragState = {
       isDragging: false,
       dragType: null,

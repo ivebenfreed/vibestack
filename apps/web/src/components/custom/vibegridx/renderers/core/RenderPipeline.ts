@@ -116,7 +116,18 @@ export class RenderPipeline {
         this.config.onScroll?.(initialViewport);
       } else {
         // Subsequent renders: use RAF for better performance
+        console.log('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
+          rowCount: state.rows.length,
+          columnCount: state.columns?.length,
+          timestamp: performance.now(),
+          firstRenderComplete: this.firstRenderComplete
+        });
+        
         requestAnimationFrame(() => {
+          console.log('🎨 RenderOrchestrator: RAF callback executing', {
+            timestamp: performance.now()
+          });
+          
           // Batch all operations in single frame for better performance
           this.updateViewport(state);
           this.config.rowRenderingEngine.renderVisibleRows(state);

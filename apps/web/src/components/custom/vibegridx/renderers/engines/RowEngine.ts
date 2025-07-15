@@ -184,17 +184,38 @@ export class RowEngine {
   }
   
   private cleanupInvisibleRows(visibleRows: TableRow[]): void {
+    console.log('🎨 RowEngine: cleanupInvisibleRows called', {
+      visibleRowCount: visibleRows.length,
+      timestamp: performance.now()
+    });
+    
+    let removedCount = 0;
     this.config.domManager.forEachRowElement((element, rowId) => {
       if (!visibleRows.find(row => row.id === rowId)) {
         this.config.domManager.removeRowElement(rowId);
+        element.remove(); // Also remove from DOM
+        removedCount++;
       }
+    });
+    
+    console.log('🎨 RowEngine: cleanupInvisibleRows complete', {
+      removedRows: removedCount
     });
   }
   
   private renderRowsBatched(rows: TableRow[], startIndex: number, state?: RenderState): number {
+    console.log('🎨 RowEngine: renderRowsBatched called', {
+      rowCount: rows.length,
+      startIndex,
+      hasState: !!state,
+      timestamp: performance.now()
+    });
+    
     const fragment = document.createDocumentFragment();
     const newRowElements: Array<{ element: HTMLElement; rowId: string }> = [];
     let totalCells = 0;
+    let existingRowCount = 0;
+    let newRowCount = 0;
     
     // Pre-create new rows in fragment (batched DOM insertion)
     rows.forEach((row, index) => {
@@ -205,11 +226,20 @@ export class RowEngine {
         rowElement = this.createRowElement(row);
         newRowElements.push({ element: rowElement, rowId: row.id });
         fragment.appendChild(rowElement);
+        newRowCount++;
+      } else {
+        existingRowCount++;
       }
       
       // Position and update row content
       this.updateRowElement(row, rowElement, absoluteIndex, state);
       totalCells += this.getColumnCount(state);
+    });
+    
+    console.log('🎨 RowEngine: Row processing complete', {
+      existingRows: existingRowCount,
+      newRows: newRowCount,
+      totalRows: rows.length
     });
     
     // Single DOM append for all new rows
@@ -254,14 +284,44 @@ export class RowEngine {
   }
   
   renderRowCells(row: TableRow, rowElement: HTMLElement, state?: RenderState, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
+    console.log('🎨 RowEngine: renderRowCells called', {
+      rowId: row.id,
+      existingChildren: rowElement.children.length,
+      hasState: !!state,
+      timestamp: performance.now()
+    });
+    
     // Get columns to render - this must come from state to ensure proper ordering
     const columnsToRender = this.getColumnsToRender(row, state);
     
     // Resolve relationship values if resolvers provided
     const rowDataWithResolved = relationshipResolvers ? this.resolveRelationships(row, columnsToRender, relationshipResolvers) : row;
     
-    // Clear existing content efficiently
-    rowElement.textContent = '';
+    console.log('🎨 RowEngine: Before clearing row content', {
+      rowId: row.id,
+      childCount: rowElement.children.length,
+      firstChildType: rowElement.firstChild?.nodeName
+    });
+    
+    // Clear existing content properly to avoid overlapping cells
+    while (rowElement.firstChild) {
+      rowElement.removeChild(rowElement.firstChild);
+    }
+    
+    // Also clear cell cache for this row to prevent stale references
+    const keysToRemove: string[] = [];
+    this.config.domManager['cellElements'].forEach((_, key) => {
+      if (key.startsWith(`${row.id}:`)) {
+        keysToRemove.push(key);
+      }
+    });
+    keysToRemove.forEach(key => this.config.domManager['cellElements'].delete(key));
+    
+    console.log('🎨 RowEngine: After clearing row content', {
+      rowId: row.id,
+      childCount: rowElement.children.length,
+      cacheKeysRemoved: keysToRemove.length
+    });
     
     // Create document fragment for batched insertion
     const fragment = document.createDocumentFragment();
@@ -278,8 +338,19 @@ export class RowEngine {
       fragment.appendChild(cell);
     });
     
+    console.log('🎨 RowEngine: Before appending fragment', {
+      rowId: row.id,
+      fragmentChildCount: fragment.children.length,
+      columnsCount: columnsToRender.length
+    });
+    
     // Single DOM insertion
     rowElement.appendChild(fragment);
+    
+    console.log('🎨 RowEngine: After appending fragment', {
+      rowId: row.id,
+      finalChildCount: rowElement.children.length
+    });
   }
   
   private createSelectionCell(row: TableRow): HTMLElement {

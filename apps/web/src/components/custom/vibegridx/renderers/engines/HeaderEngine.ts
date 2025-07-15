@@ -113,7 +113,16 @@ export class HeaderEngine {
     
     // STEP 8: Append fragment to header
     const step8Start = performance.now();
-    this.config.domManager.getElement('header').appendChild(fragment);
+    const header = this.config.domManager.getElement('header');
+    header.appendChild(fragment);
+    
+    // Add drop indicator element if it doesn't exist
+    if (!header.querySelector('.vibegridx-column-drop-indicator')) {
+      const dropIndicator = document.createElement('div');
+      dropIndicator.className = 'vibegridx-column-drop-indicator';
+      header.appendChild(dropIndicator);
+    }
+    
     metrics.phases.domInsert = performance.now() - step8Start;
     
     metrics.renderTime = performance.now() - headerStartTime;

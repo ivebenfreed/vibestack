@@ -234,20 +234,132 @@ export const viewActions = {
   
   // Column drag actions
   startColumnDrag: assign({
-    columnDragState: ({ event }: any) => ({
-      columnId: event.columnId,
-      startX: event.x,
-      startY: event.y,
-      mouseX: event.x,
-      mouseY: event.y
-    })
+    columnDragState: ({ event, context }: any) => {
+      // Find the column's current position in the coordinate mapping
+      const draggedColumn = context.coordinateMapping?.columns.find(
+        (col: any) => col.columnId === event.columnId
+      );
+      
+      console.log('🎯 StartColumnDrag: Setting up drag state', {
+        columnId: event.columnId,
+        mouseX: event.x,
+        draggedColumn: draggedColumn ? {
+          id: draggedColumn.columnId,
+          start: draggedColumn.offset,
+          end: draggedColumn.offset + draggedColumn.width,
+          width: draggedColumn.width
+        } : null,
+        allColumns: context.coordinateMapping?.columns.map((col: any) => ({
+          id: col.columnId,
+          start: col.offset,
+          end: col.offset + col.width
+        }))
+      });
+      
+      return {
+        columnId: event.columnId,
+        startX: event.x,
+        startY: event.y,
+        mouseX: event.x,
+        mouseY: event.y,
+        // Store the column's original bounds to check if mouse has left
+        originalBounds: draggedColumn ? {
+          start: draggedColumn.offset,
+          end: draggedColumn.offset + draggedColumn.width
+        } : null,
+        // Store the coordinate mapping version to detect stale bounds
+        coordinateMappingVersion: context.coordinateMapping?.version || 0,
+        // Initialize with no preview
+        currentTargetIndex: null,
+        previewActive: false
+      };
+    }
   }),
   
   updateColumnDrag: assign({
     columnDragState: ({ context, event }: any) => {
       if (!context.columnDragState) return null;
+      
+      const state = context.columnDragState;
+      
+      // Check if mouse has left the original column bounds
+      if (state.originalBounds && !state.previewActive) {
+        // Verify that our coordinate mapping is still valid
+        const currentCoordinateVersion = context.coordinateMapping?.version || 0;
+        const stateCoordinateVersion = state.coordinateMappingVersion || 0;
+        
+        if (currentCoordinateVersion !== stateCoordinateVersion) {
+          console.log('🎯 UpdateColumnDrag: Coordinate mapping changed, recalculating bounds', {
+            currentVersion: currentCoordinateVersion,
+            stateVersion: stateCoordinateVersion
+          });
+          
+          // Recalculate original bounds with current coordinate mapping
+          const draggedColumn = context.coordinateMapping?.columns.find(
+            (col: any) => col.columnId === state.columnId
+          );
+          
+          if (draggedColumn) {
+            const newOriginalBounds = {
+              start: draggedColumn.offset,
+              end: draggedColumn.offset + draggedColumn.width
+            };
+            
+            // Update the state with new bounds and version
+            const updatedState = {
+              ...state,
+              originalBounds: newOriginalBounds,
+              coordinateMappingVersion: currentCoordinateVersion,
+              mouseX: event.x,
+              mouseY: event.y
+            };
+            
+            // Check bounds with the updated bounds
+            const isOutsideBounds = event.x < newOriginalBounds.start || event.x > newOriginalBounds.end;
+            
+            console.log('🎯 UpdateColumnDrag: Checking updated bounds', {
+              mouseX: event.x,
+              newOriginalBounds,
+              isOutsideBounds
+            });
+            
+            if (isOutsideBounds) {
+              console.log('🎯 UpdateColumnDrag: Activating preview - mouse left updated column');
+              return {
+                ...updatedState,
+                previewActive: true
+              };
+            }
+            
+            return updatedState;
+          }
+        }
+        
+        // Use existing bounds logic
+        const isOutsideBounds = event.x < state.originalBounds.start || event.x > state.originalBounds.end;
+        
+        console.log('🎯 UpdateColumnDrag: Checking bounds', {
+          mouseX: event.x,
+          originalBounds: state.originalBounds,
+          isOutsideBounds,
+          previewActive: state.previewActive
+        });
+        
+        if (isOutsideBounds) {
+          // Mouse has left the original column - activate preview
+          console.log('🎯 UpdateColumnDrag: Activating preview - mouse left column');
+          return {
+            ...state,
+            mouseX: event.x,
+            mouseY: event.y,
+            previewActive: true
+          };
+        }
+      }
+      
+      // Just update mouse position
       return {
-        ...context.columnDragState,
+        ...state,
         mouseX: event.x,
         mouseY: event.y
       };
