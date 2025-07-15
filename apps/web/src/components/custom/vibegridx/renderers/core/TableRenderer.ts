@@ -241,8 +241,8 @@ export class TableRenderer {
     const lastRenderState = this.stateManager.getLastRenderState();
     if (lastRenderState?.coordinateMapping) {
       const coordinateColumns = lastRenderState.coordinateMapping.columns;
-      const totalDataWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
-      return totalDataWidth + (this.options.enableSelectionColumn ? 48 : 0);
+      // The coordinate mapping already includes the selection column width
+      return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
     }
     // Fallback to render state totalWidth if coordinate mapping not available
     return lastRenderState?.totalWidth || 0;

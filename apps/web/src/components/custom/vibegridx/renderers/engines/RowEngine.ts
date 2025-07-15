@@ -348,12 +348,8 @@ export class RowEngine {
     const width = coordinateColumn?.width || column.width || 120;
     
     // Get offset from coordinate mapping (authoritative source)
-    let xOffset = coordinateColumn?.offset || 0;
-    
-    // Add selection column offset if enabled
-    if (this.config.enableSelectionColumn) {
-      xOffset += 48;
-    }
+    // The coordinate mapping already includes the selection column offset
+    const xOffset = coordinateColumn?.offset || 0;
     
     // DEBUG: Log DOM position calculation
     if (column.id === 'project' && row.id === '03097812-7cc9-4d3d-87d3-e0626ee2cfd8') {
@@ -485,8 +481,8 @@ export class RowEngine {
     // Use coordinate mapping from state machine if available
     if (state?.coordinateMapping) {
       const coordinateColumns = state.coordinateMapping.columns;
-      const totalDataWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
-      return totalDataWidth + (this.config.enableSelectionColumn ? 48 : 0);
+      // The coordinate mapping already includes the selection column width
+      return coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
     }
     
     // Fallback to render state totalWidth
