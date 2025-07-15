@@ -50,13 +50,31 @@ export const createInitialViewState = (
   const filters = persistedData?.filters || [];
   const groupBy = persistedData?.groupBy || [];
   const columnVisibility = persistedData?.columnVisibility || defaultVisibility;
-  const columnOrder = persistedData?.columnOrder || columns.map(col => col.id);
+  
+  // Filter persisted column order to only include valid column IDs
+  const validColumnIds = new Set(columns.map(col => col.id));
+  const persistedColumnOrder = persistedData?.columnOrder || [];
+  const validPersistedOrder = persistedColumnOrder.filter((id: string) => validColumnIds.has(id));
+  
+  // Add any new columns that aren't in the persisted order
+  const missingColumns = columns
+    .map(col => col.id)
+    .filter(id => !validPersistedOrder.includes(id));
+    
+  const columnOrder = validPersistedOrder.length > 0 
+    ? [...validPersistedOrder, ...missingColumns]
+    : columns.map(col => col.id);
   
   // Calculate hidden column count from column visibility
   const hiddenColumnCount = Object.values(columnVisibility).filter(visible => !visible).length;
   
   console.log('[ViewSlice] createInitialViewState:', {
     entityType,
+    providedColumns: columns.map(c => c.id),
+    persistedColumnOrder,
+    validPersistedOrder,
+    missingColumns,
+    finalColumnOrder: columnOrder,
     hasPersistedData: !!persistedData,
     persistedColumnOrder: persistedData?.columnOrder,
     defaultColumnOrder: columns.map(col => col.id),

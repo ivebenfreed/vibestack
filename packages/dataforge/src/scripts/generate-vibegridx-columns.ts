@@ -195,6 +195,9 @@ export type CellType =
         output += generateEntityVibeGridXColumns(entity, entityClasses, storage, config);
     }
 
+    // Add entity configurations
+    output += generateEntityConfigurations(entityClasses);
+
     // Add utility functions if enabled
     if (config.outputOptions.includeUtilityFunctions) {
         output += generateUtilityFunctions(entityClasses);
@@ -596,6 +599,119 @@ function formatFieldLabel(propertyName: string): string {
 // getMaxColumnWidth function removed - use getConfigMaxColumnWidth from config instead
 
 // getPlaceholder function removed - use getConfigPlaceholder from config instead
+
+/**
+ * Generate entity configurations
+ */
+function generateEntityConfigurations(entityClasses: Function[]): string {
+    let output = `
+// ============================================================================
+// ENTITY CONFIGURATIONS
+// ============================================================================
+
+// Entity configuration interface
+export interface VibeGridXEntityConfig<T = any> {
+  entityType: string;
+  columns: VibeGridXColumns<T>;
+  atom: {
+    path: string;
+    name: string;
+  };
+  updateFn: {
+    path: string;
+    name: string;
+  };
+  relationshipAtoms: Record<string, {
+    path: string;
+    name: string;
+    displayField: string;
+  }>;
+}
+
+`;
+
+    // Generate individual entity configurations
+    for (const entity of entityClasses) {
+        const entityName = entity.name;
+        const entityNameLower = entityName.toLowerCase();
+        
+        // Find all relationship columns for this entity
+        const schema = findSchemaForEntity(entityName);
+        const relations = schema?.options.relations || {};
+        const relationshipAtoms: Record<string, any> = {};
+        
+        // Build relationship atom mappings
+        for (const [propertyName, relationDef] of Object.entries(relations)) {
+            const relation = relationDef as any;
+            if (relation.type === 'many-to-one' || relation.type === 'one-to-one') {
+                const targetEntity = relation.target;
+                const targetEntityLower = targetEntity.toLowerCase();
+                
+                // Map common relationship names to their atoms
+                if (propertyName === 'project' || targetEntity === 'Project') {
+                    relationshipAtoms[propertyName] = {
+                        path: '@/domain/project',
+                        name: 'projectsAtom',
+                        displayField: 'name'
+                    };
+                } else if (propertyName === 'assignee' || propertyName === 'user' || targetEntity === 'User') {
+                    relationshipAtoms[propertyName] = {
+                        path: '@/domain/user',
+                        name: 'usersAtom',
+                        displayField: 'displayName'
+                    };
+                } else if (propertyName === 'task' || targetEntity === 'Task') {
+                    relationshipAtoms[propertyName] = {
+                        path: '@/domain/task',
+                        name: 'tasksAtom',
+                        displayField: 'title'
+                    };
+                } else if (propertyName === 'comment' || targetEntity === 'Comment') {
+                    relationshipAtoms[propertyName] = {
+                        path: '@/domain/comment',
+                        name: 'commentsAtom',
+                        displayField: 'content'
+                    };
+                }
+            }
+        }
+        
+        output += `// ${entityName} entity configuration
+export const ${entityName}EntityConfig: VibeGridXEntityConfig<${entityName}> = {
+  entityType: '${entityNameLower}',
+  columns: ${entityName}Columns,
+  atom: {
+    path: '@/domain/${entityNameLower}',
+    name: '${entityNameLower}sAtom'
+  },
+  updateFn: {
+    path: '@/domain/${entityNameLower}',
+    name: 'update${entityName}UI'
+  },
+  relationshipAtoms: ${JSON.stringify(relationshipAtoms, null, 2).split('\n').join('\n  ')}
+};
+
+`;
+    }
+    
+    // Generate master configuration object
+    output += `// Master entity configuration registry
+export const VIBEGRIDX_ENTITY_CONFIGS = {
+${entityClasses.map(e => `  ${e.name.toLowerCase()}: ${e.name}EntityConfig`).join(',\n')}
+} as const;
+
+// Type-safe entity type union
+export type VibeGridXEntityType = keyof typeof VIBEGRIDX_ENTITY_CONFIGS;
+
+// Get entity configuration by type
+export function getEntityConfig<T = any>(entityType: VibeGridXEntityType): VibeGridXEntityConfig<T> | undefined {
+  return VIBEGRIDX_ENTITY_CONFIGS[entityType] as VibeGridXEntityConfig<T>;
+}
+
+`;
+    
+    return output;
+}
 
 /**
  * Generate utility functions

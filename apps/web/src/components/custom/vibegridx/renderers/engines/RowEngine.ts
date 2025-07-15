@@ -100,7 +100,7 @@ export class RowEngine {
   /**
    * Update a single row
    */
-  updateRow(row: TableRow, state?: RenderState): void {
+  updateRow(row: TableRow, state?: RenderState, columns?: Column[], relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
     const rowElement = this.config.domManager.getRowElement(row.id);
     if (!rowElement) {
       return;
@@ -108,8 +108,8 @@ export class RowEngine {
     
     const startTime = performance.now();
     
-    // Update row content
-    this.renderRowCells(row, rowElement, state);
+    // Update row content with optional columns and resolvers
+    this.renderRowCells(row, rowElement, state || columns ? { ...state, columns } : state, relationshipResolvers);
     
     // Update row state
     rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
@@ -254,9 +254,12 @@ export class RowEngine {
     rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
   }
   
-  private renderRowCells(row: TableRow, rowElement: HTMLElement, state?: RenderState): void {
-    // Get columns to render
+  renderRowCells(row: TableRow, rowElement: HTMLElement, state?: RenderState, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
+    // Get columns to render - this must come from state to ensure proper ordering
     const columnsToRender = this.getColumnsToRender(row, state);
+    
+    // Resolve relationship values if resolvers provided
+    const rowDataWithResolved = relationshipResolvers ? this.resolveRelationships(row, columnsToRender, relationshipResolvers) : row;
     
     // Clear existing content efficiently
     rowElement.textContent = '';
@@ -272,7 +275,7 @@ export class RowEngine {
     
     // Add data cells
     columnsToRender.forEach((column, index) => {
-      const cell = this.createDataCell(row, column, index, columnsToRender);
+      const cell = this.createDataCell(rowDataWithResolved, column, index, columnsToRender);
       fragment.appendChild(cell);
     });
     
@@ -345,6 +348,20 @@ export class RowEngine {
     // Calculate offset
     const xOffset = this.calculateCellOffset(index, allColumns);
     
+    // DEBUG: Log DOM position calculation
+    if (column.id === 'project' && row.id === '03097812-7cc9-4d3d-87d3-e0626ee2cfd8') {
+      console.log('🔍 RowEngine: Creating project cell DOM position', {
+        rowId: row.id,
+        columnId: column.id,
+        columnIndex: index,
+        calculatedXOffset: xOffset,
+        columnWidth: width,
+        allColumnsCount: allColumns.length,
+        allColumnIds: allColumns.map(c => c.id),
+        enableSelectionColumn: this.config.enableSelectionColumn
+      });
+    }
+    
     // Create cell element
     const cell = document.createElement('div');
     cell.className = CSS_CLASSES.CELL;
@@ -408,10 +425,29 @@ export class RowEngine {
   private calculateCellOffset(index: number, columns: Column[]): number {
     let offset = this.config.enableSelectionColumn ? 48 : 0; // Start after selection column if enabled
     
+    const offsets: Array<{columnId: string, width: number, cumulative: number}> = [];
+    
     for (let i = 0; i < index; i++) {
       const prevColumn = columns[i];
       const prevWidth = this.config.columnManager.getColumnWidth(prevColumn.id);
       offset += prevWidth;
+      
+      offsets.push({
+        columnId: prevColumn.id,
+        width: prevWidth,
+        cumulative: offset
+      });
+    }
+    
+    // DEBUG: Log offset calculation for project column
+    if (index < columns.length && columns[index].id === 'project') {
+      console.log('🔍 RowEngine: calculateCellOffset for project column', {
+        columnIndex: index,
+        finalOffset: offset,
+        enableSelectionColumn: this.config.enableSelectionColumn,
+        selectionColumnWidth: this.config.enableSelectionColumn ? 48 : 0,
+        previousColumns: offsets
+      });
     }
     
     return offset;
@@ -425,6 +461,28 @@ export class RowEngine {
     });
     
     return totalWidth;
+  }
+  
+  private resolveRelationships(row: TableRow, columns: Column[], resolvers: Record<string, (id: string | string[]) => string>): TableRow {
+    // Create a copy of row data with resolved relationships
+    const resolvedData = { ...row.data };
+    
+    columns.forEach(column => {
+      const cellType = column.cellType || column.type;
+      if (cellType?.startsWith('relationship') && resolvers[column.id]) {
+        const field = column.field || column.id;
+        const value = row.data[field];
+        if (value != null) {
+          // Add resolved value with special key that renderers can use
+          resolvedData[`__resolved_${column.id}`] = resolvers[column.id](value);
+        }
+      }
+    });
+    
+    return {
+      ...row,
+      data: resolvedData
+    };
   }
   
   private getColumnCount(state?: RenderState): number {

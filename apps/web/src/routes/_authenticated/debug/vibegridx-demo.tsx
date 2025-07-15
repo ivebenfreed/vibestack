@@ -151,21 +151,29 @@ function VibeGridXDemoPage() {
     <div className="h-screen flex flex-col p-4">
       {/* Simple header */}
       <div className="mb-4">
-        <h1 className="text-2xl font-bold">VibeGridX Demo</h1>
+        <h1 className="text-2xl font-bold">VibeGridX Demo - Simplified Entity-Based Usage</h1>
+        <p className="text-gray-600 mt-2">
+          Using entityType="task" with auto-configuration from DataForge
+        </p>
       </div>
       
-      {/* Full height table */}
+      {/* Full height table - Now using simplified entity-based configuration */}
       <div className="flex-1 overflow-hidden">
         <VibeGridX<Task>
-          tableId={tableId}
           entityType="task"
-          columns={taskColumns}
+          tableId={tableId}
+          selectedColumns={[
+            'title',
+            'status', 
+            'priority',
+            'description',
+            'project',
+            'assignee',
+            'dueDate',
+            'createdAt',
+            'updatedAt'
+          ]}
           height="100%"
-          primaryAtom={tasksAtom}
-          relationshipAtoms={{
-            projects: projectsAtom,
-            users: usersAtom
-          }}
           initialData={initialData}
           enableVirtualScrolling={true}
           enableCanvasOverlays={true}

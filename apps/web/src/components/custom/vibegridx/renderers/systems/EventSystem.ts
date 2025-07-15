@@ -175,8 +175,8 @@ export class EventSystem {
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
 
-    // Ensure viewport has focus for keyboard events
-    this.config.domManager.getElement('viewport').focus();
+    // Ensure viewport has focus for keyboard events, but prevent scrolling
+    this.config.domManager.getElement('viewport').focus({ preventScroll: true });
 
     this.config.callbacks.onCellClick?.(rowId, columnId, event);
   }

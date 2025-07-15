@@ -13,7 +13,7 @@
 
 import { fromCallback } from 'xstate';
 import type { TableRenderer } from '../renderers/core/TableRenderer';
-import type { RenderState, RendererOptions, ViewportInfo } from '../types';
+import type { RenderState, RendererOptions, ViewportInfo, Column } from '../types';
 
 // ====================================
 // EVENT TYPES
@@ -26,11 +26,15 @@ export type RendererActorEvent =
   | { type: 'UPDATE_VIEWPORT'; viewport: ViewportInfo }
   | { type: 'UPDATE_COLUMNS'; columns: any[] }
   | { type: 'UPDATE_COLUMN_WIDTH'; columnId: string; width: number }
+  | { type: 'UPDATE_CELL'; rowId: string; columnId: string; field: string; value: any; oldValue: any }
+  | { type: 'UPDATE_ROW'; rowId: string; entity: any; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
+  | { type: 'REMOVE_ROW'; rowId: string }
   | { type: 'DESTROY' };
 
 export type RendererActorResponse =
   | { type: 'RENDERER_READY' }
   | { type: 'CANVAS_CONTAINER_READY'; container: HTMLElement }
+  | { type: 'CELL_UPDATED'; rowId: string; columnId: string }
   | { type: 'ROWS_RENDERED'; actualOrder?: string[]; viewport?: ViewportInfo | null; rowCount?: number }
   | { type: 'VIEWPORT_UPDATED'; viewport: ViewportInfo }
   | { type: 'COLUMNS_UPDATED' }
@@ -254,6 +258,34 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           });
           break;
           
+        case 'UPDATE_CELL':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update cell - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Updating single cell:', {
+            rowId: event.rowId,
+            columnId: event.columnId,
+            value: event.value
+          });
+          
+          // Update just the specific cell with optimistic value
+          if (renderer.updateCell) {
+            // For now, pass the field as the column until we have proper column lookup
+            const column = { id: event.columnId, field: event.field };
+            renderer.updateCell(event.rowId, event.columnId, event.value, column as any);
+          } else {
+            console.warn('RendererActor: updateCell method not available on renderer');
+          }
+          
+          sendBack({ 
+            type: 'CELL_UPDATED',
+            rowId: event.rowId,
+            columnId: event.columnId
+          });
+          break;
+          
         case 'UPDATE_COLUMNS':
           if (!renderer) {
             console.warn('RendererActor: Cannot update columns - renderer not initialized');
@@ -358,6 +390,60 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           sendBack({ 
             type: 'ROWS_RENDERED',
             rowCount: event.state.rows?.length || 0
+          });
+          break;
+          
+        case 'UPDATE_ROW':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update row - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Updating single row:', {
+            rowId: event.rowId,
+            entity: event.entity,
+            timestamp: performance.now()
+          });
+          
+          // Update just the specific row with new entity data
+          if (renderer.updateRow) {
+            // Don't pass columns - let renderer use its last render state
+            renderer.updateRow(event.rowId, event.entity, event.relationshipResolvers);
+          } else {
+            console.warn('RendererActor: updateRow method not available on renderer');
+          }
+          
+          sendBack({ 
+            type: 'CELL_UPDATED',
+            rowId: event.rowId,
+            columnId: 'all' // Indicates entire row was updated
+          });
+          break;
+          
+        case 'REMOVE_ROW':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot remove row - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Removing row:', {
+            rowId: event.rowId
+          });
+          
+          // Remove the row from DOM
+          if (renderer.removeRow) {
+            renderer.removeRow(event.rowId);
+          } else {
+            // Fallback: Find and remove the row element directly
+            const rowElement = renderer.getRowElement?.(event.rowId);
+            if (rowElement) {
+              rowElement.remove();
+            }
+          }
+          
+          sendBack({ 
+            type: 'ROWS_RENDERED',
+            rowCount: (renderState?.rows?.length || 0) - 1
           });
           break;
           

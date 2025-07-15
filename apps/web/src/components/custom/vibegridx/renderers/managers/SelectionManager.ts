@@ -118,7 +118,7 @@ export class SelectionManager {
       if (newElement) {
         newElement.classList.add(CSS_CLASSES.EDITING);
         newElement.contentEditable = 'true';
-        newElement.focus();
+        newElement.focus({ preventScroll: true });
       }
     }
   }

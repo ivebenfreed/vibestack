@@ -442,6 +442,22 @@ export class DOMSystem {
   }
   
   /**
+   * Remove a row element from cache
+   */
+  removeRowElement(rowId: string): void {
+    this.rowElements.delete(rowId);
+    
+    // Also remove all associated cell elements
+    const keysToRemove: string[] = [];
+    for (const key of this.cellElements.keys()) {
+      if (key.startsWith(`${rowId}:`)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => this.cellElements.delete(key));
+  }
+  
+  /**
    * CSS class constants
    */
   static get CSS_CLASSES() {

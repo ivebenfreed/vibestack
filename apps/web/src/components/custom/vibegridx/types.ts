@@ -253,6 +253,17 @@ export interface TableContext {
   // Relationship resolvers for foreign key lookups
   relationshipResolvers: Record<string, (id: string | string[]) => string>;
   
+  // Entity update handler for self-contained saves
+  onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+  
+  // Atom subscription management (moved from React to XState)
+  primaryAtom?: any; // Primary entity atom to subscribe to
+  relationshipAtoms?: Record<string, any>; // Relationship atoms for foreign key lookups
+  atomUnsubscribers?: {
+    primary?: () => void;
+    relationships: Record<string, () => void>;
+  }; // Cleanup functions for atom subscriptions
+  
   // View state management (moved from viewCoordinator)
   sortBy: SortConfig[];
   filters: FilterConfig[];
@@ -359,6 +370,8 @@ export type TableEvents =
   // Entity configuration
   | { type: 'SET_ENTITY_TYPE'; entityType: string; columns: Column[] }
   | { type: 'SET_VISIBLE_ENTITIES'; entityIds: string[] }
+  | { type: 'SET_ENTITIES'; entities: any[] }
+  | { type: 'UPDATE_RELATIONSHIP_DATA'; relationshipTable: string; data: Record<string, any> }
   | { type: 'ROWS_SORTED'; rowIds: string[]; sortBy: SortConfig[] }
   
   // Selection events
@@ -453,6 +466,7 @@ export interface TableConfig {
   settings?: TableSettings;
   enableSelectionColumn?: boolean;
   persistedData?: any; // Persisted UI state from localStorage (sync machine pattern)
+  onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void; // Generic entity update handler
 }
 
 // ====================================

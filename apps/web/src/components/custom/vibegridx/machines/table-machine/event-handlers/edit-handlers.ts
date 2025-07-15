@@ -6,6 +6,30 @@ import { sendTo, assign, emit } from 'xstate';
 import { editActions } from '../slices/edit-slice';
 
 export const editHandlers = {
+  'edit.cell.start': {
+    actions: [
+      // Create cell ref from event
+      ({ context, event, self }) => {
+        const cell = {
+          rowId: event.rowId,
+          columnId: event.columnId,
+          field: context.columns.find(c => c.id === event.columnId)?.field || event.columnId
+        };
+        
+        // Get current value from row data
+        const row = context.rows.find(r => r.id === event.rowId);
+        const value = row?.data[cell.field];
+        
+        // Send the edit.start event with proper structure
+        self.send({
+          type: 'edit.start',
+          cell,
+          value
+        });
+      }
+    ]
+  },
+  
   'edit.start': {
     actions: [
       editActions.startEdit,
@@ -14,6 +38,20 @@ export const editHandlers = {
       assign({
         editingCell: ({ event }) => event.cell
       }),
+      
+      // Send to canvas for positioning the editing overlay
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        ({ context, event }) => ({
+          type: 'UPDATE_EDITING',
+          editingCell: event.cell,
+          editValue: event.value,
+          column: context.columns.find(c => c.id === event.cell.columnId),
+          coordinateMapping: context.coordinateMapping,
+          viewport: context.viewport,
+          rowHeight: context.rowHeight
+        })
+      ),
       
       // Emit edit start event
       emit(({ event }) => ({
@@ -35,6 +73,21 @@ export const editHandlers = {
     actions: [
       editActions.updateEditValue,
       
+      // Update canvas overlay with new value
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        ({ context, event }) => ({
+          type: 'UPDATE_EDITING',
+          editingCell: context.editingCell,
+          editValue: event.value,
+          column: context.columns.find(c => c.id === context.editingCell?.columnId),
+          coordinateMapping: context.coordinateMapping,
+          viewport: context.viewport,
+          rowHeight: context.rowHeight,
+          validationErrors: context.validationErrors
+        })
+      ),
+      
       ({ context, event }) => {
         console.log('TableMachine: Edit value updated', {
           cell: context.editingCell,
@@ -47,6 +100,29 @@ export const editHandlers = {
 
   'edit.commit': {
     actions: [
+      // Store optimistic operation for tracking
+      assign({
+        optimisticOperations: ({ context, event }) => {
+          if (!context.editingCell) return context.optimisticOperations;
+          
+          const { rowId, columnId, field } = context.editingCell;
+          const operationId = `edit-${rowId}-${columnId}-${Date.now()}`;
+          
+          const newOperations = new Map(context.optimisticOperations);
+          newOperations.set(operationId, {
+            id: operationId,
+            type: 'update',
+            entityId: rowId,
+            field: field,
+            newValue: event.value,
+            oldValue: context.originalValue,
+            timestamp: Date.now()
+          });
+          
+          return newOperations;
+        }
+      }),
+      
       editActions.commitEdit,
       
       // Clear editing state after commit
@@ -57,21 +133,46 @@ export const editHandlers = {
         editingCell: () => null
       }),
       
-      // Emit edit complete event
-      emit(({ context, event }) => ({
-        type: 'vibegridx.cell.edit',
-        rowId: context.editingCell?.rowId,
-        columnId: context.editingCell?.columnId,
-        value: event.value,
-        oldValue: context.originalValue
-      })),
+      // Hide canvas editing overlay
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({
+          type: 'UPDATE_EDITING',
+          editingCell: null
+        })
+      ),
       
+      // Tell renderer to apply optimistic update to just the edited cell
+      sendTo(
+        ({ context }) => context.actors.rendererActor!,
+        ({ context, event }) => {
+          const { rowId, columnId, field } = context.editingCell!;
+          return {
+            type: 'UPDATE_CELL',
+            rowId,
+            columnId,
+            field,
+            value: event.value,
+            oldValue: context.originalValue
+          };
+        }
+      ),
+      
+      // Call entity update handler if provided (fire and forget)
       ({ context, event }) => {
-        console.log('TableMachine: Edit committed', {
-          cell: context.editingCell,
-          value: event.value,
-          oldValue: context.originalValue
-        });
+        if (context.onEntityUpdate && context.editingCell) {
+          const { rowId, field } = context.editingCell;
+          const updates = { [field]: event.value };
+          
+          console.log('TableMachine: Calling onEntityUpdate', {
+            rowId,
+            updates,
+            field
+          });
+          
+          // Fire and forget - don't await
+          context.onEntityUpdate(rowId, updates);
+        }
       }
     ]
   },
@@ -84,6 +185,15 @@ export const editHandlers = {
       assign({
         editingCell: () => null
       }),
+      
+      // Hide canvas editing overlay
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({
+          type: 'UPDATE_EDITING',
+          editingCell: null
+        })
+      ),
       
       ({ context }) => {
         console.log('TableMachine: Edit cancelled', {
@@ -109,6 +219,21 @@ export const editHandlers = {
   'edit.error': {
     actions: [
       editActions.setValidationErrors,
+      
+      // Update canvas to show validation errors
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        ({ context, event }) => ({
+          type: 'UPDATE_EDITING',
+          editingCell: context.editingCell,
+          editValue: context.editValue,
+          column: context.columns.find(c => c.id === context.editingCell?.columnId),
+          coordinateMapping: context.coordinateMapping,
+          viewport: context.viewport,
+          rowHeight: context.rowHeight,
+          validationErrors: event.errors
+        })
+      ),
       
       emit(({ event }) => ({
         type: 'vibegridx.error',
@@ -146,6 +271,58 @@ export const editHandlers = {
         console.log('TableMachine: Optimistic operation updated', {
           operationId: event.operationId,
           status: event.status
+        });
+      }
+    ]
+  },
+
+  // Canvas actor responses
+  'EDIT_UPDATE': {
+    actions: [
+      ({ event }) => {
+        console.log('TableMachine: Edit update from canvas', {
+          value: event.value
+        });
+      },
+      
+      // Forward the update to the edit slice
+      ({ self, event }) => {
+        self.send({
+          type: 'edit.update',
+          value: event.value
+        });
+      }
+    ]
+  },
+
+  'EDIT_COMMIT': {
+    actions: [
+      ({ event }) => {
+        console.log('TableMachine: Edit commit from canvas', {
+          value: event.value
+        });
+      },
+      
+      // Forward the commit to the edit slice
+      ({ self, event }) => {
+        self.send({
+          type: 'edit.commit',
+          value: event.value
+        });
+      }
+    ]
+  },
+
+  'EDIT_CANCEL': {
+    actions: [
+      ({ event }) => {
+        console.log('TableMachine: Edit cancel from canvas');
+      },
+      
+      // Forward the cancel to the edit slice
+      ({ self }) => {
+        self.send({
+          type: 'edit.cancel'
         });
       }
     ]

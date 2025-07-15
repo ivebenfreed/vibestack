@@ -15,7 +15,14 @@ export const selectionHandlers = {
       
       // Send visual positions to canvas
       ({ context, self }) => {
+        // Skip selection updates when editing
+        if (context.editingCell) {
+          console.log('SelectionHandler: Skipping selection update - editing in progress');
+          return;
+        }
+        
         console.log('SelectionHandler: Preparing canvas update', {
+          eventType: 'selection.cell.select',
           hasCoordinateMapping: !!context.coordinateMapping,
           hasCanvasActor: !!context.actors?.canvasActor,
           selectedCellsSize: context.selectedCells.size
@@ -81,6 +88,12 @@ export const selectionHandlers = {
       
       // Send visual positions to canvas
       ({ context, self }) => {
+        // Skip selection updates when editing
+        if (context.editingCell) {
+          console.log('SelectionHandler: Skipping range selection update - editing in progress');
+          return;
+        }
+        
         const visualPositions = calculateVisualPositions(
           context.selectedCells,
           context.coordinateMapping,
@@ -266,6 +279,12 @@ export const selectionHandlers = {
       
       // Send visual positions to canvas
       ({ context, self }) => {
+        // Skip selection updates when editing
+        if (context.editingCell) {
+          console.log('SelectionHandler: Skipping drag move update - editing in progress');
+          return;
+        }
+        
         const visualPositions = calculateVisualPositions(
           context.selectedCells,
           context.coordinateMapping,

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo, lazy } from 'react';
 import { useActorRef } from '@xstate/react';
 import { useSelector as useAtomSelector } from '@xstate/store/react';
 import { shallowEqual } from '@xstate/store';
@@ -7,24 +7,8 @@ import {
   type InitializationRefs 
 } from './VibeGridXCore';
 // PortalCanvasOverlayProvider removed - using embedded canvas approach
-import {
-  createCellDoubleClickHandler,
-  createColumnClickHandler,
-  createKeyboardHandler,
-  createScrollHandler,
-  createRendererStateChangeHandler,
-  createMouseDownHandler,
-  createMouseMoveHandler,
-  createMouseUpHandler,
-  createColumnDragStartHandler,
-  createColumnDragMoveHandler,
-  createColumnDragEndHandler,
-  createColumnResizeStartHandler,
-  createColumnResizeMoveHandler,
-  createColumnResizeEndHandler,
-  type EventHandlerRefs,
-  type EventHandlerCallbacks
-} from './VibeGridXEvents';
+// Legacy event handlers removed - using unified EventDelegationManager only
+import { EventDelegationManager, type EventDelegationConfig } from './systems/EventDelegationManager';
 import {
   useChangeDetection,
   useRenderStateExtractor,
@@ -37,19 +21,31 @@ import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } fro
 import { VibeGridXHeader } from './components/VibeGridXHeader';
 import './vibegridx.css';
 
+// Import entity configurations from DataForge
+import { 
+  getEntityConfig, 
+  VIBEGRIDX_ENTITY_CONFIGS,
+  type VibeGridXEntityType,
+  type VibeGridXEntityConfig
+} from '@repo/dataforge/vibegridx-columns';
+
+// Import domain registry for dynamic atom/update function access
+import { DOMAIN_REGISTRY, getDomainAtom, getDomainUpdateFn } from '@/domain/registry';
+
 // ====================================
 // COMPONENT PROPS
 // ====================================
 
-interface VibeGridXProps<T = any> {
+// Entity-based configuration (recommended)
+interface VibeGridXEntityProps<T = any> {
   tableId: string;  // Unique identifier for this table instance (required for persistence)
-  entityType?: string;  // Entity type for data operations (optional)
-  columns: Column<T>[];  // Required typed columns
-  primaryAtom: any; // XState atom for primary data
-  relationshipAtoms?: Record<string, any>; // XState atoms for relationship data
+  entityType: VibeGridXEntityType;  // Entity type for auto-configuration
+  selectedColumns?: string[]; // Column IDs to include (optional - defaults to all)
+  
+  // Common options
   className?: string;
-  height?: number;
-  width?: number;
+  height?: number | string;
+  width?: number | string;
   
   // Initial data from route loader (for synchronous rendering)
   initialData?: {
@@ -58,7 +54,7 @@ interface VibeGridXProps<T = any> {
     coordinateMapping: any;
   };
   
-  // Event handlers
+  // Event handlers (all optional - entity config provides defaults)
   onCellClick?: (rowId: string, columnId: string) => void;
   onCellDoubleClick?: (rowId: string, columnId: string) => void;
   onSelectionChange?: (selectedCells: Set<string>) => void;
@@ -75,8 +71,43 @@ interface VibeGridXProps<T = any> {
   enableFiltering?: boolean;
   enableSorting?: boolean;
   enableDragAndDrop?: boolean;
-  enableSelectionColumn?: boolean; // Enable checkbox selection column
+  enableSelectionColumn?: boolean;
 }
+
+// Manual configuration (for custom use cases)
+interface VibeGridXManualProps<T = any> {
+  tableId: string;
+  columns: Column<T>[];
+  primaryAtom: any;
+  relationshipAtoms?: Record<string, any>;
+  onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+  
+  // Common options (same as entity props)
+  className?: string;
+  height?: number | string;
+  width?: number | string;
+  initialData?: {
+    processedRows: any[];
+    visibleColumns: Column[];
+    coordinateMapping: any;
+  };
+  onCellClick?: (rowId: string, columnId: string) => void;
+  onCellDoubleClick?: (rowId: string, columnId: string) => void;
+  onSelectionChange?: (selectedCells: Set<string>) => void;
+  onEditingChange?: (editingCell: CellRef | null) => void;
+  onPerformanceUpdate?: (metrics: any) => void;
+  enableVirtualScrolling?: boolean;
+  enableCanvasOverlays?: boolean;
+  bufferSize?: number;
+  enableGrouping?: boolean;
+  enableFiltering?: boolean;
+  enableSorting?: boolean;
+  enableDragAndDrop?: boolean;
+  enableSelectionColumn?: boolean;
+}
+
+// Discriminated union type for props
+type VibeGridXProps<T = any> = VibeGridXEntityProps<T> | VibeGridXManualProps<T>;
 
 // ====================================
 // MAIN COMPONENT
@@ -85,27 +116,97 @@ interface VibeGridXProps<T = any> {
 export const VibeGridX = <T extends Record<string, any> = any>(
   props: VibeGridXProps<T>
 ): React.ReactElement => {
+  // Type guard to check if props are entity-based
+  const isEntityProps = (p: VibeGridXProps<T>): p is VibeGridXEntityProps<T> => {
+    return 'entityType' in p;
+  };
+  
+  // Handle entity-based configuration if entityType is provided
+  const entityConfig = useMemo(() => {
+    if (isEntityProps(props)) {
+      const config = getEntityConfig(props.entityType);
+      
+      if (!config) {
+        console.error(`VibeGridX: No entity configuration found for type "${props.entityType}"`);
+        return null;
+      }
+      
+      // Get primary atom and update function from domain registry
+      const primaryAtom = getDomainAtom(props.entityType as any);
+      const updateFn = getDomainUpdateFn(props.entityType as any);
+      
+      // Build relationship atoms from config
+      const relationshipAtoms: Record<string, any> = {};
+      for (const [key, relConfig] of Object.entries(config.relationshipAtoms)) {
+        // Extract entity type from atom name (e.g., 'projectsAtom' -> 'project')
+        const entityType = relConfig.name.replace('sAtom', '');
+        const atom = getDomainAtom(entityType as any);
+        if (atom) {
+          relationshipAtoms[key] = atom;
+        }
+      }
+      
+      // Filter columns if selectedColumns is provided
+      let columns = config.columns;
+      if (props.selectedColumns) {
+        columns = columns.filter(col => props.selectedColumns.includes(col.id));
+      }
+      
+      return {
+        columns,
+        primaryAtom,
+        relationshipAtoms,
+        onEntityUpdate: updateFn ? 
+          (rowId: string, updates: Record<string, any>) => updateFn(rowId, updates) : 
+          undefined
+      };
+    }
+    return null;
+  }, [props]);
+  
+  // Extract configuration based on prop type
+  const columns = entityConfig?.columns || (!isEntityProps(props) ? props.columns : []);
+  const primaryAtom = entityConfig?.primaryAtom || (!isEntityProps(props) ? props.primaryAtom : undefined);
+  const relationshipAtoms = entityConfig?.relationshipAtoms || (!isEntityProps(props) ? props.relationshipAtoms : {}) || {};
+  const onEntityUpdate = entityConfig?.onEntityUpdate || (!isEntityProps(props) ? props.onEntityUpdate : undefined);
+  
+  // Common props (available in both types)
   const {
-    columns,
     className = '',
     height = 600,
     width = '100%',
     enableSelectionColumn = false,
-    primaryAtom,
-    relationshipAtoms = {},
     onCellClick,
     onCellDoubleClick,
     onSelectionChange,
     onEditingChange,
     onPerformanceUpdate,
+    initialData,
+    enableVirtualScrolling,
+    enableCanvasOverlays,
+    bufferSize,
+    enableGrouping,
+    enableFiltering,
+    enableSorting,
+    enableDragAndDrop,
   } = props;
   
-  // CLEAN API: Use useSelector internally for reactive data
-  const entities = useAtomSelector(primaryAtom, (atomData) => {
-    const values = Object.values(atomData || {});
-    // PERFORMANCE FIX: Only log when entity count actually changes
-    return values;
-  }, shallowEqual);
+  // Validate required props
+  if (!primaryAtom) {
+    console.error('VibeGridX: primaryAtom is required. Either provide it directly or use entityType for auto-configuration.');
+    return <div>Error: Missing required primaryAtom</div>;
+  }
+  
+  if (!columns || columns.length === 0) {
+    console.error('VibeGridX: columns are required. Either provide them directly or use entityType for auto-configuration.');
+    return <div>Error: Missing required columns</div>;
+  }
+  
+  // PERFORMANCE: Get initial entities but don't subscribe - renderer handles all updates via DOM
+  const entities = useMemo(() => {
+    const atomData = primaryAtom.get();
+    return Object.values(atomData || {});
+  }, []); // Empty deps - only run once on mount, never re-render
   
   // Subscribe to relationship atoms and create resolvers
   // We need to dynamically subscribe based on which columns need relationship data
@@ -116,19 +217,20 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     });
   }, [columns]);
   
-  // Subscribe to project atom if needed
-  const projectsData = useAtomSelector(
-    relationshipColumns.some(col => col.relationshipTable === 'project') ? relationshipAtoms.projects : null,
-    (atomData) => atomData || {},
-    shallowEqual
-  );
+  // Get initial relationship data but don't subscribe - renderer handles updates
+  const projectsData = useMemo(() => {
+    if (relationshipColumns.some(col => col.relationshipTable === 'project') && relationshipAtoms.projects) {
+      return relationshipAtoms.projects.get() || {};
+    }
+    return {};
+  }, []); // Only run once
   
-  // Subscribe to user atom if needed  
-  const usersData = useAtomSelector(
-    relationshipColumns.some(col => col.relationshipTable === 'assignee' || col.relationshipTable === 'user') ? relationshipAtoms.users : null,
-    (atomData) => atomData || {},
-    shallowEqual
-  );
+  const usersData = useMemo(() => {
+    if (relationshipColumns.some(col => col.relationshipTable === 'assignee' || col.relationshipTable === 'user') && relationshipAtoms.users) {
+      return relationshipAtoms.users.get() || {};
+    }
+    return {};
+  }, []); // Only run once
   
   // Create resolvers based on subscribed data
   const relationshipResolvers = useMemo(() => {
@@ -169,16 +271,11 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     return resolvers;
   }, [relationshipColumns, projectsData, usersData]);
   
-  // Track entities length to detect actual changes
-  const entitiesLengthRef = useRef(0);
-  const shouldLogEntities = entities.length !== entitiesLengthRef.current;
-  if (shouldLogEntities) {
-    entitiesLengthRef.current = entities.length;
-    console.log('VibeGridX: useAtomSelector entity count changed:', { 
-      newLength: entities.length,
-      firstValue: entities[0]
-    });
-  }
+  // Log initial entity count only
+  console.log('VibeGridX: Initial entity count:', { 
+    entityCount: entities.length,
+    renderOnce: true
+  });
   
   // ====================================
   // CORE INITIALIZATION - PERFORMANCE OPTIMIZED
@@ -201,6 +298,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     startCell: CellRef | null;
     startPos: { x: number; y: number } | null;
   }>({ isDragging: false, startCell: null, startPos: null });
+  
+  // Unified event system refs
+  const eventDelegationManagerRef = useRef<EventDelegationManager | null>(null);
   
   // ====================================
   // CORE INITIALIZATION
@@ -250,14 +350,18 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     input: {
       id: tableId,
       entityType: entityType || 'unknown',
-      columns: props.columns,
+      columns: columns, // Use the derived columns variable, not props.columns
       enableSelectionColumn: enableSelectionColumn,
-      entities: entities, // Pass reactive entities directly
+      entities: entities, // Initial entities for setup
+      primaryAtom: primaryAtom, // Pass atom for machine to subscribe to changes
+      relationshipAtoms: relationshipAtoms, // Pass relationship atoms
       relationshipResolvers: relationshipResolvers, // Pass resolvers for relationship columns
       // Include persisted data in input for context initialization
       persistedData: persistedData,
       // Pass initial processed data from route loader
       initialData: props.initialData,
+      // Pass entity update handler for self-contained saves
+      onEntityUpdate: onEntityUpdate,
       settings: {
         enableVirtualScrolling: props.enableVirtualScrolling ?? true,
         enableGrouping: props.enableGrouping ?? true,
@@ -274,12 +378,14 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         }
       }
     }
-  }), [tableId, entityType, props.columns, enableSelectionColumn, entities, relationshipResolvers, persistedData, props.initialData, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
+  }), [tableId, entityType, columns, enableSelectionColumn, primaryAtom, relationshipAtoms, relationshipResolvers, persistedData, props.initialData, onEntityUpdate, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
   
   // PERFORMANCE: Use useActorRef instead of useMachine to avoid re-renders
   // All actual rendering is done via direct DOM manipulation, not React
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
   const tableSend = tableActor.send;
+  
+  // Unified Event System is always used
   
   // PERFORMANCE: Track if entities have been sent to avoid duplicates
   const entitiesSentRef = useRef(false);
@@ -293,61 +399,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   
   // PERFORMANCE: Remove excessive debug logging to reduce useEffect cascade
   
-  // Refs object for event handlers
-  const refs: InitializationRefs & { columns: Column[] } = {
-    containerRef,
-    overlayContainerRef,
-    rendererRef,
-    canvasOverlayRef,
-    selectedCellsRef,
-    anchorCellRef,
-    subscriptionRef,
-    dragStateRef,
-    columns
-  };
-  
-  // State extraction hooks
-  const { getChangedRows } = useChangeDetection();
-  const { extractRenderStateFromActor } = useRenderStateExtractor();
-  
-  // Event callbacks
-  const eventCallbacks: EventHandlerCallbacks = {
-    onCellClick,
-    onCellDoubleClick,
-    onSelectionChange,
-    onEditingChange,
-    onPerformanceUpdate
-  };
-  
-  // ====================================
-  // EVENT HANDLERS
-  // ====================================
-  
-  // Cell click is now handled by mousedown/mouseup to avoid duplicate events
-  // Cell clicks are now handled by mousedown/mouseup for better drag selection support
-  const handleCellClick = useCallback(() => {
-    // No-op - handled by mousedown/mouseup events
-  }, []);
-  const handleCellDoubleClick = createCellDoubleClickHandler(tableSend, eventCallbacks);
-  const handleColumnClick = createColumnClickHandler(refs, tableSend);
-  const handleKeyDown = createKeyboardHandler(refs, tableSend);
-  const handleScroll = createScrollHandler(refs, tableSend);
-  const handleRendererStateChange = createRendererStateChangeHandler(refs, eventCallbacks, tableSend);
-  
-  // Cell selection drag handlers
-  const handleMouseDown = createMouseDownHandler(refs, tableSend);
-  const handleMouseMove = createMouseMoveHandler(refs, tableSend);
-  const handleMouseUp = createMouseUpHandler(refs, tableSend);
-  
-  // Column drag handlers
-  const handleColumnDragStart = createColumnDragStartHandler(tableSend);
-  const handleColumnDragMove = createColumnDragMoveHandler(tableSend);
-  const handleColumnDragEnd = createColumnDragEndHandler(tableSend);
-  
-  // Column resize handlers
-  const handleColumnResizeStart = createColumnResizeStartHandler(tableSend);
-  const handleColumnResizeMove = createColumnResizeMoveHandler(tableSend);
-  const handleColumnResizeEnd = createColumnResizeEndHandler(tableSend);
+  // All event handling is now done by the unified EventDelegationManager
   
   // ====================================
   // SYNCHRONOUS RENDERER INITIALIZATION
@@ -362,17 +414,16 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     // Don't pass container yet - will be set when ref is attached
     enableSelectionColumn: enableSelectionColumn,
     cellHeight: 40,
-    // Add event handlers
-    onCellClick: handleCellClick,
-    onCellDoubleClick: handleCellDoubleClick,
-    onColumnClick: handleColumnClick,
-    onColumnDragStart: handleColumnDragStart,
-    onColumnDragEnd: handleColumnDragEnd,
-    onColumnResizeStart: handleColumnResizeStart,
-    onColumnResizeMove: handleColumnResizeMove,
-    onColumnResizeEnd: handleColumnResizeEnd,
-    onStateChange: handleRendererStateChange
-  }), [enableSelectionColumn, handleCellClick, handleCellDoubleClick, handleColumnClick, handleColumnDragStart, handleColumnDragEnd, handleColumnResizeStart, handleColumnResizeMove, handleColumnResizeEnd, handleRendererStateChange]);
+    // No event handlers - unified EventDelegationManager handles all events
+    onStateChange: (event: any) => {
+      // Simple state change handler for render events
+      if (event.type === 'render.complete') {
+        if (event.renderTime > 100) {
+          console.warn('Slow render detected:', event);
+        }
+      }
+    }
+  }), [enableSelectionColumn]);
   
   // Store pending options for when container is ready
   pendingRendererOptionsRef.current = rendererOptions;
@@ -445,6 +496,10 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     };
   }, []);
   
+  // Atom subscriptions are now handled inside XState machine
+  // No need for useEffect here
+
+  
   // ====================================
   // PUBLIC API
   // ====================================
@@ -475,71 +530,32 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // Selection state sync is now handled by useSelectionStateSync hook
   
   // ====================================
-  // DRAG EVENT HANDLERS
+  // EVENT SYSTEM SETUP
   // ====================================
   
-  // Attach drag handlers to the viewport after renderer is ready
+  // Setup unified event handling system
   useEffect(() => {
     if (!containerRef.current) return;
     
-    // PERFORMANCE: Retry logic to find viewport after renderer creates it
-    let attached = false;
-    let retryCount = 0;
-    const maxRetries = 20;
+    console.log('🎯 VibeGridX: Initializing unified event system');
     
-    const attachHandlers = (viewport: HTMLElement) => {
-      if (attached) return; // Prevent duplicates
-      
-      viewport.addEventListener('mousedown', handleMouseDown);
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      attached = true;
-      console.log('VibeGridX: Drag handlers attached successfully');
+    const delegationConfig: EventDelegationConfig = {
+      container: containerRef.current,
+      tableSend
     };
     
-    const tryAttach = () => {
-      const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
-      if (viewport) {
-        attachHandlers(viewport);
-        return true;
-      }
-      return false;
-    };
+    const delegationManager = new EventDelegationManager(delegationConfig);
+    eventDelegationManagerRef.current = delegationManager;
     
-    // Try immediately
-    if (!tryAttach() && retryCount < maxRetries) {
-      // Retry with exponential backoff
-      const retryTimer = setInterval(() => {
-        retryCount++;
-        if (tryAttach() || retryCount >= maxRetries) {
-          clearInterval(retryTimer);
-        }
-      }, 10); // Check every 10ms
-      
-      return () => {
-        clearInterval(retryTimer);
-        if (attached) {
-          const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
-          if (viewport) {
-            viewport.removeEventListener('mousedown', handleMouseDown);
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-          }
-        }
-      };
-    }
+    console.log('✅ VibeGridX: Unified event system active');
     
     return () => {
-      if (attached) {
-        const viewport = containerRef.current?.querySelector('.vibegridx-viewport') as HTMLElement;
-        if (viewport) {
-          viewport.removeEventListener('mousedown', handleMouseDown);
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-        }
+      if (eventDelegationManagerRef.current) {
+        eventDelegationManagerRef.current.destroy();
+        eventDelegationManagerRef.current = null;
       }
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp]);
+  }, [tableSend]);
   
   // ====================================
   // RENDER
@@ -563,7 +579,6 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         outline: 'none' // Remove focus outline that can cause scroll
       }}
       tabIndex={0}
-      onKeyDown={handleKeyDown}
     >
       {/* Header with Column Visibility Controls */}
       <VibeGridXHeader

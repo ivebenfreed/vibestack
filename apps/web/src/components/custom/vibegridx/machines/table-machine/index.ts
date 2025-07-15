@@ -12,6 +12,7 @@ import { createInitialViewState, viewActions } from './slices/view-slice';
 import { createInitialEditState, editActions } from './slices/edit-slice';
 import { createInitialDragState, dragActions } from './slices/drag-slice';
 import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
+import { atomActions, atomHandlers } from './slices/atom-slice';
 
 // Import event handlers
 import { selectionHandlers } from './event-handlers/selection-handlers';
@@ -75,7 +76,12 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Create overlay state
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
   
-  // Create atom state with config
+  // Store atoms from input
+  const atomState = {
+    primaryAtom: input.primaryAtom,
+    relationshipAtoms: input.relationshipAtoms,
+    atomUnsubscribers: undefined
+  };
   
   return {
     id: input.id,
@@ -119,6 +125,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     ...overlayState,
     
     // Spread atom state
+    ...atomState,
     
     // DEPRECATED: Legacy coordinate manager - disabled in favor of unified coordinateMapping
     coordinateManager: null,
@@ -131,6 +138,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Relationship resolvers
     relationshipResolvers: input.relationshipResolvers || {},
+    
+    // Entity update handler
+    onEntityUpdate: input.onEntityUpdate,
     
     actors: {
       rendererActor: null,
@@ -201,6 +211,7 @@ export const tableBaseMachine = setup({
     ...overlayActions,
     
     // Atom actions
+    ...atomActions,
     
     // Additional actions
     logError: ({ event, context }) => {
@@ -325,8 +336,8 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
-        // CLEAN API: Skip atom subscriptions - entities come from props via useSelector
-        // Entities will be sent via useEffect in React component
+        // Set up atom subscriptions in XState (moved from React)
+        'setupAtomSubscriptions',
         
         // Spawn essential actors (canvas deferred to post-render)
         assign({
@@ -721,6 +732,9 @@ export const tableBaseMachine = setup({
       // Fill events (from canvas actor)
       ...fillHandlers,
       
+      // Atom events
+      ...atomHandlers,
+      
       // Legacy edit events (now handled by edit slice)
       'edit.legacy.*': {
         actions: sendTo(
@@ -774,6 +788,182 @@ export const tableBaseMachine = setup({
             ({ event }) => ({ type: 'ENTITY_TYPE_CHANGED', entityType: event.entityType })
           )
         ]
+      },
+      
+      // Entity data updates from atom subscriptions
+      'SET_ENTITIES': {
+        actions: [
+          // Update entities in context
+          assign({
+            entities: ({ event }) => event.entities
+          }),
+          
+          // Trigger view processing to update rows
+          ({ self }) => {
+            console.log('TableMachine: SET_ENTITIES - triggering view actor');
+            self.send({ type: 'INVOKE_VIEW_ACTOR' });
+          }
+        ]
+      },
+      
+      // Relationship data updates
+      'UPDATE_RELATIONSHIP_DATA': {
+        actions: [
+          // Update relationship resolvers
+          assign({
+            relationshipResolvers: ({ context, event }) => {
+              const { relationshipTable, data } = event;
+              const columns = context.columns.filter(col => 
+                col.relationshipTable === relationshipTable
+              );
+              
+              const newResolvers = { ...context.relationshipResolvers };
+              
+              columns.forEach(column => {
+                const displayField = column.relationshipDisplayField || 'name';
+                newResolvers[column.id] = (id: string | string[]) => {
+                  if (Array.isArray(id)) {
+                    return id.map(i => {
+                      const entity = data[i];
+                      return entity ? (entity[displayField] || entity.name || i) : i;
+                    }).join(', ');
+                  }
+                  const entity = data[id];
+                  return entity ? (entity[displayField] || entity.name || id) : id;
+                };
+              });
+              
+              return newResolvers;
+            }
+          }),
+          
+          // Trigger view refresh to update relationship displays
+          ({ self }) => {
+            console.log('TableMachine: UPDATE_RELATIONSHIP_DATA - triggering view refresh');
+            self.send({ type: 'INVOKE_VIEW_ACTOR' });
+          }
+        ]
+      },
+      
+      // Individual entity update (atomic update after initial load)
+      'UPDATE_ENTITY': {
+        actions: [
+          // Update the specific entity in our entities array
+          assign({
+            entities: ({ context, event }) => {
+              const index = context.entities.findIndex(e => e.id === event.entityId);
+              if (index !== -1) {
+                const newEntities = [...context.entities];
+                newEntities[index] = event.entity;
+                return newEntities;
+              }
+              return context.entities;
+            }
+          }),
+          
+          // Update the specific row in our processed rows
+          assign({
+            rows: ({ context, event }) => {
+              const index = context.rows.findIndex(r => r.id === event.entityId);
+              if (index !== -1) {
+                const newRows = [...context.rows];
+                // Convert entity to TableRow format
+                newRows[index] = {
+                  id: event.entity.id,
+                  data: event.entity,
+                  metadata: {
+                    createdAt: event.entity.createdAt,
+                    updatedAt: event.entity.updatedAt,
+                    version: (newRows[index].metadata?.version || 0) + 1,
+                    isNew: false,
+                    isDirty: false
+                  }
+                };
+                return newRows;
+              }
+              return context.rows;
+            },
+            version: ({ context }) => context.version + 1
+          }),
+          
+          // Send targeted update to renderer for just this row
+          sendTo(
+            ({ context }) => context.actors.rendererActor!,
+            ({ event, context }) => ({
+              type: 'UPDATE_ROW',
+              rowId: event.entityId,
+              entity: event.entity,
+              // Don't send columns - let renderer use its last render state columns
+              relationshipResolvers: context.relationshipResolvers
+            })
+          ),
+          
+          ({ event }) => {
+            console.log('TableMachine: UPDATE_ENTITY - updating single row', {
+              entityId: event.entityId,
+              timestamp: performance.now()
+            });
+          }
+        ]
+      },
+      
+      // Add entity (for new items)
+      'ADD_ENTITY': {
+        actions: [
+          assign({
+            entities: ({ context, event }) => [...context.entities, event.entity],
+            rows: ({ context, event }) => {
+              // Add new row at the beginning (or according to sort)
+              const newRow = {
+                id: event.entity.id,
+                data: event.entity,
+                metadata: {
+                  createdAt: event.entity.createdAt,
+                  updatedAt: event.entity.updatedAt,
+                  version: 1,
+                  isNew: true,
+                  isDirty: false
+                }
+              };
+              return [newRow, ...context.rows];
+            },
+            visibleRowIds: ({ context, event }) => [event.entity.id, ...context.visibleRowIds],
+            allRowIds: ({ context, event }) => [event.entity.id, ...context.allRowIds],
+            version: ({ context }) => context.version + 1
+          }),
+          
+          // For now, trigger full re-render for adds (could optimize later)
+          ({ self }) => {
+            console.log('TableMachine: ADD_ENTITY - triggering view refresh');
+            self.send({ type: 'INVOKE_VIEW_ACTOR' });
+          }
+        ]
+      },
+      
+      // Remove entity
+      'REMOVE_ENTITY': {
+        actions: [
+          assign({
+            entities: ({ context, event }) => 
+              context.entities.filter(e => e.id !== event.entityId),
+            rows: ({ context, event }) => 
+              context.rows.filter(r => r.id !== event.entityId),
+            visibleRowIds: ({ context, event }) => 
+              context.visibleRowIds.filter(id => id !== event.entityId),
+            allRowIds: ({ context, event }) => 
+              context.allRowIds.filter(id => id !== event.entityId),
+            version: ({ context }) => context.version + 1
+          }),
+          
+          // Send remove event to renderer
+          sendTo(
+            ({ context }) => context.actors.rendererActor!,
+            ({ event }) => ({
+              type: 'REMOVE_ROW',
+              rowId: event.entityId
+            })
+          )
+        ]
       }
     }
   }, // End of active state
@@ -786,7 +976,10 @@ export const tableBaseMachine = setup({
         target: 'initializing'
       }
     }
-  }
+  },
+  
+  // Add global exit handler for cleanup
+  exit: 'cleanupAtomSubscriptions'
 }, // End of states
   
 on: {

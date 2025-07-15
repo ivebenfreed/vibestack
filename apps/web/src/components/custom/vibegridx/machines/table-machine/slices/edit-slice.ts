@@ -37,15 +37,15 @@ export const createInitialEditState = (): EditState => ({
 
 export const editActions = {
   startEdit: assign({
-    editingCell: (_, event: any) => event.cell,
-    editValue: (_, event: any) => event.value,
-    originalValue: (_, event: any) => event.value,
+    editingCell: ({ event }: any) => event.cell,
+    editValue: ({ event }: any) => event.value,
+    originalValue: ({ event }: any) => event.value,
     isDirty: () => false,
     validationErrors: () => new Map()
   }),
 
   updateEditValue: assign({
-    editValue: (_, event: any) => event.value,
+    editValue: ({ event }: any) => event.value,
     isDirty: ({ context, event }: any) => {
       const originalValue = context.originalValue;
       const newValue = event.value;
@@ -90,7 +90,7 @@ export const editActions = {
   }),
 
   setValidationErrors: assign({
-    validationErrors: (_, event: any) => new Map(event.errors)
+    validationErrors: ({ event }: any) => new Map(event.errors)
   }),
 
   clearValidationErrors: assign({

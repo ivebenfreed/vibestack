@@ -438,6 +438,12 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
   let orderedDataColumns = visibleDataColumns;
   if (input.columnOrder && input.columnOrder.length > 0) {
     // Applying column order
+    console.log('[ViewActor] Applying column order:', {
+      columnOrder: input.columnOrder,
+      availableColumns: input.columns.map(c => c.id),
+      visibleDataColumns: visibleDataColumns.map(c => c.id)
+    });
+    
     orderedDataColumns = input.columnOrder
       .filter(colId => colId !== '__selection')
       .map(colId => {

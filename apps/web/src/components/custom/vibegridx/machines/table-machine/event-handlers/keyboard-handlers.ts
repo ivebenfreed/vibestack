@@ -77,6 +77,10 @@ export const keyboardHandlers = {
   },
   
   'keyboard.delete': {
+    guard: ({ context }) => {
+      // Don't process delete when in editing mode
+      return !context.editingCell;
+    },
     actions: [
       // TODO: Delete functionality not implemented
       // editCoordinator was supposed to handle this but was never created
@@ -92,14 +96,14 @@ export const keyboardHandlers = {
   
   'keyboard.enter': {
     actions: [
-      ({ context, event }) => {
+      ({ context, event, self }) => {
         // Get active cell
         const activeCell = context.activeCell;
         if (!activeCell) return;
         
         if (event.shift) {
           // Shift+Enter: Move up
-          context.self.send({
+          self.send({
             type: 'keyboard.arrow',
             direction: 'up'
           });
@@ -107,14 +111,14 @@ export const keyboardHandlers = {
           // Enter: Start editing or move down
           if (context.editingCell) {
             // Commit edit and move down
-            context.self.send({ type: 'edit.commit' });
-            context.self.send({
+            self.send({ type: 'edit.commit' });
+            self.send({
               type: 'keyboard.arrow',
               direction: 'down'
             });
           } else {
             // Start editing
-            context.self.send({
+            self.send({
               type: 'edit.cell.start',
               rowId: activeCell.rowId,
               columnId: activeCell.columnId
@@ -127,17 +131,17 @@ export const keyboardHandlers = {
   
   'keyboard.tab': {
     actions: [
-      ({ context, event }) => {
+      ({ context, event, self }) => {
         // Tab navigation
         if (event.shift) {
           // Shift+Tab: Move left
-          context.self.send({
+          self.send({
             type: 'keyboard.arrow',
             direction: 'left'
           });
         } else {
           // Tab: Move right
-          context.self.send({
+          self.send({
             type: 'keyboard.arrow',
             direction: 'right'
           });
