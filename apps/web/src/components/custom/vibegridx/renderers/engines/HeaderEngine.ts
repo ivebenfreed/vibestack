@@ -12,7 +12,6 @@ import type { SelectionManager } from '../managers/SelectionManager';
 // ====================================
 
 export interface HeaderEngineConfig {
-  columnManager: ColumnManager;
   domManager: DOMSystem;
   selectionManager: SelectionManager;
   enableSelectionColumn: boolean;
@@ -109,7 +108,7 @@ export class HeaderEngine {
     
     // STEP 7: Create data column headers
     const step7Start = performance.now();
-    const fragment = this.createDataColumnHeaders(dataColumns, sortLookup);
+    const fragment = this.createDataColumnHeaders(dataColumns, sortLookup, state.coordinateMapping);
     metrics.phases.dataColumns = performance.now() - step7Start;
     
     // STEP 8: Append fragment to header
@@ -185,12 +184,18 @@ export class HeaderEngine {
       return state.columns;
     }
     
-    // Get visible columns using state machine data
-    if (state.columns && state.columnVisibility) {
-      const visibleColumns = this.config.columnManager.getVisibleColumns(state.columns, state.columnVisibility);
-      if (visibleColumns.length > 0) {
-        return visibleColumns;
-      }
+    // Get visible columns using coordinate mapping (state machine authority)
+    if (state.coordinateMapping?.columns) {
+      const coordinateColumns = state.coordinateMapping.columns;
+      // Convert coordinate mapping to columns
+      return coordinateColumns.map((coord: any) => ({
+        id: coord.columnId,
+        name: coord.columnId,
+        field: coord.columnId,
+        type: 'text' as const,
+        width: coord.width,
+        sortable: true
+      }));
     }
     
     // Fallback: create columns from first row data
@@ -246,12 +251,13 @@ export class HeaderEngine {
   
   private createDataColumnHeaders(
     columns: Column[], 
-    sortLookup: Map<string, { direction: 'asc' | 'desc'; index: number }>
+    sortLookup: Map<string, { direction: 'asc' | 'desc'; index: number }>,
+    coordinateMapping: any
   ): DocumentFragment {
     const fragment = document.createDocumentFragment();
     
     columns.forEach((column) => {
-      const headerCell = this.createHeaderCell(column, sortLookup);
+      const headerCell = this.createHeaderCell(column, sortLookup, coordinateMapping);
       fragment.appendChild(headerCell);
     });
     
@@ -260,9 +266,13 @@ export class HeaderEngine {
   
   private createHeaderCell(
     column: Column,
-    sortLookup: Map<string, { direction: 'asc' | 'desc'; index: number }>
+    sortLookup: Map<string, { direction: 'asc' | 'desc'; index: number }>,
+    coordinateMapping: any
   ): HTMLElement {
-    const width = this.config.columnManager.getColumnWidth(column.id);
+    // Get width from coordinate mapping (state machine authority)
+    const coordinateColumn = coordinateMapping?.columns.find((c: any) => c.columnId === column.id);
+    const width = coordinateColumn?.width || column.width || 120;
+    
     const field = column.field || column.id;
     const sortInfo = sortLookup.get(field);
     

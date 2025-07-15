@@ -16,7 +16,6 @@ import type { PerformanceSystem } from '../systems/PerformanceSystem';
 
 export interface RenderPipelineConfig {
   virtualGrid: VirtualScrollManager;
-  columnManager: ColumnManager;
   domManager: DOMSystem;
   headerRenderer: HeaderEngine;
   rowRenderingEngine: RowEngine;

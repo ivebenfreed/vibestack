@@ -53,7 +53,6 @@ const CSS_CLASSES = {
 
 export class TableRenderer {
   private virtualGrid: VirtualScrollManager;
-  private columnManager: ColumnManager;
   private domManager: DOMSystem;
   private selectionManager: SelectionManager;
   private eventSystem: EventSystem;
@@ -78,13 +77,6 @@ export class TableRenderer {
     this.coordinateManager = options.coordinateManager || null;
     
     // Initialize managers
-    this.columnManager = new ColumnManager({
-      columns: options.columns,
-      enableSelectionColumn: options.enableSelectionColumn || false,
-      columnVisibility: options.columnVisibility,
-      columnWidths: options.columnWidths
-    });
-    
     this.domManager = new DOMSystem(options.container);
     
     // Initialize selection manager with DOM dependencies
@@ -92,7 +84,7 @@ export class TableRenderer {
       getCellElement: (rowId: string, columnId: string) => this.getCellElement(rowId, columnId),
       forEachRowElement: (callback) => this.domManager.forEachRowElement(callback),
       getHeaderElement: () => this.domManager.getElement('header'),
-      isSelectionColumnEnabled: () => this.columnManager.isSelectionColumnEnabled()
+      isSelectionColumnEnabled: () => this.options.enableSelectionColumn || false
     });
     
     // Use configured row height or default
@@ -138,14 +130,12 @@ export class TableRenderer {
     this.eventSystem = new EventSystem({
       domManager: this.domManager,
       virtualGrid: this.virtualGrid,
-      columnManager: this.columnManager,
       callbacks: eventCallbacks
     });
     
     // Initialize row rendering engine
     this.rowRenderingEngine = new RowEngine({
       virtualGrid: this.virtualGrid,
-      columnManager: this.columnManager,
       domManager: this.domManager,
       selectionManager: this.selectionManager,
       rowHeight: this.rowHeight,
@@ -154,7 +144,6 @@ export class TableRenderer {
     
     // Initialize header renderer
     this.headerRenderer = new HeaderEngine({
-      columnManager: this.columnManager,
       domManager: this.domManager,
       selectionManager: this.selectionManager,
       enableSelectionColumn: options.enableSelectionColumn || false,
@@ -185,7 +174,6 @@ export class TableRenderer {
     // Initialize render orchestrator
     this.renderOrchestrator = new RenderPipeline({
       virtualGrid: this.virtualGrid,
-      columnManager: this.columnManager,
       domManager: this.domManager,
       headerRenderer: this.headerRenderer,
       rowRenderingEngine: this.rowRenderingEngine,
@@ -196,7 +184,6 @@ export class TableRenderer {
     
     // Initialize state manager
     this.stateManager = new StateManager({
-      columnManager: this.columnManager,
       virtualGrid: this.virtualGrid,
       selectionManager: this.selectionManager,
       headerRenderer: this.headerRenderer,
@@ -253,7 +240,9 @@ export class TableRenderer {
   private getTotalColumnsWidth(): number {
     const lastRenderState = this.stateManager.getLastRenderState();
     if (lastRenderState?.coordinateMapping) {
-      return this.columnManager.getTotalColumnsWidth(lastRenderState.coordinateMapping);
+      const coordinateColumns = lastRenderState.coordinateMapping.columns;
+      const totalDataWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
+      return totalDataWidth + (this.options.enableSelectionColumn ? 48 : 0);
     }
     // Fallback to render state totalWidth if coordinate mapping not available
     return lastRenderState?.totalWidth || 0;
@@ -263,7 +252,8 @@ export class TableRenderer {
   private getColumnOffset(columnId: string): number {
     const lastRenderState = this.stateManager.getLastRenderState();
     if (lastRenderState?.coordinateMapping) {
-      return this.columnManager.getColumnOffset(columnId, lastRenderState.coordinateMapping);
+      const coordinateColumn = lastRenderState.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
+      return coordinateColumn?.offset || 0;
     }
     // Fallback to render state offsets if coordinate mapping not available
     return lastRenderState?.columnOffsets?.[columnId] || 0;

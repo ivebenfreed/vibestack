@@ -28,7 +28,6 @@ const CSS_CLASSES = {
 
 export interface RowEngineConfig {
   virtualGrid: VirtualScrollManager;
-  columnManager: ColumnManager;
   domManager: DOMSystem;
   selectionManager: SelectionManager;
   rowHeight: number;
@@ -275,7 +274,7 @@ export class RowEngine {
     
     // Add data cells
     columnsToRender.forEach((column, index) => {
-      const cell = this.createDataCell(rowDataWithResolved, column, index, columnsToRender);
+      const cell = this.createDataCell(rowDataWithResolved, column, index, columnsToRender, state?.coordinateMapping);
       fragment.appendChild(cell);
     });
     
@@ -340,13 +339,16 @@ export class RowEngine {
     return cell;
   }
   
-  private createDataCell(row: TableRow, column: Column, index: number, allColumns: Column[]): HTMLElement {
+  private createDataCell(row: TableRow, column: Column, index: number, allColumns: Column[], coordinateMapping?: any): HTMLElement {
     const cellKey = `${row.id}:${column.id}`;
     const value = row.data[column.field || column.id];
-    const width = this.config.columnManager.getColumnWidth(column.id);
     
-    // Calculate offset
-    const xOffset = this.calculateCellOffset(index, allColumns);
+    // Get width from coordinate mapping (state machine authority)
+    const coordinateColumn = coordinateMapping?.columns.find((c: any) => c.columnId === column.id);
+    const width = coordinateColumn?.width || column.width || 120;
+    
+    // Calculate offset using coordinate mapping
+    const xOffset = coordinateColumn?.offset || this.calculateCellOffset(index, allColumns);
     
     // DEBUG: Log DOM position calculation
     if (column.id === 'project' && row.id === '03097812-7cc9-4d3d-87d3-e0626ee2cfd8') {
@@ -406,12 +408,31 @@ export class RowEngine {
       return stateColumns.filter(col => col.id !== '__selection');
     }
     
-    // Fall back to visible columns from column manager using state machine data
+    // Use coordinate mapping from state machine if available
+    if (state?.coordinateMapping?.columns) {
+      const coordinateColumns = state.coordinateMapping.columns;
+      return coordinateColumns.map((coord: any) => ({
+        id: coord.columnId,
+        name: coord.columnId,
+        field: coord.columnId,
+        type: 'text' as const,
+        width: coord.width
+      }));
+    }
+    
+    // Fall back to visible columns from state data
     if (state?.columns && state?.columnVisibility) {
-      const visibleColumns = this.config.columnManager.getVisibleColumns(state.columns, state.columnVisibility);
-      if (visibleColumns.length > 0) {
-        return this.config.columnManager.getDataColumns(state.columns, state.columnVisibility);
-      }
+      const visibleColumns = state.columns.filter(col => {
+        if (!state.columnVisibility || Object.keys(state.columnVisibility).length === 0) {
+          return true;
+        }
+        return state.columnVisibility[col.id] !== false;
+      });
+      
+      // Filter out selection column
+      return this.config.enableSelectionColumn 
+        ? visibleColumns.filter(col => col.id !== '__selection')
+        : visibleColumns;
     }
     
     // Last resort: create columns from row data
@@ -431,7 +452,7 @@ export class RowEngine {
     
     for (let i = 0; i < index; i++) {
       const prevColumn = columns[i];
-      const prevWidth = this.config.columnManager.getColumnWidth(prevColumn.id);
+      const prevWidth = prevColumn.width || 120; // Use column width directly
       offset += prevWidth;
       
       offsets.push({
@@ -458,7 +479,9 @@ export class RowEngine {
   private getTotalColumnsWidth(state?: RenderState): number {
     // Use coordinate mapping from state machine if available
     if (state?.coordinateMapping) {
-      return this.config.columnManager.getTotalColumnsWidth(state.coordinateMapping);
+      const coordinateColumns = state.coordinateMapping.columns;
+      const totalDataWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
+      return totalDataWidth + (this.config.enableSelectionColumn ? 48 : 0);
     }
     
     // Fallback to render state totalWidth
@@ -467,12 +490,19 @@ export class RowEngine {
     }
     
     // Last resort: calculate from column data
-    if (state?.columns && state?.columnVisibility) {
+    if (state?.columns) {
       let totalWidth = this.config.enableSelectionColumn ? 48 : 0; // Selection column
       
-      const visibleColumns = this.config.columnManager.getVisibleColumns(state.columns, state.columnVisibility);
+      const visibleColumns = state.columns.filter(col => {
+        if (!state.columnVisibility || Object.keys(state.columnVisibility).length === 0) {
+          return true;
+        }
+        return state.columnVisibility[col.id] !== false;
+      });
+      
       visibleColumns.forEach(column => {
-        totalWidth += this.config.columnManager.getColumnWidth(column.id, state.columnWidths || {}, state.columns);
+        const width = state.columnWidths?.[column.id] || column.width || 120;
+        totalWidth += width;
       });
       
       return totalWidth;
@@ -505,9 +535,13 @@ export class RowEngine {
   }
   
   private getColumnCount(state?: RenderState): number {
+    if (state?.coordinateMapping?.columns) {
+      return state.coordinateMapping.columns.length + (this.config.enableSelectionColumn ? 1 : 0);
+    }
+    
     const dataColumns = state?.columns 
       ? state.columns.filter(col => col.id !== '__selection').length
-      : this.config.columnManager.getDataColumns(state?.columns || [], state?.columnVisibility || {}).length;
+      : 0;
     
     return dataColumns + (this.config.enableSelectionColumn ? 1 : 0);
   }

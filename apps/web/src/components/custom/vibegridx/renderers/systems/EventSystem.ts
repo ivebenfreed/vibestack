@@ -24,7 +24,6 @@ export interface EventCallbacks {
 export interface EventSystemConfig {
   domManager: any; // DOMSystem
   virtualGrid: any; // VirtualScrollManager
-  columnManager: any; // ColumnManager
   callbacks: EventCallbacks;
 }
 

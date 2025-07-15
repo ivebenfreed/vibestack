@@ -24,7 +24,6 @@ import type { RenderOrchestrator } from './RenderOrchestrator';
 // ====================================
 
 export interface StateManagerConfig {
-  columnManager: ColumnManager;
   virtualGrid: VirtualScrollManager;
   selectionManager: SelectionManager;
   headerRenderer: HeaderEngine;
@@ -146,16 +145,11 @@ export class StateManager {
     if (manager && typeof manager.getColumnIds === 'function') {
       const coordinateColumnIds = manager.getColumnIds();
       console.log('StateManager: Syncing visible columns with coordinate manager', {
-        coordinateManagerColumns: coordinateColumnIds,
-        rendererColumns: this.config.columnManager.getVisibleColumns().map(c => c.id)
+        coordinateManagerColumns: coordinateColumnIds
       });
       
-      // Update column order to match coordinate manager
-      this.config.columnManager.setColumnOrder(coordinateColumnIds);
-      
-      console.log('StateManager: Updated visible columns', {
-        newVisibleColumns: this.config.columnManager.getVisibleColumns().map(c => c.id)
-      });
+      // Column order is now managed by state machine coordinate mapping
+      console.log('StateManager: Column order managed by state machine coordinate mapping');
     }
     
     // Subscribe to dimension changes
@@ -223,14 +217,22 @@ export class StateManager {
    * Update header dimensions without full re-render
    */
   private updateHeaderDimensions(): void {
-    if (this.config.columnManager.getVisibleColumns().length > 0) {
-      const totalWidth = this.config.columnManager.getTotalColumnsWidth(this.lastRenderState?.columnWidths);
+    if (this.lastRenderState?.coordinateMapping?.columns?.length > 0) {
+      const coordinateColumns = this.lastRenderState.coordinateMapping.columns;
+      const totalWidth = coordinateColumns.reduce((sum: number, col: any) => sum + col.width, 0);
       const header = this.config.domManager.getElement('header');
       header.style.width = `${totalWidth}px`;
       
       // Update dimension manager with visible columns
       if (this.dimensionManager) {
-        this.dimensionManager.setColumns(this.config.columnManager.getVisibleColumns());
+        const columns = coordinateColumns.map((coord: any) => ({
+          id: coord.columnId,
+          name: coord.columnId,
+          field: coord.columnId,
+          type: 'text' as const,
+          width: coord.width
+        }));
+        this.dimensionManager.setColumns(columns);
       }
       
       // Re-render header content to show/hide columns
