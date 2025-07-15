@@ -63,11 +63,6 @@ export class RowEngine {
     const startTime = performance.now();
     
     const visibleRange = this.config.virtualGrid.getVisibleRange();
-    console.log('🎨 RowEngine: renderVisibleRows', {
-      visibleRange,
-      stateRowsLength: state.rows.length,
-      sliceResult: state.rows.slice(visibleRange.start, visibleRange.end).length
-    });
     
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
@@ -184,10 +179,6 @@ export class RowEngine {
   }
   
   private cleanupInvisibleRows(visibleRows: TableRow[]): void {
-    console.log('🎨 RowEngine: cleanupInvisibleRows called', {
-      visibleRowCount: visibleRows.length,
-      timestamp: performance.now()
-    });
     
     let removedCount = 0;
     this.config.domManager.forEachRowElement((element, rowId) => {
@@ -198,18 +189,9 @@ export class RowEngine {
       }
     });
     
-    console.log('🎨 RowEngine: cleanupInvisibleRows complete', {
-      removedRows: removedCount
-    });
   }
   
   private renderRowsBatched(rows: TableRow[], startIndex: number, state?: RenderState): number {
-    console.log('🎨 RowEngine: renderRowsBatched called', {
-      rowCount: rows.length,
-      startIndex,
-      hasState: !!state,
-      timestamp: performance.now()
-    });
     
     const fragment = document.createDocumentFragment();
     const newRowElements: Array<{ element: HTMLElement; rowId: string }> = [];
@@ -284,12 +266,6 @@ export class RowEngine {
   }
   
   renderRowCells(row: TableRow, rowElement: HTMLElement, state?: RenderState, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
-    console.log('🎨 RowEngine: renderRowCells called', {
-      rowId: row.id,
-      existingChildren: rowElement.children.length,
-      hasState: !!state,
-      timestamp: performance.now()
-    });
     
     // Get columns to render - this must come from state to ensure proper ordering
     const columnsToRender = this.getColumnsToRender(row, state);
@@ -297,11 +273,6 @@ export class RowEngine {
     // Resolve relationship values if resolvers provided
     const rowDataWithResolved = relationshipResolvers ? this.resolveRelationships(row, columnsToRender, relationshipResolvers) : row;
     
-    console.log('🎨 RowEngine: Before clearing row content', {
-      rowId: row.id,
-      childCount: rowElement.children.length,
-      firstChildType: rowElement.firstChild?.nodeName
-    });
     
     // Clear existing content properly to avoid overlapping cells
     while (rowElement.firstChild) {
@@ -317,11 +288,6 @@ export class RowEngine {
     });
     keysToRemove.forEach(key => this.config.domManager['cellElements'].delete(key));
     
-    console.log('🎨 RowEngine: After clearing row content', {
-      rowId: row.id,
-      childCount: rowElement.children.length,
-      cacheKeysRemoved: keysToRemove.length
-    });
     
     // Create document fragment for batched insertion
     const fragment = document.createDocumentFragment();
@@ -338,19 +304,10 @@ export class RowEngine {
       fragment.appendChild(cell);
     });
     
-    console.log('🎨 RowEngine: Before appending fragment', {
-      rowId: row.id,
-      fragmentChildCount: fragment.children.length,
-      columnsCount: columnsToRender.length
-    });
     
     // Single DOM insertion
     rowElement.appendChild(fragment);
     
-    console.log('🎨 RowEngine: After appending fragment', {
-      rowId: row.id,
-      finalChildCount: rowElement.children.length
-    });
   }
   
   private createSelectionCell(row: TableRow): HTMLElement {
