@@ -5,6 +5,7 @@
 import { sendTo, assign, raise, emit } from 'xstate';
 import { viewActions } from '../slices/view-slice';
 import { selectionActions } from '../slices/selection-slice';
+import { dimensionActions } from '../slices/dimensions-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 export const viewHandlers = {
@@ -443,6 +444,19 @@ export const viewHandlers = {
         version: ({ context }) => context.version + 1
       }),
       
+      // CRITICAL: Recalculate coordinate mapping immediately after column reorder
+      // This ensures the state machine remains the single source of truth
+      ({ context, self }) => {
+        console.log('ViewHandlers: Recalculating coordinates after column drag end');
+        self.send({
+          type: 'dimensions.recalculate',
+          columns: context.columns,
+          columnOrder: context.columnOrder,
+          columnWidths: context.columnWidths,
+          enableSelectionColumn: context.enableSelectionColumn
+        });
+      },
+      
       // Clear drag state
       viewActions.clearColumnDrag,
       
@@ -489,6 +503,49 @@ export const viewHandlers = {
       // Emit event for UI feedback
       emit({ type: 'view.drag.cancelled' }),
       
+    ]
+  },
+  
+  // DIMENSIONS RECALCULATION - SINGLE SOURCE OF TRUTH
+  'dimensions.recalculate': {
+    actions: [
+      dimensionActions.recalculateCoordinateMapping,
+      
+      // Forward updated coordinates to canvas for overlay sync
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          console.log('ViewHandlers: Forwarding updated coordinates to canvas');
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_COORDINATES',
+              mapping: context.coordinateMapping
+            }
+          });
+        }
+      },
+      
+      // Forward updated coordinates to renderer for passive consumption
+      ({ context, self }) => {
+        if (context.actors?.rendererActor) {
+          console.log('ViewHandlers: Forwarding updated coordinates to renderer');
+          self.send({
+            type: 'FORWARD_TO_RENDERER', 
+            event: {
+              type: 'UPDATE_COORDINATES',
+              mapping: context.coordinateMapping,
+              version: context.coordinateMapping.version
+            }
+          });
+        }
+      },
+      
+      ({ context }) => {
+        console.log('ViewHandlers: Coordinate mapping recalculated:', {
+          version: context.coordinateMapping.version,
+          columnCount: context.coordinateMapping.columns.length
+        });
+      }
     ]
   },
   

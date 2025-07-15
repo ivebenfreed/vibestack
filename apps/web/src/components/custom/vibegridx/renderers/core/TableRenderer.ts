@@ -224,14 +224,14 @@ export class TableRenderer {
     this.stateManager.initializeCanvasPostRender();
   }
   
-  // Set or update columns
+  // Set or update columns - DEPRECATED: Now handled by state machine coordinate mapping
   setColumns(columns: Column[]): void {
-    this.stateManager.setColumns(columns);
+    console.warn('TableRenderer: setColumns is deprecated - column data comes from state machine coordinate mapping');
   }
 
-  // Set or update column visibility
+  // Set or update column visibility - DEPRECATED: Now handled by state machine coordinate mapping
   setColumnVisibility(visibility: Record<string, boolean>): void {
-    this.stateManager.setColumnVisibility(visibility);
+    console.warn('TableRenderer: setColumnVisibility is deprecated - column visibility comes from state machine coordinate mapping');
   }
   
   // Initialize renderer with complete configuration - single render
@@ -240,7 +240,7 @@ export class TableRenderer {
   }
   
   setColumnOrder(order: string[]): void {
-    this.stateManager.setColumnOrder(order);
+    console.warn('TableRenderer: setColumnOrder is deprecated - column order comes from state machine coordinate mapping');
   }
   
   
@@ -249,19 +249,24 @@ export class TableRenderer {
     this.stateManager.setDimensionManager(manager);
   }
   
-  // Get total width of all visible columns using table machine context
+  // Get total width from STATE MACHINE coordinate mapping
   private getTotalColumnsWidth(): number {
-    return this.columnManager.getTotalColumnsWidth(this.stateManager.getLastRenderState()?.columnWidths);
+    const lastRenderState = this.stateManager.getLastRenderState();
+    if (lastRenderState?.coordinateMapping) {
+      return this.columnManager.getTotalColumnsWidth(lastRenderState.coordinateMapping);
+    }
+    // Fallback to render state totalWidth if coordinate mapping not available
+    return lastRenderState?.totalWidth || 0;
   }
   
-  // Get column offset position for visible columns only using table machine context
+  // Get column offset from STATE MACHINE coordinate mapping
   private getColumnOffset(columnId: string): number {
     const lastRenderState = this.stateManager.getLastRenderState();
-    return this.columnManager.getColumnOffset(
-      columnId,
-      lastRenderState?.columnOffsets,
-      lastRenderState?.columnWidths
-    );
+    if (lastRenderState?.coordinateMapping) {
+      return this.columnManager.getColumnOffset(columnId, lastRenderState.coordinateMapping);
+    }
+    // Fallback to render state offsets if coordinate mapping not available
+    return lastRenderState?.columnOffsets?.[columnId] || 0;
   }
   
   private setupEventListeners() {
@@ -511,57 +516,37 @@ export class TableRenderer {
     };
   }
   
-  // Update a single column width
+  // Update a single column width - DEPRECATED: Use state machine coordinate mapping
   updateColumnWidth(columnId: string, width: number): void {
-    // Get layout information from ColumnManager
-    const layoutInfo = this.columnManager.updateColumnWidthAndCalculateLayout(columnId, width);
-    if (!layoutInfo) return;
+    console.warn('TableRenderer: updateColumnWidth is deprecated - column updates should come from state machine');
     
-    const { totalWidth, columnOffsets, columnWidths, visibleColumns } = layoutInfo;
-    
-    // Update the header cell width
-    const headerCell = this.domManager.getElement('header').querySelector(`[data-column="${columnId}"]`) as HTMLElement;
-    if (headerCell) {
-      headerCell.style.width = `${width}px`;
-      headerCell.style.minWidth = `${width}px`;
-      headerCell.style.maxWidth = `${width}px`;
-      // Force flex-shrink to prevent overlapping
-      headerCell.style.flexShrink = '0';
-    }
-    
-    // Update all cells - both width and position
-    visibleColumns.forEach(col => {
-      const cells = this.domManager.getElement('body').querySelectorAll(`[data-column-id="${col.id}"]`) as NodeListOf<HTMLElement>;
-      const colWidth = columnWidths[col.id] || this.columnManager.getColumnWidth(col.id);
-      const colOffset = columnOffsets[col.id];
-      
-      cells.forEach(cell => {
-        cell.style.width = `${colWidth}px`;
-        cell.style.left = `${colOffset}px`;
-      });
-    });
-    
-    // Update header total width
-    this.domManager.getElement('header').style.width = `${totalWidth}px`;
-    
-    // Force layout recalculation
-    this.domManager.getElement('header').offsetHeight; // Force reflow
-    
-    // Update body spacer if needed
-    if (this.domManager.getElement('body').firstElementChild) {
-      const spacer = this.domManager.getElement('body').firstElementChild as HTMLElement;
-      if (spacer.classList.contains('vibegridx-virtual-spacer')) {
-        spacer.style.width = `${totalWidth}px`;
-      }
-    }
-    
-    // Update all visible rows to match the new total width
-    const rows = this.domManager.getElement('body').querySelectorAll('.vibegridx-row') as NodeListOf<HTMLElement>;
-    rows.forEach(row => {
-      row.style.width = `${totalWidth}px`;
-    });
+    // Column width updates should now go through the state machine
+    // which will recalculate coordinates and send them back to the renderer
+    // The state machine will then call updateCoordinateMapping() with the new coordinates
   }
-  
+  // CRITICAL: Accept coordinate mapping updates from state machine
+  updateCoordinateMapping(coordinateMapping: any, version: number): void {
+    console.log('TableRenderer: Updating coordinate mapping from state machine:', {
+      version,
+      columnCount: coordinateMapping.columns.length,
+      authoritative: true
+    });
+    
+    // Store the coordinate mapping for use by internal methods
+    this.stateManager.setCoordinateMapping(coordinateMapping, version);
+    
+    // Trigger re-render if needed to apply new coordinates
+    const lastRenderState = this.stateManager.getLastRenderState();
+    if (lastRenderState) {
+      const updatedState = {
+        ...lastRenderState,
+        coordinateMapping,
+        version: version
+      };
+      this.render(updatedState);
+    }
+  }
+
   destroy(): void {
     this.performanceMonitor.cancelFrameTracking();
     

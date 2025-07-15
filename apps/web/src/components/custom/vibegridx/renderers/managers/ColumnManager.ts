@@ -1,145 +1,60 @@
 import type { Column } from '../../types';
 
 // ====================================
-// COLUMN MANAGER
+// COLUMN MANAGER - PASSIVE UTILITY
 // ====================================
 
 /**
- * Manages column configuration, visibility, ordering, and widths
- * Provides centralized column state management
+ * PASSIVE utility for accessing column data from the state machine
+ * No longer manages its own state - all data comes from the table machine
  */
 export class ColumnManager {
-  private columns: Column[] = [];
-  private columnVisibility: Record<string, boolean> = {};
-  private visibleColumns: Column[] = [];
-  private columnWidths: Record<string, number> = {};
   private enableSelectionColumn: boolean;
   
   constructor(options: {
-    columns?: Column[];
     enableSelectionColumn?: boolean;
-    columnVisibility?: Record<string, boolean>;
-    columnWidths?: Record<string, number>;
   } = {}) {
     this.enableSelectionColumn = options.enableSelectionColumn || false;
-    
-    if (options.columns) {
-      this.setColumns(options.columns);
-    }
-    
-    if (options.columnVisibility) {
-      this.columnVisibility = options.columnVisibility;
-    }
-    
-    if (options.columnWidths) {
-      this.columnWidths = options.columnWidths;
-    }
   }
   
   /**
-   * Set or update columns
+   * Get all columns from state machine data
    */
-  setColumns(columns: Column[]): void {
-    this.columns = columns;
-    this.updateVisibleColumns();
+  getColumns(columns: Column[]): Column[] {
+    return columns;
   }
   
   /**
-   * Get all columns
+   * Get column width from state machine data
    */
-  getColumns(): Column[] {
-    return this.columns;
+  getColumnWidth(columnId: string, columnWidths: Record<string, number>, columns: Column[], defaultWidth = 120): number {
+    const column = columns.find(c => c.id === columnId);
+    return columnWidths[columnId] || column?.width || defaultWidth;
   }
   
   /**
-   * Set or update column visibility
+   * Get visible columns using state machine data
    */
-  setColumnVisibility(visibility: Record<string, boolean>): void {
-    this.columnVisibility = visibility;
-    this.updateVisibleColumns();
-    
-    // Note: Column ordering is maintained separately from visibility
-    // The view-actor.ts handles filtering out hidden columns from the order
-  }
-  
-  /**
-   * Get column visibility map
-   */
-  getColumnVisibility(): Record<string, boolean> {
-    return this.columnVisibility;
-  }
-  
-  /**
-   * Apply column order
-   */
-  setColumnOrder(order: string[]): void {
-    const orderedColumns: Column[] = [];
-    
-    // First pass: add columns in the specified order (only if they exist)
-    for (const columnId of order) {
-      const column = this.columns.find(c => c.id === columnId);
-      if (column) {
-        orderedColumns.push(column);
+  getVisibleColumns(columns: Column[], columnVisibility: Record<string, boolean>): Column[] {
+    return columns.filter(column => {
+      // If no visibility settings, all columns are visible by default
+      if (Object.keys(columnVisibility).length === 0) {
+        return true;
       }
-      // Note: Silently skip columns that don't exist in this.columns
-      // This prevents warnings when column order contains hidden columns
-    }
-    
-    // Second pass: add any remaining columns not in the order
-    for (const column of this.columns) {
-      if (!order.includes(column.id)) {
-        orderedColumns.push(column);
-      }
-    }
-    
-    this.columns = orderedColumns;
-    this.updateVisibleColumns();
-  }
-  
-  /**
-   * Set column widths
-   */
-  setColumnWidths(widths: Record<string, number>): void {
-    this.columnWidths = widths;
-  }
-  
-  /**
-   * Set width for a specific column
-   */
-  setColumnWidth(columnId: string, width: number): void {
-    this.columnWidths[columnId] = width;
-  }
-  
-  /**
-   * Get column width
-   */
-  getColumnWidth(columnId: string, defaultWidth = 120): number {
-    const column = this.columns.find(c => c.id === columnId);
-    return this.columnWidths[columnId] || column?.width || defaultWidth;
-  }
-  
-  /**
-   * Get all column widths
-   */
-  getColumnWidths(): Record<string, number> {
-    return this.columnWidths;
-  }
-  
-  /**
-   * Get visible columns (filtered by visibility settings)
-   */
-  getVisibleColumns(): Column[] {
-    return this.visibleColumns;
+      // Otherwise check visibility setting (default to true if not specified)
+      return columnVisibility[column.id] !== false;
+    });
   }
   
   /**
    * Get data columns (visible columns excluding selection column)
    */
-  getDataColumns(): Column[] {
+  getDataColumns(columns: Column[], columnVisibility: Record<string, boolean>): Column[] {
+    const visibleColumns = this.getVisibleColumns(columns, columnVisibility);
     // Filter out the selection column when enabled
     return this.enableSelectionColumn 
-      ? this.visibleColumns.filter(col => col.id !== '__selection')
-      : this.visibleColumns;
+      ? visibleColumns.filter(col => col.id !== '__selection')
+      : visibleColumns;
   }
   
   /**
@@ -150,247 +65,114 @@ export class ColumnManager {
   }
   
   /**
-   * Enable or disable selection column
+   * Get total width from state machine data - USE STATE MACHINE VALUES
    */
-  setSelectionColumnEnabled(enabled: boolean): void {
-    this.enableSelectionColumn = enabled;
-    this.updateVisibleColumns();
-  }
-  
-  /**
-   * Calculate total width of all visible columns
-   */
-  getTotalWidth(): number {
-    let totalWidth = 0;
-    
-    // Add selection column width if enabled
-    if (this.enableSelectionColumn) {
-      totalWidth += 48; // Fixed width for selection column
-    }
-    
-    // Add widths of all visible data columns
-    for (const column of this.visibleColumns) {
-      totalWidth += this.getColumnWidth(column.id);
-    }
-    
+  getTotalWidth(totalWidth: number): number {
+    // State machine is the authoritative source
     return totalWidth;
   }
   
   /**
-   * Get column by ID
+   * Get column by ID from state machine data
    */
-  getColumnById(columnId: string): Column | undefined {
-    return this.columns.find(col => col.id === columnId);
+  getColumnById(columnId: string, columns: Column[]): Column | undefined {
+    return columns.find(col => col.id === columnId);
   }
   
   /**
-   * Get visible column order (filters out hidden columns)
+   * Get visible column order using state machine data
    */
-  getVisibleColumnOrder(): string[] {
-    return this.getVisibleColumns().map(col => col.id);
+  getVisibleColumnOrder(columns: Column[], columnVisibility: Record<string, boolean>): string[] {
+    return this.getVisibleColumns(columns, columnVisibility).map(col => col.id);
   }
   
   /**
-   * Get column index in visible columns
+   * Get column index in visible columns using state machine data
    */
-  getVisibleColumnIndex(columnId: string): number {
-    return this.visibleColumns.findIndex(col => col.id === columnId);
+  getVisibleColumnIndex(columnId: string, columns: Column[], columnVisibility: Record<string, boolean>): number {
+    const visibleColumns = this.getVisibleColumns(columns, columnVisibility);
+    return visibleColumns.findIndex(col => col.id === columnId);
   }
   
   /**
-   * Update the list of visible columns based on visibility settings
+   * Get total width of all visible columns using STATE MACHINE coordinate mapping
+   * @param coordinateMapping Authoritative coordinate mapping from state machine
    */
-  private updateVisibleColumns(): void {
-    // Filter columns based on visibility settings
-    this.visibleColumns = this.columns.filter(column => {
-      // If no visibility settings, all columns are visible by default
-      if (Object.keys(this.columnVisibility).length === 0) {
-        return true;
-      }
-      // Otherwise check visibility setting (default to true if not specified)
-      return this.columnVisibility[column.id] !== false;
-    });
-  }
-  
-  /**
-   * Get total width of all visible columns using render state context
-   * @param renderStateWidths Optional column widths from render state
-   */
-  getTotalColumnsWidth(renderStateWidths?: Record<string, number>): number {
-    // Use render state column widths if available (from table machine context)
-    if (renderStateWidths) {
-      let totalWidth = 0;
-      
-      // Selection column is always included
-      if (this.enableSelectionColumn) {
-        totalWidth += 48; // Fixed width for selection column
-      }
-      
-      this.visibleColumns.forEach(column => {
-        totalWidth += renderStateWidths[column.id] || column.width || 120;
-      });
-      
-      return totalWidth;
-    }
+  getTotalColumnsWidth(coordinateMapping: any): number {
+    // State machine coordinateMapping is the authoritative source
+    const totalWidth = coordinateMapping.columns.reduce((sum: number, col: any) => sum + col.width, 0);
     
-    // Fallback: calculate from column definitions
-    let totalWidth = 0;
-    
-    // Selection column is always included
-    if (this.enableSelectionColumn) {
-      totalWidth += 48; // Fixed width for selection column
-    }
-    
-    this.visibleColumns.forEach(column => {
-      totalWidth += this.getColumnWidth(column.id);
-    });
-    
-    console.log('ColumnManager: Total width calculation:', {
+    console.log('ColumnManager: Using state machine total width:', {
       totalWidth,
-      visibleColumns: this.visibleColumns.length,
-      hasRenderStateWidths: !!renderStateWidths,
-      columnWidths: this.columnWidths
+      columnCount: coordinateMapping.columns.length,
+      version: coordinateMapping.version
     });
     
     return totalWidth;
   }
   
   /**
-   * Get column offset position for visible columns only
+   * Get column offset position using STATE MACHINE coordinate mapping
    * @param columnId The column ID to get offset for
-   * @param renderStateOffsets Optional column offsets from render state
-   * @param renderStateWidths Optional column widths from render state
+   * @param coordinateMapping Authoritative coordinate mapping from state machine
    */
-  getColumnOffset(
-    columnId: string, 
-    renderStateOffsets?: Record<string, number>,
-    renderStateWidths?: Record<string, number>
-  ): number {
-    // Use render state column offsets if available (from table machine context)
-    if (renderStateOffsets && renderStateOffsets[columnId] !== undefined) {
-      return renderStateOffsets[columnId];
+  getColumnOffset(columnId: string, coordinateMapping: any): number {
+    // State machine coordinateMapping is the authoritative source
+    const colData = coordinateMapping.columns.find((col: any) => col.columnId === columnId);
+    
+    if (!colData) {
+      console.warn(`ColumnManager: Column ${columnId} not found in coordinate mapping`);
+      return 0;
     }
     
-    // Fallback: calculate offset based on visible columns that come before this column
-    let offset = 0;
-    
-    // Selection column is always included and goes first
-    if (this.enableSelectionColumn) {
-      offset += 48; // Fixed width for selection column
-    }
-    
-    for (const column of this.visibleColumns) {
-      if (column.id === columnId) {
-        break;
-      }
-      const width = renderStateWidths?.[column.id] || this.getColumnWidth(column.id);
-      offset += width;
-    }
-    
-    return offset;
+    return colData.offset;
   }
   
   /**
-   * Calculate all column offsets for current visible columns
+   * Get all column offsets using STATE MACHINE coordinate mapping
+   * @param coordinateMapping Authoritative coordinate mapping from state machine
    * @returns Map of column ID to offset position
    */
-  calculateColumnOffsets(): Record<string, number> {
+  getColumnOffsets(coordinateMapping: any): Record<string, number> {
+    // State machine coordinateMapping is the authoritative source
     const offsets: Record<string, number> = {};
-    let currentOffset = 0;
     
-    // Handle selection column specially if it exists
-    if (this.enableSelectionColumn) {
-      offsets['__selection'] = 0;
-      currentOffset = 48; // Selection column is always 48px wide
-    }
-    
-    // Position data columns
-    this.visibleColumns.forEach(column => {
-      if (column.id === '__selection') return; // Already handled
-      
-      offsets[column.id] = currentOffset;
-      const width = this.getColumnWidth(column.id);
-      currentOffset += width;
+    coordinateMapping.columns.forEach((col: any) => {
+      offsets[col.columnId] = col.offset;
     });
     
     return offsets;
   }
   
   /**
-   * Update column width and calculate new layout information
-   * @param columnId The column to update
-   * @param width The new width
-   * @returns Layout information needed for DOM updates
+   * Get column width using STATE MACHINE coordinate mapping
+   * @param columnId The column ID to get width for
+   * @param coordinateMapping Authoritative coordinate mapping from state machine
    */
-  updateColumnWidthAndCalculateLayout(columnId: string, width: number): {
-    totalWidth: number;
-    columnOffsets: Record<string, number>;
-    columnWidths: Record<string, number>;
-    visibleColumns: Column[];
-    columnIndex: number;
-  } | null {
-    console.log('[ColumnManager] Updating column width', { columnId, width });
+  getColumnWidthFromMapping(columnId: string, coordinateMapping: any): number {
+    // State machine coordinateMapping is the authoritative source
+    const colData = coordinateMapping.columns.find((col: any) => col.columnId === columnId);
     
-    // Update the width
-    this.setColumnWidth(columnId, width);
-    
-    // Find the column index
-    const columnIndex = this.getVisibleColumnIndex(columnId);
-    if (columnIndex === -1) return null;
-    
-    // Calculate new offsets
-    let currentOffset = 0;
-    const columnOffsets: Record<string, number> = {};
-    const columnWidths: Record<string, number> = {};
-    
-    console.log('[ColumnManager] Calculating offsets:', {
-      enableSelectionColumn: this.enableSelectionColumn,
-      startingOffset: currentOffset,
-      visibleColumns: this.visibleColumns.map(c => c.id)
-    });
-    
-    // Handle selection column specially if it exists
-    if (this.enableSelectionColumn) {
-      columnOffsets['__selection'] = 0;
-      currentOffset = 48; // Selection column is always 48px wide
-      console.log('[ColumnManager] Selection column found, positioned at 0, next offset: 48');
-    } else {
-      // If no selection column in visibleColumns but cells expect it, start at 48
-      currentOffset = 48;
-      console.log('[ColumnManager] No selection column in visibleColumns, but starting at 48 for cell compatibility');
+    if (!colData) {
+      console.warn(`ColumnManager: Column ${columnId} not found in coordinate mapping`);
+      return 120; // Default width
     }
     
-    // Position data columns and collect widths
-    this.visibleColumns.forEach(col => {
-      if (col.id === '__selection') return; // Already handled
-      
-      columnOffsets[col.id] = currentOffset;
-      const colWidth = this.getColumnWidth(col.id);
-      columnWidths[col.id] = colWidth;
-      console.log(`[ColumnManager] Column ${col.id}: offset=${currentOffset}, width=${colWidth}`);
-      currentOffset += colWidth;
-    });
-    
-    return {
-      totalWidth: currentOffset,
-      columnOffsets,
-      columnWidths,
-      visibleColumns: this.visibleColumns,
-      columnIndex
-    };
+    return colData.width;
   }
   
   /**
-   * Get metrics for debugging
+   * Get metrics for debugging using state machine data
    */
-  getMetrics() {
+  getMetrics(columns: Column[], columnVisibility: Record<string, boolean>, coordinateMapping: any) {
+    const visibleColumns = this.getVisibleColumns(columns, columnVisibility);
     return {
-      totalColumns: this.columns.length,
-      visibleColumns: this.visibleColumns.length,
-      hiddenColumns: this.columns.length - this.visibleColumns.length,
+      totalColumns: columns.length,
+      visibleColumns: visibleColumns.length,
+      hiddenColumns: columns.length - visibleColumns.length,
       selectionColumnEnabled: this.enableSelectionColumn,
-      totalWidth: this.getTotalWidth(),
-      columnWidths: this.columnWidths
+      totalWidth: this.getTotalColumnsWidth(coordinateMapping),
+      coordinateVersion: coordinateMapping.version
     };
   }
 }

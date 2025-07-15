@@ -47,25 +47,26 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Load persisted data if available (sync machine pattern)
   const persistedData = input.persistedData;
   
-  // Create dimension state with persisted column widths
-  const dimensionState = createInitialDimensionsState(
-    input.columns || [],
-    initialRowCount,
-    rowHeight,
-    input.enableSelectionColumn || false,
-    persistedData?.columnWidths // Pass persisted column widths
-  );
-  
-  // Create selection state
-  const selectionState = createInitialSelectionState();
-  
-  // Create view state with persisted view settings
+  // Create view state with persisted view settings FIRST (needed for column order)
   const viewState = createInitialViewState(
     input.entityType,
     input.columns || [],
     input.settings?.initialViewport,
     persistedData // Pass all persisted data for view state initialization
   );
+  
+  // Create dimension state with persisted column widths
+  const dimensionState = createInitialDimensionsState(
+    input.columns || [],
+    initialRowCount,
+    rowHeight,
+    input.enableSelectionColumn || false,
+    persistedData?.columnWidths, // Pass persisted column widths
+    viewState.columnOrder // Pass column order for coordinate mapping
+  );
+  
+  // Create selection state
+  const selectionState = createInitialSelectionState();
   
   // Create edit state
   const editState = createInitialEditState();
@@ -243,6 +244,20 @@ export const tableBaseMachine = setup({
       }
     },
     
+    forwardToRenderer: ({ context, event }) => {
+      console.log('TableMachine: forwardToRenderer action', {
+        hasRendererActor: !!context.actors.rendererActor,
+        eventType: event.type,
+        innerEventType: (event as any).event?.type
+      });
+      
+      if (context.actors.rendererActor) {
+        context.actors.rendererActor.send((event as any).event);
+      } else {
+        console.error('TableMachine: No renderer actor available for forwarding');
+      }
+    },
+    
     // Persistence action
     persistSnapshot: ({ context, self }) => {
       if (typeof window === 'undefined') return;
@@ -412,9 +427,10 @@ export const tableBaseMachine = setup({
                   columnOffsets: context.columnOffsets,
                   totalWidth: context.totalWidth,
                   totalHeight: context.totalHeight,
-                  viewport: context.viewport
-                },
-                coordinateMapping: context.initialData?.coordinateMapping || null
+                  viewport: context.viewport,
+                  // CRITICAL: Include coordinate mapping for passive renderer
+                  coordinateMapping: context.coordinateMapping
+                }
               })
             ),
             // Spawn canvas actor post-render for selection handling
@@ -541,9 +557,10 @@ export const tableBaseMachine = setup({
                       columnWidths: context.columnWidths,
                       columnOffsets: context.columnOffsets,
                       totalWidth: context.totalWidth,
-                      totalHeight: context.totalHeight
-                    },
-                    coordinateMapping: event.output.coordinateMapping
+                      totalHeight: context.totalHeight,
+                      // CRITICAL: Include coordinate mapping for passive renderer
+                      coordinateMapping: event.output.coordinateMapping
+                    }
                   })
                 ),
                 
@@ -995,6 +1012,11 @@ on: {
     // Forward events to canvas from any state
     FORWARD_TO_CANVAS: {
       actions: 'forwardToCanvas'
+    },
+    
+    // Forward events to renderer from any state
+    FORWARD_TO_RENDERER: {
+      actions: 'forwardToRenderer'
     }
   }
 });

@@ -26,6 +26,7 @@ export type RendererActorEvent =
   | { type: 'UPDATE_VIEWPORT'; viewport: ViewportInfo }
   | { type: 'UPDATE_COLUMNS'; columns: any[] }
   | { type: 'UPDATE_COLUMN_WIDTH'; columnId: string; width: number }
+  | { type: 'UPDATE_COORDINATES'; mapping: any; version: number }
   | { type: 'UPDATE_CELL'; rowId: string; columnId: string; field: string; value: any; oldValue: any }
   | { type: 'UPDATE_ROW'; rowId: string; entity: any; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
   | { type: 'REMOVE_ROW'; rowId: string }
@@ -39,6 +40,7 @@ export type RendererActorResponse =
   | { type: 'VIEWPORT_UPDATED'; viewport: ViewportInfo }
   | { type: 'COLUMNS_UPDATED' }
   | { type: 'COLUMN_WIDTH_UPDATED' }
+  | { type: 'COORDINATES_UPDATED' }
   | { type: 'RENDERER_ERROR'; error: string };
 
 // ====================================
@@ -318,6 +320,27 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           }
           
           sendBack({ type: 'COLUMN_WIDTH_UPDATED' });
+          break;
+          
+        case 'UPDATE_COORDINATES':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update coordinates - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Updating coordinates from state machine:', {
+            version: event.version,
+            columnCount: event.mapping.columns.length
+          });
+          
+          // Update coordinate mapping in renderer - this is the authoritative source
+          if (renderer.updateCoordinateMapping) {
+            renderer.updateCoordinateMapping(event.mapping, event.version);
+          } else {
+            console.warn('RendererActor: Renderer does not support updateCoordinateMapping');
+          }
+          
+          sendBack({ type: 'COORDINATES_UPDATED' });
           break;
           
         case 'RENDER':

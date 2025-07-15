@@ -185,9 +185,12 @@ export class HeaderEngine {
       return state.columns;
     }
     
-    const visibleColumns = this.config.columnManager.getVisibleColumns();
-    if (visibleColumns.length > 0) {
-      return visibleColumns;
+    // Get visible columns using state machine data
+    if (state.columns && state.columnVisibility) {
+      const visibleColumns = this.config.columnManager.getVisibleColumns(state.columns, state.columnVisibility);
+      if (visibleColumns.length > 0) {
+        return visibleColumns;
+      }
     }
     
     // Fallback: create columns from first row data

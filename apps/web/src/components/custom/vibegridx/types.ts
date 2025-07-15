@@ -539,4 +539,21 @@ export interface RenderState {
   columnOffsets?: Record<string, number>; // Column offsets from table machine context
   totalWidth?: number; // Total width of all columns from table machine context
   totalHeight?: number; // Total height from table machine context
+  
+  // AUTHORITATIVE coordinate mapping from state machine
+  coordinateMapping?: {
+    rows: Array<{
+      rowId: string;
+      originalIndex: number;
+      sortedIndex: number;
+      offset: number;
+    }>;
+    columns: Array<{
+      columnId: string;
+      index: number;
+      offset: number;
+      width: number;
+    }>;
+    version: number;
+  };
 }

@@ -73,7 +73,7 @@ export class RowEngine {
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
     // Update virtual dimensions
-    this.updateVirtualDimensions();
+    this.updateVirtualDimensions(state);
     
     // Handle empty visible rows case
     let rowsToRender = visibleRows;
@@ -164,9 +164,9 @@ export class RowEngine {
   // PRIVATE METHODS
   // ====================================
   
-  private updateVirtualDimensions(): void {
+  private updateVirtualDimensions(state?: RenderState): void {
     const totalHeight = this.config.virtualGrid.getTotalHeight();
-    const totalWidth = this.getTotalColumnsWidth();
+    const totalWidth = this.getTotalColumnsWidth(state);
     
     // Batch DOM style updates
     this.config.domManager.getElement('body').style.height = `${totalHeight}px`;
@@ -243,7 +243,7 @@ export class RowEngine {
     rowElement.style.left = '0px';
     
     // Calculate total width from columns
-    const totalWidth = this.getTotalColumnsWidth();
+    const totalWidth = this.getTotalColumnsWidth(state);
     rowElement.style.width = `${totalWidth}px`;
     rowElement.style.height = `${this.config.virtualGrid.getRowHeight()}px`;
     
@@ -406,10 +406,12 @@ export class RowEngine {
       return stateColumns.filter(col => col.id !== '__selection');
     }
     
-    // Fall back to visible columns from column manager
-    const visibleColumns = this.config.columnManager.getVisibleColumns();
-    if (visibleColumns.length > 0) {
-      return this.config.columnManager.getDataColumns();
+    // Fall back to visible columns from column manager using state machine data
+    if (state?.columns && state?.columnVisibility) {
+      const visibleColumns = this.config.columnManager.getVisibleColumns(state.columns, state.columnVisibility);
+      if (visibleColumns.length > 0) {
+        return this.config.columnManager.getDataColumns(state.columns, state.columnVisibility);
+      }
     }
     
     // Last resort: create columns from row data
@@ -453,14 +455,31 @@ export class RowEngine {
     return offset;
   }
   
-  private getTotalColumnsWidth(): number {
-    let totalWidth = this.config.enableSelectionColumn ? 48 : 0; // Selection column
+  private getTotalColumnsWidth(state?: RenderState): number {
+    // Use coordinate mapping from state machine if available
+    if (state?.coordinateMapping) {
+      return this.config.columnManager.getTotalColumnsWidth(state.coordinateMapping);
+    }
     
-    this.config.columnManager.getVisibleColumns().forEach(column => {
-      totalWidth += this.config.columnManager.getColumnWidth(column.id);
-    });
+    // Fallback to render state totalWidth
+    if (state?.totalWidth) {
+      return state.totalWidth;
+    }
     
-    return totalWidth;
+    // Last resort: calculate from column data
+    if (state?.columns && state?.columnVisibility) {
+      let totalWidth = this.config.enableSelectionColumn ? 48 : 0; // Selection column
+      
+      const visibleColumns = this.config.columnManager.getVisibleColumns(state.columns, state.columnVisibility);
+      visibleColumns.forEach(column => {
+        totalWidth += this.config.columnManager.getColumnWidth(column.id, state.columnWidths || {}, state.columns);
+      });
+      
+      return totalWidth;
+    }
+    
+    // Default fallback
+    return 800;
   }
   
   private resolveRelationships(row: TableRow, columns: Column[], resolvers: Record<string, (id: string | string[]) => string>): TableRow {
@@ -488,7 +507,7 @@ export class RowEngine {
   private getColumnCount(state?: RenderState): number {
     const dataColumns = state?.columns 
       ? state.columns.filter(col => col.id !== '__selection').length
-      : this.config.columnManager.getDataColumns().length;
+      : this.config.columnManager.getDataColumns(state?.columns || [], state?.columnVisibility || {}).length;
     
     return dataColumns + (this.config.enableSelectionColumn ? 1 : 0);
   }

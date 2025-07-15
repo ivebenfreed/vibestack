@@ -75,17 +75,8 @@ export class StateManager {
   initialize(state: RenderState): void {
     try {
       // Set all configuration at once without triggering updates
-      if (state.columnVisibility) {
-        this.config.columnManager.setColumnVisibility(state.columnVisibility);
-      }
-      
-      if (state.columnOrder && state.columnOrder.length > 0) {
-        this.config.columnManager.setColumnOrder(state.columnOrder);
-      }
-      
-      if (state.columns && state.columns.length > 0) {
-        this.config.columnManager.setColumns(state.columns);
-      }
+      // Column information now comes from state machine coordinate mapping
+      // No need to update ColumnManager as it's now passive
       
       // Update virtual grid with row count first
       this.config.virtualGrid.setRowCount(state.rows.length);
@@ -122,30 +113,27 @@ export class StateManager {
   // ====================================
   
   /**
-   * Set or update columns
+   * Set or update columns - DEPRECATED: Now handled by state machine coordinate mapping
    */
   setColumns(columns: Column[]): void {
-    this.config.columnManager.setColumns(columns);
-    // Dimension manager will be set separately via setDimensionManager
+    console.warn('StateManager: setColumns is deprecated - column data comes from state machine coordinate mapping');
+    // Column information now comes from state machine coordinate mapping
   }
   
   /**
-   * Set or update column visibility
+   * Set or update column visibility - DEPRECATED: Now handled by state machine coordinate mapping
    */
   setColumnVisibility(visibility: Record<string, boolean>): void {
-    this.config.columnManager.setColumnVisibility(visibility);
-    
-    // Update dimensions without triggering full re-render to avoid infinite loop
-    this.updateHeaderDimensions();
+    console.warn('StateManager: setColumnVisibility is deprecated - column visibility comes from state machine coordinate mapping');
+    // Column visibility changes should go through state machine
   }
   
   /**
-   * Set column order
+   * Set column order - DEPRECATED: Now handled by state machine coordinate mapping  
    */
   setColumnOrder(order: string[]): void {
-    console.log('[StateManager] Setting column order:', order);
-    this.config.columnManager.setColumnOrder(order);
-    this.updateHeaderDimensions();
+    console.warn('StateManager: setColumnOrder is deprecated - column order comes from state machine coordinate mapping');
+    // Column order changes should go through state machine
   }
   
   /**
@@ -198,6 +186,23 @@ export class StateManager {
    */
   setLastRenderState(state: RenderState): void {
     this.lastRenderState = state;
+  }
+  
+  /**
+   * Set coordinate mapping from state machine (AUTHORITATIVE SOURCE)
+   */
+  setCoordinateMapping(coordinateMapping: any, version: number): void {
+    if (this.lastRenderState) {
+      this.lastRenderState = {
+        ...this.lastRenderState,
+        coordinateMapping,
+        version
+      };
+    }
+    console.log('StateManager: Updated coordinate mapping from state machine:', {
+      version,
+      columnCount: coordinateMapping.columns.length
+    });
   }
   
   /**

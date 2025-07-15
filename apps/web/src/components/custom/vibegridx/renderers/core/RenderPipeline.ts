@@ -52,15 +52,8 @@ export class RenderPipeline {
   render(state: RenderState): void {
     this.config.performanceMonitor.startRender();
     
-    // Update column widths from render state
-    if (state.columnWidths) {
-      this.config.columnManager.setColumnWidths(state.columnWidths);
-    }
-    
-    // Update columns if provided in state
-    if (state.columns && state.columns.length > 0) {
-      this.config.columnManager.setColumns(state.columns);
-    }
+    // Column information now comes from state machine coordinate mapping
+    // No need to update ColumnManager as it's now passive and gets data from render state
     
     try {
       // STEP 1: Render header
