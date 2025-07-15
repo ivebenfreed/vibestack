@@ -557,6 +557,11 @@ export const createViewActorInput = (config: {
 }): ViewActorInput => {
   const { entities, columns, viewState = {}, columnWidths, viewport, rowHeight = 40, enableSelectionColumn = false, relationshipResolvers } = config;
   
+  // Debug log to ensure resolvers are passed
+  if ((window as any).__VIBEGRIDX_DEBUG && relationshipResolvers) {
+    console.log('[createViewActorInput] Relationship resolvers provided:', Object.keys(relationshipResolvers));
+  }
+  
   return {
     entities,
     sortBy: viewState.sortBy || [],

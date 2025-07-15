@@ -270,8 +270,8 @@ export class RowEngine {
     // Get columns to render - this must come from state to ensure proper ordering
     const columnsToRender = this.getColumnsToRender(row, state);
     
-    // Resolve relationship values if resolvers provided
-    const rowDataWithResolved = relationshipResolvers ? this.resolveRelationships(row, columnsToRender, relationshipResolvers) : row;
+    // Use row data as-is since ViewActor has already resolved relationships
+    const rowDataWithResolved = row;
     
     
     // Clear existing content properly to avoid overlapping cells

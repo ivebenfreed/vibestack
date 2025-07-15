@@ -80,6 +80,7 @@ interface VibeGridXManualProps<T = any> {
   columns: Column<T>[];
   primaryAtom: any;
   relationshipAtoms?: Record<string, any>;
+  relationshipResolvers?: Record<string, (id: string | string[]) => string>;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
   
   // Common options (same as entity props)
@@ -152,10 +153,67 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         columns = columns.filter(col => props.selectedColumns.includes(col.id));
       }
       
+      // Build relationship resolvers based on columns and atoms
+      const relationshipResolvers: Record<string, (id: string | string[]) => string> = {};
+      
+      columns.forEach(column => {
+        const cellType = column.cellType || column.type;
+        if (cellType?.startsWith('relationship') && column.relationshipTable) {
+          const tableKey = column.relationshipTable;
+          const displayField = column.relationshipDisplayField;
+          
+          // Find the atom for this relationship
+          let targetAtom: any = null;
+          
+          // Try to find atom by table key
+          if (relationshipAtoms[tableKey]) {
+            targetAtom = relationshipAtoms[tableKey];
+          } else if (relationshipAtoms[tableKey + 's']) {
+            targetAtom = relationshipAtoms[tableKey + 's'];
+          }
+          
+          // Create resolver that reads atom data dynamically
+          relationshipResolvers[column.id] = (id: string | string[]) => {
+            // Get fresh atom data when resolver is called
+            const atomData = targetAtom ? targetAtom.get() || {} : {};
+            
+            if (Array.isArray(id)) {
+              const names = id.map(i => {
+                const entity = atomData[i];
+                if (!entity) return i;
+                
+                // Try different common display fields
+                const display = entity[displayField || 'displayName'] || 
+                              entity.displayName || 
+                              entity.name || 
+                              entity.title || 
+                              entity.label ||
+                              i;
+                return display;
+              });
+              return names.join(', ');
+            }
+            
+            const entity = atomData[id];
+            if (!entity) return id;
+            
+            // Try different common display fields
+            const display = entity[displayField || 'displayName'] || 
+                          entity.displayName || 
+                          entity.name || 
+                          entity.title || 
+                          entity.label ||
+                          id;
+            return display;
+          };
+        }
+      });
+      
       return {
         columns,
         primaryAtom,
         relationshipAtoms,
+        relationshipResolvers,
         onEntityUpdate: updateFn ? 
           (rowId: string, updates: Record<string, any>) => updateFn(rowId, updates) : 
           undefined
@@ -208,68 +266,11 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     return Object.values(atomData || {});
   }, []); // Empty deps - only run once on mount, never re-render
   
-  // Subscribe to relationship atoms and create resolvers
-  // We need to dynamically subscribe based on which columns need relationship data
-  const relationshipColumns = useMemo(() => {
-    return columns.filter(column => {
-      const cellType = column.cellType || column.type;
-      return cellType?.startsWith('relationship') && column.relationshipTable;
-    });
-  }, [columns]);
-  
-  // Get initial relationship data but don't subscribe - renderer handles updates
-  const projectsData = useMemo(() => {
-    if (relationshipColumns.some(col => col.relationshipTable === 'project') && relationshipAtoms.projects) {
-      return relationshipAtoms.projects.get() || {};
-    }
-    return {};
-  }, []); // Only run once
-  
-  const usersData = useMemo(() => {
-    if (relationshipColumns.some(col => col.relationshipTable === 'assignee' || col.relationshipTable === 'user') && relationshipAtoms.users) {
-      return relationshipAtoms.users.get() || {};
-    }
-    return {};
-  }, []); // Only run once
-  
-  // Create resolvers based on subscribed data
-  const relationshipResolvers = useMemo(() => {
-    const resolvers: Record<string, (id: string | string[]) => string> = {};
-    
-    relationshipColumns.forEach(column => {
-      const tableKey = column.relationshipTable!;
-      const displayField = column.relationshipDisplayField;
-      
-      // Create resolver based on the table
-      if (tableKey === 'project' && projectsData) {
-        resolvers[column.id] = (id: string | string[]) => {
-          if (Array.isArray(id)) {
-            const names = id.map(i => {
-              const entity = projectsData[i];
-              return entity ? (entity[displayField || 'name'] || entity.name || i) : i;
-            });
-            return names.join(', ');
-          }
-          const entity = projectsData[id];
-          return entity ? (entity[displayField || 'name'] || entity.name || id) : id;
-        };
-      } else if ((tableKey === 'assignee' || tableKey === 'user') && usersData) {
-        resolvers[column.id] = (id: string | string[]) => {
-          if (Array.isArray(id)) {
-            const names = id.map(i => {
-              const entity = usersData[i];
-              return entity ? (entity[displayField || 'displayName'] || entity.name || i) : i;
-            });
-            return names.join(', ');
-          }
-          const entity = usersData[id];
-          return entity ? (entity[displayField || 'displayName'] || entity.name || id) : id;
-        };
-      }
-    });
-    
-    return resolvers;
-  }, [relationshipColumns, projectsData, usersData]);
+  // Get relationship resolvers from entity config or manual props
+  // The parent component should provide pre-configured resolvers
+  const relationshipResolvers = entityConfig?.relationshipResolvers || 
+    (!isEntityProps(props) ? props.relationshipResolvers : undefined) || 
+    {};
   
   // Log initial entity count only
   console.log('VibeGridX: Initial entity count:', { 
