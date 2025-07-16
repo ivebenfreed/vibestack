@@ -100,28 +100,55 @@ export const editHandlers = {
 
   'edit.commit': {
     actions: [
-      // Store optimistic operation for tracking
-      assign({
-        optimisticOperations: ({ context, event }) => {
-          if (!context.editingCell) return context.optimisticOperations;
+      // Store editing cell info before clearing it
+      ({ context, event, self }) => {
+        if (!context.editingCell) return;
+        
+        const editingCell = context.editingCell;
+        const { rowId, columnId, field } = editingCell;
+        
+        // Store optimistic operation for tracking
+        const operationId = `edit-${rowId}-${columnId}-${Date.now()}`;
+        const newOperations = new Map(context.optimisticOperations);
+        newOperations.set(operationId, {
+          id: operationId,
+          type: 'update',
+          entityId: rowId,
+          field: field,
+          newValue: event.value,
+          oldValue: context.originalValue,
+          timestamp: Date.now()
+        });
+        
+        // Update optimistic operations
+        Object.assign(context, { optimisticOperations: newOperations });
+        
+        // Tell renderer to apply optimistic update to just the edited cell
+        if (context.actors?.rendererActor) {
+          context.actors.rendererActor.send({
+            type: 'UPDATE_CELL',
+            rowId,
+            columnId,
+            field,
+            value: event.value,
+            oldValue: context.originalValue
+          });
+        }
+        
+        // Call entity update handler if provided (fire and forget)
+        if (context.onEntityUpdate) {
+          const updates = { [field]: event.value };
           
-          const { rowId, columnId, field } = context.editingCell;
-          const operationId = `edit-${rowId}-${columnId}-${Date.now()}`;
-          
-          const newOperations = new Map(context.optimisticOperations);
-          newOperations.set(operationId, {
-            id: operationId,
-            type: 'update',
-            entityId: rowId,
-            field: field,
-            newValue: event.value,
-            oldValue: context.originalValue,
-            timestamp: Date.now()
+          console.log('TableMachine: Calling onEntityUpdate', {
+            rowId,
+            updates,
+            field
           });
           
-          return newOperations;
+          // Fire and forget - don't await
+          context.onEntityUpdate(rowId, updates);
         }
-      }),
+      },
       
       editActions.commitEdit,
       
@@ -140,40 +167,7 @@ export const editHandlers = {
           type: 'UPDATE_EDITING',
           editingCell: null
         })
-      ),
-      
-      // Tell renderer to apply optimistic update to just the edited cell
-      sendTo(
-        ({ context }) => context.actors.rendererActor!,
-        ({ context, event }) => {
-          const { rowId, columnId, field } = context.editingCell!;
-          return {
-            type: 'UPDATE_CELL',
-            rowId,
-            columnId,
-            field,
-            value: event.value,
-            oldValue: context.originalValue
-          };
-        }
-      ),
-      
-      // Call entity update handler if provided (fire and forget)
-      ({ context, event }) => {
-        if (context.onEntityUpdate && context.editingCell) {
-          const { rowId, field } = context.editingCell;
-          const updates = { [field]: event.value };
-          
-          console.log('TableMachine: Calling onEntityUpdate', {
-            rowId,
-            updates,
-            field
-          });
-          
-          // Fire and forget - don't await
-          context.onEntityUpdate(rowId, updates);
-        }
-      }
+      )
     ]
   },
 

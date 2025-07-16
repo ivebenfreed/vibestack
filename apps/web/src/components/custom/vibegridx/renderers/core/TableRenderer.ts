@@ -268,9 +268,8 @@ export class TableRenderer {
     // Setup event delegation system
     this.eventSystem.setupEventListeners();
     
-    // Make viewport focusable for keyboard events (handled at component level)
-    const viewport = this.domManager.getElement('viewport');
-    viewport.tabIndex = 0;
+    // Focus management is now handled by EventDelegationManager on the container
+    // No need to set tabIndex on viewport
   }
   
   cleanup(): void {

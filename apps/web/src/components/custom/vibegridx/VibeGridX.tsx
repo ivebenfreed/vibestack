@@ -581,7 +581,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         position: 'relative',
         outline: 'none' // Remove focus outline that can cause scroll
       }}
-      tabIndex={0}
+      // tabIndex removed - EventDelegationManager handles focus on renderer container
     >
       {/* Header with Column Visibility Controls */}
       <VibeGridXHeader

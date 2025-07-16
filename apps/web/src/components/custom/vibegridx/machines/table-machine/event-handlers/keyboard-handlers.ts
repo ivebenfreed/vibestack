@@ -8,6 +8,10 @@ import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 export const keyboardHandlers = {
   'keyboard.arrow': {
+    guard: ({ context }) => {
+      // Don't process arrow keys when editing a cell - let the input handle them
+      return !context.editingCell;
+    },
     actions: [
       // Update selection based on arrow key
       selectionActions.moveSelection,
@@ -51,6 +55,10 @@ export const keyboardHandlers = {
   },
   
   'keyboard.copy': {
+    guard: ({ context }) => {
+      // Don't process copy when editing a cell - let the input handle Ctrl+C
+      return !context.editingCell;
+    },
     actions: [
       // TODO: Copy functionality not implemented
       // overlayActor was supposed to handle this but was never spawned
@@ -65,6 +73,10 @@ export const keyboardHandlers = {
   },
   
   'keyboard.paste': {
+    guard: ({ context }) => {
+      // Don't process paste when editing a cell - let the input handle Ctrl+V
+      return !context.editingCell;
+    },
     actions: [
       // TODO: Paste functionality not implemented
       // overlayActor was supposed to handle this but was never spawned
@@ -97,27 +109,29 @@ export const keyboardHandlers = {
   'keyboard.enter': {
     actions: [
       ({ context, event, self }) => {
-        // Get active cell
-        const activeCell = context.activeCell;
-        if (!activeCell) return;
-        
-        if (event.shift) {
-          // Shift+Enter: Move up
-          self.send({
-            type: 'keyboard.arrow',
-            direction: 'up'
+        if (context.editingCell) {
+          // If editing, commit the edit and handle navigation if desired
+          self.send({ 
+            type: 'edit.commit',
+            value: context.editValue // Use current edit value
           });
-        } else {
-          // Enter: Start editing or move down
-          if (context.editingCell) {
-            // Commit edit and move down
-            self.send({ type: 'edit.commit' });
+          
+          // Navigate after committing if not Shift+Enter
+          if (!event.shift) {
             self.send({
               type: 'keyboard.arrow',
               direction: 'down'
             });
           } else {
-            // Start editing
+            self.send({
+              type: 'keyboard.arrow',
+              direction: 'up'
+            });
+          }
+        } else {
+          // If not editing, start editing the active cell
+          const activeCell = context.activeCell;
+          if (activeCell) {
             self.send({
               type: 'edit.cell.start',
               rowId: activeCell.rowId,
@@ -130,6 +144,10 @@ export const keyboardHandlers = {
   },
   
   'keyboard.tab': {
+    guard: ({ context }) => {
+      // Don't process tab when editing a cell - let the input handle tab navigation
+      return !context.editingCell;
+    },
     actions: [
       ({ context, event, self }) => {
         // Tab navigation
@@ -152,23 +170,16 @@ export const keyboardHandlers = {
   
   'keyboard.escape': {
     actions: [
-      // Clear selection
-      assign({
-        selectedCells: () => new Set<string>()
-      }),
-      
-      // Clear visual selection directly to avoid event loops
-      ({ context }) => {
-        if (context.actors.canvasActor) {
-          context.actors.canvasActor.send({
-            type: 'UPDATE_SELECTION_VISUAL',
-            visualCells: []
-          });
+      ({ context, self }) => {
+        if (context.editingCell) {
+          // If editing, cancel the edit
+          self.send({ type: 'edit.cancel' });
+          console.log('TableMachine: Escape - cancelled editing');
+        } else {
+          // If not editing, clear selection
+          self.send({ type: 'selection.clear' });
+          console.log('TableMachine: Escape - cleared selection');
         }
-      },
-      
-      () => {
-        console.log('TableMachine: Escape - cleared selection and editing');
       }
     ]
   }

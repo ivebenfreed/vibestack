@@ -657,6 +657,13 @@ export class EventDelegationManager {
   private handleKeyDown(event: KeyboardEvent): void {
     if (this.isDestroyed) return;
     
+    // Skip keyboard handling when editing overlay is active
+    const target = event.target as Element;
+    if (target.closest('.vibegridx-editing-portal')) {
+      console.log('🎯 EventDelegationManager: Ignoring keyboard event on editing overlay');
+      return;
+    }
+    
     // Handle arrow key navigation
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();
