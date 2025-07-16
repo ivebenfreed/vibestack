@@ -17,8 +17,8 @@ export interface VisualCellPosition {
 // ====================================
 
 export interface OverlayConfig {
-  dimensionManager?: any; // Will be typed as ColumnDimensionManager
-  rowDimensionManager?: any; // Will be typed as RowDimensionManager
+  // Dimension manager removed - use coordinateMapping instead
+  // Row dimension manager removed - use coordinateMapping instead
   coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager
   columns?: any[]; // Column array for coordinate calculations
   overlayActor?: any; // Legacy: Overlay machine actor  

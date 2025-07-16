@@ -8,7 +8,7 @@ import type {
   OptimisticOperation,
   SortConfig 
 } from '../../types';
-import type { ColumnDimensionManager } from '../../dimensions/ColumnDimensionManager';
+// ColumnDimensionManager removed - use coordinateMapping instead
 import { CellPipeline } from '../engines/CellPipeline';
 import { VirtualScrollManager } from '../managers/VirtualScrollManager';
 import { ColumnManager } from '../managers/ColumnManager';
@@ -84,7 +84,7 @@ export class TableRenderer {
       getCellElement: (rowId: string, columnId: string) => this.getCellElement(rowId, columnId),
       forEachRowElement: (callback) => this.domManager.forEachRowElement(callback),
       getHeaderElement: () => this.domManager.getElement('header'),
-      isSelectionColumnEnabled: () => this.options.enableSelectionColumn || false
+      isSelectionColumnEnabled: () => true // Selection column is always enabled
     });
     
     // Use configured row height or default
@@ -140,14 +140,14 @@ export class TableRenderer {
       domManager: this.domManager,
       selectionManager: this.selectionManager,
       rowHeight: this.rowHeight,
-      enableSelectionColumn: options.enableSelectionColumn || false
+      enableSelectionColumn: true // Selection column is always enabled
     });
     
     // Initialize header renderer
     this.headerRenderer = new HeaderEngine({
       domManager: this.domManager,
       selectionManager: this.selectionManager,
-      enableSelectionColumn: options.enableSelectionColumn || false,
+      enableSelectionColumn: true, // Selection column is always enabled
       getTotalColumnsWidth: () => this.getTotalColumnsWidth()
     });
     
@@ -232,10 +232,7 @@ export class TableRenderer {
   }
   
   
-  // Set dimension manager (called by parent component)
-  setDimensionManager(manager: ColumnDimensionManager): void {
-    this.stateManager.setDimensionManager(manager);
-  }
+  // Dimension manager removed - use coordinateMapping from state machine
   
   // Get total width from STATE MACHINE coordinate mapping
   private getTotalColumnsWidth(): number {

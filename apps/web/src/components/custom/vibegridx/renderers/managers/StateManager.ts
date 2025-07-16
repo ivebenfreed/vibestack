@@ -10,7 +10,7 @@ import type {
   RendererOptions 
 } from '../../types';
 import type { ColumnManager } from './ColumnManager';
-import type { ColumnDimensionManager } from '../../dimensions/ColumnDimensionManager';
+// ColumnDimensionManager removed - use coordinateMapping instead
 import type { DOMSystem } from '../systems/DOMSystem';
 import type { VirtualScrollManager } from './VirtualScrollManager';
 import type { SelectionManager } from './SelectionManager';
@@ -52,7 +52,7 @@ export interface BatchUpdate {
 export class StateManager {
   private config: StateManagerConfig;
   private lastRenderState: RenderState | null = null;
-  private dimensionManager: ColumnDimensionManager | null = null;
+  // Dimension manager removed - use coordinateMapping instead
   private canvasInitialized = false;
   
   // Batch update management
@@ -61,7 +61,7 @@ export class StateManager {
   
   constructor(config: StateManagerConfig) {
     this.config = config;
-    this.dimensionManager = config.options.dimensionManager || null;
+    // Dimension manager removed - comes from coordinateMapping
   }
   
   // ====================================
@@ -138,31 +138,7 @@ export class StateManager {
   /**
    * Set dimension manager (called by parent component)
    */
-  setDimensionManager(manager: ColumnDimensionManager): void {
-    this.dimensionManager = manager;
-    
-    // If this is a coordinate manager, sync visible columns
-    if (manager && typeof manager.getColumnIds === 'function') {
-      const coordinateColumnIds = manager.getColumnIds();
-      console.log('StateManager: Syncing visible columns with coordinate manager', {
-        coordinateManagerColumns: coordinateColumnIds
-      });
-      
-      // Column order is now managed by state machine coordinate mapping
-      console.log('StateManager: Column order managed by state machine coordinate mapping');
-    }
-    
-    // Subscribe to dimension changes
-    manager.subscribe?.((event) => {
-      // Handle dimension changes - could trigger re-render of affected cells
-      console.log('StateManager: Column dimension changed', event);
-      
-      // Re-render header to reflect new widths
-      if (this.lastRenderState) {
-        this.config.headerRenderer.renderHeader(this.lastRenderState);
-      }
-    });
-  }
+  // Dimension manager removed - use coordinateMapping from state machine
   
   // ====================================
   // STATE MANAGEMENT

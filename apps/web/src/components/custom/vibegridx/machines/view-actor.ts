@@ -464,20 +464,18 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
     // Using default column order
   }
   
-  // Add selection column if enabled
+  // Always add selection column (selection column is always enabled)
   const visibleColumns: Column[] = [];
-  if (input.enableSelectionColumn) {
-    visibleColumns.push({
-      id: '__selection',
-      field: '__selection',
-      name: 'Select',
-      type: 'boolean',
-      width: 48,
-      resizable: false,
-      sortable: false,
-      hideable: false
-    } as Column);
-  }
+  visibleColumns.push({
+    id: '__selection',
+    field: '__selection',
+    name: 'Select',
+    type: 'boolean',
+    width: 48,
+    resizable: false,
+    sortable: false,
+    hideable: false
+  } as Column);
   visibleColumns.push(...orderedDataColumns);
   
   // Step 4: Calculate coordinate mapping
@@ -555,7 +553,7 @@ export const createViewActorInput = (config: {
   enableSelectionColumn?: boolean;
   relationshipResolvers?: Record<string, (id: string | string[]) => string>;
 }): ViewActorInput => {
-  const { entities, columns, viewState = {}, columnWidths, viewport, rowHeight = 40, enableSelectionColumn = false, relationshipResolvers } = config;
+  const { entities, columns, viewState = {}, columnWidths, viewport, rowHeight = 40, enableSelectionColumn = true, relationshipResolvers } = config;
   
   // Debug log to ensure resolvers are passed
   if ((window as any).__VIBEGRIDX_DEBUG && relationshipResolvers) {

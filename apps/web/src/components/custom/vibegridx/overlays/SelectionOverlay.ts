@@ -2,7 +2,6 @@ import Konva from 'konva';
 import type { ViewportInfo } from '../types';
 import type { CoordinateProvider } from './CoordinateProvider';
 import { CoordinateHelper } from './CoordinateProvider';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import type { VisualCellPosition } from './OverlayTypes';
 
 // ====================================
@@ -14,7 +13,6 @@ export interface SelectionOverlayConfig {
   selectionBorderColor: string;
   borderWidth: number;
   cellHeight: number;
-  dimensionManager?: ColumnDimensionManager;
 }
 
 export class SelectionOverlay {

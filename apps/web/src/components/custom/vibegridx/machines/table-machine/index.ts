@@ -2,7 +2,7 @@
 // TABLE MACHINE - MAIN COMPOSITION
 // ====================================
 
-import { setup, assign, spawnChild, sendTo, fromPromise, emit } from 'xstate';
+import { setup, assign, spawnChild, sendTo, fromPromise, emit, raise } from 'xstate';
 import type { TableContext, TableEvents, TableConfig } from '../../types';
 
 // Import slices
@@ -60,9 +60,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     input.columns || [],
     initialRowCount,
     rowHeight,
-    input.enableSelectionColumn || false,
-    persistedData?.columnWidths, // Pass persisted column widths
-    viewState.columnOrder // Pass column order for coordinate mapping
+    viewState.columnOrder, // Pass column order for coordinate mapping
+    viewState.columnVisibility, // Pass column visibility
+    persistedData?.columnWidths // Pass persisted column widths
   );
   
   // Create selection state
@@ -271,8 +271,6 @@ export const tableBaseMachine = setup({
           value: currentState.value,
           context: {
             // Only persist the UI state fields we care about
-            columnWidths: context.columnWidths,
-            columnOffsets: context.columnOffsets,
             rowHeight: context.rowHeight,
             sortBy: context.sortBy,
             filters: context.filters,
@@ -281,7 +279,11 @@ export const tableBaseMachine = setup({
             columnOrder: context.columnOrder,
             hiddenColumnCount: context.hiddenColumnCount,
             settings: context.settings,
-            viewport: context.viewport
+            viewport: context.viewport,
+            // Persist column widths from coordinate mapping
+            columnWidths: context.coordinateMapping?.columns ? 
+              Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width])) : 
+              {}
           }
         };
         
@@ -320,19 +322,15 @@ export const tableBaseMachine = setup({
         allRowIds: [],
         settings: input.settings || {},
         version: 0,
-        enableSelectionColumn: input.enableSelectionColumn || false,
+        enableSelectionColumn: true, // Selection column is always enabled
         entities: [],
         relationshipResolvers: {},
         actors: {},
         coordinateManager: null,
         coordinateMapping: null,
         // Add other required fields with defaults
-        columnWidths: {},
-        columnOffsets: {},
         rowHeight: 40,
-        totalWidth: 0,
         totalRows: 0,
-        totalHeight: 0,
         selectedCells: new Set(),
         anchorCell: null,
         sortBy: [],
@@ -422,11 +420,6 @@ export const tableBaseMachine = setup({
                   sortBy: context.sortBy,
                   columnVisibility: context.columnVisibility,
                   columnOrder: context.columnOrder,
-                  // Include dimensions from table machine context
-                  columnWidths: context.columnWidths,
-                  columnOffsets: context.columnOffsets,
-                  totalWidth: context.totalWidth,
-                  totalHeight: context.totalHeight,
                   viewport: context.viewport,
                   // CRITICAL: Include coordinate mapping for passive renderer
                   coordinateMapping: context.coordinateMapping
@@ -506,7 +499,9 @@ export const tableBaseMachine = setup({
                   columnVisibility: context.columnVisibility,
                   columnOrder: context.columnOrder
                 },
-                columnWidths: context.columnWidths,
+                columnWidths: context.coordinateMapping?.columns ? 
+                  Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width])) : 
+                  {},
                 viewport: context.viewport,
                 rowHeight: context.rowHeight,
                 enableSelectionColumn: context.enableSelectionColumn,
@@ -553,11 +548,6 @@ export const tableBaseMachine = setup({
                       sortBy: context.sortBy,
                       columnVisibility: context.columnVisibility,
                       columnOrder: context.columnOrder,
-                      // Include dimensions from table machine context
-                      columnWidths: context.columnWidths,
-                      columnOffsets: context.columnOffsets,
-                      totalWidth: context.totalWidth,
-                      totalHeight: context.totalHeight,
                       // CRITICAL: Include coordinate mapping for passive renderer
                       coordinateMapping: event.output.coordinateMapping
                     }
@@ -616,8 +606,7 @@ export const tableBaseMachine = setup({
                   editingBorderColor: '#059669',
                   enableAnimations: false,
                   animationDuration: 0,
-                  borderWidth: 2,
-                  dimensionManager: context.dimensionManager
+                  borderWidth: 2
                 }
               });
               
@@ -712,8 +701,7 @@ export const tableBaseMachine = setup({
                     editingBorderColor: '#059669',
                     enableAnimations: false,
                     animationDuration: 0,
-                    borderWidth: 2,
-                    dimensionManager: context.dimensionManager
+                    borderWidth: 2
                   }
                 });
                 
@@ -790,8 +778,8 @@ export const tableBaseMachine = setup({
             columns: ({ event }) => event.columns
           }),
           
-          // Update dimension manager
-          dimensionActions.resetColumnDimensions,
+          // Trigger coordinate recalculation
+          raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
           
           // Send to edit actor
           sendTo(

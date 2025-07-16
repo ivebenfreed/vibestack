@@ -12,6 +12,13 @@ export interface DragPreviewData {
     offset: number;
   }>;
   dropIndicatorX: number;
+  // Mouse position for floating preview
+  mouseX?: number;
+  mouseY?: number;
+  // Column display name
+  columnName?: string;
+  // Flag to indicate if this is the initial preview (for hiding original column)
+  isInitialPreview?: boolean;
   // Debug information
   debugInfo?: {
     currentIndex: number;
@@ -28,7 +35,8 @@ export interface DragPreviewData {
 export function calculateDragPreview(
   mouseX: number,
   draggedColumnId: string,
-  coordinateMapping: any
+  coordinateMapping: any,
+  scrollLeft: number = 0
 ): DragPreviewData {
   if (!coordinateMapping?.columns) {
     return {
@@ -56,8 +64,9 @@ export function calculateDragPreview(
     };
   }
 
-  // Mouse coordinates are now container-relative, no adjustment needed
-  const adjustedMouseX = mouseX;
+  // Mouse coordinates are container-relative, but we need to add scrollLeft
+  // to get the actual position in the scrolled content
+  const adjustedMouseX = mouseX + scrollLeft;
 
   // Find current index of dragged column
   const currentIndex = dataColumns.findIndex((col: any) => col.columnId === draggedColumnId);
@@ -77,12 +86,7 @@ export function calculateDragPreview(
   let dropIndicatorX = 0;
   const draggedColumn = dataColumns[currentIndex];
   
-  console.log('🎯 DragPreview: Calculating target position', {
-    draggedColumn: draggedColumnId,
-    mouseX: adjustedMouseX,
-    currentIndex,
-    draggedBounds: { start: draggedColumn.offset, end: draggedColumn.offset + draggedColumn.width }
-  });
+  // Removed verbose logging to reduce console spam
   
   // Mouse is outside the dragged column - now use midpoint logic
   // Check columns from left to right to find where the mouse is
@@ -94,11 +98,7 @@ export function calculateDragPreview(
   
   // When dragging left, find the leftmost column whose midpoint we haven't passed
   if (adjustedMouseX < draggedColumn.offset) {
-    console.log('🎯 DragPreview: Dragging left logic', {
-      mouseX: adjustedMouseX,
-      draggedOffset: draggedColumn.offset,
-      currentIndex
-    });
+    // Dragging left logic
     
     // Check if we should show the indicator at the absolute leftmost data position
     // This would be right after the selection column if it exists
@@ -114,27 +114,16 @@ export function calculateDragPreview(
       const col = dataColumns[i];
       const colMidpoint = col.offset + col.width / 2;
       
-      console.log('🎯 DragPreview: Checking left column', {
-        columnId: col.columnId,
-        index: i,
-        colOffset: col.offset,
-        colMidpoint,
-        mouseX: adjustedMouseX,
-        isLeftOfMidpoint: adjustedMouseX < colMidpoint
-      });
+      // Check if mouse is left of this column's midpoint
       
       if (adjustedMouseX < colMidpoint) {
         // Mouse is left of this column's midpoint, so we want to insert before it
         bestTargetIndex = i;
         bestDropX = col.offset;
-        console.log('🎯 DragPreview: Updated target to left', {
-          bestTargetIndex,
-          bestDropX,
-          columnId: col.columnId
-        });
+        // Updated target to left
       } else {
         // Mouse has passed this column's midpoint, stop searching
-        console.log('🎯 DragPreview: Mouse past midpoint, stopping search');
+        // Mouse past midpoint, stop searching
         break;
       }
     }
@@ -142,22 +131,13 @@ export function calculateDragPreview(
     // Special case: if we're at the leftmost position (index 0), 
     // make sure the drop indicator is positioned correctly after the selection column
     if (bestTargetIndex === 0 && selectionColumn) {
-      console.log('🎯 DragPreview: Adjusting for selection column', {
-        oldDropX: bestDropX,
-        newDropX: leftmostDataPosition,
-        selectionWidth: selectionColumn.width
-      });
+      // Adjust for selection column
       bestDropX = leftmostDataPosition;
     }
   }
   // When dragging right, find the rightmost column whose midpoint we've passed
   else if (adjustedMouseX > draggedColumn.offset + draggedColumn.width) {
-    console.log('🎯 DragPreview: Dragging right logic', {
-      mouseX: adjustedMouseX,
-      draggedEnd: draggedColumn.offset + draggedColumn.width,
-      currentIndex,
-      totalColumns: dataColumns.length
-    });
+    // Dragging right logic
     
     bestTargetIndex = currentIndex + 1; // Default to right of current position
     bestDropX = draggedColumn.offset + draggedColumn.width;
@@ -166,29 +146,16 @@ export function calculateDragPreview(
       const col = dataColumns[i];
       const colMidpoint = col.offset + col.width / 2;
       
-      console.log('🎯 DragPreview: Checking right column', {
-        columnId: col.columnId,
-        index: i,
-        colOffset: col.offset,
-        colMidpoint,
-        colEnd: col.offset + col.width,
-        mouseX: adjustedMouseX,
-        hasPassedMidpoint: adjustedMouseX > colMidpoint
-      });
+      // Check if mouse has passed this column's midpoint
       
       if (adjustedMouseX > colMidpoint) {
         // Mouse has passed this column's midpoint, update target to after this column
         bestTargetIndex = i + 1;
         bestDropX = col.offset + col.width;
-        console.log('🎯 DragPreview: Updated target to right', {
-          bestTargetIndex,
-          bestDropX,
-          isLastColumn: i === dataColumns.length - 1,
-          maxPossibleIndex: dataColumns.length
-        });
+        // Updated target to right
       } else {
         // Mouse hasn't reached this column's midpoint, stop here
-        console.log('🎯 DragPreview: Mouse not past midpoint, stopping search');
+        // Mouse not past midpoint, stop searching
         break;
       }
     }
@@ -196,10 +163,7 @@ export function calculateDragPreview(
     // Ensure we don't exceed the array bounds
     // The maximum target index should be dataColumns.length (to insert at the end)
     if (bestTargetIndex > dataColumns.length) {
-      console.log('🎯 DragPreview: Clamping target index to array bounds', {
-        originalTarget: bestTargetIndex,
-        clampedTarget: dataColumns.length
-      });
+      // Clamp target index to array bounds
       bestTargetIndex = dataColumns.length;
     }
   }
@@ -207,19 +171,11 @@ export function calculateDragPreview(
   targetIndex = bestTargetIndex;
   dropIndicatorX = bestDropX;
   
-  console.log('🎯 DragPreview: Final target position', {
-    currentIndex,
-    targetIndex,
-    dropIndicatorX,
-    mouseX: adjustedMouseX,
-    draggedBounds: { start: draggedColumn.offset, end: draggedColumn.offset + draggedColumn.width }
-  });
+  // Final target position calculated
   
   // If we didn't find a target, we're in a gap - use nearest position
   if (!foundTarget) {
-    console.log('🎯 DragPreview: No specific target found, using nearest', {
-      mouseX: adjustedMouseX
-    });
+    // No specific target found, using nearest position
   }
 
   // No adjustment needed - targetIndex represents the insertion point
@@ -277,17 +233,7 @@ export function calculateDragPreview(
     }
   };
 
-  console.log('🎯 DragPreview: Final result', {
-    currentIndex,
-    targetIndex: result.targetIndex,
-    dropIndicatorX: result.dropIndicatorX,
-    columnsToShift: result.columnsToShift.length,
-    shiftDetails: result.columnsToShift.map(s => ({ 
-      columnId: s.columnId, 
-      direction: s.direction, 
-      offset: s.offset 
-    }))
-  });
+  // Return final drag preview result
 
   return result;
 }
@@ -300,14 +246,129 @@ export function applyDragPreview(
   domManager: any
 ): void {
   const header = domManager.getElement('header');
+  const viewport = domManager.getElement('viewport');
+  const container = domManager.getElement('container');
   
-  console.log('🎯 ApplyDragPreview: Applying preview', {
-    draggedColumn: dragPreview.draggedColumnId,
-    targetIndex: dragPreview.targetIndex,
-    dropIndicatorX: dragPreview.dropIndicatorX,
-    columnsToShift: dragPreview.columnsToShift,
-    debugInfo: dragPreview.debugInfo
-  });
+  // Get current scroll position
+  const currentScrollLeft = viewport?.scrollLeft || 0;
+  
+  // Apply drag preview to DOM
+  
+  // Hide the original column if this is the initial preview
+  if ((dragPreview as any).isInitialPreview) {
+    console.log('🎯 ApplyDragPreview: Hiding original column for initial preview', {
+      columnId: dragPreview.draggedColumnId
+    });
+    
+    const draggingColumn = header.querySelector(`[data-column="${dragPreview.draggedColumnId}"]`) as HTMLElement;
+    if (draggingColumn) {
+      console.log('🎯 ApplyDragPreview: Found column to hide', {
+        column: draggingColumn,
+        dataset: draggingColumn.dataset,
+        before: {
+          opacity: draggingColumn.style.opacity,
+          visibility: draggingColumn.style.visibility
+        }
+      });
+      
+      draggingColumn.style.opacity = '0';
+      draggingColumn.style.visibility = 'hidden';
+      draggingColumn.style.pointerEvents = 'none';
+      
+      console.log('🎯 ApplyDragPreview: Column hidden', {
+        after: {
+          opacity: draggingColumn.style.opacity,
+          visibility: draggingColumn.style.visibility,
+          pointerEvents: draggingColumn.style.pointerEvents
+        }
+      });
+    } else {
+      console.warn('🎯 ApplyDragPreview: Could not find column to hide', {
+        columnId: dragPreview.draggedColumnId,
+        selector: `[data-column="${dragPreview.draggedColumnId}"]`,
+        headerChildren: Array.from(header.children).map(el => ({
+          tag: el.tagName,
+          class: el.className,
+          dataset: (el as HTMLElement).dataset
+        }))
+      });
+    }
+  }
+  
+  // Create or update floating drag preview that follows mouse
+  if (dragPreview.mouseX !== undefined && dragPreview.mouseY !== undefined) {
+    console.log('🎯 ApplyDragPreview: Creating/updating floating preview', {
+      mouseX: dragPreview.mouseX,
+      mouseY: dragPreview.mouseY,
+      columnName: dragPreview.columnName,
+      draggedColumnId: dragPreview.draggedColumnId
+    });
+    
+    let floatingPreview = document.querySelector('.vibegridx-drag-preview') as HTMLElement;
+    
+    if (!floatingPreview) {
+      // Create floating preview element
+      console.log('🎯 ApplyDragPreview: Creating new floating preview element');
+      floatingPreview = document.createElement('div');
+      floatingPreview.className = 'vibegridx-drag-preview';
+      floatingPreview.textContent = dragPreview.columnName || dragPreview.draggedColumnId;
+      document.body.appendChild(floatingPreview);
+      console.log('🎯 ApplyDragPreview: Created element', {
+        element: floatingPreview,
+        parent: floatingPreview.parentElement,
+        text: floatingPreview.textContent
+      });
+    }
+    
+    // Update text content if column name changed
+    const newText = dragPreview.columnName || dragPreview.draggedColumnId;
+    if (floatingPreview.textContent !== newText) {
+      floatingPreview.textContent = newText;
+    }
+    
+    // Position the preview at mouse coordinates
+    // The coordinates should now be client coordinates (from event.clientX/Y)
+    // Center the preview horizontally and vertically under the cursor
+    const previewRect = floatingPreview.getBoundingClientRect();
+    const centerOffsetX = previewRect.width / 2;
+    const centerOffsetY = previewRect.height / 2;
+    
+    console.log('🎯 ApplyDragPreview: Preview dimensions', {
+      width: previewRect.width,
+      height: previewRect.height,
+      centerOffsetX,
+      centerOffsetY
+    });
+    
+    // Position directly centered under cursor like it's being grabbed
+    const finalLeft = dragPreview.mouseX - centerOffsetX;
+    const finalTop = dragPreview.mouseY - centerOffsetY;
+    
+    floatingPreview.style.left = `${finalLeft}px`;
+    floatingPreview.style.top = `${finalTop}px`;
+    floatingPreview.style.display = 'block';
+    
+    console.log('🎯 ApplyDragPreview: Final position', {
+      mouseX: dragPreview.mouseX,
+      mouseY: dragPreview.mouseY,
+      finalLeft,
+      finalTop,
+      centerOffsetX,
+      centerOffsetY,
+      styleLeft: floatingPreview.style.left,
+      styleTop: floatingPreview.style.top,
+      computedStyle: {
+        position: window.getComputedStyle(floatingPreview).position,
+        display: window.getComputedStyle(floatingPreview).display,
+        visibility: window.getComputedStyle(floatingPreview).visibility
+      }
+    });
+  } else {
+    console.log('🎯 ApplyDragPreview: No mouse coordinates provided', {
+      mouseX: dragPreview.mouseX,
+      mouseY: dragPreview.mouseY
+    });
+  }
   
   // Clear all preview classes and styles
   header.querySelectorAll('.vibegridx-header-cell').forEach((cell: HTMLElement) => {
@@ -319,24 +380,18 @@ export function applyDragPreview(
     cell.style.removeProperty('box-shadow');
   });
   
+  // Ensure the header maintains its scroll position during drag
+  if (header) {
+    header.style.transform = `translateX(-${currentScrollLeft}px)`;
+  }
 
   // Apply shifts to columns that need to move
-  console.log('🎯 ApplyDragPreview: Processing column shifts', {
-    shiftCount: dragPreview.columnsToShift.length,
-    shifts: dragPreview.columnsToShift
-  });
+  // Process column shifts
   
   dragPreview.columnsToShift.forEach(({ columnId, direction, offset }) => {
     const cell = header.querySelector(`[data-column="${columnId}"]`) as HTMLElement;
     if (cell) {
-      console.log('🎯 ApplyDragPreview: Shifting column', {
-        columnId,
-        direction,
-        offset,
-        cellFound: true,
-        currentTransform: cell.style.transform,
-        currentClasses: cell.className
-      });
+      // Apply shift to column
       
       // Remove opposite direction class if present
       cell.classList.remove(`vibegridx-will-move-${direction === 'left' ? 'right' : 'left'}`);
@@ -344,26 +399,28 @@ export function applyDragPreview(
       cell.classList.add(`vibegridx-will-move-${direction}`);
       cell.style.setProperty('--drag-offset', `${offset}px`);
       cell.style.transition = 'transform 0.2s ease-out';
-      cell.style.transform = `translateX(${direction === 'right' ? offset : -offset}px)`;
+      
+      // Apply transform relative to the cell, not affecting parent scroll
+      const xOffset = direction === 'right' ? offset : -offset;
+      cell.style.transform = `translateX(${xOffset}px)`;
     } else {
-      console.warn('🎯 ApplyDragPreview: Column cell not found', columnId);
+      console.warn('ApplyDragPreview: Column cell not found', columnId);
     }
   });
 
   // Update drop indicator position
   let dropIndicator = header.querySelector('.vibegridx-column-drop-indicator') as HTMLElement;
   if (!dropIndicator) {
-    console.warn('🎯 ApplyDragPreview: Drop indicator not found, creating one');
+    // Create drop indicator if missing
     // Create drop indicator if it doesn't exist
     dropIndicator = document.createElement('div');
     dropIndicator.className = 'vibegridx-column-drop-indicator';
     header.appendChild(dropIndicator);
   }
   
-  console.log('🎯 ApplyDragPreview: Setting drop indicator', {
-    left: dragPreview.dropIndicatorX,
-    dropIndicator: dropIndicator
-  });
+  // The dropIndicatorX is in content coordinates, no need to adjust for scroll
+  // because the indicator is inside the header which scrolls with content
+  // Position drop indicator
   dropIndicator.style.left = `${dragPreview.dropIndicatorX}px`;
   dropIndicator.style.opacity = '1';
 }
@@ -373,8 +430,19 @@ export function applyDragPreview(
  */
 export function clearDragPreview(domManager: any): void {
   const header = domManager.getElement('header');
+  const viewport = domManager.getElement('viewport');
   
-  console.log('🎯 ClearDragPreview: Clearing all drag preview effects');
+  // Get current scroll position to maintain it
+  const currentScrollLeft = viewport?.scrollLeft || 0;
+  
+  // Clear all drag preview effects
+  
+  // Remove floating drag preview
+  const floatingPreview = document.querySelector('.vibegridx-drag-preview');
+  if (floatingPreview) {
+    // Remove floating preview
+    floatingPreview.remove();
+  }
   
   header.querySelectorAll('.vibegridx-header-cell').forEach((cell: HTMLElement) => {
     cell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right');
@@ -382,10 +450,15 @@ export function clearDragPreview(domManager: any): void {
     cell.style.removeProperty('transform');
     cell.style.removeProperty('transition');
   });
+  
+  // Restore the header's scroll transform after clearing cell transforms
+  if (header && currentScrollLeft > 0) {
+    header.style.transform = `translateX(-${currentScrollLeft}px)`;
+  }
 
   const dropIndicator = header.querySelector('.vibegridx-column-drop-indicator') as HTMLElement;
   if (dropIndicator) {
-    console.log('🎯 ClearDragPreview: Hiding drop indicator');
+    // Hide drop indicator
     dropIndicator.style.opacity = '0';
     dropIndicator.style.left = '0px';
   }

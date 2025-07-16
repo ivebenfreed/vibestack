@@ -83,7 +83,7 @@ export class EventDelegationManager {
    * Convert viewport-relative mouse coordinates to container-relative coordinates
    * This ensures all coordinates are in the same system as the coordinate mapping
    */
-  private convertToContainerCoordinates(event: MouseEvent): { x: number; y: number } {
+  private convertToContainerCoordinates(event: MouseEvent | { clientX: number; clientY: number }): { x: number; y: number } {
     const containerRect = this.config.container.getBoundingClientRect();
     return {
       x: event.clientX - containerRect.left,
@@ -232,6 +232,10 @@ export class EventDelegationManager {
             this.config.tableSend({ type: 'FILL_COMPLETE', fillCells: new Set() });
             break;
         }
+      } else if (this.dragState.dragType === 'column') {
+        // Column drag was started but not moved - restore cursor
+        document.body.style.cursor = '';
+        document.body.classList.remove('vibegridx-dragging-active');
       }
       
       // Always reset drag state to prevent ghost dragging
@@ -383,6 +387,10 @@ export class EventDelegationManager {
       // Sort operation - handle in click, not mousedown
       return;
     }
+    
+    // Immediately change cursor to grabbing for column drag
+    document.body.style.cursor = 'grabbing';
+    document.body.classList.add('vibegridx-dragging-active');
     
     // Column drag start
     const containerCoords = this.convertToContainerCoordinates(event);
@@ -575,7 +583,9 @@ export class EventDelegationManager {
           type: 'view.columns.drag.start',
           columnId: this.dragState.startColumnId!,
           x: containerCoords.x,
-          y: containerCoords.y
+          y: containerCoords.y,
+          clientX: event.clientX,
+          clientY: event.clientY
         });
       }
     }
@@ -602,13 +612,23 @@ export class EventDelegationManager {
         }
         
         // Schedule a single update for the next frame
+        // Store the current mouse position to avoid closure issues
+        const currentClientX = event.clientX;
+        const currentClientY = event.clientY;
+        
         this.dragMoveThrottleId = requestAnimationFrame(() => {
           this.lastDragMoveTime = Date.now();
-          const containerCoords = this.convertToContainerCoordinates(event);
+          
+          // Use the stored position instead of the closed-over event
+          const freshEvent = { clientX: currentClientX, clientY: currentClientY } as MouseEvent;
+          const containerCoords = this.convertToContainerCoordinates(freshEvent);
+          
           this.config.tableSend({
             type: 'view.columns.drag.move',
             x: containerCoords.x,
-            y: containerCoords.y
+            y: containerCoords.y,
+            clientX: currentClientX,
+            clientY: currentClientY
           });
           this.dragMoveThrottleId = null;
         });
@@ -621,7 +641,9 @@ export class EventDelegationManager {
       this.config.tableSend({
         type: 'view.columns.drag.move',
         x: containerCoords.x,
-        y: containerCoords.y
+        y: containerCoords.y,
+        clientX: event.clientX,
+        clientY: event.clientY
       });
     }
   }

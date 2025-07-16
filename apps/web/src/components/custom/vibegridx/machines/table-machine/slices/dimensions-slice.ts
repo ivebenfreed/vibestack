@@ -1,55 +1,127 @@
 // ====================================
-// DIMENSIONS SLICE
+// DIMENSIONS SLICE - CLEAN VERSION
 // ====================================
-// SINGLE SOURCE OF TRUTH for all coordinate and dimension data
-// This slice is the authoritative source for all coordinate calculations
+// Single source of truth: coordinateMapping
+// No deprecated fields, no backward compatibility
+// Elegant, focused, and simple
 
 import { assign } from 'xstate';
 import type { Column } from '../../../types';
-import { createColumnDimensionManager } from '../../../dimensions/ColumnDimensionManager';
-import { createRowDimensionManager } from '../../../dimensions/RowDimensionManager';
+
+// ====================================
+// CONSTANTS
+// ====================================
+
+const SELECTION_COLUMN_ID = '__selection';
+const SELECTION_COLUMN_WIDTH = 48;
+const DEFAULT_COLUMN_WIDTH = 120;
+const DEFAULT_ROW_HEIGHT = 40;
 
 // ====================================
 // TYPES
 // ====================================
 
-export interface DimensionsState {
-  // Column dimensions - AUTHORITATIVE
-  columnWidths: Record<string, number>;
-  columnOffsets: Record<string, number>;
-  totalWidth: number;
-  
-  // Row dimensions - AUTHORITATIVE
-  rowHeight: number;
-  totalRows: number;
-  totalHeight: number;
-  
-  // Coordinate mapping - AUTHORITATIVE
-  coordinateMapping: {
-    rows: Array<{
-      rowId: string;
-      originalIndex: number;
-      sortedIndex: number;
-      offset: number;
-    }>;
-    columns: Array<{
-      columnId: string;
-      index: number;
-      offset: number;
-      width: number;
-    }>;
-    version: number;
-  };
-  
-  // Managers (for backward compatibility, will be phased out)
-  dimensionManager?: any;
-  rowDimensionManager?: any;
+export interface ColumnCoordinate {
+  columnId: string;
+  index: number;
+  offset: number;
+  width: number;
 }
 
-// This is needed for the context to have all required fields
-export interface DimensionsContext extends DimensionsState {
-  enableSelectionColumn: boolean;
+export interface RowCoordinate {
+  rowId: string;
+  originalIndex: number;
+  sortedIndex: number;
+  offset: number;
 }
+
+export interface CoordinateMapping {
+  rows: RowCoordinate[];
+  columns: ColumnCoordinate[];
+  version: number;
+}
+
+export interface DimensionsState {
+  // Row dimensions
+  rowHeight: number;
+  totalRows: number;
+  
+  // The single source of truth
+  coordinateMapping: CoordinateMapping;
+}
+
+// ====================================
+// BUILDER FUNCTIONS
+// ====================================
+
+/**
+ * Build column coordinates from configuration
+ */
+const buildColumnCoordinates = (
+  columns: Column[],
+  columnOrder: string[],
+  columnVisibility: Record<string, boolean>,
+  columnWidths?: Record<string, number>
+): ColumnCoordinate[] => {
+  const coordinates: ColumnCoordinate[] = [];
+  let currentOffset = 0;
+  let currentIndex = 0;
+  
+  // Always add selection column first
+  coordinates.push({
+    columnId: SELECTION_COLUMN_ID,
+    index: currentIndex++,
+    offset: currentOffset,
+    width: SELECTION_COLUMN_WIDTH
+  });
+  currentOffset += SELECTION_COLUMN_WIDTH;
+  
+  // Add visible columns in order
+  for (const columnId of columnOrder) {
+    if (columnId === SELECTION_COLUMN_ID) continue;
+    
+    const column = columns.find(col => col.id === columnId);
+    if (column && columnVisibility[columnId] !== false) {
+      const width = columnWidths?.[columnId] || column.width || DEFAULT_COLUMN_WIDTH;
+      coordinates.push({
+        columnId: column.id,
+        index: currentIndex++,
+        offset: currentOffset,
+        width
+      });
+      currentOffset += width;
+    }
+  }
+  
+  // Add any remaining visible columns not in order
+  const processedIds = new Set([SELECTION_COLUMN_ID, ...columnOrder]);
+  for (const column of columns) {
+    if (!processedIds.has(column.id) && columnVisibility[column.id] !== false) {
+      const width = columnWidths?.[column.id] || column.width || DEFAULT_COLUMN_WIDTH;
+      coordinates.push({
+        columnId: column.id,
+        index: currentIndex++,
+        offset: currentOffset,
+        width
+      });
+      currentOffset += width;
+    }
+  }
+  
+  return coordinates;
+};
+
+/**
+ * Build row coordinates
+ */
+const buildRowCoordinates = (rowCount: number, rowHeight: number): RowCoordinate[] => {
+  return Array.from({ length: rowCount }, (_, index) => ({
+    rowId: `row-${index}`,
+    originalIndex: index,
+    sortedIndex: index,
+    offset: index * rowHeight
+  }));
+};
 
 // ====================================
 // INITIAL STATE
@@ -58,85 +130,32 @@ export interface DimensionsContext extends DimensionsState {
 export const createInitialDimensionsState = (
   columns: Column[],
   rowCount: number,
-  rowHeight: number = 40,
-  enableSelectionColumn: boolean = false, // Keep parameter for backward compatibility but always treat as true
-  persistedColumnWidths?: Record<string, number>,
-  columnOrder?: string[]
+  rowHeight: number = DEFAULT_ROW_HEIGHT,
+  columnOrder: string[] = [],
+  columnVisibility: Record<string, boolean> = {},
+  columnWidths?: Record<string, number>
 ): DimensionsState => {
-  // Create managers for backward compatibility
-  const dimensionManager = createColumnDimensionManager(columns || []);
-  dimensionManager.setSelectionColumnEnabled(true); // Always enable selection column
+  // Default visibility - all columns visible
+  const visibility = Object.keys(columnVisibility).length > 0 
+    ? columnVisibility 
+    : Object.fromEntries(columns.map(col => [col.id, true]));
   
-  const rowDimensionManager = createRowDimensionManager(rowCount, rowHeight);
+  // Default order - all columns
+  const order = columnOrder.length > 0 
+    ? columnOrder 
+    : columns.map(col => col.id);
   
-  // Extract initial state from managers
-  const columnWidths: Record<string, number> = {};
-  const columnOffsets: Record<string, number> = {};
-  let totalWidth = 0;
-  
-  // Build coordinate mapping - AUTHORITATIVE source
-  const coordinateMapping = {
-    rows: Array.from({ length: rowCount }, (_, index) => ({
-      rowId: `row-${index}`,
-      originalIndex: index,
-      sortedIndex: index,
-      offset: index * rowHeight
-    })),
-    columns: [] as Array<{
-      columnId: string;
-      index: number;
-      offset: number;
-      width: number;
-    }>,
+  // Build coordinate mapping
+  const coordinateMapping: CoordinateMapping = {
+    rows: buildRowCoordinates(rowCount, rowHeight),
+    columns: buildColumnCoordinates(columns, order, visibility, columnWidths),
     version: 0
   };
   
-  // Always add selection column first
-  const selectionWidth = 48;
-  columnWidths['__selection'] = selectionWidth;
-  columnOffsets['__selection'] = 0;
-  coordinateMapping.columns.push({
-    columnId: '__selection',
-    index: 0,
-    offset: 0,
-    width: selectionWidth
-  });
-  totalWidth = selectionWidth;
-  
-  // Order columns according to columnOrder if provided
-  const orderedColumns = columnOrder 
-    ? columnOrder.map(id => columns.find(col => col.id === id)).filter(Boolean) as Column[]
-    : columns;
-  
-  // Add remaining columns not in the order
-  const remainingColumns = columns.filter(col => !orderedColumns.some(oc => oc.id === col.id));
-  const allOrderedColumns = [...orderedColumns, ...remainingColumns];
-  
-  allOrderedColumns.forEach((col, index) => {
-    const width = persistedColumnWidths?.[col.id] || col.width || 120;
-    columnWidths[col.id] = width;
-    columnOffsets[col.id] = totalWidth;
-    
-    coordinateMapping.columns.push({
-      columnId: col.id,
-      index: index + 1, // Always offset by 1 for selection column
-      offset: totalWidth,
-      width: width
-    });
-    
-    totalWidth += width;
-  });
-  
   return {
-    columnWidths,
-    columnOffsets,
-    totalWidth,
     rowHeight,
     totalRows: rowCount,
-    totalHeight: rowCount * rowHeight,
-    coordinateMapping,
-    dimensionManager,
-    rowDimensionManager
+    coordinateMapping
   };
 };
 
@@ -145,222 +164,87 @@ export const createInitialDimensionsState = (
 // ====================================
 
 export const dimensionActions = {
-  // AUTHORITATIVE coordinate recalculation - called when column order changes
+  /**
+   * Recalculate coordinate mapping when layout changes
+   */
   recalculateCoordinateMapping: assign({
-    coordinateMapping: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number> }) => {
-      const { columns, columnOrder, columnWidths } = event;
+    coordinateMapping: ({ context }) => {
+      // Get current column widths from existing coordinate mapping
+      const currentColumnWidths = context.coordinateMapping?.columns ? 
+        Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width])) : 
+        {};
       
-      const newCoordinateMapping = {
-        rows: context.coordinateMapping.rows, // Preserve existing row mapping
-        columns: [] as Array<{
-          columnId: string;
-          index: number;
-          offset: number;
-          width: number;
-        }>,
+      const columnCoordinates = buildColumnCoordinates(
+        context.columns,
+        context.columnOrder,
+        context.columnVisibility,
+        currentColumnWidths
+      );
+      
+      return {
+        rows: context.coordinateMapping.rows,
+        columns: columnCoordinates,
         version: context.coordinateMapping.version + 1
       };
-      
-      let totalOffset = 0;
-      
-      // Always add selection column first
-      const selectionWidth = 48;
-      newCoordinateMapping.columns.push({
-        columnId: '__selection',
-        index: 0,
-        offset: 0,
-        width: selectionWidth
-      });
-      totalOffset = selectionWidth;
-      
-      // Order columns according to columnOrder
-      const orderedColumns = columnOrder
-        .map(id => columns.find(col => col.id === id))
-        .filter(Boolean) as Column[];
-      
-      // Add remaining columns not in the order
-      const remainingColumns = columns.filter(col => !orderedColumns.some(oc => oc.id === col.id));
-      const allOrderedColumns = [...orderedColumns, ...remainingColumns];
-      
-      allOrderedColumns.forEach((col, index) => {
-        const width = columnWidths[col.id] || col.width || 120;
-        newCoordinateMapping.columns.push({
-          columnId: col.id,
-          index: index + 1, // Always offset by 1 for selection column
-          offset: totalOffset,
-          width: width
-        });
-        totalOffset += width;
-      });
-      
-      console.log('DimensionsSlice: Recalculated coordinate mapping:', {
-        version: newCoordinateMapping.version,
-        columnCount: newCoordinateMapping.columns.length,
-        columnOrder
-      });
-      
-      return newCoordinateMapping;
-    },
-    columnOffsets: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number> }) => {
-      const { columns, columnOrder, columnWidths } = event;
-      const newOffsets: Record<string, number> = {};
-      let totalOffset = 0;
-      
-      // Always add selection column first
-      const selectionWidth = 48;
-      newOffsets['__selection'] = 0;
-      totalOffset = selectionWidth;
-      
-      // Order columns according to columnOrder
-      const orderedColumns = columnOrder
-        .map(id => columns.find(col => col.id === id))
-        .filter(Boolean) as Column[];
-      
-      // Add remaining columns not in the order
-      const remainingColumns = columns.filter(col => !orderedColumns.some(oc => oc.id === col.id));
-      const allOrderedColumns = [...orderedColumns, ...remainingColumns];
-      
-      allOrderedColumns.forEach((col) => {
-        const width = columnWidths[col.id] || col.width || 120;
-        newOffsets[col.id] = totalOffset;
-        totalOffset += width;
-      });
-      
-      return newOffsets;
-    },
-    totalWidth: ({ context }, event: { columns: Column[]; columnOrder: string[]; columnWidths: Record<string, number> }) => {
-      const { columns, columnWidths } = event;
-      let totalWidth = 48; // Always include selection column
-      
-      columns.forEach(col => {
-        totalWidth += columnWidths[col.id] || col.width || 120;
-      });
-      
-      return totalWidth;
     }
   }),
 
+  /**
+   * Update a single column's width
+   */
   updateColumnWidth: assign({
-    columnWidths: ({ context }, event: { columnId: string; width: number }) => ({
-      ...context.columnWidths,
-      [event.columnId]: event.width
-    }),
-    columnOffsets: ({ context }, event: { columnId: string; width: number }) => {
-      // Recalculate offsets when width changes
-      const newOffsets = { ...context.columnOffsets };
-      const columns = Object.keys(context.columnWidths);
-      let offset = 0;
-      
-      for (const colId of columns) {
-        newOffsets[colId] = offset;
-        offset += colId === event.columnId ? event.width : (context.columnWidths[colId] || 120);
-      }
-      
-      return newOffsets;
-    },
-    totalWidth: ({ context }, event: { columnId: string; width: number }) => {
-      const oldWidth = context.columnWidths[event.columnId] || 120;
-      return context.totalWidth - oldWidth + event.width;
-    },
     coordinateMapping: ({ context }, event: { columnId: string; width: number }) => {
-      // Update coordinate mapping when column width changes
-      const newCoordinateMapping = {
-        ...context.coordinateMapping,
-        columns: context.coordinateMapping.columns.map(col => {
-          if (col.columnId === event.columnId) {
-            return { ...col, width: event.width };
-          }
-          return col;
-        }),
-        version: context.coordinateMapping.version + 1
-      };
-      
-      // Recalculate offsets for all columns after the resized one
-      let totalOffset = 0;
-      newCoordinateMapping.columns.forEach((col, index) => {
-        newCoordinateMapping.columns[index] = {
-          ...col,
-          offset: totalOffset
-        };
-        totalOffset += col.width;
+      const newColumns = context.coordinateMapping.columns.map(col => {
+        if (col.columnId === event.columnId) {
+          return { ...col, width: event.width };
+        }
+        return col;
       });
       
-      return newCoordinateMapping;
-    },
-    dimensionManager: ({ context }, event: { columnId: string; width: number }) => {
-      // Update manager for backward compatibility
-      if (context.dimensionManager) {
-        context.dimensionManager.setColumnWidth(event.columnId, event.width);
-      }
-      return context.dimensionManager;
+      // Recalculate offsets
+      let currentOffset = 0;
+      newColumns.forEach(col => {
+        col.offset = currentOffset;
+        currentOffset += col.width;
+      });
+      
+      return {
+        ...context.coordinateMapping,
+        columns: newColumns,
+        version: context.coordinateMapping.version + 1
+      };
     }
   }),
   
+  /**
+   * Update row dimensions
+   */
   updateRowHeight: assign({
     rowHeight: (_, event: { height: number }) => event.height,
-    totalHeight: ({ context }, event: { height: number }) => context.totalRows * event.height,
-    rowDimensionManager: ({ context }, event: { height: number }) => {
-      if (context.rowDimensionManager) {
-        context.rowDimensionManager.setRowHeight(event.height);
-      }
-      return context.rowDimensionManager;
+    coordinateMapping: ({ context }, event: { height: number }) => {
+      const newRows = context.coordinateMapping.rows.map((row, index) => ({
+        ...row,
+        offset: index * event.height
+      }));
+      
+      return {
+        ...context.coordinateMapping,
+        rows: newRows,
+        version: context.coordinateMapping.version + 1
+      };
     }
   }),
   
   updateRowCount: assign({
     totalRows: (_, event: { count: number }) => event.count,
-    totalHeight: ({ context }, event: { count: number }) => event.count * context.rowHeight,
-    rowDimensionManager: ({ context }, event: { count: number }) => {
-      if (context.rowDimensionManager) {
-        context.rowDimensionManager.setTotalRows(event.count);
-      }
-      return context.rowDimensionManager;
-    }
-  }),
-  
-  resetColumnDimensions: assign({
-    columnWidths: ({ context }, event: { columns: Column[] }) => {
-      const newWidths: Record<string, number> = {};
+    coordinateMapping: ({ context }, event: { count: number }) => {
+      const newRows = buildRowCoordinates(event.count, context.rowHeight);
       
-      if (context.enableSelectionColumn) {
-        newWidths['__selection'] = 48;
-      }
-      
-      event.columns.forEach(col => {
-        newWidths[col.id] = col.width || 120;
-      });
-      
-      return newWidths;
-    },
-    columnOffsets: ({ context }, event: { columns: Column[] }) => {
-      const newOffsets: Record<string, number> = {};
-      let offset = 0;
-      
-      if (context.enableSelectionColumn) {
-        newOffsets['__selection'] = 0;
-        offset = 48;
-      }
-      
-      event.columns.forEach(col => {
-        newOffsets[col.id] = offset;
-        offset += col.width || 120;
-      });
-      
-      return newOffsets;
-    },
-    totalWidth: ({ context }, event: { columns: Column[] }) => {
-      let width = context.enableSelectionColumn ? 48 : 0;
-      event.columns.forEach(col => {
-        width += col.width || 120;
-      });
-      return width;
-    },
-    dimensionManager: ({ context }, event: { columns: Column[] }) => {
-      const manager = createColumnDimensionManager(event.columns);
-      if (context.enableSelectionColumn) {
-        manager.setSelectionColumnEnabled(true);
-      }
-      return manager;
+      return {
+        ...context.coordinateMapping,
+        rows: newRows,
+        version: context.coordinateMapping.version + 1
+      };
     }
   })
 };
@@ -370,50 +254,93 @@ export const dimensionActions = {
 // ====================================
 
 export const dimensionSelectors = {
-  getColumnWidth: (context: any, columnId: string): number => {
-    return context.columnWidths[columnId] || 120;
+  // Column queries
+  getColumnWidth: (context: DimensionsState, columnId: string): number => {
+    const column = context.coordinateMapping.columns.find(col => col.columnId === columnId);
+    return column?.width || DEFAULT_COLUMN_WIDTH;
   },
   
-  getColumnOffset: (context: any, columnId: string): number => {
-    return context.columnOffsets[columnId] || 0;
+  getColumnOffset: (context: DimensionsState, columnId: string): number => {
+    const column = context.coordinateMapping.columns.find(col => col.columnId === columnId);
+    return column?.offset || 0;
   },
   
-  getTotalWidth: (context: any): number => {
-    return context.totalWidth;
+  getColumnByIndex: (context: DimensionsState, index: number): ColumnCoordinate | undefined => {
+    return context.coordinateMapping.columns.find(col => col.index === index);
   },
   
-  getRowHeight: (context: any): number => {
+  getColumnById: (context: DimensionsState, columnId: string): ColumnCoordinate | undefined => {
+    return context.coordinateMapping.columns.find(col => col.columnId === columnId);
+  },
+  
+  getColumnAtPosition: (context: DimensionsState, x: number): ColumnCoordinate | undefined => {
+    return context.coordinateMapping.columns.find(
+      col => x >= col.offset && x < col.offset + col.width
+    );
+  },
+  
+  // Column collections
+  getAllColumns: (context: DimensionsState): ColumnCoordinate[] => {
+    return context.coordinateMapping.columns;
+  },
+  
+  getDataColumns: (context: DimensionsState): ColumnCoordinate[] => {
+    return context.coordinateMapping.columns.filter(col => col.columnId !== SELECTION_COLUMN_ID);
+  },
+  
+  getSelectionColumn: (context: DimensionsState): ColumnCoordinate | undefined => {
+    return context.coordinateMapping.columns.find(col => col.columnId === SELECTION_COLUMN_ID);
+  },
+  
+  // Row queries
+  getRowHeight: (context: DimensionsState): number => {
     return context.rowHeight;
   },
   
-  getTotalHeight: (context: any): number => {
-    return context.totalHeight;
+  getRowByIndex: (context: DimensionsState, index: number): RowCoordinate | undefined => {
+    return context.coordinateMapping.rows.find(row => row.sortedIndex === index);
   },
   
-  getVisibleColumns: (context: any): string[] => {
-    return Object.keys(context.columnWidths).filter(
-      colId => context.columnVisibility[colId] !== false
-    );
+  getRowById: (context: DimensionsState, rowId: string): RowCoordinate | undefined => {
+    return context.coordinateMapping.rows.find(row => row.rowId === rowId);
   },
   
-  // AUTHORITATIVE coordinate mapping selectors
-  getCoordinateMapping: (context: any) => {
+  getRowAtPosition: (context: DimensionsState, y: number): RowCoordinate | undefined => {
+    const rowIndex = Math.floor(y / context.rowHeight);
+    return context.coordinateMapping.rows[rowIndex];
+  },
+  
+  // Aggregate queries
+  getTotalWidth: (context: DimensionsState): number => {
+    const columns = context.coordinateMapping.columns;
+    if (columns.length === 0) return 0;
+    const lastColumn = columns[columns.length - 1];
+    return lastColumn.offset + lastColumn.width;
+  },
+  
+  getTotalHeight: (context: DimensionsState): number => {
+    return context.totalRows * context.rowHeight;
+  },
+  
+  // Meta queries
+  getCoordinateMapping: (context: DimensionsState): CoordinateMapping => {
     return context.coordinateMapping;
   },
   
-  getColumnCoordinates: (context: any, columnId: string) => {
-    return context.coordinateMapping.columns.find(
-      (col: any) => col.columnId === columnId
-    );
-  },
-  
-  getRowCoordinates: (context: any, rowId: string) => {
-    return context.coordinateMapping.rows.find(
-      (row: any) => row.rowId === rowId
-    );
-  },
-  
-  getCoordinateVersion: (context: any): number => {
+  getVersion: (context: DimensionsState): number => {
     return context.coordinateMapping.version;
+  },
+  
+  // Utility queries
+  getColumnCount: (context: DimensionsState): number => {
+    return context.coordinateMapping.columns.length;
+  },
+  
+  getDataColumnCount: (context: DimensionsState): number => {
+    return context.coordinateMapping.columns.filter(col => col.columnId !== SELECTION_COLUMN_ID).length;
+  },
+  
+  getRowCount: (context: DimensionsState): number => {
+    return context.totalRows;
   }
 };

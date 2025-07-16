@@ -57,15 +57,13 @@ export const useRendererInitialization = (
     if (!refs.containerRef.current) return;
     
     // Get managers from table state
-    const dimensionManager = tableState?.context?.dimensionManager;
-    const rowDimensionManager = tableState?.context?.rowDimensionManager;
     const coordinateManager = tableState?.context?.coordinateManager;
     const selectionManager = tableState?.context?.selectionManager;
+    const coordinateMapping = tableState?.context?.coordinateMapping;
     
     console.log('useRendererInitialization: Initial render debug:', {
-      hasDimensionManager: !!dimensionManager,
-      hasRowDimensionManager: !!rowDimensionManager,
       hasCoordinateManager: !!coordinateManager,
+      hasCoordinateMapping: !!coordinateMapping,
       tableStateValue: tableState?.value,
       contextKeys: tableState?.context ? Object.keys(tableState.context) : [],
       coordinateManagerColumnCount: coordinateManager?.getColumnCount?.() || 0,
@@ -75,8 +73,6 @@ export const useRendererInitialization = (
     // Initialize atomic renderer with canvas container callback
     refs.rendererRef.current = new TableRenderer({
       container: refs.containerRef.current,
-      dimensionManager: coordinateManager || dimensionManager, // Use coordinate manager for positioning
-      rowDimensionManager,
       coordinateManager, // Pass coordinate manager for direct updates
       ...rendererOptions,
       onCanvasContainerReady: (canvasContainer: HTMLElement) => {
@@ -110,12 +106,10 @@ export const useRendererInitialization = (
                 type: 'INITIALIZE',
                 container: canvasContainer,
                 config: {
-                  dimensionManager,
-                  rowDimensionManager,
                   coordinateManager,
                   columns: rendererOptions.columns,
               cellWidth: 120,
-              cellHeight: rowDimensionManager?.getRowHeight() || 40,
+              cellHeight: coordinateMapping?.rowHeight || 40,
               selectionColor: '#3b82f6',
               selectionBorderColor: '#1d4ed8',
               editingColor: '#10b981',

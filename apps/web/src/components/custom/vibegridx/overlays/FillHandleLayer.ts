@@ -3,7 +3,6 @@ import type { ViewportInfo } from '../types';
 // OverlayMachineActor removed - using direct canvas actor approach
 import type { CoordinateProvider } from './CoordinateProvider';
 import { CoordinateHelper } from './CoordinateProvider';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 import type { VisualCellPosition } from './OverlayTypes';
 
 // ====================================
@@ -12,7 +11,6 @@ import type { VisualCellPosition } from './OverlayTypes';
 
 export interface FillHandleConfig {
   cellHeight: number;
-  dimensionManager: ColumnDimensionManager;
   selectionBorderColor: string;
 }
 

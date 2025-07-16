@@ -2,7 +2,6 @@ import Konva from 'konva';
 import type { ViewportInfo } from '../types';
 import type { CoordinateProvider } from './CoordinateProvider';
 import { CoordinateHelper } from './CoordinateProvider';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
 
 // ====================================
 // CLIPBOARD OVERLAY
@@ -10,7 +9,6 @@ import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManage
 
 export interface ClipboardOverlayConfig {
   cellHeight: number;
-  dimensionManager?: ColumnDimensionManager;
   copyColor?: string;
   cutColor?: string;
 }

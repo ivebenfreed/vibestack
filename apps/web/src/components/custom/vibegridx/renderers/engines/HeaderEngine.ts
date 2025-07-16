@@ -91,7 +91,7 @@ export class HeaderEngine {
     // STEP 4: Column filtering and offset calculation
     const step4Start = performance.now();
     const dataColumns = columnsToRender.filter(col => col.id !== '__selection');
-    metrics.columnCount = dataColumns.length + (this.config.enableSelectionColumn ? 1 : 0);
+    metrics.columnCount = dataColumns.length + 1; // +1 for selection column (always enabled)
     metrics.phases.columnFilter = performance.now() - step4Start;
     
     // STEP 5: Clear existing header
@@ -101,9 +101,8 @@ export class HeaderEngine {
     
     // STEP 6: Create selection header
     const step6Start = performance.now();
-    if (this.config.enableSelectionColumn) {
-      this.createSelectionHeader(state);
-    }
+    // Always create selection header (selection column is always enabled)
+    this.createSelectionHeader(state);
     metrics.phases.selectionHeader = performance.now() - step6Start;
     
     // STEP 7: Create data column headers
@@ -172,7 +171,7 @@ export class HeaderEngine {
    * Update header checkbox state
    */
   updateHeaderCheckbox(allRows: number, selectedRows: number): void {
-    if (!this.config.enableSelectionColumn) return;
+    // Selection column is always enabled, so no need to check
     
     const checkbox = this.config.domManager.getElement('header').querySelector('.vibegridx-header-checkbox') as HTMLInputElement;
     if (!checkbox) return;

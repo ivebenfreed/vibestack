@@ -14,8 +14,7 @@ import { DragPreviewOverlay } from './DragPreviewOverlay';
 import { ColumnDragOverlay } from './ColumnDragOverlay';
 import { ColumnResizeOverlay } from './ColumnResizeOverlay';
 import { SelectionColumnOverlay } from './SelectionColumnOverlay';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
-import type { RowDimensionManager } from '../dimensions/RowDimensionManager';
+import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { ColumnDragState, ColumnResizeState } from '../types';
 import { EditingOverlay } from './EditingOverlay';
 import { calculateVisualPositions } from '../machines/table-machine/helpers/visual-position-helpers';
@@ -156,8 +155,7 @@ export class CanvasOverlay implements CoordinateProvider {
           selectionColor: this.config.selectionColor,
           selectionBorderColor: this.config.selectionBorderColor,
           borderWidth: this.config.borderWidth,
-          cellHeight: this.config.cellHeight,
-          dimensionManager: this.config.dimensionManager as ColumnDimensionManager
+          cellHeight: this.config.cellHeight
         }
       );
     }
@@ -173,7 +171,6 @@ export class CanvasOverlay implements CoordinateProvider {
         this, // Pass canvas overlay reference as coordinate provider
         {
           cellHeight: this.config.cellHeight,
-          dimensionManager: this.config.dimensionManager as ColumnDimensionManager,
           selectionBorderColor: this.config.selectionBorderColor
         },
         {
@@ -197,8 +194,7 @@ export class CanvasOverlay implements CoordinateProvider {
         this.layer,
         this, // Pass self as coordinate provider
         {
-          cellHeight: this.config.cellHeight,
-          dimensionManager: this.config.dimensionManager as ColumnDimensionManager
+          cellHeight: this.config.cellHeight
         }
       );
     }
@@ -228,12 +224,15 @@ export class CanvasOverlay implements CoordinateProvider {
       this.ensureStageInitialized();
       this.columnDragOverlay = new ColumnDragOverlay(
         this.layer,
-        this.config.dimensionManager as ColumnDimensionManager,
         {
           cellHeight: this.config.cellHeight,
           headerHeight: 40 // Standard header height
         }
       );
+      // Update coordinate mapping if available
+      if (this.coordinateMapping) {
+        this.columnDragOverlay.updateCoordinateMapping(this.coordinateMapping);
+      }
     }
     return this.columnDragOverlay;
   }
@@ -244,12 +243,15 @@ export class CanvasOverlay implements CoordinateProvider {
       this.ensureStageInitialized();
       this.columnResizeOverlay = new ColumnResizeOverlay(
         this.layer,
-        this.config.dimensionManager as ColumnDimensionManager,
         {
           cellHeight: this.config.cellHeight,
           headerHeight: 40 // Standard header height
         }
       );
+      // Update coordinate mapping if available
+      if (this.coordinateMapping) {
+        this.columnResizeOverlay.updateCoordinateMapping(this.coordinateMapping);
+      }
     }
     return this.columnResizeOverlay;
   }
@@ -510,6 +512,14 @@ export class CanvasOverlay implements CoordinateProvider {
     
     // PERFORMANCE: Store mapping for later use, don't process now
     this.coordinateMapping = mapping;
+    
+    // Update overlays that need coordinate mapping
+    if (this.columnDragOverlay) {
+      this.columnDragOverlay.updateCoordinateMapping(mapping);
+    }
+    if (this.columnResizeOverlay) {
+      this.columnResizeOverlay.updateCoordinateMapping(mapping);
+    }
     
     // Legacy coordinate manager update will happen when actually needed
   }

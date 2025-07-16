@@ -112,8 +112,8 @@ export class EventSystem {
     // header.addEventListener('click', this.handleHeaderClick.bind(this));
     // header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
 
-    // Make viewport focusable
-    viewport.setAttribute('tabindex', '0');
+    // Focus is now managed by EventDelegationManager on the container
+    // viewport.setAttribute('tabindex', '0');
   }
 
   cleanup(): void {

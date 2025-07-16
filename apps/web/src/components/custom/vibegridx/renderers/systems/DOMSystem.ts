@@ -80,6 +80,8 @@ export class DOMSystem {
     // Create viewport for scrollable content
     const viewport = document.createElement('div');
     viewport.className = 'vibegridx-viewport';
+    // Prevent viewport from receiving focus (focus is managed on container)
+    viewport.setAttribute('tabindex', '-1');
     Object.assign(viewport.style, {
       overflow: 'auto',
       position: 'relative',

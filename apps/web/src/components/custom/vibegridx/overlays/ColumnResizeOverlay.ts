@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import type { ColumnResizeState, ViewportInfo } from '../types';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import type { CoordinateMapping, ColumnCoordinate } from '../machines/table-machine/slices/dimensions-slice';
 
 // ====================================
 // COLUMN RESIZE OVERLAY
@@ -18,7 +18,7 @@ export interface ColumnResizeOverlayConfig {
 export class ColumnResizeOverlay {
   private layer: Konva.Layer;
   private config: ColumnResizeOverlayConfig;
-  private dimensionManager: ColumnDimensionManager;
+  private coordinateMapping: CoordinateMapping | null = null;
   
   // Resize preview elements
   private resizeLine: Konva.Line | null = null;
@@ -29,11 +29,9 @@ export class ColumnResizeOverlay {
   
   constructor(
     layer: Konva.Layer,
-    dimensionManager: ColumnDimensionManager,
     config: ColumnResizeOverlayConfig
   ) {
     this.layer = layer;
-    this.dimensionManager = dimensionManager;
     this.config = {
       resizeLineColor: '#3b82f6',
       resizeLineWidth: 3,
@@ -41,6 +39,13 @@ export class ColumnResizeOverlay {
       resizeLineConstrainedColor: '#ef4444', // Red color when at min/max
       ...config
     };
+  }
+  
+  /**
+   * Update coordinate mapping
+   */
+  updateCoordinateMapping(coordinateMapping: CoordinateMapping): void {
+    this.coordinateMapping = coordinateMapping;
   }
   
   /**
@@ -65,22 +70,28 @@ export class ColumnResizeOverlay {
     
     this.resizeState = resizeState;
     
-    // Get column info
-    const columnIndex = this.dimensionManager.getColumnIndex(resizeState.resizingColumnId);
-    if (columnIndex === -1) {
-      console.warn('[ColumnResizeOverlay] Column not found:', resizeState.resizingColumnId);
+    if (!this.coordinateMapping) {
+      console.warn('[ColumnResizeOverlay] No coordinate mapping available');
       return;
     }
     
-    const columnX = this.dimensionManager.getColumnX(columnIndex);
+    // Get column info from coordinate mapping
+    const column = this.coordinateMapping.columns.find(col => col.columnId === resizeState.resizingColumnId);
+    if (!column) {
+      console.warn('[ColumnResizeOverlay] Column not found in coordinate mapping:', resizeState.resizingColumnId);
+      return;
+    }
+    
+    const columnIndex = column.index;
+    const columnX = column.offset;
     // Account for horizontal scroll - the canvas is transformed, so we need to compensate
     const scrollLeft = this.currentViewport?.scrollLeft || 0;
     const previewX = columnX + resizeState.previewWidth - scrollLeft;
     
     // Check if we're at a constraint
-    const column = this.dimensionManager.getColumnByIndex(columnIndex);
-    const minWidth = column?.minWidth || 50;
-    const maxWidth = column?.maxWidth || 500;
+    // TODO: Get min/max width from column config when available
+    const minWidth = 50;
+    const maxWidth = 500;
     const isAtConstraint = resizeState.previewWidth <= minWidth || resizeState.previewWidth >= maxWidth;
     
     console.log('[ColumnResizeOverlay] Updating resize preview', {

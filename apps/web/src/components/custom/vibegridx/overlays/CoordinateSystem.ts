@@ -1,6 +1,6 @@
 import type { ViewportInfo, Column } from '../types';
 import type { OverlayConfig, CellPosition } from './OverlayTypes';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 
 // ====================================
 // COORDINATE SYSTEM UTILITIES
@@ -14,8 +14,8 @@ export class CoordinateSystem {
   private indexToColumnId: Map<number, string> = new Map();
   private isInsideScrollContainer: boolean = true; // Canvas is now inside scrollable body
   
-  // Dimension manager reference
-  private dimensionManager: ColumnDimensionManager | null = null;
+  // Coordinate mapping reference
+  private coordinateMapping: CoordinateMapping | null = null;
   public columns: Column[] = [];
   
   // Column caches - these are worth keeping since they avoid iteration
@@ -48,9 +48,14 @@ export class CoordinateSystem {
     return parsed;
   }
 
-  constructor(config: OverlayConfig, dimensionManager?: ColumnDimensionManager) {
+  constructor(config: OverlayConfig) {
     this.config = config;
-    this.dimensionManager = dimensionManager || null;
+  }
+  
+  // Update coordinate mapping
+  updateCoordinateMapping(coordinateMapping: CoordinateMapping): void {
+    this.coordinateMapping = coordinateMapping;
+    this.clearCaches();
   }
 
   // Update the index mappings when data changes
@@ -100,7 +105,12 @@ export class CoordinateSystem {
   private getColumnWidth(columnId: string): number {
     let width = this.columnWidthCache.get(columnId);
     if (width === undefined) {
-      width = this.dimensionManager?.getColumnWidth(columnId) || this.config.cellWidth;
+      if (this.coordinateMapping) {
+        const column = this.coordinateMapping.columns.find(col => col.columnId === columnId);
+        width = column ? column.width : this.config.cellWidth;
+      } else {
+        width = this.config.cellWidth;
+      }
       this.columnWidthCache.set(columnId, width);
     }
     return width;
@@ -110,7 +120,12 @@ export class CoordinateSystem {
   getColumnOffset(columnId: string): number {
     let offset = this.columnOffsetCache.get(columnId);
     if (offset === undefined) {
-      offset = this.dimensionManager?.getColumnOffset(columnId) || 0;
+      if (this.coordinateMapping) {
+        const column = this.coordinateMapping.columns.find(col => col.columnId === columnId);
+        offset = column ? column.offset : 0;
+      } else {
+        offset = 0;
+      }
       this.columnOffsetCache.set(columnId, offset);
     }
     return offset;
@@ -118,20 +133,17 @@ export class CoordinateSystem {
   
   // Get column by x position
   private getColumnByX(x: number): { columnId: string; columnIndex: number } | null {
-    let currentX = 0;
+    if (!this.coordinateMapping) return null;
     
-    for (let i = 0; i < this.columns.length; i++) {
-      const col = this.columns[i];
-      const width = this.getColumnWidth(col.id);
-      
-      if (x >= currentX && x < currentX + width) {
-        const columnIndex = this.columnIndexMap.get(col.id);
-        if (columnIndex !== undefined) {
-          return { columnId: col.id, columnIndex };
-        }
+    const column = this.coordinateMapping.columns.find(
+      col => x >= col.offset && x < col.offset + col.width
+    );
+    
+    if (column) {
+      const columnIndex = this.columnIndexMap.get(column.columnId);
+      if (columnIndex !== undefined) {
+        return { columnId: column.columnId, columnIndex };
       }
-      
-      currentX += width;
     }
     
     return null;

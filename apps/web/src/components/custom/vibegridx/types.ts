@@ -238,13 +238,11 @@ export interface TableContext {
   version: number;
   enableSelectionColumn: boolean;
   
-  // Dimension management
-  dimensionManager?: any; // Will be typed as ColumnDimensionManager after import
-  rowDimensionManager?: any; // Will be typed as RowDimensionManager after import
-  coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager after import
-  // selectionManager removed - selection state now managed directly in TableMachine
+  // Row dimensions
+  rowHeight: number;
+  totalRows: number;
   
-  // Coordinate mapping from coordinate actor
+  // Coordinate mapping - single source of truth
   coordinateMapping?: any; // Will be typed as CoordinateMapping after import
   
   // Entities from parent component (via EntityIntegration/domain atoms)
@@ -487,8 +485,8 @@ export interface RelationshipDataProvider {
 export interface RendererOptions {
   container: HTMLElement;
   columns?: Column<any>[];
-  dimensionManager?: any; // Will be typed as ColumnDimensionManager
-  rowDimensionManager?: any; // Will be typed as RowDimensionManager
+  // Dimension manager removed - use coordinateMapping instead
+  // Row dimension manager removed - use coordinateMapping instead
   coordinateManager?: any; // Will be typed as VibeGridXCoordinateManager
   relationshipData?: RelationshipDataProvider;
   enableSelectionColumn?: boolean;
@@ -535,10 +533,6 @@ export interface RenderState {
   sortBy?: SortConfig[]; // Current sort configuration
   columnVisibility?: Record<string, boolean>; // Column visibility state
   columnOrder?: string[]; // Column order array
-  columnWidths?: Record<string, number>; // Column widths from table machine context
-  columnOffsets?: Record<string, number>; // Column offsets from table machine context
-  totalWidth?: number; // Total width of all columns from table machine context
-  totalHeight?: number; // Total height from table machine context
   
   // AUTHORITATIVE coordinate mapping from state machine
   coordinateMapping?: {

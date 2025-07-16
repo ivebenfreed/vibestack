@@ -14,7 +14,7 @@ export class ColumnManager {
   constructor(options: {
     enableSelectionColumn?: boolean;
   } = {}) {
-    this.enableSelectionColumn = options.enableSelectionColumn || false;
+    this.enableSelectionColumn = true; // Selection column is always enabled
   }
   
   /**
@@ -52,16 +52,15 @@ export class ColumnManager {
   getDataColumns(columns: Column[], columnVisibility: Record<string, boolean>): Column[] {
     const visibleColumns = this.getVisibleColumns(columns, columnVisibility);
     // Filter out the selection column when enabled
-    return this.enableSelectionColumn 
-      ? visibleColumns.filter(col => col.id !== '__selection')
-      : visibleColumns;
+    // Always filter out selection column since it's always enabled
+    return visibleColumns.filter(col => col.id !== '__selection');
   }
   
   /**
    * Check if selection column is enabled
    */
   isSelectionColumnEnabled(): boolean {
-    return this.enableSelectionColumn;
+    return true; // Selection column is always enabled
   }
   
   /**

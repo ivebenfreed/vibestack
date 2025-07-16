@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import type { ColumnDragState } from '../types';
-import type { ColumnDimensionManager } from '../dimensions/ColumnDimensionManager';
+import type { CoordinateMapping, ColumnCoordinate } from '../machines/table-machine/slices/dimensions-slice';
 
 // ====================================
 // COLUMN DRAG OVERLAY
@@ -19,7 +19,7 @@ export interface ColumnDragOverlayConfig {
 export class ColumnDragOverlay {
   private layer: Konva.Layer;
   private config: ColumnDragOverlayConfig;
-  private dimensionManager: ColumnDimensionManager;
+  private coordinateMapping: CoordinateMapping | null = null;
   
   // Drag preview elements
   private columnPreview: Konva.Group | null = null;
@@ -31,11 +31,9 @@ export class ColumnDragOverlay {
   
   constructor(
     layer: Konva.Layer,
-    dimensionManager: ColumnDimensionManager,
     config: ColumnDragOverlayConfig
   ) {
     this.layer = layer;
-    this.dimensionManager = dimensionManager;
     this.config = {
       dragOpacity: 0.8,
       dropIndicatorColor: '#3b82f6',
@@ -44,6 +42,13 @@ export class ColumnDragOverlay {
       previewBorderColor: 'rgba(59, 130, 246, 0.5)',
       ...config
     };
+  }
+  
+  /**
+   * Update coordinate mapping
+   */
+  updateCoordinateMapping(coordinateMapping: CoordinateMapping): void {
+    this.coordinateMapping = coordinateMapping;
   }
   
   /**
@@ -57,10 +62,21 @@ export class ColumnDragOverlay {
     
     this.dragState = dragState;
     
-    // Get column info
-    const columnIndex = dragState.draggedColumnIndex;
-    const columnWidth = this.dimensionManager.getColumnWidth(columnIndex);
-    const columnX = this.dimensionManager.getColumnX(columnIndex);
+    if (!this.coordinateMapping) {
+      console.warn('[ColumnDragOverlay] No coordinate mapping available');
+      return;
+    }
+    
+    // Get column info from coordinate mapping
+    const column = this.coordinateMapping.columns.find(col => col.columnId === dragState.draggedColumnId);
+    if (!column) {
+      console.warn('[ColumnDragOverlay] Column not found in coordinate mapping:', dragState.draggedColumnId);
+      return;
+    }
+    
+    const columnIndex = column.index;
+    const columnWidth = column.width;
+    const columnX = column.offset;
     
     // Create or update preview
     if (!this.columnPreview) {
@@ -89,7 +105,7 @@ export class ColumnDragOverlay {
       });
       
       // Add column name text
-      const columnName = this.dimensionManager.getColumnName?.(columnIndex) || dragState.draggedColumnId;
+      const columnName = dragState.draggedColumnId;
       const text = new Konva.Text({
         x: 10,
         y: this.config.headerHeight / 2 - 6,
@@ -120,10 +136,13 @@ export class ColumnDragOverlay {
    * Update the drop indicator position based on mouse position
    */
   private updateDropIndicator(mouseX: number): void {
-    if (!this.dragState || !this.dragState.isDragging) return;
+    if (!this.dragState || !this.dragState.isDragging || !this.coordinateMapping) return;
     
     // Find which column index the mouse is over
-    const targetIndex = this.dimensionManager.getColumnIndexAtX(mouseX);
+    const targetColumn = this.coordinateMapping.columns.find(
+      col => mouseX >= col.offset && mouseX < col.offset + col.width
+    );
+    const targetIndex = targetColumn ? targetColumn.index : this.coordinateMapping.columns.length;
     
     if (targetIndex === this.dropIndex) return; // No change
     
@@ -145,12 +164,17 @@ export class ColumnDragOverlay {
     let dropX: number;
     if (targetIndex <= this.dragState.draggedColumnIndex) {
       // Dropping to the left
-      dropX = this.dimensionManager.getColumnX(targetIndex);
+      const targetCol = this.coordinateMapping.columns.find(col => col.index === targetIndex);
+      dropX = targetCol ? targetCol.offset : 0;
     } else {
       // Dropping to the right
-      dropX = targetIndex >= this.dimensionManager.getColumnCount() 
-        ? this.dimensionManager.getTotalWidth()
-        : this.dimensionManager.getColumnX(targetIndex);
+      if (targetIndex >= this.coordinateMapping.columns.length) {
+        const lastCol = this.coordinateMapping.columns[this.coordinateMapping.columns.length - 1];
+        dropX = lastCol ? lastCol.offset + lastCol.width : 0;
+      } else {
+        const targetCol = this.coordinateMapping.columns.find(col => col.index === targetIndex);
+        dropX = targetCol ? targetCol.offset : 0;
+      }
     }
     
     // Create drop indicator with enhanced visual
@@ -171,9 +195,13 @@ export class ColumnDragOverlay {
    * Get the current drop index based on mouse position
    */
   getDropIndex(mouseX: number): number {
-    if (!this.dragState || !this.dragState.isDragging) return -1;
+    if (!this.dragState || !this.dragState.isDragging || !this.coordinateMapping) return -1;
     
-    const targetIndex = this.dimensionManager.getColumnIndexAtX(mouseX);
+    // Find which column index the mouse is over
+    const targetColumn = this.coordinateMapping.columns.find(
+      col => mouseX >= col.offset && mouseX < col.offset + col.width
+    );
+    const targetIndex = targetColumn ? targetColumn.index : this.coordinateMapping.columns.length;
     
     // Adjust for dragging to the right
     if (targetIndex > this.dragState.draggedColumnIndex) {

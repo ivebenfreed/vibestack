@@ -251,21 +251,32 @@ export const viewActions = {
         (col: any) => col.columnId === event.columnId
       );
       
-      console.log('🎯 StartColumnDrag: Setting up drag state', {
-        columnId: event.columnId,
-        mouseX: event.x,
-        draggedColumn: draggedColumn ? {
-          id: draggedColumn.columnId,
-          start: draggedColumn.offset,
-          end: draggedColumn.offset + draggedColumn.width,
-          width: draggedColumn.width
-        } : null,
-        allColumns: context.coordinateMapping?.columns.map((col: any) => ({
-          id: col.columnId,
-          start: col.offset,
-          end: col.offset + col.width
-        }))
-      });
+      // Pre-calculate shift thresholds for all columns
+      const shiftThresholds: Array<{ columnId: string; threshold: number; targetIndex: number }> = [];
+      let currentIndex = -1;
+      
+      if (draggedColumn && context.coordinateMapping) {
+        const dataColumns = context.coordinateMapping.columns
+          .filter((col: any) => col.columnId !== '__selection')
+          .sort((a: any, b: any) => a.index - b.index);
+        
+        currentIndex = dataColumns.findIndex((col: any) => col.columnId === event.columnId);
+        
+        // Calculate thresholds for each column (midpoint of each column)
+        dataColumns.forEach((col: any, index: number) => {
+          if (index !== currentIndex) {
+            const midpoint = col.offset + (col.width / 2);
+            shiftThresholds.push({
+              columnId: col.columnId,
+              threshold: midpoint,
+              targetIndex: index < currentIndex ? index : index + 1
+            });
+          }
+        });
+        
+        // Sort thresholds by position for efficient checking
+        shiftThresholds.sort((a, b) => a.threshold - b.threshold);
+      }
       
       return {
         columnId: event.columnId,
@@ -282,7 +293,10 @@ export const viewActions = {
         coordinateMappingVersion: context.coordinateMapping?.version || 0,
         // Initialize with no preview
         currentTargetIndex: null,
-        previewActive: false
+        previewActive: false,
+        // Pre-calculated shift thresholds for efficient checking
+        shiftThresholds,
+        currentColumnIndex: currentIndex
       };
     }
   }),
@@ -293,87 +307,52 @@ export const viewActions = {
       
       const state = context.columnDragState;
       
-      // Check if mouse has left the original column bounds
-      if (state.originalBounds && !state.previewActive) {
-        // Verify that our coordinate mapping is still valid
-        const currentCoordinateVersion = context.coordinateMapping?.version || 0;
-        const stateCoordinateVersion = state.coordinateMappingVersion || 0;
-        
-        if (currentCoordinateVersion !== stateCoordinateVersion) {
-          console.log('🎯 UpdateColumnDrag: Coordinate mapping changed, recalculating bounds', {
-            currentVersion: currentCoordinateVersion,
-            stateVersion: stateCoordinateVersion
-          });
-          
-          // Recalculate original bounds with current coordinate mapping
-          const draggedColumn = context.coordinateMapping?.columns.find(
-            (col: any) => col.columnId === state.columnId
-          );
-          
-          if (draggedColumn) {
-            const newOriginalBounds = {
-              start: draggedColumn.offset,
-              end: draggedColumn.offset + draggedColumn.width
-            };
-            
-            // Update the state with new bounds and version
-            const updatedState = {
-              ...state,
-              originalBounds: newOriginalBounds,
-              coordinateMappingVersion: currentCoordinateVersion,
-              mouseX: event.x,
-              mouseY: event.y
-            };
-            
-            // Check bounds with the updated bounds
-            const isOutsideBounds = event.x < newOriginalBounds.start || event.x > newOriginalBounds.end;
-            
-            console.log('🎯 UpdateColumnDrag: Checking updated bounds', {
-              mouseX: event.x,
-              newOriginalBounds,
-              isOutsideBounds
-            });
-            
-            if (isOutsideBounds) {
-              console.log('🎯 UpdateColumnDrag: Activating preview - mouse left updated column');
-              return {
-                ...updatedState,
-                previewActive: true
-              };
-            }
-            
-            return updatedState;
-          }
-        }
-        
-        // Use existing bounds logic
-        const isOutsideBounds = event.x < state.originalBounds.start || event.x > state.originalBounds.end;
-        
-        console.log('🎯 UpdateColumnDrag: Checking bounds', {
-          mouseX: event.x,
-          originalBounds: state.originalBounds,
-          isOutsideBounds,
-          previewActive: state.previewActive
-        });
-        
-        if (isOutsideBounds) {
-          // Mouse has left the original column - activate preview
-          console.log('🎯 UpdateColumnDrag: Activating preview - mouse left column');
-          return {
-            ...state,
-            mouseX: event.x,
-            mouseY: event.y,
-            previewActive: true
-          };
-        }
-      }
-      
-      // Just update mouse position
-      return {
+      // Simply update mouse position
+      const updatedState = {
         ...state,
         mouseX: event.x,
         mouseY: event.y
       };
+      
+      // Check if mouse has left the original column bounds (activate preview)
+      if (state.originalBounds && !state.previewActive) {
+        const isOutsideBounds = event.x < state.originalBounds.start || event.x > state.originalBounds.end;
+        if (isOutsideBounds) {
+          updatedState.previewActive = true;
+        }
+      }
+      
+      // Use pre-calculated thresholds to determine target index
+      if (state.shiftThresholds && state.shiftThresholds.length > 0 && state.originalBounds) {
+        let targetIndex = state.currentColumnIndex;
+        
+        // Find the appropriate target index based on mouse position
+        // Since thresholds are sorted, we can do this efficiently
+        if (event.x < state.originalBounds.start) {
+          // Dragging left - find the appropriate threshold
+          for (let i = state.shiftThresholds.length - 1; i >= 0; i--) {
+            const threshold = state.shiftThresholds[i];
+            if (threshold.threshold < state.originalBounds.start && event.x < threshold.threshold) {
+              targetIndex = threshold.targetIndex;
+              break;
+            }
+          }
+        } else if (event.x > state.originalBounds.end) {
+          // Dragging right - find the appropriate threshold
+          for (const threshold of state.shiftThresholds) {
+            if (threshold.threshold > state.originalBounds.end && event.x > threshold.threshold) {
+              targetIndex = threshold.targetIndex;
+            }
+          }
+        }
+        
+        // Only update if target changed
+        if (targetIndex !== state.currentTargetIndex) {
+          updatedState.currentTargetIndex = targetIndex;
+        }
+      }
+      
+      return updatedState;
     }
   }),
   

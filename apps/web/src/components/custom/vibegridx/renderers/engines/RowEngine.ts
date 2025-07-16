@@ -331,11 +331,9 @@ export class RowEngine {
     // Create document fragment for batched insertion
     const fragment = document.createDocumentFragment();
     
-    // Add selection checkbox cell if enabled
-    if (this.config.enableSelectionColumn) {
-      const selectionCell = this.createSelectionCell(row);
-      fragment.appendChild(selectionCell);
-    }
+    // Always add selection checkbox cell (selection column is always enabled)
+    const selectionCell = this.createSelectionCell(row);
+    fragment.appendChild(selectionCell);
     
     // Add data cells
     columnsToRender.forEach((column, index) => {
@@ -503,7 +501,7 @@ export class RowEngine {
   }
   
   private calculateCellOffset(index: number, columns: Column[]): number {
-    let offset = this.config.enableSelectionColumn ? 48 : 0; // Start after selection column if enabled
+    let offset = 48; // Always start after selection column (selection column is always enabled)
     
     const offsets: Array<{columnId: string, width: number, cumulative: number}> = [];
     
@@ -525,7 +523,7 @@ export class RowEngine {
         columnIndex: index,
         finalOffset: offset,
         enableSelectionColumn: this.config.enableSelectionColumn,
-        selectionColumnWidth: this.config.enableSelectionColumn ? 48 : 0,
+        selectionColumnWidth: 48, // Selection column is always enabled
         previousColumns: offsets
       });
     }
