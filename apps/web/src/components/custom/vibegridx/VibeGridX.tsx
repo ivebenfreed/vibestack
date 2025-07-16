@@ -415,6 +415,8 @@ export const VibeGridX = <T extends Record<string, any> = any>(
     // Don't pass container yet - will be set when ref is attached
     enableSelectionColumn: enableSelectionColumn,
     cellHeight: 40,
+    // Note: onScroll is handled internally by EventSystem and updates the virtual grid directly
+    // No need to forward to table machine as the renderer handles viewport changes internally
     // No event handlers - unified EventDelegationManager handles all events
     onStateChange: (event: any) => {
       // Simple state change handler for render events

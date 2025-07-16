@@ -118,11 +118,8 @@ export class EventDelegationManager {
     container.addEventListener('focusin', this.boundHandlers.handleFocusIn);
     container.addEventListener('focusout', this.boundHandlers.handleFocusOut);
     
-    // Scroll delegation
-    const viewport = container.querySelector('.vibegridx-viewport') as HTMLElement;
-    if (viewport) {
-      viewport.addEventListener('scroll', this.boundHandlers.handleScroll, { passive: true });
-    }
+    // Scroll delegation - DISABLED: EventSystem in renderer handles scroll
+    // this.setupScrollListener();
     
     console.log('🎯 EventDelegationManager: Event listeners attached');
   }
@@ -253,8 +250,40 @@ export class EventDelegationManager {
     if (this.dragState.isDragging) return;
     
     const target = event.target as Element;
-    const cell = target.closest('.vibegridx-cell') as HTMLElement;
     
+    console.log('🎯 EventDelegationManager: Click event', {
+      target: target,
+      targetClass: target.className,
+      targetTagName: target.tagName,
+      targetDataset: (target as HTMLElement).dataset
+    });
+    
+    // Check for header cell click first
+    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
+    if (headerCell) {
+      const columnId = headerCell.dataset.column; // Use data-column attribute, not data-column-id
+      
+      console.log('🎯 EventDelegationManager: Header cell found', {
+        columnId,
+        headerCell,
+        dataset: headerCell.dataset
+      });
+      
+      if (columnId) {
+        // Send XState event for column click (triggers sorting)
+        this.config.tableSend({
+          type: 'view.column.click',
+          field: columnId // Use 'field' instead of 'columnId' to match view-slice expectation
+        });
+        
+        // Legacy callback support
+        this.config.legacyCallbacks?.onHeaderClick?.(columnId, event);
+      }
+      return;
+    }
+    
+    // Check for regular cell click
+    const cell = target.closest('.vibegridx-cell') as HTMLElement;
     if (cell) {
       const rowId = cell.dataset.rowId;
       const columnId = cell.dataset.columnId;
@@ -653,21 +682,36 @@ export class EventDelegationManager {
     const viewport = this.config.container.querySelector('.vibegridx-viewport') as HTMLElement;
     if (!viewport) return;
     
-    const viewportInfo: ViewportInfo = {
-      scrollTop: viewport.scrollTop,
-      scrollLeft: viewport.scrollLeft,
-      clientHeight: viewport.clientHeight,
-      clientWidth: viewport.clientWidth,
-      startRow: 0, // TODO: Calculate from scroll position
-      endRow: 0,   // TODO: Calculate from scroll position
-      startColumn: 0, // TODO: Calculate from scroll position
-      endColumn: 0,   // TODO: Calculate from scroll position
-      visibleRows: [] // TODO: Calculate visible rows
-    };
+    // Cancel any pending RAF
+    if (this.scrollRAF !== null) {
+      cancelAnimationFrame(this.scrollRAF);
+    }
     
-    this.config.tableSend({
-      type: 'view.viewport.update',
-      viewport: viewportInfo
+    // Use RAF to debounce scroll events for better performance
+    this.scrollRAF = requestAnimationFrame(() => {
+      // Only send update if scroll position actually changed
+      if (viewport.scrollTop !== this.lastScrollTop) {
+        this.lastScrollTop = viewport.scrollTop;
+        
+        const viewportInfo: ViewportInfo = {
+          scrollTop: viewport.scrollTop,
+          scrollLeft: viewport.scrollLeft,
+          clientHeight: viewport.clientHeight,
+          clientWidth: viewport.clientWidth,
+          startRow: 0, // TODO: Calculate from scroll position
+          endRow: 0,   // TODO: Calculate from scroll position
+          startColumn: 0, // TODO: Calculate from scroll position
+          endColumn: 0,   // TODO: Calculate from scroll position
+          visibleRows: [] // TODO: Calculate visible rows
+        };
+        
+        this.config.tableSend({
+          type: 'view.viewport.update',
+          viewport: viewportInfo
+        });
+      }
+      
+      this.scrollRAF = null;
     });
   }
 
@@ -744,10 +788,7 @@ export class EventDelegationManager {
     document.removeEventListener('mousemove', this.boundHandlers.handleMouseMove);
     document.removeEventListener('mouseup', this.boundHandlers.handleMouseUp);
     
-    const viewport = container.querySelector('.vibegridx-viewport') as HTMLElement;
-    if (viewport) {
-      viewport.removeEventListener('scroll', this.boundHandlers.handleScroll);
-    }
+    // Scroll handling disabled - EventSystem in renderer handles it
     
     this.isDestroyed = true;
     console.log('🎯 EventDelegationManager: Destroyed');

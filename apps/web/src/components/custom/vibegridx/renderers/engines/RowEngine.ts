@@ -57,6 +57,21 @@ export class RowEngine {
   // ====================================
   
   /**
+   * Pre-calculate and set body dimensions before rendering
+   * This prevents layout recalculation on first scroll
+   */
+  initializeVirtualDimensions(state: RenderState): void {
+    // Set the row count first
+    this.config.virtualGrid.setRowCount(state.rows.length);
+    
+    // Calculate total height without updating columns width
+    const totalHeight = this.config.virtualGrid.getTotalHeight();
+    
+    // Just set the body height to establish scrollable area
+    this.config.domManager.getElement('body').style.height = `${totalHeight}px`;
+  }
+
+  /**
    * Render all visible rows
    */
   renderVisibleRows(state: RenderState): RowRenderMetrics {
@@ -66,7 +81,7 @@ export class RowEngine {
     
     const visibleRows = state.rows.slice(visibleRange.start, visibleRange.end);
     
-    // Update virtual dimensions
+    // Update virtual dimensions (in case row count changed)
     this.updateVirtualDimensions(state);
     
     // Fail fast if visible rows calculation is wrong

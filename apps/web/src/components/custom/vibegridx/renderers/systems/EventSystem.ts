@@ -66,7 +66,6 @@ export class EventSystem {
   private boundHandleResizeEnd: (event: MouseEvent) => void;
   private boundHandleDragMove: (event: MouseEvent) => void;
   private boundHandleDragEnd: (event: MouseEvent) => void;
-  private boundHandleScroll: () => void;
 
   constructor(config: EventSystemConfig) {
     this.config = config;
@@ -76,7 +75,6 @@ export class EventSystem {
     this.boundHandleResizeEnd = this.handleResizeEnd.bind(this);
     this.boundHandleDragMove = this.handleDragMove.bind(this);
     this.boundHandleDragEnd = this.handleDragEnd.bind(this);
-    this.boundHandleScroll = this.handleScroll.bind(this);
   }
 
   // ====================================
@@ -90,15 +88,24 @@ export class EventSystem {
     const viewport = domManager.getElement('viewport');
 
     // Scroll handling
-    viewport.addEventListener('scroll', this.boundHandleScroll);
+    viewport.addEventListener('scroll', () => {
+      const viewportInfo = this.config.virtualGrid.calculateViewportFromScroll(
+        viewport.scrollTop,
+        viewport.clientHeight,
+        viewport.clientWidth,
+        viewport.scrollLeft
+      );
+      
+      this.config.callbacks.onScroll?.(viewportInfo);
+    });
 
     // Cell interaction handlers
     body.addEventListener('click', this.handleCellClick.bind(this));
     body.addEventListener('dblclick', this.handleCellDoubleClick.bind(this));
 
-    // Header interaction handlers
-    header.addEventListener('click', this.handleHeaderClick.bind(this));
-    header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
+    // Header interaction handlers - DISABLED: EventDelegationManager handles all events
+    // header.addEventListener('click', this.handleHeaderClick.bind(this));
+    // header.addEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
 
     // Make viewport focusable
     viewport.setAttribute('tabindex', '0');
@@ -110,58 +117,23 @@ export class EventSystem {
     const body = domManager.getElement('body');
     const viewport = domManager.getElement('viewport');
 
-    // Remove scroll listener
-    viewport.removeEventListener('scroll', this.boundHandleScroll);
+    // Remove scroll listener - DISABLED: Now handled by EventDelegationManager
+    // viewport.removeEventListener('scroll', this.boundHandleScroll);
 
     // Remove cell listeners
     body.removeEventListener('click', this.handleCellClick.bind(this));
     body.removeEventListener('dblclick', this.handleCellDoubleClick.bind(this));
 
-    // Remove header listeners
-    header.removeEventListener('click', this.handleHeaderClick.bind(this));
-    header.removeEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
+    // Remove header listeners - DISABLED: EventDelegationManager handles all events
+    // header.removeEventListener('click', this.handleHeaderClick.bind(this));
+    // header.removeEventListener('mousedown', this.handleHeaderMouseDown.bind(this));
 
     // Remove global listeners if active
     this.removeGlobalDragListeners();
     this.removeGlobalResizeListeners();
   }
 
-  // ====================================
-  // SCROLL HANDLING
-  // ====================================
 
-  private handleScroll(): void {
-    const { domManager, virtualGrid, callbacks } = this.config;
-    const header = domManager.getElement('header');
-    const viewport = domManager.getElement('viewport');
-
-    // Always sync header immediately for smooth horizontal scrolling
-    header.style.transform = `translateX(-${viewport.scrollLeft}px)`;
-
-    // Prevent multiple simultaneous updates
-    if (this.isScrolling) return;
-    this.isScrolling = true;
-
-    requestAnimationFrame(() => {
-      const scrollTop = viewport.scrollTop;
-      const viewportHeight = viewport.clientHeight;
-      const viewportWidth = viewport.clientWidth;
-      const scrollLeft = viewport.scrollLeft;
-
-      // Use VirtualScrollManager to calculate viewport
-      const newViewport = virtualGrid.calculateViewportFromScroll(
-        scrollTop,
-        viewportHeight,
-        viewportWidth,
-        scrollLeft
-      );
-
-      callbacks.onScroll?.(newViewport);
-
-      // Allow next update
-      this.isScrolling = false;
-    });
-  }
 
   // ====================================
   // CELL EVENT HANDLERS
@@ -203,7 +175,7 @@ export class EventSystem {
     if (resizeHandle) return;
 
     if (headerCell) {
-      const columnId = headerCell.dataset.column!;
+      const columnId = headerCell.dataset.columnId!;
       this.config.callbacks.onHeaderClick?.(columnId, event);
     }
   }
@@ -233,7 +205,9 @@ export class EventSystem {
 
   private startResize(event: MouseEvent, resizeHandle: HTMLElement): void {
     event.preventDefault();
-    const columnId = resizeHandle.dataset.column;
+    // Get columnId from the parent header cell
+    const headerCell = resizeHandle.closest(`.${CSS_CLASSES.HEADER_CELL}`) as HTMLElement;
+    const columnId = headerCell?.dataset.columnId;
 
     if (columnId) {
       // Just forward the raw event to the state machine 

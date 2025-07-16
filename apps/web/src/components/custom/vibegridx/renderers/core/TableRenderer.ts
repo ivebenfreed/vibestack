@@ -117,10 +117,11 @@ export class TableRenderer {
       onColumnDragEnd: options.onColumnDragEnd,
       onScroll: (viewport: ViewportInfo) => {
         // Update virtual grid and re-render if needed
-        if (this.lastRenderState) {
-          const hasViewportChanged = this.virtualGrid.updateViewport(viewport, this.lastRenderState.rows.length);
+        const lastRenderState = this.stateManager.getLastRenderState();
+        if (lastRenderState) {
+          const hasViewportChanged = this.virtualGrid.updateViewport(viewport, lastRenderState.rows.length);
           if (hasViewportChanged) {
-            this.rowRenderingEngine.renderVisibleRows(this.lastRenderState);
+            this.rowRenderingEngine.renderVisibleRows(lastRenderState);
           }
         }
         options.onScroll?.(viewport);
