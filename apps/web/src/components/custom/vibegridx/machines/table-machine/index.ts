@@ -102,7 +102,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       ...input.settings
     },
     version: 0,
-    enableSelectionColumn: input.enableSelectionColumn || false,
+    enableSelectionColumn: true, // Always enabled
     
     // Store initial data for immediate rendering
     initialData: hasInitialData ? input.initialData : null,

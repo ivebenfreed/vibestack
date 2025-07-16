@@ -40,6 +40,7 @@ export class EditingOverlay {
       position: absolute;
       z-index: ${this.config.zIndex || 1000};
       pointer-events: auto;
+      box-sizing: border-box;
     `;
     
     // Ensure the portal can receive focus events
@@ -82,6 +83,25 @@ export class EditingOverlay {
     this.portal.style.top = `${position.y}px`;
     this.portal.style.width = `${position.width}px`;
     this.portal.style.height = `${position.height}px`;
+    
+    // For text editors, we want the input to fill the cell exactly
+    const isTextType = ['text', 'string', 'email', 'url', 'textarea', 'longtext'].includes(column.cellType || column.type || 'text');
+    if (isTextType) {
+      // Match the exact cell styles for seamless inline editing
+      this.portal.style.padding = '0';
+      this.portal.style.boxSizing = 'border-box';
+      this.portal.style.fontSize = '13px';
+      this.portal.style.overflow = 'hidden';
+      // Add subtle editing indicator
+      this.portal.style.outline = '2px solid rgb(59, 130, 246)';
+      this.portal.style.outlineOffset = '-1px';
+    } else {
+      // Reset padding for non-text editors
+      this.portal.style.padding = '4px';
+      // Different outline for non-text editors
+      this.portal.style.outline = '2px solid rgb(59, 130, 246)';
+      this.portal.style.outlineOffset = '-1px';
+    }
     
     // Render the editor component using shadcn components
     this.root.render(
@@ -145,6 +165,10 @@ export class EditingOverlay {
     
     // Hide portal
     this.portal.style.display = 'none';
+    
+    // Reset styles
+    this.portal.style.padding = '0';
+    this.portal.style.outline = 'none';
     
     // Clear React content
     if (this.root) {

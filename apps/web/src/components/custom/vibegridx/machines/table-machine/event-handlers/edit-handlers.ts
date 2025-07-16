@@ -99,6 +99,14 @@ export const editHandlers = {
   },
 
   'edit.commit': {
+    guard: ({ context }) => {
+      // Don't commit if we're canceling
+      if (context.isCanceling) {
+        return false;
+      }
+      // Only commit if there are changes
+      return context.isDirty;
+    },
     actions: [
       // Store editing cell info before clearing it
       ({ context, event, self }) => {
@@ -122,6 +130,28 @@ export const editHandlers = {
         
         // Update optimistic operations
         Object.assign(context, { optimisticOperations: newOperations });
+        
+        // CRITICAL: Update the row data in state optimistically
+        const rowIndex = context.rows.findIndex(r => r.id === rowId);
+        if (rowIndex !== -1) {
+          const updatedRow = {
+            ...context.rows[rowIndex],
+            data: {
+              ...context.rows[rowIndex].data,
+              [field]: event.value
+            }
+          };
+          const updatedRows = [...context.rows];
+          updatedRows[rowIndex] = updatedRow;
+          Object.assign(context, { rows: updatedRows });
+          
+          console.log('TableMachine: Updated row data optimistically', {
+            rowId,
+            field,
+            newValue: event.value,
+            oldValue: context.originalValue
+          });
+        }
         
         // Tell renderer to apply optimistic update to just the edited cell
         if (context.actors?.rendererActor) {
@@ -173,6 +203,11 @@ export const editHandlers = {
 
   'edit.cancel': {
     actions: [
+      // Set canceling flag first
+      assign({
+        isCanceling: () => true
+      }),
+      
       editActions.cancelEdit,
       
       // Update overlay state
@@ -320,5 +355,6 @@ export const editHandlers = {
         });
       }
     ]
-  }
+  },
+
 };

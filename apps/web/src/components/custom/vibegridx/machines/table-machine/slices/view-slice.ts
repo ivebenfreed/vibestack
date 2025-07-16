@@ -49,7 +49,13 @@ export const createInitialViewState = (
   const sortBy = persistedData?.sortBy || [];
   const filters = persistedData?.filters || [];
   const groupBy = persistedData?.groupBy || [];
-  const columnVisibility = persistedData?.columnVisibility || defaultVisibility;
+  
+  // Ensure selection column is always visible
+  const baseVisibility = persistedData?.columnVisibility || defaultVisibility;
+  const columnVisibility = {
+    ...baseVisibility,
+    '__selection': true // Always visible
+  };
   
   // Filter persisted column order to only include valid column IDs
   const validColumnIds = new Set(columns.map(col => col.id));
@@ -61,9 +67,14 @@ export const createInitialViewState = (
     .map(col => col.id)
     .filter(id => !validPersistedOrder.includes(id));
     
-  const columnOrder = validPersistedOrder.length > 0 
+  // Build column order with selection column always first
+  const baseOrder = validPersistedOrder.length > 0 
     ? [...validPersistedOrder, ...missingColumns]
     : columns.map(col => col.id);
+    
+  // Ensure selection column is always first (remove if exists and prepend)
+  const orderWithoutSelection = baseOrder.filter(id => id !== '__selection');
+  const columnOrder = ['__selection', ...orderWithoutSelection];
   
   // Calculate hidden column count from column visibility
   const hiddenColumnCount = Object.values(columnVisibility).filter(visible => !visible).length;

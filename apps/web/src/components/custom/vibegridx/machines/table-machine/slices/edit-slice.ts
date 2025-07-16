@@ -16,6 +16,7 @@ export interface EditState {
   validationErrors: Map<string, string>;
   optimisticOperations: Map<string, OptimisticOperation>;
   isDirty: boolean;
+  isCanceling: boolean;
 }
 
 // ====================================
@@ -28,7 +29,8 @@ export const createInitialEditState = (): EditState => ({
   originalValue: null,
   validationErrors: new Map(),
   optimisticOperations: new Map(),
-  isDirty: false
+  isDirty: false,
+  isCanceling: false
 });
 
 // ====================================
@@ -41,6 +43,7 @@ export const editActions = {
     editValue: ({ event }: any) => event.value,
     originalValue: ({ event }: any) => event.value,
     isDirty: () => false,
+    isCanceling: () => false,
     validationErrors: () => new Map()
   }),
 
@@ -79,6 +82,7 @@ export const editActions = {
     editValue: () => null,
     originalValue: () => null,
     isDirty: () => false,
+    isCanceling: () => false,
     validationErrors: () => new Map()
   }),
 

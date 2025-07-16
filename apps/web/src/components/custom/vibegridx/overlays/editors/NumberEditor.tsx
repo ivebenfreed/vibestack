@@ -50,6 +50,7 @@ export function NumberEditor({
   };
 
   const handleBlur = () => {
+    // Always commit - XState will decide what to do
     commitValue();
   };
 

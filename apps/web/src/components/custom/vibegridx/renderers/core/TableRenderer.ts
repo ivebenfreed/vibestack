@@ -311,7 +311,40 @@ export class TableRenderer {
   }
   
   updateCell(rowId: string, columnId: string, value: any, column: Column): void {
-    this.stateManager.queueCellUpdate(rowId, columnId, value);
+    // Get the cell element
+    const cellElement = this.getCellElement(rowId, columnId);
+    if (!cellElement) {
+      console.warn(`TableRenderer: Cannot update cell - element not found for ${rowId}:${columnId}`);
+      return;
+    }
+    
+    // Find the row data
+    const lastRenderState = this.stateManager.getLastRenderState();
+    const row = lastRenderState?.rows.find(r => r.id === rowId);
+    if (!row) {
+      console.warn(`TableRenderer: Cannot update cell - row not found for ${rowId}`);
+      return;
+    }
+    
+    // Update the cell content immediately for optimistic update
+    const content = CellPipeline.createCellContent(value, column, row.data);
+    
+    // Clear existing content
+    while (cellElement.firstChild) {
+      cellElement.removeChild(cellElement.firstChild);
+    }
+    
+    // Add new content
+    cellElement.appendChild(content);
+    
+    // Add visual feedback for optimistic update
+    cellElement.classList.add('vibegridx-optimistic');
+    
+    console.log('TableRenderer: Cell updated optimistically', {
+      rowId,
+      columnId,
+      value
+    });
   }
 
   // Update a single row without full table re-render

@@ -276,8 +276,13 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           // Update just the specific cell with optimistic value
           if (renderer.updateCell) {
-            // For now, pass the field as the column until we have proper column lookup
-            const column = { id: event.columnId, field: event.field };
+            // Get the actual column from render state
+            const lastRenderState = renderState;
+            const column = lastRenderState?.columns?.find(c => c.id === event.columnId) || {
+              id: event.columnId,
+              field: event.field || event.columnId,
+              type: 'text' as const
+            };
             renderer.updateCell(event.rowId, event.columnId, event.value, column as any);
           } else {
             console.warn('RendererActor: updateCell method not available on renderer');
@@ -306,23 +311,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           sendBack({ type: 'COLUMNS_UPDATED' });
           break;
           
-        case 'UPDATE_COLUMN_WIDTH':
-          if (!renderer) {
-            console.warn('RendererActor: Cannot update column width - renderer not initialized');
-            return;
-          }
-          
-          console.log('RendererActor: Updating column width:', event.columnId, event.width);
-          
-          // Update column width in renderer
-          if (renderer.updateColumnWidth) {
-            renderer.updateColumnWidth(event.columnId, event.width);
-          } else {
-            console.warn('RendererActor: Renderer does not support updateColumnWidth');
-          }
-          
-          sendBack({ type: 'COLUMN_WIDTH_UPDATED' });
-          break;
+        // UPDATE_COLUMN_WIDTH removed - column widths now updated via UPDATE_COORDINATES
           
         case 'UPDATE_COORDINATES':
           if (!renderer) {

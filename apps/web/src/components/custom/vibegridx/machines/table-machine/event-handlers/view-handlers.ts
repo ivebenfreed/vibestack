@@ -808,63 +808,88 @@ export const viewHandlers = {
         }
       }),
       
-      // Send column width update to renderer actor for real-time visual feedback
-      sendTo(
-        ({ context }) => context.actors.rendererActor!,
-        ({ context }) => ({
-          type: 'UPDATE_COLUMN_WIDTH',
-          columnId: context.columnResizeState!.columnId,
-          width: context.columnResizeState!.currentWidth
-        })
-      ),
+      // Column width visual update now handled through coordinate mapping update below
       
-      // Update coordinate mapping with new column width
-      ({ context, self }) => {
-        if (context.coordinateMapping && context.columnResizeState) {
+      // Update coordinate mapping with new column width (immutably)
+      assign({
+        coordinateMapping: ({ context }) => {
+          if (!context.coordinateMapping || !context.columnResizeState) {
+            return context.coordinateMapping;
+          }
+          
           const { columnId, currentWidth } = context.columnResizeState;
           
-          // Find and update the column in the coordinate mapping
+          // Find the column in the coordinate mapping
           const columnIndex = context.coordinateMapping.columns.findIndex((c: any) => c.columnId === columnId);
-          if (columnIndex !== -1) {
-            const oldWidth = context.coordinateMapping.columns[columnIndex].width;
-            const widthDiff = currentWidth - oldWidth;
-            
-            // Update the column width
-            context.coordinateMapping.columns[columnIndex].width = currentWidth;
-            
-            // Update offsets for all columns after the resized one
-            for (let i = columnIndex + 1; i < context.coordinateMapping.columns.length; i++) {
-              context.coordinateMapping.columns[i].offset += widthDiff;
+          if (columnIndex === -1) {
+            return context.coordinateMapping;
+          }
+          
+          const oldWidth = context.coordinateMapping.columns[columnIndex].width;
+          const widthDiff = currentWidth - oldWidth;
+          
+          // Create new coordinate mapping with updated widths and offsets
+          const newColumns = context.coordinateMapping.columns.map((col: any, index: number) => {
+            if (index === columnIndex) {
+              // Update the resizing column's width
+              return { ...col, width: currentWidth };
+            } else if (index > columnIndex) {
+              // Update offsets for columns after the resized one
+              return { ...col, offset: col.offset + widthDiff };
             }
-            
-            // If there's a selection, update the overlay
-            if (context.selectedCells && context.selectedCells.size > 0 && context.actors.canvasActor) {
-              const visualPositions = calculateVisualPositions(
-                context.selectedCells,
-                context.coordinateMapping,
-                context.viewport,
-                context.rowHeight || context.settings?.rowHeight || 40
-              );
-              
-              if (visualPositions.length > 0) {
-                self.send({
-                  type: 'FORWARD_TO_CANVAS',
-                  event: {
-                    type: 'UPDATE_SELECTION_VISUAL',
-                    visualCells: visualPositions
-                  }
-                });
-                
-                // Also update fill handle position
-                self.send({
-                  type: 'FORWARD_TO_CANVAS',
-                  event: {
-                    type: 'RENDER_FILL_HANDLE',
-                    visualCells: visualPositions
-                  }
-                });
+            return col;
+          });
+          
+          // Also update the columnWidths in the new mapping to ensure consistency
+          return {
+            ...context.coordinateMapping,
+            columns: newColumns,
+            version: Date.now()
+          };
+        }
+      }),
+      
+      // Send updated coordinates to renderer for real-time column width updates
+      ({ context, self }) => {
+        if (context.actors?.rendererActor && context.coordinateMapping) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_COORDINATES',
+              mapping: context.coordinateMapping,
+              version: context.coordinateMapping.version
+            }
+          });
+        }
+      },
+      
+      // Update selection overlay if needed
+      ({ context, self }) => {
+        if (context.selectedCells && context.selectedCells.size > 0 && context.actors.canvasActor) {
+          const visualPositions = calculateVisualPositions(
+            context.selectedCells,
+            context.coordinateMapping,
+            context.viewport,
+            context.rowHeight || context.settings?.rowHeight || 40
+          );
+          
+          if (visualPositions.length > 0) {
+            self.send({
+              type: 'FORWARD_TO_CANVAS',
+              event: {
+                type: 'UPDATE_SELECTION_VISUAL',
+                visualCells: visualPositions
               }
-            }
+            });
+            
+            // Also update fill handle position
+            self.send({
+              type: 'FORWARD_TO_CANVAS',
+              event: {
+                type: 'RENDER_FILL_HANDLE',
+                visualCells: visualPositions
+              }
+            });
           }
         }
       },
@@ -960,28 +985,42 @@ export const viewHandlers = {
           
           // Recalculate column positions based on new order
           let currentOffset = 0;
+          const selectionWidth = 48;
           
           // Process columns in the specified order
           columnOrder.forEach((columnId, orderIndex) => {
-            const column = columns.find(c => c.id === columnId);
-            if (column) {
-              const width = columnWidths[columnId] || column.width || 120;
-              
+            // Handle selection column (always first) or regular columns
+            if (columnId === '__selection') {
               newCoordinateMapping.columns.push({
-                columnId,
+                columnId: '__selection',
                 index: orderIndex,
                 offset: currentOffset,
-                width
+                width: selectionWidth
               });
-              
-              currentOffset += width;
+              currentOffset += selectionWidth;
+            } else {
+              const column = columns.find(c => c.id === columnId);
+              if (column) {
+                const width = columnWidths[columnId] || column.width || 120;
+                
+                newCoordinateMapping.columns.push({
+                  columnId,
+                  index: orderIndex,
+                  offset: currentOffset,
+                  width
+                });
+                
+                currentOffset += width;
+              }
             }
           });
           
           console.log('🔄 COLUMN_LAYOUT_CHANGED: Coordinate mapping recalculated', {
             version: newCoordinateMapping.version,
             columnCount: newCoordinateMapping.columns.length,
-            columnOrder: columnOrder.slice(0, 5) // Log first 5 for debugging
+            columnOrder: columnOrder.slice(0, 5), // Log first 5 for debugging
+            firstColumnOffset: newCoordinateMapping.columns[0]?.offset,
+            firstColumnId: newCoordinateMapping.columns[0]?.columnId
           });
           
           return newCoordinateMapping;

@@ -1,6 +1,4 @@
 import React from 'react';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import type { CellRef, Column } from '../../types';
 
 interface TextEditorProps {
@@ -9,6 +7,7 @@ interface TextEditorProps {
   initialValue: string;
   onCommit: (value: string) => void;
   onCancel: () => void;
+  onBlur?: () => void;
   multiline?: boolean;
 }
 
@@ -18,6 +17,7 @@ export function TextEditor({
   initialValue,
   onCommit,
   onCancel,
+  onBlur,
   multiline = false
 }: TextEditorProps) {
   const [value, setValue] = React.useState(initialValue || '');
@@ -42,34 +42,67 @@ export function TextEditor({
   };
 
   const handleBlur = () => {
+    // Always commit with current value - XState will decide what to do
     onCommit(value);
   };
 
-  const commonProps = {
-    value,
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setValue(e.target.value),
-    onKeyDown: handleKeyDown,
-    onBlur: handleBlur,
-    autoFocus: true,
-    className: "border-2 border-blue-500 shadow-lg"
+  // Container style to match cell layout
+  const containerStyle: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    fontSize: '13px',
+    boxSizing: 'border-box',
+  };
+
+  // Input styles that match cell content exactly
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    height: multiline ? '100%' : 'auto',
+    border: 'none',
+    outline: 'none',
+    background: 'transparent',
+    padding: '0 12px', // Match cell horizontal padding
+    margin: '0',
+    font: 'inherit',
+    fontSize: 'inherit',
+    color: 'inherit',
+    lineHeight: multiline ? '1.5' : 'inherit',
+    textAlign: 'inherit',
+    resize: multiline ? 'none' : undefined,
+    boxSizing: 'border-box',
   };
 
   if (multiline) {
     return (
-      <Textarea 
-        {...commonProps}
-        rows={3}
-        placeholder={column.placeholder}
-      />
+      <div style={containerStyle}>
+        <textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          autoFocus
+          style={inputStyle}
+          placeholder={column.placeholder}
+        />
+      </div>
     );
   }
 
   return (
-    <Input 
-      {...commonProps}
-      type={column.type === 'email' ? 'email' : column.type === 'url' ? 'url' : 'text'}
-      placeholder={column.placeholder}
-      maxLength={column.maxLength}
-    />
+    <div style={containerStyle}>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        autoFocus
+        style={inputStyle}
+        type={column.type === 'email' ? 'email' : column.type === 'url' ? 'url' : 'text'}
+        placeholder={column.placeholder}
+        maxLength={column.maxLength}
+      />
+    </div>
   );
 }

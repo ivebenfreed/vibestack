@@ -59,15 +59,13 @@ export const createInitialDimensionsState = (
   columns: Column[],
   rowCount: number,
   rowHeight: number = 40,
-  enableSelectionColumn: boolean = false,
+  enableSelectionColumn: boolean = false, // Keep parameter for backward compatibility but always treat as true
   persistedColumnWidths?: Record<string, number>,
   columnOrder?: string[]
 ): DimensionsState => {
   // Create managers for backward compatibility
   const dimensionManager = createColumnDimensionManager(columns || []);
-  if (enableSelectionColumn) {
-    dimensionManager.setSelectionColumnEnabled(true);
-  }
+  dimensionManager.setSelectionColumnEnabled(true); // Always enable selection column
   
   const rowDimensionManager = createRowDimensionManager(rowCount, rowHeight);
   
@@ -93,19 +91,17 @@ export const createInitialDimensionsState = (
     version: 0
   };
   
-  // Handle selection column first if enabled
-  if (enableSelectionColumn) {
-    const selectionWidth = 48;
-    columnWidths['__selection'] = selectionWidth;
-    columnOffsets['__selection'] = 0;
-    coordinateMapping.columns.push({
-      columnId: '__selection',
-      index: 0,
-      offset: 0,
-      width: selectionWidth
-    });
-    totalWidth = selectionWidth;
-  }
+  // Always add selection column first
+  const selectionWidth = 48;
+  columnWidths['__selection'] = selectionWidth;
+  columnOffsets['__selection'] = 0;
+  coordinateMapping.columns.push({
+    columnId: '__selection',
+    index: 0,
+    offset: 0,
+    width: selectionWidth
+  });
+  totalWidth = selectionWidth;
   
   // Order columns according to columnOrder if provided
   const orderedColumns = columnOrder 
@@ -123,7 +119,7 @@ export const createInitialDimensionsState = (
     
     coordinateMapping.columns.push({
       columnId: col.id,
-      index: enableSelectionColumn ? index + 1 : index,
+      index: index + 1, // Always offset by 1 for selection column
       offset: totalWidth,
       width: width
     });

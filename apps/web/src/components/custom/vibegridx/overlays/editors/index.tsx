@@ -16,6 +16,7 @@ export interface EditorProps {
   initialValue: any;
   onCommit: (value: any) => void;
   onCancel: () => void;
+  onBlur?: () => void;
 }
 
 // Editor factory function

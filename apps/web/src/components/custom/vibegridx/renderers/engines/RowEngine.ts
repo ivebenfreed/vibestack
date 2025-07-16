@@ -117,11 +117,38 @@ export class RowEngine {
     
     const startTime = performance.now();
     
+    // Get the row index from DOM position (top style) if we need positioning
+    const currentTop = parseInt(rowElement.style.top) || 0;
+    const rowIndex = Math.floor(currentTop / this.config.rowHeight);
+    
     // Update row content with optional columns and resolvers
     this.renderRowCells(row, rowElement, state || columns ? { ...state, columns } : state, relationshipResolvers);
     
-    // Update row state
+    // Apply ALL row styling (matching full render path from updateRowElement)
+    // 1. Positioning styles (CRITICAL for virtual scrolling)
+    rowElement.style.position = 'absolute';
+    rowElement.style.top = `${currentTop}px`; // Maintain current position
+    rowElement.style.left = '0px';
+    
+    // 2. Dimensions
+    const totalWidth = state ? this.getTotalColumnsWidth(state) : parseInt(rowElement.style.width) || 0;
+    rowElement.style.width = `${totalWidth}px`;
+    rowElement.style.height = `${this.config.virtualGrid.getRowHeight()}px`;
+    
+    // 3. Base row styles
+    rowElement.style.borderBottom = '1px solid var(--border)';
+    rowElement.style.boxSizing = 'border-box';
+    
+    // 4. State classes
     rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
+    
+    // 5. Row selection state - CRITICAL: Must check and apply row selection
+    const isRowSelected = this.config.selectionManager.isRowSelected(row.id);
+    if (isRowSelected) {
+      rowElement.classList.add('vibegridx-row-selected');
+    } else {
+      rowElement.classList.remove('vibegridx-row-selected');
+    }
     
     const duration = performance.now() - startTime;
     if (duration > 0.5 * 10) { // Warn if row update is slow
@@ -136,11 +163,8 @@ export class RowEngine {
     const startTime = performance.now();
     
     rows.forEach(row => {
-      const rowElement = this.config.domManager.getRowElement(row.id);
-      if (rowElement) {
-        this.renderRowCells(row, rowElement, state);
-        rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
-      }
+      // Use the single updateRow method to ensure consistency
+      this.updateRow(row, state);
     });
     
     const duration = performance.now() - startTime;

@@ -451,8 +451,21 @@ export class EventDelegationManager {
     const columnId = resizeHandle.dataset.column;
     if (!columnId) return;
     
-    // Get current column width (would need to be provided by coordinate system)
-    const currentWidth = 150; // TODO: Get from coordinate mapping
+    // Get actual column width from the resize handle's parent header cell
+    const headerCell = resizeHandle.closest('.vibegridx-header-cell') as HTMLElement;
+    let currentWidth = 150; // Default fallback
+    
+    if (headerCell) {
+      // Try to get the actual rendered width
+      const computedWidth = headerCell.offsetWidth;
+      if (computedWidth > 0) {
+        currentWidth = computedWidth;
+        console.log('🎯 EventDelegationManager: Got column width from offsetWidth', {
+          columnId,
+          width: currentWidth
+        });
+      }
+    }
     
     this.dragState = {
       isDragging: true,
