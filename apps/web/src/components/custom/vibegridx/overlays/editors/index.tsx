@@ -4,10 +4,12 @@ import { NumberEditor } from './NumberEditor';
 import { SelectEditor } from './SelectEditor';
 import { BooleanEditor } from './BooleanEditor';
 import { DateEditor } from './DateEditor';
+import { SingleRelationshipEditor } from './SingleRelationshipEditor';
+import { MultiRelationshipEditor } from './MultiRelationshipEditor';
 import type { CellRef, Column } from '../../types';
 
 // Export all editor components
-export { TextEditor, NumberEditor, SelectEditor, BooleanEditor, DateEditor };
+export { TextEditor, NumberEditor, SelectEditor, BooleanEditor, DateEditor, SingleRelationshipEditor, MultiRelationshipEditor };
 
 // Editor props interface
 export interface EditorProps {
@@ -16,17 +18,36 @@ export interface EditorProps {
   initialValue: any;
   onCommit: (value: any) => void;
   onCancel: () => void;
+  onUpdate?: (value: any) => void;
   onBlur?: () => void;
+  // Additional context for relationship editors
+  relationshipContext?: {
+    relationshipResolvers?: Record<string, (id: string | string[]) => string>;
+    relationshipAtoms?: Record<string, any>;
+  };
 }
 
 // Editor factory function
 export function createEditor(props: EditorProps): React.ReactElement {
   const { column } = props;
   const cellType = column.cellType || column.type;
+  
+  console.log('🔧 createEditor: Creating editor', {
+    cellType,
+    columnId: column.id,
+    columnName: column.name,
+    initialValue: props.initialValue,
+    hasCallbacks: {
+      onCommit: !!props.onCommit,
+      onCancel: !!props.onCancel,
+      onUpdate: !!props.onUpdate
+    }
+  });
 
   switch (cellType) {
     case 'text':
     case 'string':
+      console.log('🔧 createEditor: Creating TextEditor');
       return <TextEditor {...props} />;
       
     case 'textarea':
@@ -62,6 +83,14 @@ export function createEditor(props: EditorProps): React.ReactElement {
       
     case 'url':
       return <TextEditor {...props} />;
+      
+    case 'relationship':
+    case 'relationship-single':
+      return <SingleRelationshipEditor {...props} />;
+      
+    case 'relationship-multi':
+    case 'relationship-collection':
+      return <MultiRelationshipEditor {...props} />;
       
     default:
       // Default to text editor for unknown types

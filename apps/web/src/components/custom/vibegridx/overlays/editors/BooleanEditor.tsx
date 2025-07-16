@@ -1,6 +1,5 @@
 import React from 'react';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
+import { ComboboxEditor } from './ComboboxEditor';
 import type { CellRef, Column } from '../../types';
 
 interface BooleanEditorProps {
@@ -20,53 +19,35 @@ export function BooleanEditor({
   onCancel,
   variant = 'checkbox'
 }: BooleanEditorProps) {
-  const [value, setValue] = React.useState(initialValue ?? false);
+  // Convert boolean to string for ComboboxEditor
+  const stringValue = initialValue === null ? null : String(initialValue);
   
-  React.useEffect(() => {
-    // Auto-commit immediately on value change for boolean inputs
-    onCommit(value);
-  }, [value, onCommit]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        setValue(!value);
-        break;
-      case 'Escape':
-        e.preventDefault();
-        onCancel();
-        break;
-      case 'Tab':
-        e.preventDefault();
-        onCommit(value);
-        break;
+  const handleCommit = (value: any) => {
+    if (value === null) {
+      onCommit(null);
+    } else {
+      onCommit(value === 'true');
     }
   };
 
-  if (variant === 'switch') {
-    return (
-      <div className="flex items-center justify-center p-2 bg-white border-2 border-blue-500 rounded shadow-lg">
-        <Switch
-          checked={value}
-          onCheckedChange={setValue}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        />
-      </div>
-    );
-  }
+  // Create boolean options
+  const booleanColumn = {
+    ...column,
+    options: [
+      { value: 'true', label: 'Yes' },
+      { value: 'false', label: 'No' }
+    ]
+  };
 
   return (
-    <div className="flex items-center justify-center p-2 bg-white border-2 border-blue-500 rounded shadow-lg">
-      <Checkbox
-        checked={value}
-        onCheckedChange={(checked) => setValue(checked === true)}
-        onKeyDown={handleKeyDown}
-        autoFocus
-        className="w-5 h-5"
-      />
-    </div>
+    <ComboboxEditor
+      cell={cell}
+      column={booleanColumn}
+      initialValue={stringValue}
+      onCommit={handleCommit}
+      onCancel={onCancel}
+      placeholder="Select..."
+      searchPlaceholder="Search..."
+    />
   );
 }

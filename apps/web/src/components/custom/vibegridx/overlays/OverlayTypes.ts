@@ -31,8 +31,6 @@ export interface OverlayConfig {
   // Colors
   selectionColor: string;
   selectionBorderColor: string;
-  editingColor: string;
-  editingBorderColor: string;
   dragIndicatorColor: string;
   
   // Animation
@@ -50,7 +48,6 @@ export interface OverlayConfig {
 
 export interface OverlayState {
   selectedCells: Set<string>;
-  editingCell: CellRef | null;
   selectionRanges: SelectionRange[];
   draggedItem: any | null;
   dropTarget: any | null;
@@ -86,8 +83,6 @@ export const DEFAULT_CONFIG: OverlayConfig = {
   borderWidth: 2,
   selectionColor: '#3b82f6',
   selectionBorderColor: '#1d4ed8',
-  editingColor: '#10b981',
-  editingBorderColor: '#059669',
   dragIndicatorColor: '#6366f1',
   enableAnimations: false,
   animationDuration: 200,

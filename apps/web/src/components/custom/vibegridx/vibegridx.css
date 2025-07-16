@@ -130,13 +130,13 @@
   opacity: 0;
   transition: opacity 0.2s;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   flex-direction: column;
   gap: 0;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px 6px;
   border-radius: 4px;
   flex-shrink: 0;
 }
@@ -159,8 +159,8 @@
 }
 
 .vibegridx-sort-icon svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Hide the old sort indicator */
@@ -381,6 +381,221 @@ body.vibegridx-dragging-active * {
   cursor: pointer;
   color: hsl(var(--foreground));
   background: inherit;
+}
+
+/* Single-click editing hover states */
+.vibegridx-cell-content-editable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.2em;
+  min-width: 20px;
+}
+
+.vibegridx-cell-content-editable:hover {
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+/* Text content hover states */
+.vibegridx-cell-text-editable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.2em;
+  min-width: 20px;
+}
+
+.vibegridx-cell-text-editable:hover {
+  background-color: var(--accent);
+}
+
+/* Badge/enum content hover states */
+.vibegridx-cell-badge-editable {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  border-radius: 4px;
+}
+
+.vibegridx-cell-badge-editable:hover {
+  opacity: 0.8;
+}
+
+/* Number content hover states */
+.vibegridx-cell-number-editable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.2em;
+  min-width: 20px;
+}
+
+.vibegridx-cell-number-editable:hover {
+  background-color: var(--accent);
+}
+
+/* Boolean/checkbox content hover states */
+.vibegridx-cell-boolean-editable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.2em;
+  min-width: 20px;
+}
+
+.vibegridx-cell-boolean-editable:hover {
+  background-color: var(--accent);
+}
+
+/* Empty state hover indicators */
+.vibegridx-cell-empty-editable {
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 1.2em;
+  min-width: 20px;
+  transition: background-color 0.15s ease;
+}
+
+.vibegridx-cell-empty-editable:hover {
+  background-color: hsl(var(--muted));
+}
+
+.vibegridx-cell-empty-editable::before {
+  content: "✏️";
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* Disable hover states when editing */
+.vibegridx-editing .vibegridx-cell-content-editable,
+.vibegridx-editing .vibegridx-cell-text-editable,
+.vibegridx-editing .vibegridx-cell-badge-editable,
+.vibegridx-editing .vibegridx-cell-number-editable,
+.vibegridx-editing .vibegridx-cell-boolean-editable,
+.vibegridx-editing .vibegridx-cell-empty-editable {
+  pointer-events: none;
+}
+
+/* Hide cell content when text editor is active */
+.vibegridx-cell-content-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Dropdown editing indicator */
+.vibegridx-cell-dropdown-editing {
+  position: relative;
+}
+
+.vibegridx-cell-dropdown-editing::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(59, 130, 246, 0.05);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Empty state styling */
+.vibegridx-cell-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  transition: opacity 0.15s ease;
+}
+
+.vibegridx-cell-empty-state:hover {
+  opacity: 0.8;
+}
+
+/* Enum badge styling */
+.vibegridx-enum-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+/* Relationship badge styling */
+.vibegridx-relationship-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid var(--primary);
+}
+
+.vibegridx-relationship-badge.vibegridx-relationship-small {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.vibegridx-relationship-badge.vibegridx-relationship-count {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+.vibegridx-relationship-badge.vibegridx-relationship-unresolved {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+  border: 1px solid var(--destructive);
+}
+
+/* Multi-relationship container */
+.vibegridx-multi-relationship-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+
+/* Accessibility improvements */
+.vibegridx-cell-content-editable:focus-visible,
+.vibegridx-cell-text-editable:focus-visible,
+.vibegridx-cell-badge-editable:focus-visible,
+.vibegridx-cell-number-editable:focus-visible,
+.vibegridx-cell-boolean-editable:focus-visible,
+.vibegridx-cell-empty-editable:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 /* First cell in row needs left border */

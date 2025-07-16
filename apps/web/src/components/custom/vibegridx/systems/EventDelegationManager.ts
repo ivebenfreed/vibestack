@@ -20,12 +20,6 @@ import type { ViewportInfo, CellRef } from '../types';
 export interface EventDelegationConfig {
   container: HTMLElement;
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send'];
-  // Optional callbacks for backwards compatibility during transition
-  legacyCallbacks?: {
-    onCellClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
-    onCellDoubleClick?: (rowId: string, columnId: string, event: MouseEvent) => void;
-    onColumnClick?: (columnId: string, event: MouseEvent) => void;
-  };
 }
 
 // ====================================
@@ -280,8 +274,6 @@ export class EventDelegationManager {
           field: columnId // Use 'field' instead of 'columnId' to match view-slice expectation
         });
         
-        // Legacy callback support
-        this.config.legacyCallbacks?.onHeaderClick?.(columnId, event);
       }
       return;
     }
@@ -293,6 +285,16 @@ export class EventDelegationManager {
       return;
     }
     
+    // Check for editable content click (single-click editing)
+    const editableContent = target.closest('.vibegridx-cell-content-editable, .vibegridx-cell-text-editable, .vibegridx-cell-badge-editable, .vibegridx-cell-number-editable, .vibegridx-cell-boolean-editable, .vibegridx-cell-empty-editable');
+    if (editableContent) {
+      const cell = editableContent.closest('.vibegridx-cell') as HTMLElement;
+      if (cell) {
+        this.handleCellContentClick(event, cell);
+        return;
+      }
+    }
+    
     // Check for regular cell click
     const cell = target.closest('.vibegridx-cell') as HTMLElement;
     if (cell) {
@@ -300,8 +302,7 @@ export class EventDelegationManager {
       const columnId = cell.dataset.columnId;
       
       if (rowId && columnId) {
-        // Legacy callback support
-        this.config.legacyCallbacks?.onCellClick?.(rowId, columnId, event);
+        // Cell click handling - currently just handled by single-click content editing
       }
     }
   }
@@ -317,17 +318,48 @@ export class EventDelegationManager {
       const columnId = cell.dataset.columnId;
       
       if (rowId && columnId) {
-        // Start editing on double-click
+        // Start editing on double-click - works anywhere in the cell
         this.config.tableSend({
           type: 'edit.cell.start',
           rowId,
           columnId
         });
-        
-        // Legacy callback support
-        this.config.legacyCallbacks?.onCellDoubleClick?.(rowId, columnId, event);
       }
     }
+  }
+
+  private handleCellContentClick(event: MouseEvent, cell: HTMLElement): void {
+    if (this.isDestroyed) return;
+    
+    const rowId = cell.dataset.rowId;
+    const columnId = cell.dataset.columnId;
+    
+    if (!rowId || !columnId) return;
+    
+    // Skip selection column
+    if (columnId === '__selection') return;
+    
+    console.log('🎯 EventDelegationManager: Content click detected', {
+      rowId,
+      columnId,
+      target: event.target,
+      timestamp: Date.now()
+    });
+    
+    // Stop propagation to prevent normal cell selection
+    event.stopPropagation();
+    event.preventDefault();
+    
+    // Start editing immediately on content click
+    this.config.tableSend({
+      type: 'edit.cell.start.single',
+      rowId,
+      columnId,
+      immediate: true
+    });
+    
+    // Ensure focus without triggering cascading events
+    this.ensureFocus();
   }
 
   // ====================================
@@ -818,6 +850,48 @@ export class EventDelegationManager {
 
   private handleFocusOut(event: FocusEvent): void {
     console.log('🎯 EventDelegationManager: Focus out', { target: (event.target as HTMLElement)?.className });
+    
+    // Check if focus is leaving the editing area
+    const relatedTarget = event.relatedTarget as HTMLElement;
+    const isLeavingEditingArea = !relatedTarget || 
+      (!relatedTarget.closest('.vibegridx-editing-portal') && 
+       !relatedTarget.closest('.vibegridx-container') &&
+       !relatedTarget.closest('[data-radix-popper-content-wrapper]') && // Radix dropdown content
+       !relatedTarget.closest('[role="listbox"]') && // Select dropdown
+       !relatedTarget.closest('[role="option"]') && // Select options
+       !relatedTarget.closest('[data-radix-select-content]') && // Radix Select content
+       !relatedTarget.closest('[data-radix-select-item]') && // Radix Select items
+       !relatedTarget.closest('.select-content') && // Custom select content
+       !relatedTarget.closest('.select-item')); // Custom select items
+    
+    if (isLeavingEditingArea) {
+      // Small delay to allow blur events to process first, then ensure editing is ended
+      setTimeout(() => {
+        // Double-check that we're still leaving the editing area after the delay
+        // This prevents race conditions where focus changes rapidly
+        const currentActive = document.activeElement as HTMLElement;
+        const stillLeavingEditingArea = !currentActive || 
+          (!currentActive.closest('.vibegridx-editing-portal') && 
+           !currentActive.closest('.vibegridx-container') &&
+           !currentActive.closest('[data-radix-popper-content-wrapper]') && // Radix dropdown content
+           !currentActive.closest('[role="listbox"]') && // Select dropdown
+           !currentActive.closest('[role="option"]') && // Select options
+           !currentActive.closest('[data-radix-select-content]') && // Radix Select content
+           !currentActive.closest('[data-radix-select-item]') && // Radix Select items
+           !currentActive.closest('.select-content') && // Custom select content
+           !currentActive.closest('.select-item')); // Custom select items
+        
+        if (stillLeavingEditingArea) {
+          console.log('🎯 EventDelegationManager: Focus left editing area, ensuring edit mode ends');
+          // Don't cancel - let the blur handlers commit first, then just ensure we exit edit mode
+          this.config.tableSend({
+            type: 'edit.ensure.end'
+          });
+        } else {
+          console.log('🎯 EventDelegationManager: Focus returned to editing area, no action needed');
+        }
+      }, 50);
+    }
   }
 
   private ensureFocus(): void {

@@ -29,7 +29,6 @@ export type CanvasActorEvent =
   | { type: 'UPDATE_VIEWPORT'; viewport: ViewportInfo }
   | { type: 'UPDATE_COLUMN_DRAG'; dragState: any; mouseX: number; mouseY: number }
   | { type: 'UPDATE_COLUMN_RESIZE'; resizeState: any }
-  | { type: 'UPDATE_EDITING'; editingCell: CellRef | null; editValue?: any; column?: any; coordinateMapping?: any; viewport?: ViewportInfo; rowHeight?: number; validationErrors?: Map<string, string> }
   | { type: 'SHOW_COPY_INDICATOR'; isCut: boolean }
   | { type: 'HIDE_COPY_INDICATOR' }
   | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[]; selectedRows?: Set<string> }
@@ -45,7 +44,6 @@ export type CanvasActorResponse =
   | { type: 'SELECTION_UPDATED' }
   | { type: 'CANVAS_COORDINATES_UPDATED' }
   | { type: 'VIEWPORT_UPDATED' }
-  | { type: 'EDITING_UPDATED' }
   | { type: 'FILL_START'; direction: 'vertical' | 'horizontal' }
   | { type: 'FILL_PREVIEW'; previewCells: Set<string> }
   | { type: 'FILL_COMPLETE'; fillCells: Set<string> }
@@ -54,9 +52,6 @@ export type CanvasActorResponse =
   | { type: 'CUT'; cells: Set<string> }
   | { type: 'PASTE' }
   | { type: 'CLEAR_CLIPBOARD' }
-  | { type: 'EDIT_UPDATE'; value: any }
-  | { type: 'EDIT_COMMIT'; value: any }
-  | { type: 'EDIT_CANCEL' }
   | { type: 'CANVAS_ERROR'; error: string };
 
 // ====================================
@@ -111,9 +106,6 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
               canvas.onCut = (cells) => sendBack({ type: 'CUT', cells });
               canvas.onPaste = () => sendBack({ type: 'PASTE' });
               canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
-              canvas.onEditUpdate = (value) => sendBack({ type: 'EDIT_UPDATE', value });
-              canvas.onEditCommit = (value) => sendBack({ type: 'EDIT_COMMIT', value });
-              canvas.onEditCancel = () => sendBack({ type: 'EDIT_CANCEL' });
               
               // Pre-initialize Stage progressively
               await canvas.preInitializeAsync();
@@ -303,30 +295,6 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           hideFillLayer.hideFillHandle();
           break;
           
-        case 'UPDATE_EDITING':
-          if (!canvas) {
-            console.warn('CanvasActor: Cannot update editing - canvas not initialized');
-            return;
-          }
-          
-          console.log('CanvasActor: Updating editing state:', {
-            editingCell: event.editingCell,
-            hasColumn: !!event.column,
-            hasValue: event.editValue !== undefined
-          });
-          
-          canvas.updateEditing({
-            editingCell: event.editingCell,
-            editValue: event.editValue,
-            column: event.column,
-            coordinateMapping: event.coordinateMapping,
-            viewport: event.viewport,
-            rowHeight: event.rowHeight,
-            validationErrors: event.validationErrors
-          });
-          
-          sendBack({ type: 'EDITING_UPDATED' });
-          break;
           
         case 'DESTROY':
           console.log('CanvasActor: Destroying canvas overlay');
@@ -371,7 +339,7 @@ export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
   return event && typeof event.type === 'string' && 
     [
       'INITIALIZE', 'UPDATE_SELECTION', 'UPDATE_SELECTION_VISUAL', 'UPDATE_COORDINATES', 'UPDATE_VIEWPORT',
-      'UPDATE_COLUMN_DRAG', 'UPDATE_COLUMN_RESIZE', 'UPDATE_EDITING', 'SHOW_COPY_INDICATOR', 
+      'UPDATE_COLUMN_DRAG', 'UPDATE_COLUMN_RESIZE', 'SHOW_COPY_INDICATOR', 
       'HIDE_COPY_INDICATOR', 'RENDER_FILL_HANDLE', 'RENDER_FILL_HANDLE_ROW_SELECTION', 'RENDER_FILL_PREVIEW',
       'CLEAR_FILL_PREVIEW', 'HIDE_FILL_HANDLE', 'DESTROY'
     ].includes(event.type);
@@ -384,7 +352,7 @@ export function isCanvasActorResponse(response: any): response is CanvasActorRes
   return response && typeof response.type === 'string' && 
     [
       'CANVAS_READY', 'CANVAS_DEFERRED_READY', 'SELECTION_UPDATED', 'CANVAS_COORDINATES_UPDATED', 'VIEWPORT_UPDATED',
-      'EDITING_UPDATED', 'FILL_START', 'FILL_PREVIEW', 'FILL_COMPLETE', 'FILL_CANCEL',
-      'COPY', 'CUT', 'PASTE', 'CLEAR_CLIPBOARD', 'EDIT_UPDATE', 'EDIT_COMMIT', 'EDIT_CANCEL', 'CANVAS_ERROR'
+      'FILL_START', 'FILL_PREVIEW', 'FILL_COMPLETE', 'FILL_CANCEL',
+      'COPY', 'CUT', 'PASTE', 'CLEAR_CLIPBOARD', 'CANVAS_ERROR'
     ].includes(response.type);
 }

@@ -7,6 +7,7 @@ interface TextEditorProps {
   initialValue: string;
   onCommit: (value: string) => void;
   onCancel: () => void;
+  onUpdate?: (value: string) => void;
   onBlur?: () => void;
   multiline?: boolean;
 }
@@ -17,10 +18,30 @@ export function TextEditor({
   initialValue,
   onCommit,
   onCancel,
+  onUpdate,
   onBlur,
   multiline = false
 }: TextEditorProps) {
   const [value, setValue] = React.useState(initialValue || '');
+  
+  console.log('🔧 TextEditor: Rendering', {
+    cellId: cell.rowId + ':' + cell.columnId,
+    columnName: column.name,
+    initialValue,
+    multiline,
+    hasCallbacks: {
+      onCommit: !!onCommit,
+      onCancel: !!onCancel,
+      onBlur: !!onBlur
+    }
+  });
+  
+  React.useEffect(() => {
+    console.log('🔧 TextEditor: Component mounted');
+    return () => {
+      console.log('🔧 TextEditor: Component unmounted');
+    };
+  }, []);
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -42,7 +63,7 @@ export function TextEditor({
   };
 
   const handleBlur = () => {
-    // Always commit with current value - XState will decide what to do
+    // Commit on blur - this is standard behavior
     onCommit(value);
   };
 
@@ -74,12 +95,17 @@ export function TextEditor({
     boxSizing: 'border-box',
   };
 
+  const handleChange = (newValue: string) => {
+    setValue(newValue);
+    onUpdate?.(newValue);
+  };
+
   if (multiline) {
     return (
       <div style={containerStyle}>
         <textarea
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           autoFocus
@@ -94,7 +120,7 @@ export function TextEditor({
     <div style={containerStyle}>
       <input
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         autoFocus

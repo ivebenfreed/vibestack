@@ -2,8 +2,8 @@
 // EDIT ACTOR - Pure Actor for Edit Operations
 // ====================================
 
-import { fromPromise } from 'xstate';
-import type { Column } from '../types';
+import { fromPromise, fromCallback } from 'xstate';
+import type { Column, CellRef } from '../types';
 
 // ====================================
 // VALIDATION HELPERS
@@ -238,4 +238,124 @@ export const editActor = fromPromise(async ({ input }: {
       console.warn('EditActor: Unknown operation type', { type });
       return { success: false, error: `Unknown operation: ${type}` };
   }
+});
+
+// ====================================
+// UI EDIT ACTOR - For UI Integration
+// ====================================
+
+export type UIEditActorEvent = 
+  | { type: 'SHOW_EDITOR'; cell: CellRef; column: Column; value: any; position: { x: number; y: number; width: number; height: number }; mode?: 'single-click' | 'double-click' | 'keyboard' }
+  | { type: 'HIDE_EDITOR' }
+  | { type: 'UPDATE_EDITOR_VALUE'; value: any }
+  | { type: 'UPDATE_EDITOR_VALIDATION'; errors: Map<string, string> }
+  | { type: 'SET_RENDERER'; renderer: any }
+  | { type: 'DESTROY' };
+
+export type UIEditActorResponse = 
+  | { type: 'EDITOR_SHOWN' }
+  | { type: 'EDITOR_HIDDEN' }
+  | { type: 'EDITOR_VALUE_UPDATED' }
+  | { type: 'EDITOR_VALIDATION_UPDATED' }
+  | { type: 'RENDERER_SET' }
+  | { type: 'EDIT_UPDATE'; value: any }
+  | { type: 'EDIT_COMMIT'; value: any }
+  | { type: 'EDIT_CANCEL' }
+  | { type: 'UI_EDIT_ERROR'; error: string };
+
+export const uiEditActor = fromCallback<UIEditActorEvent, UIEditActorResponse>(({ sendBack, receive }) => {
+  let rendererActor: any = null;
+  
+  console.log('UIEditActor: Created for renderer integration');
+  
+  receive((event) => {
+    console.log('UIEditActor: Received event:', event.type);
+    
+    try {
+      switch (event.type) {
+        case 'SET_RENDERER':
+          rendererActor = event.renderer;
+          sendBack({ type: 'RENDERER_SET' });
+          break;
+          
+        case 'SHOW_EDITOR':
+          if (!rendererActor) {
+            console.warn('UIEditActor: Cannot show editor - no renderer actor set');
+            sendBack({ type: 'UI_EDIT_ERROR', error: 'No renderer actor available' });
+            return;
+          }
+          
+          console.log('UIEditActor: Forwarding show editor request to renderer actor', event);
+          rendererActor.send({
+            type: 'SHOW_EDITOR',
+            cell: event.cell,
+            column: event.column,
+            value: event.value,
+            position: event.position,
+            mode: event.mode
+          });
+          sendBack({ type: 'EDITOR_SHOWN' });
+          break;
+          
+        case 'HIDE_EDITOR':
+          if (!rendererActor) {
+            console.warn('UIEditActor: Cannot hide editor - no renderer actor set');
+            return;
+          }
+          
+          console.log('UIEditActor: Forwarding hide editor request to renderer actor');
+          rendererActor.send({
+            type: 'HIDE_EDITOR'
+          });
+          sendBack({ type: 'EDITOR_HIDDEN' });
+          break;
+          
+        case 'UPDATE_EDITOR_VALUE':
+          if (!rendererActor) {
+            console.warn('UIEditActor: Cannot update editor value - no renderer actor set');
+            return;
+          }
+          
+          console.log('UIEditActor: Forwarding update editor value to renderer actor', event.value);
+          rendererActor.send({
+            type: 'UPDATE_EDITOR_VALUE',
+            value: event.value
+          });
+          sendBack({ type: 'EDITOR_VALUE_UPDATED' });
+          break;
+          
+        case 'UPDATE_EDITOR_VALIDATION':
+          if (!rendererActor) {
+            console.warn('UIEditActor: Cannot update editor validation - no renderer actor set');
+            return;
+          }
+          
+          console.log('UIEditActor: Forwarding update editor validation to renderer actor', event.errors);
+          rendererActor.send({
+            type: 'UPDATE_EDITOR_VALIDATION',
+            errors: event.errors
+          });
+          sendBack({ type: 'EDITOR_VALIDATION_UPDATED' });
+          break;
+          
+        case 'DESTROY':
+          console.log('UIEditActor: Destroying');
+          rendererActor = null;
+          break;
+          
+        default:
+          console.warn('UIEditActor: Unknown event type', event);
+          sendBack({ type: 'UI_EDIT_ERROR', error: `Unknown event: ${event.type}` });
+      }
+    } catch (error) {
+      console.error('UIEditActor: Error handling event:', error);
+      sendBack({ type: 'UI_EDIT_ERROR', error: String(error) });
+    }
+  });
+  
+  // Return cleanup function
+  return () => {
+    console.log('UIEditActor: Cleaning up');
+    rendererActor = null;
+  };
 });

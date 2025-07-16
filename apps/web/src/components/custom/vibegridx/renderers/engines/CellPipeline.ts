@@ -74,13 +74,59 @@ export class CellPipeline {
     
     // Set content efficiently - pass row data for relationship resolution
     const cellContent = this.renderValue(value, column, rowData);
-    
-    // Check if this is an enum type that returns HTML
     const cellType = column.cellType || column.type;
-    if (cellType === 'enum') {
-      content.innerHTML = cellContent;
+    
+    // Check if column is editable
+    const isEditable = column.editable !== false; // Default to true unless explicitly false
+    
+    if (isEditable) {
+      // Create wrapper element for editable content
+      const wrapper = document.createElement('div');
+      
+      // Add appropriate CSS class based on content type
+      const isEmpty = !cellContent || cellContent === '' || cellContent === 'null' || cellContent === 'undefined';
+      
+      if (isEmpty) {
+        wrapper.className = 'vibegridx-cell-empty-editable';
+        wrapper.textContent = 'Click to edit';
+      } else {
+        // Add type-specific editable class
+        switch (cellType) {
+          case 'text':
+          case 'string':
+            wrapper.className = 'vibegridx-cell-text-editable';
+            break;
+          case 'number':
+          case 'integer':
+          case 'float':
+            wrapper.className = 'vibegridx-cell-number-editable';
+            break;
+          case 'boolean':
+            wrapper.className = 'vibegridx-cell-boolean-editable';
+            break;
+          case 'enum':
+            wrapper.className = 'vibegridx-cell-badge-editable';
+            break;
+          default:
+            wrapper.className = 'vibegridx-cell-content-editable';
+        }
+        
+        // Set content based on type
+        if (cellType === 'enum' || cellType?.startsWith('relationship')) {
+          wrapper.innerHTML = cellContent;
+        } else {
+          wrapper.textContent = cellContent;
+        }
+      }
+      
+      content.appendChild(wrapper);
     } else {
-      content.textContent = cellContent;
+      // Non-editable content - render normally
+      if (cellType === 'enum' || cellType?.startsWith('relationship')) {
+        content.innerHTML = cellContent;
+      } else {
+        content.textContent = cellContent;
+      }
     }
     
     return content;

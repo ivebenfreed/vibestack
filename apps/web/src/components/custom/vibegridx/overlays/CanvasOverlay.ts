@@ -16,7 +16,6 @@ import { ColumnResizeOverlay } from './ColumnResizeOverlay';
 import { SelectionColumnOverlay } from './SelectionColumnOverlay';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { ColumnDragState, ColumnResizeState } from '../types';
-import { EditingOverlay } from './EditingOverlay';
 import { calculateVisualPositions } from '../machines/table-machine/helpers/visual-position-helpers';
 
 // ====================================
@@ -45,7 +44,6 @@ export class CanvasOverlay implements CoordinateProvider {
   private columnDragOverlay: ColumnDragOverlay | null = null;
   private columnResizeOverlay: ColumnResizeOverlay | null = null;
   private selectionColumnOverlay: SelectionColumnOverlay | null = null;
-  private editingOverlay: EditingOverlay | null = null;
   
   // Callbacks for parent communication (pure actors approach)
   public onSelectionChange?: (selectedCells: Set<string>) => void;
@@ -57,9 +55,6 @@ export class CanvasOverlay implements CoordinateProvider {
   public onCut?: (cells: Set<string>) => void;
   public onPaste?: () => void;
   public onClearClipboard?: () => void;
-  public onEditUpdate?: (value: any) => void;
-  public onEditCommit?: (value: any) => void;
-  public onEditCancel?: () => void;
   
   // State access for overlays (passed from table machine)
   private currentSelectedCells: Set<string> = new Set();
@@ -256,21 +251,6 @@ export class CanvasOverlay implements CoordinateProvider {
     return this.columnResizeOverlay;
   }
   
-  private getEditingOverlay(): EditingOverlay {
-    if (!this.editingOverlay) {
-      console.log('CanvasOverlay: Lazily creating EditingOverlay');
-      this.editingOverlay = new EditingOverlay(
-        this.container,
-        {
-          onUpdate: (value) => this.onEditUpdate?.(value),
-          onCommit: (value) => this.onEditCommit?.(value),
-          onCancel: () => this.onEditCancel?.(),
-          zIndex: 1000 // Above canvas
-        }
-      );
-    }
-    return this.editingOverlay;
-  }
   
   private async prepareContainer(): Promise<void> {
     // Ensure container has ID
@@ -617,47 +597,6 @@ export class CanvasOverlay implements CoordinateProvider {
     }
   }
   
-  updateEditing(params: {
-    editingCell: CellRef | null;
-    editValue?: any;
-    column?: Column;
-    coordinateMapping?: any;
-    viewport?: ViewportInfo;
-    rowHeight?: number;
-    validationErrors?: Map<string, string>;
-  }): void {
-    const { editingCell, editValue, column, coordinateMapping, viewport, rowHeight, validationErrors } = params;
-    
-    console.log('CanvasOverlay: updateEditing', { editingCell, column: column?.id });
-    
-    if (!editingCell) {
-      // Hide editing overlay
-      if (this.editingOverlay) {
-        this.editingOverlay.hide();
-      }
-      return;
-    }
-    
-    // Calculate visual position for editing cell
-    const cellKey = `${editingCell.rowId}:${editingCell.columnId}`;
-    const visualPositions = calculateVisualPositions(
-      new Set([cellKey]),
-      coordinateMapping || this.coordinateMapping,
-      viewport || this.currentViewport,
-      rowHeight || this.config.cellHeight
-    );
-    
-    if (visualPositions.length > 0 && column) {
-      const editingOverlay = this.getEditingOverlay();
-      editingOverlay.showAt(
-        visualPositions[0],
-        editingCell,
-        column,
-        editValue,
-        validationErrors
-      );
-    }
-  }
   
   // Event handlers for overlay interactions (pure actors approach)
   get overlayRenderer() {
@@ -711,7 +650,6 @@ export class CanvasOverlay implements CoordinateProvider {
     if (this.columnDragOverlay) this.columnDragOverlay.destroy();
     if (this.columnResizeOverlay) this.columnResizeOverlay.destroy();
     if (this.selectionColumnOverlay) this.selectionColumnOverlay.destroy();
-    if (this.editingOverlay) this.editingOverlay.destroy();
     
     // Destroy layers
     if (this.fillHandleLayer) this.fillHandleLayer.destroy();

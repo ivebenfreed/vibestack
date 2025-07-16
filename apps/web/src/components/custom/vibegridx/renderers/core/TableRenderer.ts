@@ -195,6 +195,7 @@ export class TableRenderer {
       options
     });
     
+    
     // Event handlers now managed by EventDelegationSystem
     
     // DOM is already initialized by DOMStructureManager
@@ -204,6 +205,7 @@ export class TableRenderer {
   // ====================================
   // INITIALIZATION
   // ====================================
+  
   
   // DOM is now handled by DOMStructureManager
   
@@ -391,6 +393,11 @@ export class TableRenderer {
     this.selectionManager.setEditingCell(cellRef);
   }
   
+  // ====================================
+  // EDITING SYSTEM METHODS
+  // ====================================
+  
+  
   setSelectedCells(selectedCells: Set<string>): void {
     this.selectionManager.setSelectedCells(selectedCells);
   }
@@ -573,6 +580,7 @@ export class TableRenderer {
 
   destroy(): void {
     this.performanceMonitor.cancelFrameTracking();
+    
     
     this.stateManager.cleanup();
     this.domManager.clearAllCaches();

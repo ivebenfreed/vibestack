@@ -4,6 +4,7 @@
 
 import { sendTo, assign, emit } from 'xstate';
 import { editActions } from '../slices/edit-slice';
+import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 export const editHandlers = {
   'edit.cell.start': {
@@ -29,6 +30,60 @@ export const editHandlers = {
       }
     ]
   },
+
+  'edit.cell.start.single': {
+    actions: [
+      // Log single-click edit initiation
+      ({ context, event }) => {
+        console.log('🎯 Edit Handler: Single-click edit initiated', {
+          rowId: event.rowId,
+          columnId: event.columnId,
+          immediate: event.immediate,
+          timestamp: Date.now()
+        });
+      },
+      
+      // Validate that the column is editable
+      ({ context, event, self }) => {
+        const column = context.columns.find(c => c.id === event.columnId);
+        if (!column) {
+          console.warn('🎯 Edit Handler: Column not found', { columnId: event.columnId });
+          return;
+        }
+        
+        if (column.editable === false) {
+          console.warn('🎯 Edit Handler: Column not editable', { columnId: event.columnId });
+          return;
+        }
+        
+        // Create cell ref from event
+        const cell = {
+          rowId: event.rowId,
+          columnId: event.columnId,
+          field: column.field || event.columnId
+        };
+        
+        // Get current value from row data
+        const row = context.rows.find(r => r.id === event.rowId);
+        const value = row?.data[cell.field];
+        
+        console.log('🎯 Edit Handler: Starting single-click edit', {
+          cell,
+          value,
+          column: column.name
+        });
+        
+        // Send the edit.start event with proper structure and immediate flag
+        self.send({
+          type: 'edit.start',
+          cell,
+          value,
+          mode: 'single-click',
+          immediate: event.immediate
+        });
+      }
+    ]
+  },
   
   'edit.start': {
     actions: [
@@ -39,18 +94,36 @@ export const editHandlers = {
         editingCell: ({ event }) => event.cell
       }),
       
-      // Send to canvas for positioning the editing overlay
+      // Send to editing actor for showing the editor
       sendTo(
-        ({ context }) => context.actors.canvasActor!,
-        ({ context, event }) => ({
-          type: 'UPDATE_EDITING',
-          editingCell: event.cell,
-          editValue: event.value,
-          column: context.columns.find(c => c.id === event.cell.columnId),
-          coordinateMapping: context.coordinateMapping,
-          viewport: context.viewport,
-          rowHeight: context.rowHeight
-        })
+        ({ context }) => context.actors.editingActor!,
+        ({ context, event }) => {
+          const column = context.columns.find(c => c.id === event.cell.columnId);
+          if (!column) {
+            console.error('EditHandlers: Column not found for cell', event.cell);
+            return { type: 'SHOW_EDITOR', cell: event.cell, column: { id: 'unknown' }, value: event.value, position: { x: 0, y: 0, width: 100, height: 40 } };
+          }
+          
+          // Use the same visual position calculation as canvas overlay
+          const cellKey = `${event.cell.rowId}:${event.cell.columnId}`;
+          const visualPositions = calculateVisualPositions(
+            new Set([cellKey]),
+            context.coordinateMapping,
+            context.viewport,
+            context.settings.rowHeight
+          );
+          
+          const position = visualPositions[0] || { x: 0, y: 0, width: 100, height: 40 };
+          
+          return {
+            type: 'SHOW_EDITOR',
+            cell: event.cell,
+            column,
+            value: event.value,
+            position,
+            mode: event.mode || 'double-click'
+          };
+        }
       ),
       
       // Emit edit start event
@@ -73,18 +146,12 @@ export const editHandlers = {
     actions: [
       editActions.updateEditValue,
       
-      // Update canvas overlay with new value
+      // Update editing actor with new value
       sendTo(
-        ({ context }) => context.actors.canvasActor!,
+        ({ context }) => context.actors.editingActor!,
         ({ context, event }) => ({
-          type: 'UPDATE_EDITING',
-          editingCell: context.editingCell,
-          editValue: event.value,
-          column: context.columns.find(c => c.id === context.editingCell?.columnId),
-          coordinateMapping: context.coordinateMapping,
-          viewport: context.viewport,
-          rowHeight: context.rowHeight,
-          validationErrors: context.validationErrors
+          type: 'UPDATE_EDITOR_VALUE',
+          value: event.value
         })
       ),
       
@@ -190,12 +257,11 @@ export const editHandlers = {
         editingCell: () => null
       }),
       
-      // Hide canvas editing overlay
+      // Hide editing overlay
       sendTo(
-        ({ context }) => context.actors.canvasActor!,
+        ({ context }) => context.actors.editingActor!,
         () => ({
-          type: 'UPDATE_EDITING',
-          editingCell: null
+          type: 'HIDE_EDITOR'
         })
       )
     ]
@@ -215,12 +281,11 @@ export const editHandlers = {
         editingCell: () => null
       }),
       
-      // Hide canvas editing overlay
+      // Hide editing overlay
       sendTo(
-        ({ context }) => context.actors.canvasActor!,
+        ({ context }) => context.actors.editingActor!,
         () => ({
-          type: 'UPDATE_EDITING',
-          editingCell: null
+          type: 'HIDE_EDITOR'
         })
       ),
       
@@ -249,18 +314,12 @@ export const editHandlers = {
     actions: [
       editActions.setValidationErrors,
       
-      // Update canvas to show validation errors
+      // Update editing actor to show validation errors
       sendTo(
-        ({ context }) => context.actors.canvasActor!,
+        ({ context }) => context.actors.editingActor!,
         ({ context, event }) => ({
-          type: 'UPDATE_EDITING',
-          editingCell: context.editingCell,
-          editValue: context.editValue,
-          column: context.columns.find(c => c.id === context.editingCell?.columnId),
-          coordinateMapping: context.coordinateMapping,
-          viewport: context.viewport,
-          rowHeight: context.rowHeight,
-          validationErrors: event.errors
+          type: 'UPDATE_EDITOR_VALIDATION',
+          errors: event.errors
         })
       ),
       
@@ -354,6 +413,37 @@ export const editHandlers = {
           type: 'edit.cancel'
         });
       }
+    ]
+  },
+
+  'edit.ensure.end': {
+    guard: ({ context }) => {
+      // Only act if we're actually in edit mode
+      return context.editingCell !== null;
+    },
+    actions: [
+      ({ context }) => {
+        console.log('TableMachine: Ensuring edit mode ends', {
+          editingCell: context.editingCell,
+          isDirty: context.isDirty
+        });
+      },
+      
+      // Clear editing state
+      editActions.clearEdit,
+      
+      // Update overlay state
+      assign({
+        editingCell: () => null
+      }),
+      
+      // Hide editing overlay
+      sendTo(
+        ({ context }) => context.actors.editingActor!,
+        () => ({
+          type: 'HIDE_EDITOR'
+        })
+      )
     ]
   },
 

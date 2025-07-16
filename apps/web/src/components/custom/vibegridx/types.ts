@@ -125,6 +125,9 @@ export interface TableSettings {
   rowHeight?: number;
   bufferSize?: number;
   initialViewport?: ViewportInfo;
+  
+  // Editing configuration - single-click is always enabled
+  // No configuration needed - editing is always available
 }
 
 // ====================================
@@ -280,6 +283,7 @@ export interface TableContext {
   actors: {
     rendererActor: ActorRefFrom<any> | null;
     canvasActor: ActorRefFrom<any> | null;
+    editingActor: ActorRefFrom<any> | null;
     selectionCoordinator: ActorRefFrom<any> | null;
     // viewCoordinator removed - view state now managed directly in TableMachine
     dragCoordinator: ActorRefFrom<any> | null;
@@ -506,6 +510,17 @@ export interface RendererOptions {
   onFillComplete?: (originalCells: Set<string>, fillCells: Set<string>) => void;
   // onCanvasContainerReady removed - now using event-driven pattern
   debug?: boolean;
+  
+  // Relationship context for editing system
+  relationshipContext?: {
+    relationshipResolvers?: Record<string, (id: string | string[]) => string>;
+    relationshipAtoms?: Record<string, any>;
+  };
+  
+  // Edit callbacks for editing system
+  onEditUpdate?: (value: any) => void;
+  onEditCommit?: (value: any) => void;
+  onEditCancel?: () => void;
   
   // Canvas overlay configuration
   cellHeight?: number;

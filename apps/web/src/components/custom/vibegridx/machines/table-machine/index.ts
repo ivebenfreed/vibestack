@@ -29,6 +29,7 @@ import { createViewportFromScroll, calculateVisualPositions } from './helpers/vi
 import { viewActor, createViewActorInput } from '../view-actor';
 import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
+import { editingActor } from '../../actors/editing-actor';
 import { editActor } from '../../actors/edit-actor';
 import { dragActor } from '../../actors/drag-actor';
 // No overlay actor needed - canvas subscribes directly to table machine context
@@ -147,6 +148,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       rendererActor: null,
       canvasActor: null,
       viewActor: null,
+      editingActor: null,
       selectionCoordinator: null,
       dragCoordinator: null,
       rowActors: new Map()
@@ -188,6 +190,7 @@ export const tableBaseMachine = setup({
     rendererActor,
     canvasActor,
     viewActor,
+    editingActor,
     editActor,
     dragActor,
   },
@@ -362,6 +365,9 @@ export const tableBaseMachine = setup({
                 containerId: context.id,
                 enableSelectionColumn: context.enableSelectionColumn
               }
+            }),
+            editingActor: spawn('editingActor', {
+              id: 'editing'
             })
             // canvasActor: deferred to post-render to avoid blocking critical path
             // editActor: spawn as needed for editing
@@ -376,13 +382,14 @@ export const tableBaseMachine = setup({
       
       on: {
         INITIALIZE_RENDERER: {
-          actions: ({ context, event }) => {
+          actions: ({ context, event, self }) => {
             console.log('TableMachine: INITIALIZE_RENDERER event received', {
               hasRendererActor: !!context.actors.rendererActor,
               optionsKeys: Object.keys(event.options || {})
             });
             
             if (context.actors.rendererActor) {
+              // Initialize renderer without editing callbacks (editing handled by editingActor)
               context.actors.rendererActor.send({
                 type: 'INITIALIZE',
                 options: event.options
@@ -435,7 +442,11 @@ export const tableBaseMachine = setup({
                   canvasActor: spawn('canvasActor', { id: 'canvas' })
                 };
               }
-            })
+            }),
+            // Initialize editing actor with editing container (will be set later)
+            ({ context }) => {
+              console.log('TableMachine: Editing actor spawned, waiting for editing container');
+            }
           ]
         },
         
@@ -714,6 +725,42 @@ export const tableBaseMachine = setup({
                   });
                 }
               });
+            }
+            
+            // Initialize editing actor with body container (parent of canvas) for proper positioning
+            if (context.actors.editingActor && context.actors.rendererActor) {
+              console.log('TableMachine: Initializing editing actor with body container for proper positioning');
+              
+              // Get the body container (parent of canvas container)
+              const canvasContainer = event.container;
+              const bodyContainer = canvasContainer.parentElement;
+              
+              console.log('TableMachine: Using body container for editing overlay', {
+                canvasContainer,
+                bodyContainer,
+                bodyClass: bodyContainer?.className,
+                found: !!bodyContainer,
+                containerInDOM: bodyContainer ? document.contains(bodyContainer) : false,
+                containerBounds: bodyContainer ? bodyContainer.getBoundingClientRect() : null
+              });
+              
+              if (bodyContainer) {
+                context.actors.editingActor.send({
+                  type: 'INITIALIZE',
+                  container: bodyContainer,
+                  config: {
+                    relationshipContext: {
+                      relationshipResolvers: context.relationshipResolvers,
+                      relationshipAtoms: context.relationshipAtoms
+                    }
+                  }
+                });
+              } else {
+                console.error('TableMachine: Could not find body container for editing actor', {
+                  canvasContainer,
+                  bodyContainer
+                });
+              }
             }
           }
         ]
