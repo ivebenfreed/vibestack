@@ -282,6 +282,13 @@ export class EventDelegationManager {
       return;
     }
     
+    // Check for checkbox click first
+    const checkbox = target.closest('.vibegridx-checkbox-wrapper, .vibegridx-row-checkbox, .vibegridx-header-checkbox');
+    if (checkbox) {
+      this.handleCheckboxClick(event, checkbox as HTMLElement);
+      return;
+    }
+    
     // Check for regular cell click
     const cell = target.closest('.vibegridx-cell') as HTMLElement;
     if (cell) {
@@ -393,8 +400,51 @@ export class EventDelegationManager {
   }
 
   private handleCheckboxMouseDown(event: MouseEvent, checkbox: HTMLElement): void {
-    // Let the checkbox handle its own click, but prevent drag operations
+    // Prevent drag operations
     event.stopPropagation();
+  }
+
+  private handleCheckboxClick(event: MouseEvent, checkbox: HTMLElement): void {
+    // Handle selection logic on click, not mousedown
+    event.stopPropagation();
+    event.preventDefault(); // Prevent default checkbox behavior since we're handling it manually
+    
+    // Only handle clicks on the wrapper (label), not the input itself to avoid duplicates
+    if (checkbox.tagName === 'INPUT') {
+      return; // Skip input clicks, only handle wrapper clicks
+    }
+    
+    // Find the row this checkbox belongs to
+    const cell = checkbox.closest('.vibegridx-selection-cell') as HTMLElement;
+    if (cell) {
+      const rowId = cell.dataset.rowId;
+      if (rowId) {
+        console.log('🎯 EventDelegationManager: Row checkbox clicked', { rowId });
+        // Send XState event for row selection toggle (correct event name)
+        this.config.tableSend({
+          type: 'selection.checkbox.toggle',
+          rowId,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey
+        });
+      }
+      return;
+    }
+    
+    // Handle header checkbox (select all)
+    const headerCheckbox = checkbox.closest('.vibegridx-selection-header');
+    if (headerCheckbox) {
+      console.log('🎯 EventDelegationManager: Header checkbox clicked');
+      
+      // Check if the checkbox is currently checked to determine action
+      const checkboxInput = headerCheckbox.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      const isCurrentlyChecked = checkboxInput?.checked || false;
+      
+      // If currently checked, deselect all; if not checked, select all
+      this.config.tableSend({
+        type: isCurrentlyChecked ? 'selection.checkbox.none' : 'selection.checkbox.all'
+      });
+    }
   }
 
   private handleResizeStart(event: MouseEvent, resizeHandle: HTMLElement): void {

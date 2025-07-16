@@ -79,7 +79,7 @@ export class FillHandleLayer {
   /**
    * Render fill handle using pre-calculated visual positions (pure actors approach)
    */
-  renderFillHandleWithVisualPositions(visualCells: VisualCellPosition[]): void {
+  renderFillHandleWithVisualPositions(visualCells: VisualCellPosition[], selectedRows?: Set<string>): void {
     if (visualCells.length === 0) {
       this.hideFillHandle();
       return;
@@ -103,16 +103,34 @@ export class FillHandleLayer {
       return;
     }
     
-    // Position fill handle at bottom-right of selection
-    const handleX = maxX;
-    const handleY = maxY;
+    // Check if this is a complete row selection
+    const isCompleteRowSelection = this.isCompleteRowSelection(visualCells, selectedRows);
     
-    console.log('FillHandleLayer: Positioning fill handle at', {
-      handleX,
-      handleY,
-      bounds: { minX, minY, maxX, maxY },
-      visualCells
-    });
+    let handleX: number;
+    let handleY: number;
+    
+    if (isCompleteRowSelection) {
+      // Position fill handle in checkbox column for row selections
+      const CHECKBOX_COLUMN_WIDTH = 48; // Standard checkbox column width
+      handleX = CHECKBOX_COLUMN_WIDTH - 5; // Position near right edge of checkbox column
+      handleY = maxY; // Still at bottom of selection
+      
+      console.log('FillHandleLayer: Positioning fill handle in checkbox column for row selection', {
+        handleX,
+        handleY,
+        selectedRowsCount: selectedRows?.size || 0
+      });
+    } else {
+      // Use existing logic - bottom-right of cell selection
+      handleX = maxX;
+      handleY = maxY;
+      
+      console.log('FillHandleLayer: Positioning fill handle at bottom-right for cell selection', {
+        handleX,
+        handleY,
+        bounds: { minX, minY, maxX, maxY }
+      });
+    }
     
     // Create or update fill handle
     if (!this.activeFillHandle) {
@@ -315,6 +333,39 @@ export class FillHandleLayer {
     return previewCells;
   }
   
+  // ====================================
+  // ROW SELECTION DETECTION
+  // ====================================
+  
+  /**
+   * Determine if the visual cells represent a complete row selection
+   */
+  private isCompleteRowSelection(visualCells: VisualCellPosition[], selectedRows?: Set<string>): boolean {
+    if (!selectedRows || selectedRows.size === 0) {
+      return false;
+    }
+    
+    // Extract unique row IDs from visual cells
+    const visualRowIds = new Set<string>();
+    visualCells.forEach(cell => {
+      // Parse cell key format: "rowId:columnId"
+      const parts = cell.cellKey.split(':');
+      if (parts.length >= 2) {
+        visualRowIds.add(parts[0]);
+      }
+    });
+    
+    // Check if all visual rows are in selectedRows
+    for (const rowId of visualRowIds) {
+      if (!selectedRows.has(rowId)) {
+        return false; // This row is not selected, so it's partial cell selection
+      }
+    }
+    
+    // All visual rows are in selectedRows, this is a complete row selection
+    return visualRowIds.size > 0;
+  }
+
   // ====================================
   // PRIVATE IMPLEMENTATION
   // ====================================

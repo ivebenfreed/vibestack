@@ -119,6 +119,16 @@ export const selectionActions = {
       
       return newSelection;
     },
+    selectedRows: ({ event }) => {
+      // Clear row selection when making a new cell selection (unless using Ctrl/Shift)
+      if (!event || event.type !== 'selection.cell.select') return new Set<string>();
+      if (event.ctrlKey || event.shiftKey) {
+        // Keep existing row selection when extending selection
+        return new Set<string>();
+      }
+      // Clear row selection for new single cell selection
+      return new Set<string>();
+    },
     activeCell: ({ event }) => {
       if (!event || event.type !== 'selection.cell.select') return null;
       return {
@@ -141,6 +151,10 @@ export const selectionActions = {
       if (!event || event.type !== 'selection.range.select') return context.selectedCells;
       return calculateRangeSelection(event.start, event.end, context.coordinateMapping);
     },
+    selectedRows: () => {
+      // Clear row selection when making a range selection
+      return new Set<string>();
+    },
     anchor: ({ event }) => {
       if (!event || event.type !== 'selection.range.select') return null;
       return event.start;
@@ -156,7 +170,7 @@ export const selectionActions = {
   // Checkbox selection actions
   toggleRowSelection: assign({
     selectedRows: ({ context, event }) => {
-      if (!event || event.type !== 'selection.row.toggle') return context.selectedRows;
+      if (!event || event.type !== 'selection.checkbox.toggle') return context.selectedRows;
       const newSelection = new Set(context.selectedRows);
       if (newSelection.has(event.rowId)) {
         newSelection.delete(event.rowId);
@@ -165,24 +179,71 @@ export const selectionActions = {
       }
       return newSelection;
     },
+    selectedCells: ({ context, event }) => {
+      if (!event || event.type !== 'selection.checkbox.toggle') return context.selectedCells;
+      
+      // Update selectedCells to include all cells in selected rows
+      const newSelectedCells = new Set<string>();
+      
+      // First, determine the new selectedRows state
+      const newSelectedRows = new Set(context.selectedRows);
+      if (newSelectedRows.has(event.rowId)) {
+        newSelectedRows.delete(event.rowId);
+      } else {
+        newSelectedRows.add(event.rowId);
+      }
+      
+      // If no rows are selected, clear all selectedCells
+      if (newSelectedRows.size === 0) {
+        return new Set<string>();
+      }
+      
+      // Then generate selectedCells for all selected rows (including checkbox column)
+      newSelectedRows.forEach(rowId => {
+        if (context.coordinateMapping?.columns) {
+          context.coordinateMapping.columns.forEach((col: any) => {
+            // Include ALL columns including the selection column
+            newSelectedCells.add(`${rowId}:${col.columnId}`);
+          });
+        }
+      });
+      
+      return newSelectedCells;
+    },
     lastSelectedRowId: ({ event }) => {
-      if (!event || event.type !== 'selection.row.toggle') return null;
+      if (!event || event.type !== 'selection.checkbox.toggle') return null;
       return event.rowId;
     }
   }),
   
   selectAllRows: assign({
-    selectedRows: ({ context }) => new Set(context.allRowIds)
+    selectedRows: ({ context }) => new Set(context.allRowIds),
+    selectedCells: ({ context }) => {
+      // Generate selectedCells for all rows (including checkbox column)
+      const newSelectedCells = new Set<string>();
+      
+      context.allRowIds.forEach(rowId => {
+        if (context.coordinateMapping?.columns) {
+          context.coordinateMapping.columns.forEach((col: any) => {
+            // Include ALL columns including the selection column
+            newSelectedCells.add(`${rowId}:${col.columnId}`);
+          });
+        }
+      });
+      
+      return newSelectedCells;
+    }
   }),
   
   clearRowSelection: assign({
     selectedRows: () => new Set<string>(),
+    selectedCells: () => new Set<string>(), // Clear selectedCells as well
     lastSelectedRowId: () => null
   }),
   
   selectRowRange: assign({
     selectedRows: ({ context, event }) => {
-      if (!event || event.type !== 'selection.row.range') return context.selectedRows;
+      if (!event || event.type !== 'selection.checkbox.range') return context.selectedRows;
       const newSelection = new Set(context.selectedRows);
       
       // Find indices in allRowIds
@@ -200,6 +261,39 @@ export const selectionActions = {
       }
       
       return newSelection;
+    },
+    selectedCells: ({ context, event }) => {
+      if (!event || event.type !== 'selection.checkbox.range') return context.selectedCells;
+      
+      // Generate selectedCells for the updated selectedRows
+      const newSelectedCells = new Set<string>();
+      const newSelectedRows = new Set(context.selectedRows);
+      
+      // Find indices in allRowIds
+      const startIndex = context.allRowIds.indexOf(event.startRowId);
+      const endIndex = context.allRowIds.indexOf(event.endRowId);
+      
+      if (startIndex !== -1 && endIndex !== -1) {
+        const minIndex = Math.min(startIndex, endIndex);
+        const maxIndex = Math.max(startIndex, endIndex);
+        
+        // Add all rows in range
+        for (let i = minIndex; i <= maxIndex; i++) {
+          newSelectedRows.add(context.allRowIds[i]);
+        }
+      }
+      
+      // Generate selectedCells for all selected rows (including checkbox column)
+      newSelectedRows.forEach(rowId => {
+        if (context.coordinateMapping?.columns) {
+          context.coordinateMapping.columns.forEach((col: any) => {
+            // Include ALL columns including the selection column
+            newSelectedCells.add(`${rowId}:${col.columnId}`);
+          });
+        }
+      });
+      
+      return newSelectedCells;
     }
   }),
   

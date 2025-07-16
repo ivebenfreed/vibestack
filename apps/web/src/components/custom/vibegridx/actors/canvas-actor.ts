@@ -32,7 +32,8 @@ export type CanvasActorEvent =
   | { type: 'UPDATE_EDITING'; editingCell: CellRef | null; editValue?: any; column?: any; coordinateMapping?: any; viewport?: ViewportInfo; rowHeight?: number; validationErrors?: Map<string, string> }
   | { type: 'SHOW_COPY_INDICATOR'; isCut: boolean }
   | { type: 'HIDE_COPY_INDICATOR' }
-  | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[] }
+  | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[]; selectedRows?: Set<string> }
+  | { type: 'RENDER_FILL_HANDLE_ROW_SELECTION'; selectedRows: Set<string>; visualCells: VisualCellPosition[] }
   | { type: 'RENDER_FILL_PREVIEW'; previewCells: Set<string>; viewport: ViewportInfo }
   | { type: 'CLEAR_FILL_PREVIEW' }
   | { type: 'HIDE_FILL_HANDLE' }
@@ -248,10 +249,25 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           }
           
           console.log('CanvasActor: Rendering fill handle with visual positions:', {
-            cellCount: event.visualCells.length
+            cellCount: event.visualCells.length,
+            selectedRowsCount: event.selectedRows?.size || 0
           });
           const fillHandleLayer = (canvas as any).getFillHandleLayer();
-          fillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells);
+          fillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells, event.selectedRows);
+          break;
+          
+        case 'RENDER_FILL_HANDLE_ROW_SELECTION':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot render row selection fill handle - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Rendering fill handle for row selection:', {
+            selectedRowsCount: event.selectedRows.size,
+            visualCellsCount: event.visualCells.length
+          });
+          const rowFillHandleLayer = (canvas as any).getFillHandleLayer();
+          rowFillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells, event.selectedRows);
           break;
           
         case 'RENDER_FILL_PREVIEW':
@@ -356,7 +372,7 @@ export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
     [
       'INITIALIZE', 'UPDATE_SELECTION', 'UPDATE_SELECTION_VISUAL', 'UPDATE_COORDINATES', 'UPDATE_VIEWPORT',
       'UPDATE_COLUMN_DRAG', 'UPDATE_COLUMN_RESIZE', 'UPDATE_EDITING', 'SHOW_COPY_INDICATOR', 
-      'HIDE_COPY_INDICATOR', 'RENDER_FILL_HANDLE', 'RENDER_FILL_PREVIEW',
+      'HIDE_COPY_INDICATOR', 'RENDER_FILL_HANDLE', 'RENDER_FILL_HANDLE_ROW_SELECTION', 'RENDER_FILL_PREVIEW',
       'CLEAR_FILL_PREVIEW', 'HIDE_FILL_HANDLE', 'DESTROY'
     ].includes(event.type);
 }

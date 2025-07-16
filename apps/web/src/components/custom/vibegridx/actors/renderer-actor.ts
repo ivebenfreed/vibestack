@@ -29,6 +29,7 @@ export type RendererActorEvent =
   | { type: 'UPDATE_COORDINATES'; mapping: any; version: number }
   | { type: 'UPDATE_CELL'; rowId: string; columnId: string; field: string; value: any; oldValue: any }
   | { type: 'UPDATE_ROW'; rowId: string; entity: any; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
+  | { type: 'UPDATE_SELECTED_ROWS'; selectedRows: Set<string> }
   | { type: 'REMOVE_ROW'; rowId: string }
   | { type: 'DESTROY' };
 
@@ -41,6 +42,7 @@ export type RendererActorResponse =
   | { type: 'COLUMNS_UPDATED' }
   | { type: 'COLUMN_WIDTH_UPDATED' }
   | { type: 'COORDINATES_UPDATED' }
+  | { type: 'SELECTED_ROWS_UPDATED' }
   | { type: 'RENDERER_ERROR'; error: string };
 
 // ====================================
@@ -443,6 +445,27 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           });
           break;
           
+        case 'UPDATE_SELECTED_ROWS':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update selected rows - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Updating selected rows:', {
+            selectedRowsSize: event.selectedRows.size,
+            selectedRowIds: Array.from(event.selectedRows)
+          });
+          
+          // Update selected rows in renderer to sync checkbox states and row styles
+          if (renderer.setSelectedRows) {
+            renderer.setSelectedRows(event.selectedRows);
+          } else {
+            console.warn('RendererActor: setSelectedRows method not available on renderer');
+          }
+          
+          sendBack({ type: 'SELECTED_ROWS_UPDATED' });
+          break;
+          
         case 'REMOVE_ROW':
           if (!renderer) {
             console.warn('RendererActor: Cannot remove row - renderer not initialized');
@@ -543,7 +566,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
  */
 export function isRendererActorEvent(event: any): event is RendererActorEvent {
   return event && typeof event.type === 'string' && 
-    ['INITIALIZE', 'RENDER_ROWS', 'UPDATE_VIEWPORT', 'UPDATE_COLUMNS', 'DESTROY'].includes(event.type);
+    ['INITIALIZE', 'RENDER_ROWS', 'UPDATE_VIEWPORT', 'UPDATE_COLUMNS', 'UPDATE_SELECTED_ROWS', 'DESTROY'].includes(event.type);
 }
 
 /**
@@ -551,5 +574,5 @@ export function isRendererActorEvent(event: any): event is RendererActorEvent {
  */
 export function isRendererActorResponse(response: any): response is RendererActorResponse {
   return response && typeof response.type === 'string' && 
-    ['RENDERER_READY', 'CANVAS_CONTAINER_READY', 'ROWS_RENDERED', 'VIEWPORT_UPDATED', 'COLUMNS_UPDATED', 'RENDERER_ERROR'].includes(response.type);
+    ['RENDERER_READY', 'CANVAS_CONTAINER_READY', 'ROWS_RENDERED', 'VIEWPORT_UPDATED', 'COLUMNS_UPDATED', 'SELECTED_ROWS_UPDATED', 'RENDERER_ERROR'].includes(response.type);
 }

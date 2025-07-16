@@ -68,7 +68,21 @@ export const selectionHandlers = {
             type: 'FORWARD_TO_CANVAS',
             event: {
               type: 'RENDER_FILL_HANDLE',
-              visualCells: visualPositions
+              visualCells: visualPositions,
+              selectedRows: context.selectedRows
+            }
+          });
+        }
+      },
+      
+      // Update renderer to clear selected rows when making cell selection
+      ({ context, self }) => {
+        if (context.actors?.rendererActor) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_SELECTED_ROWS',
+              selectedRows: context.selectedRows // Will be empty set from selectCell action
             }
           });
         }
@@ -115,7 +129,8 @@ export const selectionHandlers = {
             type: 'FORWARD_TO_CANVAS',
             event: {
               type: 'RENDER_FILL_HANDLE',
-              visualCells: visualPositions
+              visualCells: visualPositions,
+              selectedRows: context.selectedRows
             }
           });
         }
@@ -137,7 +152,20 @@ export const selectionHandlers = {
       sendTo(
         ({ context }) => context.actors.canvasActor!,
         () => ({ type: 'HIDE_FILL_HANDLE' })
-      )
+      ),
+      
+      // Update renderer to clear selected rows when clearing all selection
+      ({ context, self }) => {
+        if (context.actors?.rendererActor) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_SELECTED_ROWS',
+              selectedRows: new Set<string>() // Clear all row selection
+            }
+          });
+        }
+      }
     ]
   },
   
@@ -152,6 +180,89 @@ export const selectionHandlers = {
           isSelected: context.selectedRows.has(event.rowId),
           totalSelected: context.selectedRows.size
         });
+      },
+      
+      // Send visual positions to canvas (same pattern as cell selection)
+      ({ context, self }) => {
+        // Skip selection updates when editing
+        if (context.editingCell) {
+          console.log('SelectionHandler: Skipping row selection update - editing in progress');
+          return;
+        }
+        
+        // Only proceed if we have valid context
+        if (!context.coordinateMapping) {
+          console.warn('SelectionHandler: Missing coordinate mapping');
+          return;
+        }
+        
+        // PERFORMANCE: Spawn canvas actor on first selection if needed
+        if (!context.actors?.canvasActor) {
+          console.log('SelectionHandler: No canvas actor, sending spawn event');
+          self.send({ type: 'SPAWN_CANVAS_ACTOR_FOR_SELECTION' });
+          return;
+        }
+        
+        const visualPositions = calculateVisualPositions(
+          context.selectedCells, // Use the updated selectedCells from the action
+          context.coordinateMapping,
+          context.viewport,
+          context.rowHeight || context.settings?.rowHeight || 40
+        );
+        
+        console.log('SelectionHandler: Calculated visual positions for row selection', {
+          selectedCellsSize: context.selectedCells.size,
+          selectedRowsSize: context.selectedRows.size,
+          visualPositionsCount: visualPositions.length
+        });
+        
+        if (visualPositions.length > 0) {
+          console.log('SelectionHandler: Sending row selection canvas events');
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: visualPositions
+            }
+          });
+          
+          // Render fill handle using selectedRows to determine positioning
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'RENDER_FILL_HANDLE',
+              visualCells: visualPositions,
+              selectedRows: context.selectedRows
+            }
+          });
+        } else {
+          // No visual positions means no selection - clear canvas overlays
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
+        
+        // Update renderer with selected rows to sync checkbox states and row styles
+        if (context.actors?.rendererActor) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_SELECTED_ROWS',
+              selectedRows: context.selectedRows
+            }
+          });
+        }
       }
     ]
   },
@@ -165,6 +276,64 @@ export const selectionHandlers = {
           totalRows: context.allRowIds.length,
           selectedCount: context.selectedRows.size
         });
+      },
+      
+      // Send visual positions to canvas (same pattern as cell selection)
+      ({ context, self }) => {
+        // Skip selection updates when editing
+        if (context.editingCell) {
+          console.log('SelectionHandler: Skipping select all update - editing in progress');
+          return;
+        }
+        
+        // Only proceed if we have valid context
+        if (!context.coordinateMapping) {
+          console.warn('SelectionHandler: Missing coordinate mapping');
+          return;
+        }
+        
+        if (!context.actors?.canvasActor) {
+          console.log('SelectionHandler: No canvas actor, sending spawn event');
+          self.send({ type: 'SPAWN_CANVAS_ACTOR_FOR_SELECTION' });
+          return;
+        }
+        
+        const visualPositions = calculateVisualPositions(
+          context.selectedCells, // Use the updated selectedCells from the action
+          context.coordinateMapping,
+          context.viewport,
+          context.rowHeight || context.settings?.rowHeight || 40
+        );
+        
+        if (visualPositions.length > 0) {
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: visualPositions
+            }
+          });
+          
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'RENDER_FILL_HANDLE',
+              visualCells: visualPositions,
+              selectedRows: context.selectedRows
+            }
+          });
+        }
+        
+        // Update renderer with selected rows to sync checkbox states and row styles
+        if (context.actors?.rendererActor) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_SELECTED_ROWS',
+              selectedRows: context.selectedRows
+            }
+          });
+        }
       }
     ]
   },
@@ -175,6 +344,39 @@ export const selectionHandlers = {
       
       () => {
         console.log('TableMachine: All rows deselected');
+      },
+      
+      // Clear selection visual and hide fill handle
+      ({ context, self }) => {
+        if (context.actors?.canvasActor) {
+          // Clear selection visual
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'UPDATE_SELECTION_VISUAL',
+              visualCells: []
+            }
+          });
+          
+          // Hide fill handle
+          self.send({
+            type: 'FORWARD_TO_CANVAS',
+            event: {
+              type: 'HIDE_FILL_HANDLE'
+            }
+          });
+        }
+        
+        // Update renderer to clear selected rows and sync checkbox states
+        if (context.actors?.rendererActor) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_SELECTED_ROWS',
+              selectedRows: new Set<string>() // Empty set to clear selection
+            }
+          });
+        }
       }
     ]
   },
@@ -311,6 +513,19 @@ export const selectionHandlers = {
               }
             });
           }
+        }
+      },
+      
+      // Update renderer to clear selected rows when making range selection
+      ({ context, self }) => {
+        if (context.actors?.rendererActor) {
+          self.send({
+            type: 'FORWARD_TO_RENDERER',
+            event: {
+              type: 'UPDATE_SELECTED_ROWS',
+              selectedRows: context.selectedRows // Will be empty set from selectRange action
+            }
+          });
         }
       }
     ]
