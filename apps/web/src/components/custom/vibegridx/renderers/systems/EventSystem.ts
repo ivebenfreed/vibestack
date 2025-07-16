@@ -96,6 +96,11 @@ export class EventSystem {
         viewport.scrollLeft
       );
       
+      // Sync header horizontal scroll position
+      if (header) {
+        header.style.transform = `translateX(-${viewport.scrollLeft}px)`;
+      }
+      
       this.config.callbacks.onScroll?.(viewportInfo);
     });
 
