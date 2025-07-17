@@ -5,6 +5,72 @@
 import { sendTo, assign, emit } from 'xstate';
 import { editActions } from '../slices/edit-slice';
 import { calculateVisualPositions } from '../helpers/visual-position-helpers';
+import { EditingOverlay } from '../../../overlays/EditingOverlay';
+
+// Global editing overlay instance - managed directly without actor wrapper
+let globalEditingOverlay: EditingOverlay | null = null;
+
+// Helper function to ensure editing overlay is initialized
+function ensureEditingOverlay(context: any, self?: any): EditingOverlay {
+  if (!globalEditingOverlay) {
+    // Get container from context or DOM - try multiple selectors
+    let container = context.containerElement;
+    
+    if (!container) {
+      // Try to find the vibegridx body container
+      container = document.querySelector('[data-vibegridx-container]') || 
+                 document.querySelector('.vibegridx-body') ||
+                 document.querySelector('.vibegridx-container');
+    }
+    
+    if (!container) {
+      throw new Error('EditHandlers: No container found for editing overlay. Available containers: ' + 
+        Array.from(document.querySelectorAll('[class*="vibegridx"]')).map(el => el.className).join(', '));
+    }
+    
+    const config = {
+      onCommit: (value: any) => {
+        // Send commit event back to state machine with safety check
+        if (self && self.getSnapshot && self.getSnapshot().status !== 'stopped') {
+          try {
+            self.send({ type: 'EDIT_COMMIT', value });
+          } catch (error) {
+            console.warn('EditHandlers: Could not send EDIT_COMMIT, machine may be stopped:', error);
+          }
+        }
+      },
+      onCancel: () => {
+        // Send cancel event back to state machine with safety check
+        if (self && self.getSnapshot && self.getSnapshot().status !== 'stopped') {
+          try {
+            self.send({ type: 'EDIT_CANCEL' });
+          } catch (error) {
+            console.warn('EditHandlers: Could not send EDIT_CANCEL, machine may be stopped:', error);
+          }
+        }
+      },
+      zIndex: 1000,
+      relationshipContext: {
+        relationshipResolvers: context.relationshipResolvers,
+        relationshipAtoms: context.relationshipAtoms
+      }
+    };
+    
+    globalEditingOverlay = new EditingOverlay(container, config);
+    console.log('EditHandlers: Created new EditingOverlay instance');
+  }
+  
+  return globalEditingOverlay;
+}
+
+// Helper function to cleanup editing overlay
+function cleanupEditingOverlay(): void {
+  if (globalEditingOverlay) {
+    globalEditingOverlay.destroy();
+    globalEditingOverlay = null;
+    console.log('EditHandlers: Cleaned up EditingOverlay instance');
+  }
+}
 
 export const editHandlers = {
   'edit.cell.start': {
@@ -94,14 +160,14 @@ export const editHandlers = {
         editingCell: ({ event }) => event.cell
       }),
       
-      // Send to editing actor for showing the editor
-      sendTo(
-        ({ context }) => context.actors.editingActor!,
-        ({ context, event }) => {
+      // Show editor directly using EditingOverlay
+      ({ context, event, self }) => {
+        try {
+          const editingOverlay = ensureEditingOverlay(context, self);
           const column = context.columns.find(c => c.id === event.cell.columnId);
           if (!column) {
             console.error('EditHandlers: Column not found for cell', event.cell);
-            return { type: 'SHOW_EDITOR', cell: event.cell, column: { id: 'unknown' }, value: event.value, position: { x: 0, y: 0, width: 100, height: 40 } };
+            return;
           }
           
           // Use the same visual position calculation as canvas overlay
@@ -115,16 +181,26 @@ export const editHandlers = {
           
           const position = visualPositions[0] || { x: 0, y: 0, width: 100, height: 40 };
           
-          return {
-            type: 'SHOW_EDITOR',
+          console.log('EditHandlers: Showing editor directly', {
             cell: event.cell,
-            column,
+            column: column.id,
             value: event.value,
             position,
             mode: event.mode || 'double-click'
-          };
+          });
+          
+          editingOverlay.showAt(
+            position,
+            event.cell,
+            column,
+            event.value,
+            undefined, // validationErrors
+            event.mode || 'double-click'
+          );
+        } catch (error) {
+          console.error('EditHandlers: Error showing editor', error);
         }
-      ),
+      },
       
       // Send to canvas actor to show editing overlay
       sendTo(
@@ -180,116 +256,6 @@ export const editHandlers = {
     ]
   },
 
-  'edit.commit': {
-    guard: ({ context, event }) => {
-      // Don't commit if we're canceling
-      if (context.isCanceling) {
-        return false;
-      }
-      // Check if value has changed - either through isDirty flag or by comparing values
-      const hasChanged = context.isDirty || (event.value !== context.originalValue);
-      return hasChanged;
-    },
-    actions: [
-      // Store editing cell info before clearing it
-      ({ context, event, self }) => {
-        if (!context.editingCell) return;
-        
-        const editingCell = context.editingCell;
-        const { rowId, columnId, field } = editingCell;
-        
-        // Store optimistic operation for tracking
-        const operationId = `edit-${rowId}-${columnId}-${Date.now()}`;
-        const newOperations = new Map(context.optimisticOperations);
-        newOperations.set(operationId, {
-          id: operationId,
-          type: 'update',
-          entityId: rowId,
-          field: field,
-          newValue: event.value,
-          oldValue: context.originalValue,
-          timestamp: Date.now()
-        });
-        
-        // Update optimistic operations
-        Object.assign(context, { optimisticOperations: newOperations });
-        
-        // CRITICAL: Update the row data in state optimistically
-        const rowIndex = context.rows.findIndex(r => r.id === rowId);
-        if (rowIndex !== -1) {
-          const updatedRow = {
-            ...context.rows[rowIndex],
-            data: {
-              ...context.rows[rowIndex].data,
-              [field]: event.value
-            }
-          };
-          const updatedRows = [...context.rows];
-          updatedRows[rowIndex] = updatedRow;
-          Object.assign(context, { rows: updatedRows });
-          
-          console.log('TableMachine: Updated row data optimistically', {
-            rowId,
-            field,
-            newValue: event.value,
-            oldValue: context.originalValue
-          });
-        }
-        
-        // Tell renderer to apply optimistic update to just the edited cell
-        if (context.actors?.rendererActor) {
-          context.actors.rendererActor.send({
-            type: 'UPDATE_CELL',
-            rowId,
-            columnId,
-            field,
-            value: event.value,
-            oldValue: context.originalValue
-          });
-        }
-        
-        // Call entity update handler if provided (fire and forget)
-        if (context.onEntityUpdate) {
-          const updates = { [field]: event.value };
-          
-          console.log('TableMachine: Calling onEntityUpdate', {
-            rowId,
-            updates,
-            field
-          });
-          
-          // Fire and forget - don't await
-          context.onEntityUpdate(rowId, updates);
-        }
-      },
-      
-      editActions.commitEdit,
-      
-      // Clear editing state after commit
-      editActions.clearEdit,
-      
-      // Update overlay state
-      assign({
-        editingCell: () => null
-      }),
-      
-      // Hide editing overlay
-      sendTo(
-        ({ context }) => context.actors.editingActor!,
-        () => ({
-          type: 'HIDE_EDITOR'
-        })
-      ),
-      
-      // Hide editing overlay in canvas
-      sendTo(
-        ({ context }) => context.actors.canvasActor!,
-        () => ({
-          type: 'HIDE_EDITING'
-        })
-      )
-    ]
-  },
 
   'edit.cancel': {
     actions: [
@@ -305,13 +271,17 @@ export const editHandlers = {
         editingCell: () => null
       }),
       
-      // Hide editing overlay
-      sendTo(
-        ({ context }) => context.actors.editingActor!,
-        () => ({
-          type: 'HIDE_EDITOR'
-        })
-      ),
+      // Hide editor directly
+      ({ context }) => {
+        try {
+          if (globalEditingOverlay) {
+            globalEditingOverlay.hide();
+            console.log('EditHandlers: Editor hidden directly');
+          }
+        } catch (error) {
+          console.error('EditHandlers: Error hiding editor', error);
+        }
+      },
       
       // Hide editing overlay in canvas
       sendTo(
@@ -346,14 +316,17 @@ export const editHandlers = {
     actions: [
       editActions.setValidationErrors,
       
-      // Update editing actor to show validation errors
-      sendTo(
-        ({ context }) => context.actors.editingActor!,
-        ({ context, event }) => ({
-          type: 'UPDATE_EDITOR_VALIDATION',
-          errors: event.errors
-        })
-      ),
+      // Update editor validation directly
+      ({ context, event }) => {
+        try {
+          if (globalEditingOverlay) {
+            globalEditingOverlay.updateValidationErrors(event.errors);
+            console.log('EditHandlers: Validation errors updated directly');
+          }
+        } catch (error) {
+          console.error('EditHandlers: Error updating validation errors', error);
+        }
+      },
       
       emit(({ event }) => ({
         type: 'vibegridx.error',
@@ -416,6 +389,10 @@ export const editHandlers = {
   },
 
   'EDIT_COMMIT': {
+    guard: ({ context, event }) => {
+      // Always allow commit for relationship changes
+      return true;
+    },
     actions: [
       ({ event }) => {
         console.log('TableMachine: Edit commit from canvas', {
@@ -423,13 +400,195 @@ export const editHandlers = {
         });
       },
       
-      // Forward the commit to the edit slice
-      ({ self, event }) => {
-        self.send({
-          type: 'edit.commit',
-          value: event.value
+      // Store editing cell info before clearing it
+      ({ context, event, self }) => {
+        if (!context.editingCell) return;
+        
+        const editingCell = context.editingCell;
+        const { rowId, columnId, field } = editingCell;
+        
+        // Store optimistic operation for tracking
+        const operationId = `edit-${rowId}-${columnId}-${Date.now()}`;
+        const newOperations = new Map(context.optimisticOperations);
+        newOperations.set(operationId, {
+          id: operationId,
+          type: 'update',
+          entityId: rowId,
+          field: field,
+          newValue: event.value,
+          oldValue: context.originalValue,
+          timestamp: Date.now()
         });
-      }
+        
+        // Update optimistic operations
+        Object.assign(context, { optimisticOperations: newOperations });
+        
+        // CRITICAL: Update both entities and rows optimistically
+        const entityIndex = context.entities.findIndex(e => e.id === rowId);
+        const rowIndex = context.rows.findIndex(r => r.id === rowId);
+        
+        if (entityIndex !== -1 && rowIndex !== -1) {
+          // Update entity first
+          const updatedEntity = {
+            ...context.entities[entityIndex],
+            [field]: event.value
+          };
+          const updatedEntities = [...context.entities];
+          updatedEntities[entityIndex] = updatedEntity;
+          Object.assign(context, { entities: updatedEntities });
+          
+          // Then update row data
+          const updatedRowData = {
+            ...context.rows[rowIndex].data,
+            [field]: event.value
+          };
+          
+          // Check if this is a relationship column and resolve it
+          const column = context.columns.find(c => c.id === columnId);
+          console.log('TableMachine: Checking if column needs relationship resolution', {
+            columnId,
+            columnType: column?.cellType || column?.type,
+            isRelationship: (column?.cellType || column?.type)?.startsWith('relationship'),
+            hasResolvers: !!context.relationshipResolvers,
+            hasThisResolver: !!context.relationshipResolvers?.[columnId],
+            resolverKeys: Object.keys(context.relationshipResolvers || {})
+          });
+          
+          if (column && (column.cellType || column.type)?.startsWith('relationship')) {
+            const resolver = context.relationshipResolvers?.[columnId];
+            console.log('TableMachine: Attempting to resolve relationship', {
+              columnId,
+              hasResolver: !!resolver,
+              eventValue: event.value,
+              eventValueType: typeof event.value
+            });
+            
+            if (resolver && event.value != null) {
+              try {
+                // Update the resolved value as well
+                const resolvedValue = resolver(event.value);
+                updatedRowData[`__resolved_${columnId}`] = resolvedValue;
+                console.log('TableMachine: Successfully resolved relationship value', {
+                  columnId,
+                  rawValue: event.value,
+                  resolvedValue,
+                  resolvedKey: `__resolved_${columnId}`
+                });
+              } catch (error) {
+                console.error('TableMachine: Error resolving relationship', {
+                  columnId,
+                  value: event.value,
+                  error
+                });
+              }
+            } else {
+              console.warn('TableMachine: Cannot resolve relationship - missing resolver or null value', {
+                columnId,
+                hasResolver: !!resolver,
+                value: event.value
+              });
+            }
+          }
+          
+          const updatedRow = {
+            ...context.rows[rowIndex],
+            data: updatedRowData
+          };
+          const updatedRows = [...context.rows];
+          updatedRows[rowIndex] = updatedRow;
+          Object.assign(context, { rows: updatedRows });
+          
+          console.log('TableMachine: Updated row data optimistically', {
+            rowId,
+            field,
+            newValue: event.value,
+            oldValue: context.originalValue
+          });
+          
+          // Trigger ViewActor to process updated data and re-render
+          // This ensures consistent sorting, styling, and relationship resolution
+          if (self && self.send) {
+            console.log('TableMachine: Triggering view processing after edit');
+            self.send({ type: 'INVOKE_VIEW_ACTOR' });
+          }
+          
+          // Call entity update handler if provided (fire and forget)
+          console.log('TableMachine: Checking onEntityUpdate availability', {
+            hasOnEntityUpdate: !!context.onEntityUpdate,
+            onEntityUpdateType: typeof context.onEntityUpdate,
+            contextKeys: Object.keys(context)
+          });
+          
+          if (context.onEntityUpdate) {
+            const updates = { [field]: event.value };
+            
+            console.log('TableMachine: Calling onEntityUpdate', {
+              rowId,
+              updates,
+              field,
+              functionName: context.onEntityUpdate.name
+            });
+            
+            try {
+              // Fire and forget - don't await
+              const result = context.onEntityUpdate(rowId, updates);
+              console.log('TableMachine: onEntityUpdate called successfully', {
+                rowId,
+                updates,
+                result: result instanceof Promise ? 'Promise' : result
+              });
+            } catch (error) {
+              console.error('TableMachine: Error calling onEntityUpdate', {
+                rowId,
+                updates,
+                error
+              });
+            }
+          } else {
+            console.warn('TableMachine: No onEntityUpdate handler provided', {
+              rowId,
+              field,
+              value: event.value
+            });
+          }
+        } else {
+          console.warn('TableMachine: Could not find entity or row to update', {
+            rowId,
+            entityIndex,
+            rowIndex
+          });
+        }
+      },
+      
+      editActions.commitEdit,
+      
+      // Clear editing state after commit
+      editActions.clearEdit,
+      
+      // Update overlay state
+      assign({
+        editingCell: () => null
+      }),
+      
+      // Hide editor directly
+      ({ context }) => {
+        try {
+          if (globalEditingOverlay) {
+            globalEditingOverlay.hide();
+            console.log('EditHandlers: Editor hidden directly');
+          }
+        } catch (error) {
+          console.error('EditHandlers: Error hiding editor', error);
+        }
+      },
+      
+      // Hide editing overlay in canvas
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({
+          type: 'HIDE_EDITING'
+        })
+      )
     ]
   },
 
@@ -469,13 +628,17 @@ export const editHandlers = {
         editingCell: () => null
       }),
       
-      // Hide editing overlay
-      sendTo(
-        ({ context }) => context.actors.editingActor!,
-        () => ({
-          type: 'HIDE_EDITOR'
-        })
-      ),
+      // Hide editor directly
+      ({ context }) => {
+        try {
+          if (globalEditingOverlay) {
+            globalEditingOverlay.hide();
+            console.log('EditHandlers: Editor hidden directly');
+          }
+        } catch (error) {
+          console.error('EditHandlers: Error hiding editor', error);
+        }
+      },
       
       // Hide editing overlay in canvas
       sendTo(
@@ -487,4 +650,16 @@ export const editHandlers = {
     ]
   },
 
+  // Cleanup when editing system is destroyed
+  'cleanup.editing': {
+    actions: [
+      () => {
+        cleanupEditingOverlay();
+      }
+    ]
+  }
+
 };
+
+// Export cleanup function for external use
+export { cleanupEditingOverlay };

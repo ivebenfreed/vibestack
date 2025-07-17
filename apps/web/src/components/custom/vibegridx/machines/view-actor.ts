@@ -160,7 +160,13 @@ const createGroupTree = (
 };
 
 const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
-  if (sortBy.length === 0) return rows;
+  // If no explicit sort is configured, maintain the original order from entities
+  // This preserves the insertion order and prevents re-ordering on updates
+  if (sortBy.length === 0) {
+    // Return rows as-is to maintain stable order
+    // The order comes from how entities are stored in the atom
+    return rows;
+  }
   
   const sortStartTime = performance.now();
   

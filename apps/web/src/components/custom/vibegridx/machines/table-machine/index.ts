@@ -29,7 +29,6 @@ import { createViewportFromScroll, calculateVisualPositions } from './helpers/vi
 import { viewActor, createViewActorInput } from '../view-actor';
 import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
-import { editingActor } from '../../actors/editing-actor';
 import { editActor } from '../../actors/edit-actor';
 import { dragActor } from '../../actors/drag-actor';
 // No overlay actor needed - canvas subscribes directly to table machine context
@@ -148,7 +147,6 @@ const createDefaultContext = (input: TableConfig): TableContext => {
       rendererActor: null,
       canvasActor: null,
       viewActor: null,
-      editingActor: null,
       selectionCoordinator: null,
       dragCoordinator: null,
       rowActors: new Map()
@@ -190,7 +188,6 @@ export const tableBaseMachine = setup({
     rendererActor,
     canvasActor,
     viewActor,
-    editingActor,
     editActor,
     dragActor,
   },
@@ -365,9 +362,6 @@ export const tableBaseMachine = setup({
                 containerId: context.id,
                 enableSelectionColumn: context.enableSelectionColumn
               }
-            }),
-            editingActor: spawn('editingActor', {
-              id: 'editing'
             })
             // canvasActor: deferred to post-render to avoid blocking critical path
             // editActor: spawn as needed for editing
@@ -389,7 +383,7 @@ export const tableBaseMachine = setup({
             });
             
             if (context.actors.rendererActor) {
-              // Initialize renderer without editing callbacks (editing handled by editingActor)
+              // Initialize renderer without editing callbacks (editing handled by edit-handlers.ts directly)
               context.actors.rendererActor.send({
                 type: 'INITIALIZE',
                 options: event.options
@@ -401,38 +395,9 @@ export const tableBaseMachine = setup({
 // SET_VISIBLE_ENTITIES removed - we always use pre-loaded data from route loader
         
         RENDERER_READY: {
-          // Single path: Always use pre-processed data from route loader
-          target: 'active.idle',
+          // Process through ViewActor to ensure consistent data flow
+          target: 'active.processingViewData',
           actions: [
-            // Update context with pre-processed data
-            assign({
-              rows: ({ context }) => context.initialData?.processedRows || [],
-              visibleRowIds: ({ context }) => context.initialData?.processedRows?.map((r: any) => r.id) || [],
-              coordinateMapping: ({ context }) => context.initialData?.coordinateMapping || null,
-              version: ({ context }) => context.version + 1
-            }),
-            // Send initial data directly to renderer
-            sendTo(
-              ({ context }) => context.actors.rendererActor!,
-              ({ context }) => ({
-                type: 'RENDER',
-                state: {
-                  rows: context.initialData?.processedRows || [],
-                  columns: context.initialData?.visibleColumns || context.columns,
-                  selectedCells: context.selectedCells,
-                  editingCell: null,
-                  groupedData: [],
-                  optimisticOperations: new Map(),
-                  version: context.version + 1,
-                  sortBy: context.sortBy,
-                  columnVisibility: context.columnVisibility,
-                  columnOrder: context.columnOrder,
-                  viewport: context.viewport,
-                  // CRITICAL: Include coordinate mapping for passive renderer
-                  coordinateMapping: context.coordinateMapping
-                }
-              })
-            ),
             // Spawn canvas actor post-render for selection handling
             assign({
               actors: ({ context, spawn }) => {
@@ -727,41 +692,8 @@ export const tableBaseMachine = setup({
               });
             }
             
-            // Initialize editing actor with body container (parent of canvas) for proper positioning
-            if (context.actors.editingActor && context.actors.rendererActor) {
-              console.log('TableMachine: Initializing editing actor with body container for proper positioning');
-              
-              // Get the body container (parent of canvas container)
-              const canvasContainer = event.container;
-              const bodyContainer = canvasContainer.parentElement;
-              
-              console.log('TableMachine: Using body container for editing overlay', {
-                canvasContainer,
-                bodyContainer,
-                bodyClass: bodyContainer?.className,
-                found: !!bodyContainer,
-                containerInDOM: bodyContainer ? document.contains(bodyContainer) : false,
-                containerBounds: bodyContainer ? bodyContainer.getBoundingClientRect() : null
-              });
-              
-              if (bodyContainer) {
-                context.actors.editingActor.send({
-                  type: 'INITIALIZE',
-                  container: bodyContainer,
-                  config: {
-                    relationshipContext: {
-                      relationshipResolvers: context.relationshipResolvers,
-                      relationshipAtoms: context.relationshipAtoms
-                    }
-                  }
-                });
-              } else {
-                console.error('TableMachine: Could not find body container for editing actor', {
-                  canvasContainer,
-                  bodyContainer
-                });
-              }
-            }
+            // Note: EditingOverlay is now managed directly by edit-handlers.ts
+            // No separate actor initialization needed
           }
         ]
       },
@@ -847,7 +779,33 @@ export const tableBaseMachine = setup({
         actions: [
           // Update entities in context
           assign({
-            entities: ({ event }) => event.entities
+            entities: ({ event, context }) => {
+              // If we have existing entities, maintain their order when possible
+              // This prevents re-ordering when Object.values() returns a different order
+              if (context.entities.length > 0) {
+                const newEntitiesMap = new Map(event.entities.map(e => [e.id, e]));
+                const orderedEntities: any[] = [];
+                
+                // First, add all existing entities in their current order (if they still exist)
+                context.entities.forEach(existingEntity => {
+                  const updated = newEntitiesMap.get(existingEntity.id);
+                  if (updated) {
+                    orderedEntities.push(updated);
+                    newEntitiesMap.delete(existingEntity.id); // Remove from map so we don't add it twice
+                  }
+                });
+                
+                // Then add any new entities that weren't in the existing list
+                newEntitiesMap.forEach(newEntity => {
+                  orderedEntities.push(newEntity);
+                });
+                
+                return orderedEntities;
+              }
+              
+              // First time - just use the order as given
+              return event.entities;
+            }
           }),
           
           // Trigger view processing to update rows
@@ -900,22 +858,83 @@ export const tableBaseMachine = setup({
       // Individual entity update (atomic update after initial load)
       'UPDATE_ENTITY': {
         actions: [
-          // Update the specific entity in our entities array
+          // Update the specific entity in our entities array with shallow equality check
           assign({
             entities: ({ context, event }) => {
               const index = context.entities.findIndex(e => e.id === event.entityId);
               if (index !== -1) {
-                const newEntities = [...context.entities];
-                newEntities[index] = event.entity;
-                return newEntities;
+                // Shallow equality check to prevent unnecessary updates
+                const existingEntity = context.entities[index];
+                
+                // Check if entity has actually changed
+                let hasChanged = false;
+                
+                // First check if they're the same reference
+                if (existingEntity === event.entity) {
+                  return context.entities; // No change needed
+                }
+                
+                // Then check if all properties are equal
+                const existingKeys = Object.keys(existingEntity);
+                const newKeys = Object.keys(event.entity);
+                
+                if (existingKeys.length !== newKeys.length) {
+                  hasChanged = true;
+                } else {
+                  // Check each property for shallow equality
+                  const changedKeys: string[] = [];
+                  for (const key of existingKeys) {
+                    if (existingEntity[key] !== event.entity[key]) {
+                      changedKeys.push(key);
+                    }
+                  }
+                  
+                  // Only consider it changed if fields other than updatedAt have changed
+                  // This prevents unnecessary re-renders when only timestamps update
+                  hasChanged = changedKeys.some(key => key !== 'updatedAt');
+                  
+                  if (changedKeys.length > 0 && !hasChanged) {
+                    console.log('TableMachine: UPDATE_ENTITY - only updatedAt changed, skipping update', {
+                      entityId: event.entityId,
+                      changedKeys
+                    });
+                  }
+                }
+                
+                // Only update if there's an actual change
+                if (hasChanged) {
+                  console.log('TableMachine: UPDATE_ENTITY - entity has changed', {
+                    entityId: event.entityId,
+                    changedFields: existingKeys.filter(key => existingEntity[key] !== event.entity[key] && key !== 'updatedAt')
+                  });
+                  const newEntities = [...context.entities];
+                  newEntities[index] = event.entity;
+                  // Store flag to indicate change happened for next action
+                  (event as any)._entityChanged = true;
+                  return newEntities;
+                } else {
+                  console.log('TableMachine: UPDATE_ENTITY - no changes detected, skipping update', {
+                    entityId: event.entityId
+                  });
+                  (event as any)._entityChanged = false;
+                  return context.entities;
+                }
               }
               return context.entities;
             }
           }),
           
-          // Update the specific row in our processed rows
+          // Update the specific row in our processed rows only if entity changed
           assign({
             rows: ({ context, event }) => {
+              const entityIndex = context.entities.findIndex(e => e.id === event.entityId);
+              const existingEntity = entityIndex !== -1 ? context.entities[entityIndex] : null;
+              
+              // Skip if entity hasn't changed (based on entities array update above)
+              if (existingEntity === event.entity) {
+                return context.rows;
+              }
+              
               const index = context.rows.findIndex(r => r.id === event.entityId);
               if (index !== -1) {
                 const newRows = [...context.rows];
@@ -938,20 +957,18 @@ export const tableBaseMachine = setup({
             version: ({ context }) => context.version + 1
           }),
           
-          // Send targeted update to renderer for just this row
-          sendTo(
-            ({ context }) => context.actors.rendererActor!,
-            ({ event, context }) => ({
-              type: 'UPDATE_ROW',
-              rowId: event.entityId,
-              entity: event.entity,
-              // Don't send columns - let renderer use its last render state columns
-              relationshipResolvers: context.relationshipResolvers
-            })
-          ),
+          // Trigger view processing to ensure consistent rendering
+          // ViewActor will handle sorting, filtering, and relationship resolution
+          ({ self, event }) => {
+            // Check the flag set by the previous action to see if entity changed
+            if ((event as any)._entityChanged) {
+              console.log('TableMachine: UPDATE_ENTITY - triggering view processing');
+              self.send({ type: 'INVOKE_VIEW_ACTOR' });
+            }
+          },
           
           ({ event }) => {
-            console.log('TableMachine: UPDATE_ENTITY - updating single row', {
+            console.log('TableMachine: UPDATE_ENTITY - processed', {
               entityId: event.entityId,
               timestamp: performance.now()
             });

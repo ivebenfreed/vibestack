@@ -27,8 +27,6 @@ export type RendererActorEvent =
   | { type: 'UPDATE_COLUMNS'; columns: any[] }
   | { type: 'UPDATE_COLUMN_WIDTH'; columnId: string; width: number }
   | { type: 'UPDATE_COORDINATES'; mapping: any; version: number }
-  | { type: 'UPDATE_CELL'; rowId: string; columnId: string; field: string; value: any; oldValue: any }
-  | { type: 'UPDATE_ROW'; rowId: string; entity: any; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
   | { type: 'UPDATE_SELECTED_ROWS'; selectedRows: Set<string> }
   | { type: 'REMOVE_ROW'; rowId: string }
   | { type: 'DESTROY' };
@@ -36,7 +34,6 @@ export type RendererActorEvent =
 export type RendererActorResponse =
   | { type: 'RENDERER_READY' }
   | { type: 'CANVAS_CONTAINER_READY'; container: HTMLElement }
-  | { type: 'CELL_UPDATED'; rowId: string; columnId: string }
   | { type: 'ROWS_RENDERED'; actualOrder?: string[]; viewport?: ViewportInfo | null; rowCount?: number }
   | { type: 'VIEWPORT_UPDATED'; viewport: ViewportInfo }
   | { type: 'COLUMNS_UPDATED' }
@@ -262,38 +259,6 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           });
           break;
           
-        case 'UPDATE_CELL':
-          if (!renderer) {
-            console.warn('RendererActor: Cannot update cell - renderer not initialized');
-            return;
-          }
-          
-          console.log('RendererActor: Updating single cell:', {
-            rowId: event.rowId,
-            columnId: event.columnId,
-            value: event.value
-          });
-          
-          // Update just the specific cell with optimistic value
-          if (renderer.updateCell) {
-            // Get the actual column from render state
-            const lastRenderState = renderState;
-            const column = lastRenderState?.columns?.find(c => c.id === event.columnId) || {
-              id: event.columnId,
-              field: event.field || event.columnId,
-              type: 'text' as const
-            };
-            renderer.updateCell(event.rowId, event.columnId, event.value, column as any);
-          } else {
-            console.warn('RendererActor: updateCell method not available on renderer');
-          }
-          
-          sendBack({ 
-            type: 'CELL_UPDATED',
-            rowId: event.rowId,
-            columnId: event.columnId
-          });
-          break;
           
         case 'UPDATE_COLUMNS':
           if (!renderer) {
@@ -407,32 +372,6 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           });
           break;
           
-        case 'UPDATE_ROW':
-          if (!renderer) {
-            console.warn('RendererActor: Cannot update row - renderer not initialized');
-            return;
-          }
-          
-          console.log('RendererActor: Updating single row:', {
-            rowId: event.rowId,
-            entity: event.entity,
-            timestamp: performance.now()
-          });
-          
-          // Update just the specific row with new entity data
-          if (renderer.updateRow) {
-            // Don't pass columns - let renderer use its last render state
-            renderer.updateRow(event.rowId, event.entity, event.relationshipResolvers);
-          } else {
-            console.warn('RendererActor: updateRow method not available on renderer');
-          }
-          
-          sendBack({ 
-            type: 'CELL_UPDATED',
-            rowId: event.rowId,
-            columnId: 'all' // Indicates entire row was updated
-          });
-          break;
           
         case 'UPDATE_SELECTED_ROWS':
           if (!renderer) {

@@ -309,71 +309,13 @@ export class TableRenderer {
     this.renderOrchestrator.render(state);
   }
   
-  updateCell(rowId: string, columnId: string, value: any, column: Column): void {
-    // Get the cell element
-    const cellElement = this.getCellElement(rowId, columnId);
-    if (!cellElement) {
-      console.warn(`TableRenderer: Cannot update cell - element not found for ${rowId}:${columnId}`);
-      return;
-    }
-    
-    // Find the row data
-    const lastRenderState = this.stateManager.getLastRenderState();
-    const row = lastRenderState?.rows.find(r => r.id === rowId);
-    if (!row) {
-      console.warn(`TableRenderer: Cannot update cell - row not found for ${rowId}`);
-      return;
-    }
-    
-    // Update the cell content immediately for optimistic update
-    const content = CellPipeline.createCellContent(value, column, row.data);
-    
-    // Clear existing content
-    while (cellElement.firstChild) {
-      cellElement.removeChild(cellElement.firstChild);
-    }
-    
-    // Add new content
-    cellElement.appendChild(content);
-    
-    // Add visual feedback for optimistic update
-    cellElement.classList.add('vibegridx-optimistic');
-    
-    console.log('TableRenderer: Cell updated optimistically', {
-      rowId,
-      columnId,
-      value
-    });
-  }
 
-  // Update a single row without full table re-render
-  updateRow(rowId: string, entity: any, columns?: Column[], relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
-    // Convert entity to TableRow format
-    const row: TableRow = {
-      id: entity.id,
-      data: entity,
-      metadata: {
-        createdAt: entity.createdAt,
-        updatedAt: entity.updatedAt,
-        version: 1,
-        isNew: false,
-        isDirty: false
-      }
-    };
-    
-    // Update the row using the engine
-    this.rowRenderingEngine.updateRow(row, this.stateManager.getLastRenderState(), columns, relationshipResolvers);
-  }
   
   // Get row element for direct manipulation
   getRowElement(rowId: string): HTMLElement | null {
     return this.domManager.getRowElement(rowId);
   }
   
-  // Render row cells (for fallback in renderer-actor)
-  renderRowCells(row: TableRow, rowElement: HTMLElement, columns: Column[], relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
-    this.rowRenderingEngine.renderRowCells(row, rowElement, columns, relationshipResolvers);
-  }
   
   // Remove a row from the DOM
   removeRow(rowId: string): void {
@@ -384,10 +326,6 @@ export class TableRenderer {
     }
   }
 
-  // NEW: Update multiple rows (but not the entire table)
-  updateRows(rows: TableRow[]): void {
-    this.rowRenderingEngine.updateRows(rows, this.stateManager.getLastRenderState());
-  }
   
   setEditingCell(cellRef: CellRef | null): void {
     this.selectionManager.setEditingCell(cellRef);

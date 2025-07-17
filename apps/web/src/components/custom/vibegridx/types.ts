@@ -283,7 +283,6 @@ export interface TableContext {
   actors: {
     rendererActor: ActorRefFrom<any> | null;
     canvasActor: ActorRefFrom<any> | null;
-    editingActor: ActorRefFrom<any> | null;
     selectionCoordinator: ActorRefFrom<any> | null;
     // viewCoordinator removed - view state now managed directly in TableMachine
     dragCoordinator: ActorRefFrom<any> | null;
