@@ -346,6 +346,42 @@ export class EventDelegationManager {
       timestamp: Date.now()
     });
     
+    // Check if we're currently editing a different cell - if so, ensure edit mode ends first
+    const editingPortal = document.querySelector('.vibegridx-editing-portal');
+    if (editingPortal && editingPortal.style.display !== 'none') {
+      const currentEditingCell = editingPortal.getAttribute('data-cell-id');
+      const newCellId = `${rowId}:${columnId}`;
+      
+      if (currentEditingCell && currentEditingCell !== newCellId) {
+        console.log('🎯 EventDelegationManager: Content click on different cell while editing, ensuring edit ends first');
+        
+        // Force any blur handlers to run immediately
+        const activeInput = editingPortal.querySelector('input, select, textarea') as HTMLElement;
+        if (activeInput) {
+          activeInput.blur();
+        }
+        
+        // Then ensure edit mode is ended
+        this.config.tableSend({
+          type: 'edit.ensure.end'
+        });
+        
+        // Small delay to allow state to settle before starting new edit
+        setTimeout(() => {
+          this.config.tableSend({
+            type: 'edit.cell.start.single',
+            rowId,
+            columnId,
+            immediate: true
+          });
+        }, 10);
+        
+        event.stopPropagation();
+        event.preventDefault();
+        return;
+      }
+    }
+    
     // Stop propagation to prevent normal cell selection
     event.stopPropagation();
     event.preventDefault();
@@ -374,6 +410,32 @@ export class EventDelegationManager {
     
     // Skip selection column
     if (columnId === '__selection') return;
+    
+    // Check if we clicked on editable content - if so, skip selection
+    const target = event.target as Element;
+    const isEditableContent = target.closest('.vibegridx-cell-content-editable, .vibegridx-cell-text-editable, .vibegridx-cell-badge-editable, .vibegridx-cell-number-editable, .vibegridx-cell-boolean-editable, .vibegridx-cell-empty-editable');
+    if (isEditableContent) {
+      console.log('🎯 EventDelegationManager: Clicked on editable content, skipping selection');
+      // Don't send selection event - let click handler deal with it
+      return;
+    }
+    
+    // Check if we're currently editing - if so, ensure edit mode ends first
+    const editingPortal = document.querySelector('.vibegridx-editing-portal');
+    if (editingPortal && editingPortal.style.display !== 'none') {
+      console.log('🎯 EventDelegationManager: Cell clicked while editing, ensuring edit ends first');
+      
+      // Force any blur handlers to run immediately
+      const activeInput = editingPortal.querySelector('input, select, textarea') as HTMLElement;
+      if (activeInput) {
+        activeInput.blur();
+      }
+      
+      // Then ensure edit mode is ended
+      this.config.tableSend({
+        type: 'edit.ensure.end'
+      });
+    }
     
     // Ensure focus without triggering cascading events
     this.ensureFocus();

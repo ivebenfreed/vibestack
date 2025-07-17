@@ -112,6 +112,9 @@ export class EditingOverlay {
     this.currentColumn = column;
     this.currentValue = value;
     
+    // Store cell ID on portal for tracking
+    this.portal.setAttribute('data-cell-id', `${cell.rowId}:${cell.columnId}`);
+    
     // Position the portal
     this.portal.style.display = 'block';
     
@@ -146,19 +149,12 @@ export class EditingOverlay {
       this.portal.style.boxSizing = 'border-box';
       this.portal.style.fontSize = '13px';
       this.portal.style.overflow = 'hidden';
+      this.portal.style.backgroundColor = 'transparent'; // Avoid white flash
       
       // Hide the cell content by adding a class to the cell
       this.hideCellContent(cell);
       
-      // Add subtle editing indicator
-      if (mode === 'single-click') {
-        this.portal.style.outline = '1px solid rgb(59, 130, 246)'; // Blue for consistency
-        this.portal.style.outlineOffset = '-1px';
-        this.portal.style.transition = 'outline-color 0.2s ease';
-      } else {
-        this.portal.style.outline = '2px solid rgb(59, 130, 246)'; // Blue for double-click
-        this.portal.style.outlineOffset = '-1px';
-      }
+      // No outline needed - canvas overlay handles the border
     } else if (isDropdownType) {
       // Dropdown editors: Position below the cell and keep cell content visible
       this.portal.style.left = `${position.x}px`;
@@ -183,9 +179,7 @@ export class EditingOverlay {
       this.portal.style.height = `${position.height}px`;
       this.portal.style.padding = '4px';
       
-      // Consistent outline for all editors
-      this.portal.style.outline = '2px solid rgb(59, 130, 246)'; // Blue for consistency
-      this.portal.style.outlineOffset = '-1px';
+      // No outline needed - canvas overlay handles the border
     }
     
     // Render the editor component using shadcn components
@@ -219,47 +213,11 @@ export class EditingOverlay {
     
     this.root.render(editorComponent);
     
-    // Check portal contents immediately after render
-    setTimeout(() => {
-      console.log('🔧 EditingOverlay: Portal contents after render', {
-        portalChildCount: this.portal?.childNodes.length || 0,
-        portalInnerHTML: this.portal?.innerHTML || 'none',
-        portalVisible: this.portal?.offsetWidth > 0 && this.portal?.offsetHeight > 0,
-        portalStyles: {
-          display: this.portal?.style.display,
-          position: this.portal?.style.position,
-          left: this.portal?.style.left,
-          top: this.portal?.style.top,
-          width: this.portal?.style.width,
-          height: this.portal?.style.height,
-          zIndex: this.portal?.style.zIndex,
-          pointerEvents: this.portal?.style.pointerEvents
-        },
-        containerStyles: {
-          position: this.container?.style.position,
-          pointerEvents: this.container?.style.pointerEvents,
-          zIndex: this.container?.style.zIndex,
-          overflow: this.container?.style.overflow
-        },
-        computedStyles: this.portal ? {
-          display: window.getComputedStyle(this.portal).display,
-          visibility: window.getComputedStyle(this.portal).visibility,
-          opacity: window.getComputedStyle(this.portal).opacity,
-          zIndex: window.getComputedStyle(this.portal).zIndex
-        } : null
-      });
-      
-      const input = this.portal?.querySelector('input, select, textarea') as HTMLElement;
-      if (input) {
-        console.log('EditingOverlay: Force focusing input after render');
-        input.focus();
-        if ('select' in input) {
-          (input as HTMLInputElement).select();
-        }
-      } else {
-        console.log('🔧 EditingOverlay: No input found in portal');
-      }
-    }, 10);
+    // Debug logging only
+    console.log('🔧 EditingOverlay: Portal contents after render', {
+      portalChildCount: this.portal?.childNodes.length || 0,
+      portalVisible: this.portal?.offsetWidth > 0 && this.portal?.offsetHeight > 0
+    });
   }
   
   public updateValue(value: any): void {
@@ -310,8 +268,7 @@ export class EditingOverlay {
     const cellElement = document.querySelector(`[data-row-id="${cell.rowId}"][data-column-id="${cell.columnId}"]`) as HTMLElement;
     if (cellElement) {
       cellElement.classList.add('vibegridx-cell-dropdown-editing');
-      cellElement.style.outline = '2px solid rgb(59, 130, 246)'; // Blue for consistency
-      cellElement.style.outlineOffset = '-1px';
+      // No outline needed - canvas overlay handles the border
     }
   }
   
@@ -321,8 +278,6 @@ export class EditingOverlay {
     if (cellElement) {
       cellElement.classList.remove('vibegridx-cell-content-hidden');
       cellElement.classList.remove('vibegridx-cell-dropdown-editing');
-      cellElement.style.outline = '';
-      cellElement.style.outlineOffset = '';
     }
   }
 
@@ -341,7 +296,6 @@ export class EditingOverlay {
     
     // Reset styles
     this.portal.style.padding = '0';
-    this.portal.style.outline = 'none';
     this.portal.style.backgroundColor = '';
     this.portal.style.border = '';
     this.portal.style.borderRadius = '';

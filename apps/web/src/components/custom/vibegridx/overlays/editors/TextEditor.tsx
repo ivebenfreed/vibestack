@@ -23,6 +23,7 @@ export function TextEditor({
   multiline = false
 }: TextEditorProps) {
   const [value, setValue] = React.useState(initialValue || '');
+  const inputRef = React.useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   
   console.log('🔧 TextEditor: Rendering', {
     cellId: cell.rowId + ':' + cell.columnId,
@@ -38,6 +39,11 @@ export function TextEditor({
   
   React.useEffect(() => {
     console.log('🔧 TextEditor: Component mounted');
+    // Select text immediately on mount
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
     return () => {
       console.log('🔧 TextEditor: Component unmounted');
     };
@@ -63,8 +69,16 @@ export function TextEditor({
   };
 
   const handleBlur = () => {
+    console.log('🔧 TextEditor: Blur event triggered', {
+      cellId: cell.rowId + ':' + cell.columnId,
+      value,
+      hasOnCommit: !!onCommit
+    });
+    
     // Commit on blur - this is standard behavior
-    onCommit(value);
+    if (onCommit) {
+      onCommit(value);
+    }
   };
 
   // Container style to match cell layout
@@ -104,11 +118,11 @@ export function TextEditor({
     return (
       <div style={containerStyle}>
         <textarea
+          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          autoFocus
           style={inputStyle}
           placeholder={column.placeholder}
         />
@@ -119,11 +133,11 @@ export function TextEditor({
   return (
     <div style={containerStyle}>
       <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
-        autoFocus
         style={inputStyle}
         type={column.type === 'email' ? 'email' : column.type === 'url' ? 'url' : 'text'}
         placeholder={column.placeholder}

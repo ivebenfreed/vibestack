@@ -9,6 +9,7 @@ import type { VibeGridXCoordinateManager } from '../coordinates/VibeGridXCoordin
 import type { CoordinateProvider } from './CoordinateProvider';
 import { FillHandleLayer } from './FillHandleLayer';
 import { SelectionOverlay } from './SelectionOverlay';
+import { EditingCanvasOverlay } from './EditingCanvasOverlay';
 import { ClipboardOverlay } from './ClipboardOverlay';
 import { DragPreviewOverlay } from './DragPreviewOverlay';
 import { ColumnDragOverlay } from './ColumnDragOverlay';
@@ -39,6 +40,7 @@ export class CanvasOverlay implements CoordinateProvider {
   // Feature overlays - LAZY LOADED
   private fillHandleLayer: FillHandleLayer | null = null;
   private selectionOverlay: SelectionOverlay | null = null;
+  private editingCanvasOverlay: EditingCanvasOverlay | null = null;
   private clipboardOverlay: ClipboardOverlay | null = null;
   private dragPreviewOverlay: DragPreviewOverlay | null = null;
   private columnDragOverlay: ColumnDragOverlay | null = null;
@@ -155,6 +157,18 @@ export class CanvasOverlay implements CoordinateProvider {
       );
     }
     return this.selectionOverlay;
+  }
+  
+  private getEditingCanvasOverlay(): EditingCanvasOverlay {
+    if (!this.editingCanvasOverlay) {
+      console.log('CanvasOverlay: Lazily creating EditingCanvasOverlay');
+      
+      // Ensure stage exists
+      this.ensureStageInitialized();
+      
+      this.editingCanvasOverlay = new EditingCanvasOverlay(this.layer);
+    }
+    return this.editingCanvasOverlay;
   }
   
   private getFillHandleLayer(): FillHandleLayer {
@@ -518,6 +532,50 @@ export class CanvasOverlay implements CoordinateProvider {
   updateSelectionVisual(visualCells: VisualCellPosition[]): void {
     // Update selection overlay with pre-calculated visual positions
     this.getSelectionOverlay().updateWithVisualPositions(visualCells);
+    
+    // Redraw the layer
+    this.layer.batchDraw();
+  }
+  
+  showEditingOverlay(position: VisualCellPosition): void {
+    // Hide selection overlay when editing
+    if (this.selectionOverlay) {
+      this.selectionOverlay.clear();
+    }
+    
+    // Hide fill handle when editing
+    if (this.fillHandleLayer) {
+      this.fillHandleLayer.hideFillHandle();
+    }
+    
+    // Show editing overlay
+    this.getEditingCanvasOverlay().show(position);
+    
+    // Redraw the layer
+    this.layer.batchDraw();
+  }
+  
+  hideEditingOverlay(): void {
+    // Hide editing overlay
+    if (this.editingCanvasOverlay) {
+      this.editingCanvasOverlay.hide();
+    }
+    
+    // Restore selection overlay if there are selected cells
+    if (this.currentSelectedCells.size > 0 && this.coordinateMapping && this.currentViewport) {
+      const visualPositions = calculateVisualPositions(
+        this.currentSelectedCells,
+        this.coordinateMapping,
+        this.currentViewport,
+        this.config.cellHeight
+      );
+      this.updateSelectionVisual(visualPositions);
+      
+      // Show fill handle again
+      if (this.fillHandleLayer) {
+        this.fillHandleLayer.render(visualPositions, new Set());
+      }
+    }
     
     // Redraw the layer
     this.layer.batchDraw();

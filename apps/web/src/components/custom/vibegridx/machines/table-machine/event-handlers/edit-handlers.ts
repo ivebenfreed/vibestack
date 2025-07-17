@@ -126,6 +126,27 @@ export const editHandlers = {
         }
       ),
       
+      // Send to canvas actor to show editing overlay
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        ({ context, event }) => {
+          const cellKey = `${event.cell.rowId}:${event.cell.columnId}`;
+          const visualPositions = calculateVisualPositions(
+            new Set([cellKey]),
+            context.coordinateMapping,
+            context.viewport,
+            context.settings.rowHeight
+          );
+          
+          const position = visualPositions[0] || { x: 0, y: 0, width: 100, height: 40 };
+          
+          return {
+            type: 'SHOW_EDITING',
+            position
+          };
+        }
+      ),
+      
       // Emit edit start event
       emit(({ event }) => ({
         type: 'vibegridx.cell.edit.start',
@@ -263,6 +284,14 @@ export const editHandlers = {
         () => ({
           type: 'HIDE_EDITOR'
         })
+      ),
+      
+      // Hide editing overlay in canvas
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({
+          type: 'HIDE_EDITING'
+        })
       )
     ]
   },
@@ -286,6 +315,14 @@ export const editHandlers = {
         ({ context }) => context.actors.editingActor!,
         () => ({
           type: 'HIDE_EDITOR'
+        })
+      ),
+      
+      // Hide editing overlay in canvas
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({
+          type: 'HIDE_EDITING'
         })
       ),
       
@@ -442,6 +479,14 @@ export const editHandlers = {
         ({ context }) => context.actors.editingActor!,
         () => ({
           type: 'HIDE_EDITOR'
+        })
+      ),
+      
+      // Hide editing overlay in canvas
+      sendTo(
+        ({ context }) => context.actors.canvasActor!,
+        () => ({
+          type: 'HIDE_EDITING'
         })
       )
     ]

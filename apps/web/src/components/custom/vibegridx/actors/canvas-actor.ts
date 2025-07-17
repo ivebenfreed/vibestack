@@ -36,6 +36,8 @@ export type CanvasActorEvent =
   | { type: 'RENDER_FILL_PREVIEW'; previewCells: Set<string>; viewport: ViewportInfo }
   | { type: 'CLEAR_FILL_PREVIEW' }
   | { type: 'HIDE_FILL_HANDLE' }
+  | { type: 'SHOW_EDITING'; position: VisualCellPosition }
+  | { type: 'HIDE_EDITING' }
   | { type: 'DESTROY' };
 
 export type CanvasActorResponse =
@@ -295,6 +297,25 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           hideFillLayer.hideFillHandle();
           break;
           
+        case 'SHOW_EDITING':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot show editing overlay - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Showing editing overlay', event.position);
+          canvas.showEditingOverlay(event.position);
+          break;
+          
+        case 'HIDE_EDITING':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot hide editing overlay - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Hiding editing overlay');
+          canvas.hideEditingOverlay();
+          break;
           
         case 'DESTROY':
           console.log('CanvasActor: Destroying canvas overlay');
