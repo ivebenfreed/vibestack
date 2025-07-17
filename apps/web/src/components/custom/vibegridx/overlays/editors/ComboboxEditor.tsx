@@ -151,7 +151,15 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
               <CommandItem
                 key={option.value}
                 value={option.value}
-                onSelect={() => handleSelect(option.value)}
+                onSelect={() => {
+                  console.log('ComboboxEditor: onSelect called', option.value);
+                  handleSelect(option.value);
+                }}
+                onClick={(e) => {
+                  console.log('ComboboxEditor: onClick called', option.value);
+                  e.stopPropagation();
+                  handleSelect(option.value);
+                }}
                 className={cn(
                   "cursor-pointer",
                   index === highlightedIndex && "bg-accent"

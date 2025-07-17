@@ -181,13 +181,14 @@ export const editHandlers = {
   },
 
   'edit.commit': {
-    guard: ({ context }) => {
+    guard: ({ context, event }) => {
       // Don't commit if we're canceling
       if (context.isCanceling) {
         return false;
       }
-      // Only commit if there are changes
-      return context.isDirty;
+      // Check if value has changed - either through isDirty flag or by comparing values
+      const hasChanged = context.isDirty || (event.value !== context.originalValue);
+      return hasChanged;
     },
     actions: [
       // Store editing cell info before clearing it

@@ -134,9 +134,12 @@ export class EventDelegationManager {
     // Determine what was clicked and dispatch appropriate XState event
     const target = event.target as Element;
     
-    // Skip events on editing overlay - shadcn components handle their own events
-    if (target.closest('.vibegridx-editing-portal')) {
-      console.log('🎯 EventDelegationManager: Ignoring event on editing overlay');
+    // Check if we're clicking on the editing overlay
+    const isEditingPortal = target.closest('.vibegridx-editing-portal');
+    if (isEditingPortal) {
+      console.log('🎯 EventDelegationManager: Event on editing overlay - skipping table actions');
+      // Don't prevent the event, just skip table-specific handling
+      // This allows the dropdown components to receive their events
       return;
     }
     
@@ -248,6 +251,12 @@ export class EventDelegationManager {
     if (this.dragState.isDragging) return;
     
     const target = event.target as Element;
+    
+    // Skip events on editing overlay
+    if (target.closest('.vibegridx-editing-portal')) {
+      console.log('🎯 EventDelegationManager: Ignoring click on editing overlay');
+      return;
+    }
     
     console.log('🎯 EventDelegationManager: Click event', {
       target: target,
