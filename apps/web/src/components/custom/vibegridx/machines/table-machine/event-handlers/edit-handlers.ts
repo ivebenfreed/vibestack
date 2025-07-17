@@ -167,14 +167,8 @@ export const editHandlers = {
     actions: [
       editActions.updateEditValue,
       
-      // Update editing actor with new value
-      sendTo(
-        ({ context }) => context.actors.editingActor!,
-        ({ context, event }) => ({
-          type: 'UPDATE_EDITOR_VALUE',
-          value: event.value
-        })
-      ),
+      // No need to update editing actor on every keypress
+      // The editor component manages its own state
       
       ({ context, event }) => {
         console.log('TableMachine: Edit value updated', {

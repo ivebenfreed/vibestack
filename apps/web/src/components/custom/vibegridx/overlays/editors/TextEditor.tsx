@@ -12,7 +12,7 @@ interface TextEditorProps {
   multiline?: boolean;
 }
 
-export function TextEditor({
+function TextEditorComponent({
   cell,
   column,
   initialValue,
@@ -22,31 +22,16 @@ export function TextEditor({
   onBlur,
   multiline = false
 }: TextEditorProps) {
+  
   const [value, setValue] = React.useState(initialValue || '');
   const inputRef = React.useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   
-  console.log('🔧 TextEditor: Rendering', {
-    cellId: cell.rowId + ':' + cell.columnId,
-    columnName: column.name,
-    initialValue,
-    multiline,
-    hasCallbacks: {
-      onCommit: !!onCommit,
-      onCancel: !!onCancel,
-      onBlur: !!onBlur
-    }
-  });
-  
   React.useEffect(() => {
-    console.log('🔧 TextEditor: Component mounted');
     // Select text immediately on mount
     if (inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
-    return () => {
-      console.log('🔧 TextEditor: Component unmounted');
-    };
   }, []);
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -69,12 +54,6 @@ export function TextEditor({
   };
 
   const handleBlur = () => {
-    console.log('🔧 TextEditor: Blur event triggered', {
-      cellId: cell.rowId + ':' + cell.columnId,
-      value,
-      hasOnCommit: !!onCommit
-    });
-    
     // Commit on blur - this is standard behavior
     if (onCommit) {
       onCommit(value);
@@ -111,7 +90,10 @@ export function TextEditor({
 
   const handleChange = (newValue: string) => {
     setValue(newValue);
-    onUpdate?.(newValue);
+    // Only call onUpdate if it's provided
+    if (onUpdate) {
+      onUpdate(newValue);
+    }
   };
 
   if (multiline) {
@@ -146,3 +128,14 @@ export function TextEditor({
     </div>
   );
 }
+
+// Memoize the TextEditor to prevent re-renders when parent re-renders
+// Only re-render if cell ID changes or initialValue changes
+export const TextEditor = React.memo(TextEditorComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.cell.rowId === nextProps.cell.rowId &&
+    prevProps.cell.columnId === nextProps.cell.columnId &&
+    prevProps.initialValue === nextProps.initialValue &&
+    prevProps.multiline === nextProps.multiline
+  );
+});

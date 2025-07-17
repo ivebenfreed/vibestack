@@ -11,7 +11,7 @@ import { createEditor, type EditorProps } from './editors';
 // ====================================
 
 interface EditingOverlayConfig {
-  onUpdate: (value: any) => void;
+  onUpdate?: (value: any) => void;  // Made optional to prevent re-renders
   onCommit: (value: any) => void;
   onCancel: () => void;
   zIndex?: number;
@@ -222,20 +222,8 @@ export class EditingOverlay {
   
   public updateValue(value: any): void {
     this.currentValue = value;
-    // Re-render with new value if needed
-    if (this.currentCell && this.currentColumn && this.root) {
-      this.root.render(
-        createEditor({
-          cell: this.currentCell,
-          column: this.currentColumn,
-          initialValue: value,
-          onCommit: this.config.onCommit,
-          onCancel: this.config.onCancel,
-          onUpdate: this.config.onUpdate,
-          relationshipContext: this.config.relationshipContext
-        })
-      );
-    }
+    // Don't re-render - the TextEditor component manages its own state
+    // This prevents unnecessary re-renders on every keypress
   }
   
   public updateValidationErrors(errors: Map<string, string>): void {

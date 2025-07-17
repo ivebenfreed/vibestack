@@ -97,7 +97,8 @@ export const editingActor = fromCallback<EditingActorEvent, EditingActorResponse
               
               // Create the editing overlay with callbacks
               const editingOverlayConfig = {
-                onUpdate: (value: any) => sendBack({ type: 'EDIT_UPDATE', value }),
+                // Don't pass onUpdate - we don't need real-time updates
+                // This prevents re-renders on every keypress
                 onCommit: (value: any) => sendBack({ type: 'EDIT_COMMIT', value }),
                 onCancel: () => sendBack({ type: 'EDIT_CANCEL' }),
                 zIndex: 1000,
