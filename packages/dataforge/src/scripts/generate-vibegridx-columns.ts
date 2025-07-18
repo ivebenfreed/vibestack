@@ -354,8 +354,12 @@ function generateEntityVibeGridXColumns(entity: Function, allEntities: Function[
             output += `    filterable: ${config.processingRules.filterableByDefault},\n`;
             output += `    resizable: ${config.processingRules.resizableByDefault},\n`;
             output += `    hideable: ${isConfigHideable(propertyName, config)},\n`;
+            // Get the target entity's table name from its schema
+            const targetSchema = findSchemaForEntity(relation.target);
+            const targetTableName = targetSchema?.options?.tableName || `${relation.target.toLowerCase()}s`;
+            
             output += `    cellType: '${cellType}',\n`;
-            output += `    relationshipTable: '${propertyName}',\n`;
+            output += `    relationshipTable: '${targetTableName}',\n`;
             output += `    relationshipDisplayField: '${relConfig.displayField || 'name'}',\n`;
             
             // Add relationship metadata

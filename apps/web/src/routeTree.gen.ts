@@ -48,6 +48,7 @@ import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authent
 import { Route as AuthenticatedDebugVibegridxDemoImport } from './routes/_authenticated/debug/vibegridx-demo'
 import { Route as AuthenticatedDebugVibegridxArchitectureDemoImport } from './routes/_authenticated/debug/vibegridx-architecture-demo'
 import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_authenticated/debug/vibegridfinal-tasks'
+import { Route as AuthenticatedDebugVibegriddexTestImport } from './routes/_authenticated/debug/vibegriddex-test'
 import { Route as AuthenticatedDebugTanstackDbPocImport } from './routes/_authenticated/debug/tanstack-db-poc'
 import { Route as AuthenticatedDebugStatusTestImport } from './routes/_authenticated/debug/status-test'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
@@ -341,6 +342,13 @@ const AuthenticatedDebugVibegridfinalTasksRoute =
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
+const AuthenticatedDebugVibegriddexTestRoute =
+  AuthenticatedDebugVibegriddexTestImport.update({
+    id: '/vibegriddex-test',
+    path: '/vibegriddex-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 const AuthenticatedDebugTanstackDbPocRoute =
   AuthenticatedDebugTanstackDbPocImport.update({
     id: '/tanstack-db-poc',
@@ -631,6 +639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugTanstackDbPocImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/vibegriddex-test': {
+      id: '/_authenticated/debug/vibegriddex-test'
+      path: '/vibegriddex-test'
+      fullPath: '/debug/vibegriddex-test'
+      preLoaderRoute: typeof AuthenticatedDebugVibegriddexTestImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/vibegridfinal-tasks': {
       id: '/_authenticated/debug/vibegridfinal-tasks'
       path: '/vibegridfinal-tasks'
@@ -801,6 +816,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugStatusTestRoute: typeof AuthenticatedDebugStatusTestRoute
   AuthenticatedDebugTanstackDbPocRoute: typeof AuthenticatedDebugTanstackDbPocRoute
+  AuthenticatedDebugVibegriddexTestRoute: typeof AuthenticatedDebugVibegriddexTestRoute
   AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
   AuthenticatedDebugVibegridxArchitectureDemoRoute: typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   AuthenticatedDebugVibegridxDemoRoute: typeof AuthenticatedDebugVibegridxDemoRoute
@@ -828,6 +844,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugStatusTestRoute: AuthenticatedDebugStatusTestRoute,
     AuthenticatedDebugTanstackDbPocRoute: AuthenticatedDebugTanstackDbPocRoute,
+    AuthenticatedDebugVibegriddexTestRoute:
+      AuthenticatedDebugVibegriddexTestRoute,
     AuthenticatedDebugVibegridfinalTasksRoute:
       AuthenticatedDebugVibegridfinalTasksRoute,
     AuthenticatedDebugVibegridxArchitectureDemoRoute:
@@ -931,6 +949,7 @@ export interface FileRoutesByFullPath {
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/status-test': typeof AuthenticatedDebugStatusTestRoute
   '/debug/tanstack-db-poc': typeof AuthenticatedDebugTanstackDbPocRoute
+  '/debug/vibegriddex-test': typeof AuthenticatedDebugVibegriddexTestRoute
   '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   '/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
@@ -982,6 +1001,7 @@ export interface FileRoutesByTo {
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/status-test': typeof AuthenticatedDebugStatusTestRoute
   '/debug/tanstack-db-poc': typeof AuthenticatedDebugTanstackDbPocRoute
+  '/debug/vibegriddex-test': typeof AuthenticatedDebugVibegriddexTestRoute
   '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   '/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
@@ -1037,6 +1057,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/status-test': typeof AuthenticatedDebugStatusTestRoute
   '/_authenticated/debug/tanstack-db-poc': typeof AuthenticatedDebugTanstackDbPocRoute
+  '/_authenticated/debug/vibegriddex-test': typeof AuthenticatedDebugVibegriddexTestRoute
   '/_authenticated/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/_authenticated/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   '/_authenticated/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
@@ -1093,6 +1114,7 @@ export interface FileRouteTypes {
     | '/debug/state-machine-test'
     | '/debug/status-test'
     | '/debug/tanstack-db-poc'
+    | '/debug/vibegriddex-test'
     | '/debug/vibegridfinal-tasks'
     | '/debug/vibegridx-architecture-demo'
     | '/debug/vibegridx-demo'
@@ -1143,6 +1165,7 @@ export interface FileRouteTypes {
     | '/debug/state-machine-test'
     | '/debug/status-test'
     | '/debug/tanstack-db-poc'
+    | '/debug/vibegriddex-test'
     | '/debug/vibegridfinal-tasks'
     | '/debug/vibegridx-architecture-demo'
     | '/debug/vibegridx-demo'
@@ -1196,6 +1219,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/status-test'
     | '/_authenticated/debug/tanstack-db-poc'
+    | '/_authenticated/debug/vibegriddex-test'
     | '/_authenticated/debug/vibegridfinal-tasks'
     | '/_authenticated/debug/vibegridx-architecture-demo'
     | '/_authenticated/debug/vibegridx-demo'
@@ -1317,6 +1341,7 @@ export const routeTree = rootRoute
         "/_authenticated/debug/state-machine-test",
         "/_authenticated/debug/status-test",
         "/_authenticated/debug/tanstack-db-poc",
+        "/_authenticated/debug/vibegriddex-test",
         "/_authenticated/debug/vibegridfinal-tasks",
         "/_authenticated/debug/vibegridx-architecture-demo",
         "/_authenticated/debug/vibegridx-demo",
@@ -1426,6 +1451,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/tanstack-db-poc": {
       "filePath": "_authenticated/debug/tanstack-db-poc.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegriddex-test": {
+      "filePath": "_authenticated/debug/vibegriddex-test.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/debug/vibegridfinal-tasks": {

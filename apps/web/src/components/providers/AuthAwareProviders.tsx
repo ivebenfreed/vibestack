@@ -1,6 +1,6 @@
 import React from 'react'
 // import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
-import { VibestackPGliteProvider } from '../../db/pglite-provider'
+import { VibestackDexieProvider } from '../../db/dexie-provider'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 // 🔥 UPDATED: Use V2 orchestrator hooks
@@ -22,11 +22,11 @@ export function AuthAwareProviders({ children }: { children: React.ReactNode }) 
   // Simple rule: mount database when authenticated and not checking or signing out
   if (isAuthenticated && !isCheckingAuth && !isSigningOut) {
     return (
-      <VibestackPGliteProvider>
+      <VibestackDexieProvider>
         <AbilityProvider>
           <AppLayout>{children}</AppLayout>
         </AbilityProvider>
-      </VibestackPGliteProvider>
+      </VibestackDexieProvider>
     )
   }
   

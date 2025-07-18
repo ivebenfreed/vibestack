@@ -1,61 +1,16 @@
-// MUST be first - Apply TypeORM patches before any TypeORM code runs
-import './db/newtypeorm/applyPatches';
+// TypeORM patches no longer needed with Dexie
+// import './db/newtypeorm/applyPatches';
 
-import "reflect-metadata"; // Required for TypeORM decorators
+// Reflect metadata no longer needed with Dexie
+// import "reflect-metadata"; // Required for TypeORM decorators
 
 // Debug utilities (only in development)
 if (process.env.NODE_ENV === 'development') {
   import('./debug/manual-integrity-reset');
 }
 
-// Global error handlers for IndexedDB concurrency issues
-if (typeof window !== 'undefined') {
-  // Handle uncaught promise rejections (like ErrnoError 44)
-  window.addEventListener('unhandledrejection', (event) => {
-    const error = event.reason;
-    
-    // Check if this is an IndexedDB ErrnoError 44 (device busy)
-    if (error?.name === 'ErrnoError' && error?.errno === 44) {
-      console.warn('[GLOBAL] 🔄 Caught IndexedDB ErrnoError 44 (device busy) - this is expected during high concurrency operations');
-      console.warn('[GLOBAL] 📋 Error details:', {
-        name: error.name,
-        errno: error.errno,
-        message: error.message || 'Device or resource busy',
-        stack: error.stack || 'No stack trace available'
-      });
-      
-      // Prevent the error from appearing in console as "Uncaught"
-      event.preventDefault();
-      return;
-    }
-    
-    // Check for other IndexedDB related errors
-    if (error?.message?.includes('database is locked') || 
-        error?.message?.includes('device or resource busy') ||
-        error?.message?.includes('syncToFs')) {
-      console.warn('[GLOBAL] 🔄 Caught IndexedDB concurrency error:', error?.message || error);
-      event.preventDefault();
-      return;
-    }
-    
-    // Let other errors bubble up normally
-    console.error('[GLOBAL] ❌ Unhandled promise rejection:', error);
-  });
-  
-  // Handle general errors
-  window.addEventListener('error', (event) => {
-    const error = event.error;
-    
-    // Check if this is an IndexedDB ErrnoError 44
-    if (error?.name === 'ErrnoError' && error?.errno === 44) {
-      console.warn('[GLOBAL] 🔄 Caught IndexedDB ErrnoError 44 via error event - suppressing');
-      event.preventDefault();
-      return;
-    }
-    
-    // Let other errors bubble up normally
-  });
-}
+// Dexie uses native IndexedDB, which is more stable than PGLite
+// No special error handling needed for Dexie
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
@@ -71,12 +26,12 @@ import { taskUtils } from '@/domain/task'
 import { projectUtils } from '@/domain/project'
 import { userUtils } from '@/domain/user'
 
-// 🔥 ORCHESTRATOR INTEGRATION FLOW:
+// 🔥 DEXIE INTEGRATION FLOW:
 // 1. main.tsx: Creates router and renders root providers
-// 2. __root.tsx: Creates orchestrator actor and provides it globally  
-// 3. AuthAwareProviders: Sends DB_INIT_START when user is authenticated
-// 4. VibestackPGliteProvider: Dispatches database:ready events to orchestrator
-// 5. Orchestrator: Coordinates auth → database → sync → liveChanges → routes
+// 2. __root.tsx: Creates XState actors and provides them globally  
+// 3. AuthAwareProviders: Mounts DexieProvider when user is authenticated
+// 4. VibestackDexieProvider: Dispatches database:ready events to XState
+// 5. app-init-machine: Coordinates auth → database → sync → liveChanges → routes
 // 6. UnifiedLoadingScreen: Shows appropriate loading state for each phase
 
 // Global instances for HMR persistence

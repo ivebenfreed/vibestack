@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { extractEntityMetadata, EntityMetadata, RelationshipMetadata } from '../utils/metadata-extraction.js';
 import * as ClientEntities from '../generated/client-entities.js';
 
@@ -10,12 +11,63 @@ console.log('[generate-dexie-schema] Starting Dexie schema generation...');
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PACKAGE_ROOT = path.resolve(__dirname, '../..');
+const VERSION_HISTORY_PATH = path.join(PACKAGE_ROOT, 'src/dexie-version-history.json');
 
 // Junction table type definitions
 interface JunctionTable {
   name: string;
   columns: Array<{ name: string; type: string }>;
   indexes: string[];
+}
+
+interface VersionHistory {
+  currentVersion: number;
+  versions: Array<{
+    version: number;
+    generatedAt: string;
+    schemaHash: string;
+    stores: Record<string, string>;
+  }>;
+}
+
+/**
+ * Load version history from file
+ */
+async function loadVersionHistory(): Promise<VersionHistory> {
+  try {
+    const content = await fs.readFile(VERSION_HISTORY_PATH, 'utf-8');
+    return JSON.parse(content);
+  } catch (error) {
+    // If file doesn't exist, return initial version
+    console.log('[generate-dexie-schema] No version history found, starting fresh');
+    return {
+      currentVersion: 0,
+      versions: []
+    };
+  }
+}
+
+/**
+ * Save version history to file
+ */
+async function saveVersionHistory(history: VersionHistory): Promise<void> {
+  await fs.writeFile(VERSION_HISTORY_PATH, JSON.stringify(history, null, 2));
+}
+
+/**
+ * Calculate hash of schema for comparison
+ */
+function calculateSchemaHash(stores: Record<string, string>): string {
+  const sortedStores = Object.keys(stores).sort().reduce((acc, key) => {
+    acc[key] = stores[key];
+    return acc;
+  }, {} as Record<string, string>);
+  
+  return crypto
+    .createHash('sha256')
+    .update(JSON.stringify(sortedStores))
+    .digest('hex')
+    .substring(0, 16);
 }
 
 /**
@@ -28,12 +80,42 @@ async function generateDexieSchema() {
   const generatedDir = path.join(PACKAGE_ROOT, 'src/generated');
   await fs.mkdir(generatedDir, { recursive: true });
   
+  // Load version history
+  const history = await loadVersionHistory();
+  
   // Extract entity metadata
   const entityMetadataMap = extractAllEntityMetadata();
   const junctionTables = extractJunctionTables(entityMetadataMap);
   
-  // Generate Dexie schema
-  const schemaOutput = generateDexieSchemaFile(entityMetadataMap, junctionTables);
+  // Generate current schema stores
+  const currentStores = generateStoreDefinitions(entityMetadataMap, junctionTables);
+  const currentSchemaHash = calculateSchemaHash(currentStores);
+  
+  // Check if schema has changed
+  const lastVersion = history.versions[history.versions.length - 1];
+  const hasChanged = !lastVersion || lastVersion.schemaHash !== currentSchemaHash;
+  
+  if (hasChanged) {
+    // Increment version and add to history
+    const newVersion = history.currentVersion + 1;
+    console.log(`[generate-dexie-schema] Schema changed, incrementing version from ${history.currentVersion} to ${newVersion}`);
+    
+    history.currentVersion = newVersion;
+    history.versions.push({
+      version: newVersion,
+      generatedAt: new Date().toISOString(),
+      schemaHash: currentSchemaHash,
+      stores: currentStores
+    });
+    
+    // Save updated history
+    await saveVersionHistory(history);
+  } else {
+    console.log(`[generate-dexie-schema] Schema unchanged, keeping version ${history.currentVersion}`);
+  }
+  
+  // Generate Dexie schema with version history
+  const schemaOutput = generateDexieSchemaFile(entityMetadataMap, junctionTables, history);
   
   // Write the generated file
   const outputPath = path.join(generatedDir, 'dexie-schema.ts');
@@ -223,11 +305,35 @@ function generateEntityIndexes(metadata: EntityMetadata): string[] {
 }
 
 /**
+ * Generate store definitions for current schema
+ */
+function generateStoreDefinitions(
+  entityMetadataMap: Map<string, EntityMetadata>,
+  junctionTables: JunctionTable[]
+): Record<string, string> {
+  const stores: Record<string, string> = {};
+  
+  // Entity tables
+  for (const entity of entityMetadataMap.values()) {
+    const indexes = generateEntityIndexes(entity);
+    stores[entity.tableName] = indexes.join(', ');
+  }
+  
+  // Junction tables
+  for (const junction of junctionTables) {
+    stores[junction.name] = junction.indexes.join(', ');
+  }
+  
+  return stores;
+}
+
+/**
  * Generate the Dexie schema TypeScript file
  */
 function generateDexieSchemaFile(
   entityMetadataMap: Map<string, EntityMetadata>,
-  junctionTables: JunctionTable[]
+  junctionTables: JunctionTable[],
+  history: VersionHistory
 ): string {
   const entities = Array.from(entityMetadataMap.values());
   
@@ -254,12 +360,27 @@ function generateDexieSchemaFile(
   // Generate import statements for entities
   const entityImports = entities.map(e => e.name).join(', ');
   
+  // Generate version blocks
+  const versionBlocks = history.versions.map(version => {
+    const storeEntries = Object.entries(version.stores)
+      .map(([table, indexes]) => `        ${table}: '${indexes}'`)
+      .join(',\n');
+    
+    return `    // Version ${version.version} - Generated at ${version.generatedAt}
+    this.version(${version.version}).stores({
+${storeEntries}
+    });`;
+  }).join('\n\n');
+  
   return `/**
  * Auto-generated Dexie schema from TypeORM entities
  * Generated at: ${new Date().toISOString()}
+ * Current Version: ${history.currentVersion}
  * 
  * This file is auto-generated. Do not edit manually.
- * Run 'pnpm forge:dexie' to regenerate.
+ * Run 'pnpm forge:build' to regenerate.
+ * 
+ * Schema version is automatically incremented when changes are detected.
  */
 
 import { Dexie, Table } from 'dexie';
@@ -272,6 +393,9 @@ ${junctionInterfaces}
 
 /**
  * Dexie database class with TypeORM entity types
+ * 
+ * Version History:
+${history.versions.map(v => ` * - Version ${v.version}: ${v.generatedAt}`).join('\n')}
  */
 export class VibeStackDB extends Dexie {
   // Entity tables - using TypeORM entity types
@@ -283,10 +407,7 @@ ${junctionTables.map(j => `  ${j.name}!: Table<${toPascalCase(j.name)}>;`).join(
   constructor() {
     super('vibestack-db');
     
-    this.version(1).stores({
-      // Entity tables with indexes
-${storeConfigs.join(',\n')}
-    });
+${versionBlocks}
   }
 }
 

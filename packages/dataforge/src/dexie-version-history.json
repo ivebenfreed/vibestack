@@ -1,0 +1,45 @@
+{
+  "currentVersion": 2,
+  "versions": [
+    {
+      "version": 1,
+      "generatedAt": "2025-07-18T00:05:15.457Z",
+      "schemaHash": "",
+      "stores": {
+        "comments": "id, authorId, parentId, taskId, projectId, updatedAt, clientId",
+        "projects": "id, ownerId, updatedAt, clientId, status",
+        "status_definitions": "id, statusSetId, updatedAt, clientId, name, isDefault",
+        "status_sets": "id, updatedAt, clientId",
+        "tags": "id, tagSetId, parentId, updatedAt, clientId, name",
+        "tag_sets": "id, updatedAt, clientId",
+        "tasks": "id, statusId, projectId, assigneeId, updatedAt, clientId, [statusId+priority], legacyStatus",
+        "users": "id, updatedAt, clientId, &email",
+        "project_members": "[projectId+userId], projectId, userId",
+        "project_status_sets": "[projectId+statussetId], projectId, statussetId",
+        "project_tag_sets": "[projectId+tagsetId], projectId, tagsetId",
+        "task_tags": "[taskId+tagId], taskId, tagId",
+        "task_dependencies": "[dependentTaskId+dependencyTaskId], dependentTaskId, dependencyTaskId"
+      }
+    },
+    {
+      "version": 2,
+      "generatedAt": "2025-07-18T01:10:38.137Z",
+      "schemaHash": "5fce2e583ec80479",
+      "stores": {
+        "comments": "id, authorId, parentId, taskId, projectId, updatedAt, clientId",
+        "projects": "id, ownerId, updatedAt, clientId, status",
+        "status_definitions": "id, statusSetId, updatedAt, clientId, name, isDefault",
+        "status_sets": "id, updatedAt, clientId",
+        "tags": "id, tagSetId, parentId, updatedAt, clientId, name",
+        "tag_sets": "id, updatedAt, clientId",
+        "tasks": "id, statusId, projectId, assigneeId, updatedAt, clientId, [statusId+priority], legacyStatus",
+        "users": "id, updatedAt, clientId, &email",
+        "project_members": "[projectId+userId], projectId, userId",
+        "project_status_sets": "[projectId+statussetId], projectId, statussetId",
+        "project_tag_sets": "[projectId+tagsetId], projectId, tagsetId",
+        "task_tags": "[taskId+tagId], taskId, tagId",
+        "task_dependencies": "[dependentTaskId+dependencyTaskId], dependentTaskId, dependencyTaskId"
+      }
+    }
+  ]
+}

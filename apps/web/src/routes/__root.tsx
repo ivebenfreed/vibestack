@@ -10,8 +10,6 @@ import { AuthAwareProviders } from '@/components/providers/AuthAwareProviders'
 import { Task, Project, User } from '@repo/dataforge/client-entities'
 // import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
 import { authClient } from '@/lib/auth'
-import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
-import { usePGliteContext } from '@/db/pglite-provider'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 // 🔥 NEW: Import XState machines directly (no orchestrator needed)
 import { createActor } from 'xstate'
@@ -221,14 +219,7 @@ if (!appInitActor) {
   console.log('[APP INIT] 🔥 HMR: Using existing app init machine actor')
 }
 
-// Handle PGlite filesystem errors gracefully
-window.addEventListener('unhandledrejection', (event) => {
-  // Check if it's a PGlite ErrnoError that we can safely ignore
-  if (event.reason && event.reason.name === 'ErrnoError') {
-    console.warn('[PGlite] ErrnoError caught and handled:', event.reason.errno);
-    event.preventDefault(); // Prevent the error from being logged as uncaught
-  }
-})
+// Dexie uses native IndexedDB, no special error handling needed
 
 
 // Actors are already globally accessible (assigned during creation)
@@ -274,8 +265,8 @@ window.addEventListener('auth:signout', () => {
   }
 })
 
-// Note: DB_INIT_START is sent from AuthAwareProviders when user is authenticated
-// and PGlite Provider is actually mounted to handle the database events
+// Note: Dexie database is initialized when user is authenticated
+// and DexieProvider is mounted to handle the database events
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   // 🎯 LOADING COMPONENT: Show loading during navigation (intent preloading)
