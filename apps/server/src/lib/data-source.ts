@@ -5,14 +5,14 @@
 // Now import other modules
 import 'reflect-metadata'; // Required by TypeORM
 import { DataSourceOptions, EntitySchema } from 'typeorm';
-import { NeonDataSource, NeonDataSourceOptions, createNeonDataSource } from './neon-orm/NeonDataSource';
-import { NeonDriverOptions } from './neon-orm/NeonDriver'; // Keep NeonDriverOptions if used explicitly, though likely redundant now
+import { NeonDataSource, NeonDataSourceOptions, createNeonDataSource } from './neon-orm/NeonDataSource.js';
+import { NeonDriverOptions } from './neon-orm/NeonDriver.js'; // Keep NeonDriverOptions if used explicitly, though likely redundant now
 import * as ServerEntities from '@repo/dataforge/server-entities'; // Import all entities
 import type { Context } from 'hono'; // Import Hono context
 import type { Env } from '../types/env'; // Import Env type
 import type { AppBindings } from '../types/hono'; // Import AppBindings
-import { addConnectTimeout } from './db'; // Import helper from db.ts
-import { dbLogger } from '../middleware/logger';
+import { addConnectTimeout } from './db.js'; // Import helper from db.ts
+import { dbLogger } from '../middleware/logger.js';
 
 const MODULE_NAME = 'data-source';
 

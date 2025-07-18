@@ -1,6 +1,7 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
 import { liveChangesMachine } from './live-changes-machine';
+import { getDomainEntityNames } from '@/lib/entity-registry';
 
 export interface AppInitContext {
   // Database state
@@ -148,7 +149,7 @@ export const appInitMachine = setup({
     
     startLiveChanges: sendTo('liveChangesMachine', {
       type: 'START',
-      entities: ['Task', 'Project', 'User', 'Comment']
+      entities: getDomainEntityNames()
     }),
   },
 }).createMachine({

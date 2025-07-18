@@ -16,6 +16,8 @@ import {
 import { User } from './User.js';
 import { Project } from './Project.js';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
+import { StatusDefinition } from './StatusDefinition.js';
+import { Tag } from './Tag.js';
 // No need for ServerOnly/ClientOnly decorators as this is a shared entity
 import { EnumTypeName } from '../utils/decorators.js'; // Import the new decorator
 
@@ -54,10 +56,22 @@ export class Task extends BaseDomainEntity {
   @MaxLength(5000, { message: "Description cannot exceed 5000 characters" })
   description?: string;
   
-  @Column({ type: "enum", enum: TaskStatus, default: TaskStatus.OPEN })
+  // Legacy status field - will be removed after migration
+  @Column({ type: "enum", enum: TaskStatus, default: TaskStatus.OPEN, nullable: true, name: 'legacy_status' })
+  @IsOptional()
   @IsEnum(TaskStatus)
   @EnumTypeName({ name: 'TaskStatus', sourcePath: './Task' })
-  status!: TaskStatus;
+  legacyStatus?: TaskStatus;
+  
+  // New status relationship
+  @Column({ type: 'uuid', nullable: true, name: 'status_id' })
+  @IsOptional()
+  @IsUUID()
+  statusId?: string;
+  
+  @ManyToOne(() => StatusDefinition, status => status.tasks, { eager: true })
+  @JoinColumn({ name: 'status_id' })
+  status?: StatusDefinition;
   
   @Column({ type: "enum", enum: TaskPriority, default: TaskPriority.MEDIUM })
   @IsEnum(TaskPriority)
@@ -87,10 +101,21 @@ export class Task extends BaseDomainEntity {
   @IsOptional()
   estimatedDuration?: string;
   
-  @Column("text", { array: true, default: [] })
+  // Legacy tags field - will be removed after migration
+  @Column("text", { array: true, default: [], nullable: true, name: 'legacy_tags' })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  tags!: string[];
+  legacyTags?: string[];
+  
+  // New tags relationship
+  @ManyToMany(() => Tag, tag => tag.tasks, { eager: true })
+  @JoinTable({
+    name: 'task_tags',
+    joinColumn: { name: 'task_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' }
+  })
+  tags!: Tag[];
   
   @Column({ type: "uuid", name: "project_id", nullable: true })
   @IsOptional()

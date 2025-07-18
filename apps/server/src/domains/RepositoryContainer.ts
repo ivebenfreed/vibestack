@@ -4,9 +4,13 @@ import { TaskRepository } from './tasks';
 import { UserRepository } from './users';
 import { CommentRepository } from './comments';
 import { ChangeHistoryRepository } from './ChangeHistoryRepository';
+import { StatusSetRepository } from './status-sets';
+import { StatusDefinitionRepository } from './status-definitions';
+import { TagSetRepository } from './tag-sets';
+import { TagRepository } from './tags';
 import { BaseServerRepository } from './BaseServerRepository';
 import { EntityTarget } from 'typeorm';
-import { Project, Task, User, Comment, ChangeHistory } from '@repo/dataforge/server-entities';
+import { Project, Task, User, Comment, ChangeHistory, StatusSet, StatusDefinition, TagSet, Tag } from '@repo/dataforge/server-entities';
 
 /**
  * Central repository container for managing all domain repositories
@@ -18,6 +22,10 @@ export class RepositoryContainer {
   public readonly users: UserRepository;
   public readonly comments: CommentRepository;
   public readonly changeHistory: ChangeHistoryRepository;
+  public readonly statusSets: StatusSetRepository;
+  public readonly statusDefinitions: StatusDefinitionRepository;
+  public readonly tagSets: TagSetRepository;
+  public readonly tags: TagRepository;
   
   // Map for dynamic repository access - use any for mixed repository types
   private repositoryMap: Map<string, any>;
@@ -29,6 +37,10 @@ export class RepositoryContainer {
     this.users = new UserRepository(neonService);
     this.comments = new CommentRepository(neonService);
     this.changeHistory = new ChangeHistoryRepository(neonService);
+    this.statusSets = new StatusSetRepository(neonService);
+    this.statusDefinitions = new StatusDefinitionRepository(neonService);
+    this.tagSets = new TagSetRepository(neonService);
+    this.tags = new TagRepository(neonService);
     
     // Create repository map for dynamic access
     this.repositoryMap = new Map();
@@ -37,6 +49,10 @@ export class RepositoryContainer {
     this.repositoryMap.set('users', this.users);
     this.repositoryMap.set('comments', this.comments);
     this.repositoryMap.set('change_history', this.changeHistory);
+    this.repositoryMap.set('status_sets', this.statusSets);
+    this.repositoryMap.set('status_definitions', this.statusDefinitions);
+    this.repositoryMap.set('tag_sets', this.tagSets);
+    this.repositoryMap.set('tags', this.tags);
   }
   
   /**
@@ -81,6 +97,14 @@ export class RepositoryContainer {
       return this.comments as unknown as BaseServerRepository<T>;
     } else if (entityClass === ChangeHistory) {
       return this.changeHistory as unknown as BaseServerRepository<T>;
+    } else if (entityClass === StatusSet) {
+      return this.statusSets as unknown as BaseServerRepository<T>;
+    } else if (entityClass === StatusDefinition) {
+      return this.statusDefinitions as unknown as BaseServerRepository<T>;
+    } else if (entityClass === TagSet) {
+      return this.tagSets as unknown as BaseServerRepository<T>;
+    } else if (entityClass === Tag) {
+      return this.tags as unknown as BaseServerRepository<T>;
     }
     return undefined;
   }
@@ -112,6 +136,10 @@ export class RepositoryContainer {
     users: boolean;
     comments: boolean;
     changeHistory: boolean;
+    statusSets: boolean;
+    statusDefinitions: boolean;
+    tagSets: boolean;
+    tags: boolean;
     overall: boolean;
   }> {
     try {
@@ -121,8 +149,14 @@ export class RepositoryContainer {
       const usersHealthy = !!this.users;
       const commentsHealthy = !!this.comments;
       const changeHistoryHealthy = !!this.changeHistory;
+      const statusSetsHealthy = !!this.statusSets;
+      const statusDefinitionsHealthy = !!this.statusDefinitions;
+      const tagSetsHealthy = !!this.tagSets;
+      const tagsHealthy = !!this.tags;
       
-      const overall = projectsHealthy && tasksHealthy && usersHealthy && commentsHealthy && changeHistoryHealthy;
+      const overall = projectsHealthy && tasksHealthy && usersHealthy && commentsHealthy && 
+                     changeHistoryHealthy && statusSetsHealthy && statusDefinitionsHealthy && 
+                     tagSetsHealthy && tagsHealthy;
       
       return {
         projects: projectsHealthy,
@@ -130,6 +164,10 @@ export class RepositoryContainer {
         users: usersHealthy,
         comments: commentsHealthy,
         changeHistory: changeHistoryHealthy,
+        statusSets: statusSetsHealthy,
+        statusDefinitions: statusDefinitionsHealthy,
+        tagSets: tagSetsHealthy,
+        tags: tagsHealthy,
         overall
       };
     } catch (error) {
@@ -139,6 +177,10 @@ export class RepositoryContainer {
         users: false,
         comments: false,
         changeHistory: false,
+        statusSets: false,
+        statusDefinitions: false,
+        tagSets: false,
+        tags: false,
         overall: false
       };
     }

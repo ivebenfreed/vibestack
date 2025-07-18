@@ -517,6 +517,18 @@ export class IncomingChangeService {
         case 'comments':
           await this.applyCommentChange(change);
           break;
+        case 'status_sets':
+          await this.applyStatusSetChange(change);
+          break;
+        case 'status_definitions':
+          await this.applyStatusDefinitionChange(change);
+          break;
+        case 'tags':
+          await this.applyTagChange(change);
+          break;
+        case 'tag_sets':
+          await this.applyTagSetChange(change);
+          break;
         default:
           throw new Error(`No incoming function support for table: ${change.table}`);
       }
@@ -631,6 +643,102 @@ export class IncomingChangeService {
       
       default:
         throw new Error(`Unknown comment operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply status set changes using incoming path functions
+   */
+  private async applyStatusSetChange(change: TableChange): Promise<void> {
+    const { insertStatusSetIncoming, updateStatusSetIncoming, deleteStatusSetIncoming } = await import('../domain/status-set');
+    
+    switch (change.operation) {
+      case 'insert':
+        await insertStatusSetIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateStatusSetIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteStatusSetIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown status set operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply status definition changes using incoming path functions
+   */
+  private async applyStatusDefinitionChange(change: TableChange): Promise<void> {
+    const { insertStatusDefinitionIncoming, updateStatusDefinitionIncoming, deleteStatusDefinitionIncoming } = await import('../domain/status-definition');
+    
+    switch (change.operation) {
+      case 'insert':
+        await insertStatusDefinitionIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateStatusDefinitionIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteStatusDefinitionIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown status definition operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply tag changes using incoming path functions
+   */
+  private async applyTagChange(change: TableChange): Promise<void> {
+    const { insertTagIncoming, updateTagIncoming, deleteTagIncoming } = await import('../domain/tag');
+    
+    switch (change.operation) {
+      case 'insert':
+        await insertTagIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateTagIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteTagIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown tag operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Apply tag set changes using incoming path functions
+   */
+  private async applyTagSetChange(change: TableChange): Promise<void> {
+    const { insertTagSetIncoming, updateTagSetIncoming, deleteTagSetIncoming } = await import('../domain/tag-set');
+    
+    switch (change.operation) {
+      case 'insert':
+        await insertTagSetIncoming(change.data as any);
+        break;
+      
+      case 'update':
+        await updateTagSetIncoming(change.data.id, change.data);
+        break;
+      
+      case 'delete':
+        await deleteTagSetIncoming(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown tag set operation: ${change.operation}`);
     }
   }
 

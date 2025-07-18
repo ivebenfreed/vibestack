@@ -231,10 +231,13 @@ function generateValidationFunctions(entityMetadata: EntityMetadata): string {
                     output += `  }\n\n`;
                     break;
                 case 'enum':
-                    const enumValues = Object.values(field.enum || {}).map(v => `'${v}'`).join(', ');
-                    output += `  if (value && ![${enumValues}].includes(value)) {\n`;
-                    output += `    errors.push('${rule.message}');\n`;
-                    output += `  }\n\n`;
+                    const enumValues = Object.values(field.enum || {});
+                    if (enumValues.length > 0) {
+                        const enumValuesStr = enumValues.map(v => `'${v}'`).join(', ');
+                        output += `  if (value && ![${enumValuesStr}].includes(value)) {\n`;
+                        output += `    errors.push('${rule.message}');\n`;
+                        output += `  }\n\n`;
+                    }
                     break;
             }
         });
@@ -297,6 +300,8 @@ function generateBusinessLogicFunctions(entityMetadata: EntityMetadata): string 
         } else if (typeof field.default === 'string') {
             defaultValue = `'${field.default}'`;
         } else if (Array.isArray(field.default)) {
+            defaultValue = JSON.stringify(field.default);
+        } else if (typeof field.default === 'object' && field.default !== null) {
             defaultValue = JSON.stringify(field.default);
         } else {
             defaultValue = field.default;

@@ -19,7 +19,7 @@ export class MetadataFilter {
      */
     async discoverEntities(): Promise<Function[]> {
         const entityFiles = await globPromise(path.join(PACKAGE_ROOT, 'src/entities/**/*.{ts,js}'), {
-            ignore: ['**/*.test.ts', '**/*.spec.ts'],
+            ignore: ['**/*.test.ts', '**/*.spec.ts', '**/index.ts', '**/index.js'],
             absolute: true
         });
 

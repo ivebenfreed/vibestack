@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { ComboboxEditor } from './ComboboxEditor';
-import type { CellRef, Column } from '../../types';
+import type { CellRef, Column, RelationshipContext } from '../../types';
 
 interface SingleRelationshipEditorProps {
   cell: CellRef;
@@ -78,6 +78,25 @@ export function SingleRelationshipEditor({
     }
   };
 
+  // Create proper RelationshipContext for ComboboxEditor
+  const relationshipContextForCombobox: RelationshipContext | undefined = 
+    relationshipContext?.relationshipAtoms ? {
+      currentEntity: null, // TODO: Get current entity being edited
+      atoms: relationshipContext.relationshipAtoms,
+      column: column,
+      fieldName: column.field || column.id
+    } : undefined;
+
+  console.log('🔍 SingleRelationshipEditor: Creating relationship context', {
+    columnId: column.id,
+    hasRelationshipContext: !!relationshipContext,
+    hasRelationshipAtoms: !!relationshipContext?.relationshipAtoms,
+    relationshipAtoms: relationshipContext?.relationshipAtoms ? Object.keys(relationshipContext.relationshipAtoms) : [],
+    relationshipTable: column.relationshipTable,
+    hasProvider: !!column.relationshipOptionsProvider,
+    relationshipContextForCombobox: relationshipContextForCombobox
+  });
+
   return (
     <ComboboxEditor
       cell={cell}
@@ -87,6 +106,7 @@ export function SingleRelationshipEditor({
       onCancel={onCancel}
       placeholder="Select..."
       searchPlaceholder="Search..."
+      relationshipContext={relationshipContextForCombobox}
     />
   );
 }

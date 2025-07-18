@@ -28,6 +28,10 @@
       "types": "./dist/*-operations.d.ts",
       "import": "./dist/*-operations.js"
     },
+    "./dexie-schema": {
+      "types": "./dist/dexie-schema.d.ts",
+      "import": "./dist/dexie-schema.js"
+    },
     "./entities/*": {
       "types": "./dist/entities/*.d.ts",
       "import": "./dist/entities/*.js",
@@ -53,7 +57,8 @@
     "generate-rdg-columns": "tsx src/scripts/generate-rdg-columns.ts",
     "generate-vibegridx-columns": "tsx src/scripts/generate-vibegridx-columns.ts",
     "generate-crud-operations": "node --loader ts-node/esm src/scripts/generate-crud-operations.ts",
-    "generate": "pnpm run generate-entities && pnpm run generate-vibegridx-columns && pnpm run generate-crud-operations",
+    "generate-dexie-schema": "tsx src/scripts/generate-dexie-schema.ts",
+    "generate": "pnpm run generate-entities && pnpm run generate-vibegridx-columns && pnpm run generate-crud-operations && pnpm run generate-dexie-schema",
     "compile": "tsup",
     "build": "pnpm run forge:build",
     "migration:generate:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
@@ -89,17 +94,22 @@
     "migration:clear:published": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts --published",
     "migration:clear:lite-local": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts --lite-local",
     "forge:build": "pnpm run generate && pnpm run compile",
+    "forge:dexie": "pnpm run generate-dexie-schema",
     "forge:migrate": "node --loader ts-node/esm src/scripts/manage-migrations.ts",
     "forge:trigger:apply": "node --loader ts-node/esm src/scripts/manage-trigger-migration.ts",
     "deploy": "pnpm run forge:build && pnpm run forge:migrate generate && pnpm run forge:migrate run",
     "test": "vitest",
     "seed": "node --loader ts-node/esm src/scripts/seed.ts",
+    "seed:task-statuses": "tsx src/seeds/seed-task-statuses.ts",
+    "seed:tags": "tsx src/seeds/seed-tags.ts",
+    "seed:all": "pnpm run seed:task-statuses && pnpm run seed:tags",
     "debug:changes": "node --loader ts-node/esm src/scripts/debug-changes.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dexie": "^4.0.11",
     "dotenv": "^16.5.0",
     "pg": "^8.15.6",
     "reflect-metadata": "^0.1.14",
@@ -112,6 +122,7 @@
     "@types/node": "^18.19.87",
     "ts-node": "^10.9.2",
     "tsup": "^8.4.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vitest": "^1.6.1"
   },

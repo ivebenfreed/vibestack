@@ -14,13 +14,8 @@
 
 import { NewPGliteDataSource } from '../../db/newtypeorm/NewDataSource';
 import type { IMessageSender } from '../interfaces';
-import { 
-  User, 
-  Project, 
-  Task, 
-  Comment, 
-  CLIENT_DOMAIN_TABLES,
-} from '@repo/dataforge/client-entities';
+import { CLIENT_DOMAIN_TABLES } from '@repo/dataforge/client-entities';
+import { getTableToEntityMap } from '@/lib/entity-registry';
 import { MoreThan } from 'typeorm';
 import { 
   IntegrityDecisionEngine, 
@@ -71,13 +66,8 @@ export interface IntegrityValidationCallbacks {
   onValidationError?: (error: Error, reason?: string) => void;
 }
 
-// Map table names to entity classes
-const TABLE_TO_ENTITY_MAP: Record<string, any> = {
-  'users': User,
-  'projects': Project,
-  'tasks': Task,
-  'comments': Comment,
-};
+// Get table to entity mapping from the central registry
+const TABLE_TO_ENTITY_MAP = getTableToEntityMap();
 
 // Get clean table names (without quotes) from CLIENT_DOMAIN_TABLES
 const CRITICAL_TABLES = CLIENT_DOMAIN_TABLES.map(table => table.replace(/"/g, ''));

@@ -68,6 +68,27 @@ function DebugIndexPage() {
       path: '/debug/vibegridx-architecture-demo',
       color: 'border-cyan-500/20 hover:border-cyan-500/30 bg-cyan-500/5 dark:border-cyan-400/20 dark:hover:border-cyan-400/30 dark:bg-cyan-400/5',
       badge: 'ARCHITECTURE'
+    },
+    {
+      title: '🔍 Status Test',
+      description: 'Test StatusDefinition queries and task status updates to debug foreign key constraint issues in the relationship system.',
+      path: '/debug/status-test',
+      color: 'border-yellow-500/20 hover:border-yellow-500/30 bg-yellow-500/5 dark:border-yellow-400/20 dark:hover:border-yellow-400/30 dark:bg-yellow-400/5',
+      badge: 'STATUS DEBUG'
+    },
+    {
+      title: '🗄️ TanStack DB POC',
+      description: 'Proof of concept testing TanStack DB with Dexie.js persistence. Compare performance with PGLite and test reactive queries.',
+      path: '/debug/tanstack-db-poc',
+      color: 'border-pink-500/20 hover:border-pink-500/30 bg-pink-500/5 dark:border-pink-400/20 dark:hover:border-pink-400/30 dark:bg-pink-400/5',
+      badge: 'TANSTACK DB'
+    },
+    {
+      title: '💾 Dexie POC',
+      description: 'Test Dexie implementation with live queries, reactive hooks, and sync integration. Validate TypeORM entity compatibility and performance.',
+      path: '/debug/dexie-poc',
+      color: 'border-teal-500/20 hover:border-teal-500/30 bg-teal-500/5 dark:border-teal-400/20 dark:hover:border-teal-400/30 dark:bg-teal-400/5',
+      badge: 'DEXIE POC'
     }
   ]
 
@@ -104,6 +125,10 @@ function DebugIndexPage() {
                   ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
                   : page.badge === 'ARCHITECTURE'
                   ? 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300 border border-cyan-500/20'
+                  : page.badge === 'STATUS DEBUG'
+                  ? 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-400/10 dark:text-yellow-300 border border-yellow-500/20'
+                  : page.badge === 'DEXIE POC'
+                  ? 'bg-teal-500/10 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300 border border-teal-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -124,6 +149,9 @@ function DebugIndexPage() {
                    : page.badge === 'GRID MACHINE' ? '🎛️ Open Grid Machine'
                    : page.badge === 'VIBEGRIDX POC' ? '🚀 Open POC Demo'
                    : page.badge === 'ARCHITECTURE' ? '🏗️ Open Architecture Demo'
+                   : page.badge === 'STATUS DEBUG' ? '🔍 Open Status Test'
+                   : page.badge === 'TANSTACK DB' ? '🗄️ Open POC'
+                   : page.badge === 'DEXIE POC' ? '💾 Open Dexie POC'
                    : 'Open Tool'}
                 </Button>
               </Link>

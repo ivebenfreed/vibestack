@@ -17,6 +17,28 @@ export type FilterConfig = {
 import type { EnumOption, VibeGridXColumn } from '@repo/dataforge/vibegridx-columns';
 
 // ====================================
+// RELATIONSHIP OPTIONS PROVIDER TYPES
+// ====================================
+
+// Context provided to relationship options providers
+export interface RelationshipContext {
+  // Current entity being edited (null for new entities)
+  currentEntity: any | null;
+  // All atoms available for relationship lookups
+  atoms: Record<string, any>;
+  // Column metadata for the relationship field
+  column: Column;
+  // Field name being edited
+  fieldName: string;
+}
+
+// Provider function that returns filtered options for a relationship field
+export type RelationshipOptionsProvider = (context: RelationshipContext) => Promise<EnumOption[]> | EnumOption[];
+
+// Map of field names to their options providers
+export type RelationshipOptionsProviders = Record<string, RelationshipOptionsProvider>;
+
+// ====================================
 // CORE ENTITY TYPES
 // ====================================
 
@@ -36,6 +58,12 @@ export interface TableRow {
 export interface Column<T = any> extends VibeGridXColumn<T> {
   // Additional runtime options not in generated columns
   options?: string[] | EnumOption[]; // Allow string[] for backward compatibility
+  
+  // Dynamic options provider for relationship fields
+  relationshipOptionsProvider?: RelationshipOptionsProvider;
+  
+  // Entity type for filtering relationship options (e.g., 'task' for StatusDefinition filtering)
+  relationshipEntityType?: string;
   
   // Additional display formatting
   className?: string;

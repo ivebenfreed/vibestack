@@ -48,6 +48,8 @@ import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authent
 import { Route as AuthenticatedDebugVibegridxDemoImport } from './routes/_authenticated/debug/vibegridx-demo'
 import { Route as AuthenticatedDebugVibegridxArchitectureDemoImport } from './routes/_authenticated/debug/vibegridx-architecture-demo'
 import { Route as AuthenticatedDebugVibegridfinalTasksImport } from './routes/_authenticated/debug/vibegridfinal-tasks'
+import { Route as AuthenticatedDebugTanstackDbPocImport } from './routes/_authenticated/debug/tanstack-db-poc'
+import { Route as AuthenticatedDebugStatusTestImport } from './routes/_authenticated/debug/status-test'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugQueryTestImport } from './routes/_authenticated/debug/query-test'
@@ -55,6 +57,7 @@ import { Route as AuthenticatedDebugOptimisticTestImport } from './routes/_authe
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugGridOptimusProjectsImport } from './routes/_authenticated/debug/grid-optimus-projects'
 import { Route as AuthenticatedDebugGridMachineTestImport } from './routes/_authenticated/debug/grid-machine-test'
+import { Route as AuthenticatedDebugDexiePocImport } from './routes/_authenticated/debug/dexie-poc'
 import { Route as authResetPasswordTokenImport } from './routes/(auth)/reset-password.$token'
 import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authenticated/settings/admin.users'
 
@@ -338,6 +341,20 @@ const AuthenticatedDebugVibegridfinalTasksRoute =
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
+const AuthenticatedDebugTanstackDbPocRoute =
+  AuthenticatedDebugTanstackDbPocImport.update({
+    id: '/tanstack-db-poc',
+    path: '/tanstack-db-poc',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
+const AuthenticatedDebugStatusTestRoute =
+  AuthenticatedDebugStatusTestImport.update({
+    id: '/status-test',
+    path: '/status-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 const AuthenticatedDebugStateMachineTestRoute =
   AuthenticatedDebugStateMachineTestImport.update({
     id: '/state-machine-test',
@@ -385,6 +402,14 @@ const AuthenticatedDebugGridMachineTestRoute =
     path: '/grid-machine-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+
+const AuthenticatedDebugDexiePocRoute = AuthenticatedDebugDexiePocImport.update(
+  {
+    id: '/dexie-poc',
+    path: '/dexie-poc',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any,
+)
 
 const authResetPasswordTokenRoute = authResetPasswordTokenImport.update({
   id: '/(auth)/reset-password/$token',
@@ -536,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authResetPasswordTokenImport
       parentRoute: typeof rootRoute
     }
+    '/_authenticated/debug/dexie-poc': {
+      id: '/_authenticated/debug/dexie-poc'
+      path: '/dexie-poc'
+      fullPath: '/debug/dexie-poc'
+      preLoaderRoute: typeof AuthenticatedDebugDexiePocImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/grid-machine-test': {
       id: '/_authenticated/debug/grid-machine-test'
       path: '/grid-machine-test'
@@ -583,6 +615,20 @@ declare module '@tanstack/react-router' {
       path: '/state-machine-test'
       fullPath: '/debug/state-machine-test'
       preLoaderRoute: typeof AuthenticatedDebugStateMachineTestImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/status-test': {
+      id: '/_authenticated/debug/status-test'
+      path: '/status-test'
+      fullPath: '/debug/status-test'
+      preLoaderRoute: typeof AuthenticatedDebugStatusTestImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/tanstack-db-poc': {
+      id: '/_authenticated/debug/tanstack-db-poc'
+      path: '/tanstack-db-poc'
+      fullPath: '/debug/tanstack-db-poc'
+      preLoaderRoute: typeof AuthenticatedDebugTanstackDbPocImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/debug/vibegridfinal-tasks': {
@@ -745,6 +791,7 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugDexiePocRoute: typeof AuthenticatedDebugDexiePocRoute
   AuthenticatedDebugGridMachineTestRoute: typeof AuthenticatedDebugGridMachineTestRoute
   AuthenticatedDebugGridOptimusProjectsRoute: typeof AuthenticatedDebugGridOptimusProjectsRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
@@ -752,6 +799,8 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugQueryTestRoute: typeof AuthenticatedDebugQueryTestRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
+  AuthenticatedDebugStatusTestRoute: typeof AuthenticatedDebugStatusTestRoute
+  AuthenticatedDebugTanstackDbPocRoute: typeof AuthenticatedDebugTanstackDbPocRoute
   AuthenticatedDebugVibegridfinalTasksRoute: typeof AuthenticatedDebugVibegridfinalTasksRoute
   AuthenticatedDebugVibegridxArchitectureDemoRoute: typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   AuthenticatedDebugVibegridxDemoRoute: typeof AuthenticatedDebugVibegridxDemoRoute
@@ -764,6 +813,7 @@ interface AuthenticatedDebugRouteRouteChildren {
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
+    AuthenticatedDebugDexiePocRoute: AuthenticatedDebugDexiePocRoute,
     AuthenticatedDebugGridMachineTestRoute:
       AuthenticatedDebugGridMachineTestRoute,
     AuthenticatedDebugGridOptimusProjectsRoute:
@@ -776,6 +826,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
+    AuthenticatedDebugStatusTestRoute: AuthenticatedDebugStatusTestRoute,
+    AuthenticatedDebugTanstackDbPocRoute: AuthenticatedDebugTanstackDbPocRoute,
     AuthenticatedDebugVibegridfinalTasksRoute:
       AuthenticatedDebugVibegridfinalTasksRoute,
     AuthenticatedDebugVibegridxArchitectureDemoRoute:
@@ -869,6 +921,7 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/reset-password/$token': typeof authResetPasswordTokenRoute
+  '/debug/dexie-poc': typeof AuthenticatedDebugDexiePocRoute
   '/debug/grid-machine-test': typeof AuthenticatedDebugGridMachineTestRoute
   '/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
@@ -876,6 +929,8 @@ export interface FileRoutesByFullPath {
   '/debug/query-test': typeof AuthenticatedDebugQueryTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/status-test': typeof AuthenticatedDebugStatusTestRoute
+  '/debug/tanstack-db-poc': typeof AuthenticatedDebugTanstackDbPocRoute
   '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   '/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
@@ -917,6 +972,7 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
   '/reset-password/$token': typeof authResetPasswordTokenRoute
+  '/debug/dexie-poc': typeof AuthenticatedDebugDexiePocRoute
   '/debug/grid-machine-test': typeof AuthenticatedDebugGridMachineTestRoute
   '/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
@@ -924,6 +980,8 @@ export interface FileRoutesByTo {
   '/debug/query-test': typeof AuthenticatedDebugQueryTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/status-test': typeof AuthenticatedDebugStatusTestRoute
+  '/debug/tanstack-db-poc': typeof AuthenticatedDebugTanstackDbPocRoute
   '/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   '/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
@@ -969,6 +1027,7 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/(auth)/reset-password/$token': typeof authResetPasswordTokenRoute
+  '/_authenticated/debug/dexie-poc': typeof AuthenticatedDebugDexiePocRoute
   '/_authenticated/debug/grid-machine-test': typeof AuthenticatedDebugGridMachineTestRoute
   '/_authenticated/debug/grid-optimus-projects': typeof AuthenticatedDebugGridOptimusProjectsRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
@@ -976,6 +1035,8 @@ export interface FileRoutesById {
   '/_authenticated/debug/query-test': typeof AuthenticatedDebugQueryTestRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/_authenticated/debug/status-test': typeof AuthenticatedDebugStatusTestRoute
+  '/_authenticated/debug/tanstack-db-poc': typeof AuthenticatedDebugTanstackDbPocRoute
   '/_authenticated/debug/vibegridfinal-tasks': typeof AuthenticatedDebugVibegridfinalTasksRoute
   '/_authenticated/debug/vibegridx-architecture-demo': typeof AuthenticatedDebugVibegridxArchitectureDemoRoute
   '/_authenticated/debug/vibegridx-demo': typeof AuthenticatedDebugVibegridxDemoRoute
@@ -1022,6 +1083,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/reset-password/$token'
+    | '/debug/dexie-poc'
     | '/debug/grid-machine-test'
     | '/debug/grid-optimus-projects'
     | '/debug/kanban'
@@ -1029,6 +1091,8 @@ export interface FileRouteTypes {
     | '/debug/query-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/status-test'
+    | '/debug/tanstack-db-poc'
     | '/debug/vibegridfinal-tasks'
     | '/debug/vibegridx-architecture-demo'
     | '/debug/vibegridx-demo'
@@ -1069,6 +1133,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/'
     | '/reset-password/$token'
+    | '/debug/dexie-poc'
     | '/debug/grid-machine-test'
     | '/debug/grid-optimus-projects'
     | '/debug/kanban'
@@ -1076,6 +1141,8 @@ export interface FileRouteTypes {
     | '/debug/query-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/status-test'
+    | '/debug/tanstack-db-poc'
     | '/debug/vibegridfinal-tasks'
     | '/debug/vibegridx-architecture-demo'
     | '/debug/vibegridx-demo'
@@ -1119,6 +1186,7 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/'
     | '/(auth)/reset-password/$token'
+    | '/_authenticated/debug/dexie-poc'
     | '/_authenticated/debug/grid-machine-test'
     | '/_authenticated/debug/grid-optimus-projects'
     | '/_authenticated/debug/kanban'
@@ -1126,6 +1194,8 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/query-test'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
+    | '/_authenticated/debug/status-test'
+    | '/_authenticated/debug/tanstack-db-poc'
     | '/_authenticated/debug/vibegridfinal-tasks'
     | '/_authenticated/debug/vibegridx-architecture-demo'
     | '/_authenticated/debug/vibegridx-demo'
@@ -1237,6 +1307,7 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/route.tsx",
       "parent": "/_authenticated",
       "children": [
+        "/_authenticated/debug/dexie-poc",
         "/_authenticated/debug/grid-machine-test",
         "/_authenticated/debug/grid-optimus-projects",
         "/_authenticated/debug/kanban",
@@ -1244,6 +1315,8 @@ export const routeTree = rootRoute
         "/_authenticated/debug/query-test",
         "/_authenticated/debug/reactflow-positioning",
         "/_authenticated/debug/state-machine-test",
+        "/_authenticated/debug/status-test",
+        "/_authenticated/debug/tanstack-db-poc",
         "/_authenticated/debug/vibegridfinal-tasks",
         "/_authenticated/debug/vibegridx-architecture-demo",
         "/_authenticated/debug/vibegridx-demo",
@@ -1315,6 +1388,10 @@ export const routeTree = rootRoute
     "/(auth)/reset-password/$token": {
       "filePath": "(auth)/reset-password.$token.tsx"
     },
+    "/_authenticated/debug/dexie-poc": {
+      "filePath": "_authenticated/debug/dexie-poc.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/debug/grid-machine-test": {
       "filePath": "_authenticated/debug/grid-machine-test.tsx",
       "parent": "/_authenticated/debug"
@@ -1341,6 +1418,14 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/state-machine-test": {
       "filePath": "_authenticated/debug/state-machine-test.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/status-test": {
+      "filePath": "_authenticated/debug/status-test.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/tanstack-db-poc": {
+      "filePath": "_authenticated/debug/tanstack-db-poc.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/debug/vibegridfinal-tasks": {

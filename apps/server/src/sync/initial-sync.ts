@@ -380,7 +380,8 @@ export async function performInitialSync(
         messageId: `srv_${Date.now()}`,
         timestamp: Date.now(),
         clientId,
-        serverLSN: syncState.startLSN + ' (resuming)'
+        serverLSN: syncState.startLSN,
+        resuming: true
       };
       await messageHandler.send(resumeMsg);
     }

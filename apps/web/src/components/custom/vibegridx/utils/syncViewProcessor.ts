@@ -230,6 +230,10 @@ function createCoordinateMapping(
   
   // Add data columns
   columns.forEach((col, index) => {
+    if (!col) {
+      console.warn(`[syncViewProcessor] Column at index ${index} is undefined`);
+      return;
+    }
     const width = columnWidths[col.id] || col.width || 120;
     coordinateMapping.columns.push({
       columnId: col.id,

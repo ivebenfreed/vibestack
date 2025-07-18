@@ -67,6 +67,7 @@ interface ServerInitChangesMessage extends ServerMessage {
 interface ServerInitStartMessage extends ServerMessage {
     type: 'srv_init_start';
     serverLSN: string;
+    resuming?: boolean;
 }
 interface ServerInitCompleteMessage extends ServerMessage {
     type: 'srv_init_complete';

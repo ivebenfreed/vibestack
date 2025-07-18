@@ -12,7 +12,7 @@ import React from 'react'
 import { cn } from '@/lib/utils'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Check } from 'lucide-react'
-import type { CellRef, Column } from '../../types'
+import type { CellRef, Column, RelationshipContext } from '../../types'
 
 export interface ComboboxEditorProps {
   cell: CellRef
@@ -24,6 +24,8 @@ export interface ComboboxEditorProps {
   searchPlaceholder?: string
   className?: string
   isMultiSelect?: boolean
+  // Context for relationship options providers
+  relationshipContext?: RelationshipContext
 }
 
 export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({ 
@@ -35,15 +37,78 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
   placeholder = "Select...",
   searchPlaceholder = "Search...",
   className = "",
-  isMultiSelect = false
+  isMultiSelect = false,
+  relationshipContext
 }) => {
   const [searchValue, setSearchValue] = React.useState('')
   const [highlightedIndex, setHighlightedIndex] = React.useState(0)
   const [hasCommitted, setHasCommitted] = React.useState(false)
+  const [dynamicOptions, setDynamicOptions] = React.useState<any[]>([])
+  const [isLoadingOptions, setIsLoadingOptions] = React.useState(false)
 
-  // Get options from column configuration
+  // Load options from provider if available
+  React.useEffect(() => {
+    console.log('🔍 ComboboxEditor: Provider check', {
+      columnId: column.id,
+      hasProvider: !!column.relationshipOptionsProvider,
+      hasContext: !!relationshipContext,
+      relationshipContext: relationshipContext,
+      relationshipTable: column.relationshipTable,
+      relationshipEntityType: column.relationshipEntityType
+    });
+    
+    if (column.relationshipOptionsProvider && relationshipContext) {
+      console.log('🔍 ComboboxEditor: Loading relationship options', {
+        columnId: column.id,
+        relationshipTable: column.relationshipTable,
+        hasProvider: !!column.relationshipOptionsProvider,
+        hasContext: !!relationshipContext
+      });
+      
+      setIsLoadingOptions(true)
+      
+      const loadOptions = async () => {
+        try {
+          const providerOptions = await column.relationshipOptionsProvider!(relationshipContext)
+          
+          console.log('🔍 ComboboxEditor: Loaded relationship options', {
+            columnId: column.id,
+            optionCount: providerOptions.length,
+            options: providerOptions.map(opt => ({ value: opt.value, label: opt.label }))
+          });
+          
+          setDynamicOptions(providerOptions)
+        } catch (error) {
+          console.error('ComboboxEditor: Error loading relationship options:', error)
+          setDynamicOptions([])
+        } finally {
+          setIsLoadingOptions(false)
+        }
+      }
+      
+      loadOptions()
+    }
+  }, [column.relationshipOptionsProvider, relationshipContext])
+
+  // Get options from column configuration or dynamic provider
   const options = React.useMemo(() => {
-    const rawOptions = column.enumOptions || column.options || []
+    let rawOptions: any[] = []
+    
+    // Use dynamic options if available, otherwise fall back to static options
+    if (column.relationshipOptionsProvider && dynamicOptions.length > 0) {
+      rawOptions = dynamicOptions
+    } else {
+      rawOptions = column.enumOptions || column.options || []
+    }
+    
+    console.log('🔍 ComboboxEditor: Computing options', {
+      columnId: column.id,
+      hasProvider: !!column.relationshipOptionsProvider,
+      dynamicOptionsCount: dynamicOptions.length,
+      staticOptionsCount: (column.enumOptions || column.options || []).length,
+      usingDynamic: column.relationshipOptionsProvider && dynamicOptions.length > 0,
+      rawOptionsCount: rawOptions.length
+    });
     
     // Convert to standard format
     const standardOptions = rawOptions.map(option => {
@@ -58,8 +123,14 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
       standardOptions.unshift({ value: '__null__', label: 'None' })
     }
 
+    console.log('🔍 ComboboxEditor: Final options', {
+      columnId: column.id,
+      optionCount: standardOptions.length,
+      options: standardOptions.map(opt => ({ value: opt.value, label: opt.label }))
+    });
+
     return standardOptions
-  }, [column.enumOptions, column.options, column.nullable])
+  }, [column.enumOptions, column.options, column.nullable, column.relationshipOptionsProvider, dynamicOptions])
 
   // Filter options based on search
   const filteredOptions = React.useMemo(() => {
@@ -145,8 +216,14 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
           className="border-none focus:ring-0"
         />
         <CommandList className="max-h-64 overflow-auto">
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup>
+          {isLoadingOptions ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">
+              Loading options...
+            </div>
+          ) : (
+            <>
+              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandGroup>
             {filteredOptions.map((option, index) => (
               <CommandItem
                 key={option.value}
@@ -178,7 +255,9 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
                 </span>
               </CommandItem>
             ))}
-          </CommandGroup>
+              </CommandGroup>
+            </>
+          )}
         </CommandList>
       </Command>
     </div>

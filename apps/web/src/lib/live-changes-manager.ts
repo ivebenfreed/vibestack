@@ -367,7 +367,7 @@ class LiveChangesManager {
     // This ensures live changes and initial loading are consistent
     switch (entityName) {
       case 'task':
-        return ['project', 'assignee'] // Matches ensureTasksLoaded
+        return ['project', 'assignee', 'status'] // Matches ensureTasksLoaded
       case 'project':
         return ['owner', 'members'] // Matches ensureProjectsLoaded - FIXED: was missing 'members'
       case 'comment':

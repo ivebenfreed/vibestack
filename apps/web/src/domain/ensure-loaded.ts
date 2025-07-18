@@ -6,111 +6,89 @@
  */
 
 import { getGlobalDataSource } from '@/db/global-datasource';
-import { Task, Project, User, Comment } from '@repo/dataforge/client-entities';
-import { tasksAtom, taskUtils } from './task';
-import { projectsAtom, projectUtils } from './project';
-import { usersAtom, userUtils } from './user';
-import { commentsAtom, commentUtils } from './comment';
+import { DOMAIN_REGISTRY, getDomainAtom, type DomainKey } from './registry';
 
 // ⚡ PERFORMANCE: Cached loaded state to avoid expensive atom reads
-let _tasksLoaded = false;
-let _projectsLoaded = false;
-let _usersLoaded = false;
-let _commentsLoaded = false;
+const _domainLoadedState = new Map<DomainKey, boolean>();
 
-// Check functions - truly zero overhead with caching
-export const areTasksLoaded = () => _tasksLoaded || (_tasksLoaded = Object.keys(tasksAtom.get()).length > 0);
-export const areProjectsLoaded = () => _projectsLoaded || (_projectsLoaded = Object.keys(projectsAtom.get()).length > 0);
-export const areUsersLoaded = () => _usersLoaded || (_usersLoaded = Object.keys(usersAtom.get()).length > 0);
-export const areCommentsLoaded = () => _commentsLoaded || (_commentsLoaded = Object.keys(commentsAtom.get()).length > 0);
+// Helper to check if a domain is loaded
+function isDomainLoaded(domainKey: DomainKey): boolean {
+  if (_domainLoadedState.has(domainKey)) {
+    return _domainLoadedState.get(domainKey)!;
+  }
+  
+  const atom = getDomainAtom(domainKey);
+  if (!atom) {
+    _domainLoadedState.set(domainKey, false);
+    return false;
+  }
+  
+  const isLoaded = Object.keys(atom.get()).length > 0;
+  _domainLoadedState.set(domainKey, isLoaded);
+  return isLoaded;
+}
 
-export const areAllDomainsLoaded = () => 
-  areTasksLoaded() && areProjectsLoaded() && areUsersLoaded() && areCommentsLoaded();
+// Check functions - using dynamic domain registry
+export const areTasksLoaded = () => isDomainLoaded('task');
+export const areProjectsLoaded = () => isDomainLoaded('project');
+export const areUsersLoaded = () => isDomainLoaded('user');
+export const areCommentsLoaded = () => isDomainLoaded('comment');
+
+// Check all domains dynamically
+export const areAllDomainsLoaded = () => {
+  const allDomainKeys = Object.keys(DOMAIN_REGISTRY) as DomainKey[];
+  return allDomainKeys.every(domainKey => isDomainLoaded(domainKey));
+};
 
 /**
  * Helper to create optimized loaders that skip when data is already loaded
- * Usage: createOptimizedLoader(['tasks', 'projects'])
+ * Usage: createOptimizedLoader(['task', 'project'])
  */
-export function createOptimizedLoader(domains: Array<'tasks' | 'projects' | 'users' | 'comments'>) {
+export function createOptimizedLoader(domains: DomainKey[]) {
   return async () => {
     // Check if all requested domains are loaded
-    const checks = {
-      tasks: domains.includes('tasks') ? areTasksLoaded() : true,
-      projects: domains.includes('projects') ? areProjectsLoaded() : true,
-      users: domains.includes('users') ? areUsersLoaded() : true,
-      comments: domains.includes('comments') ? areCommentsLoaded() : true,
-    };
-    
-    // Fast path - return immediately if everything is loaded
-    if (Object.values(checks).every(Boolean)) {
-      return null;
+    const allLoaded = domains.every(domain => isDomainLoaded(domain));
+    if (allLoaded) {
+      return;
     }
     
-    // Load only what's missing
-    const loadPromises = [];
-    if (domains.includes('tasks') && !areTasksLoaded()) {
-      loadPromises.push(ensureTasksLoaded());
-    }
-    if (domains.includes('projects') && !areProjectsLoaded()) {
-      loadPromises.push(ensureProjectsLoaded());
-    }
-    if (domains.includes('users') && !areUsersLoaded()) {
-      loadPromises.push(ensureUsersLoaded());
-    }
-    if (domains.includes('comments') && !areCommentsLoaded()) {
-      loadPromises.push(ensureCommentsLoaded());
-    }
+    // Load only the domains that aren't loaded yet
+    const loadPromises = domains
+      .filter(domain => !isDomainLoaded(domain))
+      .map(domain => ensureDomainLoaded(domain));
     
     if (loadPromises.length > 0) {
       await Promise.all(loadPromises);
     }
-    
-    return null;
   };
 }
 
-// Direct ensureLoaded functions for each domain - minimal overhead
-export const ensureTasksLoaded = async () => {
-  if (!_tasksLoaded && Object.keys(tasksAtom.get()).length === 0) {
-    const dataSource = await getGlobalDataSource();
-    const tasks = await dataSource.getRepository(Task).find({
-      relations: ['project', 'assignee']
-    });
-    taskUtils.loadTasks(tasks);
-    _tasksLoaded = true;
+/**
+ * Generic function to ensure a domain is loaded
+ */
+async function ensureDomainLoaded(domainKey: DomainKey): Promise<void> {
+  // Check if already loaded
+  if (isDomainLoaded(domainKey)) {
+    return;
   }
-};
-
-export const ensureProjectsLoaded = async () => {
-  if (!_projectsLoaded && Object.keys(projectsAtom.get()).length === 0) {
-    const dataSource = await getGlobalDataSource();
-    const projects = await dataSource.getRepository(Project).find({
-      relations: ['owner', 'members']
-    });
-    projectUtils.loadProjects(projects);
-    _projectsLoaded = true;
+  
+  const domain = DOMAIN_REGISTRY[domainKey];
+  if (!domain) {
+    console.warn(`Domain ${domainKey} not found in registry`);
+    return;
   }
-};
-
-export const ensureUsersLoaded = async () => {
-  if (!_usersLoaded && Object.keys(usersAtom.get()).length === 0) {
-    const dataSource = await getGlobalDataSource();
-    const users = await dataSource.getRepository(User).find();
-    userUtils.loadUsers(users);
-    _usersLoaded = true;
+  
+  // Get the utils object that should have ensureLoaded
+  const utilsName = `${domainKey}Utils`;
+  const utils = (domain as any)[utilsName];
+  
+  if (utils?.ensureLoaded) {
+    await utils.ensureLoaded();
+    _domainLoadedState.set(domainKey, true);
+  } else {
+    console.warn(`No ensureLoaded function found for domain ${domainKey}`);
   }
-};
-
-export const ensureCommentsLoaded = async () => {
-  if (!_commentsLoaded && Object.keys(commentsAtom.get()).length === 0) {
-    const dataSource = await getGlobalDataSource();
-    const comments = await dataSource.getRepository(Comment).find({
-      relations: ['author', 'task', 'project', 'parent']
-    });
-    commentUtils.loadComments(comments);
-    _commentsLoaded = true;
-  }
-};
+}
 
 /**
  * Load all domains in parallel - maximum performance
@@ -122,12 +100,11 @@ export async function ensureAllDomainsLoaded(): Promise<void> {
     return;
   }
   
-  // Only load what's needed
-  const loadPromises = [];
-  if (!areTasksLoaded()) loadPromises.push(ensureTasksLoaded());
-  if (!areProjectsLoaded()) loadPromises.push(ensureProjectsLoaded());
-  if (!areUsersLoaded()) loadPromises.push(ensureUsersLoaded());
-  if (!areCommentsLoaded()) loadPromises.push(ensureCommentsLoaded());
+  // Load all domains that aren't loaded yet
+  const allDomainKeys = Object.keys(DOMAIN_REGISTRY) as DomainKey[];
+  const loadPromises = allDomainKeys
+    .filter(domainKey => !isDomainLoaded(domainKey))
+    .map(domainKey => ensureDomainLoaded(domainKey));
   
   if (loadPromises.length > 0) {
     await Promise.all(loadPromises);

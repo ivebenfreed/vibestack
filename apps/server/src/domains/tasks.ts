@@ -59,7 +59,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
    * Find tasks by status
    */
   async findByStatus(status: TaskStatus): Promise<Task[]> {
-    return await this.neonService.find(Task, { status } as FindOptionsWhere<Task>);
+    return await this.neonService.find(Task, { legacyStatus: status } as FindOptionsWhere<Task>);
   }
 
   /**
@@ -69,7 +69,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
     // Set default values if not provided
     const taskData = {
       ...data,
-      status: data.status || TaskStatus.OPEN,
+      legacyStatus: data.status || TaskStatus.OPEN,
       priority: data.priority || TaskPriority.MEDIUM
     };
     
@@ -106,7 +106,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
     const completedAt = status === TaskStatus.COMPLETED ? new Date() : null;
     
     // Use parent class update method
-    return await this.update(id, { status, completedAt } as TaskUpdateInput);
+    return await this.update(id, { legacyStatus: status, completedAt } as TaskUpdateInput);
   }
 
   /**
@@ -162,7 +162,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
       if (!task) return null;
       
       // Check if tag already exists
-      const tags = task.tags || [];
+      const tags = task.legacyTags || [];
       if (!tags.includes(tag)) {
         // Add the tag and update
         tags.push(tag);
@@ -171,7 +171,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
         await this.neonService.update(
           Task,
           { id } as FindOptionsWhere<Task>,
-          { tags } as DeepPartial<Task>
+          { legacyTags: tags } as DeepPartial<Task>
         );
       }
       
@@ -193,14 +193,14 @@ export class TaskRepository extends BaseServerRepository<Task> {
       if (!task) return null;
       
       // Remove the tag if it exists
-      const tags = task.tags || [];
+      const tags = task.legacyTags || [];
       const updatedTags = tags.filter(t => t !== tag);
       
       // Update using the standard update method
       await this.neonService.update(
         Task,
         { id } as FindOptionsWhere<Task>,
-        { tags: updatedTags } as DeepPartial<Task>
+        { legacyTags: updatedTags } as DeepPartial<Task>
       );
       
       // Return updated task

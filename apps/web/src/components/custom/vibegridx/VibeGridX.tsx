@@ -14,7 +14,7 @@ import {
   useRenderStateExtractor,
   useVibeGridXApi
 } from './VibeGridXHooks';
-import type { RenderState, TableRow, CellRef, Column } from './types';
+import type { RenderState, TableRow, CellRef, Column, RelationshipOptionsProviders } from './types';
 import type { TableRenderer } from './renderers/core/TableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
 import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
@@ -31,6 +31,10 @@ import {
 
 // Import domain registry for dynamic atom/update function access
 import { DOMAIN_REGISTRY, getDomainAtom, getDomainUpdateFn } from '@/domain/registry';
+
+// Import provider utilities
+import type { RelationshipOptionsProvider } from './types';
+import { createGenericRelationshipProvider } from './providers/generic-relationship-provider';
 
 // ====================================
 // COMPONENT PROPS
@@ -53,6 +57,9 @@ interface VibeGridXEntityProps<T = any> {
     visibleColumns: Column[];
     coordinateMapping: any;
   };
+  
+  // Relationship options providers (optional - auto-generated if not provided)
+  relationshipOptionsProviders?: RelationshipOptionsProviders;
   
   // Event handlers (all optional - entity config provides defaults)
   onCellClick?: (rowId: string, columnId: string) => void;
@@ -81,6 +88,7 @@ interface VibeGridXManualProps<T = any> {
   primaryAtom: any;
   relationshipAtoms?: Record<string, any>;
   relationshipResolvers?: Record<string, (id: string | string[]) => string>;
+  relationshipOptionsProviders?: RelationshipOptionsProviders;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
   
   // Common options (same as entity props)
@@ -147,6 +155,29 @@ export const VibeGridX = <T extends Record<string, any> = any>(
         }
       }
       
+      // Add commonly needed atoms that might be missing from config
+      const commonAtoms = [
+        { key: 'statusDefinitions', entityType: 'statusDefinition' },
+        { key: 'statusSets', entityType: 'statusSet' },
+        { key: 'tags', entityType: 'tag' },
+        { key: 'tagSets', entityType: 'tagSet' }
+      ];
+      
+      for (const { key, entityType } of commonAtoms) {
+        if (!relationshipAtoms[key]) {
+          const atom = getDomainAtom(entityType as any);
+          if (atom) {
+            relationshipAtoms[key] = atom;
+            console.log('🔍 VibeGridX: Added common atom', { key, entityType, atomExists: !!atom });
+          }
+        }
+      }
+      
+      console.log('🔍 VibeGridX: Final relationship atoms', {
+        entityType: props.entityType,
+        relationshipAtoms: Object.keys(relationshipAtoms)
+      });
+      
       // Filter columns if selectedColumns is provided
       let columns = config.columns;
       if (props.selectedColumns) {
@@ -162,20 +193,47 @@ export const VibeGridX = <T extends Record<string, any> = any>(
           const tableKey = column.relationshipTable;
           const displayField = column.relationshipDisplayField;
           
-          // Find the atom for this relationship
+          // Find the atom for this relationship using the same logic as the generic provider
           let targetAtom: any = null;
           
-          // Try to find atom by table key
-          if (relationshipAtoms[tableKey]) {
-            targetAtom = relationshipAtoms[tableKey];
-          } else if (relationshipAtoms[tableKey + 's']) {
-            targetAtom = relationshipAtoms[tableKey + 's'];
+          // Try various atom naming patterns (same as generic provider)
+          const atomKeys = [
+            tableKey,
+            `${tableKey}s`,
+            `${tableKey}sAtom`,
+            tableKey.replace(/s$/, ''),
+            `${tableKey.replace(/s$/, '')}s`,
+            `${tableKey}Definitions`,
+            `${tableKey}Definition`,
+            `${tableKey}definitions`,
+            `${tableKey}definition`
+          ];
+          
+          for (const key of atomKeys) {
+            if (relationshipAtoms[key]) {
+              targetAtom = relationshipAtoms[key];
+              console.log('🔍 VibeGridX: Found resolver atom', {
+                columnId: column.id,
+                tableKey,
+                atomKey: key,
+                hasAtom: !!targetAtom
+              });
+              break;
+            }
           }
           
           // Create resolver that reads atom data dynamically
           relationshipResolvers[column.id] = (id: string | string[]) => {
             // Get fresh atom data when resolver is called
             const atomData = targetAtom ? targetAtom.get() || {} : {};
+            
+            console.log('🔍 VibeGridX: Resolver called', {
+              columnId: column.id,
+              id,
+              hasTargetAtom: !!targetAtom,
+              atomDataKeys: Object.keys(atomData),
+              atomDataCount: Object.keys(atomData).length
+            });
             
             if (Array.isArray(id)) {
               const names = id.map(i => {
@@ -195,7 +253,10 @@ export const VibeGridX = <T extends Record<string, any> = any>(
             }
             
             const entity = atomData[id];
-            if (!entity) return id;
+            if (!entity) {
+              console.log('🔍 VibeGridX: Entity not found', { id, availableIds: Object.keys(atomData) });
+              return id;
+            }
             
             // Try different common display fields
             const display = entity[displayField || 'displayName'] || 
@@ -204,16 +265,66 @@ export const VibeGridX = <T extends Record<string, any> = any>(
                           entity.title || 
                           entity.label ||
                           id;
+            
+            console.log('🔍 VibeGridX: Resolved display', {
+              columnId: column.id,
+              id,
+              entity,
+              displayField,
+              resolvedDisplay: display
+            });
+            
             return display;
           };
         }
       });
       
+      // Auto-generate options providers for relationship columns
+      const autoRelationshipOptionsProviders: RelationshipOptionsProviders = {};
+      
+      // Add providers if not already provided
+      const providedProviders = props.relationshipOptionsProviders || {};
+      
+      columns.forEach(column => {
+        const cellType = column.cellType || column.type;
+        if (cellType?.startsWith('relationship') && column.relationshipTable && !providedProviders[column.id]) {
+          // Add entity type to column for filtering
+          const enhancedColumn = {
+            ...column,
+            relationshipEntityType: props.entityType
+          };
+          
+          console.log('🔍 VibeGridX: Creating generic relationship provider', {
+            columnId: column.id,
+            relationshipTable: column.relationshipTable,
+            entityType: props.entityType,
+            cellType,
+            availableRelationshipAtoms: Object.keys(relationshipAtoms)
+          });
+          
+          // Create a generic provider that works with any relationship pattern
+          autoRelationshipOptionsProviders[column.id] = createGenericRelationshipProvider(enhancedColumn, relationshipAtoms);
+        }
+      });
+      
+      // Merge provided and auto-generated providers
+      const allRelationshipOptionsProviders = { ...autoRelationshipOptionsProviders, ...providedProviders };
+      
+      // Add options providers to columns
+      const columnsWithProviders = columns.map(column => {
+        const provider = allRelationshipOptionsProviders[column.id];
+        if (provider) {
+          return { ...column, relationshipOptionsProvider: provider };
+        }
+        return column;
+      });
+      
       return {
-        columns,
+        columns: columnsWithProviders,
         primaryAtom,
         relationshipAtoms,
         relationshipResolvers,
+        relationshipOptionsProviders: allRelationshipOptionsProviders,
         onEntityUpdate: updateFn ? 
           (rowId: string, updates: Record<string, any>) => updateFn(rowId, updates) : 
           undefined
@@ -226,6 +337,7 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   const columns = entityConfig?.columns || (!isEntityProps(props) ? props.columns : []);
   const primaryAtom = entityConfig?.primaryAtom || (!isEntityProps(props) ? props.primaryAtom : undefined);
   const relationshipAtoms = entityConfig?.relationshipAtoms || (!isEntityProps(props) ? props.relationshipAtoms : {}) || {};
+  const relationshipOptionsProviders = entityConfig?.relationshipOptionsProviders || (!isEntityProps(props) ? props.relationshipOptionsProviders : {}) || {};
   const onEntityUpdate = entityConfig?.onEntityUpdate || (!isEntityProps(props) ? props.onEntityUpdate : undefined);
   
   // Common props (available in both types)

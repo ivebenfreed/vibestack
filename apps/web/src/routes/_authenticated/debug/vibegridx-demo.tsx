@@ -1,14 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { VibeGridX } from '@/components/custom/vibegridx';
-import { tasksAtom } from '@/domain/task';
-import { projectsAtom } from '@/domain/project'; 
-import { usersAtom } from '@/domain/user';
-import type { Column } from '@/components/custom/vibegridx';
 import type { Task } from '@repo/dataforge/client-entities';
-import { TaskColumns } from '@repo/dataforge/vibegridx-columns';
 import { createOptimizedLoader } from '@/domain/ensure-loaded';
-import { syncProcessView } from '@/components/custom/vibegridx/utils/syncViewProcessor';
-import type { ViewActorInput } from '@/components/custom/vibegridx/machines/view-actor';
 
 // Enhanced loader that processes data synchronously
 async function vibegridxDemoLoader() {
@@ -16,14 +9,9 @@ async function vibegridxDemoLoader() {
   console.log('🚀 Route Loader: Starting synchronous data processing');
   
   // 1. Load entities using the optimized loader
-  await createOptimizedLoader(['tasks', 'projects', 'users'])();
+  await createOptimizedLoader(['task', 'project', 'user', 'comment', 'statusDefinition', 'statusSet', 'tag', 'tagSet'])();
   
-  // 2. Get entities from atoms (synchronously)
-  const tasks = Object.values(tasksAtom.get() || {});
-  const projects = projectsAtom.get() || {};
-  const users = usersAtom.get() || {};
-  
-  // 3. Load persisted view state from localStorage
+  // 2. Load persisted view state from localStorage
   const tableId = 'vibegridx-demo-v2';
   const persistenceKey = `vibegridx-${tableId}-state`;
   let persistedViewState = null;
@@ -43,89 +31,12 @@ async function vibegridxDemoLoader() {
     console.warn('Route Loader: Failed to load persisted state', error);
   }
   
-  // 4. Create relationship resolvers
-  const relationshipResolvers: Record<string, (id: string | string[]) => string> = {
-    project: (id: string | string[]) => {
-      if (Array.isArray(id)) {
-        return id.map(i => projects[i]?.name || i).join(', ');
-      }
-      return projects[id]?.name || id;
-    },
-    assignee: (id: string | string[]) => {
-      if (Array.isArray(id)) {
-        return id.map(i => users[i]?.displayName || users[i]?.name || i).join(', ');
-      }
-      return users[id]?.displayName || users[id]?.name || id;
-    }
-  };
-  
-  // 5. Process view data synchronously
-  const selectedColumnIds = [
-    'title',
-    'status', 
-    'priority',
-    'description',
-    'project',
-    'assignee',
-    'dueDate',
-    'createdAt',
-    'updatedAt'
-  ];
-  
-  const taskColumns: Column<Task>[] = TaskColumns
-    .filter(col => selectedColumnIds.includes(col.id))
-    .map(col => ({
-      id: col.id,
-      name: col.name,
-      field: col.field,
-      type: col.type,
-      width: col.width,
-      editable: col.editable,
-      minWidth: col.minWidth,
-      maxWidth: col.maxWidth,
-      resizable: col.resizable,
-      sortable: col.sortable,
-      filterable: col.filterable,
-      ...(col.options && { options: col.options }),
-      ...(col.cellType && { cellType: col.cellType }),
-      ...(col.relationshipTable && { relationshipTable: col.relationshipTable }),
-      ...(col.relationshipDisplayField && { relationshipDisplayField: col.relationshipDisplayField }),
-      ...(col.enumOptions && { enumOptions: col.enumOptions }),
-      ...(col.placeholder && { placeholder: col.placeholder }),
-      ...(col.dateFormat && { dateFormat: col.dateFormat }),
-      ...(col.maxLength && { maxLength: col.maxLength }),
-      ...(col.required && { required: col.required }),
-      ...(col.meta && { metadata: col.meta })
-    }));
-  
-  const viewActorInput: ViewActorInput = {
-    entities: tasks,
-    columns: taskColumns,
-    relationshipResolvers,
-    enableSelectionColumn: true,
-    sortBy: persistedViewState?.sortBy || [],
-    filters: persistedViewState?.filters || [],
-    groupBy: persistedViewState?.groupBy || [],
-    columnVisibility: persistedViewState?.columnVisibility || {},
-    columnOrder: persistedViewState?.columnOrder || [],
-    columnWidths: persistedViewState?.columnWidths
-  };
-  
-  // Process data synchronously
-  const processedData = syncProcessView(viewActorInput);
-  
   const loadTime = performance.now() - startTime;
-  console.log(`🚀 Route Loader: Completed in ${loadTime.toFixed(2)}ms`, {
-    taskCount: tasks.length,
-    processedRowCount: processedData.processedRows.length,
-    visibleColumnCount: processedData.visibleColumns.length
-  });
+  console.log(`🚀 Route Loader: Completed in ${loadTime.toFixed(2)}ms`);
   
   return {
     tableId,
-    initialData: processedData,
-    persistedViewState,
-    taskColumns
+    persistedViewState
   };
 }
 
@@ -141,7 +52,7 @@ export const Route = createFileRoute('/_authenticated/debug/vibegridx-demo')({
 
 function VibeGridXDemoPage() {
   // Get pre-processed data from route loader
-  const { tableId, initialData, persistedViewState, taskColumns } = Route.useLoaderData();
+  const { tableId, persistedViewState } = Route.useLoaderData();
   
   // ====================================
   // RENDER
@@ -164,8 +75,8 @@ function VibeGridXDemoPage() {
           tableId={tableId}
           selectedColumns={[
             'title',
-            'status', 
             'priority',
+            'status',
             'description',
             'project',
             'assignee',
@@ -174,7 +85,6 @@ function VibeGridXDemoPage() {
             'updatedAt'
           ]}
           height="100%"
-          initialData={initialData}
           enableVirtualScrolling={true}
           enableCanvasOverlays={true}
           enableGrouping={true}

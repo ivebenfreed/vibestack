@@ -8,6 +8,10 @@ import * as taskDomain from './task';
 import * as projectDomain from './project';
 import * as userDomain from './user';
 import * as commentDomain from './comment';
+import * as statusDefinitionDomain from './status-definition';
+import * as statusSetDomain from './status-set';
+import * as tagDomain from './tag';
+import * as tagSetDomain from './tag-set';
 
 // Domain module registry - maps entity types to their domain modules
 export const DOMAIN_REGISTRY = {
@@ -15,6 +19,10 @@ export const DOMAIN_REGISTRY = {
   project: projectDomain,
   user: userDomain,
   comment: commentDomain,
+  statusDefinition: statusDefinitionDomain,
+  statusSet: statusSetDomain,
+  tag: tagDomain,
+  tagSet: tagSetDomain,
 } as const;
 
 // Type for domain keys
@@ -45,3 +53,7 @@ export * from './task';
 export * from './project';
 export * from './user';
 export * from './comment';
+export * from './status-definition';
+export * from './status-set';
+export * from './tag';
+export * from './tag-set';

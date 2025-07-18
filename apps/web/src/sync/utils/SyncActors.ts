@@ -166,6 +166,15 @@ export const syncActors = {
   }),
 
   /**
+   * Clean LSN by removing any suffixes like "(resuming)"
+   */
+  cleanLSN: (lsn: string): string => {
+    // Remove any text after the LSN format (hex/hex), including "(resuming)" and similar suffixes
+    const cleanMatch = lsn.match(/^[0-9A-Fa-f]+\/[0-9A-Fa-f]+/);
+    return cleanMatch ? cleanMatch[0] : lsn;
+  },
+
+  /**
    * Load persisted state from localStorage
    */
   loadPersistedState: fromPromise(async (): Promise<{
@@ -182,7 +191,8 @@ export const syncActors = {
         const parsedState = JSON.parse(stored);
         if (parsedState.clientId && parsedState.currentLSN) {
           persistedClientId = parsedState.clientId;
-          persistedLSN = parsedState.currentLSN;
+          // Clean the LSN to remove any suffixes like "(resuming)"
+          persistedLSN = syncActors.cleanLSN(parsedState.currentLSN);
           syncLogger.info('persistence', 'Loaded persisted sync state', {
             clientId: persistedClientId,
             currentLSN: persistedLSN

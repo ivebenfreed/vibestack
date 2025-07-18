@@ -13,10 +13,10 @@
   },
   "scripts": {
     "build": "tsc --noEmit && wrangler deploy --outdir=dist",
-    "dev": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229",
+    "dev": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229 --ip 127.0.0.1",
     "_start_servers_for_pwa_test": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229",
-    "dev:debug": "wrangler dev --var LOG_LEVEL:debug --inspector-port=9229",
-    "dev:info": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229",
+    "dev:debug": "wrangler dev --var LOG_LEVEL:debug --inspector-port=9229 --ip 127.0.0.1",
+    "dev:info": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229 --ip 127.0.0.1",
     "deploy": "wrangler deploy",
     "lint": "eslint",
     "format": "prettier --write .",
@@ -46,6 +46,6 @@
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
     "vitest": "^1.2.2",
-    "wrangler": "^4.14.0"
+    "wrangler": "^4.25.0"
   }
 }

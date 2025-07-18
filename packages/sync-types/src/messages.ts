@@ -78,6 +78,7 @@ export interface ServerInitChangesMessage extends ServerMessage {
 export interface ServerInitStartMessage extends ServerMessage {
   type: 'srv_init_start';
   serverLSN: string;  // Server's current LSN at start of initial sync
+  resuming?: boolean; // Indicates if this is resuming an interrupted sync
 }
 
 export interface ServerInitCompleteMessage extends ServerMessage {

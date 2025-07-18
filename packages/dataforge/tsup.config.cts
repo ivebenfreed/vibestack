@@ -10,7 +10,8 @@ const config = {
     'src/generated/column-configurations.ts',
     'src/generated/rdg-column-configurations.ts',
     'src/generated/vibegridx-columns.ts',
-    'src/generated/*-operations.ts'
+    'src/generated/*-operations.ts',
+    'src/generated/dexie-schema.ts'
   ],
   format: ['esm'],
   dts: true, // Changed from experimentalDts to generate individual .d.ts files
@@ -24,6 +25,7 @@ const config = {
     'class-validator',
     '@electric-sql/pglite',
     'pg',
+    'dexie',
   ],
   treeshake: false,
   esbuildOptions(options: import('esbuild').BuildOptions) {
