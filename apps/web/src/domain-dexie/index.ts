@@ -16,6 +16,16 @@
 
 // Task domain exports
 export {
+  // UI operations (with sync tracking)
+  createTaskUI,
+  updateTaskUI,
+  deleteTaskUI,
+  // Incoming operations (no sync tracking)
+  createTaskIncoming,
+  updateTaskIncoming,
+  deleteTaskIncoming,
+  bulkCreateTasksIncoming,
+  // Service and utilities
   taskService,
   useTaskQueries,
   taskRepository,
@@ -26,6 +36,15 @@ export {
 
 // Project domain exports
 export {
+  // UI operations (with sync tracking)
+  createProjectUI,
+  updateProjectUI,
+  deleteProjectUI,
+  // Incoming operations (no sync tracking)
+  createProjectIncoming,
+  updateProjectIncoming,
+  deleteProjectIncoming,
+  // Service and utilities
   projectService,
   useProjectQueries,
   projectRepository,
@@ -34,11 +53,50 @@ export {
   type UpdateProjectInput,
 } from './project';
 
+// User domain exports
+export {
+  // UI operations (with sync tracking)
+  createUserUI,
+  updateUserUI,
+  deleteUserUI,
+  // Incoming operations (no sync tracking)
+  createUserIncoming,
+  updateUserIncoming,
+  deleteUserIncoming,
+  // Service and utilities
+  userService,
+  useUserQueries,
+  userRepository,
+  userUtils,
+  type CreateUserInput,
+  type UpdateUserInput,
+} from './user';
+
+// Comment domain exports
+export {
+  // UI operations (with sync tracking)
+  createCommentUI,
+  updateCommentUI,
+  deleteCommentUI,
+  // Incoming operations (no sync tracking)
+  createCommentIncoming,
+  updateCommentIncoming,
+  deleteCommentIncoming,
+  // Service and utilities
+  commentService,
+  useCommentQueries,
+  commentRepository,
+  commentUtils,
+  type CreateCommentInput,
+  type UpdateCommentInput,
+} from './comment';
+
 // Re-export types from dataforge for convenience
 export type {
   Task,
   Project,
   User,
+  Comment,
   TaskStatus,
   TaskPriority,
   ProjectStatus,

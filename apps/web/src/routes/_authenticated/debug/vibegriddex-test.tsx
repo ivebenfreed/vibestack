@@ -1,8 +1,7 @@
 import React from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { VibeGridDex } from '@/components/custom/vibegriddex';
-import { useTaskQueries, useProjectQueries } from '@/domain-dexie';
-import { updateTaskUI } from '@/domain/task'; // Import the UI update function with sync tracking
+import { useTaskQueries, useProjectQueries, updateTaskUI } from '@/domain-dexie';
 import { Button } from '@/components/ui/button';
 import { db } from '@repo/dataforge/dexie-schema';
 import { useLiveQuery } from 'dexie-react-hooks';

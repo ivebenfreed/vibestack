@@ -3,12 +3,18 @@
  * 
  * This is a parallel implementation that uses Dexie live queries instead of atomic stores.
  * Shows how to handle relationships and complex queries with Dexie.
+ * 
+ * Uses the same 3-path pattern as the XState domain:
+ * - UI operations: Include manual sync tracking via trackOutgoingChange
+ * - Incoming operations: Server sync without tracking (to avoid loops)
+ * - Direct Dexie updates: For live queries to react
  */
 
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@repo/dataforge/dexie-schema';
 import { nanoid } from 'nanoid';
+import { trackOutgoingChange } from '@/db/dexie-change-tracking';
 
 // ============================================================================
 // Types
@@ -38,80 +44,191 @@ export interface UpdateProjectInput {
 }
 
 // ============================================================================
-// Service Layer (CRUD Operations)
+// UI Operations (with sync tracking)
+// ============================================================================
+
+/**
+ * Create Project from UI - includes manual sync tracking
+ */
+export async function createProjectUI(projectData: CreateProjectInput): Promise<Project> {
+  const project: Project = {
+    id: nanoid(),
+    name: projectData.name,
+    description: projectData.description || '',
+    status: projectData.status || 'active',
+    ownerId: projectData.ownerId || 'current-user',
+    startDate: projectData.startDate,
+    endDate: projectData.endDate,
+    priority: projectData.priority || 'medium',
+    budget: projectData.budget,
+    actualCost: undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    clientId: 'dexie-client',
+    userId: 'current-user',
+  };
+
+  // Apply to Dexie
+  await db.projects.add(project);
+  
+  // Track for outgoing sync
+  await trackOutgoingChange('projects', 'insert', project);
+  
+  return project;
+}
+
+/**
+ * Update Project from UI - includes manual sync tracking
+ */
+export async function updateProjectUI(projectId: string, updates: UpdateProjectInput): Promise<Project> {
+  const existingProject = await db.projects.get(projectId);
+  if (!existingProject) {
+    throw new Error(`Project ${projectId} not found`);
+  }
+
+  const updatedProject: Project = {
+    ...existingProject,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Apply to Dexie
+  await db.projects.put(updatedProject);
+  
+  // Track for outgoing sync
+  await trackOutgoingChange('projects', 'update', updatedProject);
+  
+  return updatedProject;
+}
+
+/**
+ * Delete Project from UI - includes manual sync tracking
+ */
+export async function deleteProjectUI(projectId: string): Promise<boolean> {
+  const existingProject = await db.projects.get(projectId);
+  if (!existingProject) {
+    return false;
+  }
+
+  try {
+    await db.transaction('rw', db.projects, db.project_members, db.project_status_sets, db.project_tag_sets, db.tasks, async () => {
+      // Delete the project
+      await db.projects.delete(projectId);
+      
+      // Clean up relationships
+      await db.project_members.where('projectId').equals(projectId).delete();
+      await db.project_status_sets.where('projectId').equals(projectId).delete();
+      await db.project_tag_sets.where('projectId').equals(projectId).delete();
+      
+      // Optional: Delete associated tasks or just unlink them
+      // For now, we'll unlink them
+      const projectTasks = await db.tasks.where('projectId').equals(projectId).toArray();
+      for (const task of projectTasks) {
+        await db.tasks.put({ ...task, projectId: undefined, updatedAt: new Date().toISOString() });
+      }
+    });
+    
+    // Track for outgoing sync
+    await trackOutgoingChange('projects', 'delete', existingProject);
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    return false;
+  }
+}
+
+// ============================================================================
+// Incoming Operations (no sync tracking)
+// ============================================================================
+
+/**
+ * Create Project from incoming sync - no tracking to avoid loops
+ */
+export async function createProjectIncoming(projectData: Project): Promise<Project> {
+  // Apply to Dexie without tracking
+  await db.projects.add(projectData);
+  return projectData;
+}
+
+/**
+ * Update Project from incoming sync - no tracking to avoid loops
+ */
+export async function updateProjectIncoming(projectId: string, updates: Partial<Project>): Promise<Project> {
+  const existingProject = await db.projects.get(projectId);
+  if (!existingProject) {
+    throw new Error(`Project ${projectId} not found`);
+  }
+
+  const updatedProject: Project = {
+    ...existingProject,
+    ...updates,
+  };
+
+  // Apply to Dexie without tracking
+  await db.projects.put(updatedProject);
+  return updatedProject;
+}
+
+/**
+ * Delete Project from incoming sync - no tracking to avoid loops
+ */
+export async function deleteProjectIncoming(projectId: string): Promise<boolean> {
+  try {
+    await db.transaction('rw', db.projects, db.project_members, db.project_status_sets, db.project_tag_sets, db.tasks, async () => {
+      // Delete the project
+      await db.projects.delete(projectId);
+      
+      // Clean up relationships
+      await db.project_members.where('projectId').equals(projectId).delete();
+      await db.project_status_sets.where('projectId').equals(projectId).delete();
+      await db.project_tag_sets.where('projectId').equals(projectId).delete();
+      
+      // Unlink tasks
+      const projectTasks = await db.tasks.where('projectId').equals(projectId).toArray();
+      for (const task of projectTasks) {
+        await db.tasks.put({ ...task, projectId: undefined, updatedAt: new Date().toISOString() });
+      }
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    return false;
+  }
+}
+
+// ============================================================================
+// Service Layer (legacy interface for compatibility)
 // ============================================================================
 
 export const projectService = {
   /**
-   * Create a new project
+   * Create a new project (delegates to UI operation)
    */
   async create(projectData: CreateProjectInput): Promise<Project> {
-    const project: Project = {
-      id: nanoid(),
-      name: projectData.name,
-      description: projectData.description || '',
-      status: projectData.status || 'active',
-      ownerId: projectData.ownerId || 'current-user',
-      startDate: projectData.startDate,
-      endDate: projectData.endDate,
-      priority: projectData.priority || 'medium',
-      budget: projectData.budget,
-      actualCost: undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      clientId: 'dexie-client',
-      userId: 'current-user',
-    };
-
-    await db.projects.add(project);
-    return project;
+    return createProjectUI(projectData);
   },
 
   /**
-   * Update a project
+   * Update a project (delegates to UI operation)
    */
   async update(projectId: string, updates: UpdateProjectInput): Promise<Project | null> {
-    const existingProject = await db.projects.get(projectId);
-    if (!existingProject) {
-      return null;
+    try {
+      return await updateProjectUI(projectId, updates);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        return null;
+      }
+      throw error;
     }
-
-    const updatedProject: Project = {
-      ...existingProject,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await db.projects.put(updatedProject);
-    return updatedProject;
   },
 
   /**
-   * Delete a project
+   * Delete a project (delegates to UI operation)
    */
   async delete(projectId: string): Promise<boolean> {
-    try {
-      await db.transaction('rw', db.projects, db.project_members, db.project_status_sets, db.project_tag_sets, db.tasks, async () => {
-        // Delete the project
-        await db.projects.delete(projectId);
-        
-        // Clean up relationships
-        await db.project_members.where('projectId').equals(projectId).delete();
-        await db.project_status_sets.where('projectId').equals(projectId).delete();
-        await db.project_tag_sets.where('projectId').equals(projectId).delete();
-        
-        // Optional: Delete associated tasks or just unlink them
-        // For now, we'll unlink them
-        const projectTasks = await db.tasks.where('projectId').equals(projectId).toArray();
-        for (const task of projectTasks) {
-          await db.tasks.put({ ...task, projectId: undefined, updatedAt: new Date().toISOString() });
-        }
-      });
-      return true;
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      return false;
-    }
+    return deleteProjectUI(projectId);
   },
 
   /**
@@ -525,5 +642,30 @@ export const projectUtils = {
         ? Math.ceil((new Date(project.endDate).getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24))
         : null
     };
+  },
+  
+  /**
+   * Load projects (for compatibility with atomic store pattern)
+   */
+  loadProjects: async (projects: Project[]) => {
+    // Clear existing and load new projects
+    await db.projects.clear();
+    await db.projects.bulkAdd(projects);
+  },
+  
+  /**
+   * Clear all projects
+   */
+  clearProjects: async () => {
+    await db.projects.clear();
+  },
+  
+  /**
+   * Ensure loaded (compatibility method - Dexie is always "loaded")
+   */
+  ensureLoaded: async () => {
+    // No-op for Dexie - data is always available from IndexedDB
+    // This method exists for API compatibility with atomic store pattern
+    return;
   },
 };

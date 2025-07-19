@@ -3,11 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@repo/dataforge/dexie-schema';
 import { getEntityConfig, type VibeGridXEntityType } from '@repo/dataforge/vibegridx-columns';
 import type { Column } from '../types';
-// Import the UI operations that include sync tracking
-import { updateTaskUI } from '@/domain/task';
-import { updateProjectUI } from '@/domain/project';
-import { updateUserUI } from '@/domain/user';
-import { updateCommentUI } from '@/domain/comment';
+// Import Dexie domain UI operations that include sync tracking
+import { updateTaskUI, updateProjectUI, updateUserUI, updateCommentUI } from '@/domain-dexie';
 
 interface DexieEntityConfig {
   data: any[];
