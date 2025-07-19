@@ -254,7 +254,8 @@ export async function getTaskDependencies() {
     dataSource,
     EntityClass: Task,
     atomActions,
-    outgoingChangeService: services?.outgoingChangeService || null
+    // Use dexieOutgoing for manual change tracking
+    outgoingChangeService: services?.dexieOutgoing || null
   };
 }
 

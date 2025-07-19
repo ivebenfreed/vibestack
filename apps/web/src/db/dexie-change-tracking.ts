@@ -105,100 +105,22 @@ let hooksInitialized = false;
 /**
  * Initialize Dexie change tracking hooks
  * 
+ * IMPORTANT: This function is now DISABLED. 
+ * We use manual tracking in the domain layer instead of hooks.
+ * Hooks should only be used for UI reactivity, not sync tracking.
+ * 
  * @param clientId - The client ID for this session
  * @param userId - The current user ID
  */
 export function initializeDexieChangeTracking(clientId: string, userId: string) {
-  console.log('[Dexie Change Tracking] Initializing hooks for client:', clientId);
+  console.log('[Dexie Change Tracking] DISABLED - Using manual tracking in domain layer instead');
   
-  // Update global client and user IDs
+  // Update global client and user IDs (still needed for manual tracking)
   currentClientId = clientId;
   currentUserId = userId;
   
-  // Prevent duplicate initialization
-  if (hooksInitialized) {
-    console.log('[Dexie Change Tracking] Hooks already initialized, skipping');
-    return;
-  }
-  hooksInitialized = true;
-  
-  TRACKED_TABLES.forEach(tableName => {
-    const table = db[tableName];
-    if (!table) {
-      console.warn(`[Dexie Change Tracking] Table ${tableName} not found`);
-      return;
-    }
-    
-    // Hook for tracking inserts
-    table.hook('creating', function(primKey, obj, transaction) {
-      // Skip sync transactions
-      if ((transaction as any)[SYNC_TRANSACTION]) {
-        return;
-      }
-      console.log(`[Dexie Change Tracking] Creating ${tableName} record:`, primKey);
-      
-      const changeRecord: Omit<LocalChanges, 'id'> = {
-        table: tableName,
-        operation: 'insert',
-        data: { ...obj, id: primKey },
-        lsn: generateClientSequence(),
-        clientId: currentClientId,
-        updatedAt: new Date(),
-        processedSync: 0
-      };
-      
-      // Log change asynchronously to avoid transaction conflicts
-      logChange(changeRecord, transaction);
-    });
-    
-    // Hook for tracking updates
-    table.hook('updating', function(modifications, primKey, obj, transaction) {
-      // Skip sync transactions
-      if ((transaction as any)[SYNC_TRANSACTION]) {
-        return;
-      }
-      console.log(`[Dexie Change Tracking] Updating ${tableName} record:`, primKey);
-      
-      const updatedData = { ...obj, ...modifications, id: primKey };
-      
-      const changeRecord: Omit<LocalChanges, 'id'> = {
-        table: tableName,
-        operation: 'update',
-        data: updatedData,
-        lsn: generateClientSequence(),
-        clientId: currentClientId,
-        updatedAt: new Date(),
-        processedSync: 0
-      };
-      
-      // Log change asynchronously to avoid transaction conflicts
-      logChange(changeRecord, transaction);
-    });
-    
-    // Hook for tracking deletes
-    table.hook('deleting', function(primKey, obj, transaction) {
-      // Skip sync transactions
-      if ((transaction as any)[SYNC_TRANSACTION]) {
-        return;
-      }
-      console.log(`[Dexie Change Tracking] Deleting ${tableName} record:`, primKey);
-      
-      const changeRecord: Omit<LocalChanges, 'id'> = {
-        table: tableName,
-        operation: 'delete',
-        data: { ...obj, id: primKey },
-        lsn: generateClientSequence(),
-        clientId: currentClientId,
-        updatedAt: new Date(),
-        processedSync: 0
-      };
-      
-      // Log change asynchronously to avoid transaction conflicts
-      logChange(changeRecord, transaction);
-    });
-  });
-  
-  console.log('[Dexie Change Tracking] Hooks initialized for tables:', TRACKED_TABLES);
+  // DO NOT INITIALIZE HOOKS - we track changes manually in the domain layer
+  return;
 }
 
 /**
@@ -284,19 +206,51 @@ export function enableChangeTracking(): void {
 }
 
 /**
+ * Manually track a change for outgoing sync
+ * This replaces the automatic hook-based tracking
+ * 
+ * @param table - The table name
+ * @param operation - The operation type
+ * @param data - The entity data
+ */
+export async function trackOutgoingChange(
+  table: string,
+  operation: 'insert' | 'update' | 'delete',
+  data: any
+): Promise<void> {
+  // Skip if tracking is disabled (e.g., during initial/catchup sync)
+  if (!isTrackingEnabled) {
+    console.log(`[Dexie Change Tracking] Tracking disabled, skipping ${operation} for ${table}`);
+    return;
+  }
+  
+  const changeRecord: LocalChanges = {
+    id: nanoid(),
+    table,
+    operation,
+    data,
+    lsn: generateClientSequence(),
+    clientId: currentClientId,
+    updatedAt: new Date(),
+    processedSync: 0
+  };
+  
+  try {
+    await db.local_changes.add(changeRecord);
+    console.log(`[Dexie Change Tracking] Manually tracked ${operation} for ${table}:`, changeRecord.id);
+  } catch (error) {
+    console.error('[Dexie Change Tracking] Failed to track change:', error);
+  }
+}
+
+/**
  * Apply sync changes without triggering change tracking
  * This should be used by IncomingChangeService for server data
+ * 
+ * Note: With manual tracking, this is now just a regular Dexie operation
+ * since hooks are disabled. Kept for compatibility.
  */
 export async function applySyncChanges(operation: () => Promise<void>): Promise<void> {
-  const { db } = await import('@repo/dataforge/dexie-schema');
-  
-  // Run the operation in a transaction marked as sync
-  await db.transaction('rw', db.tasks, db.projects, db.users, db.comments, 
-    db.status_definitions, db.status_sets, db.tags, db.tag_sets, async (trans) => {
-    // Mark this transaction as a sync operation
-    (trans as any)[SYNC_TRANSACTION] = true;
-    
-    // Execute the operation within the marked transaction
-    await operation();
-  });
+  // Just run the operation directly since hooks are disabled
+  await operation();
 }

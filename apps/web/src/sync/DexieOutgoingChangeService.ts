@@ -12,7 +12,8 @@ import {
   getPendingChanges, 
   markChangesAsProcessed, 
   clearProcessedChanges,
-  getPendingChangeCount 
+  getPendingChangeCount,
+  trackOutgoingChange 
 } from '../db/dexie-change-tracking';
 import { db } from '@repo/dataforge/dexie-schema';
 import type { LocalChanges } from '@repo/dataforge/client-entities';
@@ -337,6 +338,21 @@ export class DexieOutgoingChangeService {
     };
   }
   
+  /**
+   * Track an entity change for outgoing sync
+   * This is the manual tracking method called by domain operations
+   */
+  async trackEntityChange(table: string, operation: 'insert' | 'update' | 'delete', entity: any): Promise<void> {
+    try {
+      console.log(`[DexieOutgoingChangeService] Tracking ${operation} for ${table}:`, entity.id);
+      await trackOutgoingChange(table, operation, entity);
+    } catch (error) {
+      console.error(`[DexieOutgoingChangeService] Failed to track ${operation} for ${table}:`, error);
+      this.callbacks.onError?.(error as Error, 'track_entity_change');
+      throw error;
+    }
+  }
+
   /**
    * Find LocalChanges records by entity ID (for server response handling)
    */

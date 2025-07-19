@@ -9,7 +9,6 @@
 
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { TableChange } from '@repo/sync-types';
-import { applySyncChanges } from '../db/dexie-change-tracking';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -357,11 +356,10 @@ export class IncomingChangeService {
       // Extract entities data from changes
       const entitiesData = changes.map(change => change.data);
       
-      // Perform bulk insert to Dexie wrapped in sync transaction
-      await applySyncChanges(async () => {
-        const { db } = await import('@repo/dataforge/dexie-schema');
-        
-        switch (table) {
+      // Perform bulk insert to Dexie - no need for transaction wrapper since hooks are disabled
+      const { db } = await import('@repo/dataforge/dexie-schema');
+      
+      switch (table) {
           case 'tasks':
             console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tasks into IndexedDB`);
             await db.tasks.bulkPut(entitiesData);
@@ -421,17 +419,16 @@ export class IncomingChangeService {
           return results;
         }
         
-        // Create success results for all bulk inserted entities
-        changes.forEach((change, index) => {
-          results.push({
-            change,
-            success: true,
-            error: undefined
-          });
+      // Create success results for all bulk inserted entities
+      changes.forEach((change, index) => {
+        results.push({
+          change,
+          success: true,
+          error: undefined
         });
-        
-        console.log(`[IncomingChangeService] ✅ Bulk inserted ${changes.length} ${table} entities`);
       });
+      
+      console.log(`[IncomingChangeService] ✅ Bulk inserted ${changes.length} ${table} entities`);
       
     } catch (error) {
       console.error(`[IncomingChangeService] ❌ Bulk insert failed for ${table}:`, error);
@@ -468,11 +465,10 @@ export class IncomingChangeService {
       // Extract entities data from changes
       const entitiesData = changes.map(change => change.data);
       
-      // Perform bulk update wrapped in sync transaction
-      await applySyncChanges(async () => {
-        const { db } = await import('@repo/dataforge/dexie-schema');
-        
-        switch (table) {
+      // Perform bulk update - no need for transaction wrapper since hooks are disabled
+      const { db } = await import('@repo/dataforge/dexie-schema');
+      
+      switch (table) {
           case 'tasks':
             console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tasks in IndexedDB`);
             await db.tasks.bulkPut(entitiesData);
@@ -509,13 +505,12 @@ export class IncomingChangeService {
           console.warn(`[IncomingChangeService] Unknown table ${table} for Dexie bulk update`);
         }
         
-        // Create success results for all bulk updated entities
-        changes.forEach((change) => {
-          results.push({
-            change,
-            success: true,
-            error: undefined
-          });
+      // Create success results for all bulk updated entities
+      changes.forEach((change) => {
+        results.push({
+          change,
+          success: true,
+          error: undefined
         });
       });
       
@@ -613,240 +608,224 @@ export class IncomingChangeService {
    * Apply task changes using Dexie only
    */
   private async applyTaskChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting task ${change.data.id} into IndexedDB`);
+        await db.tasks.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting task ${change.data.id} into IndexedDB`);
-          await db.tasks.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating task ${change.data.id} in IndexedDB`);
-          await db.tasks.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting task ${change.data.id} from IndexedDB`);
-          await db.tasks.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown task operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating task ${change.data.id} in IndexedDB`);
+        await db.tasks.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting task ${change.data.id} from IndexedDB`);
+        await db.tasks.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown task operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply project changes using Dexie only
    */
   private async applyProjectChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting project ${change.data.id} into IndexedDB`);
+        await db.projects.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting project ${change.data.id} into IndexedDB`);
-          await db.projects.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating project ${change.data.id} in IndexedDB`);
-          await db.projects.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting project ${change.data.id} from IndexedDB`);
-          await db.projects.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown project operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating project ${change.data.id} in IndexedDB`);
+        await db.projects.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting project ${change.data.id} from IndexedDB`);
+        await db.projects.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown project operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply user changes using Dexie only
    */
   private async applyUserChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting user ${change.data.id} into IndexedDB`);
+        await db.users.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting user ${change.data.id} into IndexedDB`);
-          await db.users.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating user ${change.data.id} in IndexedDB`);
-          await db.users.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting user ${change.data.id} from IndexedDB`);
-          await db.users.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown user operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating user ${change.data.id} in IndexedDB`);
+        await db.users.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting user ${change.data.id} from IndexedDB`);
+        await db.users.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown user operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply comment changes using Dexie only
    */
   private async applyCommentChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting comment ${change.data.id} into IndexedDB`);
+        await db.comments.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting comment ${change.data.id} into IndexedDB`);
-          await db.comments.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating comment ${change.data.id} in IndexedDB`);
-          await db.comments.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting comment ${change.data.id} from IndexedDB`);
-          await db.comments.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown comment operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating comment ${change.data.id} in IndexedDB`);
+        await db.comments.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting comment ${change.data.id} from IndexedDB`);
+        await db.comments.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown comment operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply status set changes using Dexie only
    */
   private async applyStatusSetChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_set ${change.data.id} into IndexedDB`);
+        await db.status_sets.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_set ${change.data.id} into IndexedDB`);
-          await db.status_sets.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
-          await db.status_sets.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_set ${change.data.id} from IndexedDB`);
-          await db.status_sets.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown status set operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
+        await db.status_sets.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_set ${change.data.id} from IndexedDB`);
+        await db.status_sets.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown status set operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply status definition changes using Dexie only
    */
   private async applyStatusDefinitionChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_definition ${change.data.id} into IndexedDB`);
+        await db.status_definitions.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_definition ${change.data.id} into IndexedDB`);
-          await db.status_definitions.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
-          await db.status_definitions.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_definition ${change.data.id} from IndexedDB`);
-          await db.status_definitions.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown status definition operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
+        await db.status_definitions.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_definition ${change.data.id} from IndexedDB`);
+        await db.status_definitions.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown status definition operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply tag changes using Dexie only
    */
   private async applyTagChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag ${change.data.id} into IndexedDB`);
+        await db.tags.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag ${change.data.id} into IndexedDB`);
-          await db.tags.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag ${change.data.id} in IndexedDB`);
-          await db.tags.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag ${change.data.id} from IndexedDB`);
-          await db.tags.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown tag operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag ${change.data.id} in IndexedDB`);
+        await db.tags.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag ${change.data.id} from IndexedDB`);
+        await db.tags.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown tag operation: ${change.operation}`);
+    }
   }
 
   /**
    * Apply tag set changes using Dexie only
    */
   private async applyTagSetChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only, wrapped in sync transaction
-    await applySyncChanges(async () => {
-      const { db } = await import('@repo/dataforge/dexie-schema');
+    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag_set ${change.data.id} into IndexedDB`);
+        await db.tag_sets.put(change.data as any);
+        break;
       
-      switch (change.operation) {
-        case 'insert':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag_set ${change.data.id} into IndexedDB`);
-          await db.tag_sets.put(change.data as any);
-          break;
-        
-        case 'update':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
-          await db.tag_sets.put(change.data as any);
-          break;
-        
-        case 'delete':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag_set ${change.data.id} from IndexedDB`);
-          await db.tag_sets.delete(change.data.id);
-          break;
-        
-        default:
-          throw new Error(`Unknown tag set operation: ${change.operation}`);
-      }
-    });
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
+        await db.tag_sets.put(change.data as any);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag_set ${change.data.id} from IndexedDB`);
+        await db.tag_sets.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown tag set operation: ${change.operation}`);
+    }
   }
 
 } 
