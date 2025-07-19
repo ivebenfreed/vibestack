@@ -1,7 +1,8 @@
 import React from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { VibeGridDex } from '@/components/custom/vibegriddex';
-import { useTaskQueries, useProjectQueries, taskService } from '@/domain-dexie';
+import { useTaskQueries, useProjectQueries } from '@/domain-dexie';
+import { updateTaskUI } from '@/domain/task'; // Import the UI update function with sync tracking
 import { Button } from '@/components/ui/button';
 import { db } from '@repo/dataforge/dexie-schema';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -318,7 +319,8 @@ function VibeGridDexTestPage() {
             )
           }}
           onEntityUpdate={async (rowId, updates) => {
-            await taskService.update(rowId, updates);
+            console.log('[vibegriddex-test] onEntityUpdate called', { rowId, updates });
+            await updateTaskUI(rowId, updates);
           }}
           height={600}
           enableSelectionColumn={true}
