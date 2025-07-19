@@ -1,9 +1,13 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@repo/dataforge/dexie-schema';
-import * as dexieDomains from '@/domain-dexie';
 import { getEntityConfig, type VibeGridXEntityType } from '@repo/dataforge/vibegridx-columns';
 import type { Column } from '../types';
+// Import the UI operations that include sync tracking
+import { updateTaskUI } from '@/domain/task';
+import { updateProjectUI } from '@/domain/project';
+import { updateUserUI } from '@/domain/user';
+import { updateCommentUI } from '@/domain/comment';
 
 interface DexieEntityConfig {
   data: any[];
@@ -254,25 +258,27 @@ export function useDexieEntityConfig(
       }
     });
     
-    // Get update function from Dexie domains
+    // Get update function that includes sync tracking
     const onEntityUpdate = async (id: string, field: string, value: any) => {
       const updates = { [field]: value };
       
+      console.log('[useDexieEntityConfig] onEntityUpdate called', { id, field, value, entityType });
+      
       switch (entityType) {
         case 'task':
-          await dexieDomains.taskService.update(id, updates);
+          await updateTaskUI(id, updates);
           break;
         case 'project':
-          await dexieDomains.projectService.update(id, updates);
+          await updateProjectUI(id, updates);
           break;
         case 'user':
-          // User updates might need special handling
-          console.warn('User updates not yet implemented in Dexie domains');
+          await updateUserUI(id, updates);
           break;
         case 'comment':
-          // Comment updates might need special handling
-          console.warn('Comment updates not yet implemented in Dexie domains');
+          await updateCommentUI(id, updates);
           break;
+        default:
+          console.warn(`[useDexieEntityConfig] No update handler for entity type: ${entityType}`);
       }
     };
     
