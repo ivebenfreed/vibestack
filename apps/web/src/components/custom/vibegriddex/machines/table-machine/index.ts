@@ -3,7 +3,7 @@
 // ====================================
 
 import { setup, assign, spawnChild, sendTo, fromPromise, emit, raise } from 'xstate';
-import type { TableContext, TableEvents, TableConfig } from '../../types';
+import type { TableContext, TableEvents, TableConfig, RenderState } from '../../types';
 
 // Import slices
 import { createInitialDimensionsState, dimensionActions } from './slices/dimensions-slice';
@@ -30,7 +30,11 @@ import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
 import { editActor } from '../../actors/edit-actor';
 import { dragActor } from '../../actors/drag-actor';
+import { dataSubscriptionActor } from '../../actors/data-subscription-actor';
 // No overlay actor needed - canvas subscribes directly to table machine context
+
+// Import view processing
+import { syncProcessView } from '../../utils/syncViewProcessor';
 
 // ====================================
 // CONTEXT CREATION
@@ -186,6 +190,7 @@ export const tableBaseMachine = setup({
     viewActor,
     editActor,
     dragActor,
+    dataSubscriptionActor,
   },
   
   actions: {
@@ -416,6 +421,17 @@ export const tableBaseMachine = setup({
       
       initial: 'idle',
       
+      // Spawn data subscription actor for live updates
+      invoke: {
+        id: 'dataSubscription',
+        src: 'dataSubscriptionActor',
+        input: ({ context }) => ({ entityType: context.entityType }),
+        onError: {
+          actions: ({ event }) => {
+            console.error('❌ TableMachine: Data subscription error:', event);
+          }
+        }
+      },
       
       states: {
         idle: {
@@ -425,6 +441,98 @@ export const tableBaseMachine = setup({
             // Handle view updates (sorting, column reorder, etc)
             INVOKE_VIEW_ACTOR: {
               target: 'processingViewData'
+            },
+            
+            // Handle data updates from subscription actor
+            DATA_UPDATE: {
+              actions: [
+                assign({
+                  rows: ({ context, event }) => {
+                    console.log('📊 TableMachine: Processing data update from subscription actor', {
+                      entityCount: event.data.length,
+                      currentRowCount: context.rows.length
+                    });
+                    
+                    // Process the updated entities
+                    const processedData = syncProcessView({
+                      entities: event.data,
+                      columns: context.columns,
+                      relationshipResolvers: context.relationshipResolvers,
+                      sortBy: context.sortBy, // Fixed: was sortConfig
+                      filters: context.filters,
+                      groupBy: context.groupBy,
+                      columnWidths: context.columnWidths,
+                      columnVisibility: context.columnVisibility,
+                      columnOrder: context.columnOrder,
+                      enableSelectionColumn: context.enableSelectionColumn,
+                      rowHeight: context.rowHeight
+                    });
+                    
+                    console.log('✅ TableMachine: Processed updated data', {
+                      processedRowCount: processedData.processedRows.length
+                    });
+                    
+                    // Store updated processed data for renderer
+                    (context as any).processedData = processedData;
+                    
+                    return processedData.processedRows;
+                  },
+                  // Also update coordinate mapping in context
+                  coordinateMapping: ({ context, event }) => {
+                    const processedData = (context as any).processedData;
+                    return processedData?.coordinateMapping || context.coordinateMapping;
+                  }
+                }),
+                // Trigger re-render with new data
+                ({ context, event }) => {
+                  if (context.actors.rendererActor) {
+                    console.log('🎨 TableMachine: Triggering re-render after data update');
+                    
+                    // Get the processed data that was just stored
+                    const processedData = (context as any).processedData;
+                    
+                    // Make sure we have coordinate mapping
+                    if (!processedData?.coordinateMapping) {
+                      console.warn('⚠️ TableMachine: No coordinate mapping from processed data, skipping render');
+                      return;
+                    }
+                    
+                    // First update the coordinate mapping in the renderer
+                    context.actors.rendererActor.send({
+                      type: 'UPDATE_COORDINATES',
+                      mapping: processedData.coordinateMapping,
+                      version: Date.now()
+                    });
+                    
+                    // Then send RENDER event with the updated state
+                    const renderState: RenderState = {
+                      rows: context.rows,
+                      columns: processedData.visibleColumns || context.columns,
+                      selectedCells: context.selectedCells,
+                      editingCell: context.editingCell,
+                      columnWidths: context.columnWidths,
+                      version: Date.now(), // Always use a new version to force render
+                      coordinateMapping: processedData.coordinateMapping, // Include coordinate mapping
+                      groupedData: [],
+                      optimisticOperations: new Map(),
+                      sortBy: context.sortBy || [], // Include sort state
+                      columnVisibility: context.columnVisibility,
+                      columnOrder: context.columnOrder
+                    };
+                    context.actors.rendererActor.send({ 
+                      type: 'RENDER', 
+                      state: renderState
+                    });
+                  }
+                }
+              ]
+            },
+            
+            // Handle subscription errors
+            DATA_SUBSCRIPTION_ERROR: {
+              actions: ({ event }) => {
+                console.error('❌ TableMachine: Data subscription error:', event.error);
+              }
             },
             
             // Include all common event handlers in idle state

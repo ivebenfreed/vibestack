@@ -25,7 +25,8 @@ export const syncActors = {
       clientId: input.clientId,
       currentLSN: input.currentLSN,
       serverUrl: input.serverUrl,
-      autoResetOnFailure: true // Enable auto-reset for integrity failures
+      autoResetOnFailure: true, // Enable auto-reset for integrity failures
+      enableDexieSync: true // Enable parallel Dexie sync
     };
     
     await serviceCoordinator.initialize(coordinatorConfig);
@@ -39,6 +40,7 @@ export const syncActors = {
       webSocket: !!services.webSocket,
       incoming: !!services.incoming,
       outgoing: !!services.outgoing,
+      dexieOutgoing: !!services.dexieOutgoing,
       integrity: !!services.integrity
     });
     
@@ -106,13 +108,28 @@ export const syncActors = {
     
     // Step 1: Check and send pending outgoing changes
     try {
-      const pendingCount = services.outgoing.getPendingChangesCount();
-      if (pendingCount > 0) {
-        syncLogger.info('validation', `Sending ${pendingCount} pending outgoing changes`);
-        await services.outgoing.sendQueuedChanges();
-        syncLogger.info('validation', 'Pending changes sent successfully');
+      // Handle both old TypeORM system and new Dexie system
+      if (services.outgoing) {
+        // Old system
+        const pendingCount = services.outgoing.getPendingChangesCount();
+        if (pendingCount > 0) {
+          syncLogger.info('validation', `Sending ${pendingCount} pending outgoing changes`);
+          await services.outgoing.sendQueuedChanges();
+          syncLogger.info('validation', 'Pending changes sent successfully');
+        } else {
+          syncLogger.info('validation', 'No pending outgoing changes to send');
+        }
+      } else if (services.dexieOutgoing) {
+        // Dexie system - Skip processing during pre-live validation
+        // Changes will be processed after transitioning to live mode
+        const status = await services.dexieOutgoing.getStatus();
+        if (status.pendingCount > 0) {
+          syncLogger.info('validation', `Found ${status.pendingCount} pending Dexie changes - will process after transitioning to live mode`);
+        } else {
+          syncLogger.info('validation', 'No pending Dexie changes found');
+        }
       } else {
-        syncLogger.info('validation', 'No pending outgoing changes to send');
+        syncLogger.warn('validation', 'No outgoing change service available');
       }
     } catch (error) {
       syncLogger.serviceError('OutgoingChanges', error as Error, 'pre-live validation');
@@ -166,6 +183,24 @@ export const syncActors = {
   }),
 
   /**
+   * Validate LSN format (PostgreSQL WAL LSN format: hex/hex)
+   */
+  validateLSN: (lsn: string): void => {
+    // Valid LSN format: hex/hex (e.g., "0/0", "16/B374D848")
+    const lsnRegex = /^[0-9A-Fa-f]+\/[0-9A-Fa-f]+$/;
+    
+    // Check if it looks like a timestamp (13 digits)
+    if (/^\d{13}$/.test(lsn)) {
+      throw new Error(`Invalid LSN format: "${lsn}" appears to be a timestamp. LSN must be in hex/hex format (e.g., "0/0" or "16/B374D848")`);
+    }
+    
+    // Check general format
+    if (!lsnRegex.test(lsn)) {
+      throw new Error(`Invalid LSN format: "${lsn}". LSN must be in hex/hex format (e.g., "0/0" or "16/B374D848")`);
+    }
+  },
+
+  /**
    * Clean LSN by removing any suffixes like "(resuming)"
    */
   cleanLSN: (lsn: string): string => {
@@ -191,12 +226,27 @@ export const syncActors = {
         const parsedState = JSON.parse(stored);
         if (parsedState.clientId && parsedState.currentLSN) {
           persistedClientId = parsedState.clientId;
-          // Clean the LSN to remove any suffixes like "(resuming)"
-          persistedLSN = syncActors.cleanLSN(parsedState.currentLSN);
-          syncLogger.info('persistence', 'Loaded persisted sync state', {
-            clientId: persistedClientId,
-            currentLSN: persistedLSN
-          });
+          
+          // Validate and clean the LSN
+          try {
+            // First try to clean it
+            const cleanedLSN = syncActors.cleanLSN(parsedState.currentLSN);
+            // Then validate it
+            syncActors.validateLSN(cleanedLSN);
+            persistedLSN = cleanedLSN;
+            
+            syncLogger.info('persistence', 'Loaded persisted sync state', {
+              clientId: persistedClientId,
+              currentLSN: persistedLSN
+            });
+          } catch (error) {
+            syncLogger.warn('persistence', 'Invalid LSN in persisted state, resetting to 0/0', {
+              invalidLSN: parsedState.currentLSN,
+              error: error instanceof Error ? error.message : String(error)
+            });
+            // Reset to default if invalid
+            persistedLSN = '0/0';
+          }
         }
       }
     } catch (error) {
@@ -225,6 +275,9 @@ export const syncActors = {
     const SYNC_STATE_KEY = 'sync-machine-state';
     
     try {
+      // Validate LSN format before saving
+      syncActors.validateLSN(input.currentLSN);
+      
       const stateToSave = {
         clientId: input.clientId,
         currentLSN: input.currentLSN,
@@ -236,8 +289,13 @@ export const syncActors = {
       
       return { success: true };
     } catch (error) {
-      syncLogger.warn('persistence', 'Failed to save state', error);
-      return { success: false };
+      syncLogger.error('persistence', 'Failed to save state', { 
+        error: error instanceof Error ? error.message : String(error),
+        currentLSN: input.currentLSN,
+        clientId: input.clientId
+      });
+      // Re-throw to ensure the error is handled by the state machine
+      throw error;
     }
   }),
 

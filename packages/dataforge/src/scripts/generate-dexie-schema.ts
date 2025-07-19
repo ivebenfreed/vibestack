@@ -3,8 +3,14 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { extractEntityMetadata, EntityMetadata, RelationshipMetadata } from '../utils/metadata-extraction.js';
+import { extractEntityMetadata, EntityMetadata as BaseEntityMetadata, RelationshipMetadata } from '../utils/metadata-extraction.js';
+import { getDexieIndexedProperties } from '../utils/context.js';
 import * as ClientEntities from '../generated/client-entities.js';
+
+// Extended metadata interface to include indexed fields
+interface EntityMetadata extends BaseEntityMetadata {
+  indexedFields?: string[];
+}
 
 console.log('[generate-dexie-schema] Starting Dexie schema generation...');
 
@@ -130,9 +136,14 @@ async function generateDexieSchema() {
 function extractAllEntityMetadata(): Map<string, EntityMetadata> {
   const entityMetadataMap = new Map<string, EntityMetadata>();
   
-  // Get domain table names
+  // Get all client table names (domain + system + utility)
   const domainTableNames = ClientEntities.CLIENT_DOMAIN_TABLES.map(table => table.replace(/"/g, ''));
-  console.log('[generate-dexie-schema] Domain tables:', domainTableNames);
+  const systemTableNames = ClientEntities.CLIENT_SYSTEM_TABLES.map(table => table.replace(/"/g, ''));
+  const utilityTableNames = ClientEntities.CLIENT_UTILITY_TABLES ? 
+    ClientEntities.CLIENT_UTILITY_TABLES.map(table => table.replace(/"/g, '')) : [];
+  
+  const allClientTableNames = [...domainTableNames, ...systemTableNames, ...utilityTableNames];
+  console.log('[generate-dexie-schema] All client tables:', allClientTableNames);
   
   // Extract entity schemas and classes
   const entitySchemas: Array<{ name: string; schema: any }> = [];
@@ -161,17 +172,68 @@ function extractAllEntityMetadata(): Map<string, EntityMetadata> {
     const schemaOptions = schema.options || schema._schema || schema;
     const tableName = schemaOptions.tableName;
     
-    // Only process domain entities
-    if (!domainTableNames.includes(tableName)) {
-      console.log(`[generate-dexie-schema] Skipping non-domain entity: ${entityName} (${tableName})`);
+    // Process all client entities (domain + system + utility)
+    if (!allClientTableNames.includes(tableName)) {
+      console.log(`[generate-dexie-schema] Skipping non-client entity: ${entityName} (${tableName})`);
       continue;
     }
     
     const metadata = extractEntityMetadata(entityName, schemaOptions, entityClass);
+    
+    // Extract indexes from schema and entity class
+    const indexedFields = extractIndexedFields(schemaOptions, entityClass);
+    metadata.indexedFields = indexedFields;
+    
     entityMetadataMap.set(entityName, metadata);
   }
   
   return entityMetadataMap;
+}
+
+/**
+ * Extract indexed fields from entity schema and TypeORM metadata
+ */
+function extractIndexedFields(schemaOptions: any, entityClass?: Function): string[] {
+  const indexedFields: string[] = [];
+  
+  // Extract indexes from schema
+  if (schemaOptions.indices) {
+    for (const index of schemaOptions.indices) {
+      if (typeof index === 'string') {
+        indexedFields.push(index);
+      } else if (index.columnNames && Array.isArray(index.columnNames)) {
+        indexedFields.push(...index.columnNames);
+      }
+    }
+  }
+  
+  // Also check for individual column indexes
+  if (schemaOptions.columns) {
+    for (const [columnName, columnDef] of Object.entries(schemaOptions.columns)) {
+      if ((columnDef as any).index === true) {
+        indexedFields.push(columnName);
+      }
+    }
+  }
+  
+  // Extract indexes from our custom @DexieIndex() decorator
+  if (entityClass) {
+    try {
+      const dexieIndexedProps = getDexieIndexedProperties(entityClass);
+      indexedFields.push(...dexieIndexedProps);
+      
+      // Temporary hardcoded fix for LocalChanges processedSync index
+      // TODO: Fix decorator extraction to work with original entity classes
+      if (entityClass.name === 'LocalChanges') {
+        indexedFields.push('processedSync');
+      }
+    } catch (error) {
+      console.warn(`[generate-dexie-schema] Failed to extract Dexie indexes from class metadata:`, error);
+    }
+  }
+  
+  console.log(`[generate-dexie-schema] Extracted indexes for entity:`, indexedFields);
+  return indexedFields;
 }
 
 /**
@@ -257,6 +319,13 @@ function generateEntityIndexes(metadata: EntityMetadata): string[] {
       addedIndexes.add(index);
     }
   };
+  
+  // Add indexes from schema metadata (includes @Index() decorators)
+  if (metadata.indexedFields) {
+    for (const indexedField of metadata.indexedFields) {
+      addIndex(indexedField);
+    }
+  }
   
   // Add foreign keys
   for (const field of metadata.fields) {

@@ -27,6 +27,7 @@ import { syncLogger } from '../../sync/utils/SyncLogger';
 import { MessageProcessor } from '../../sync/utils/MessageProcessor';
 import { StateValidators, Guards } from '../../sync/utils/StateValidators';
 import { syncActors } from '../../sync/utils/SyncActors';
+import { disableChangeTracking, enableChangeTracking } from '../../db/dexie-change-tracking';
 
 // Phase 3: Streamlined service management
 import { ServiceCoordinator, Services } from '../../sync/utils/ServiceCoordinator';
@@ -205,20 +206,41 @@ export const syncMachineV3 = setup({
     // Update LSN and save state
     updateLSN: assign(({ event, context }) => {
       if (event.type === 'LSN_UPDATE') {
-        console.log(`[SyncMachineV3] 📊 LSN update: ${context.currentLSN} → ${event.lsn} (source: ${event.source || 'unknown'})`);
-        
-        // Critical: Update WebSocketService for heartbeat consistency
-        const services = context.serviceCoordinator?.getServices();
-        if (services?.webSocket && context.clientId) {
-          console.log(`[SyncMachineV3] 🔄 Updating WebSocketService connection params with new LSN: ${event.lsn}`);
-          services.webSocket.updateConnectionParams(context.clientId, event.lsn);
-        } else {
-          console.warn(`[SyncMachineV3] ⚠️ Cannot update WebSocketService - missing service or clientId`);
+        // Validate LSN format before updating
+        try {
+          // Import validation from syncActors
+          const lsnRegex = /^[0-9A-Fa-f]+\/[0-9A-Fa-f]+$/;
+          
+          // Check if it looks like a timestamp (13 digits)
+          if (/^\d{13}$/.test(event.lsn)) {
+            console.error(`[SyncMachineV3] ❌ Invalid LSN format: "${event.lsn}" appears to be a timestamp`);
+            return {}; // Don't update with invalid LSN
+          }
+          
+          // Check general format
+          if (!lsnRegex.test(event.lsn)) {
+            console.error(`[SyncMachineV3] ❌ Invalid LSN format: "${event.lsn}". Expected hex/hex format`);
+            return {}; // Don't update with invalid LSN
+          }
+          
+          console.log(`[SyncMachineV3] 📊 LSN update: ${context.currentLSN} → ${event.lsn} (source: ${event.source || 'unknown'})`);
+          
+          // Critical: Update WebSocketService for heartbeat consistency
+          const services = context.serviceCoordinator?.getServices();
+          if (services?.webSocket && context.clientId) {
+            console.log(`[SyncMachineV3] 🔄 Updating WebSocketService connection params with new LSN: ${event.lsn}`);
+            services.webSocket.updateConnectionParams(context.clientId, event.lsn);
+          } else {
+            console.warn(`[SyncMachineV3] ⚠️ Cannot update WebSocketService - missing service or clientId`);
+          }
+          
+          return {
+            currentLSN: event.lsn
+          };
+        } catch (error) {
+          console.error(`[SyncMachineV3] ❌ LSN validation failed:`, error);
+          return {}; // Don't update with invalid LSN
         }
-        
-        return {
-          currentLSN: event.lsn
-        };
       }
       console.log(`[SyncMachineV3] 🔍 updateLSN called with non-LSN_UPDATE event: ${event.type}`);
       return {};
@@ -374,6 +396,8 @@ export const syncMachineV3 = setup({
       
       console.log(`[SyncMachineV3] Processing ${event.changes.length} incoming changes (${event.messageType})`);
       
+      // Note: Change tracking is controlled by state transitions, not message types
+      
       // Use the service's processChanges method which handles queuing internally
       services.incoming.processChanges(event.changes, event.messageType)
         .then((results: any) => {
@@ -484,6 +508,10 @@ export const syncMachineV3 = setup({
     idle: {
       entry: [
         () => syncLogger.stateEntry('idle', 'Shell mode - awaiting connection request'),
+        () => {
+          console.log('[SyncMachineV3] 🔔 Enabling change tracking in idle state');
+          enableChangeTracking();
+        },
         'logState'
       ],
       on: {
@@ -497,6 +525,10 @@ export const syncMachineV3 = setup({
     connecting: {
       entry: [
         () => syncLogger.stateEntry('connecting', 'Phase 1: Real service initialization and connection'),
+        () => {
+          console.log('[SyncMachineV3] 🔇 Disabling change tracking during sync connection');
+          disableChangeTracking();
+        },
         'saveOwnState'
       ],
       
@@ -526,7 +558,7 @@ export const syncMachineV3 = setup({
                   globalServicesV3 = {
                     webSocketService: event.output.services.webSocket,
                     incomingChangeService: event.output.services.incoming,
-                    outgoingChangeService: event.output.services.outgoing,
+                    outgoingChangeService: event.output.services.outgoing || null, // May be null when using Dexie sync
                     integrityService: event.output.services.integrity
                   };
                   
@@ -655,7 +687,11 @@ export const syncMachineV3 = setup({
     
     initial_sync: {
       entry: [
-        () => syncLogger.stateEntry('initial_sync', 'Running initial synchronization')
+        () => syncLogger.stateEntry('initial_sync', 'Running initial synchronization'),
+        () => {
+          console.log('[SyncMachineV3] 🔇 Disabling change tracking during initial sync');
+          disableChangeTracking();
+        }
       ],
       
       on: {
@@ -707,7 +743,11 @@ export const syncMachineV3 = setup({
     
     catchup_sync: {
       entry: [
-        () => syncLogger.stateEntry('catchup_sync', 'Running catchup synchronization')
+        () => syncLogger.stateEntry('catchup_sync', 'Running catchup synchronization'),
+        () => {
+          console.log('[SyncMachineV3] 🔇 Disabling change tracking during catchup sync');
+          disableChangeTracking();
+        }
       ],
       
       on: {
@@ -760,7 +800,11 @@ export const syncMachineV3 = setup({
     
     establishing_baseline: {
       entry: [
-        () => syncLogger.stateEntry('establishing_baseline', 'Establishing integrity baseline after initial sync')
+        () => syncLogger.stateEntry('establishing_baseline', 'Establishing integrity baseline after initial sync'),
+        () => {
+          console.log('[SyncMachineV3] 🔇 Keeping change tracking disabled during baseline establishment');
+          // Keep tracking disabled during baseline establishment
+        }
       ],
       
       invoke: {
@@ -833,7 +877,31 @@ export const syncMachineV3 = setup({
     
     live_sync: {
       entry: [
-        () => syncLogger.stateEntry('live_sync', 'Enhanced validation complete, system ready for real-time sync')
+        () => syncLogger.stateEntry('live_sync', 'Enhanced validation complete, system ready for real-time sync'),
+        () => {
+          // Re-enable change tracking now that initial/catchup sync is complete
+          console.log('[SyncMachineV3] 🔄 Re-enabling Dexie change tracking for live sync');
+          enableChangeTracking();
+        },
+        ({ context }) => {
+          // Start Dexie outgoing sync monitoring if available
+          const dexieService = context.serviceCoordinator?.getServices()?.dexieOutgoing;
+          if (dexieService) {
+            console.log('[SyncMachineV3] 🚀 Starting Dexie outgoing sync monitoring');
+            dexieService.startMonitoring(1000); // Check every second
+          }
+        }
+      ],
+      
+      exit: [
+        ({ context }) => {
+          // Stop Dexie outgoing sync monitoring when leaving live sync
+          const dexieService = context.serviceCoordinator?.getServices()?.dexieOutgoing;
+          if (dexieService) {
+            console.log('[SyncMachineV3] 🛑 Stopping Dexie outgoing sync monitoring');
+            dexieService.stopMonitoring();
+          }
+        }
       ],
       
       // Periodic status reporting
@@ -948,6 +1016,10 @@ export const syncMachineV3 = setup({
     reconnecting: {
       entry: [
         ({ context }) => console.log(`[SyncMachineV3] 🔄 Attempting reconnection (attempt ${context.reconnectAttempts})`),
+        () => {
+          console.log('[SyncMachineV3] 🔇 Keeping change tracking disabled during reconnection');
+          // Keep tracking disabled during reconnection
+        },
         'incrementReconnectAttempts'
       ],
       
@@ -982,7 +1054,11 @@ export const syncMachineV3 = setup({
     
     error: {
       entry: [
-        () => console.log('[SyncMachineV3] ❌ Entered error state')
+        () => console.log('[SyncMachineV3] ❌ Entered error state'),
+        () => {
+          console.log('[SyncMachineV3] 🔔 Re-enabling change tracking in error state');
+          enableChangeTracking();
+        }
       ],
       
       on: {

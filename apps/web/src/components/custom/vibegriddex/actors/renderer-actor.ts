@@ -333,14 +333,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             return;
           }
           
-          // PERFORMANCE: Skip duplicate render events with same version
-          if (event.state.version && event.state.version <= lastRenderedVersion) {
-            console.log('RendererActor: Skipping duplicate render - version already processed', {
-              currentVersion: event.state.version,
-              lastRenderedVersion
-            });
-            return;
-          }
+          // Note: Removed version checking - we want to render whenever data changes
           
           console.log('RendererActor: Rendering with state:', {
             rows: event.state.rows?.length,
@@ -357,10 +350,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             renderer.render(event.state);
             console.log('RendererActor: renderer.render() completed successfully');
             
-            // PERFORMANCE: Update version tracking after successful render
-            if (event.state.version) {
-              lastRenderedVersion = event.state.version;
-            }
+            // Version tracking removed - we render on data changes
           } catch (renderError) {
             console.error('RendererActor: Error in renderer.render():', renderError);
             throw renderError;

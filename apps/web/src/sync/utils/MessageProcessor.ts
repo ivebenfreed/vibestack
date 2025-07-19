@@ -11,7 +11,11 @@ import type { SyncMachineV3Context } from '../../state-machines/machines/sync-ma
 export interface MessageProcessorServices {
   webSocket: any;
   incoming: any;
-  outgoing: any;
+  outgoing?: any; // Optional when using Dexie sync
+  dexieOutgoing?: {
+    markChangesAsProcessedByRecordIds: (recordIds: string[]) => Promise<void>;
+    [key: string]: any;
+  }; // Optional Dexie sync service
   integrity: any;
 }
 
@@ -227,17 +231,66 @@ export class MessageProcessor {
     try {
       if (messageType === 'srv_changes_received') {
         syncLogger.info('message', 'Server acknowledged receipt of changes');
-        services.outgoing.handleChangesReceived(message);
+        if (services.outgoing) {
+          services.outgoing.handleChangesReceived(message);
+        }
+        // Note: Dexie system doesn't need to handle 'received' acknowledgments
       } else if (messageType === 'srv_changes_applied') {
         syncLogger.info('message', 'Server confirmed changes were applied');
-        services.outgoing.handleChangesApplied(message)
-          .catch((error: any) => {
-            syncLogger.serviceError('OutgoingChanges', error, 'changes applied');
-            sendEvent({ type: 'SERVICE_ERROR', service: 'outgoing', error });
+        console.log('[MessageProcessor] srv_changes_applied message full content:', JSON.stringify(message, null, 2));
+        console.log('[MessageProcessor] Services available:', {
+          hasOutgoing: !!services.outgoing,
+          hasDexieOutgoing: !!services.dexieOutgoing
+        });
+        
+        if (services.outgoing) {
+          console.log('[MessageProcessor] Handling with old OutgoingChangeService');
+          services.outgoing.handleChangesApplied(message)
+            .catch((error: any) => {
+              syncLogger.serviceError('OutgoingChanges', error, 'changes applied');
+              sendEvent({ type: 'SERVICE_ERROR', service: 'outgoing', error });
+            });
+        }
+        
+        // Handle for Dexie system when old outgoing service is disabled
+        if (services.dexieOutgoing) {
+          console.log('[MessageProcessor] Dexie system - checking srv_changes_applied message:', {
+            hasAppliedChanges: !!message.appliedChanges,
+            appliedChangesCount: message.appliedChanges?.length,
+            messageKeys: Object.keys(message)
           });
+          
+          if (message.appliedChanges && Array.isArray(message.appliedChanges)) {
+            try {
+              // appliedChanges contains record IDs, not change IDs
+              const recordIds = message.appliedChanges;
+              console.log('[MessageProcessor] Record IDs from server:', recordIds);
+              
+              if (recordIds.length > 0) {
+                // Use the service's method to mark changes as processed based on record IDs
+                services.dexieOutgoing.markChangesAsProcessedByRecordIds(recordIds)
+                  .then(() => {
+                    console.log('[MessageProcessor] Successfully marked Dexie changes as processed');
+                  })
+                  .catch((error: any) => {
+                    console.error('[MessageProcessor] Failed to mark Dexie changes as processed:', error);
+                  });
+              }
+            } catch (error) {
+              console.error('[MessageProcessor] Error processing Dexie change confirmations:', error);
+            }
+          } else {
+            console.log('[MessageProcessor] No appliedChanges array found in message');
+          }
+        } else {
+          console.log('[MessageProcessor] No DexieOutgoingChangeService available');
+        }
       } else if (messageType === 'srv_error' && message.context === 'outgoing_changes') {
         syncLogger.warn('message', 'Server reported error for outgoing changes');
-        services.outgoing.handleServerError(message);
+        if (services.outgoing) {
+          services.outgoing.handleServerError(message);
+        }
+        // TODO: Add error handling for Dexie system if needed
       }
     } catch (error) {
       syncLogger.serviceError('OutgoingChanges', error as Error, messageType);

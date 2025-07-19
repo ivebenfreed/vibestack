@@ -406,8 +406,36 @@ export async function transformWALChanges(
             const columnName = change.columnnames[i];
             let columnValue = change.columnvalues[i];
             
+            // Debug logging for client_id before parsing
+            if (columnName === 'client_id') {
+              replicationLogger.debug('WAL client_id before parsing', {
+                table: change.table,
+                columnName,
+                rawValue: columnValue,
+                rawType: typeof columnValue,
+                rawStringified: JSON.stringify(columnValue),
+                isNull: columnValue === null,
+                isUndefined: columnValue === undefined,
+                isEmpty: columnValue === ''
+              }, MODULE_NAME);
+            }
+            
             // Parse PostgreSQL-specific data types using comprehensive type detection
             columnValue = parsePostgreSQLValue(columnName, columnValue, change.table);
+            
+            // Debug logging for client_id after parsing
+            if (columnName === 'client_id') {
+              replicationLogger.debug('WAL client_id after parsing', {
+                table: change.table,
+                columnName,
+                parsedValue: columnValue,
+                parsedType: typeof columnValue,
+                parsedStringified: JSON.stringify(columnValue),
+                isNull: columnValue === null,
+                isUndefined: columnValue === undefined,
+                isEmpty: columnValue === ''
+              }, MODULE_NAME);
+            }
             
             snakeCaseData[columnName] = columnValue;
           }
@@ -439,7 +467,26 @@ export async function transformWALChanges(
           new Date().toISOString();
 
         // Extract clientId for top-level TableChange field (for anti-echo filtering) 
-        const topLevelClientId = camelCaseData.clientId as string | undefined;
+        // Important: Only set clientId if it has a real value (not null, undefined, or empty string)
+        let topLevelClientId: string | undefined = undefined;
+        if (camelCaseData.clientId && typeof camelCaseData.clientId === 'string' && camelCaseData.clientId.trim() !== '') {
+          topLevelClientId = camelCaseData.clientId as string;
+        }
+        
+        // Debug logging for clientId detection - always log
+        replicationLogger.debug('WAL data extraction complete', {
+          table: change.table,
+          operation: change.kind,
+          hasClientIdInCamelCase: !!camelCaseData.clientId,
+          clientIdValue: camelCaseData.clientId,
+          clientIdType: typeof camelCaseData.clientId,
+          hasClientIdInSnakeCase: !!snakeCaseData.client_id,
+          snakeClientIdValue: snakeCaseData.client_id,
+          snakeClientIdType: typeof snakeCaseData.client_id,
+          topLevelClientIdWillBe: topLevelClientId,
+          columnNames: change.columnnames || [],
+          dataKeys: Object.keys(camelCaseData)
+        }, MODULE_NAME);
 
         // Add to result array with proper TableChange format (camelCase)
         tableChanges.push({
@@ -770,8 +817,22 @@ export async function processChanges(
       } else if (tableChanges.length > 0) {
         // Filter out client-originated changes - only notify system changes
         const systemChanges = tableChanges.filter(change => {
-          const clientId = change.clientId || change.data?.clientId;
-          return !clientId; // Only include changes without clientId (system-originated)
+          // Check both top-level clientId and clientId within data
+          const hasClientId = !!(change.clientId || change.data?.clientId);
+          
+          // Debug logging for filter - always log for debugging
+          replicationLogger.debug('System change filter check', {
+            table: change.table,
+            topLevelClientId: change.clientId,
+            topLevelClientIdType: typeof change.clientId,
+            dataClientId: change.data?.clientId,
+            dataClientIdType: typeof change.data?.clientId,
+            hasClientId,
+            willBeSystemChange: !hasClientId,
+            changeDataKeys: Object.keys(change.data || {})
+          }, MODULE_NAME);
+          
+          return !hasClientId; // Only include changes without clientId (system-originated)
         });
         
         if (systemChanges.length === 0) {

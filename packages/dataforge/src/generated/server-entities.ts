@@ -1108,8 +1108,7 @@ export const TaskSchema = new EntitySchema<Task>({
             target: 'StatusDefinition', // Target Entity Name (String)
             type: 'many-to-one',
             inverseSide: 'tasks',
-            joinColumn: { name: 'status_id' },
-            eager: true
+            joinColumn: { name: 'status_id' }
         },
         'tags': {
             target: 'Tag', // Target Entity Name (String)
@@ -1119,8 +1118,7 @@ export const TaskSchema = new EntitySchema<Task>({
                 name: 'task_tags',
                 joinColumns: [{ name: 'task_id', referencedColumnName: 'id' }],
                 inverseJoinColumns: [{ name: 'tag_id', referencedColumnName: 'id' }],
-            },
-            eager: true
+            }
         },
         'project': {
             target: 'Project', // Target Entity Name (String)

@@ -1,6 +1,6 @@
 import { Entity, Column, Index } from 'typeorm';
 import { IsString, IsJSON, IsNumber } from 'class-validator';
-import { ClientOnly } from '../utils/context.js';
+import { ClientOnly, DexieIndex } from '../utils/context.js';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 
 /**
@@ -32,6 +32,8 @@ export class LocalChanges extends BaseSystemEntity {
   updatedAt!: Date;
 
   @Column({ type: 'integer', default: 0, name: 'processed_sync' })
+  @Index()
+  @DexieIndex()
   @IsNumber()
   processedSync!: number;
 } 

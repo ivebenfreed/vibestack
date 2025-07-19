@@ -9,6 +9,7 @@
 
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { TableChange } from '@repo/sync-types';
+import { applySyncChanges } from '../db/dexie-change-tracking';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -356,128 +357,50 @@ export class IncomingChangeService {
       // Extract entities data from changes
       const entitiesData = changes.map(change => change.data);
       
-      // Import Dexie for bulk operations
-      const { db } = await import('@repo/dataforge/dexie-schema');
-      
-      // Call domain-specific bulk function and Dexie bulk insert
-      let insertedEntities: any[] = [];
-      
-      switch (table) {
-        case 'tasks':
-          const { bulkCreateTasksIncoming } = await import('../domain/task');
-          insertedEntities = await bulkCreateTasksIncoming(entitiesData as any);
-          
-          // Bulk insert to Dexie
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tasks into IndexedDB`);
-          await db.tasks.bulkPut(entitiesData);
-          break;
+      // Perform bulk insert to Dexie wrapped in sync transaction
+      await applySyncChanges(async () => {
+        const { db } = await import('@repo/dataforge/dexie-schema');
+        
+        switch (table) {
+          case 'tasks':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tasks into IndexedDB`);
+            await db.tasks.bulkPut(entitiesData);
+            break;
           
         case 'comments':
-          const { bulkCreateCommentsIncoming } = await import('../domain/comment');
-          insertedEntities = await bulkCreateCommentsIncoming(entitiesData as any);
-          
-          // Bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} comments into IndexedDB`);
           await db.comments.bulkPut(entitiesData);
           break;
           
         case 'projects':
-          const { bulkCreateProjectsIncoming } = await import('../domain/project');
-          insertedEntities = await bulkCreateProjectsIncoming(entitiesData as any);
-          
-          // Bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} projects into IndexedDB`);
           await db.projects.bulkPut(entitiesData);
           break;
           
         case 'users':
-          const { bulkCreateUsersIncoming } = await import('../domain/user');
-          insertedEntities = await bulkCreateUsersIncoming(entitiesData as any);
-          
-          // Bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} users into IndexedDB`);
           await db.users.bulkPut(entitiesData);
           break;
           
         case 'status_sets':
-          // No bulk atomic handler yet, but we can bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} status_sets into IndexedDB`);
           await db.status_sets.bulkPut(entitiesData);
-          
-          // Still do individual atomic store operations
-          for (const change of changes) {
-            try {
-              const result = await this.applyChangeInTransaction(change, null);
-              results.push(result);
-            } catch (error) {
-              results.push({
-                change,
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-          return results;
+          break;
           
         case 'status_definitions':
-          // No bulk atomic handler yet, but we can bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} status_definitions into IndexedDB`);
           await db.status_definitions.bulkPut(entitiesData);
-          
-          // Still do individual atomic store operations
-          for (const change of changes) {
-            try {
-              const result = await this.applyChangeInTransaction(change, null);
-              results.push(result);
-            } catch (error) {
-              results.push({
-                change,
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-          return results;
+          break;
           
         case 'tags':
-          // No bulk atomic handler yet, but we can bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tags into IndexedDB`);
           await db.tags.bulkPut(entitiesData);
-          
-          // Still do individual atomic store operations
-          for (const change of changes) {
-            try {
-              const result = await this.applyChangeInTransaction(change, null);
-              results.push(result);
-            } catch (error) {
-              results.push({
-                change,
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-          return results;
+          break;
           
         case 'tag_sets':
-          // No bulk atomic handler yet, but we can bulk insert to Dexie
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tag_sets into IndexedDB`);
           await db.tag_sets.bulkPut(entitiesData);
-          
-          // Still do individual atomic store operations
-          for (const change of changes) {
-            try {
-              const result = await this.applyChangeInTransaction(change, null);
-              results.push(result);
-            } catch (error) {
-              results.push({
-                change,
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-          return results;
+          break;
           
         default:
           // Fallback to individual processing for unknown tables
@@ -496,18 +419,19 @@ export class IncomingChangeService {
             }
           }
           return results;
-      }
-      
-      // Create success results for all bulk inserted entities
-      changes.forEach((change, index) => {
-        results.push({
-          change,
-          success: true,
-          error: undefined
+        }
+        
+        // Create success results for all bulk inserted entities
+        changes.forEach((change, index) => {
+          results.push({
+            change,
+            success: true,
+            error: undefined
+          });
         });
+        
+        console.log(`[IncomingChangeService] ✅ Bulk inserted ${changes.length} ${table} entities`);
       });
-      
-      console.log(`[IncomingChangeService] ✅ Bulk inserted ${insertedEntities.length} ${table} entities`);
       
     } catch (error) {
       console.error(`[IncomingChangeService] ❌ Bulk insert failed for ${table}:`, error);
@@ -544,64 +468,56 @@ export class IncomingChangeService {
       // Extract entities data from changes
       const entitiesData = changes.map(change => change.data);
       
-      // Import Dexie for bulk operations
-      const { db } = await import('@repo/dataforge/dexie-schema');
-      
-      // Perform bulk update for Dexie
-      switch (table) {
-        case 'tasks':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tasks in IndexedDB`);
-          await db.tasks.bulkPut(entitiesData);
-          break;
-        case 'projects':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} projects in IndexedDB`);
-          await db.projects.bulkPut(entitiesData);
-          break;
-        case 'users':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} users in IndexedDB`);
-          await db.users.bulkPut(entitiesData);
-          break;
-        case 'comments':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} comments in IndexedDB`);
-          await db.comments.bulkPut(entitiesData);
-          break;
-        case 'status_sets':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} status_sets in IndexedDB`);
-          await db.status_sets.bulkPut(entitiesData);
-          break;
-        case 'status_definitions':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} status_definitions in IndexedDB`);
-          await db.status_definitions.bulkPut(entitiesData);
-          break;
-        case 'tags':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tags in IndexedDB`);
-          await db.tags.bulkPut(entitiesData);
-          break;
-        case 'tag_sets':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tag_sets in IndexedDB`);
-          await db.tag_sets.bulkPut(entitiesData);
-          break;
+      // Perform bulk update wrapped in sync transaction
+      await applySyncChanges(async () => {
+        const { db } = await import('@repo/dataforge/dexie-schema');
+        
+        switch (table) {
+          case 'tasks':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tasks in IndexedDB`);
+            await db.tasks.bulkPut(entitiesData);
+            break;
+          case 'projects':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} projects in IndexedDB`);
+            await db.projects.bulkPut(entitiesData);
+            break;
+          case 'users':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} users in IndexedDB`);
+            await db.users.bulkPut(entitiesData);
+            break;
+          case 'comments':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} comments in IndexedDB`);
+            await db.comments.bulkPut(entitiesData);
+            break;
+          case 'status_sets':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} status_sets in IndexedDB`);
+            await db.status_sets.bulkPut(entitiesData);
+            break;
+          case 'status_definitions':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} status_definitions in IndexedDB`);
+            await db.status_definitions.bulkPut(entitiesData);
+            break;
+          case 'tags':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tags in IndexedDB`);
+            await db.tags.bulkPut(entitiesData);
+            break;
+          case 'tag_sets':
+            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tag_sets in IndexedDB`);
+            await db.tag_sets.bulkPut(entitiesData);
+            break;
         default:
           console.warn(`[IncomingChangeService] Unknown table ${table} for Dexie bulk update`);
-      }
-      
-      // For now, still do individual processing for atomic stores since bulk update operations
-      // are not yet implemented in domain services
-      console.log(`[IncomingChangeService] Processing individual atomic store updates for ${table}`);
-      
-      for (const change of changes) {
-        try {
-          const result = await this.applyChangeInTransaction(change, null);
-          results.push(result);
-        } catch (error) {
-          console.error(`[IncomingChangeService] Update failed for ${table}:${change.data.id}:`, error);
+        }
+        
+        // Create success results for all bulk updated entities
+        changes.forEach((change) => {
           results.push({
             change,
-            success: false,
-            error: error instanceof Error ? error.message : String(error)
+            success: true,
+            error: undefined
           });
-        }
-      }
+        });
+      });
       
     } catch (error) {
       console.error(`[IncomingChangeService] ❌ Bulk update failed for ${table}:`, error);
@@ -694,355 +610,243 @@ export class IncomingChangeService {
   }
 
   /**
-   * Apply task changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply task changes using Dexie only
    */
   private async applyTaskChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { createTaskIncoming, updateTaskIncoming, deleteTaskIncoming } = await import('../domain/task');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await createTaskIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting task ${change.data.id} into IndexedDB`);
-        await db.tasks.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateTaskIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting task ${change.data.id} into IndexedDB`);
+          await db.tasks.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating task ${change.data.id} in IndexedDB`);
-        await db.tasks.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteTaskIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating task ${change.data.id} in IndexedDB`);
+          await db.tasks.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting task ${change.data.id} from IndexedDB`);
-        await db.tasks.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown task operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting task ${change.data.id} from IndexedDB`);
+          await db.tasks.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown task operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply project changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply project changes using Dexie only
    */
   private async applyProjectChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { createProjectIncoming, updateProjectIncoming, deleteProjectIncoming } = await import('../domain/project');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await createProjectIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting project ${change.data.id} into IndexedDB`);
-        await db.projects.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateProjectIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting project ${change.data.id} into IndexedDB`);
+          await db.projects.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating project ${change.data.id} in IndexedDB`);
-        await db.projects.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteProjectIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating project ${change.data.id} in IndexedDB`);
+          await db.projects.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting project ${change.data.id} from IndexedDB`);
-        await db.projects.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown project operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting project ${change.data.id} from IndexedDB`);
+          await db.projects.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown project operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply user changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply user changes using Dexie only
    */
   private async applyUserChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { createUserIncoming, updateUserIncoming, deleteUserIncoming } = await import('../domain/user');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await createUserIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting user ${change.data.id} into IndexedDB`);
-        await db.users.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateUserIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting user ${change.data.id} into IndexedDB`);
+          await db.users.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating user ${change.data.id} in IndexedDB`);
-        await db.users.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteUserIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating user ${change.data.id} in IndexedDB`);
+          await db.users.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting user ${change.data.id} from IndexedDB`);
-        await db.users.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown user operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting user ${change.data.id} from IndexedDB`);
+          await db.users.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown user operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply comment changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply comment changes using Dexie only
    */
   private async applyCommentChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { createCommentIncoming, updateCommentIncoming, deleteCommentIncoming } = await import('../domain/comment');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await createCommentIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting comment ${change.data.id} into IndexedDB`);
-        await db.comments.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateCommentIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting comment ${change.data.id} into IndexedDB`);
+          await db.comments.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating comment ${change.data.id} in IndexedDB`);
-        await db.comments.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteCommentIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating comment ${change.data.id} in IndexedDB`);
+          await db.comments.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting comment ${change.data.id} from IndexedDB`);
-        await db.comments.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown comment operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting comment ${change.data.id} from IndexedDB`);
+          await db.comments.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown comment operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply status set changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply status set changes using Dexie only
    */
   private async applyStatusSetChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { insertStatusSetIncoming, updateStatusSetIncoming, deleteStatusSetIncoming } = await import('../domain/status-set');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await insertStatusSetIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_set ${change.data.id} into IndexedDB`);
-        await db.status_sets.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateStatusSetIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_set ${change.data.id} into IndexedDB`);
+          await db.status_sets.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
-        await db.status_sets.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteStatusSetIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
+          await db.status_sets.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_set ${change.data.id} from IndexedDB`);
-        await db.status_sets.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown status set operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_set ${change.data.id} from IndexedDB`);
+          await db.status_sets.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown status set operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply status definition changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply status definition changes using Dexie only
    */
   private async applyStatusDefinitionChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { insertStatusDefinitionIncoming, updateStatusDefinitionIncoming, deleteStatusDefinitionIncoming } = await import('../domain/status-definition');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await insertStatusDefinitionIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_definition ${change.data.id} into IndexedDB`);
-        await db.status_definitions.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateStatusDefinitionIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_definition ${change.data.id} into IndexedDB`);
+          await db.status_definitions.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
-        await db.status_definitions.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteStatusDefinitionIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
+          await db.status_definitions.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_definition ${change.data.id} from IndexedDB`);
-        await db.status_definitions.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown status definition operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_definition ${change.data.id} from IndexedDB`);
+          await db.status_definitions.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown status definition operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply tag changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply tag changes using Dexie only
    */
   private async applyTagChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { insertTagIncoming, updateTagIncoming, deleteTagIncoming } = await import('../domain/tag');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await insertTagIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag ${change.data.id} into IndexedDB`);
-        await db.tags.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateTagIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag ${change.data.id} into IndexedDB`);
+          await db.tags.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag ${change.data.id} in IndexedDB`);
-        await db.tags.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteTagIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag ${change.data.id} in IndexedDB`);
+          await db.tags.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag ${change.data.id} from IndexedDB`);
-        await db.tags.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown tag operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag ${change.data.id} from IndexedDB`);
+          await db.tags.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown tag operation: ${change.operation}`);
+      }
+    });
   }
 
   /**
-   * Apply tag set changes using incoming path functions
-   * Also applies changes to Dexie for parallel testing
+   * Apply tag set changes using Dexie only
    */
   private async applyTagSetChange(change: TableChange): Promise<void> {
-    // Apply to atomic store system (existing)
-    const { insertTagSetIncoming, updateTagSetIncoming, deleteTagSetIncoming } = await import('../domain/tag-set');
-    
-    // Apply to Dexie system (parallel)
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        // Apply to atomic store
-        await insertTagSetIncoming(change.data as any);
-        
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag_set ${change.data.id} into IndexedDB`);
-        await db.tag_sets.put(change.data as any);
-        break;
+    // Apply to Dexie system only, wrapped in sync transaction
+    await applySyncChanges(async () => {
+      const { db } = await import('@repo/dataforge/dexie-schema');
       
-      case 'update':
-        // Apply to atomic store
-        await updateTagSetIncoming(change.data.id, change.data);
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag_set ${change.data.id} into IndexedDB`);
+          await db.tag_sets.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
-        await db.tag_sets.put(change.data as any);
-        break;
-      
-      case 'delete':
-        // Apply to atomic store
-        await deleteTagSetIncoming(change.data.id);
+        case 'update':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
+          await db.tag_sets.put(change.data as any);
+          break;
         
-        // Apply to Dexie
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag_set ${change.data.id} from IndexedDB`);
-        await db.tag_sets.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown tag set operation: ${change.operation}`);
-    }
+        case 'delete':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag_set ${change.data.id} from IndexedDB`);
+          await db.tag_sets.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown tag set operation: ${change.operation}`);
+      }
+    });
   }
 
 } 

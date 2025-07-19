@@ -418,8 +418,14 @@ export const editHandlers = {
 
   'EDIT_COMMIT': {
     guard: ({ context, event }) => {
-      // Always allow commit for relationship changes
-      return true;
+      // Check if value actually changed
+      const hasChanged = context.originalValue !== event.value;
+      console.log('TableMachine: Edit commit guard check', {
+        originalValue: context.originalValue,
+        newValue: event.value,
+        hasChanged
+      });
+      return hasChanged;
     },
     actions: [
       ({ event }) => {
@@ -518,31 +524,43 @@ export const editHandlers = {
             }
           }
           
-          const updatedRow = {
-            ...context.rows[rowIndex],
-            data: updatedRowData
-          };
-          const updatedRows = [...context.rows];
-          updatedRows[rowIndex] = updatedRow;
-          Object.assign(context, { rows: updatedRows });
+          // Skip optimistic update if we have an onEntityUpdate handler (Dexie will handle it)
+          const hasEntityUpdateHandler = !!context.onEntityUpdate;
           
-          console.log('TableMachine: Updated row data optimistically', {
-            rowId,
-            field,
-            newValue: event.value,
-            oldValue: context.originalValue
-          });
-          
-          // Trigger ViewActor to process updated data and re-render
-          // This ensures consistent sorting, styling, and relationship resolution
-          if (self && self.send) {
-            console.log('TableMachine: Triggering view processing after edit');
-            self.send({ type: 'INVOKE_VIEW_ACTOR' });
+          if (!hasEntityUpdateHandler) {
+            // Only do optimistic update if there's no entity update handler
+            const updatedRow = {
+              ...context.rows[rowIndex],
+              data: updatedRowData
+            };
+            const updatedRows = [...context.rows];
+            updatedRows[rowIndex] = updatedRow;
+            Object.assign(context, { rows: updatedRows });
+            
+            console.log('TableMachine: Updated row data optimistically (no entity handler)', {
+              rowId,
+              field,
+              newValue: event.value,
+              oldValue: context.originalValue
+            });
+            
+            // Trigger ViewActor to process updated data and re-render
+            // This ensures consistent sorting, styling, and relationship resolution
+            if (self && self.send) {
+              console.log('TableMachine: Triggering view processing after edit');
+              self.send({ type: 'INVOKE_VIEW_ACTOR' });
+            }
+          } else {
+            console.log('TableMachine: Skipping optimistic update - entity handler will trigger updates', {
+              rowId,
+              field,
+              newValue: event.value
+            });
           }
           
           // Call entity update handler if provided (fire and forget)
           console.log('TableMachine: Checking onEntityUpdate availability', {
-            hasOnEntityUpdate: !!context.onEntityUpdate,
+            hasOnEntityUpdate: hasEntityUpdateHandler,
             onEntityUpdateType: typeof context.onEntityUpdate,
             contextKeys: Object.keys(context)
           });

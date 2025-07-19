@@ -974,6 +974,15 @@ export class EventDelegationManager {
       return;
     }
     
+    // Don't try to focus container if we're currently editing
+    const editingPortal = document.querySelector('.vibegridx-editing-portal');
+    const isCurrentlyEditing = editingPortal && editingPortal.style.display !== 'none';
+    
+    if (isCurrentlyEditing) {
+      console.log('🎯 EventDelegationManager: Skipping focus - editing in progress');
+      return;
+    }
+    
     if (document.activeElement !== this.config.container) {
       console.log('🎯 EventDelegationManager: Ensuring container focus');
       this.lastFocusTime = now;

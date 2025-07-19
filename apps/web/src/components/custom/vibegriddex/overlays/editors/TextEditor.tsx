@@ -98,7 +98,17 @@ function TextEditorComponent({
 
   if (multiline) {
     return (
-      <div style={containerStyle}>
+      <div 
+        style={containerStyle}
+        onMouseDown={(e) => {
+          // Prevent event from bubbling to EventDelegationManager
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          // Prevent event from bubbling to EventDelegationManager
+          e.stopPropagation();
+        }}
+      >
         <textarea
           ref={inputRef as React.RefObject<HTMLTextAreaElement>}
           value={value}
@@ -107,13 +117,31 @@ function TextEditorComponent({
           onBlur={handleBlur}
           style={inputStyle}
           placeholder={column.placeholder}
+          onMouseDown={(e) => {
+            // Ensure textarea gets focus and stop propagation
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            // Stop propagation to prevent any parent handlers
+            e.stopPropagation();
+          }}
         />
       </div>
     );
   }
 
   return (
-    <div style={containerStyle}>
+    <div 
+      style={containerStyle}
+      onMouseDown={(e) => {
+        // Prevent event from bubbling to EventDelegationManager
+        e.stopPropagation();
+      }}
+      onClick={(e) => {
+        // Prevent event from bubbling to EventDelegationManager
+        e.stopPropagation();
+      }}
+    >
       <input
         ref={inputRef as React.RefObject<HTMLInputElement>}
         value={value}
@@ -124,6 +152,14 @@ function TextEditorComponent({
         type={column.type === 'email' ? 'email' : column.type === 'url' ? 'url' : 'text'}
         placeholder={column.placeholder}
         maxLength={column.maxLength}
+        onMouseDown={(e) => {
+          // Ensure input gets focus and stop propagation
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          // Stop propagation to prevent any parent handlers
+          e.stopPropagation();
+        }}
       />
     </div>
   );

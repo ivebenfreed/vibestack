@@ -131,7 +131,10 @@ export class StateValidators {
 
     if (!services.webSocket) issues.push('WebSocket service missing');
     if (!services.incoming) issues.push('Incoming changes service missing');
-    if (!services.outgoing) issues.push('Outgoing changes service missing');
+    // Outgoing service is optional when using Dexie sync
+    if (!services.outgoing && !services.dexieOutgoing) {
+      issues.push('No outgoing change service available (neither TypeORM nor Dexie)');
+    }
     if (!services.integrity) issues.push('Integrity service missing');
 
     return {

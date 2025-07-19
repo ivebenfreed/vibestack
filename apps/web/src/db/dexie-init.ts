@@ -24,6 +24,16 @@ export async function initializeDexieDatabase(): Promise<void> {
     const version = db.verno;
     console.log(`[Dexie Init] Database opened successfully. Version: ${version}`);
     
+    // Initialize change tracking hooks
+    // The clientId doesn't matter here - it will be overridden by DexieOutgoingChangeService
+    // which gets the correct clientId from the sync machine context
+    const clientId = 'dexie-client-temp';
+    const userId = 'current-user';
+    
+    const { initializeDexieChangeTracking } = await import('./dexie-change-tracking');
+    initializeDexieChangeTracking(clientId, userId);
+    console.log('[Dexie Init] Change tracking hooks initialized');
+    
     // Quick health check - count some tables
     const [taskCount, userCount] = await Promise.all([
       db.tasks.count(),

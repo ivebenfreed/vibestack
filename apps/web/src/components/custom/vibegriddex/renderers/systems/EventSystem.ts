@@ -151,8 +151,15 @@ export class EventSystem {
     const rowId = cellElement.dataset.rowId!;
     const columnId = cellElement.dataset.columnId!;
 
-    // Ensure viewport has focus for keyboard events, but prevent scrolling
-    this.config.domManager.getElement('viewport').focus({ preventScroll: true });
+    // Only focus viewport if we're not currently editing
+    // This prevents focus bouncing when clicking inside text editors
+    const editingPortal = document.querySelector('.vibegridx-editing-portal');
+    const isCurrentlyEditing = editingPortal && editingPortal.style.display !== 'none';
+    
+    if (!isCurrentlyEditing) {
+      // Ensure viewport has focus for keyboard events, but prevent scrolling
+      this.config.domManager.getElement('viewport').focus({ preventScroll: true });
+    }
 
     this.config.callbacks.onCellClick?.(rowId, columnId, event);
   }

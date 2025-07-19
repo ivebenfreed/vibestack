@@ -9,13 +9,8 @@ export function relationshipSingle(
   column: Column,
   rowData?: any
 ): string {
-  console.log('🔍 relationshipSingle: Called', {
-    columnId: column.id,
-    value,
-    hasRowData: !!rowData,
-    resolvedKey: `__resolved_${column.id}`,
-    resolvedValue: rowData?.[`__resolved_${column.id}`]
-  });
+  // Debug logging disabled for performance
+  // console.log('🔍 relationshipSingle: Called', { columnId: column.id, value });
   
   // First check for pre-resolved value from ViewActor
   if (rowData && rowData[`__resolved_${column.id}`]) {

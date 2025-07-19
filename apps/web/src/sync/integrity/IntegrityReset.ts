@@ -287,6 +287,12 @@ export class IntegrityReset {
     try {
       console.log(`[IntegrityReset] Setting LSN to ${targetLSN}...`);
       
+      // Validate LSN format
+      const lsnRegex = /^[0-9A-Fa-f]+\/[0-9A-Fa-f]+$/;
+      if (!lsnRegex.test(targetLSN)) {
+        throw new Error(`Invalid LSN format: "${targetLSN}". Expected hex/hex format (e.g., "0/0" or "16/B374D848")`);
+      }
+      
       // Set in localStorage (sync machine's own state)
       const SYNC_STATE_KEY = 'sync-machine-state';
       try {

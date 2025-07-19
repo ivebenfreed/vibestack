@@ -69,7 +69,7 @@ export class Task extends BaseDomainEntity {
   @IsUUID()
   statusId?: string;
   
-  @ManyToOne(() => StatusDefinition, status => status.tasks, { eager: true })
+  @ManyToOne(() => StatusDefinition, status => status.tasks)
   @JoinColumn({ name: 'status_id' })
   status?: StatusDefinition;
   
@@ -109,7 +109,7 @@ export class Task extends BaseDomainEntity {
   legacyTags?: string[];
   
   // New tags relationship
-  @ManyToMany(() => Tag, tag => tag.tasks, { eager: true })
+  @ManyToMany(() => Tag, tag => tag.tasks)
   @JoinTable({
     name: 'task_tags',
     joinColumn: { name: 'task_id', referencedColumnName: 'id' },

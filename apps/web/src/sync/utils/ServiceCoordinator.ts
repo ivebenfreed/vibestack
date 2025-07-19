@@ -11,6 +11,7 @@
 import { WebSocketService, WebSocketServiceConfig } from '../WebSocketService';
 import { IncomingChangeService, IncomingChangeServiceConfig } from '../IncomingChangeService';
 import { OutgoingChangeService, OutgoingChangeServiceConfig } from '../OutgoingChangeService';
+import { DexieOutgoingChangeService, DexieOutgoingChangeServiceConfig } from '../DexieOutgoingChangeService';
 import { IntegrityService, IntegrityServiceConfig } from '../IntegrityService';
 import { NewPGliteDataSource } from '../../db/newtypeorm/NewDataSource';
 import { syncLogger } from './SyncLogger';
@@ -19,6 +20,7 @@ export interface Services {
   webSocket: WebSocketService;
   incoming: IncomingChangeService;
   outgoing: OutgoingChangeService;
+  dexieOutgoing?: DexieOutgoingChangeService; // Optional for parallel sync
   integrity: IntegrityService;
 }
 
@@ -35,6 +37,7 @@ export interface ServiceCoordinatorConfig {
   enableServerValidation?: boolean;
   validationTimeoutMs?: number;
   autoResetOnFailure?: boolean;
+  enableDexieSync?: boolean; // Enable parallel Dexie sync
 }
 
 /**
@@ -47,11 +50,13 @@ export class ServiceCoordinator {
     webSocket: WebSocketService | null;
     incoming: IncomingChangeService | null;
     outgoing: OutgoingChangeService | null;
+    dexieOutgoing: DexieOutgoingChangeService | null;
     integrity: IntegrityService | null;
   } = {
     webSocket: null,
     incoming: null,
     outgoing: null,
+    dexieOutgoing: null,
     integrity: null
   };
 
@@ -126,23 +131,49 @@ export class ServiceCoordinator {
       syncLogger.info('service', 'Creating IncomingChangeService...');
       this.services.incoming = new IncomingChangeService(incomingConfig, this.dataSource);
       
-      syncLogger.info('service', 'Creating OutgoingChangeService with WebSocket message sender...');
-      this.services.outgoing = new OutgoingChangeService(outgoingConfig, this.dataSource, this.services.webSocket);
+      // Only create old OutgoingChangeService if Dexie sync is disabled
+      if (!config.enableDexieSync) {
+        syncLogger.info('service', 'Creating OutgoingChangeService with WebSocket message sender...');
+        this.services.outgoing = new OutgoingChangeService(outgoingConfig, this.dataSource, this.services.webSocket);
+      } else {
+        syncLogger.info('service', 'Skipping OutgoingChangeService - using Dexie sync instead');
+      }
       
       syncLogger.info('service', 'Creating IntegrityService with WebSocket message sender...');
       this.services.integrity = new IntegrityService(integrityConfig, this.dataSource);
       this.services.integrity.setMessageSender(this.services.webSocket);
 
+      // Initialize Dexie outgoing service if enabled
+      if (config.enableDexieSync) {
+        syncLogger.info('service', 'Creating DexieOutgoingChangeService for parallel sync...');
+        const dexieOutgoingConfig: DexieOutgoingChangeServiceConfig = {
+          clientId: config.clientId,
+          batchSize: config.batchSize || 100,
+          maxRetries: 3,
+          retryDelay: 1000
+        };
+        this.services.dexieOutgoing = new DexieOutgoingChangeService(dexieOutgoingConfig);
+        console.log('[ServiceCoordinator] ✅ DexieOutgoingChangeService created successfully');
+      } else {
+        console.log('[ServiceCoordinator] ⚠️ DexieOutgoingChangeService NOT created - enableDexieSync is false');
+      }
+
       // Validate all services created successfully
-      if (!this.services.webSocket || !this.services.incoming || 
-          !this.services.outgoing || !this.services.integrity) {
-        throw new Error('Failed to create one or more services');
+      // Note: outgoing service is optional when Dexie sync is enabled
+      const requiredServices = [this.services.webSocket, this.services.incoming, this.services.integrity];
+      if (!config.enableDexieSync) {
+        requiredServices.push(this.services.outgoing);
+      }
+      
+      if (requiredServices.some(service => !service)) {
+        throw new Error('Failed to create one or more required services');
       }
 
       syncLogger.serviceInitialized('ServiceCoordinator', {
         webSocket: !!this.services.webSocket,
         incoming: !!this.services.incoming,
         outgoing: !!this.services.outgoing,
+        dexieOutgoing: !!this.services.dexieOutgoing,
         integrity: !!this.services.integrity,
         autonomous: true // No orchestrator dependencies
       });
@@ -151,6 +182,7 @@ export class ServiceCoordinator {
         webSocket: this.services.webSocket,
         incoming: this.services.incoming,
         outgoing: this.services.outgoing,
+        dexieOutgoing: this.services.dexieOutgoing,
         integrity: this.services.integrity
       };
 
@@ -167,9 +199,10 @@ export class ServiceCoordinator {
   setupCallbacks(eventHandler: (event: any) => void): void {
     this.eventHandler = eventHandler;
     
-    if (!this.services.webSocket || !this.services.incoming || 
-        !this.services.outgoing || !this.services.integrity) {
-      throw new Error('Services not initialized - call initialize() first');
+    // Check required services (outgoing is optional with Dexie sync)
+    const requiredServices = [this.services.webSocket, this.services.incoming, this.services.integrity];
+    if (requiredServices.some(service => !service)) {
+      throw new Error('Required services not initialized - call initialize() first');
     }
 
     syncLogger.info('service', 'Setting up simplified service callbacks');
@@ -211,8 +244,9 @@ export class ServiceCoordinator {
       }
     });
 
-    // Outgoing change service callbacks
-    this.services.outgoing.setCallbacks({
+    // Outgoing change service callbacks (only if using old system)
+    if (this.services.outgoing) {
+      this.services.outgoing.setCallbacks({
       onChangesQueued: (count: number) => {
         syncLogger.serviceCallback('OutgoingChanges', 'changesQueued', { count });
         eventHandler({ type: 'OUTGOING_CHANGES_QUEUED', count });
@@ -235,6 +269,7 @@ export class ServiceCoordinator {
         eventHandler({ type: 'SERVICE_ERROR', service: 'outgoing', error });
       }
     });
+    }
 
     // Integrity service callbacks
     this.services.integrity.setCallbacks({
@@ -262,10 +297,67 @@ export class ServiceCoordinator {
       }
     });
 
+    // Dexie outgoing service callbacks (if enabled)
+    if (this.services.dexieOutgoing) {
+      this.services.dexieOutgoing.setCallbacks({
+        onChangesSent: (changes, success) => {
+          syncLogger.serviceCallback('DexieOutgoingChanges', 'changesSent', { 
+            count: changes.length,
+            success 
+          });
+          if (success) {
+            eventHandler({ type: 'DEXIE_CHANGES_SENT', count: changes.length });
+          }
+        },
+        onError: (error: Error, context?: string) => {
+          syncLogger.serviceError('DexieOutgoingChanges', error, context);
+          eventHandler({ type: 'SERVICE_ERROR', service: 'dexieOutgoing', error });
+        },
+        onProgress: (sent: number, total: number) => {
+          syncLogger.serviceCallback('DexieOutgoingChanges', 'progress', { sent, total });
+        },
+        onSendRequest: async (changes) => {
+          // Send changes via WebSocket
+          if (this.services.webSocket) {
+            try {
+              const messageId = Date.now().toString();
+              
+              // Debug log what we're sending
+              console.log('[ServiceCoordinator] Sending Dexie changes to server:', {
+                changeCount: changes.length,
+                clientId: this.config!.clientId,
+                changes: changes.map(c => ({
+                  table: c.table,
+                  operation: c.operation,
+                  hasClientIdInData: !!c.data?.clientId,
+                  clientIdValue: c.data?.clientId,
+                  dataKeys: Object.keys(c.data || {})
+                }))
+              });
+              
+              this.services.webSocket.send({
+                type: 'clt_send_changes',
+                messageId,
+                changes,
+                clientId: this.config!.clientId,
+                timestamp: Date.now()
+              });
+              return true;
+            } catch (error) {
+              syncLogger.serviceError('DexieOutgoingChanges', error as Error, 'send_request');
+              return false;
+            }
+          }
+          return false;
+        }
+      });
+    }
+
     syncLogger.serviceInitialized('Callbacks', {
       webSocket: true,
       incoming: true,
       outgoing: true,
+      dexieOutgoing: !!this.services.dexieOutgoing,
       integrity: true,
       eventHandler: !!this.eventHandler
     });
@@ -275,8 +367,9 @@ export class ServiceCoordinator {
    * Get services - simple access pattern
    */
   getServices(): Services | null {
-    if (!this.services.webSocket || !this.services.incoming || 
-        !this.services.outgoing || !this.services.integrity) {
+    // Check required services (outgoing is optional with Dexie sync)
+    const requiredServices = [this.services.webSocket, this.services.incoming, this.services.integrity];
+    if (requiredServices.some(service => !service)) {
       return null;
     }
 
@@ -284,6 +377,7 @@ export class ServiceCoordinator {
       webSocket: this.services.webSocket,
       incoming: this.services.incoming,
       outgoing: this.services.outgoing,
+      dexieOutgoing: this.services.dexieOutgoing,
       integrity: this.services.integrity
     };
   }
@@ -317,6 +411,7 @@ export class ServiceCoordinator {
       webSocket: !!this.services.webSocket,
       incoming: !!this.services.incoming,
       outgoing: !!this.services.outgoing,
+      dexieOutgoing: !!this.services.dexieOutgoing,
       integrity: !!this.services.integrity,
       coordinator: !!this.config,
       dataSource: !!this.dataSource?.isInitialized
@@ -381,6 +476,15 @@ export class ServiceCoordinator {
       }
     }
 
+    if (this.services.dexieOutgoing) {
+      try {
+        this.services.dexieOutgoing.destroy();
+        syncLogger.info('service', 'DexieOutgoingChangeService destroyed');
+      } catch (error) {
+        syncLogger.serviceError('DexieOutgoingChanges', error as Error, 'destruction');
+      }
+    }
+
     // IntegrityService doesn't currently have a destroy method
     if (this.services.integrity) {
       syncLogger.info('service', 'IntegrityService cleanup completed');
@@ -391,6 +495,7 @@ export class ServiceCoordinator {
       webSocket: null,
       incoming: null,
       outgoing: null,
+      dexieOutgoing: null,
       integrity: null
     };
 

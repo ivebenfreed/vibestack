@@ -333,9 +333,14 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       entities,
       columns: validColumns,
       relationshipResolvers,
-      sortConfig: [],
-      filterConfigs: [],
-      groupConfig: null
+      sortBy: persistedData?.sortBy || [],
+      filters: persistedData?.filters || [],
+      groupBy: persistedData?.groupBy || [],
+      columnWidths: persistedData?.columnWidths || {},
+      columnVisibility: persistedData?.columnVisibility || {},
+      columnOrder: persistedData?.columnOrder || [],
+      enableSelectionColumn: enableSelectionColumn,
+      rowHeight: 40
     };
     
     const processed = syncProcessView(viewInput);

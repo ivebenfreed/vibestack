@@ -469,7 +469,11 @@ export type TableEvents =
   | { type: 'FILL_START'; direction: 'vertical' | 'horizontal' }
   | { type: 'FILL_PREVIEW'; previewCells: Set<string> }
   | { type: 'FILL_COMPLETE'; fillCells: Set<string> }
-  | { type: 'FILL_CANCEL' };
+  | { type: 'FILL_CANCEL' }
+  
+  // Data subscription events (from data subscription actor)
+  | { type: 'DATA_UPDATE'; data: any[] }
+  | { type: 'DATA_SUBSCRIPTION_ERROR'; error: Error };
 
 // ====================================
 // CONFIGURATION TYPES

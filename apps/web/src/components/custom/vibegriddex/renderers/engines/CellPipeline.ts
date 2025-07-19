@@ -46,18 +46,10 @@ export class CellPipeline {
     const cellType = column.cellType || column.type;
     const renderer = CellPipeline.renderers[cellType] || text;
     
-    // Debug relationship rendering
-    if (cellType?.startsWith('relationship') && column.id === 'assignee') {
-      console.log('🔍 CellPipeline: Rendering relationship', {
-        columnId: column.id,
-        cellType,
-        value,
-        hasRowData: !!rowData,
-        resolvedKey: `__resolved_${column.id}`,
-        resolvedValue: rowData?.[`__resolved_${column.id}`],
-        rowDataKeys: rowData ? Object.keys(rowData).filter(k => k.includes('resolved')) : []
-      });
-    }
+    // Debug relationship rendering disabled for performance
+    // if (cellType?.startsWith('relationship') && column.id === 'assignee') {
+    //   console.log('🔍 CellPipeline: Rendering relationship', { columnId: column.id, cellType });
+    // }
     
     // For relationship types, pass row data for pre-resolved values
     if (cellType?.startsWith('relationship')) {
