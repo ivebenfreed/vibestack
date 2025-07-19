@@ -20,16 +20,14 @@ export {
   createTaskUI,
   updateTaskUI,
   deleteTaskUI,
+  bulkCreateTasksUI,
   // Incoming operations (no sync tracking)
   createTaskIncoming,
   updateTaskIncoming,
   deleteTaskIncoming,
   bulkCreateTasksIncoming,
-  // Service and utilities
-  taskService,
+  // Live query hooks
   useTaskQueries,
-  taskRepository,
-  taskUtils,
   type CreateTaskInput,
   type UpdateTaskInput,
 } from './task';
@@ -40,15 +38,15 @@ export {
   createProjectUI,
   updateProjectUI,
   deleteProjectUI,
+  addProjectMemberUI,
+  removeProjectMemberUI,
+  updateProjectMemberRoleUI,
   // Incoming operations (no sync tracking)
   createProjectIncoming,
   updateProjectIncoming,
   deleteProjectIncoming,
-  // Service and utilities
-  projectService,
+  // Live query hooks
   useProjectQueries,
-  projectRepository,
-  projectUtils,
   type CreateProjectInput,
   type UpdateProjectInput,
 } from './project';
@@ -63,11 +61,8 @@ export {
   createUserIncoming,
   updateUserIncoming,
   deleteUserIncoming,
-  // Service and utilities
-  userService,
+  // Live query hooks
   useUserQueries,
-  userRepository,
-  userUtils,
   type CreateUserInput,
   type UpdateUserInput,
 } from './user';
@@ -82,11 +77,8 @@ export {
   createCommentIncoming,
   updateCommentIncoming,
   deleteCommentIncoming,
-  // Service and utilities
-  commentService,
+  // Live query hooks
   useCommentQueries,
-  commentRepository,
-  commentUtils,
   type CreateCommentInput,
   type UpdateCommentInput,
 } from './comment';
@@ -226,17 +218,17 @@ export const devUtils = {
    * Seed test data
    */
   async seedTestData() {
-    const { taskService, projectService } = await import('./');
+    const { createTaskUI, createProjectUI } = await import('./');
     
     // Create test projects
-    const project1 = await projectService.create({
+    const project1 = await createProjectUI({
       name: 'Test Project 1',
       description: 'A test project for Dexie demo',
       status: 'active',
       priority: 'high'
     });
 
-    const project2 = await projectService.create({
+    const project2 = await createProjectUI({
       name: 'Test Project 2', 
       description: 'Another test project',
       status: 'active',
@@ -253,7 +245,7 @@ export const devUtils = {
     ];
 
     for (const task of tasks) {
-      await taskService.create(task);
+      await createTaskUI(task);
     }
 
     console.log('Test data seeded:', { projects: 2, tasks: 5 });
@@ -263,7 +255,7 @@ export const devUtils = {
    * Performance benchmark
    */
   async runPerformanceBenchmark() {
-    const { taskService } = await import('./');
+    const { bulkCreateTasksUI } = await import('./');
     
     console.log('Starting performance benchmark...');
     
@@ -276,7 +268,7 @@ export const devUtils = {
     }));
 
     const start = performance.now();
-    await taskService.bulkCreate(bulkTasks);
+    await bulkCreateTasksUI(bulkTasks);
     const end = performance.now();
 
     const queryStart = performance.now();

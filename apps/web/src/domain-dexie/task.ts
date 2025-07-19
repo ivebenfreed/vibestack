@@ -225,111 +225,45 @@ export async function bulkCreateTasksIncoming(tasksData: Task[]): Promise<Task[]
 }
 
 // ============================================================================
-// Service Layer (legacy interface for compatibility)
+// Bulk Operations
 // ============================================================================
 
-export const taskService = {
-  /**
-   * Create a new task (delegates to UI operation)
-   */
-  async create(taskData: CreateTaskInput): Promise<Task> {
-    return createTaskUI(taskData);
-  },
+/**
+ * Bulk create tasks from UI - includes manual sync tracking
+ */
+export async function bulkCreateTasksUI(tasks: CreateTaskInput[]): Promise<Task[]> {
+  const taskEntities: Task[] = tasks.map(taskData => ({
+    id: nanoid(),
+    title: taskData.title,
+    description: taskData.description || '',
+    status: taskData.status || 'todo',
+    priority: taskData.priority || 'medium',
+    projectId: taskData.projectId,
+    assigneeId: taskData.assigneeId,
+    dueDate: taskData.dueDate,
+    estimatedDuration: taskData.estimatedDuration,
+    actualDuration: undefined,
+    order: taskData.order || 0,
+    blockedReason: undefined,
+    completedAt: undefined,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    clientId: 'dexie-client',
+    userId: 'current-user',
+    legacyStatus: taskData.status || 'todo',
+    statusId: undefined,
+    startDate: undefined,
+  }));
 
-  /**
-   * Update a task (delegates to UI operation)
-   */
-  async update(taskId: string, updates: UpdateTaskInput): Promise<Task | null> {
-    try {
-      return await updateTaskUI(taskId, updates);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('not found')) {
-        return null;
-      }
-      throw error;
-    }
-  },
-
-  /**
-   * Delete a task (delegates to UI operation)
-   */
-  async delete(taskId: string): Promise<boolean> {
-    return deleteTaskUI(taskId);
-  },
-
-  /**
-   * Get a single task by ID
-   */
-  async get(taskId: string): Promise<Task | null> {
-    const task = await db.tasks.get(taskId);
-    return task || null;
-  },
-
-  /**
-   * Get all tasks
-   */
-  async getAll(): Promise<Task[]> {
-    return await db.tasks.toArray();
-  },
-
-  /**
-   * Get tasks by project
-   */
-  async getByProject(projectId: string): Promise<Task[]> {
-    return await db.tasks.where('projectId').equals(projectId).toArray();
-  },
-
-  /**
-   * Get tasks by assignee
-   */
-  async getByAssignee(assigneeId: string): Promise<Task[]> {
-    return await db.tasks.where('assigneeId').equals(assigneeId).toArray();
-  },
-
-  /**
-   * Get tasks by status
-   */
-  async getByStatus(status: TaskStatus): Promise<Task[]> {
-    return await db.tasks.where('status').equals(status).toArray();
-  },
-
-  /**
-   * Bulk create tasks (with sync tracking)
-   */
-  async bulkCreate(tasks: CreateTaskInput[]): Promise<Task[]> {
-    const taskEntities: Task[] = tasks.map(taskData => ({
-      id: nanoid(),
-      title: taskData.title,
-      description: taskData.description || '',
-      status: taskData.status || 'todo',
-      priority: taskData.priority || 'medium',
-      projectId: taskData.projectId,
-      assigneeId: taskData.assigneeId,
-      dueDate: taskData.dueDate,
-      estimatedDuration: taskData.estimatedDuration,
-      actualDuration: undefined,
-      order: taskData.order || 0,
-      blockedReason: undefined,
-      completedAt: undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      clientId: 'dexie-client',
-      userId: 'current-user',
-      legacyStatus: taskData.status || 'todo',
-      statusId: undefined,
-      startDate: undefined,
-    }));
-
-    await db.tasks.bulkAdd(taskEntities);
-    
-    // Track each task for outgoing sync
-    for (const task of taskEntities) {
-      await trackOutgoingChange('tasks', 'insert', task);
-    }
-    
-    return taskEntities;
-  },
-};
+  await db.tasks.bulkAdd(taskEntities);
+  
+  // Track each task for outgoing sync
+  for (const task of taskEntities) {
+    await trackOutgoingChange('tasks', 'insert', task);
+  }
+  
+  return taskEntities;
+}
 
 // ============================================================================
 // Live Query Hooks (Replace Atomic Store Hooks)
@@ -460,137 +394,3 @@ export const useTaskQueries = {
   },
 };
 
-// ============================================================================
-// Repository Pattern (for complex operations)
-// ============================================================================
-
-export const taskRepository = {
-  /**
-   * Get tasks with their tags
-   */
-  async getTasksWithTags(projectId?: string): Promise<Array<Task & { tags: any[] }>> {
-    let tasks: Task[];
-    
-    if (projectId) {
-      tasks = await db.tasks.where('projectId').equals(projectId).toArray();
-    } else {
-      tasks = await db.tasks.toArray();
-    }
-
-    // Load tags for all tasks
-    const tasksWithTags = await Promise.all(
-      tasks.map(async (task) => {
-        const taskTags = await db.task_tags.where('taskId').equals(task.id).toArray();
-        const tagIds = taskTags.map(tt => tt.tagId);
-        const tags = await db.tags.bulkGet(tagIds);
-        
-        return {
-          ...task,
-          tags: tags.filter(Boolean)
-        };
-      })
-    );
-
-    return tasksWithTags;
-  },
-
-  /**
-   * Get task dependencies
-   */
-  async getTaskDependencies(taskId: string): Promise<Task[]> {
-    const dependencies = await db.task_dependencies
-      .where('dependentTaskId')
-      .equals(taskId)
-      .toArray();
-    
-    const depIds = dependencies.map(d => d.dependencyTaskId);
-    const depTasks = await db.tasks.bulkGet(depIds);
-    
-    return depTasks.filter(Boolean) as Task[];
-  },
-
-  /**
-   * Get tasks that depend on this task
-   */
-  async getTaskDependents(taskId: string): Promise<Task[]> {
-    const dependents = await db.task_dependencies
-      .where('dependencyTaskId')
-      .equals(taskId)
-      .toArray();
-    
-    const depIds = dependents.map(d => d.dependentTaskId);
-    const depTasks = await db.tasks.bulkGet(depIds);
-    
-    return depTasks.filter(Boolean) as Task[];
-  },
-};
-
-// ============================================================================
-// Utilities
-// ============================================================================
-
-export const taskUtils = {
-  /**
-   * Calculate task completion percentage for a project
-   */
-  async getProjectCompletion(projectId: string): Promise<number> {
-    const tasks = await db.tasks.where('projectId').equals(projectId).toArray();
-    if (tasks.length === 0) return 0;
-    
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    return Math.round((completed / tasks.length) * 100);
-  },
-
-  /**
-   * Get overdue tasks
-   */
-  async getOverdueTasks(): Promise<Task[]> {
-    const tasks = await db.tasks.toArray();
-    const now = new Date();
-    
-    return tasks.filter(task => {
-      if (!task.dueDate || task.status === 'completed') return false;
-      return new Date(task.dueDate) < now;
-    });
-  },
-
-  /**
-   * Get tasks due soon (next 7 days)
-   */
-  async getTasksDueSoon(): Promise<Task[]> {
-    const tasks = await db.tasks.toArray();
-    const now = new Date();
-    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
-    return tasks.filter(task => {
-      if (!task.dueDate || task.status === 'completed') return false;
-      const dueDate = new Date(task.dueDate);
-      return dueDate >= now && dueDate <= weekFromNow;
-    });
-  },
-  
-  /**
-   * Load tasks (for compatibility with atomic store pattern)
-   */
-  loadTasks: async (tasks: Task[]) => {
-    // Clear existing and load new tasks
-    await db.tasks.clear();
-    await db.tasks.bulkAdd(tasks);
-  },
-  
-  /**
-   * Clear all tasks
-   */
-  clearTasks: async () => {
-    await db.tasks.clear();
-  },
-  
-  /**
-   * Ensure loaded (compatibility method - Dexie is always "loaded")
-   */
-  ensureLoaded: async () => {
-    // No-op for Dexie - data is always available from IndexedDB
-    // This method exists for API compatibility with atomic store pattern
-    return;
-  },
-};
