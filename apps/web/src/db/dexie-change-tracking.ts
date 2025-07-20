@@ -14,6 +14,9 @@ let currentClientId = 'default-client';
 let currentUserId = 'default-user';
 let isTrackingEnabled = true; // Flag to control change tracking during sync
 
+// Callback for when changes are tracked
+let onChangeTrackedCallback: (() => void) | null = null;
+
 // Symbol to mark sync transactions
 export const SYNC_TRANSACTION = Symbol('sync-transaction');
 
@@ -270,6 +273,11 @@ export async function trackOutgoingChange(
       entityId: data.id,
       stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
     });
+    
+    // Notify that a change was tracked
+    if (onChangeTrackedCallback) {
+      onChangeTrackedCallback();
+    }
   } catch (error) {
     console.error('[Dexie Change Tracking] Failed to track change:', error);
   }
@@ -285,4 +293,11 @@ export async function trackOutgoingChange(
 export async function applySyncChanges(operation: () => Promise<void>): Promise<void> {
   // Just run the operation directly since hooks are disabled
   await operation();
+}
+
+/**
+ * Set callback to be notified when changes are tracked
+ */
+export function setOnChangeTrackedCallback(callback: (() => void) | null): void {
+  onChangeTrackedCallback = callback;
 }

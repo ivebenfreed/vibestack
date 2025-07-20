@@ -900,7 +900,7 @@ export const syncMachineV3 = setup({
           const dexieService = context.serviceCoordinator?.getServices()?.dexieOutgoing;
           if (dexieService) {
             console.log('[SyncMachineV3] 🚀 Starting Dexie outgoing sync monitoring');
-            dexieService.startMonitoring(1000); // Check every second
+            dexieService.startMonitoring(); // Event-driven, no polling
           }
         }
       ],

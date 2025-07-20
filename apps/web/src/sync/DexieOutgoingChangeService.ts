@@ -37,7 +37,6 @@ export class DexieOutgoingChangeService {
   private config: DexieOutgoingChangeServiceConfig;
   private callbacks: DexieOutgoingChangeServiceCallbacks = {};
   private isProcessing = false;
-  private processInterval: NodeJS.Timeout | null = null;
   private instanceId: string;
   
   // Constants for retry logic
@@ -65,37 +64,25 @@ export class DexieOutgoingChangeService {
   /**
    * Start monitoring for pending changes
    */
-  startMonitoring(intervalMs = 1000): void {
-    if (this.processInterval) {
-      console.log('[DexieOutgoingChangeService] Already monitoring');
-      return;
-    }
+  startMonitoring(): void {
+    console.log('[DexieOutgoingChangeService] Starting event-driven monitoring');
     
-    console.log(`[DexieOutgoingChangeService] Starting monitoring with ${intervalMs}ms interval`);
-    
-    // No in-memory tracking to clear - all state is in database
-    
-    // Note: Change tracking hooks are already initialized in dexie-init.ts
-    // No need to reinitialize here as it would cause duplicate hooks
-    
-    // Initial check
-    this.checkAndProcessChanges();
-    
-    // Set up interval
-    this.processInterval = setInterval(() => {
+    // Register callback for when changes are tracked
+    setOnChangeTrackedCallback(() => {
+      // Process changes immediately when they're tracked
       this.checkAndProcessChanges();
-    }, intervalMs);
+    });
+    
+    // Process any existing pending changes on startup
+    this.checkAndProcessChanges();
   }
   
   /**
    * Stop monitoring for changes
    */
   stopMonitoring(): void {
-    if (this.processInterval) {
-      clearInterval(this.processInterval);
-      this.processInterval = null;
-      console.log('[DexieOutgoingChangeService] Stopped monitoring');
-    }
+    console.log('[DexieOutgoingChangeService] Stopped monitoring');
+    // No interval to clear in event-driven mode
   }
   
   /**
