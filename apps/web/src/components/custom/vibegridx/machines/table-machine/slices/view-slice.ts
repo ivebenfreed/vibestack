@@ -87,7 +87,6 @@ export const createInitialViewState = (
     missingColumns,
     finalColumnOrder: columnOrder,
     hasPersistedData: !!persistedData,
-    persistedColumnOrder: persistedData?.columnOrder,
     defaultColumnOrder: columns.map(col => col.id)
   });
   

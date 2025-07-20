@@ -27,7 +27,7 @@ import {
   VIBEGRIDX_ENTITY_CONFIGS,
   type VibeGridXEntityType,
   type VibeGridXEntityConfig
-} from '@repo/dataforge/vibegridx-columns';
+} from '../../../../../../packages/dataforge/src/generated/vibegridx-columns';
 
 // Import domain registry for dynamic atom/update function access
 import { DOMAIN_REGISTRY, getDomainAtom, getDomainUpdateFn } from '@/domain/registry';
