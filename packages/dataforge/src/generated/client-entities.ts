@@ -74,6 +74,12 @@ export class LocalChanges extends BaseSystemEntity {
 
   processedSync!: number;
 
+  sendAttempts!: number;
+
+  lastSendAttempt?: Date;
+
+  lastError?: string;
+
 }
 
 export class Project extends BaseDomainEntity {
@@ -441,6 +447,21 @@ export const LocalChangesSchema = new EntitySchema<LocalChanges>({
             name: 'processed_sync', // Explicit DB Name
             type: 'integer', // Use helper
             default: 0
+        },
+        'sendAttempts': {
+            name: 'send_attempts', // Explicit DB Name
+            type: 'integer', // Use helper
+            default: 0
+        },
+        'lastSendAttempt': {
+            name: 'last_send_attempt', // Explicit DB Name
+            type: 'timestamptz', // Use helper
+            nullable: true
+        },
+        'lastError': {
+            name: 'last_error', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
         }
     },
     relations: {

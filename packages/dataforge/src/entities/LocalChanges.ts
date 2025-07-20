@@ -40,4 +40,15 @@ export class LocalChanges extends BaseSystemEntity {
   @DexieIndex()
   @IsNumber()
   processedSync!: number;
+
+  @Column({ type: 'integer', default: 0, name: 'send_attempts' })
+  @IsNumber()
+  sendAttempts!: number;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_send_attempt' })
+  lastSendAttempt?: Date;
+
+  @Column({ type: 'text', nullable: true, name: 'last_error' })
+  @IsString()
+  lastError?: string;
 } 
