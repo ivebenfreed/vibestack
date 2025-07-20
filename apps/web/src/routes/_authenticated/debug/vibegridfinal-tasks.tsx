@@ -6,7 +6,6 @@ import { shallowEqual } from '@xstate/store'
 import { tasksAtom } from '@/domain/task'
 import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
-import { TaskColumns } from '@repo/dataforge/column-configurations'
 import type { Task } from '@repo/dataforge/client-entities'
 
 function VibeGridFinalTasksPage() {
@@ -40,9 +39,24 @@ function VibeGridFinalTasksPage() {
 
   // ⚡ PERFORMANCE: Test with minimal columns to isolate column processing overhead
   const columns = [
-    TaskColumns.title,
-    TaskColumns.status,
-    TaskColumns.id,
+    {
+      id: 'title',
+      accessorKey: 'title',
+      header: 'Title',
+      cell: ({ getValue }) => getValue(),
+    },
+    {
+      id: 'status',
+      accessorKey: 'statusId',
+      header: 'Status',
+      cell: ({ getValue }) => getValue(),
+    },
+    {
+      id: 'id',
+      accessorKey: 'id',
+      header: 'ID',
+      cell: ({ getValue }) => getValue(),
+    },
   ]
 
   const handleSave = async (entityId: string, columnId: string, value: any) => {

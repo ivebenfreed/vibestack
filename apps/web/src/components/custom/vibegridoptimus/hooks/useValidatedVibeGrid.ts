@@ -18,8 +18,7 @@ import {
   type EntityColumnDefinitions
 } from '@repo/dataforge/client-entities'
 
-// Import all column configurations dynamically
-import * as ColumnConfigurations from '@repo/dataforge/column-configurations'
+// Column configurations removed - define locally as needed
 
 // ============================================================================
 // BRANDED TYPES FOR COMPILE-TIME VALIDATION
@@ -68,15 +67,9 @@ function getColumnConfigForEntity<T extends EntityName>(entityName: T): EntityCo
     throw new Error(`Entity "${entityName}" not found in DataForge CLIENT_DOMAIN_TABLES`)
   }
   
-  // Dynamically resolve column configuration
-  const columnConfigName = `${entityName}Columns`
-  const columnConfig = (ColumnConfigurations as any)[columnConfigName]
-  
-  if (!columnConfig) {
-    throw new Error(`Column configuration "${columnConfigName}" not found in DataForge exports`)
-  }
-  
-  return columnConfig as EntityColumnDefinitions<EntityType<T>>
+  // Column configurations removed - return null
+  // Callers should define columns locally
+  return null as any
 }
 
 // ============================================================================

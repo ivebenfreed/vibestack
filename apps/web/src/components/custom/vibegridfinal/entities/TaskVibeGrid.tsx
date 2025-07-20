@@ -22,12 +22,8 @@ import { tasksAtom } from '@/domain/task'
 import { projectsAtom } from '@/domain/project'
 import { usersAtom } from '@/domain/user'
 
-// ✅ UPDATED: Generated column configurations from correct path
-import { 
-  TaskColumns, 
-  TaskStatusOptions, 
-  TaskPriorityOptions 
-} from '@repo/dataforge/column-configurations'
+// Define columns locally since column-configurations was removed
+import { TaskPriority, TaskStatus } from '@repo/dataforge/client-entities'
 
 // ✅ UPDATED: Latest Task entity fields available (comprehensive selection)
 const DEFAULT_TASK_COLUMNS: (keyof Task)[] = [
@@ -239,14 +235,41 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
   }, [onBulkDelete, onBulkEdit, onBulkArchive])
 
   // ============================================================================
-  // ✅ UPDATED: Generated Column Configuration (Type-Safe & Complete)
+  // Column Configuration (Define locally)
   // ============================================================================
   
   const columns: ColumnDef<Task>[] = React.useMemo(() => {
+    // Define basic column mappings
+    const columnDefinitions: Record<keyof Task, ColumnDef<Task>> = {
+      id: { id: 'id', accessorKey: 'id', header: 'ID' },
+      title: { id: 'title', accessorKey: 'title', header: 'Title' },
+      description: { id: 'description', accessorKey: 'description', header: 'Description' },
+      status: { id: 'status', accessorKey: 'status', header: 'Status' },
+      statusId: { id: 'statusId', accessorKey: 'statusId', header: 'Status ID' },
+      priority: { id: 'priority', accessorKey: 'priority', header: 'Priority' },
+      assignee: { id: 'assignee', accessorKey: 'assigneeId', header: 'Assignee' },
+      assigneeId: { id: 'assigneeId', accessorKey: 'assigneeId', header: 'Assignee ID' },
+      project: { id: 'project', accessorKey: 'projectId', header: 'Project' },
+      projectId: { id: 'projectId', accessorKey: 'projectId', header: 'Project ID' },
+      dueDate: { id: 'dueDate', accessorKey: 'dueDate', header: 'Due Date' },
+      startDate: { id: 'startDate', accessorKey: 'startDate', header: 'Start Date' },
+      completedAt: { id: 'completedAt', accessorKey: 'completedAt', header: 'Completed At' },
+      tags: { id: 'tags', accessorKey: 'tags', header: 'Tags' },
+      legacyTags: { id: 'legacyTags', accessorKey: 'legacyTags', header: 'Legacy Tags' },
+      estimatedDuration: { id: 'estimatedDuration', accessorKey: 'estimatedDuration', header: 'Estimated Duration' },
+      timeRange: { id: 'timeRange', accessorKey: 'timeRange', header: 'Time Range' },
+      createdAt: { id: 'createdAt', accessorKey: 'createdAt', header: 'Created' },
+      updatedAt: { id: 'updatedAt', accessorKey: 'updatedAt', header: 'Updated' },
+      clientId: { id: 'clientId', accessorKey: 'clientId', header: 'Client ID' },
+      dependencies: { id: 'dependencies', accessorKey: 'dependencies', header: 'Dependencies' },
+      tasksDependentOnThis: { id: 'tasksDependentOnThis', accessorKey: 'tasksDependentOnThis', header: 'Dependent Tasks' },
+      legacyStatus: { id: 'legacyStatus', accessorKey: 'legacyStatus', header: 'Legacy Status' },
+    }
+    
     return customColumns.map(columnKey => {
-      const column = TaskColumns[columnKey as keyof typeof TaskColumns]
+      const column = columnDefinitions[columnKey]
       if (!column) {
-        throw new Error(`Column ${columnKey} not found in TaskColumns. Available columns: ${Object.keys(TaskColumns).join(', ')}`)
+        throw new Error(`Column ${String(columnKey)} not found. Available columns: ${Object.keys(columnDefinitions).join(', ')}`)
       }
       return column
     })
@@ -290,7 +313,7 @@ export const TaskVibeGrid: React.FC<TaskVibeGridProps> = ({
             <div>Projects: <span className="font-mono text-purple-600">{projects.length}</span></div>
             <div>Users: <span className="font-mono text-orange-600">{users.length}</span></div>
             <div>Generated: <span className="font-mono text-pink-600">✅ v2024</span></div>
-            <div>Fields: <span className="font-mono text-cyan-600">{Object.keys(TaskColumns).length} Total</span></div>
+            <div>Fields: <span className="font-mono text-cyan-600">{DEFAULT_TASK_COLUMNS.length} Selected</span></div>
             <div>XState: <span className="font-mono text-teal-600">{enablePersistence ? 'ON' : 'OFF'}</span></div>
             <div>Performance: <span className="font-mono text-cyan-600">42.54ms Target</span></div>
           </div>
