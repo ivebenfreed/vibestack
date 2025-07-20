@@ -175,6 +175,9 @@ export class DexieOutgoingChangeService {
             } else {
               console.warn('[DexieOutgoingChangeService] Failed to send changes, will retry later');
               
+              // Remove from in-flight since send failed
+              changeIds.forEach(id => this.inFlightChangeIds.delete(id));
+              
               // Update error in database
               await db.local_changes
                 .where('id')
@@ -270,6 +273,9 @@ export class DexieOutgoingChangeService {
       const changeIds = matchingChanges.map(change => change.id);
       console.log(`[DexieOutgoingChangeService] Found ${changeIds.length} changes to mark as processed`);
       
+      // Remove from in-flight tracking
+      changeIds.forEach(id => this.inFlightChangeIds.delete(id));
+      
       // Mark as processed in database
       await db.local_changes
         .where('id')
@@ -336,5 +342,6 @@ export class DexieOutgoingChangeService {
     });
     this.stopMonitoring();
     this.callbacks = {};
+    this.inFlightChangeIds.clear();
   }
 }

@@ -228,7 +228,10 @@ export async function trackOutgoingChange(
   }
   
   // Create a unique key for duplicate detection
-  const changeKey = `${table}:${operation}:${data.id || JSON.stringify(data)}`;
+  // Use entity ID for updates/deletes, full data hash for inserts
+  const changeKey = operation === 'insert' 
+    ? `${table}:${operation}:${JSON.stringify(data)}`
+    : `${table}:${operation}:${data.id}`;
   const now = Date.now();
   
   // Check for recent duplicate
