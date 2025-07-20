@@ -1,9 +1,11 @@
 import { useMemo, useState, useEffect } from 'react';
 import { db } from '@repo/dataforge/dexie-schema';
-import { getEntityConfig, type VibeGridXEntityType } from '@repo/dataforge/vibegridx-columns';
 import type { Column } from '../types';
 // Import Dexie domain UI operations that include sync tracking
 import { updateTaskUI, updateProjectUI, updateUserUI, updateCommentUI } from '@/domain-dexie';
+
+// Entity types we support
+export type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment';
 
 // Helper to get update function for entity type
 function getUpdateFunction(entityType: VibeGridXEntityType | null) {
@@ -44,14 +46,11 @@ interface PreloadedData {
 
 export function useDexieEntityConfig(
   entityType: VibeGridXEntityType | null,
-  selectedColumns?: string[],
+  columns: Column[],
   preloadedData?: PreloadedData | null
 ): DexieEntityConfig | null {
-  // Get entity configuration
-  const config = useMemo(() => entityType ? getEntityConfig(entityType) : null, [entityType]);
-  
   // If we have preloaded data, use it immediately
-  if (preloadedData && config) {
+  if (preloadedData && columns.length > 0) {
     console.log('🚀 useDexieEntityConfig: Using preloaded data', {
       entityCount: preloadedData.entities?.length || 0,
       relationshipDataKeys: Object.keys(preloadedData.relationshipData || {}),
@@ -61,16 +60,11 @@ export function useDexieEntityConfig(
     return useMemo(() => {
       const { entities, relationshipData } = preloadedData;
       
-      // Filter columns if selectedColumns is provided
-      const columns = selectedColumns 
-        ? config.columns.filter(col => selectedColumns.includes(col.id))
-        : config.columns;
-      
       // Create resolvers from preloaded data
       const relationshipResolvers: Record<string, (id: string | string[]) => string> = {};
       
       columns.forEach(column => {
-        const cellType = column.cellType || column.type;
+        const cellType = column.cellType;
         if (cellType?.startsWith('relationship') && column.relationshipTable) {
           const displayField = column.relationshipDisplayField || 'name';
           const tableData = relationshipData[column.relationshipTable] || {};
@@ -98,7 +92,7 @@ export function useDexieEntityConfig(
         relationshipResolvers,
         onEntityUpdate
       };
-    }, [preloadedData, config, selectedColumns, entityType]);
+    }, [preloadedData, columns, entityType]);
   }
   
   // State for all data - loaded once on mount
@@ -260,38 +254,27 @@ export function useDexieEntityConfig(
   
   // Build configuration
   const result = useMemo(() => {
-    if (!entityType || !config) {
+    if (!entityType || columns.length === 0) {
       if (entityType) {
-        console.error(`VibeGridDex: No entity configuration found for type "${entityType}"`);
+        console.error(`VibeGridDex: No columns provided for entity type "${entityType}"`);
       }
       return null;
     }
     
     // Check if data is loaded
-    const hasRelationshipColumns = config.columns.some(col => {
-      const cellType = col.cellType || col.type;
+    const hasRelationshipColumns = columns.some(col => {
+      const cellType = col.cellType;
       return cellType?.startsWith('relationship');
     });
     
     // Always return columns immediately - don't wait for relationship data
     // The loader pattern handles initial resolution
     
-    // Filter columns if selectedColumns is provided
-    let columns = config.columns;
-    if (selectedColumns) {
-      columns = columns.filter(col => col && selectedColumns.includes(col.id));
-      // Ensure we have at least some columns
-      if (columns.length === 0) {
-        console.warn(`VibeGridDex: No columns matched selectedColumns: ${selectedColumns.join(', ')}`);
-        columns = config.columns; // Fall back to all columns
-      }
-    }
-    
     // Build relationship resolvers
     const relationshipResolvers: Record<string, (id: string | string[]) => string> = {};
     
     columns.forEach(column => {
-        const cellType = column.cellType || column.type;
+        const cellType = column.cellType;
         if (cellType?.startsWith('relationship') && column.relationshipTable) {
           const tableKey = column.relationshipTable;
           const displayField = column.relationshipDisplayField;
@@ -388,7 +371,7 @@ export function useDexieEntityConfig(
       relationshipResolvers,
       onEntityUpdate
     };
-  }, [config, data, selectedColumns, relationshipData, entityType]);
+  }, [columns, data, relationshipData, entityType]);
   
   return result;
 }

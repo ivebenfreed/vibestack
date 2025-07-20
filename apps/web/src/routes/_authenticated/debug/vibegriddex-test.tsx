@@ -4,27 +4,45 @@ import { VibeGridDex } from '@/components/custom/vibegriddex';
 import { updateTaskUI } from '@/domain-dexie';
 import { Button } from '@/components/ui/button';
 import { db } from '@repo/dataforge/dexie-schema';
-import type { Column } from '@/components/custom/vibegriddex/types';
+import type { ColumnDef } from '@/components/custom/vibegriddex/column-types';
+import { Task, TaskPriority } from '@repo/dataforge/client-entities';
 
-// Type-safe column definitions
-const createTaskColumns = (): Column[] => {
+// Type-safe column definitions with compile-time validation
+const createTaskColumns = (): ColumnDef<Task>[] => {
   return [
-    { id: 'title', field: 'title', label: 'Title', cellType: 'text', editable: true },
+    { 
+      id: 'title', 
+      field: 'title', 
+      name: 'Title', 
+      cellType: 'text', // Validated: string → text ✓
+      editable: true 
+    },
     { 
       id: 'status', 
       field: 'statusId', 
-      label: 'Status', 
-      cellType: 'relationship-single',
+      name: 'Status', 
+      cellType: 'relationship-single', // Validated: string → relationship-single ✓
       editable: true,
       relationshipTable: 'status_definitions',
       relationshipDisplayField: 'name'
     },
-    { id: 'priority', field: 'priority', label: 'Priority', cellType: 'text', editable: true },
+    { 
+      id: 'priority', 
+      field: 'priority', 
+      name: 'Priority', 
+      cellType: 'enum', // Changed from 'text' to 'enum' for TaskPriority
+      editable: true,
+      enumOptions: [
+        { value: TaskPriority.LOW, label: 'Low' },
+        { value: TaskPriority.MEDIUM, label: 'Medium' },
+        { value: TaskPriority.HIGH, label: 'High' }
+      ]
+    },
     { 
       id: 'assignee', 
       field: 'assigneeId', 
-      label: 'Assignee', 
-      cellType: 'relationship-single',
+      name: 'Assignee', 
+      cellType: 'relationship-single', // Validated: string → relationship-single ✓
       editable: true,
       relationshipTable: 'users',
       relationshipDisplayField: 'name' 
@@ -32,14 +50,30 @@ const createTaskColumns = (): Column[] => {
     { 
       id: 'project', 
       field: 'projectId', 
-      label: 'Project',
-      cellType: 'relationship-single',
+      name: 'Project',
+      cellType: 'relationship-single', // Validated: string → relationship-single ✓
       editable: true,
       relationshipTable: 'projects',
       relationshipDisplayField: 'name'
     },
-    { id: 'createdAt', field: 'createdAt', label: 'Created', cellType: 'date' },
-    { id: 'updatedAt', field: 'updatedAt', label: 'Updated', cellType: 'date' }
+    { 
+      id: 'dueDate', 
+      field: 'dueDate', 
+      name: 'Due Date', 
+      cellType: 'date' // Validated: Date → date ✓
+    },
+    { 
+      id: 'createdAt', 
+      field: 'createdAt', 
+      name: 'Created', 
+      cellType: 'date' // Validated: Date → date ✓
+    },
+    { 
+      id: 'updatedAt', 
+      field: 'updatedAt', 
+      name: 'Updated', 
+      cellType: 'date' // Validated: Date → date ✓
+    }
   ];
 };
 
@@ -273,7 +307,7 @@ function VibeGridDexTestPage() {
       <VibeGridDex
         tableId="dexie-tasks-test"
         entityType="task"
-        columns={createTaskColumns()}
+        columns={createTaskColumns() as any}
         height={600}
         enableSelectionColumn={true}
         enableVirtualScrolling={true}

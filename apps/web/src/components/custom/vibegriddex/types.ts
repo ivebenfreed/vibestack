@@ -14,7 +14,21 @@ export type FilterConfig = {
   caseSensitive?: boolean;
   negate?: boolean;
 };
-import type { EnumOption, VibeGridXColumn } from '@repo/dataforge/vibegridx-columns';
+// Import our local column types
+import type { Column as BaseColumn, CellType } from './column-types';
+
+// EnumOption for backwards compatibility
+export interface EnumOption {
+  value: string;
+  label: string;
+  cssClass?: string;
+  color?: string;
+  backgroundColor?: string;
+  icon?: string;
+  description?: string;
+  group?: string;
+  disabled?: boolean;
+}
 
 // ====================================
 // RELATIONSHIP OPTIONS PROVIDER TYPES
@@ -52,9 +66,13 @@ export interface TableRow {
   };
 }
 
-// Extend the generated column type with runtime-specific options
-export interface Column<T = any> extends VibeGridXColumn<T> {
-  // Additional runtime options not in generated columns
+// Runtime column type with all options
+export interface Column<T = any> extends BaseColumn<T> {
+  // Legacy support
+  label?: string; // Alias for name
+  type?: string; // Legacy field
+  
+  // Additional runtime options
   options?: string[] | EnumOption[]; // Allow string[] for backward compatibility
   
   // Dynamic options provider for relationship fields

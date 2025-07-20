@@ -21,21 +21,14 @@ import { VibeGridXHeader } from './components/VibeGridXHeader';
 import { syncProcessView } from './utils/syncViewProcessor';
 import './vibegridx.css';
 
-// Import entity configurations from DataForge
-import { 
-  getEntityConfig, 
-  VIBEGRIDX_ENTITY_CONFIGS,
-  type VibeGridXEntityType,
-  type VibeGridXEntityConfig
-} from '@repo/dataforge/vibegridx-columns';
-
 // Import Dexie domain services and queries
 import * as dexieDomains from '@/domain-dexie';
 
 // Import provider utilities
 import type { RelationshipOptionsProvider } from './types';
 import { createGenericRelationshipProvider } from './providers/generic-relationship-provider-dexie';
-import { useDexieEntityConfig } from './hooks/useDexieEntityConfig';
+import { useDexieEntityConfig, type VibeGridXEntityType } from './hooks/useDexieEntityConfig';
+import { applyColumnDefaults } from './column-defaults';
 
 // ====================================
 // COMPONENT PROPS
@@ -46,9 +39,8 @@ interface VibeGridDexProps<T = any> {
   tableId: string;  // Unique identifier for this table instance (required for persistence)
   entityType: VibeGridXEntityType;  // Entity type (required - determines data source)
   
-  // Column configuration
-  columns?: Column<T>[];  // Manual columns (optional - overrides entity config columns)
-  selectedColumns?: string[]; // Column IDs to include when using entity columns (optional)
+  // Column configuration (required - no more auto-generation)
+  columns: Column<T>[];  // Explicit columns with type checking
   
   // Common options
   className?: string;
@@ -123,10 +115,15 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     return null;
   }, [props.initialData]);
   
-  // Always use entity configuration - entityType is now required
+  // Apply defaults to columns
+  const columnsWithDefaults = useMemo(() => {
+    return applyColumnDefaults(props.columns);
+  }, [props.columns]);
+  
+  // Use entity configuration with explicit columns
   const dexieEntityConfig = useDexieEntityConfig(
     props.entityType,
-    props.selectedColumns,
+    columnsWithDefaults,
     preloadedData
   );
   
@@ -215,8 +212,8 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     
     const providedProviders = props.relationshipOptionsProviders || {};
     
-    // Use manual columns if provided, otherwise use entity config columns
-    const baseColumns = props.columns || dexieEntityConfig.columns;
+    // Use columns with defaults
+    const baseColumns = columnsWithDefaults;
     
     // Auto-generate options providers for relationship columns
     const autoRelationshipOptionsProviders: RelationshipOptionsProviders = {};
