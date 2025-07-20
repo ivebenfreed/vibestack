@@ -47,7 +47,7 @@ new_sqlite_classes = ["SyncDO", "ReplicationDO"]
 
 # Cron triggers
 [triggers]
-crons = ["* * * * *"]  # Run every minute to keep replication DO alive
+crons = ["0 0 * * *"]  # Run once daily at midnight UTC
 
 # KV namespace configuration
 [[kv_namespaces]]
