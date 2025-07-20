@@ -22,33 +22,35 @@ export class TagSetRepository extends BaseServerRepository<TagSet> {
    * Get all tag sets for a specific project
    */
   async getByProjectId(projectId: string): Promise<TagSet[]> {
-    return this.findBy({ project_id: projectId });
+    // TagSet doesn't have a direct projectId field, it has a many-to-many relation
+    // This method needs to be redesigned to work with the relation
+    throw new Error('getByProjectId needs to be implemented with proper relation query');
   }
 
   /**
    * Create a new tag set with validation
    */
   async createTagSet(input: TagSetCreateInput): Promise<TagSet> {
-    const tagSet = this.create(input);
-    return this.save(tagSet);
+    // Use the base class create method which handles everything
+    return await this.create(input);
   }
 
   /**
    * Update a tag set
    */
   async updateTagSet(id: string, input: TagSetUpdateInput): Promise<TagSet | null> {
-    const tagSet = await this.findOneBy({ id });
+    const tagSet = await this.findById(id);
     if (!tagSet) return null;
 
-    Object.assign(tagSet, input);
-    return this.save(tagSet);
+    // Use the base class update method
+    return await this.update(id, input);
   }
 
   /**
    * Delete a tag set
    */
   async deleteTagSet(id: string): Promise<boolean> {
-    const result = await this.delete({ id });
-    return result.affected ? result.affected > 0 : false;
+    const result = await this.delete(id);
+    return result;
   }
 }

@@ -22,40 +22,43 @@ export class TagRepository extends BaseServerRepository<Tag> {
    * Get all tags for a specific tag set
    */
   async getByTagSetId(tagSetId: string): Promise<Tag[]> {
-    return this.findBy({ tag_set_id: tagSetId });
+    return this.findBy({ tagSetId: tagSetId });
   }
 
   /**
    * Get tag by key and tag set
    */
   async getByKeyAndTagSet(key: string, tagSetId: string): Promise<Tag | null> {
-    return this.findOneBy({ key, tag_set_id: tagSetId });
+    const result = await this.findBy({ tagSetId: tagSetId });
+    // Filter by name if that's what 'key' was supposed to be
+    const filtered = result.filter(tag => tag.name === key);
+    return filtered.length > 0 ? filtered[0] : null;
   }
 
   /**
    * Create a new tag with validation
    */
   async createTag(input: TagCreateInput): Promise<Tag> {
-    const tag = this.create(input);
-    return this.save(tag);
+    // Use the base class create method which handles everything
+    return await this.create(input);
   }
 
   /**
    * Update a tag
    */
   async updateTag(id: string, input: TagUpdateInput): Promise<Tag | null> {
-    const tag = await this.findOneBy({ id });
+    const tag = await this.findById(id);
     if (!tag) return null;
 
-    Object.assign(tag, input);
-    return this.save(tag);
+    // Use the base class update method
+    return await this.update(id, input);
   }
 
   /**
    * Delete a tag
    */
   async deleteTag(id: string): Promise<boolean> {
-    const result = await this.delete({ id });
-    return result.affected ? result.affected > 0 : false;
+    const result = await this.delete(id);
+    return result;
   }
 }

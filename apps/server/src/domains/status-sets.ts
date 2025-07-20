@@ -22,33 +22,35 @@ export class StatusSetRepository extends BaseServerRepository<StatusSet> {
    * Get all status sets for a specific project
    */
   async getByProjectId(projectId: string): Promise<StatusSet[]> {
-    return this.findBy({ project_id: projectId });
+    // StatusSet doesn't have a direct projectId field, it has a many-to-many relation
+    // This method needs to be redesigned to work with the relation
+    throw new Error('getByProjectId needs to be implemented with proper relation query');
   }
 
   /**
    * Create a new status set with validation
    */
   async createStatusSet(input: StatusSetCreateInput): Promise<StatusSet> {
-    const statusSet = this.create(input);
-    return this.save(statusSet);
+    // Use the base class create method which handles everything
+    return await this.create(input);
   }
 
   /**
    * Update a status set
    */
   async updateStatusSet(id: string, input: StatusSetUpdateInput): Promise<StatusSet | null> {
-    const statusSet = await this.findOneBy({ id });
+    const statusSet = await this.findById(id);
     if (!statusSet) return null;
 
-    Object.assign(statusSet, input);
-    return this.save(statusSet);
+    // Use the base class update method
+    return await this.update(id, input);
   }
 
   /**
    * Delete a status set
    */
   async deleteStatusSet(id: string): Promise<boolean> {
-    const result = await this.delete({ id });
-    return result.affected ? result.affected > 0 : false;
+    const result = await this.delete(id);
+    return result;
   }
 }
