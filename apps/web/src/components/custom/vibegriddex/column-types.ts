@@ -29,7 +29,7 @@ export interface Column<T, K extends keyof T = keyof T> {
   relationshipDisplayField?: string;
   
   // For enums
-  enumOptions?: Array<{ value: string; label: string }>;
+  options?: Array<{ value: string; label: string }>;
 }
 
 // Helper type to make column creation easier

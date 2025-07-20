@@ -23,7 +23,7 @@ const taskColumns: ColumnDef<Task>[] = [
     field: 'priority', 
     name: 'Priority',
     cellType: 'enum', // ✓ Valid: enum → enum
-    enumOptions: [
+    options: [
       { value: TaskPriority.LOW, label: 'Low' },
       { value: TaskPriority.MEDIUM, label: 'Medium' },
       { value: TaskPriority.HIGH, label: 'High' }

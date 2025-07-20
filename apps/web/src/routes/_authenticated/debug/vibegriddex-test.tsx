@@ -32,7 +32,7 @@ const createTaskColumns = (): ColumnDef<Task>[] => {
       name: 'Priority', 
       cellType: 'enum', // Changed from 'text' to 'enum' for TaskPriority
       editable: true,
-      enumOptions: [
+      options: [
         { value: TaskPriority.LOW, label: 'Low' },
         { value: TaskPriority.MEDIUM, label: 'Medium' },
         { value: TaskPriority.HIGH, label: 'High' }
