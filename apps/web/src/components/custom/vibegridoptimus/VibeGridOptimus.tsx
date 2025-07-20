@@ -1,7 +1,7 @@
 import React from 'react'
 import { DataGrid, type DataGridHandle } from 'react-data-grid'
 import type { VibeGridOptimusProps } from './types'
-import { getRDGColumns, TaskRDGColumns } from '@repo/dataforge/rdg-column-configurations'
+// RDG column configurations removed - define locally as needed
 import { useBatchOperations } from './hooks/useBatchOperations'
 import { useClipboardOps } from './hooks/useClipboardOps'
 import { useGridMachine } from './hooks/useGridMachine'
@@ -84,19 +84,24 @@ export function VibeGridOptimus(props: VibeGridOptimusProps) {
     console.warn(`[VibeGridOptimus] 🐌 SLOW GRID MACHINE: ${gridMachineTime.toFixed(2)}ms`)
   }
   
-  // Get pre-generated columns directly from DataForge - React Compiler handles memoization
+  // Define columns locally since rdg-column-configurations was removed
   const columnsStart = performance.now()
   const rdgColumns = (() => {
-    try {
-      return getRDGColumns(entityName)
-    } catch (error) {
-      console.warn('getRDGColumns not available, falling back to direct import for Tasks:', error)
-      // Fallback for development - use direct import for Task entity
-      if (entityName === 'Task') {
-        return TaskRDGColumns
-      }
-      return []
+    // Define basic columns based on entity type
+    // This is a temporary solution - components should define their own columns
+    if (entityName === 'Task') {
+      return [
+        { key: 'id', name: 'ID', width: 100 },
+        { key: 'title', name: 'Title', width: 200 },
+        { key: 'status', name: 'Status', width: 120 },
+        { key: 'priority', name: 'Priority', width: 100 },
+        { key: 'assigneeId', name: 'Assignee', width: 150 },
+        { key: 'projectId', name: 'Project', width: 150 },
+        { key: 'dueDate', name: 'Due Date', width: 120 },
+      ]
     }
+    console.warn(`No column configuration for entity: ${entityName}`)
+    return []
   })()
   const columnsTime = performance.now() - columnsStart
   console.log(`[VibeGridOptimus] 📋 Column generation in ${columnsTime.toFixed(2)}ms`)

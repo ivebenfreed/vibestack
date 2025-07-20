@@ -11,14 +11,16 @@ import { shallowEqual } from '@xstate/store'
 import type { EntityName } from '../core/EntityRegistry'
 import type { OptimusColumn } from '../types'
 
-// Import RDG column configurations from DataForge
-import { 
-  ProjectRDGColumns, 
-  TaskRDGColumns, 
-  UserRDGColumns, 
-  CommentRDGColumns,
-  type RDGColumn 
-} from '@repo/dataforge/rdg-column-configurations'
+// RDG column configurations removed - define types locally
+type RDGColumn<T = any> = {
+  key: string
+  name: string
+  width?: number
+  resizable?: boolean
+  frozen?: boolean
+  renderCell?: (props: any) => React.ReactNode
+  renderEditCell?: (props: any) => React.ReactNode
+}
 
 // Import XState atoms for relationship data
 import { projectsAtom } from '@/domain/project'
@@ -28,12 +30,21 @@ import { usersAtom } from '@/domain/user'
 
 /**
  * Entity RDG column configuration mapping
+ * Define basic columns locally since rdg-column-configurations was removed
  */
 const ENTITY_RDG_COLUMNS = {
-  Project: ProjectRDGColumns,
-  Task: TaskRDGColumns,
-  User: UserRDGColumns,
-  Comment: CommentRDGColumns
+  Project: [] as RDGColumn[],
+  Task: [
+    { key: 'id', name: 'ID', width: 100 },
+    { key: 'title', name: 'Title', width: 200 },
+    { key: 'status', name: 'Status', width: 120 },
+    { key: 'priority', name: 'Priority', width: 100 },
+    { key: 'assigneeId', name: 'Assignee', width: 150 },
+    { key: 'projectId', name: 'Project', width: 150 },
+    { key: 'dueDate', name: 'Due Date', width: 120 },
+  ] as RDGColumn[],
+  User: [] as RDGColumn[],
+  Comment: [] as RDGColumn[]
 } as const
 
 /**
