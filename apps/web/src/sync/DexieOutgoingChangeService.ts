@@ -178,7 +178,10 @@ export class DexieOutgoingChangeService {
               
               // Map record IDs to change IDs for acknowledgment tracking
               optimizedChanges.forEach(change => {
-                this.recordToChangeIdMap.set(change.recordId, change.id);
+                const recordId = change.data.id as string;
+                if (recordId) {
+                  this.recordToChangeIdMap.set(recordId, change.id);
+                }
               });
               
               // Track sent changes for retry logic
@@ -283,6 +286,9 @@ export class DexieOutgoingChangeService {
    * Mark changes as processed based on record IDs from server
    */
   async markChangesAsProcessedByRecordIds(recordIds: string[]): Promise<void> {
+    console.log('[DexieOutgoingChangeService] markChangesAsProcessedByRecordIds called with:', recordIds);
+    console.log('[DexieOutgoingChangeService] Current recordToChangeIdMap:', Array.from(this.recordToChangeIdMap.entries()));
+    
     const changeIds: string[] = [];
     const processedRecordIds = new Set<string>();
     
