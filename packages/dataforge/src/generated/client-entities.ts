@@ -68,6 +68,8 @@ export class LocalChanges extends BaseSystemEntity {
 
   lsn!: string;
 
+  clientSequence?: string;
+
   updatedAt!: Date;
 
   processedSync!: number;
@@ -424,6 +426,11 @@ export const LocalChangesSchema = new EntitySchema<LocalChanges>({
         'lsn': {
             name: 'lsn', // Explicit DB Name
             type: 'text', // Use helper
+        },
+        'clientSequence': {
+            name: 'clientSequence', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
         },
         'updatedAt': {
             name: 'updated_at', // Explicit DB Name

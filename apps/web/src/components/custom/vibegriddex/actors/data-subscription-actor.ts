@@ -60,7 +60,9 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
               table: tableKey,
               entityCount: latestData.length,
               isMainEntity,
-              eventType: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE'
+              eventType: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE',
+              sampleData: latestData.length > 0 ? latestData[0] : null,
+              firstThreeIds: latestData.slice(0, 3).map(item => item.id)
             });
             
             // Send update event to parent with table identifier

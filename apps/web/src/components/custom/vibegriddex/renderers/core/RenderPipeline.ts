@@ -218,34 +218,44 @@ export class RenderPipeline {
    * 14 sequential DOM queries. This method consolidates them into a single pass.
    */
   private batchMeasureDOMElements() {
+    // Cache DOM elements to avoid repeated lookups
+    const viewportEl = this.config.domManager.getElement('viewport');
+    const containerEl = this.config.domManager.getElement('container');
+    const tableEl = this.config.domManager.getElement('table');
+    
+    // Batch all reads together to minimize layout recalculations
+    const viewportBounds = viewportEl.getBoundingClientRect();
+    const containerBounds = containerEl.getBoundingClientRect();
+    const tableBounds = tableEl.getBoundingClientRect();
+    
     return {
       viewport: {
-        bounds: this.config.domManager.getElement('viewport').getBoundingClientRect(),
+        bounds: viewportBounds,
         client: {
-          width: this.config.domManager.getElement('viewport').clientWidth,
-          height: this.config.domManager.getElement('viewport').clientHeight
+          width: viewportEl.clientWidth,
+          height: viewportEl.clientHeight
         },
         scroll: {
-          top: this.config.domManager.getElement('viewport').scrollTop || 0,
-          left: this.config.domManager.getElement('viewport').scrollLeft || 0
+          top: viewportEl.scrollTop || 0,
+          left: viewportEl.scrollLeft || 0
         },
         offset: {
-          width: this.config.domManager.getElement('viewport').offsetWidth,
-          height: this.config.domManager.getElement('viewport').offsetHeight
+          width: viewportEl.offsetWidth,
+          height: viewportEl.offsetHeight
         }
       },
       container: {
-        bounds: this.config.domManager.getElement('container').getBoundingClientRect(),
+        bounds: containerBounds,
         client: {
-          width: this.config.domManager.getElement('container').clientWidth,
-          height: this.config.domManager.getElement('container').clientHeight
+          width: containerEl.clientWidth,
+          height: containerEl.clientHeight
         }
       },
       table: {
-        bounds: this.config.domManager.getElement('table').getBoundingClientRect(),
+        bounds: tableBounds,
         client: {
-          width: this.config.domManager.getElement('table').clientWidth,
-          height: this.config.domManager.getElement('table').clientHeight
+          width: tableEl.clientWidth,
+          height: tableEl.clientHeight
         }
       }
     };

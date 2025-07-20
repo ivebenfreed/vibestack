@@ -28,6 +28,10 @@ export class LocalChanges extends BaseSystemEntity {
   @IsString()
   lsn!: string;
 
+  @Column({ type: 'text', nullable: true })
+  @IsString()
+  clientSequence?: string; // Client-side sequence for ordering
+
   @Column({ type: 'timestamptz', name: 'updated_at' })
   updatedAt!: Date;
 

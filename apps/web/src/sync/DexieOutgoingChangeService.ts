@@ -267,7 +267,8 @@ export class DexieOutgoingChangeService {
         table: change.table,
         operation: change.operation,
         data: dataWithClientId,
-        lsn: change.lsn,
+        // DO NOT include lsn - it's for server-to-client only!
+        // lsn is PostgreSQL's WAL tracking, not meant for client changes
         clientId: this.config.clientId,  // Use clientId from sync context
         updatedAt: change.updatedAt.toISOString()
       };

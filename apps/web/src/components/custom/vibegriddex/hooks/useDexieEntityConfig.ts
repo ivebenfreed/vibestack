@@ -7,10 +7,8 @@ import { updateTaskUI, updateProjectUI, updateUserUI, updateCommentUI } from '@/
 
 // Helper to get update function for entity type
 function getUpdateFunction(entityType: VibeGridXEntityType | null) {
-  return async (id: string, field: string, value: any) => {
-    const updates = { [field]: value };
-    
-    console.log('[useDexieEntityConfig] onEntityUpdate called', { id, field, value, entityType });
+  return async (id: string, updates: Record<string, any>) => {
+    console.log('[useDexieEntityConfig] onEntityUpdate called', { id, updates, entityType });
     
     switch (entityType) {
       case 'task':
@@ -36,7 +34,7 @@ interface DexieEntityConfig {
   columns: Column[];
   relationshipData: Record<string, any>;
   relationshipResolvers: Record<string, (id: string | string[]) => string>;
-  onEntityUpdate: (id: string, field: string, value: any) => Promise<void>;
+  onEntityUpdate: (id: string, updates: Record<string, any>) => Promise<void>;
 }
 
 interface PreloadedData {

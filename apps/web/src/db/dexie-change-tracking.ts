@@ -229,7 +229,8 @@ export async function trackOutgoingChange(
     table,
     operation,
     data,
-    lsn: generateClientSequence(),
+    lsn: '', // Keep empty - LSN is only for server->client
+    clientSequence: generateClientSequence(), // Use new field for client ordering
     clientId: currentClientId,
     updatedAt: new Date(),
     processedSync: 0

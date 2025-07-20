@@ -160,7 +160,10 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     },
     
     // Canvas container reference (stored for lazy initialization)
-    canvasContainer: null
+    canvasContainer: null,
+    
+    // Track if we're using pre-resolved initial data from loader
+    hasInitialData
   };
 };
 
@@ -421,11 +424,14 @@ export const tableBaseMachine = setup({
       
       initial: 'idle',
       
-      // Spawn data subscription actor for live updates
+      // Data subscription actor for live updates from Dexie (entities + relationships)
       invoke: {
         id: 'dataSubscription',
         src: 'dataSubscriptionActor',
-        input: ({ context }) => ({ entityType: context.entityType }),
+        input: ({ context }) => ({ 
+          entityType: context.entityType,
+          includeRelationships: true // Subscribe to relationship tables too
+        }),
         onError: {
           actions: ({ event }) => {
             console.error('❌ TableMachine: Data subscription error:', event);
@@ -443,96 +449,104 @@ export const tableBaseMachine = setup({
               target: 'processingViewData'
             },
             
-            // Handle data updates from subscription actor
+            // Handle data updates from subscription actor (only for entity mode, not manual mode)
             DATA_UPDATE: {
               actions: [
                 assign({
-                  rows: ({ context, event }) => {
-                    console.log('📊 TableMachine: Processing data update from subscription actor', {
-                      entityCount: event.data.length,
-                      currentRowCount: context.rows.length
+                  entities: ({ context, event }) => {
+                    console.log('TableMachine: DATA_UPDATE received', {
+                      table: event.table,
+                      oldEntityCount: context.entities.length,
+                      newEntityCount: event.data?.length || 0,
+                      timestamp: performance.now(),
+                      sampleOldEntity: context.entities[0],
+                      sampleNewEntity: event.data?.[0],
+                      firstThreeNewIds: event.data?.slice(0, 3).map((item: any) => item.id)
                     });
-                    
-                    // Process the updated entities
-                    const processedData = syncProcessView({
-                      entities: event.data,
-                      columns: context.columns,
-                      relationshipResolvers: context.relationshipResolvers,
-                      sortBy: context.sortBy, // Fixed: was sortConfig
-                      filters: context.filters,
-                      groupBy: context.groupBy,
-                      columnWidths: context.columnWidths,
-                      columnVisibility: context.columnVisibility,
-                      columnOrder: context.columnOrder,
-                      enableSelectionColumn: context.enableSelectionColumn,
-                      rowHeight: context.rowHeight
-                    });
-                    
-                    console.log('✅ TableMachine: Processed updated data', {
-                      processedRowCount: processedData.processedRows.length
-                    });
-                    
-                    // Store updated processed data for renderer
-                    (context as any).processedData = processedData;
-                    
-                    return processedData.processedRows;
-                  },
-                  // Also update coordinate mapping in context
-                  coordinateMapping: ({ context, event }) => {
-                    const processedData = (context as any).processedData;
-                    return processedData?.coordinateMapping || context.coordinateMapping;
+                    return event.data || [];
                   }
                 }),
-                // Trigger re-render with new data
-                ({ context, event }) => {
-                  if (context.actors.rendererActor) {
-                    console.log('🎨 TableMachine: Triggering re-render after data update');
-                    
-                    // Get the processed data that was just stored
-                    const processedData = (context as any).processedData;
-                    
-                    // Make sure we have coordinate mapping
-                    if (!processedData?.coordinateMapping) {
-                      console.warn('⚠️ TableMachine: No coordinate mapping from processed data, skipping render');
-                      return;
-                    }
-                    
-                    // First update the coordinate mapping in the renderer
-                    context.actors.rendererActor.send({
-                      type: 'UPDATE_COORDINATES',
-                      mapping: processedData.coordinateMapping,
-                      version: Date.now()
-                    });
-                    
-                    // Then send RENDER event with the updated state
-                    const renderState: RenderState = {
-                      rows: context.rows,
-                      columns: processedData.visibleColumns || context.columns,
-                      selectedCells: context.selectedCells,
-                      editingCell: context.editingCell,
-                      columnWidths: context.columnWidths,
-                      version: Date.now(), // Always use a new version to force render
-                      coordinateMapping: processedData.coordinateMapping, // Include coordinate mapping
-                      groupedData: [],
-                      optimisticOperations: new Map(),
-                      sortBy: context.sortBy || [], // Include sort state
-                      columnVisibility: context.columnVisibility,
-                      columnOrder: context.columnOrder
-                    };
-                    context.actors.rendererActor.send({ 
-                      type: 'RENDER', 
-                      state: renderState
-                    });
-                  }
+                // Trigger view processing
+                ({ self }) => {
+                  console.log('TableMachine: DATA_UPDATE - triggering view actor');
+                  self.send({ type: 'INVOKE_VIEW_ACTOR' });
                 }
               ]
             },
             
-            // Handle subscription errors
             DATA_SUBSCRIPTION_ERROR: {
               actions: ({ event }) => {
-                console.error('❌ TableMachine: Data subscription error:', event.error);
+                console.error('TableMachine: Data subscription error:', event);
               }
+            },
+            
+            // Handle relationship data updates from subscription actor
+            RELATIONSHIP_DATA_UPDATE: {
+              actions: [
+                // Update relationship resolvers with new data
+                assign({
+                  relationshipResolvers: ({ context, event }) => {
+                    console.log('TableMachine: RELATIONSHIP_DATA_UPDATE received', {
+                      table: event.table,
+                      dataCount: event.data?.length || 0
+                    });
+                    
+                    // Find columns that use this relationship table
+                    const affectedColumns = context.columns.filter(col => {
+                      // Check various relationship table name formats
+                      return col.relationshipTable === event.table ||
+                             col.relationshipTable === event.table.replace(/s$/, '') ||
+                             col.relationshipTable === `${event.table.replace(/s$/, '')}s`;
+                    });
+                    
+                    if (affectedColumns.length === 0) {
+                      return context.relationshipResolvers; // No columns use this table
+                    }
+                    
+                    // Convert array to id-keyed object for fast lookup
+                    const dataMap = event.data.reduce((acc: any, item: any) => {
+                      acc[item.id] = item;
+                      return acc;
+                    }, {});
+                    
+                    // Update resolvers for affected columns
+                    const newResolvers = { ...context.relationshipResolvers };
+                    
+                    affectedColumns.forEach(column => {
+                      const displayField = column.relationshipDisplayField || 'displayName';
+                      
+                      newResolvers[column.id] = (id: string | string[]) => {
+                        if (Array.isArray(id)) {
+                          return id.map(i => {
+                            const entity = dataMap[i];
+                            if (!entity) return i;
+                            return entity[displayField] || entity.displayName || entity.name || entity.title || i;
+                          }).join(', ');
+                        }
+                        
+                        const entity = dataMap[id];
+                        if (!entity) return id;
+                        return entity[displayField] || entity.displayName || entity.name || entity.title || id;
+                      };
+                    });
+                    
+                    return newResolvers;
+                  }
+                }),
+                
+                // Trigger view refresh to update relationship displays
+                ({ self, context }) => {
+                  // Skip view refresh if we're using pre-resolved initial data
+                  // The initial subscription emissions don't need to trigger re-renders
+                  if (context.hasInitialData && context.viewVersion <= 10) {
+                    console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - skipping view refresh (using pre-resolved initial data)');
+                    return;
+                  }
+                  
+                  console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - triggering view refresh');
+                  self.send({ type: 'INVOKE_VIEW_ACTOR' });
+                }
+              ]
             },
             
             // Include all common event handlers in idle state

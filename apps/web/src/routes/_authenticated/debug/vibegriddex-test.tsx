@@ -110,18 +110,15 @@ export const Route = createFileRoute('/_authenticated/debug/vibegriddex-test')({
       columnCount: processedData.visibleColumns.length
     });
     
-    // Store loader data globally for component access (temporary solution)
-    (window as any).__vibegriddex_loader_data = {
-      relationshipData
-    };
-    
     return {
       tasks,
       relationshipData,
       initialData: {
         processedRows: processedData.processedRows,
         visibleColumns: processedData.visibleColumns,
-        coordinateMapping: processedData.coordinateMapping
+        coordinateMapping: processedData.coordinateMapping,
+        relationshipData, // Include relationship data directly in initialData
+        relationshipResolvers // Include resolvers too
       }
     };
   },
@@ -148,13 +145,6 @@ function VibeGridDexTestPage() {
     processedRowCount: initialData?.processedRows?.length || 0,
     visibleColumnCount: initialData?.visibleColumns?.length || 0
   });
-  
-  // Clean up global data on unmount
-  useEffect(() => {
-    return () => {
-      delete (window as any).__vibegriddex_loader_data;
-    };
-  }, []);
   
   // Setup task status set if it doesn't exist
   const ensureTaskStatusSet = async () => {
@@ -293,7 +283,9 @@ function VibeGridDexTestPage() {
         {...console.log('🟢🟢🟢 Passing initialData to VibeGridDex:', { 
           hasInitialData: !!initialData,
           processedRowCount: initialData?.processedRows?.length || 0,
-          visibleColumnCount: initialData?.visibleColumns?.length || 0
+          visibleColumnCount: initialData?.visibleColumns?.length || 0,
+          hasRelationshipData: !!(initialData as any)?.relationshipData,
+          relationshipDataKeys: Object.keys((initialData as any)?.relationshipData || {})
         })}
       />
     </div>

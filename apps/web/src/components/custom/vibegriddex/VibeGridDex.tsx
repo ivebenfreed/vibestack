@@ -60,6 +60,8 @@ interface VibeGridDexProps<T = any> {
     processedRows: any[];
     visibleColumns: Column[];
     coordinateMapping: any;
+    relationshipData?: Record<string, any>;
+    relationshipResolvers?: Record<string, (id: string | string[]) => string>;
   };
   
   // Relationship options providers (optional - auto-generated if not provided)
@@ -103,10 +105,18 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       // Extract entities from processed rows
       const entities = props.initialData.processedRows.map(row => row.data);
       
-      // Get relationship data from the test page loader
-      // This is a temporary solution - ideally this should come from props
-      const loaderData = (window as any).__vibegriddex_loader_data;
-      const relationshipData = loaderData?.relationshipData || {};
+      // Get relationship data from initialData
+      const relationshipData = (props.initialData as any).relationshipData || {};
+      
+      console.log('🔍 VibeGridDex: Preparing preloaded data', {
+        entityCount: entities.length,
+        relationshipDataKeys: Object.keys(relationshipData),
+        hasRelationshipData: Object.keys(relationshipData).length > 0,
+        initialDataKeys: Object.keys(props.initialData),
+        // Debug: Show the actual structure
+        initialDataStructure: props.initialData,
+        relationshipDataExtracted: relationshipData
+      });
       
       return { entities, relationshipData };
     }
@@ -346,7 +356,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         Object.keys(processedData.processedRows[0].data).filter(k => k.includes('__resolved')).length > 0 : false,
       columns: columnsWithProviders,
       columnCount: columnsWithProviders.length,
-      columnIds: columnsWithProviders.map(c => c.id)
+      columnIds: columnsWithProviders.map(c => c.id),
+      hasInitialResolvers: !!(props.initialData as any)?.relationshipResolvers,
+      resolverKeys: Object.keys((props.initialData as any)?.relationshipResolvers || {})
     });
     
     return {
@@ -358,7 +370,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         entities: entities,
         data: data,
         relationshipData: relationshipData,
-        relationshipResolvers: relationshipResolvers,
+        relationshipResolvers: (props.initialData as any)?.relationshipResolvers || relationshipResolvers,
         persistedData: persistedData,
         initialData: props.initialData || processedData,
         onEntityUpdate: onEntityUpdate,
@@ -379,7 +391,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         }
       }
     };
-  }, [tableId, entityType, columns, enableSelectionColumn, data, relationshipData, relationshipResolvers, persistedData, props.initialData, processedData, onEntityUpdate, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width, entities]);
+  }, [tableId, entityType, columns, enableSelectionColumn, relationshipResolvers, persistedData, props.initialData, onEntityUpdate, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
   
   // Create table actor with the machine config
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
