@@ -34,12 +34,19 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
 
     const subscription = liveQuery(() => table.toArray()).subscribe({
       next: (data) => {
-        // Skip the first emission - this is just the initial data load
+        // For first emission, send data immediately without debounce
         if (isFirstEmission) {
           isFirstEmission = false;
-          console.log('📊 DataSubscriptionActor: Skipping first emission for table:', tableKey, {
+          console.log('📊 DataSubscriptionActor: First emission for table:', tableKey, {
             entityCount: data.length,
             isMainEntity
+          });
+          
+          // Send initial data immediately
+          sendBack({ 
+            type: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE',
+            table: tableKey,
+            data: data 
           });
           return;
         }
