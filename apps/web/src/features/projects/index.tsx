@@ -7,12 +7,16 @@ import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex';
 import { updateProjectUI } from '@/domain-dexie/project';
 import type { Project } from '@repo/dataforge/client-entities';
 import type { Column } from '@/components/custom/vibegriddex/column-types';
+import { Route } from '@/routes/_authenticated/projects/index';
 
 /**
  * Main Projects Feature Component
- * Using VibeGridDex for Dexie-based data grid
+ * Using VibeGridDex for Dexie-based data grid with loader pattern
  */
 const Projects: React.FC = () => {
+  // Get the loader data
+  const loaderData = Route.useLoaderData();
+  const { initialData } = loaderData || {};
   // Define columns for Project entity
   const columns: Column<Project>[] = [
     { id: 'name', field: 'name', name: 'Name', cellType: 'text', width: 250 },
@@ -96,6 +100,7 @@ const Projects: React.FC = () => {
               enableSorting
               enableFiltering
               enableVirtualScrolling
+              initialData={initialData}
             />
           </div>
         </div>
