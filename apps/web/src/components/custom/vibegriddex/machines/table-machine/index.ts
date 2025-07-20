@@ -109,6 +109,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     
     // Store initial data for immediate rendering
     initialData: hasInitialData ? input.initialData : null,
+    hasInitialData: hasInitialData, // Track whether we have preloaded data
     
     // Spread dimension state
     ...dimensionState,
