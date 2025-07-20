@@ -21,6 +21,8 @@
     "forge:build": "pnpm --filter @repo/dataforge forge:build",
     "forge:migrate:generate": "pnpm --filter @repo/dataforge forge:migrate generate",
     "forge:migrate:run": "pnpm --filter @repo/dataforge forge:migrate run",
+    "forge:migrate:run:preview": "pnpm --filter @repo/dataforge forge:migrate:preview run",
+    "forge:migrate:run:production": "pnpm --filter @repo/dataforge forge:migrate:production run",
     "forge:deploy": "pnpm --filter @repo/dataforge deploy",
     "deploy": "pnpm deploy:server && pnpm deploy:web",
     "deploy:server": "cd apps/server && wrangler deploy",

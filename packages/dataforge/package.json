@@ -95,6 +95,8 @@
     "forge:build": "pnpm run generate && pnpm run compile",
     "forge:dexie": "pnpm run generate-dexie-schema",
     "forge:migrate": "node --loader ts-node/esm src/scripts/manage-migrations.ts",
+    "forge:migrate:preview": "NODE_ENV=preview node --loader ts-node/esm src/scripts/manage-migrations.ts",
+    "forge:migrate:production": "NODE_ENV=production node --loader ts-node/esm src/scripts/manage-migrations.ts",
     "forge:trigger:apply": "node --loader ts-node/esm src/scripts/manage-trigger-migration.ts",
     "deploy": "pnpm run forge:build && pnpm run forge:migrate generate && pnpm run forge:migrate run",
     "test": "vitest",
