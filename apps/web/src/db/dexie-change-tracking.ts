@@ -224,6 +224,34 @@ export async function trackOutgoingChange(
     return;
   }
   
+  // Create a unique key for duplicate detection
+  const changeKey = `${table}:${operation}:${data.id || JSON.stringify(data)}`;
+  const now = Date.now();
+  
+  // Check for recent duplicate
+  const lastChangeTime = recentChanges.get(changeKey);
+  if (lastChangeTime && (now - lastChangeTime) < DUPLICATE_WINDOW_MS) {
+    console.error(`[Dexie Change Tracking] DUPLICATE DETECTED - Skipping manual tracking for ${table}:${data.id}`, {
+      timeSinceLastChange: now - lastChangeTime,
+      duplicateWindow: DUPLICATE_WINDOW_MS,
+      stack: new Error().stack
+    });
+    return;
+  }
+  
+  // Record this change timestamp
+  recentChanges.set(changeKey, now);
+  
+  // Clean up old entries periodically
+  if (recentChanges.size > 100) {
+    const cutoff = now - DUPLICATE_WINDOW_MS;
+    for (const [key, timestamp] of recentChanges.entries()) {
+      if (timestamp < cutoff) {
+        recentChanges.delete(key);
+      }
+    }
+  }
+  
   const changeRecord: LocalChanges = {
     id: nanoid(),
     table,
@@ -238,7 +266,10 @@ export async function trackOutgoingChange(
   
   try {
     await db.local_changes.add(changeRecord);
-    console.log(`[Dexie Change Tracking] Manually tracked ${operation} for ${table}:`, changeRecord.id);
+    console.log(`[Dexie Change Tracking] Manually tracked ${operation} for ${table}:`, changeRecord.id, {
+      entityId: data.id,
+      stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
+    });
   } catch (error) {
     console.error('[Dexie Change Tracking] Failed to track change:', error);
   }

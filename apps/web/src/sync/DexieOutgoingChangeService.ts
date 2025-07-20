@@ -30,11 +30,15 @@ export interface DexieOutgoingChangeServiceCallbacks {
   onSendRequest?: (changes: TableChange[]) => Promise<boolean>;
 }
 
+// Track active instances to detect duplicates
+let activeInstances = 0;
+
 export class DexieOutgoingChangeService {
   private config: DexieOutgoingChangeServiceConfig;
   private callbacks: DexieOutgoingChangeServiceCallbacks = {};
   private isProcessing = false;
   private processInterval: NodeJS.Timeout | null = null;
+  private instanceId: string;
   
   // Constants for retry logic
   private readonly MAX_SEND_ATTEMPTS = 3;
@@ -42,7 +46,13 @@ export class DexieOutgoingChangeService {
   
   constructor(config: DexieOutgoingChangeServiceConfig) {
     this.config = config;
-    console.log('[DexieOutgoingChangeService] Initialized with config:', config);
+    this.instanceId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    activeInstances++;
+    console.log('[DexieOutgoingChangeService] Initialized with config:', config, {
+      instanceId: this.instanceId,
+      activeInstances,
+      warning: activeInstances > 1 ? 'MULTIPLE INSTANCES DETECTED!' : 'Single instance'
+    });
   }
   
   /**
@@ -139,7 +149,16 @@ export class DexieOutgoingChangeService {
           break;
         }
         
-        console.log(`[DexieOutgoingChangeService] Processing batch of ${pendingChanges.length} changes`);
+        console.log(`[DexieOutgoingChangeService] Processing batch of ${pendingChanges.length} changes`, {
+          instanceId: this.instanceId,
+          batchDetails: pendingChanges.map(c => ({
+            id: c.id,
+            table: c.table,
+            operation: c.operation,
+            entityId: c.data?.id,
+            clientSequence: c.clientSequence
+          }))
+        });
         
         // Update send attempts before sending
         const changeIds = pendingChanges.map(c => c.id);
@@ -323,7 +342,11 @@ export class DexieOutgoingChangeService {
    * Destroy service and clean up
    */
   destroy(): void {
-    console.log('[DexieOutgoingChangeService] Destroying...');
+    activeInstances--;
+    console.log('[DexieOutgoingChangeService] Destroying...', {
+      instanceId: this.instanceId,
+      remainingInstances: activeInstances
+    });
     this.stopMonitoring();
     this.callbacks = {};
   }

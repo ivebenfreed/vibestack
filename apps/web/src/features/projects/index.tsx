@@ -52,7 +52,7 @@ const Projects: React.FC = () => {
 
   // Handle entity updates
   const handleEntityUpdate = React.useCallback(async (rowId: string, updates: Record<string, any>) => {
-    console.log('[Projects] 🚀 Updating project:', { rowId, updates })
+    console.log('[Projects] 🚀 Updating project:', { rowId, updates, stack: new Error().stack?.split('\n').slice(2, 5).join('\n') })
     try {
       setError(null)
       await updateProjectUI(rowId, updates)
