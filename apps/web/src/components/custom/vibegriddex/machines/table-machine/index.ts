@@ -441,7 +441,8 @@ export const tableBaseMachine = setup({
         src: 'dataSubscriptionActor',
         input: ({ context }) => ({ 
           entityType: context.entityType,
-          includeRelationships: true // Subscribe to relationship tables too
+          includeRelationships: true, // Subscribe to relationship tables too
+          skipInitialEmission: context.hasInitialData // Skip first emission when we have preloaded data
         }),
         onError: {
           actions: ({ event }) => {

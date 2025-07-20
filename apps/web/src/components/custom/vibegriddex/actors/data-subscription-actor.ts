@@ -6,6 +6,7 @@ import type { Subscription } from 'dexie';
 export interface DataSubscriptionInput {
   entityType: string;
   includeRelationships?: boolean;
+  skipInitialEmission?: boolean;
 }
 
 /**
@@ -34,9 +35,20 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
 
     const subscription = liveQuery(() => table.toArray()).subscribe({
       next: (data) => {
-        // For first emission, send data immediately without debounce
+        // For first emission, check if we should skip it
         if (isFirstEmission) {
           isFirstEmission = false;
+          
+          // Skip first emission if we have preloaded data from route loader
+          if (input.skipInitialEmission) {
+            console.log('📊 DataSubscriptionActor: Skipping first emission for table:', tableKey, {
+              entityCount: data.length,
+              isMainEntity,
+              reason: 'Using preloaded data from route loader'
+            });
+            return;
+          }
+          
           console.log('📊 DataSubscriptionActor: First emission for table:', tableKey, {
             entityCount: data.length,
             isMainEntity
