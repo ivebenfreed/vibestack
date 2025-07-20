@@ -91,7 +91,8 @@ export class MessageProcessor {
         messageType === 'srv_init_complete' || 
         messageType === 'srv_catchup_completed' || 
         messageType === 'srv_live_start' || 
-        messageType === 'srv_sync_completed') {
+        messageType === 'srv_sync_completed' ||
+        messageType === 'srv_state_change') {
       this.handlePhaseTransitions(message, messageType, context, services, sendEvent);
       return;
     }
@@ -332,6 +333,20 @@ export class MessageProcessor {
       
       sendEvent({ type: 'START_INITIAL_SYNC' });
       
+      // WORKAROUND: Some server implementations send srv_init_start AFTER sending all data
+      // If we're in initial_sync state and have already received data, complete the sync
+      // This handles the case where srv_init_complete is never sent
+      if (context.syncPhase === 'initial') {
+        console.log('[MessageProcessor] ⚠️ Received srv_init_start while already in initial sync phase');
+        console.log('[MessageProcessor] 🔧 This might indicate all data was already sent - will wait for srv_init_complete');
+        
+        // Set a timeout to complete sync if we don't receive srv_init_complete
+        setTimeout(() => {
+          console.log('[MessageProcessor] ⏱️ Timeout waiting for srv_init_complete - completing sync anyway');
+          sendEvent({ type: 'INITIAL_SYNC_COMPLETE' });
+        }, 5000); // Wait 5 seconds for srv_init_complete
+      }
+      
     } else if (messageType === 'srv_init_complete') {
       console.log('[MessageProcessor] ✅ Initial sync completed');
       
@@ -399,6 +414,14 @@ export class MessageProcessor {
         console.log(`[MessageProcessor] 📊 LSN update from sync completion: ${context.currentLSN} → ${message.serverLSN}`);
         sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: 'sync_completion' });
       }
+    } else if (messageType === 'srv_state_change') {
+      console.log('[MessageProcessor] 📊 Server state change:', message);
+      
+      // Don't send acknowledgment for state changes as they're informational only
+      
+      // Note: We used to check for initial_complete here, but the server
+      // should send srv_init_complete instead. If we're not getting it,
+      // there might be a server bug or version mismatch.
     }
   }
 

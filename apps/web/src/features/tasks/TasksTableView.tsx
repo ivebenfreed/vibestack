@@ -1,12 +1,12 @@
 import React from 'react'
-import { VibeGridOptimus } from '@/components/custom/vibegridoptimus/VibeGridOptimus'
-import { createVibeGrid } from '@/components/custom/vibegridoptimus/hooks/useValidatedVibeGrid'
-import { tasksAtom, updateTaskUI } from '@/domain/task'
+import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex'
+import { updateTaskUI } from '@/domain-dexie/task'
 import { useTheme } from '@/context/theme-context'
+import type { Task } from '@repo/dataforge/client-entities'
+import type { Column } from '@/components/custom/vibegriddex/column-types'
 
 /**
- * TasksTableView - Separated table view component to isolate createVibeGrid hook
- * This prevents the hook from being called when viewing other tabs
+ * TasksTableView - Using VibeGridDex for Dexie-based data grid
  */
 export default function TasksTableView() {
   // Get theme and resolve 'system' to actual theme
@@ -15,20 +15,38 @@ export default function TasksTableView() {
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : theme
 
-  // Create save handler that uses domain wrapper (handles dependencies automatically)
-  const handleTaskSave = React.useCallback(async (id: string, column: string, value: any) => {
-    console.log('[TasksTableView] 🚀 Save handler called:', { id, column, value })
-    
-    // Build the updates object
-    const updates = { [column]: value }
-    console.log('[TasksTableView] 🔧 Constructed updates object:', updates)
-    console.log('[TasksTableView] 🔧 Updates object type:', typeof updates)
-    console.log('[TasksTableView] 🔧 Updates object keys:', Object.keys(updates))
-    console.log('[TasksTableView] 🔧 Updates object JSON:', JSON.stringify(updates))
-    
+  // Define columns for Task entity
+  const columns: Column<Task>[] = [
+    { id: 'title', field: 'title', name: 'Title', cellType: 'text', width: 300 },
+    { id: 'description', field: 'description', name: 'Description', cellType: 'text', width: 400 },
+    { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 150,
+      options: [
+        { value: 'todo', label: 'To Do' },
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' }
+      ]
+    },
+    { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 120,
+      options: [
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' }
+      ]
+    },
+    { id: 'dueDate', field: 'dueDate', name: 'Due Date', cellType: 'date', width: 150 },
+    { id: 'projectId', field: 'projectId', name: 'Project', cellType: 'relationship-single', 
+      width: 200, relationshipTable: 'projects', relationshipDisplayField: 'name' },
+    { id: 'assigneeId', field: 'assigneeId', name: 'Assignee', cellType: 'relationship-single',
+      width: 180, relationshipTable: 'users', relationshipDisplayField: 'name' },
+    { id: 'createdAt', field: 'createdAt', name: 'Created', cellType: 'date', width: 150, editable: false },
+    { id: 'updatedAt', field: 'updatedAt', name: 'Updated', cellType: 'date', width: 150, editable: false }
+  ]
+
+  // Handle entity updates
+  const handleEntityUpdate = React.useCallback(async (rowId: string, updates: Record<string, any>) => {
+    console.log('[TasksTableView] 🚀 Updating task:', { rowId, updates })
     try {
-      // Use domain wrapper that handles dependencies internally
-      await updateTaskUI(id, updates)
+      await updateTaskUI(rowId, updates)
       console.log('[TasksTableView] ✅ Task updated successfully')
     } catch (error) {
       console.error('[TasksTableView] ❌ Task update failed:', error)
@@ -36,24 +54,17 @@ export default function TasksTableView() {
     }
   }, [])
 
-  // ✅ TYPE-SAFE VIBEGRID: Enforces entity validation, data source, and column config
-  const taskGridProps = createVibeGrid({
-    entityName: "Task",
-    atom: tasksAtom,
-    onSave: handleTaskSave
-  })
-
-  console.log('[TasksTableView] 🔧 Grid props:', { 
-    hasOnSave: !!taskGridProps.onSave,
-    dataLength: taskGridProps.data.length 
-  })
-
   return (
-    <VibeGridOptimus
-      {...taskGridProps}
+    <VibeGridDex
+      tableId="tasks-table"
+      entityType="task"
+      columns={columns}
+      onEntityUpdate={handleEntityUpdate}
       height={600}
-      theme={effectiveTheme}
       className="border border-border rounded-lg"
+      enableSorting
+      enableFiltering
+      enableVirtualScrolling
     />
   )
 }
