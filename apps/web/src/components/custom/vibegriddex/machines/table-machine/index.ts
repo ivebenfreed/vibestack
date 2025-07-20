@@ -163,7 +163,10 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     canvasContainer: null,
     
     // Track if we're using pre-resolved initial data from loader
-    hasInitialData
+    hasInitialData,
+    
+    // Timer for batching view updates during rapid data changes
+    pendingViewUpdateTimer: null
   };
 };
 
@@ -347,6 +350,14 @@ export const tableBaseMachine = setup({
   
   initial: 'initializing',
   
+  // Clean up timer on machine exit
+  exit: ({ context }) => {
+    if (context.pendingViewUpdateTimer) {
+      clearTimeout(context.pendingViewUpdateTimer);
+      context.pendingViewUpdateTimer = null;
+    }
+  },
+  
   states: {
     initializing: {
       entry: [
@@ -466,10 +477,21 @@ export const tableBaseMachine = setup({
                     return event.data || [];
                   }
                 }),
-                // Trigger view processing
-                ({ self }) => {
-                  console.log('TableMachine: DATA_UPDATE - triggering view actor');
-                  self.send({ type: 'INVOKE_VIEW_ACTOR' });
+                // Batch view updates to prevent reflow during rapid sync updates
+                ({ self, context }) => {
+                  console.log('TableMachine: DATA_UPDATE - batching view actor trigger');
+                  
+                  // Clear any existing pending update timer
+                  if (context.pendingViewUpdateTimer) {
+                    clearTimeout(context.pendingViewUpdateTimer);
+                  }
+                  
+                  // Set a new timer to batch multiple updates
+                  context.pendingViewUpdateTimer = setTimeout(() => {
+                    console.log('TableMachine: DATA_UPDATE - executing batched view update');
+                    self.send({ type: 'INVOKE_VIEW_ACTOR' });
+                    context.pendingViewUpdateTimer = null;
+                  }, 150); // 150ms batching window
                 }
               ]
             },
@@ -534,7 +556,7 @@ export const tableBaseMachine = setup({
                   }
                 }),
                 
-                // Trigger view refresh to update relationship displays
+                // Trigger view refresh to update relationship displays (with batching)
                 ({ self, context }) => {
                   // Skip view refresh if we're using pre-resolved initial data
                   // The initial subscription emissions don't need to trigger re-renders
@@ -543,8 +565,19 @@ export const tableBaseMachine = setup({
                     return;
                   }
                   
-                  console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - triggering view refresh');
-                  self.send({ type: 'INVOKE_VIEW_ACTOR' });
+                  console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - batching view refresh');
+                  
+                  // Clear any existing pending update timer
+                  if (context.pendingViewUpdateTimer) {
+                    clearTimeout(context.pendingViewUpdateTimer);
+                  }
+                  
+                  // Set a new timer to batch multiple updates
+                  context.pendingViewUpdateTimer = setTimeout(() => {
+                    console.log('TableMachine: RELATIONSHIP_DATA_UPDATE - executing batched view update');
+                    self.send({ type: 'INVOKE_VIEW_ACTOR' });
+                    context.pendingViewUpdateTimer = null;
+                  }, 150); // 150ms batching window
                 }
               ]
             },

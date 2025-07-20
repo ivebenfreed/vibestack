@@ -332,6 +332,9 @@ export interface TableContext {
     visibleRows: number;
     activeActors: number;
   };
+  
+  // Timer for batching view updates during rapid data changes
+  pendingViewUpdateTimer?: NodeJS.Timeout | null;
 }
 
 export interface SelectionContext {
