@@ -4,11 +4,16 @@ import { updateTaskUI } from '@/domain-dexie/task'
 import { useTheme } from '@/context/theme-context'
 import type { Task } from '@repo/dataforge/client-entities'
 import type { Column } from '@/components/custom/vibegriddex/column-types'
+import { Route } from '@/routes/_authenticated/tasks/index'
 
 /**
  * TasksTableView - Using VibeGridDex for Dexie-based data grid
  */
 export default function TasksTableView() {
+  // Get the loader data
+  const loaderData = Route.useLoaderData()
+  const { initialData } = loaderData || {}
+  
   // Get theme and resolve 'system' to actual theme
   const { theme } = useTheme()
   const effectiveTheme = theme === 'system' 
@@ -65,6 +70,7 @@ export default function TasksTableView() {
       enableSorting
       enableFiltering
       enableVirtualScrolling
+      initialData={initialData}
     />
   )
 }

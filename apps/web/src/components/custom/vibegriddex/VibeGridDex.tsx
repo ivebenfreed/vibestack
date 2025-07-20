@@ -338,7 +338,14 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       visibleColumns: processed.visibleColumns,
       coordinateMapping: processed.coordinateMapping
     };
-  }, [entities, columnsWithProviders, relationshipResolvers, props.initialData]);
+  }, [
+    // Only include entities if we don't have initialData
+    // This prevents re-processing when data subscription updates
+    props.initialData ? null : entities, 
+    columnsWithProviders, 
+    relationshipResolvers, 
+    props.initialData
+  ]);
 
   // Create machine configuration
   const machineConfig = useMemo(() => {
