@@ -21,13 +21,9 @@ import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } fro
 import { VibeGridXHeader } from './components/VibeGridXHeader';
 import './vibegridx.css';
 
-// Import entity configurations from DataForge
-import { 
-  getEntityConfig, 
-  VIBEGRIDX_ENTITY_CONFIGS,
-  type VibeGridXEntityType,
-  type VibeGridXEntityConfig
-} from '../../../../../../packages/dataforge/src/generated/vibegridx-columns';
+// Entity configurations removed - using manual column definitions
+// TODO: Restore when column generation is re-implemented
+type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment' | string;
 
 // Import domain registry for dynamic atom/update function access
 import { DOMAIN_REGISTRY, getDomainAtom, getDomainUpdateFn } from '@/domain/registry';
@@ -133,12 +129,9 @@ export const VibeGridX = <T extends Record<string, any> = any>(
   // Handle entity-based configuration if entityType is provided
   const entityConfig = useMemo(() => {
     if (isEntityProps(props)) {
-      const config = getEntityConfig(props.entityType);
-      
-      if (!config) {
-        console.error(`VibeGridX: No entity configuration found for type "${props.entityType}"`);
-        return null;
-      }
+      // Entity configuration removed - manual columns required
+      console.warn(`VibeGridX: Entity-based configuration is temporarily disabled. Please use manual column configuration.`);
+      return null;
       
       // Get primary atom and update function from domain registry
       const primaryAtom = getDomainAtom(props.entityType as any);
