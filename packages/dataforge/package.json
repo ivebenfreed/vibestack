@@ -20,6 +20,10 @@
       "types": "./dist/rdg-column-configurations.d.ts",
       "import": "./dist/rdg-column-configurations.js"
     },
+    "./vibegridx-columns": {
+      "types": "./dist/vibegridx-columns.d.ts",
+      "import": "./dist/vibegridx-columns.js"
+    },
     "./*-operations": {
       "types": "./dist/*-operations.d.ts",
       "import": "./dist/*-operations.js"
