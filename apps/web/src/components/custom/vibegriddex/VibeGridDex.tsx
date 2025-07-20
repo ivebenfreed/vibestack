@@ -41,11 +41,14 @@ import { useDexieEntityConfig } from './hooks/useDexieEntityConfig';
 // COMPONENT PROPS
 // ====================================
 
-// Entity-based configuration (recommended)
-interface VibeGridDexEntityProps<T = any> {
+// Unified configuration - always entity-based with optional manual columns
+interface VibeGridDexProps<T = any> {
   tableId: string;  // Unique identifier for this table instance (required for persistence)
-  entityType: VibeGridXEntityType;  // Entity type for auto-configuration
-  selectedColumns?: string[]; // Column IDs to include (optional - defaults to all)
+  entityType: VibeGridXEntityType;  // Entity type (required - determines data source)
+  
+  // Column configuration
+  columns?: Column<T>[];  // Manual columns (optional - overrides entity config columns)
+  selectedColumns?: string[]; // Column IDs to include when using entity columns (optional)
   
   // Common options
   className?: string;
@@ -68,6 +71,7 @@ interface VibeGridDexEntityProps<T = any> {
   onSelectionChange?: (selectedCells: Set<string>) => void;
   onEditingChange?: (editingCell: CellRef | null) => void;
   onPerformanceUpdate?: (metrics: any) => void;
+  onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
   
   // Performance options
   enableVirtualScrolling?: boolean;
@@ -82,43 +86,6 @@ interface VibeGridDexEntityProps<T = any> {
   enableSelectionColumn?: boolean;
 }
 
-// Manual configuration (for custom use cases)
-interface VibeGridDexManualProps<T = any> {
-  tableId: string;
-  columns: Column<T>[];
-  data: T[];
-  relationshipData?: Record<string, any>;
-  relationshipResolvers?: Record<string, (id: string | string[]) => string>;
-  relationshipOptionsProviders?: RelationshipOptionsProviders;
-  onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
-  
-  // Common options (same as entity props)
-  className?: string;
-  height?: number | string;
-  width?: number | string;
-  initialData?: {
-    processedRows: any[];
-    visibleColumns: Column[];
-    coordinateMapping: any;
-  };
-  onCellClick?: (rowId: string, columnId: string) => void;
-  onCellDoubleClick?: (rowId: string, columnId: string) => void;
-  onSelectionChange?: (selectedCells: Set<string>) => void;
-  onEditingChange?: (editingCell: CellRef | null) => void;
-  onPerformanceUpdate?: (metrics: any) => void;
-  enableVirtualScrolling?: boolean;
-  enableCanvasOverlays?: boolean;
-  bufferSize?: number;
-  enableGrouping?: boolean;
-  enableFiltering?: boolean;
-  enableSorting?: boolean;
-  enableDragAndDrop?: boolean;
-  enableSelectionColumn?: boolean;
-}
-
-// Discriminated union type for props
-type VibeGridDexProps<T = any> = VibeGridDexEntityProps<T> | VibeGridDexManualProps<T>;
-
 // ====================================
 // MAIN COMPONENT
 // ====================================
@@ -130,15 +97,27 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // ====================================
   
-  // Type guard to check if props are entity-based
-  const isEntityProps = (p: VibeGridDexProps<T>): p is VibeGridDexEntityProps<T> => {
-    return 'entityType' in p;
-  };
+  // Prepare preloaded data if we have initialData from the loader
+  const preloadedData = useMemo(() => {
+    if (props.initialData && props.initialData.processedRows) {
+      // Extract entities from processed rows
+      const entities = props.initialData.processedRows.map(row => row.data);
+      
+      // Get relationship data from the test page loader
+      // This is a temporary solution - ideally this should come from props
+      const loaderData = (window as any).__vibegriddex_loader_data;
+      const relationshipData = loaderData?.relationshipData || {};
+      
+      return { entities, relationshipData };
+    }
+    return null;
+  }, [props.initialData]);
   
-  // Handle entity-based configuration if entityType is provided
+  // Always use entity configuration - entityType is now required
   const dexieEntityConfig = useDexieEntityConfig(
-    isEntityProps(props) ? props.entityType : null,
-    isEntityProps(props) ? props.selectedColumns : undefined
+    props.entityType,
+    props.selectedColumns,
+    preloadedData
   );
   
   // ====================================
@@ -184,9 +163,8 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     enableDragAndDrop,
   } = props;
 
-  // Use the stable tableId from props
-  const { tableId } = props;
-  const entityType = isEntityProps(props) ? props.entityType : undefined;
+  // Use the stable tableId and entityType from props
+  const { tableId, entityType } = props;
   
   // Load persisted state before creating machine config
   const persistenceKey = `vibegridx-${tableId}-state`;
@@ -225,84 +203,81 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   const entityConfig = useMemo(() => {
     if (!dexieEntityConfig) return null;
     
-    if (isEntityProps(props)) {
-      const providedProviders = props.relationshipOptionsProviders || {};
-      
-      // Auto-generate options providers for relationship columns
-      const autoRelationshipOptionsProviders: RelationshipOptionsProviders = {};
-      
-      dexieEntityConfig.columns.forEach(column => {
-        const cellType = column.cellType || column.type;
-        if (cellType?.startsWith('relationship') && column.relationshipTable && !providedProviders[column.id]) {
-          // Add entity type to column for filtering
-          const enhancedColumn = {
-            ...column,
-            relationshipEntityType: props.entityType
-          };
-          
-          console.log('🔍 VibeGridDex: Creating generic relationship provider', {
-            columnId: column.id,
-            relationshipTable: column.relationshipTable,
-            entityType: props.entityType,
-            cellType
-          });
-          
-          // Create a Dexie-based provider
-          autoRelationshipOptionsProviders[column.id] = createGenericRelationshipProvider(enhancedColumn, dexieEntityConfig.relationshipData);
-        }
-      });
-      
-      // Merge provided and auto-generated providers
-      const allRelationshipOptionsProviders = { ...autoRelationshipOptionsProviders, ...providedProviders };
-      
-      // Add options providers to columns
-      const columnsWithProviders = dexieEntityConfig.columns.map(column => {
-        const provider = allRelationshipOptionsProviders[column.id];
-        if (provider) {
-          return { ...column, relationshipOptionsProvider: provider };
-        }
-        return column;
-      });
-      
-      return {
-        columns: columnsWithProviders,
-        data: dexieEntityConfig.data,
-        relationshipData: dexieEntityConfig.relationshipData,
-        relationshipResolvers: dexieEntityConfig.relationshipResolvers,
-        relationshipOptionsProviders: allRelationshipOptionsProviders,
-        onEntityUpdate: dexieEntityConfig.onEntityUpdate
-      };
-    }
-    return null;
-  }, [dexieEntityConfig, props]);
+    const providedProviders = props.relationshipOptionsProviders || {};
+    
+    // Use manual columns if provided, otherwise use entity config columns
+    const baseColumns = props.columns || dexieEntityConfig.columns;
+    
+    // Auto-generate options providers for relationship columns
+    const autoRelationshipOptionsProviders: RelationshipOptionsProviders = {};
+    
+    baseColumns.forEach(column => {
+      const cellType = column.cellType || column.type;
+      if (cellType?.startsWith('relationship') && column.relationshipTable && !providedProviders[column.id]) {
+        // Add entity type to column for filtering
+        const enhancedColumn = {
+          ...column,
+          relationshipEntityType: props.entityType
+        };
+        
+        console.log('🔍 VibeGridDex: Creating generic relationship provider', {
+          columnId: column.id,
+          relationshipTable: column.relationshipTable,
+          entityType: props.entityType,
+          cellType
+        });
+        
+        // Create a Dexie-based provider
+        autoRelationshipOptionsProviders[column.id] = createGenericRelationshipProvider(enhancedColumn, dexieEntityConfig.relationshipData);
+      }
+    });
+    
+    // Merge provided and auto-generated providers
+    const allRelationshipOptionsProviders = { ...autoRelationshipOptionsProviders, ...providedProviders };
+    
+    // Add options providers to columns
+    const columnsWithProviders = baseColumns.map(column => {
+      const provider = allRelationshipOptionsProviders[column.id];
+      if (provider) {
+        return { ...column, relationshipOptionsProvider: provider };
+      }
+      return column;
+    });
+    
+    return {
+      columns: columnsWithProviders,
+      data: dexieEntityConfig.data,
+      relationshipData: dexieEntityConfig.relationshipData,
+      relationshipResolvers: dexieEntityConfig.relationshipResolvers,
+      relationshipOptionsProviders: allRelationshipOptionsProviders,
+      onEntityUpdate: props.onEntityUpdate || dexieEntityConfig.onEntityUpdate  // Allow override
+    };
+  }, [dexieEntityConfig, props.columns, props.relationshipOptionsProviders, props.entityType, props.onEntityUpdate, props.initialData]);
   
-  // Extract configuration based on prop type
-  const columns = entityConfig?.columns || (!isEntityProps(props) ? props.columns : []);
-  const data = entityConfig?.data || (!isEntityProps(props) ? props.data : []);
-  const relationshipData = entityConfig?.relationshipData || (!isEntityProps(props) ? props.relationshipData : {}) || {};
-  const relationshipOptionsProviders = entityConfig?.relationshipOptionsProviders || (!isEntityProps(props) ? props.relationshipOptionsProviders : {}) || {};
-  const onEntityUpdate = entityConfig?.onEntityUpdate || (!isEntityProps(props) ? props.onEntityUpdate : undefined);
-  const relationshipResolvers = entityConfig?.relationshipResolvers || (!isEntityProps(props) ? props.relationshipResolvers : {}) || {};
+  // Extract configuration from entity config
+  const columns = entityConfig?.columns || [];
+  const data = entityConfig?.data || [];
+  const relationshipData = entityConfig?.relationshipData || {};
+  const relationshipOptionsProviders = entityConfig?.relationshipOptionsProviders || {};
+  const onEntityUpdate = entityConfig?.onEntityUpdate;
+  const relationshipResolvers = entityConfig?.relationshipResolvers || {};
   
   // Use data directly from Dexie live query
   const entities = data || [];
   
-  // For manual configuration, add providers to columns
-  const columnsWithProviders = useMemo(() => {
-    if (!isEntityProps(props) && relationshipOptionsProviders) {
-      return columns.map(column => {
-        const provider = relationshipOptionsProviders[column.id];
-        if (provider) {
-          return { ...column, relationshipOptionsProvider: provider };
-        }
-        return column;
-      });
-    }
-    return columns;
-  }, [columns, relationshipOptionsProviders, props]);
+  // Columns already have providers from entityConfig
+  const columnsWithProviders = columns;
   
   // Process data through syncViewProcessor for initial render
   const processedData = useMemo(() => {
+    // Debug: Check what we're receiving
+    console.log('VibeGridDex: processedData useMemo', {
+      propsInitialData: props.initialData,
+      hasPropsInitialData: !!props.initialData,
+      propsInitialDataType: typeof props.initialData,
+      propsInitialDataKeys: props.initialData ? Object.keys(props.initialData) : []
+    });
+    
     // If we have initialData from route loader, use that for first render
     if (props.initialData) {
       console.log('VibeGridDex: Using initialData from route loader', {
@@ -377,7 +352,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     return {
       input: {
         id: tableId,
-        entityType: entityType || 'unknown',
+        entityType: entityType,
         columns: columnsWithProviders,
         enableSelectionColumn: enableSelectionColumn,
         entities: entities,
@@ -406,7 +381,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     };
   }, [tableId, entityType, columns, enableSelectionColumn, data, relationshipData, relationshipResolvers, persistedData, props.initialData, processedData, onEntityUpdate, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width, entities]);
   
-  // Create table actor
+  // Create table actor with the machine config
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
   const tableSend = tableActor.send;
   
@@ -518,31 +493,24 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   // CONDITIONAL RENDERING - ALL HOOKS HAVE BEEN CALLED ABOVE
   // ====================================
 
-  console.log('VibeGridDex: dexieEntityConfig status', {
+  console.log('VibeGridDex: Configuration status', {
+    entityType,
     hasConfig: !!dexieEntityConfig,
-    dataCount: dexieEntityConfig?.data?.length || 0,
-    relationshipDataKeys: dexieEntityConfig ? Object.keys(dexieEntityConfig.relationshipData) : [],
-    hasRelationshipResolvers: !!(dexieEntityConfig?.relationshipResolvers),
-    resolverCount: dexieEntityConfig ? Object.keys(dexieEntityConfig.relationshipResolvers).length : 0
-  });
-
-  console.log('VibeGridDex: Configuration extracted', {
-    isEntityProps: isEntityProps(props),
-    hasEntityConfig: !!entityConfig,
-    columnCount: columns.length,
     dataCount: data.length,
-    relationshipResolverKeys: Object.keys(relationshipResolvers),
+    columnCount: columns.length,
+    usingManualColumns: !!props.columns,
     relationshipDataKeys: Object.keys(relationshipData),
-    sampleEntity: data[0],
-    resolverDetails: Object.entries(relationshipResolvers).map(([key, resolver]) => ({
-      key,
-      hasResolver: !!resolver,
-      resolverType: typeof resolver
-    }))
+    relationshipResolverKeys: Object.keys(relationshipResolvers),
+    sampleEntity: data[0]
   });
   
-  // If using entity config and it's not ready yet, show loading
-  if (isEntityProps(props) && !entityConfig) {
+  // Show loading if entity config is not ready yet or columns are empty
+  if (!entityConfig || columns.length === 0) {
+    console.log('VibeGridDex: Waiting for configuration', {
+      hasEntityConfig: !!entityConfig,
+      columnCount: columns.length,
+      dataCount: data.length
+    });
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         Loading configuration...
@@ -550,29 +518,6 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     );
   }
   
-  // Check if we have relationship data loaded
-  if (isEntityProps(props) && entityConfig) {
-    const hasRelationshipColumns = columns.some(col => {
-      const cellType = col.cellType || col.type;
-      return cellType?.startsWith('relationship');
-    });
-    
-    if (hasRelationshipColumns) {
-      // Check if users data is loaded (most common relationship)
-      const usersLoaded = relationshipData.users && Object.keys(relationshipData.users).length > 0;
-      if (!usersLoaded) {
-        console.log('VibeGridDex: Waiting for relationship data to load', {
-          relationshipDataKeys: Object.keys(relationshipData),
-          usersCount: relationshipData.users ? Object.keys(relationshipData.users).length : 0
-        });
-        return (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            Loading relationship data...
-          </div>
-        );
-      }
-    }
-  }
   
   // Validate required props - but allow rendering if we have initialData
   if (!data && !props.initialData) {

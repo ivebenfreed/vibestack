@@ -1,10 +1,35 @@
-import { useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useMemo, useState, useEffect } from 'react';
 import { db } from '@repo/dataforge/dexie-schema';
 import { getEntityConfig, type VibeGridXEntityType } from '@repo/dataforge/vibegridx-columns';
 import type { Column } from '../types';
 // Import Dexie domain UI operations that include sync tracking
 import { updateTaskUI, updateProjectUI, updateUserUI, updateCommentUI } from '@/domain-dexie';
+
+// Helper to get update function for entity type
+function getUpdateFunction(entityType: VibeGridXEntityType | null) {
+  return async (id: string, field: string, value: any) => {
+    const updates = { [field]: value };
+    
+    console.log('[useDexieEntityConfig] onEntityUpdate called', { id, field, value, entityType });
+    
+    switch (entityType) {
+      case 'task':
+        await updateTaskUI(id, updates);
+        break;
+      case 'project':
+        await updateProjectUI(id, updates);
+        break;
+      case 'user':
+        await updateUserUI(id, updates);
+        break;
+      case 'comment':
+        await updateCommentUI(id, updates);
+        break;
+      default:
+        console.warn(`[useDexieEntityConfig] No update handler for entity type: ${entityType}`);
+    }
+  };
+}
 
 interface DexieEntityConfig {
   data: any[];
@@ -14,83 +39,188 @@ interface DexieEntityConfig {
   onEntityUpdate: (id: string, field: string, value: any) => Promise<void>;
 }
 
+interface PreloadedData {
+  entities: any[];
+  relationshipData: Record<string, any>;
+}
+
 export function useDexieEntityConfig(
   entityType: VibeGridXEntityType | null,
-  selectedColumns?: string[]
+  selectedColumns?: string[],
+  preloadedData?: PreloadedData | null
 ): DexieEntityConfig | null {
   // Get entity configuration
   const config = useMemo(() => entityType ? getEntityConfig(entityType) : null, [entityType]);
   
-  // Use Dexie live queries for data - always call all hooks unconditionally
-  const tasks = useLiveQuery(() => db.tasks.toArray());
-  const projects = useLiveQuery(() => db.projects.toArray());
-  const users = useLiveQuery(() => db.users.toArray());
-  const comments = useLiveQuery(() => db.comments.toArray());
+  // If we have preloaded data, use it immediately
+  if (preloadedData && config) {
+    console.log('🚀 useDexieEntityConfig: Using preloaded data', {
+      entityCount: preloadedData.entities?.length || 0,
+      relationshipDataKeys: Object.keys(preloadedData.relationshipData || {}),
+      entityType
+    });
+    
+    return useMemo(() => {
+      const { entities, relationshipData } = preloadedData;
+      
+      // Filter columns if selectedColumns is provided
+      const columns = selectedColumns 
+        ? config.columns.filter(col => selectedColumns.includes(col.id))
+        : config.columns;
+      
+      // Create resolvers from preloaded data
+      const relationshipResolvers: Record<string, (id: string | string[]) => string> = {};
+      
+      columns.forEach(column => {
+        const cellType = column.cellType || column.type;
+        if (cellType?.startsWith('relationship') && column.relationshipTable) {
+          const displayField = column.relationshipDisplayField || 'name';
+          const tableData = relationshipData[column.relationshipTable] || {};
+          
+          relationshipResolvers[column.id] = (id: string | string[]) => {
+            if (Array.isArray(id)) {
+              return id.map(i => {
+                const entity = tableData[i];
+                return entity?.[displayField] || entity?.name || i;
+              }).join(', ');
+            }
+            const entity = tableData[id];
+            return entity?.[displayField] || entity?.name || id;
+          };
+        }
+      });
+      
+      // Get update function
+      const onEntityUpdate = getUpdateFunction(entityType);
+      
+      return {
+        data: entities,
+        columns,
+        relationshipData,
+        relationshipResolvers,
+        onEntityUpdate
+      };
+    }, [preloadedData, config, selectedColumns, entityType]);
+  }
   
-  // Get primary data based on entity type
-  const data = useMemo(() => {
-    if (!entityType) return [];
-    switch (entityType) {
-      case 'task': return tasks || [];
-      case 'project': return projects || [];
-      case 'user': return users || [];
-      case 'comment': return comments || [];
-      default: return [];
+  // State for all data - loaded once on mount
+  const [data, setData] = useState<any[]>([]);
+  const [relationshipDataState, setRelationshipDataState] = useState<{
+    statusDefinitions: any[],
+    statusSets: any[],
+    tags: any[],
+    tagSets: any[],
+    users: any[],
+    projects: any[]
+  }>({ statusDefinitions: [], statusSets: [], tags: [], tagSets: [], users: [], projects: [] });
+  
+  // Load all data once on mount - no live queries!
+  useEffect(() => {
+    // Skip loading if we have preloaded data
+    if (preloadedData) {
+      return;
     }
-  }, [entityType, tasks, projects, users, comments]);
+    
+    const loadAllData = async () => {
+      try {
+        // Load entity data
+        let entityData: any[] = [];
+        if (entityType) {
+          switch (entityType) {
+            case 'task':
+              entityData = await db.tasks.toArray();
+              break;
+            case 'project':
+              entityData = await db.projects.toArray();
+              break;
+            case 'user':
+              entityData = await db.users.toArray();
+              break;
+            case 'comment':
+              entityData = await db.comments.toArray();
+              break;
+          }
+        }
+        
+        // Load all relationship data in parallel
+        const [statusDefs, statusSets, tags, tagSets, users, projects] = await Promise.all([
+          db.status_definitions.toArray(),
+          db.status_sets.toArray(),
+          db.tags.toArray(),
+          db.tag_sets.toArray(),
+          db.users.toArray(),
+          db.projects.toArray()
+        ]);
+        
+        console.log('🔍 useDexieEntityConfig: All initial data loaded', {
+          entityType,
+          entityCount: entityData.length,
+          usersCount: users.length,
+          projectsCount: projects.length,
+          statusDefsCount: statusDefs.length
+        });
+        
+        setData(entityData);
+        setRelationshipDataState({
+          statusDefinitions: statusDefs,
+          statusSets,
+          tags,
+          tagSets,
+          users,
+          projects
+        });
+      } catch (error) {
+        console.error('🔍 useDexieEntityConfig: Error loading data', error);
+      }
+    };
+    
+    loadAllData();
+  }, [entityType, preloadedData]);
   
-  // Load relationship data - always call all hooks
-  const statusDefinitions = useLiveQuery(() => db.status_definitions.toArray());
-  const statusSets = useLiveQuery(() => db.status_sets.toArray());
-  const tags = useLiveQuery(() => db.tags.toArray());
-  const tagSets = useLiveQuery(() => db.tag_sets.toArray());
-  const allUsers = useLiveQuery(() => db.users.toArray());
-  const allProjects = useLiveQuery(() => db.projects.toArray());
-  
-  // Build relationship data map
+  // Build relationship data map from loaded state
   const relationshipData = useMemo(() => {
     const data: Record<string, any> = {};
     
     console.log('🔍 useDexieEntityConfig: Building relationship data', {
-      hasStatusDefs: !!statusDefinitions,
-      statusDefCount: statusDefinitions?.length || 0,
-      hasUsers: !!allUsers,
-      userCount: allUsers?.length || 0,
-      hasProjects: !!allProjects,
-      projectCount: allProjects?.length || 0
+      hasStatusDefs: relationshipDataState.statusDefinitions.length > 0,
+      statusDefCount: relationshipDataState.statusDefinitions.length,
+      hasUsers: relationshipDataState.users.length > 0,
+      userCount: relationshipDataState.users.length,
+      hasProjects: relationshipDataState.projects.length > 0,
+      projectCount: relationshipDataState.projects.length
     });
     
     // Convert arrays to id-keyed objects for fast lookup
-    if (statusDefinitions) {
-      data.statusDefinitions = statusDefinitions.reduce((acc, item) => {
+    if (relationshipDataState.statusDefinitions.length > 0) {
+      data.statusDefinitions = relationshipDataState.statusDefinitions.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
     }
     
-    if (statusSets) {
-      data.statusSets = statusSets.reduce((acc, item) => {
+    if (relationshipDataState.statusSets.length > 0) {
+      data.statusSets = relationshipDataState.statusSets.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
     }
     
-    if (tags) {
-      data.tags = tags.reduce((acc, item) => {
+    if (relationshipDataState.tags.length > 0) {
+      data.tags = relationshipDataState.tags.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
     }
     
-    if (tagSets) {
-      data.tagSets = tagSets.reduce((acc, item) => {
+    if (relationshipDataState.tagSets.length > 0) {
+      data.tagSets = relationshipDataState.tagSets.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
     }
     
-    if (allUsers) {
-      const usersMap = allUsers.reduce((acc, item) => {
+    if (relationshipDataState.users.length > 0) {
+      const usersMap = relationshipDataState.users.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
@@ -103,8 +233,8 @@ export function useDexieEntityConfig(
       data.author = usersMap;
     }
     
-    if (allProjects) {
-      const projectsMap = allProjects.reduce((acc, item) => {
+    if (relationshipDataState.projects.length > 0) {
+      const projectsMap = relationshipDataState.projects.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
@@ -114,8 +244,8 @@ export function useDexieEntityConfig(
       data.project = projectsMap;
     }
     
-    if (statusDefinitions) {
-      const statusMap = statusDefinitions.reduce((acc, item) => {
+    if (relationshipDataState.statusDefinitions.length > 0) {
+      const statusMap = relationshipDataState.statusDefinitions.reduce((acc, item) => {
         acc[item.id] = item;
         return acc;
       }, {} as Record<string, any>);
@@ -128,7 +258,7 @@ export function useDexieEntityConfig(
     }
     
     return data;
-  }, [statusDefinitions, statusSets, tags, tagSets, allUsers, allProjects]);
+  }, [relationshipDataState]);
   
   // Build configuration
   const result = useMemo(() => {
@@ -139,19 +269,14 @@ export function useDexieEntityConfig(
       return null;
     }
     
-    // Wait for relationship data to load if we have relationship columns
+    // Check if data is loaded
     const hasRelationshipColumns = config.columns.some(col => {
       const cellType = col.cellType || col.type;
       return cellType?.startsWith('relationship');
     });
     
-    if (hasRelationshipColumns && (!allUsers || !allProjects)) {
-      console.log('🔍 useDexieEntityConfig: Waiting for relationship data to load', {
-        hasUsers: !!allUsers,
-        hasProjects: !!allProjects
-      });
-      return null;
-    }
+    // Always return columns immediately - don't wait for relationship data
+    // The loader pattern handles initial resolution
     
     // Filter columns if selectedColumns is provided
     let columns = config.columns;
@@ -168,116 +293,95 @@ export function useDexieEntityConfig(
     const relationshipResolvers: Record<string, (id: string | string[]) => string> = {};
     
     columns.forEach(column => {
-      const cellType = column.cellType || column.type;
-      if (cellType?.startsWith('relationship') && column.relationshipTable) {
-        const tableKey = column.relationshipTable;
-        const displayField = column.relationshipDisplayField;
-        
-        console.log('🔍 useDexieEntityConfig: Creating resolver for column', {
-          columnId: column.id,
-          field: column.field,
-          cellType,
-          relationshipTable: tableKey,
-          displayField,
-          availableDataKeys: Object.keys(relationshipData)
-        });
-        
-        // Create resolver that reads from relationshipData
-        relationshipResolvers[column.id] = (id: string | string[]) => {
-          // Find the right data source
-          const dataSource = relationshipData[tableKey] || 
-                            relationshipData[`${tableKey}s`] || 
-                            relationshipData[tableKey.replace(/s$/, '')] ||
-                            relationshipData[`${tableKey.replace(/s$/, '')}s`] ||
-                            {};
+        const cellType = column.cellType || column.type;
+        if (cellType?.startsWith('relationship') && column.relationshipTable) {
+          const tableKey = column.relationshipTable;
+          const displayField = column.relationshipDisplayField;
           
-          console.log('🔍 useDexieEntityConfig: Resolver called', {
+          console.log('🔍 useDexieEntityConfig: Creating resolver for column', {
             columnId: column.id,
-            id,
-            tableKey,
-            dataSourceFound: Object.keys(dataSource).length > 0,
-            dataSourceSample: Object.values(dataSource)[0]
+            field: column.field,
+            cellType,
+            relationshipTable: tableKey,
+            displayField,
+            availableDataKeys: Object.keys(relationshipData)
           });
           
-          if (Array.isArray(id)) {
-            const names = id.map(i => {
-              const entity = dataSource[i];
-              if (!entity) return i;
-              
-              return entity[displayField || 'displayName'] || 
-                     entity.displayName || 
-                     entity.name || 
-                     entity.title || 
-                     entity.label ||
-                     i;
-            });
-            return names.join(', ');
-          }
-          
-          const entity = dataSource[id];
-          if (!entity) {
-            // Check if we have any data at all
-            const hasAnyData = Object.keys(dataSource).length > 0;
-            if (!hasAnyData) {
-              console.warn('🔍 useDexieEntityConfig: No relationship data loaded yet', {
-                columnId: column.id,
-                tableKey,
-                id
-              });
-              // Return a placeholder that indicates loading
-              return `Loading...`;
-            }
+          // Create resolver that reads from relationshipData
+          relationshipResolvers[column.id] = (id: string | string[]) => {
+            // Find the right data source
+            const dataSource = relationshipData[tableKey] || 
+                              relationshipData[`${tableKey}s`] || 
+                              relationshipData[tableKey.replace(/s$/, '')] ||
+                              relationshipData[`${tableKey.replace(/s$/, '')}s`] ||
+                              {};
             
-            console.warn('🔍 useDexieEntityConfig: Entity not found', {
+            console.log('🔍 useDexieEntityConfig: Resolver called', {
               columnId: column.id,
               id,
               tableKey,
-              availableIds: Object.keys(dataSource).slice(0, 5)
+              dataSourceFound: Object.keys(dataSource).length > 0,
+              dataSourceSample: Object.values(dataSource)[0]
             });
-            return id;
-          }
-          
-          const resolved = entity[displayField || 'displayName'] || 
-                 entity.displayName || 
-                 entity.name || 
-                 entity.title || 
-                 entity.label ||
-                 id;
-                 
-          console.log('🔍 useDexieEntityConfig: Resolved', {
-            columnId: column.id,
-            id,
-            resolved
-          });
-          
-          return resolved;
-        };
-      }
-    });
+            
+            if (Array.isArray(id)) {
+              const names = id.map(i => {
+                const entity = dataSource[i];
+                if (!entity) return i;
+                
+                return entity[displayField || 'displayName'] || 
+                       entity.displayName || 
+                       entity.name || 
+                       entity.title || 
+                       entity.label ||
+                       i;
+              });
+              return names.join(', ');
+            }
+            
+            const entity = dataSource[id];
+            if (!entity) {
+              // Check if we have any data at all
+              const hasAnyData = Object.keys(dataSource).length > 0;
+              if (!hasAnyData) {
+                console.warn('🔍 useDexieEntityConfig: No relationship data loaded yet', {
+                  columnId: column.id,
+                  tableKey,
+                  id
+                });
+                // Return a placeholder that indicates loading
+                return `Loading...`;
+              }
+              
+              console.warn('🔍 useDexieEntityConfig: Entity not found', {
+                columnId: column.id,
+                id,
+                tableKey,
+                availableIds: Object.keys(dataSource).slice(0, 5)
+              });
+              return id;
+            }
+            
+            const resolved = entity[displayField || 'displayName'] || 
+                   entity.displayName || 
+                   entity.name || 
+                   entity.title || 
+                   entity.label ||
+                   id;
+                   
+            console.log('🔍 useDexieEntityConfig: Resolved', {
+              columnId: column.id,
+              id,
+              resolved
+            });
+            
+            return resolved;
+          };
+        }
+      });
     
     // Get update function that includes sync tracking
-    const onEntityUpdate = async (id: string, field: string, value: any) => {
-      const updates = { [field]: value };
-      
-      console.log('[useDexieEntityConfig] onEntityUpdate called', { id, field, value, entityType });
-      
-      switch (entityType) {
-        case 'task':
-          await updateTaskUI(id, updates);
-          break;
-        case 'project':
-          await updateProjectUI(id, updates);
-          break;
-        case 'user':
-          await updateUserUI(id, updates);
-          break;
-        case 'comment':
-          await updateCommentUI(id, updates);
-          break;
-        default:
-          console.warn(`[useDexieEntityConfig] No update handler for entity type: ${entityType}`);
-      }
-    };
+    const onEntityUpdate = getUpdateFunction(entityType);
     
     return {
       data,
