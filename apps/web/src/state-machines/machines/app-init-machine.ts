@@ -1,6 +1,6 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
-import { liveChangesMachine } from './live-changes-machine';
+// import { liveChangesMachine } from './live-changes-machine'; // DISABLED - TypeORM removal
 import { getDomainEntityNames } from '@/lib/entity-registry';
 
 export interface AppInitContext {
@@ -80,7 +80,7 @@ export const appInitMachine = setup({
   
   actors: {
     waitForDatabase: waitForDatabaseActor,
-    liveChangesMachine,
+    // liveChangesMachine, // DISABLED - TypeORM removal
   },
   
   actions: {
@@ -147,10 +147,14 @@ export const appInitMachine = setup({
       }
     },
     
-    startLiveChanges: sendTo('liveChangesMachine', {
-      type: 'START',
-      entities: getDomainEntityNames()
-    }),
+    // DISABLED - TypeORM removal
+    // startLiveChanges: sendTo('liveChangesMachine', {
+    //   type: 'START',
+    //   entities: getDomainEntityNames()
+    // }),
+    startLiveChanges: () => {
+      console.log('[AppInitMachine] Skipping live changes - TypeORM disabled');
+    },
   },
 }).createMachine({
   id: 'appInitMachine',
@@ -170,20 +174,21 @@ export const appInitMachine = setup({
     lastActivity: Date.now(),
   }),
   
+  // DISABLED - TypeORM removal
   // Invoke child machines at root level to persist across state transitions
-  invoke: [
-    {
-      id: 'liveChangesMachine',
-      src: 'liveChangesMachine',
-      // Receive events directly from live changes machine
-      onDone: {
-        actions: () => console.log('[AppInitMachine] Live changes machine completed')
-      },
-      onError: {
-        actions: () => console.log('[AppInitMachine] Live changes machine error')
-      }
-    }
-  ],
+  // invoke: [
+  //   {
+  //     id: 'liveChangesMachine',
+  //     src: 'liveChangesMachine',
+  //     // Receive events directly from live changes machine
+  //     onDone: {
+  //       actions: () => console.log('[AppInitMachine] Live changes machine completed')
+  //     },
+  //     onError: {
+  //       actions: () => console.log('[AppInitMachine] Live changes machine error')
+  //     }
+  //   }
+  // ],
   
   on: {
     CONNECTION_ONLINE: {
@@ -251,10 +256,12 @@ export const appInitMachine = setup({
       
       on: {
         SYNC_LIVE: {
-          target: 'live_changes',
+          // Skip live_changes state (TypeORM disabled) and go directly to ready
+          target: 'ready',
           actions: [
             'markSyncReady',
-            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine')
+            'markSystemReady',
+            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine - skipping live changes (TypeORM disabled)')
           ]
         },
         SYNC_ERROR: {

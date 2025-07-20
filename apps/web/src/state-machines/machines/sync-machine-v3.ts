@@ -423,18 +423,17 @@ export const syncMachineV3 = setup({
         });
     },
     
-    // Delegate integrity validation to child integrity machine
-    delegateIntegrityValidation: sendTo('integrityMachine', ({ event }) => ({
-      type: 'VALIDATE',
-      reason: (event as any).reason || 'sync_requested_validation'
-    })),
+    // DISABLED: Integrity operations - will refactor for Dexie
+    // delegateIntegrityValidation: sendTo('integrityMachine', ({ event }) => ({
+    //   type: 'VALIDATE',
+    //   reason: (event as any).reason || 'sync_requested_validation'
+    // })),
     
-    // Delegate integrity reset to child integrity machine
-    delegateIntegrityReset: sendTo('integrityMachine', ({ event }) => ({
-      type: 'RESET',
-      reason: (event as any).reason || 'sync_requested_reset',
-      resetType: (event as any).resetType || 'full_reset'
-    }))
+    // delegateIntegrityReset: sendTo('integrityMachine', ({ event }) => ({
+    //   type: 'RESET',
+    //   reason: (event as any).reason || 'sync_requested_reset',
+    //   resetType: (event as any).resetType || 'full_reset'
+    // }))
   }
 }).createMachine({
   id: 'syncMachineV3',
@@ -494,15 +493,15 @@ export const syncMachineV3 = setup({
     };
   },
   
-  // Invoke integrity machine as child actor for validation and reset operations
-  invoke: {
-    id: 'integrityMachine',
-    src: 'integrityMachine',
-    input: ({ context }) => ({
-      serviceCoordinator: context.serviceCoordinator,
-      clientId: context.clientId
-    })
-  },
+  // DISABLED: Integrity machine - will refactor for Dexie
+  // invoke: {
+  //   id: 'integrityMachine',
+  //   src: 'integrityMachine',
+  //   input: ({ context }) => ({
+  //     serviceCoordinator: context.serviceCoordinator,
+  //     clientId: context.clientId
+  //   })
+  // },
   
   states: {
     idle: {
@@ -669,9 +668,15 @@ export const syncMachineV3 = setup({
         
         // Handle sync completion events that come directly (sync already done)
         INITIAL_SYNC_COMPLETE: {
-          target: 'establishing_baseline',
+          // DISABLED: Skip baseline establishment until Dexie refactor
+          target: 'live_sync',
           actions: [
-            () => console.log('[SyncMachineV3] ✅ Server says initial sync already completed - establishing baseline')
+            assign({ 
+              syncPhase: 'live' as const
+            }),
+            'notifyParentLive',
+            'saveOwnState',
+            () => console.log('[SyncMachineV3] ✅ Server says initial sync already completed - skipping baseline (IntegrityService disabled)')
           ]
         },
         
@@ -714,9 +719,15 @@ export const syncMachineV3 = setup({
         },
         
         INITIAL_SYNC_COMPLETE: {
-          target: 'establishing_baseline',
+          // DISABLED: Skip baseline establishment until Dexie refactor
+          target: 'live_sync',
           actions: [
-            () => console.log('[SyncMachineV3] ✅ Initial sync completed - establishing baseline')
+            assign({ 
+              syncPhase: 'live' as const
+            }),
+            'notifyParentLive',
+            'saveOwnState',
+            () => console.log('[SyncMachineV3] ✅ Initial sync completed - skipping baseline (IntegrityService disabled)')
           ]
         },
         
@@ -798,38 +809,39 @@ export const syncMachineV3 = setup({
       }
     },
     
-    establishing_baseline: {
-      entry: [
-        () => syncLogger.stateEntry('establishing_baseline', 'Establishing integrity baseline after initial sync'),
-        () => {
-          console.log('[SyncMachineV3] 🔇 Keeping change tracking disabled during baseline establishment');
-          // Keep tracking disabled during baseline establishment
-        }
-      ],
-      
-      invoke: {
-        src: 'establishBaseline',
-        input: ({ context }) => ({
-          serviceCoordinator: context.serviceCoordinator!,
-          clientId: context.clientId
-        }),
-        onDone: {
-          target: 'live_sync',
-          actions: [
-            assign({ 
-              syncPhase: 'live' as const
-            }),
-            'notifyParentLive',
-            'saveOwnState',
-            () => console.log('[SyncMachineV3] ✅ Baseline established - sent SYNC_LIVE to parent')
-          ]
-        },
-        onError: {
-          target: 'error',
-          actions: 'recordError'
-        }
-      }
-    },
+    // DISABLED: IntegrityService baseline establishment - will refactor for Dexie
+    // establishing_baseline: {
+    //   entry: [
+    //     () => syncLogger.stateEntry('establishing_baseline', 'Establishing integrity baseline after initial sync'),
+    //     () => {
+    //       console.log('[SyncMachineV3] 🔇 Keeping change tracking disabled during baseline establishment');
+    //       // Keep tracking disabled during baseline establishment
+    //     }
+    //   ],
+    //   
+    //   invoke: {
+    //     src: 'establishBaseline',
+    //     input: ({ context }) => ({
+    //       serviceCoordinator: context.serviceCoordinator!,
+    //       clientId: context.clientId
+    //     }),
+    //     onDone: {
+    //       target: 'live_sync',
+    //       actions: [
+    //         assign({ 
+    //           syncPhase: 'live' as const
+    //         }),
+    //         'notifyParentLive',
+    //         'saveOwnState',
+    //         () => console.log('[SyncMachineV3] ✅ Baseline established - sent SYNC_LIVE to parent')
+    //       ]
+    //     },
+    //     onError: {
+    //       target: 'error',
+    //       actions: 'recordError'
+    //     }
+    //   }
+    // },
     
     pre_live_validation: {
       entry: [
@@ -977,14 +989,14 @@ export const syncMachineV3 = setup({
           ]
         },
         
-        // Delegate integrity operations to child integrity machine
-        INTEGRITY_VALIDATE: {
-          actions: 'delegateIntegrityValidation'
-        },
+        // DISABLED: Integrity operations - will refactor for Dexie
+        // INTEGRITY_VALIDATE: {
+        //   actions: 'delegateIntegrityValidation'
+        // },
         
-        INTEGRITY_RESET_REQUIRED: {
-          actions: 'delegateIntegrityReset'
-        },
+        // INTEGRITY_RESET_REQUIRED: {
+        //   actions: 'delegateIntegrityReset'
+        // },
         
         OUTGOING_CHANGES_QUEUED: {
           actions: [

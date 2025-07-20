@@ -5,7 +5,7 @@
  * backward compatibility while the codebase transitions to the new 3-path architecture.
  */
 
-import { getNewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
+// import { getNewPGliteDataSource } from '../db/newtypeorm/NewDataSource'; // DISABLED - TypeORM removal
 
 /**
  * Stub implementation of createAllDomains for backward compatibility

@@ -176,25 +176,26 @@ export class MessageProcessor {
     services: MessageProcessorServices,
     sendEvent: (event: any) => void
   ): void {
-    console.log(`[MessageProcessor] 🔍 Routing integrity validation response to IntegrityService`);
+    console.log(`[MessageProcessor] 🔍 Skipping integrity validation - TypeORM services disabled`);
     
-    try {
-      services.integrity.handleValidationResponse(message).then((result: any) => {
-        console.log(`[MessageProcessor] ✅ Integrity validation response processed:`, {
-          isValid: result.isValid,
-          issueCount: result.issues.length,
-          recommendedAction: result.recommendedAction
-        });
-      }).catch((error: any) => {
-        console.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
-        syncLogger.serviceError('IntegrityService', error as Error, 'validation response routing');
-        sendEvent({ type: 'SERVICE_ERROR', service: 'integrity', error: error as Error });
-      });
-    } catch (error) {
-      console.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
-      syncLogger.serviceError('IntegrityService', error as Error, 'validation response routing');
-      sendEvent({ type: 'SERVICE_ERROR', service: 'integrity', error: error as Error });
-    }
+    // DISABLED: IntegrityService calls - TypeORM removal
+    // try {
+    //   services.integrity.handleValidationResponse(message).then((result: any) => {
+    //     console.log(`[MessageProcessor] ✅ Integrity validation response processed:`, {
+    //       isValid: result.isValid,
+    //       issueCount: result.issues.length,
+    //       recommendedAction: result.recommendedAction
+    //     });
+    //   }).catch((error: any) => {
+    //     console.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
+    //     syncLogger.serviceError('IntegrityService', error as Error, 'validation response routing');
+    //     sendEvent({ type: 'SERVICE_ERROR', service: 'integrity', error: error as Error });
+    //   });
+    // } catch (error) {
+    //   console.error(`[MessageProcessor] ❌ Error handling validation response:`, error);
+    //   syncLogger.serviceError('IntegrityService', error as Error, 'validation response routing');
+    //   sendEvent({ type: 'SERVICE_ERROR', service: 'integrity', error: error as Error });
+    // }
   }
 
   /**
@@ -205,17 +206,19 @@ export class MessageProcessor {
     services: MessageProcessorServices,
     sendEvent: (event: any) => void
   ): void {
-    console.log(`[MessageProcessor] 🚨 Received server-initiated integrity reset command`);
+    console.log(`[MessageProcessor] 🚨 Skipping integrity reset - TypeORM services disabled`);
     
-    try {
-      services.integrity.handleServerResetCommand(message);
-    } catch (error) {
-      syncLogger.serviceError('IntegrityService', error as Error, 'server reset command routing');
-    }
+    // DISABLED: IntegrityService calls - TypeORM removal
+    // try {
+    //   services.integrity.handleServerResetCommand(message);
+    // } catch (error) {
+    //   syncLogger.serviceError('IntegrityService', error as Error, 'server reset command routing');
+    // }
     
+    // Still send the event to notify the state machine
     sendEvent({ 
       type: 'INTEGRITY_RESET_REQUIRED', 
-      reason: message.reason || 'Server-initiated reset'
+      reason: message.reason || 'Server-initiated reset (TypeORM disabled)'
     });
   }
 

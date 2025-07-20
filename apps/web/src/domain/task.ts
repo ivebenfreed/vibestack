@@ -227,14 +227,18 @@ export const taskUtils = {
   clearTasks: () => tasksAtom.set({}),
   
   ensureLoaded: async () => {
-    if (Object.keys(tasksAtom.get()).length === 0) {
-      const { getGlobalDataSource } = await import('@/db/global-datasource');
-      const dataSource = await getGlobalDataSource();
-      const tasks = await dataSource.getRepository(Task).find({
-        relations: ['project', 'assignee']
-      });
-      taskUtils.loadTasks(tasks);
-    }
+    // DISABLED: TypeORM removal - data is now loaded via Dexie
+    // if (Object.keys(tasksAtom.get()).length === 0) {
+    //   const { getGlobalDataSource } = await import('@/db/global-datasource');
+    //   const dataSource = await getGlobalDataSource();
+    //   const tasks = await dataSource.getRepository(Task).find({
+    //     relations: ['project', 'assignee']
+    //   });
+    //   taskUtils.loadTasks(tasks);
+    // }
+    
+    // With Dexie, data should already be loaded through sync
+    console.log('[TaskUtils] ensureLoaded called - TypeORM disabled, using existing atom data');
   }
 };
 
@@ -244,14 +248,15 @@ export const taskUtils = {
 
 // Helper to get dependencies for DataForge operations
 export async function getTaskDependencies() {
-  const { getGlobalDataSource } = await import('@/db/global-datasource');
+  // DISABLED: TypeORM removal - preventing PGLite initialization
+  // const { getGlobalDataSource } = await import('@/db/global-datasource');
   const { getGlobalServicesV3 } = await import('@/state-machines/machines/sync-machine-v3');
   
-  const dataSource = await getGlobalDataSource();
+  // const dataSource = await getGlobalDataSource();
   const services = getGlobalServicesV3();
   
   return {
-    dataSource,
+    dataSource: null, // TypeORM disabled
     EntityClass: Task,
     atomActions,
     // Use dexieOutgoing for manual change tracking
@@ -267,12 +272,13 @@ export async function bulkCreateTasksIncoming(tasksData: Task[]): Promise<Task[]
   const startTime = Date.now();
   
   try {
-    const { getGlobalDataSource } = await import('@/db/global-datasource');
-    const dataSource = await getGlobalDataSource();
+    // DISABLED: TypeORM removal
+    // const { getGlobalDataSource } = await import('@/db/global-datasource');
+    // const dataSource = await getGlobalDataSource();
     
     // Apply to database
-    const taskRepo = dataSource.getRepository(Task);
-    const result = await taskRepo.insert(tasksData);
+    // const taskRepo = dataSource.getRepository(Task);
+    // const result = await taskRepo.insert(tasksData);
     
     // Update atoms in batch
     const currentTasks = tasksAtom.get();

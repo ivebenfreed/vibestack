@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-
 import { useEffect } from 'react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
-import SkipToMain from '@/components/skip-to-main'
+// import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { projectUtils } from '@/domain/project'
 import { taskUtils } from '@/domain/task'
 import { userUtils } from '@/domain/user'
@@ -159,7 +159,7 @@ function RouteComponent() {
 function AuthenticatedContent() {
   return (
     <>
-      <SkipToMain />
+      {/* <SkipToMain /> - Disabled: phantom component issue */}
       <UnifiedLayout />
     </>
   )

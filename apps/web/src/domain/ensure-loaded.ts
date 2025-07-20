@@ -5,7 +5,7 @@
  * from the database, with minimal overhead and maximum parallelization.
  */
 
-import { getGlobalDataSource } from '@/db/global-datasource';
+// import { getGlobalDataSource } from '@/db/global-datasource'; // DISABLED - TypeORM removal
 import { DOMAIN_REGISTRY, getDomainAtom, type DomainKey } from './registry';
 
 // ⚡ PERFORMANCE: Cached loaded state to avoid expensive atom reads

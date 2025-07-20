@@ -108,18 +108,8 @@ export const syncActors = {
     
     // Step 1: Check and send pending outgoing changes
     try {
-      // Handle both old TypeORM system and new Dexie system
-      if (services.outgoing) {
-        // Old system
-        const pendingCount = services.outgoing.getPendingChangesCount();
-        if (pendingCount > 0) {
-          syncLogger.info('validation', `Sending ${pendingCount} pending outgoing changes`);
-          await services.outgoing.sendQueuedChanges();
-          syncLogger.info('validation', 'Pending changes sent successfully');
-        } else {
-          syncLogger.info('validation', 'No pending outgoing changes to send');
-        }
-      } else if (services.dexieOutgoing) {
+      // Only use Dexie system now (TypeORM services disabled)
+      if (services.dexieOutgoing) {
         // Dexie system - Skip processing during pre-live validation
         // Changes will be processed after transitioning to live mode
         const status = await services.dexieOutgoing.getStatus();
@@ -132,41 +122,12 @@ export const syncActors = {
         syncLogger.warn('validation', 'No outgoing change service available');
       }
     } catch (error) {
-      syncLogger.serviceError('OutgoingChanges', error as Error, 'pre-live validation');
-      throw new Error(`Failed to send pending changes: ${error}`);
+      syncLogger.serviceError('DexieOutgoingChanges', error as Error, 'pre-live validation');
+      throw new Error(`Failed to check pending changes: ${error}`);
     }
     
-    // Step 2: Run integrity validation
-    try {
-      syncLogger.info('validation', 'Running integrity validation...');
-      const integrityResult = await services.integrity.validateIntegrity('pre-live-sync-check');
-      
-      if (!integrityResult.isValid) {
-        const issueCount = integrityResult.issues?.length || 0;
-        const action = integrityResult.recommendedAction;
-        
-        if (action === 'none') {
-          // Minor issues that don't require action - log warning but continue
-          syncLogger.warn('validation', `Integrity validation found ${issueCount} minor issues but recommends no action - continuing`, {
-            issues: issueCount,
-            recommendedAction: action
-          });
-        } else {
-          // Critical issues that require action - fail validation
-          const errorMsg = `Integrity validation failed with critical issues: ${action} recommended`;
-          syncLogger.warn('validation', errorMsg, {
-            issues: issueCount,
-            recommendedAction: action
-          });
-          throw new Error(errorMsg);
-        }
-      }
-      
-      syncLogger.info('validation', 'Integrity validation passed');
-    } catch (error) {
-      syncLogger.serviceError('IntegrityService', error as Error, 'pre-live validation');
-      throw error;
-    }
+    // Step 2: Skip integrity validation (TypeORM service disabled)
+    syncLogger.info('validation', 'Skipping integrity validation - TypeORM services disabled');
     
     syncLogger.info('validation', 'Pre-live validation completed successfully');
     return { success: true };

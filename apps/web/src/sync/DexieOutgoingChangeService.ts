@@ -173,9 +173,13 @@ export class DexieOutgoingChangeService {
             const success = await this.callbacks.onSendRequest(tableChanges);
             
             if (success) {
-              // Mark changes as processed
+              // Don't mark as processed yet - wait for server acknowledgment
               const changeIds = optimizedChanges.map(c => c.id);
-              await markChangesAsProcessed(changeIds);
+              
+              // Map record IDs to change IDs for acknowledgment tracking
+              optimizedChanges.forEach(change => {
+                this.recordToChangeIdMap.set(change.recordId, change.id);
+              });
               
               // Track sent changes for retry logic
               const now = Date.now();
@@ -299,6 +303,16 @@ export class DexieOutgoingChangeService {
       // Clean up the map for processed records
       processedRecordIds.forEach(recordId => {
         this.recordToChangeIdMap.delete(recordId);
+      });
+      
+      // Remove these changes from sentChanges map to prevent timeout/retry
+      const changeIdSet = new Set(changeIds);
+      this.sentChanges.forEach((info, messageId) => {
+        // Check if all changes in this message have been acknowledged
+        if (info.changeIds.every(id => changeIdSet.has(id))) {
+          console.log(`[DexieOutgoingChangeService] Removing acknowledged message ${messageId} from retry queue`);
+          this.sentChanges.delete(messageId);
+        }
       });
       
       // If map is getting too large, clean up old entries
