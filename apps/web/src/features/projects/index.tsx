@@ -20,9 +20,9 @@ const Projects: React.FC = () => {
     { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 150,
       options: [
         { value: 'active', label: 'Active' },
-        { value: 'on_hold', label: 'On Hold' },
+        { value: 'in_progress', label: 'In Progress' },
         { value: 'completed', label: 'Completed' },
-        { value: 'cancelled', label: 'Cancelled' }
+        { value: 'on_hold', label: 'On Hold' }
       ]
     },
     { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 120,
