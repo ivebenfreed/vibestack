@@ -542,18 +542,32 @@ export const tableBaseMachine = setup({
                 ({ context, event, self }) => {
                   console.log('TableMachine: DATA_CHANGES - processing updates', {
                     changeCount: event.changes.length,
-                    sortedBy: context.sortBy?.map(s => s.columnId),
+                    sortedBy: context.sortBy?.map(s => s.field),
                     hasSortConfig: context.sortBy?.length > 0
                   });
                   
                   // Check if any changes affect sorted columns
                   const affectsSortedColumn = event.changes.some(change => {
-                    if (change.operation !== 'update' || !change.changedFields) {
+                    if (change.operation !== 'update') {
                       return false;
                     }
+                    
+                    console.log('TableMachine: Checking sort impact for change', {
+                      changeId: change.id,
+                      changedFields: change.changedFields,
+                      hasChangedFields: !!change.changedFields,
+                      sortedColumns: context.sortBy?.map(s => s.field) || []
+                    });
+                    
+                    // If no changedFields provided, we can't determine impact
+                    if (!change.changedFields || change.changedFields.length === 0) {
+                      console.warn('TableMachine: No changedFields provided, assuming sort might be affected');
+                      return true; // Conservative: assume sort is affected
+                    }
+                    
                     // Check if any changed field is a sorted column
                     return context.sortBy?.some(sort => 
-                      change.changedFields.includes(sort.columnId)
+                      change.changedFields.includes(sort.field)
                     );
                   });
                   

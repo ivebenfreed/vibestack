@@ -155,7 +155,13 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
               console.log('📊 DataSubscriptionActor: Detected changes for table:', tableKey, {
                 changesCount: changes.length,
                 changeTypes: changes.map(c => `${c.operation}:${c.id}`),
-                totalEntities: latestData.length
+                totalEntities: latestData.length,
+                firstChange: changes[0] ? {
+                  id: changes[0].id,
+                  operation: changes[0].operation,
+                  changedFields: changes[0].changedFields,
+                  hasChangedFields: 'changedFields' in changes[0]
+                } : null
               });
               
               // Send targeted changes event
