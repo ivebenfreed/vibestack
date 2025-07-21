@@ -179,6 +179,7 @@ export function UnifiedLayout({ children }: UnifiedLayoutProps) {
                 {/* Right side buttons - compact on mobile */}
                 <div className="flex items-center gap-0">
                   <ThemeSwitch />
+                  <SyncStatusIcon />
                   <ProfileDropdown />
                 </div>
               </div>
