@@ -11,7 +11,8 @@ import { TableChange } from '@repo/sync-types';
 import { 
   getPendingChangeCount,
   trackOutgoingChange,
-  clearProcessedChanges
+  clearProcessedChanges,
+  setChangeProcessor
 } from '../db/dexie-change-tracking';
 import { db } from '@repo/dataforge/dexie-schema';
 import type { LocalChanges } from '@repo/dataforge/client-entities';
@@ -38,6 +39,7 @@ export class DexieOutgoingChangeService {
   private callbacks: DexieOutgoingChangeServiceCallbacks = {};
   private isProcessing = false;
   private instanceId: string;
+  private inFlightChangeIds = new Set<string>(); // Track changes being sent to prevent duplicates
   
   // Constants for retry logic
   private readonly MAX_SEND_ATTEMPTS = 3;
@@ -65,16 +67,16 @@ export class DexieOutgoingChangeService {
    * Start monitoring for pending changes
    */
   startMonitoring(): void {
-    console.log('[DexieOutgoingChangeService] Starting event-driven monitoring');
+    console.log('[DexieOutgoingChangeService] Starting direct processing');
     
-    // Register callback for when changes are tracked
-    setOnChangeTrackedCallback(() => {
+    // Register direct processor for when changes are tracked
+    setChangeProcessor(() => {
       // Process changes immediately when they're tracked
-      this.checkAndProcessChanges();
+      this.processPendingChanges();
     });
     
     // Process any existing pending changes on startup
-    this.checkAndProcessChanges();
+    this.processPendingChanges();
   }
   
   /**
@@ -82,28 +84,7 @@ export class DexieOutgoingChangeService {
    */
   stopMonitoring(): void {
     console.log('[DexieOutgoingChangeService] Stopped monitoring');
-    // No interval to clear in event-driven mode
-  }
-  
-  /**
-   * Check for pending changes and process them
-   */
-  private async checkAndProcessChanges(): Promise<void> {
-    if (this.isProcessing) {
-      return;
-    }
-    
-    try {
-      const pendingCount = await getPendingChangeCount();
-      
-      if (pendingCount > 0) {
-        console.log(`[DexieOutgoingChangeService] Found ${pendingCount} pending changes`);
-        await this.processPendingChanges();
-      }
-    } catch (error) {
-      console.error('[DexieOutgoingChangeService] Error checking for changes:', error);
-      this.callbacks.onError?.(error as Error, 'check_changes');
-    }
+    setChangeProcessor(null); // Clear the processor
   }
   
   /**
@@ -124,10 +105,23 @@ export class DexieOutgoingChangeService {
       
       while (hasMore) {
         // Get next batch of pending changes that haven't been sent too many times
+        // AND are not currently being processed (in-flight)
         const pendingChanges = await db.local_changes
           .where('processedSync')
           .equals(0)
-          .filter(change => !change.sendAttempts || change.sendAttempts < this.MAX_SEND_ATTEMPTS)
+          .filter(change => {
+            // Skip if too many send attempts
+            if (change.sendAttempts && change.sendAttempts >= this.MAX_SEND_ATTEMPTS) {
+              return false;
+            }
+            
+            // Skip if already in-flight (being processed)
+            if (this.inFlightChangeIds.has(change.id)) {
+              return false;
+            }
+            
+            return true;
+          })
           .limit(batchSize)
           .toArray();
         
@@ -136,8 +130,13 @@ export class DexieOutgoingChangeService {
           break;
         }
         
+        // Mark changes as in-flight IMMEDIATELY to prevent duplicate processing
+        const changeIds = pendingChanges.map(c => c.id);
+        changeIds.forEach(id => this.inFlightChangeIds.add(id));
+        
         console.log(`[DexieOutgoingChangeService] Processing batch of ${pendingChanges.length} changes`, {
           instanceId: this.instanceId,
+          inFlightCount: this.inFlightChangeIds.size,
           batchDetails: pendingChanges.map(c => ({
             id: c.id,
             table: c.table,
@@ -148,7 +147,6 @@ export class DexieOutgoingChangeService {
         });
         
         // Update send attempts before sending
-        const changeIds = pendingChanges.map(c => c.id);
         await db.local_changes
           .where('id')
           .anyOf(changeIds)
@@ -308,7 +306,7 @@ export class DexieOutgoingChangeService {
     
     return {
       isProcessing: this.isProcessing,
-      isMonitoring: this.processInterval !== null,
+      isMonitoring: true, // Always monitoring via direct processor
       pendingCount
     };
   }

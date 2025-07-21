@@ -29,6 +29,7 @@ export type RendererActorEvent =
   | { type: 'UPDATE_COORDINATES'; mapping: any; version: number }
   | { type: 'UPDATE_SELECTED_ROWS'; selectedRows: Set<string> }
   | { type: 'REMOVE_ROW'; rowId: string }
+  | { type: 'SURGICAL_UPDATE'; changes: any[]; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
   | { type: 'DESTROY' };
 
 export type RendererActorResponse =
@@ -409,6 +410,30 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             type: 'ROWS_RENDERED',
             rowCount: (renderState?.rows?.length || 0) - 1
           });
+          break;
+          
+        case 'SURGICAL_UPDATE':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot perform surgical update - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Performing surgical update:', {
+            changesCount: event.changes.length,
+            changeTypes: event.changes.map(c => `${c.operation}:${c.id}`)
+          });
+          
+          // Apply each change surgically
+          for (const change of event.changes) {
+            if (change.operation === 'update') {
+              // Update the entire row with new data
+              if (renderer.updateRow) {
+                renderer.updateRow(change.id, change.data, event.relationshipResolvers);
+              }
+            }
+          }
+          
+          console.log('RendererActor: Surgical update completed');
           break;
           
         case 'APPLY_DRAG_PREVIEW':

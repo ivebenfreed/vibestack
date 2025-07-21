@@ -309,6 +309,51 @@ export class TableRenderer {
     this.renderOrchestrator.render(state);
   }
   
+  /**
+   * Update a single row's DOM without full re-render
+   */
+  updateRow(rowId: string, newData: any, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
+    const lastRenderState = this.stateManager.getLastRenderState();
+    if (!lastRenderState) {
+      console.warn('TableRenderer: updateRow - no render state available');
+      return;
+    }
+    
+    console.log('🔧 TableRenderer: Updating single row', {
+      rowId,
+      hasRenderState: !!lastRenderState,
+      newDataKeys: Object.keys(newData)
+    });
+    
+    this.rowRenderingEngine.updateSingleRow(rowId, newData, lastRenderState, relationshipResolvers);
+  }
+  
+  /**
+   * Update a single cell's DOM without full re-render
+   */
+  updateCell(rowId: string, columnId: string, newValue: any, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
+    const lastRenderState = this.stateManager.getLastRenderState();
+    if (!lastRenderState) {
+      console.warn('TableRenderer: updateCell - no render state available');
+      return;
+    }
+    
+    // Find the column definition
+    const column = lastRenderState.columns?.find(c => c.id === columnId);
+    if (!column) {
+      console.warn('TableRenderer: updateCell - column not found:', columnId);
+      return;
+    }
+    
+    console.log('🔧 TableRenderer: Updating single cell', {
+      rowId,
+      columnId,
+      newValue,
+      columnName: column.name
+    });
+    
+    this.rowRenderingEngine.updateSingleCell(rowId, columnId, newValue, column, relationshipResolvers);
+  }
 
   
   // Get row element for direct manipulation

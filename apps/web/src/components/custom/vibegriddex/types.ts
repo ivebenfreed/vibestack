@@ -608,3 +608,21 @@ export interface RenderState {
     version: number;
   };
 }
+
+// ====================================
+// CHANGE DETECTION TYPES
+// ====================================
+
+export interface EntityChange {
+  id: string;
+  operation: 'insert' | 'update' | 'delete';
+  data: Record<string, any>;
+  previousData?: Record<string, any>;
+  changedFields?: string[];
+}
+
+export interface DataChangesEvent {
+  type: 'DATA_CHANGES';
+  table: string;
+  changes: EntityChange[];
+}

@@ -2,11 +2,74 @@ import { fromCallback, sendParent } from 'xstate';
 import { db } from '@repo/dataforge/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
+import type { EntityChange } from '../types';
 
 export interface DataSubscriptionInput {
   entityType: string;
   includeRelationships?: boolean;
   skipInitialEmission?: boolean;
+}
+
+/**
+ * Detect changes between previous and current data arrays
+ */
+function detectChanges(previousData: any[] = [], currentData: any[] = []): EntityChange[] {
+  const changes: EntityChange[] = [];
+  
+  // Create maps for efficient lookup
+  const previousMap = new Map(previousData.map(item => [item.id, item]));
+  const currentMap = new Map(currentData.map(item => [item.id, item]));
+  
+  // Detect updates and inserts
+  for (const current of currentData) {
+    const previous = previousMap.get(current.id);
+    
+    if (!previous) {
+      // New entity
+      changes.push({
+        id: current.id,
+        operation: 'insert',
+        data: current
+      });
+    } else {
+      // Check for updates by comparing fields
+      const changedFields: string[] = [];
+      const allKeys = new Set([...Object.keys(previous), ...Object.keys(current)]);
+      
+      for (const key of allKeys) {
+        if (previous[key] !== current[key]) {
+          changedFields.push(key);
+        }
+      }
+      
+      // Only consider it changed if fields other than updatedAt have changed
+      const significantChanges = changedFields.filter(key => key !== 'updatedAt');
+      
+      if (significantChanges.length > 0) {
+        changes.push({
+          id: current.id,
+          operation: 'update',
+          data: current,
+          previousData: previous,
+          changedFields: significantChanges
+        });
+      }
+    }
+  }
+  
+  // Detect deletions
+  for (const previous of previousData) {
+    if (!currentMap.has(previous.id)) {
+      changes.push({
+        id: previous.id,
+        operation: 'delete',
+        data: previous,
+        previousData: previous
+      });
+    }
+  }
+  
+  return changes;
 }
 
 /**
@@ -46,6 +109,8 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
               isMainEntity,
               reason: 'Using preloaded data from route loader'
             });
+            // Still store the data for future change detection
+            lastDataMap.set(tableKey, data);
             return;
           }
           
@@ -60,8 +125,18 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
             table: tableKey,
             data: data 
           });
+          
+          // Store for future change detection
+          lastDataMap.set(tableKey, data);
           return;
         }
+        
+        // Get previous data for change detection
+        const previousData = lastDataMap.get(tableKey) || [];
+        
+        // Detect what changed
+        const changes = detectChanges(previousData, data);
+        
         // Store the latest data
         lastDataMap.set(tableKey, data);
         
@@ -75,21 +150,39 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
         const timer = setTimeout(() => {
           const latestData = lastDataMap.get(tableKey);
           if (latestData) {
-            console.log('📊 DataSubscriptionActor: Data update received (debounced)', {
-              table: tableKey,
-              entityCount: latestData.length,
-              isMainEntity,
-              eventType: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE',
-              sampleData: latestData.length > 0 ? latestData[0] : null,
-              firstThreeIds: latestData.slice(0, 3).map(item => item.id)
-            });
-            
-            // Send update event to parent with table identifier
-            sendBack({ 
-              type: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE',
-              table: tableKey,
-              data: latestData 
-            });
+            // Send targeted changes for main entity tables
+            if (isMainEntity && changes.length > 0) {
+              console.log('📊 DataSubscriptionActor: Detected changes for table:', tableKey, {
+                changesCount: changes.length,
+                changeTypes: changes.map(c => `${c.operation}:${c.id}`),
+                totalEntities: latestData.length
+              });
+              
+              // Send targeted changes event
+              sendBack({ 
+                type: 'DATA_CHANGES',
+                table: tableKey,
+                changes: changes
+              });
+            } else {
+              // For relationship tables or when no changes detected, use full update
+              console.log('📊 DataSubscriptionActor: Data update received (debounced)', {
+                table: tableKey,
+                entityCount: latestData.length,
+                isMainEntity,
+                changesDetected: changes.length,
+                eventType: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE',
+                sampleData: latestData.length > 0 ? latestData[0] : null,
+                firstThreeIds: latestData.slice(0, 3).map(item => item.id)
+              });
+              
+              // Send full update event to parent with table identifier
+              sendBack({ 
+                type: isMainEntity ? 'DATA_UPDATE' : 'RELATIONSHIP_DATA_UPDATE',
+                table: tableKey,
+                data: latestData 
+              });
+            }
           }
         }, 100); // 100ms debounce
         

@@ -14,8 +14,8 @@ let currentClientId = 'default-client';
 let currentUserId = 'default-user';
 let isTrackingEnabled = true; // Flag to control change tracking during sync
 
-// Callback for when changes are tracked
-let onChangeTrackedCallback: (() => void) | null = null;
+// Direct processor for when changes are tracked
+let changeProcessor: (() => void) | null = null;
 
 // Symbol to mark sync transactions
 export const SYNC_TRANSACTION = Symbol('sync-transaction');
@@ -277,9 +277,9 @@ export async function trackOutgoingChange(
       stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
     });
     
-    // Notify that a change was tracked
-    if (onChangeTrackedCallback) {
-      onChangeTrackedCallback();
+    // Process changes immediately after tracking
+    if (changeProcessor) {
+      changeProcessor();
     }
   } catch (error) {
     console.error('[Dexie Change Tracking] Failed to track change:', error);
@@ -299,8 +299,8 @@ export async function applySyncChanges(operation: () => Promise<void>): Promise<
 }
 
 /**
- * Set callback to be notified when changes are tracked
+ * Set the change processor function
  */
-export function setOnChangeTrackedCallback(callback: (() => void) | null): void {
-  onChangeTrackedCallback = callback;
+export function setChangeProcessor(processor: (() => void) | null): void {
+  changeProcessor = processor;
 }

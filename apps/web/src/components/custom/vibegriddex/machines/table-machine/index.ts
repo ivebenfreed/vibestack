@@ -164,7 +164,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     canvasContainer: null,
     
     // Track if we're using pre-resolved initial data from loader
-    hasInitialData,
+    // (hasInitialData already set above at line 112)
     
     // Timer for batching view updates during rapid data changes
     pendingViewUpdateTimer: null
@@ -494,6 +494,69 @@ export const tableBaseMachine = setup({
                     self.send({ type: 'INVOKE_VIEW_ACTOR' });
                     context.pendingViewUpdateTimer = null;
                   }, 150); // 150ms batching window
+                }
+              ]
+            },
+            
+            // Handle targeted data changes for surgical updates
+            DATA_CHANGES: {
+              actions: [
+                // Update specific entities based on changes
+                assign({
+                  entities: ({ context, event }) => {
+                    console.log('TableMachine: DATA_CHANGES received', {
+                      table: event.table,
+                      changesCount: event.changes.length,
+                      changeTypes: event.changes.map(c => `${c.operation}:${c.id}`)
+                    });
+                    
+                    let updatedEntities = [...context.entities];
+                    
+                    for (const change of event.changes) {
+                      const index = updatedEntities.findIndex(e => e.id === change.id);
+                      
+                      switch (change.operation) {
+                        case 'update':
+                          if (index !== -1) {
+                            updatedEntities[index] = change.data;
+                          }
+                          break;
+                        case 'insert':
+                          if (index === -1) {
+                            updatedEntities.push(change.data);
+                          }
+                          break;
+                        case 'delete':
+                          if (index !== -1) {
+                            updatedEntities.splice(index, 1);
+                          }
+                          break;
+                      }
+                    }
+                    
+                    return updatedEntities;
+                  }
+                }),
+                
+                // Send surgical updates to renderer
+                ({ context, event, self }) => {
+                  console.log('TableMachine: DATA_CHANGES - sending surgical updates to renderer');
+                  
+                  // For simple updates, skip ViewActor and update DOM directly
+                  if (event.changes.every(c => c.operation === 'update')) {
+                    // Send surgical update event to renderer
+                    if (context.actors.rendererActor) {
+                      context.actors.rendererActor.send({
+                        type: 'SURGICAL_UPDATE',
+                        changes: event.changes,
+                        relationshipResolvers: context.relationshipResolvers
+                      });
+                    }
+                  } else {
+                    // For inserts/deletes, trigger full view update
+                    console.log('TableMachine: DATA_CHANGES - contains inserts/deletes, triggering full view update');
+                    self.send({ type: 'INVOKE_VIEW_ACTOR' });
+                  }
                 }
               ]
             },

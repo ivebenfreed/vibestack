@@ -108,6 +108,90 @@ export class RowEngine {
   
   
   /**
+   * Update a single row's DOM without full re-render
+   */
+  updateSingleRow(rowId: string, newData: any, state: RenderState, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
+    const rowElement = this.config.domManager.getRowElement(rowId);
+    if (!rowElement) {
+      console.warn('RowEngine: updateSingleRow - row element not found:', rowId);
+      return;
+    }
+    
+    console.log('🔧 RowEngine: Updating single row', {
+      rowId,
+      hasRowElement: !!rowElement,
+      newDataKeys: Object.keys(newData)
+    });
+    
+    // Create TableRow format
+    const row: TableRow = {
+      id: rowId,
+      data: newData,
+      metadata: {
+        isSelected: false,
+        isDirty: false,
+        isGroup: false,
+        level: 0
+      }
+    };
+    
+    // Re-render this row's cells
+    this.renderRowCells(row, rowElement, state, relationshipResolvers);
+  }
+  
+  /**
+   * Update a single cell's DOM without full re-render
+   */
+  updateSingleCell(rowId: string, columnId: string, newValue: any, column: Column, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
+    const cellElement = this.config.domManager.getCellElement(rowId, columnId);
+    if (!cellElement) {
+      console.warn('RowEngine: updateSingleCell - cell element not found:', { rowId, columnId });
+      return;
+    }
+    
+    console.log('🔧 RowEngine: Updating single cell', {
+      rowId,
+      columnId,
+      newValue,
+      hasElement: !!cellElement
+    });
+    
+    // Create row data with the new value
+    const rowData = { [column.field || columnId]: newValue };
+    
+    // Check if this is a relationship column and resolve it
+    if (column && (column.cellType || column.type)?.startsWith('relationship')) {
+      const resolver = relationshipResolvers?.[columnId];
+      if (resolver && newValue != null) {
+        try {
+          const resolvedValue = resolver(newValue);
+          rowData[`__resolved_${columnId}`] = resolvedValue;
+          console.log('🔧 RowEngine: Resolved relationship value', {
+            columnId,
+            rawValue: newValue,
+            resolvedValue
+          });
+        } catch (error) {
+          console.error('RowEngine: Error resolving relationship', {
+            columnId,
+            value: newValue,
+            error
+          });
+        }
+      }
+    }
+    
+    // Create new cell content
+    const content = CellPipeline.createCellContent(newValue, column, rowData);
+    
+    // Replace the cell content
+    while (cellElement.firstChild) {
+      cellElement.removeChild(cellElement.firstChild);
+    }
+    cellElement.appendChild(content);
+  }
+  
+  /**
    * Apply optimistic operations to cells
    */
   applyOptimisticOperations(operations: Map<string, OptimisticOperation> | undefined): void {
