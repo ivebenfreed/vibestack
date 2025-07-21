@@ -507,7 +507,14 @@ export const tableBaseMachine = setup({
                     console.log('TableMachine: DATA_CHANGES received', {
                       table: event.table,
                       changesCount: event.changes.length,
-                      changeTypes: event.changes.map(c => `${c.operation}:${c.id}`)
+                      changeTypes: event.changes.map(c => `${c.operation}:${c.id}`),
+                      firstChangeDetail: event.changes[0] ? {
+                        id: event.changes[0].id,
+                        operation: event.changes[0].operation,
+                        changedFields: event.changes[0].changedFields,
+                        hasChangedFields: 'changedFields' in event.changes[0],
+                        changedFieldsType: typeof event.changes[0].changedFields
+                      } : null
                     });
                     
                     let updatedEntities = [...context.entities];

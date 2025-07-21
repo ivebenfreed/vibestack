@@ -46,6 +46,12 @@ function detectChanges(previousData: any[] = [], currentData: any[] = []): Entit
       const significantChanges = changedFields.filter(key => key !== 'updatedAt');
       
       if (significantChanges.length > 0) {
+        console.log('📊 DataSubscriptionActor: detectChanges - found changes', {
+          id: current.id,
+          changedFields: significantChanges,
+          allChangedFields: changedFields
+        });
+        
         changes.push({
           id: current.id,
           operation: 'update',
