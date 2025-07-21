@@ -540,10 +540,26 @@ export const tableBaseMachine = setup({
                 
                 // Send surgical updates to renderer
                 ({ context, event, self }) => {
-                  console.log('TableMachine: DATA_CHANGES - sending surgical updates to renderer');
+                  console.log('TableMachine: DATA_CHANGES - processing updates', {
+                    changeCount: event.changes.length,
+                    sortedBy: context.sortBy?.map(s => s.columnId),
+                    hasSortConfig: context.sortBy?.length > 0
+                  });
                   
-                  // For simple updates, skip ViewActor and update DOM directly
-                  if (event.changes.every(c => c.operation === 'update')) {
+                  // Check if any changes affect sorted columns
+                  const affectsSortedColumn = event.changes.some(change => {
+                    if (change.operation !== 'update' || !change.changedFields) {
+                      return false;
+                    }
+                    // Check if any changed field is a sorted column
+                    return context.sortBy?.some(sort => 
+                      change.changedFields.includes(sort.columnId)
+                    );
+                  });
+                  
+                  // For simple updates that don't affect sort order, use surgical updates
+                  if (event.changes.every(c => c.operation === 'update') && !affectsSortedColumn) {
+                    console.log('TableMachine: DATA_CHANGES - sending surgical updates (no sort impact)');
                     // Send surgical update event to renderer
                     if (context.actors.rendererActor) {
                       context.actors.rendererActor.send({
@@ -553,8 +569,11 @@ export const tableBaseMachine = setup({
                       });
                     }
                   } else {
-                    // For inserts/deletes, trigger full view update
-                    console.log('TableMachine: DATA_CHANGES - contains inserts/deletes, triggering full view update');
+                    // For inserts/deletes or updates affecting sorted columns, trigger full view update
+                    console.log('TableMachine: DATA_CHANGES - triggering full view update', {
+                      hasInsertDelete: event.changes.some(c => c.operation !== 'update'),
+                      affectsSortedColumn
+                    });
                     self.send({ type: 'INVOKE_VIEW_ACTOR' });
                   }
                 }
