@@ -89,14 +89,14 @@ const Projects: React.FC = () => {
           </div>
 
           {/* Data Grid */}
-          <div className="flex-1">
+          <div className="flex-1 p-4">
             <VibeGridDex
               tableId="projects-table"
               entityType="project"
               columns={columns}
               onEntityUpdate={handleEntityUpdate}
               height={600}
-              className="border-0"
+              className="border border-border rounded-lg"
               enableSorting
               enableFiltering
               enableVirtualScrolling
