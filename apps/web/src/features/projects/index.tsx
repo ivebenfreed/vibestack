@@ -66,45 +66,41 @@ const Projects: React.FC = () => {
 
   return (
     <ProjectsProvider>
-      <ContentContainer>
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b border-border bg-background">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight text-foreground">Projects</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Manage your projects and track their progress
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <ProjectsPrimaryButtons />
-              </div>
+      <div className="flex flex-col h-full">
+        {/* Page Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight mb-2">Projects</h1>
+              <p className="text-muted-foreground">
+                Manage your projects and track their progress
+              </p>
             </div>
-            {error && (
-              <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                <div className="text-sm text-destructive">{error}</div>
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              <ProjectsPrimaryButtons />
+            </div>
           </div>
-
-          {/* Data Grid */}
-          <div className="flex-1 p-4">
-            <VibeGridDex
-              tableId="projects-table"
-              entityType="project"
-              columns={columns}
-              onEntityUpdate={handleEntityUpdate}
-              height={600}
-              className="border border-border rounded-lg"
-              enableSorting
-              enableFiltering
-              enableVirtualScrolling
-              initialData={initialData}
-            />
-          </div>
+          {error && (
+            <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <div className="text-sm text-destructive">{error}</div>
+            </div>
+          )}
         </div>
-      </ContentContainer>
+
+        {/* Data Grid */}
+        <VibeGridDex
+          tableId="projects-table"
+          entityType="project"
+          columns={columns}
+          onEntityUpdate={handleEntityUpdate}
+          height={600}
+          className="border border-border rounded-lg"
+          enableSorting
+          enableFiltering
+          enableVirtualScrolling
+          initialData={initialData}
+        />
+      </div>
 
       <ProjectsDialogs />
     </ProjectsProvider>
