@@ -71,7 +71,7 @@ export class CanvasOverlay implements CoordinateProvider {
     
     // PERFORMANCE: Pre-calculate dimensions but defer Stage creation
     this.cachedDimensions = {
-      width: this.container.offsetWidth || 800,
+      width: this.container.offsetWidth || Math.min(800, window.innerWidth - 32),
       height: this.container.offsetHeight || 600,
       rect: this.container.getBoundingClientRect()
     };

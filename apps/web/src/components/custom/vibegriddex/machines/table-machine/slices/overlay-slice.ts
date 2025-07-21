@@ -62,7 +62,7 @@ export const createInitialOverlayState = (initialViewport?: ViewportInfo): Overl
     start: 0,
     end: 50,
     height: 600,
-    width: 800,
+    width: typeof window !== 'undefined' ? Math.min(800, window.innerWidth - 32) : 800,
     scrollTop: 0,
     scrollLeft: 0,
     itemHeight: 40

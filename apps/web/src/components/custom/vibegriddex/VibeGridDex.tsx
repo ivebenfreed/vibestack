@@ -387,7 +387,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
             start: 0,
             end: Math.ceil((typeof height === 'number' ? height : 600) / 40),
             height: typeof height === 'number' ? height : 600,
-            width: typeof width === 'number' ? width : 800,
+            width: typeof width === 'number' ? width : Math.min(800, window.innerWidth - 32), // 32px for margins
             scrollTop: 0,
             scrollLeft: 0,
             itemHeight: 40

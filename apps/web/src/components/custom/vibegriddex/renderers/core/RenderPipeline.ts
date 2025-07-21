@@ -183,7 +183,7 @@ export class RenderPipeline {
     if (!viewportWidth || viewportWidth === 0) {
       viewportWidth = measurements.container.client.width || 
                       measurements.table.client.width || 
-                      800; // Ultimate fallback
+                      Math.min(800, window.innerWidth - 32); // Ultimate fallback, responsive
     }
     
     const scrollTop = measurements.viewport.scroll.top;

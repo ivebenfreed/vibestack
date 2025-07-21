@@ -17,11 +17,11 @@ const Projects: React.FC = () => {
   // Get the loader data
   const loaderData = Route.useLoaderData();
   const { initialData } = loaderData || {};
-  // Define columns for Project entity
+  // Define columns for Project entity (responsive widths to prevent overflow)
   const columns: Column<Project>[] = [
-    { id: 'name', field: 'name', name: 'Name', cellType: 'text', width: 250 },
-    { id: 'description', field: 'description', name: 'Description', cellType: 'text', width: 400 },
-    { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 150,
+    { id: 'name', field: 'name', name: 'Name', cellType: 'text', width: 200 },
+    { id: 'description', field: 'description', name: 'Description', cellType: 'text', width: 300 },
+    { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 120,
       options: [
         { value: 'active', label: 'Active' },
         { value: 'in_progress', label: 'In Progress' },
@@ -29,7 +29,7 @@ const Projects: React.FC = () => {
         { value: 'on_hold', label: 'On Hold' }
       ]
     },
-    { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 120,
+    { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 100,
       options: [
         { value: 'low', label: 'Low' },
         { value: 'medium', label: 'Medium' },
@@ -37,14 +37,14 @@ const Projects: React.FC = () => {
         { value: 'critical', label: 'Critical' }
       ]
     },
-    { id: 'startDate', field: 'startDate', name: 'Start Date', cellType: 'date', width: 150 },
-    { id: 'endDate', field: 'endDate', name: 'End Date', cellType: 'date', width: 150 },
+    { id: 'startDate', field: 'startDate', name: 'Start Date', cellType: 'date', width: 130 },
+    { id: 'endDate', field: 'endDate', name: 'End Date', cellType: 'date', width: 130 },
     { id: 'ownerId', field: 'ownerId', name: 'Owner', cellType: 'relationship-single',
-      width: 180, relationshipTable: 'users', relationshipDisplayField: 'name' },
+      width: 150, relationshipTable: 'users', relationshipDisplayField: 'name' },
     { id: 'tags', field: 'tags', name: 'Tags', cellType: 'relationship-multi',
-      width: 250, relationshipTable: 'tags', relationshipDisplayField: 'name' },
-    { id: 'createdAt', field: 'createdAt', name: 'Created', cellType: 'date', width: 150, editable: false },
-    { id: 'updatedAt', field: 'updatedAt', name: 'Updated', cellType: 'date', width: 150, editable: false }
+      width: 180, relationshipTable: 'tags', relationshipDisplayField: 'name' },
+    { id: 'createdAt', field: 'createdAt', name: 'Created', cellType: 'date', width: 130, editable: false },
+    { id: 'updatedAt', field: 'updatedAt', name: 'Updated', cellType: 'date', width: 130, editable: false }
   ]
 
   // Error state
@@ -95,7 +95,7 @@ const Projects: React.FC = () => {
               entityType="project"
               columns={columns}
               onEntityUpdate={handleEntityUpdate}
-              height="calc(100vh - 200px)"
+              height={600}
               className="border-0"
               enableSorting
               enableFiltering
