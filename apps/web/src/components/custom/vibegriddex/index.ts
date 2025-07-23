@@ -4,7 +4,7 @@
 
 // Main component
 // Legacy export
-export { VibeGridDex } from './VibeGridDex';
+export { VibeGridDex, VibeGridDexWithSuspense } from './VibeGridDex';
 export type { VibeGridDexProps } from './VibeGridDex';
 
 // Modular components removed - files don't exist

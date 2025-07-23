@@ -24,7 +24,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { useAuth } from '@/hooks/useSimpleAuth'
+import { useAuth } from '@/state-machines'
 import { useSignOut } from '@/hooks/use-sign-out'
 
 export function NavUser({

@@ -1,18 +1,14 @@
 import React from 'react'
-import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex'
+import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex/VibeGridDex'
 import { updateTaskUI } from '@/domain-dexie/task'
 import { useTheme } from '@/context/theme-context'
 import type { Task } from '@repo/dataforge/client-entities'
 import type { Column } from '@/components/custom/vibegriddex/column-types'
-import { Route } from '@/routes/_authenticated/tasks/index'
 
 /**
  * TasksTableView - Using VibeGridDex for Dexie-based data grid
  */
 export default function TasksTableView() {
-  // Get the loader data
-  const loaderData = Route.useLoaderData()
-  const { initialData } = loaderData || {}
   
   // Get theme and resolve 'system' to actual theme
   const { theme } = useTheme()
@@ -47,30 +43,17 @@ export default function TasksTableView() {
     { id: 'updatedAt', field: 'updatedAt', name: 'Updated', cellType: 'date', width: 150, editable: false }
   ]
 
-  // Handle entity updates
-  const handleEntityUpdate = React.useCallback(async (rowId: string, updates: Record<string, any>) => {
-    console.log('[TasksTableView] 🚀 Updating task:', { rowId, updates })
-    try {
-      await updateTaskUI(rowId, updates)
-      console.log('[TasksTableView] ✅ Task updated successfully')
-    } catch (error) {
-      console.error('[TasksTableView] ❌ Task update failed:', error)
-      throw error
-    }
-  }, [])
-
   return (
-    <VibeGridDex
+    <VibeGridDexWithSuspense
       tableId="tasks-table"
       entityType="task"
       columns={columns}
-      onEntityUpdate={handleEntityUpdate}
+      domainService={{ update: updateTaskUI }}
       height={600}
       className="border border-border rounded-lg"
       enableSorting
       enableFiltering
       enableVirtualScrolling
-      initialData={initialData}
     />
   )
 }

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { InitializationErrorBoundary } from '@/components/error-boundary'
 import { AuthAwareProviders } from '@/components/providers/AuthAwareProviders'
 import { Task, Project, User } from '@repo/dataforge/client-entities'
-// import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
+// import { useAuth } from '@/state-machines' // 🔥 REPLACED with V2 orchestrator hook
 import { authClient } from '@/lib/auth'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 // 🔥 NEW: Import XState machines directly (no orchestrator needed)

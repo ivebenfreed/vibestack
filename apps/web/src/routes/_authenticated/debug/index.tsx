@@ -96,6 +96,13 @@ function DebugIndexPage() {
       path: '/debug/vibegriddex-test',
       color: 'border-amber-500/20 hover:border-amber-500/30 bg-amber-500/5 dark:border-amber-400/20 dark:hover:border-amber-400/30 dark:bg-amber-400/5',
       badge: 'VIBEGRIDDEX'
+    },
+    {
+      title: '📊 VibeGantt Debug',
+      description: 'Test VibeGantt timeline component for project scheduling. Interactive Gantt charts with task dependencies, resource allocation, and real-time updates.',
+      path: '/debug/vibegantt',
+      color: 'border-rose-500/20 hover:border-rose-500/30 bg-rose-500/5 dark:border-rose-400/20 dark:hover:border-rose-400/30 dark:bg-rose-400/5',
+      badge: 'VIBEGANTT'
     }
   ]
 
@@ -138,6 +145,8 @@ function DebugIndexPage() {
                   ? 'bg-teal-500/10 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300 border border-teal-500/20'
                   : page.badge === 'VIBEGRIDDEX'
                   ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300 border border-amber-500/20'
+                  : page.badge === 'VIBEGANTT'
+                  ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300 border border-rose-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -162,6 +171,7 @@ function DebugIndexPage() {
                    : page.badge === 'TANSTACK DB' ? '🗄️ Open POC'
                    : page.badge === 'DEXIE POC' ? '💾 Open Dexie POC'
                    : page.badge === 'VIBEGRIDDEX' ? '🔥 Open VibeGridDex Test'
+                   : page.badge === 'VIBEGANTT' ? '📊 Open VibeGantt Debug'
                    : 'Open Tool'}
                 </Button>
               </Link>

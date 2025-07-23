@@ -62,8 +62,17 @@ export const Route = createFileRoute('/_authenticated')({
     console.log('[AuthenticatedRoute] Final auth state check:', {
       matches: finalAuthSnapshot.value,
       user: !!finalAuthSnapshot.context.user,
+      authError: finalAuthSnapshot.context.authError,
+      errorRetryCount: finalAuthSnapshot.context.errorRetryCount,
       path: window.location.pathname
     })
+    
+    // Allow errorRecovery state - don't redirect immediately
+    if (finalAuthSnapshot.matches('errorRecovery')) {
+      console.log('[AuthenticatedRoute] In error recovery state, allowing access with persisted auth')
+      // The error recovery state will handle retries and eventual redirect if needed
+      return
+    }
     
     if (!finalAuthSnapshot.matches('authenticated') || !finalAuthSnapshot.context.user) {
       console.log('[AuthenticatedRoute] Redirecting to sign-in from:', window.location.pathname)

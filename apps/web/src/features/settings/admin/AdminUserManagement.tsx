@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Trash2, Edit, Plus, RotateCcw, RefreshCw } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useAuth } from '@/hooks/useSimpleAuth'
+import { useAuth } from '@/state-machines'
 import { authClient } from '@/lib/auth'
 import { toast } from 'sonner'
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useAuth } from '@/hooks/useSimpleAuth'
+import { useAuth } from '@/state-machines'
 import {
   CommandDialog,
   CommandEmpty,

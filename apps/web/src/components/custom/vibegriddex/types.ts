@@ -16,6 +16,7 @@ export type FilterConfig = {
 };
 // Import our local column types
 import type { Column as BaseColumn, CellType } from './column-types';
+import type { TableStoreActor } from './stores/types';
 
 // EnumOption for backwards compatibility
 export interface EnumOption {
@@ -323,6 +324,7 @@ export interface TableContext {
     // viewCoordinator removed - view state now managed directly in TableMachine
     dragCoordinator: ActorRefFrom<any> | null;
     rowActors: Map<string, ActorRefFrom<any>>;
+    storeActor?: TableStoreActor | null; // Pure reactive store actor
   };
   
   // Performance tracking
@@ -335,6 +337,26 @@ export interface TableContext {
   
   // Timer for batching view updates during rapid data changes
   pendingViewUpdateTimer?: NodeJS.Timeout | null;
+  
+  // Store actor for data subscription
+  storeActor?: any;
+  
+  // Pending surgical update data to be sent to renderer
+  pendingSurgicalUpdate?: {
+    changes: Array<{ id: string; operation: 'update'; data: any }>;
+    relationshipResolvers: Record<string, (id: string | string[]) => string>;
+  };
+  
+  // Relationship cache removed - now handled by store actor
+  
+  // Domain service for all data operations (maintains sync tracking)
+  domainService?: any; // Generic service interface
+  
+  // Relationship data from store for edit dropdowns
+  relationshipData?: {
+    projects: any[];
+    users: any[];
+  };
 }
 
 export interface SelectionContext {
@@ -494,7 +516,10 @@ export type TableEvents =
   
   // Data subscription events (from data subscription actor)
   | { type: 'DATA_UPDATE'; data: any[] }
-  | { type: 'DATA_SUBSCRIPTION_ERROR'; error: Error };
+  | { type: 'DATA_SUBSCRIPTION_ERROR'; error: Error }
+  
+  // Store subscription events
+  | { type: 'STORE_SNAPSHOT_RECEIVED'; snapshot: any };
 
 // ====================================
 // CONFIGURATION TYPES
@@ -507,10 +532,17 @@ export interface TableConfig {
   entities?: any[]; // CLEAN API: Pass entities directly instead of atomConfig
   relationshipResolvers?: Record<string, (id: string | string[]) => string>; // Resolvers for relationship columns
   initialData?: TableRow[];
+  initialRelationshipData?: Record<string, Array<{ id: string; [key: string]: any }>>; // Initial relationship data from loader
   settings?: TableSettings;
   enableSelectionColumn?: boolean;
   persistedData?: any; // Persisted UI state from localStorage (sync machine pattern)
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void; // Generic entity update handler
+  
+  // New store-based architecture
+  store?: any; // Table data store instance from useTableData hook
+  storeActor?: any; // XState store actor for data subscription
+  domainService?: any; // Domain service for data operations
+  initialRows?: any[]; // Pre-resolved rows for immediate render
 }
 
 // ====================================

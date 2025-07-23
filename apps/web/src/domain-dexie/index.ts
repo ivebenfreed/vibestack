@@ -1,87 +1,117 @@
 /**
- * Dexie Domain Layer
+ * Dexie Domain Layer - Formalized Domain Services
  * 
- * This is a parallel implementation to the atomic store domains that uses Dexie live queries
- * instead of XState atoms. It provides the same functionality but with different performance
- * characteristics and patterns.
+ * This provides a clean, service-based architecture for all entity operations.
+ * Each entity has its own domain service that extends a common base class.
  * 
- * Key differences from atomic domains:
- * - Uses Dexie live queries instead of XState atoms
- * - Data persistence handled by IndexedDB (via Dexie) 
- * - Reactive updates through dexie-react-hooks
- * - No normalization - data stays in relational format
- * - Better performance for bulk operations
- * - Cross-tab reactivity built-in
+ * Key features:
+ * - Type-safe operations using DataForge client entities
+ * - Automatic sync tracking for UI operations
+ * - Validation and business logic hooks
+ * - Simple interface for VibeGridDex integration
+ * - No code generation complexity
  */
 
-// Task domain exports
-export {
-  // UI operations (with sync tracking)
-  createTaskUI,
-  updateTaskUI,
-  deleteTaskUI,
-  bulkCreateTasksUI,
-  // Incoming operations (no sync tracking)
-  createTaskIncoming,
-  updateTaskIncoming,
-  deleteTaskIncoming,
-  bulkCreateTasksIncoming,
-  // Live query hooks
-  useTaskQueries,
-  type CreateTaskInput,
-  type UpdateTaskInput,
-} from './task';
+// Import domain services
+import { TaskDomainService } from './task-service';
+import { ProjectDomainService } from './project-service';
+import { UserDomainService } from './user-service';
+import { CommentDomainService } from './comment-service';
 
-// Project domain exports
-export {
-  // UI operations (with sync tracking)
-  createProjectUI,
-  updateProjectUI,
-  deleteProjectUI,
-  addProjectMemberUI,
-  removeProjectMemberUI,
-  updateProjectMemberRoleUI,
-  // Incoming operations (no sync tracking)
-  createProjectIncoming,
-  updateProjectIncoming,
-  deleteProjectIncoming,
-  // Live query hooks
-  useProjectQueries,
-  type CreateProjectInput,
-  type UpdateProjectInput,
-} from './project';
+// ============================================================================
+// Domain Service Instances
+// ============================================================================
 
-// User domain exports
-export {
-  // UI operations (with sync tracking)
-  createUserUI,
-  updateUserUI,
-  deleteUserUI,
-  // Incoming operations (no sync tracking)
-  createUserIncoming,
-  updateUserIncoming,
-  deleteUserIncoming,
-  // Live query hooks
-  useUserQueries,
-  type CreateUserInput,
-  type UpdateUserInput,
-} from './user';
+/**
+ * Singleton instances of domain services
+ */
+export const domainServices = {
+  task: new TaskDomainService(),
+  project: new ProjectDomainService(),
+  user: new UserDomainService(),
+  comment: new CommentDomainService(),
+} as const;
 
-// Comment domain exports
-export {
-  // UI operations (with sync tracking)
-  createCommentUI,
-  updateCommentUI,
-  deleteCommentUI,
-  // Incoming operations (no sync tracking)
-  createCommentIncoming,
-  updateCommentIncoming,
-  deleteCommentIncoming,
-  // Live query hooks
-  useCommentQueries,
-  type CreateCommentInput,
-  type UpdateCommentInput,
-} from './comment';
+// ============================================================================
+// Factory Functions
+// ============================================================================
+
+/**
+ * Get a domain service by entity type
+ */
+export function getDomainService(entityType: string) {
+  const service = domainServices[entityType as keyof typeof domainServices];
+  if (!service) {
+    throw new Error(`No domain service found for entity type: ${entityType}`);
+  }
+  return service;
+}
+
+/**
+ * Create a VibeGridDex-compatible adapter for a domain service
+ * Returns an object with just the update method for backward compatibility
+ */
+export function createVibeGridDexAdapter(entityType: string) {
+  const service = getDomainService(entityType);
+  return {
+    update: (id: string, updates: any) => service.updateUI(id, updates)
+  };
+}
+
+// ============================================================================
+// Legacy Function Exports (for backward compatibility)
+// ============================================================================
+
+// Task functions
+export const createTaskUI = (input: any) => domainServices.task.createUI(input);
+export const updateTaskUI = (id: string, updates: any) => domainServices.task.updateUI(id, updates);
+export const deleteTaskUI = (id: string) => domainServices.task.deleteUI(id);
+export const createTaskIncoming = (task: any) => domainServices.task.createIncoming(task);
+export const updateTaskIncoming = (id: string, updates: any) => domainServices.task.updateIncoming(id, updates);
+export const deleteTaskIncoming = (id: string) => domainServices.task.deleteIncoming(id);
+
+// Project functions
+export const createProjectUI = (input: any) => domainServices.project.createUI(input);
+export const updateProjectUI = (id: string, updates: any) => domainServices.project.updateUI(id, updates);
+export const deleteProjectUI = (id: string) => domainServices.project.deleteUI(id);
+export const createProjectIncoming = (project: any) => domainServices.project.createIncoming(project);
+export const updateProjectIncoming = (id: string, updates: any) => domainServices.project.updateIncoming(id, updates);
+export const deleteProjectIncoming = (id: string) => domainServices.project.deleteIncoming(id);
+export const addProjectMemberUI = (projectId: string, userId: string, role?: string) => domainServices.project.addProjectMemberUI(projectId, userId, role);
+export const removeProjectMemberUI = (projectId: string, userId: string) => domainServices.project.removeProjectMemberUI(projectId, userId);
+
+// User functions
+export const createUserUI = (input: any) => domainServices.user.createUI(input);
+export const updateUserUI = (id: string, updates: any) => domainServices.user.updateUI(id, updates);
+export const deleteUserUI = (id: string) => domainServices.user.deleteUI(id);
+export const createUserIncoming = (user: any) => domainServices.user.createIncoming(user);
+export const updateUserIncoming = (id: string, updates: any) => domainServices.user.updateIncoming(id, updates);
+export const deleteUserIncoming = (id: string) => domainServices.user.deleteIncoming(id);
+
+// Comment functions
+export const createCommentUI = (input: any) => domainServices.comment.createUI(input);
+export const updateCommentUI = (id: string, updates: any) => domainServices.comment.updateUI(id, updates);
+export const deleteCommentUI = (id: string) => domainServices.comment.deleteUI(id);
+export const createCommentIncoming = (comment: any) => domainServices.comment.createIncoming(comment);
+export const updateCommentIncoming = (id: string, updates: any) => domainServices.comment.updateIncoming(id, updates);
+export const deleteCommentIncoming = (id: string) => domainServices.comment.deleteIncoming(id);
+
+// ============================================================================
+// Type Exports
+// ============================================================================
+
+// Export input types from services
+export type { CreateTaskInput, UpdateTaskInput } from './task-service';
+export type { CreateProjectInput, UpdateProjectInput } from './project-service';
+export type { CreateUserInput, UpdateUserInput } from './user-service';
+export type { CreateCommentInput, UpdateCommentInput } from './comment-service';
+
+// Export service classes for extension
+export { TaskDomainService } from './task-service';
+export { ProjectDomainService } from './project-service';
+export { UserDomainService } from './user-service';
+export { CommentDomainService } from './comment-service';
+export { BaseDomainService } from './base-domain-service';
 
 // Re-export types from dataforge for convenience
 export type {
@@ -98,96 +128,82 @@ export type {
 export { db } from '@repo/dataforge/dexie-schema';
 
 // ============================================================================
-// Comparison Guide: Atomic Stores vs Dexie Live Queries
+// Usage Examples
 // ============================================================================
 
 /**
- * USAGE COMPARISON:
+ * BASIC USAGE:
  * 
- * === ATOMIC STORES (Current) ===
  * ```typescript
- * import { useTaskAtoms } from '@/domain/task';
+ * import { domainServices } from '@/domain-dexie';
  * 
- * function TaskList() {
- *   const tasks = useTaskAtoms.allTasks();
- *   const taskCount = useTaskAtoms.taskCount();
- *   // Data is normalized and cached in memory
- * }
+ * // Direct service usage
+ * const task = await domainServices.task.createUI({
+ *   title: 'New Task',
+ *   priority: TaskPriority.HIGH
+ * });
+ * 
+ * // Update with validation and sync tracking
+ * await domainServices.task.updateUI(taskId, {
+ *   status: TaskStatus.COMPLETED
+ * });
  * ```
  * 
- * === DEXIE LIVE QUERIES (Parallel) ===
- * ```typescript
- * import { useTaskQueries } from '@/domain-dexie';
+ * VIBEGRIDDEX INTEGRATION:
  * 
- * function TaskList() {
- *   const tasks = useTaskQueries.allTasks();
- *   const taskCount = useTaskQueries.taskCount();
- *   // Data is fetched from IndexedDB with live updates
- * }
+ * ```typescript
+ * // Option 1: Pass individual update function
+ * <VibeGridDexWithSuspense
+ *   entityType="task"
+ *   columns={columns}
+ *   domainService={{ update: updateTaskUI }}
+ * />
+ * 
+ * // Option 2: Use factory (coming soon)
+ * <VibeGridDexWithSuspense
+ *   entityType="task"
+ *   columns={columns}
+ *   domainService={createVibeGridDexAdapter('task')}
+ * />
  * ```
  * 
- * PERFORMANCE CHARACTERISTICS:
+ * EXTENDING SERVICES:
  * 
- * Atomic Stores:
- * ✅ Very fast reads (in-memory)
- * ✅ Surgical re-render control
- * ✅ Stable object references
- * ❌ Manual sync with database
- * ❌ Memory usage grows with data
- * ❌ Complex state management
+ * ```typescript
+ * import { TaskDomainService } from '@/domain-dexie';
  * 
- * Dexie Live Queries:
- * ✅ Automatic persistence
- * ✅ Cross-tab reactivity
- * ✅ Excellent bulk operations
- * ✅ Simpler architecture
- * ❌ Slightly slower reads (IndexedDB)
- * ❌ Less granular re-render control
- * ❌ New object instances on updates
- * 
- * WHEN TO USE EACH:
- * 
- * Use Atomic Stores for:
- * - High-frequency updates (like data grids)
- * - Complex derived computations
- * - Performance-critical UI components
- * - Need for stable references
- * 
- * Use Dexie Live Queries for:
- * - Standard CRUD operations
- * - List/detail views
- * - Dashboard components
- * - Bulk data operations
- * - Cross-tab synchronization
+ * class CustomTaskService extends TaskDomainService {
+ *   // Add custom validation
+ *   protected validateCreate(input: CreateTaskInput): void {
+ *     super.validateCreate(input);
+ *     // Your custom validation
+ *   }
+ *   
+ *   // Add custom business logic
+ *   async assignToTeam(taskId: string, teamId: string): Promise<Task> {
+ *     // Custom implementation
+ *   }
+ * }
+ * ```
  */
 
 // ============================================================================
-// Migration Utilities
+// Helper Functions
 // ============================================================================
 
 /**
- * Utilities for migrating between atomic stores and Dexie patterns
+ * Check if an entity type has a domain service
  */
-export const migrationUtils = {
-  /**
-   * Convert atomic store data to Dexie
-   */
-  async syncAtomicToIndexedDB() {
-    // This would sync current atomic store data to IndexedDB
-    // Useful for transitioning or keeping both in sync during testing
-    console.log('Migration utility: syncAtomicToIndexedDB');
-    // Implementation would go here
-  },
+export function hasDomainService(entityType: string): boolean {
+  return entityType in domainServices;
+}
 
-  /**
-   * Performance comparison helper
-   */
-  async comparePerformance() {
-    // This would run the same operations on both systems and compare timing
-    console.log('Migration utility: comparePerformance');
-    // Implementation would go here
-  },
-};
+/**
+ * Get all available entity types
+ */
+export function getAvailableEntityTypes(): string[] {
+  return Object.keys(domainServices);
+}
 
 // ============================================================================
 // Development Utilities

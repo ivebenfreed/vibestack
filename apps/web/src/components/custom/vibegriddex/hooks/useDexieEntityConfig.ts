@@ -3,6 +3,7 @@ import { db } from '@repo/dataforge/dexie-schema';
 import type { Column } from '../types';
 // Import Dexie domain UI operations that include sync tracking
 import { updateTaskUI, updateProjectUI, updateUserUI, updateCommentUI } from '@/domain-dexie';
+import { getUniqueRelationshipTables } from '../utils/relationship-discovery';
 
 // Entity types we support
 export type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment';
@@ -97,14 +98,7 @@ export function useDexieEntityConfig(
   
   // State for all data - loaded once on mount
   const [data, setData] = useState<any[]>([]);
-  const [relationshipDataState, setRelationshipDataState] = useState<{
-    statusDefinitions: any[],
-    statusSets: any[],
-    tags: any[],
-    tagSets: any[],
-    users: any[],
-    projects: any[]
-  }>({ statusDefinitions: [], statusSets: [], tags: [], tagSets: [], users: [], projects: [] });
+  const [relationshipDataState, setRelationshipDataState] = useState<Record<string, any[]>>({});
   
   // Load all data once on mount - no live queries!
   useEffect(() => {
@@ -134,33 +128,41 @@ export function useDexieEntityConfig(
           }
         }
         
-        // Load all relationship data in parallel
-        const [statusDefs, statusSets, tags, tagSets, users, projects] = await Promise.all([
-          db.status_definitions.toArray(),
-          db.status_sets.toArray(),
-          db.tags.toArray(),
-          db.tag_sets.toArray(),
-          db.users.toArray(),
-          db.projects.toArray()
-        ]);
+        // Dynamically load relationship data based on columns
+        const relationshipState: Record<string, any[]> = {};
+        
+        if (columns && columns.length > 0) {
+          const uniqueTables = getUniqueRelationshipTables(columns);
+          
+          console.log('🔍 useDexieEntityConfig: Loading relationship tables', uniqueTables);
+          
+          // Load all relationship tables in parallel
+          const loadPromises = uniqueTables.map(async (tableName) => {
+            const table = (db as any)[tableName];
+            if (!table) {
+              console.warn('⚠️ No table found for:', tableName);
+              return { tableName, data: [] };
+            }
+            const data = await table.toArray();
+            return { tableName, data };
+          });
+          
+          const results = await Promise.all(loadPromises);
+          
+          // Build relationship state
+          results.forEach(({ tableName, data }) => {
+            relationshipState[tableName] = data;
+          });
+        }
         
         console.log('🔍 useDexieEntityConfig: All initial data loaded', {
           entityType,
           entityCount: entityData.length,
-          usersCount: users.length,
-          projectsCount: projects.length,
-          statusDefsCount: statusDefs.length
+          relationshipTables: Object.keys(relationshipState).length
         });
         
         setData(entityData);
-        setRelationshipDataState({
-          statusDefinitions: statusDefs,
-          statusSets,
-          tags,
-          tagSets,
-          users,
-          projects
-        });
+        setRelationshipDataState(relationshipState);
       } catch (error) {
         console.error('🔍 useDexieEntityConfig: Error loading data', error);
       }
@@ -174,80 +176,37 @@ export function useDexieEntityConfig(
     const data: Record<string, any> = {};
     
     console.log('🔍 useDexieEntityConfig: Building relationship data', {
-      hasStatusDefs: relationshipDataState.statusDefinitions.length > 0,
-      statusDefCount: relationshipDataState.statusDefinitions.length,
-      hasUsers: relationshipDataState.users.length > 0,
-      userCount: relationshipDataState.users.length,
-      hasProjects: relationshipDataState.projects.length > 0,
-      projectCount: relationshipDataState.projects.length
+      tables: Object.keys(relationshipDataState),
+      totalItems: Object.values(relationshipDataState).reduce((sum, arr) => sum + arr.length, 0)
     });
     
     // Convert arrays to id-keyed objects for fast lookup
-    if (relationshipDataState.statusDefinitions.length > 0) {
-      data.statusDefinitions = relationshipDataState.statusDefinitions.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-    }
-    
-    if (relationshipDataState.statusSets.length > 0) {
-      data.statusSets = relationshipDataState.statusSets.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-    }
-    
-    if (relationshipDataState.tags.length > 0) {
-      data.tags = relationshipDataState.tags.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-    }
-    
-    if (relationshipDataState.tagSets.length > 0) {
-      data.tagSets = relationshipDataState.tagSets.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-    }
-    
-    if (relationshipDataState.users.length > 0) {
-      const usersMap = relationshipDataState.users.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-      
-      // Map to both plural and relationship field names
-      data.users = usersMap;
-      data.user = usersMap;
-      data.assignee = usersMap;
-      data.owner = usersMap;
-      data.author = usersMap;
-    }
-    
-    if (relationshipDataState.projects.length > 0) {
-      const projectsMap = relationshipDataState.projects.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-      
-      // Map to both plural and singular forms
-      data.projects = projectsMap;
-      data.project = projectsMap;
-    }
-    
-    if (relationshipDataState.statusDefinitions.length > 0) {
-      const statusMap = relationshipDataState.statusDefinitions.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>);
-      
-      // Map to common status field names
-      data.status = statusMap;
-      data.statusDefinition = statusMap;
-      data.status_definitions = statusMap; // Match the relationshipTable name
-      data.statusDefinitions = statusMap;
-    }
+    Object.entries(relationshipDataState).forEach(([tableName, items]) => {
+      if (items.length > 0) {
+        const itemMap = items.reduce((acc, item) => {
+          acc[item.id] = item;
+          return acc;
+        }, {} as Record<string, any>);
+        
+        // Store under the table name
+        data[tableName] = itemMap;
+        
+        // Also store under common variations for backward compatibility
+        // e.g., "users" -> "user", "assignee", etc.
+        if (tableName === 'users') {
+          data.user = itemMap;
+          data.assignee = itemMap;
+          data.owner = itemMap;
+          data.author = itemMap;
+        } else if (tableName === 'projects') {
+          data.project = itemMap;
+        } else if (tableName === 'status_definitions') {
+          data.status = itemMap;
+          data.statusDefinition = itemMap;
+          data.statusDefinitions = itemMap;
+        }
+      }
+    });
     
     return data;
   }, [relationshipDataState]);

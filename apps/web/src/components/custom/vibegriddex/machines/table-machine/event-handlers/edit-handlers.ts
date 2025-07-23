@@ -63,7 +63,9 @@ function ensureEditingOverlay(context: any, self?: any): EditingOverlay {
       },
       zIndex: 1000,
       relationshipContext: {
-        relationshipResolvers: context.relationshipResolvers
+        relationshipResolvers: context.relationshipResolvers,
+        // Get store actor from context to access relationship data
+        getStore: () => context.storeActor || (window as any).__vibegridx_store_actor
       },
       getRowData: (rowId: string) => {
         // Find the entity data by row ID
@@ -558,17 +560,53 @@ export const editHandlers = {
             });
           }
           
-          // Call entity update handler if provided (fire and forget)
-          console.log('TableMachine: Checking onEntityUpdate availability', {
+          // Use domain service if available, otherwise fall back to onEntityUpdate
+          const hasDomainService = !!context.domainService;
+          console.log('TableMachine: Checking update handler availability', {
+            hasDomainService,
             hasOnEntityUpdate: hasEntityUpdateHandler,
-            onEntityUpdateType: typeof context.onEntityUpdate,
-            contextKeys: Object.keys(context)
+            domainServiceType: typeof context.domainService,
+            onEntityUpdateType: typeof context.onEntityUpdate
           });
           
-          if (context.onEntityUpdate) {
+          if (context.domainService) {
             const updates = { [field]: event.value };
             
-            console.log('TableMachine: Calling onEntityUpdate', {
+            console.log('TableMachine: Using domain service for update', {
+              rowId,
+              updates,
+              field,
+              serviceName: context.domainService.constructor?.name
+            });
+            
+            // Use domain service update method (maintains sync tracking)
+            context.domainService.update(rowId, updates)
+              .then(() => {
+                console.log('TableMachine: Domain service update successful', { rowId, field });
+                // Remove optimistic operation on success
+                self.send({
+                  type: 'edit.operation.remove',
+                  operationId
+                });
+              })
+              .catch((error: any) => {
+                console.error('TableMachine: Domain service update failed', {
+                  rowId,
+                  field,
+                  error
+                });
+                // Emit error event
+                self.send({
+                  type: 'edit.error',
+                  message: `Failed to update ${field}: ${error.message}`,
+                  errors: [error.message]
+                });
+              });
+          } else if (context.onEntityUpdate) {
+            // Fall back to legacy onEntityUpdate if no domain service
+            const updates = { [field]: event.value };
+            
+            console.log('TableMachine: Calling onEntityUpdate (legacy)', {
               rowId,
               updates,
               field,

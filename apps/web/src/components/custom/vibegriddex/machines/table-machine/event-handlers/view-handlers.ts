@@ -501,10 +501,41 @@ export const viewHandlers = {
     ]
   },
   
-  'view.columns.drag.end': {
-    actions: [
-      // Calculate target column based on mouse coordinates
-      ({ context, event }) => {
+  'view.columns.drag.end': [
+    {
+      // Check if column was actually moved
+      guard: ({ context, event }) => {
+        // Quick check to see if drag resulted in any movement
+        const scrollLeft = context.viewport?.scrollLeft || 0;
+        const dragPreview = calculateDragPreview(
+          event.x,
+          event.columnId,
+          context.coordinateMapping,
+          scrollLeft
+        );
+        
+        const dataColumnOrder = context.columnOrder.filter(id => id !== '__selection' && context.columnVisibility[id] !== false);
+        const currentIndex = dataColumnOrder.indexOf(event.columnId);
+        
+        // If column didn't move, skip all actions
+        if (currentIndex === dragPreview.targetIndex) {
+          console.log('Column dropped in same position, skipping all drag end actions');
+          
+          // Still need to clear drag state and restore UI
+          if (context.actors?.rendererActor) {
+            context.actors.rendererActor.send({ type: 'CLEAR_DRAG_PREVIEW' });
+          }
+          document.body.style.cursor = '';
+          document.body.classList.remove('vibegridx-dragging-active');
+          
+          return false;
+        }
+        
+        return true;
+      },
+      actions: [
+        // Calculate target column based on mouse coordinates
+        ({ context, event }) => {
         console.log('🎯 ViewHandler: Column drag end - calculating target from coordinates', {
           columnId: event.columnId,
           mouseX: event.x,
@@ -524,7 +555,7 @@ export const viewHandlers = {
         );
         
         // Double-check the current index from drag preview matches our calculation
-        const dataColumnOrder = context.columnOrder.filter(id => id !== '__selection');
+        const dataColumnOrder = context.columnOrder.filter(id => id !== '__selection' && context.columnVisibility[id] !== false);
         const currentIndexFromOrder = dataColumnOrder.indexOf(event.columnId);
         
         console.log('🎯 ViewHandler: Calculated drag target', {
@@ -536,13 +567,27 @@ export const viewHandlers = {
           indexMismatch: dragPreview.debugInfo?.currentIndex !== currentIndexFromOrder
         });
         
+        // Early exit if no actual movement
+        if (currentIndexFromOrder === dragPreview.targetIndex) {
+          console.log('Column dropped in same position, skipping all updates');
+          // Set a flag to skip subsequent actions
+          (context as any)._skipColumnReorder = true;
+          return;
+        }
+        
         // Store calculated target on context for next action
         (context as any)._calculatedTargetIndex = dragPreview.targetIndex;
+        (context as any)._skipColumnReorder = false;
       },
       
       // Update column order in context using calculated target
       assign({
         columnOrder: ({ context, event }) => {
+          // Skip if flagged as no-op
+          if ((context as any)._skipColumnReorder) {
+            return context.columnOrder;
+          }
+          
           const targetIndex = (context as any)._calculatedTargetIndex;
           
           if (targetIndex !== undefined && context.columnDragState?.columnId) {
@@ -750,9 +795,25 @@ export const viewHandlers = {
       
       // Emit event for UI feedback
       emit({ type: 'view.drag.ended' }),
-      
-    ]
-  },
+      ]
+    },
+    {
+      // No-op case: just clean up drag state
+      actions: [
+        // Clear drag state
+        viewActions.clearColumnDrag,
+        
+        // Clear stored drag tracking state
+        ({ context }) => {
+          delete (context as any)._lastDragTargetIndex;
+          delete (context as any)._calculatedTargetIndex;
+          delete (context as any)._lastDragMouseX;
+          delete (context as any)._lastDragMouseY;
+          delete (context as any)._skipColumnReorder;
+        }
+      ]
+    }
+  ],
   
   'view.columns.drag.cancel': {
     actions: [

@@ -3,20 +3,16 @@ import { ContentContainer } from '@/components/layout/content-container';
 import ProjectsProvider from './context/projects-context';
 import { ProjectsDialogs } from './components/projects-dialogs';
 import { ProjectsPrimaryButtons } from './components/projects-primary-buttons';
-import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex';
+import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex/VibeGridDex';
 import { updateProjectUI } from '@/domain-dexie/project';
 import type { Project } from '@repo/dataforge/client-entities';
 import type { Column } from '@/components/custom/vibegriddex/column-types';
-import { Route } from '@/routes/_authenticated/projects/index';
 
 /**
  * Main Projects Feature Component
- * Using VibeGridDex for Dexie-based data grid with loader pattern
+ * Using VibeGridDex for Dexie-based data grid with Suspense
  */
 const Projects: React.FC = () => {
-  // Get the loader data
-  const loaderData = Route.useLoaderData();
-  const { initialData } = loaderData || {};
   // Define columns for Project entity (responsive widths to prevent overflow)
   const columns: Column<Project>[] = [
     { id: 'name', field: 'name', name: 'Name', cellType: 'text', width: 200 },
@@ -50,20 +46,6 @@ const Projects: React.FC = () => {
   // Error state
   const [error, setError] = React.useState<string | null>(null)
 
-  // Handle entity updates
-  const handleEntityUpdate = React.useCallback(async (rowId: string, updates: Record<string, any>) => {
-    console.log('[Projects] 🚀 Updating project:', { rowId, updates, stack: new Error().stack?.split('\n').slice(2, 5).join('\n') })
-    try {
-      setError(null)
-      await updateProjectUI(rowId, updates)
-      console.log('[Projects] ✅ Project updated successfully')
-    } catch (err) {
-      console.error('[Projects] ❌ Project update failed:', err)
-      setError(err instanceof Error ? err.message : 'Failed to update project')
-      throw err
-    }
-  }, [])
-
   return (
     <ProjectsProvider>
       <div className="flex flex-col h-full">
@@ -88,17 +70,16 @@ const Projects: React.FC = () => {
         </div>
 
         {/* Data Grid */}
-        <VibeGridDex
+        <VibeGridDexWithSuspense
           tableId="projects-table"
           entityType="project"
           columns={columns}
-          onEntityUpdate={handleEntityUpdate}
+          domainService={{ update: updateProjectUI }}
           height={600}
           className="border border-border rounded-lg"
           enableSorting
           enableFiltering
           enableVirtualScrolling
-          initialData={initialData}
         />
       </div>
 

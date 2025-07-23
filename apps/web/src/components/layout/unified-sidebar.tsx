@@ -5,7 +5,7 @@
 
 import * as React from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
-import { useAuth } from '@/hooks/useSimpleAuth'
+import { useAuth } from '@/state-machines'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'

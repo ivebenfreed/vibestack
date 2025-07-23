@@ -22,12 +22,20 @@ export function useAuth() {
       isSigningIn: false,
       isSigningOut: false,
       isCheckingAuth: true,
+      isInErrorRecovery: false,
+      errorRetryCount: 0,
       userRole: null,
       isAdmin: false,
       isSuperAdmin: false,
+      isMember: false,
+      isViewer: false,
       canAccessDebugFeatures: false,
+      canAccessDebug: false,
       displayName: 'User',
       initials: 'U',
+      displayUser: null,
+      isLoading: false,
+      error: null,
       signIn: () => console.error('[useAuth] AuthMachine not available'),
       signOut: () => console.error('[useAuth] AuthMachine not available'),
       refreshAuth: () => console.error('[useAuth] AuthMachine not available'),
@@ -52,6 +60,12 @@ export function useAuth() {
   );
   const isCheckingAuth = useSelector(authActor, (state) => 
     state?.matches ? state.matches('checking') : true
+  );
+  const isInErrorRecovery = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('errorRecovery') : false
+  );
+  const errorRetryCount = useSelector(authActor, (state) => 
+    state?.context?.errorRetryCount || 0
   );
 
   const signIn = useMemo(() => (credentials: { email: string; password: string }) => {
@@ -116,9 +130,17 @@ export function useAuth() {
   const userRole = user?.role || null;
   const isAdmin = userRole === 'admin' || userRole === 'super_admin';
   const isSuperAdmin = userRole === 'super_admin';
+  const isMember = userRole === 'member';
+  const isViewer = userRole === 'viewer';
   const canAccessDebugFeatures = isAdmin;
-  const displayName = user?.name || user?.displayName || 'User';
+  const canAccessDebug = isAdmin; // Alias for compatibility
+  const displayName = user?.name || user?.displayName || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  
+  // Additional computed properties for compatibility
+  const displayUser = user; // Alias for useSimpleAuth compatibility
+  const isLoading = isSigningIn; // Alias for useSimpleAuth compatibility
+  const error = authError; // Alias for useSimpleAuth compatibility
 
   return {
     // User data
@@ -131,14 +153,24 @@ export function useAuth() {
     isSigningIn,
     isSigningOut,
     isCheckingAuth,
+    isInErrorRecovery,
+    errorRetryCount,
     
     // Role data
     userRole,
     isAdmin,
     isSuperAdmin,
+    isMember,
+    isViewer,
     canAccessDebugFeatures,
+    canAccessDebug,
     displayName,
     initials,
+    
+    // Compatibility aliases
+    displayUser,
+    isLoading,
+    error,
     
     // Actions
     signIn,

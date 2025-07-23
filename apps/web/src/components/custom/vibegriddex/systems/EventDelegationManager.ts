@@ -42,7 +42,8 @@ export class EventDelegationManager {
     startPos: null as { x: number; y: number } | null,
     startColumnId: null as string | null,
     startWidth: 0,
-    startX: 0
+    startX: 0,
+    containerRect: null as DOMRect | null  // Cache container dimensions
   };
   
   // Throttling for drag move events
@@ -78,7 +79,8 @@ export class EventDelegationManager {
    * This ensures all coordinates are in the same system as the coordinate mapping
    */
   private convertToContainerCoordinates(event: MouseEvent | { clientX: number; clientY: number }): { x: number; y: number } {
-    const containerRect = this.config.container.getBoundingClientRect();
+    // Use cached container rect during drag operations to avoid forced reflow
+    const containerRect = this.dragState.containerRect || this.config.container.getBoundingClientRect();
     return {
       x: event.clientX - containerRect.left,
       y: event.clientY - containerRect.top
@@ -125,64 +127,78 @@ export class EventDelegationManager {
   private handleMouseDown(event: MouseEvent): void {
     if (this.isDestroyed) return;
     
-    console.log('🎯 EventDelegationManager: MouseDown', {
-      target: (event.target as Element)?.className,
+    // Defer console log to avoid forcing layout
+    const logData = {
+      target: 'vibegridx-header-text', // Use a placeholder to avoid accessing DOM
       timestamp: Date.now(),
       button: event.button
+    };
+    
+    // Log after critical path
+    requestAnimationFrame(() => {
+      console.log('🎯 EventDelegationManager: MouseDown', {
+        ...logData,
+        target: (event.target as Element)?.className // Access DOM property later
+      });
     });
     
     // Determine what was clicked and dispatch appropriate XState event
     const target = event.target as Element;
     
-    // Check if we're clicking on the editing overlay
-    const isEditingPortal = target.closest('.vibegridx-editing-portal');
-    if (isEditingPortal) {
-      console.log('🎯 EventDelegationManager: Event on editing overlay - skipping table actions');
-      // Don't prevent the event, just skip table-specific handling
-      // This allows the dropdown components to receive their events
-      return;
+    // Use a single traversal to find the clicked element type
+    let currentElement: Element | null = target;
+    let foundElement: { type: string; element: HTMLElement } | null = null;
+    
+    // Walk up the DOM tree once to find what was clicked
+    while (currentElement && currentElement !== this.config.container) {
+      const classList = currentElement.classList;
+      
+      if (classList.contains('vibegridx-editing-portal')) {
+        console.log('🎯 EventDelegationManager: Event on editing overlay - skipping table actions');
+        return;
+      }
+      
+      if (!foundElement) {
+        if (classList.contains('vibegridx-resize-handle')) {
+          foundElement = { type: 'resize', element: currentElement as HTMLElement };
+        } else if (classList.contains('vibegridx-fill-handle')) {
+          foundElement = { type: 'fill', element: currentElement as HTMLElement };
+        } else if (classList.contains('vibegridx-header-cell')) {
+          foundElement = { type: 'header', element: currentElement as HTMLElement };
+        } else if (classList.contains('vibegridx-cell')) {
+          foundElement = { type: 'cell', element: currentElement as HTMLElement };
+        } else if (classList.contains('vibegridx-checkbox-wrapper') || 
+                   classList.contains('vibegridx-row-checkbox')) {
+          foundElement = { type: 'checkbox', element: currentElement as HTMLElement };
+        }
+      }
+      
+      currentElement = currentElement.parentElement;
     }
     
-    // Check for resize handle
-    const resizeHandle = target.closest('.vibegridx-resize-handle') as HTMLElement;
-    if (resizeHandle) {
-      this.handleResizeStart(event, resizeHandle);
-      return;
+    // Handle the found element
+    if (foundElement) {
+      switch (foundElement.type) {
+        case 'resize':
+          this.handleResizeStart(event, foundElement.element);
+          break;
+        case 'fill':
+          this.handleFillStart(event);
+          break;
+        case 'header':
+          this.handleHeaderMouseDown(event, foundElement.element);
+          break;
+        case 'cell':
+          this.handleCellMouseDown(event, foundElement.element);
+          break;
+        case 'checkbox':
+          this.handleCheckboxMouseDown(event, foundElement.element);
+          break;
+      }
+    } else {
+      // If nothing specific was clicked, ensure focus but don't start any drag
+      this.ensureFocus();
     }
-    
-    // Check for fill handle
-    const fillHandle = target.closest('.vibegridx-fill-handle');
-    if (fillHandle) {
-      this.handleFillStart(event);
-      return;
-    }
-    
-    // Check for header cell (column operations)
-    const headerCell = target.closest('.vibegridx-header-cell') as HTMLElement;
-    if (headerCell) {
-      this.handleHeaderMouseDown(event, headerCell);
-      return;
-    }
-    
-    // Shadcn components in editing overlay handle their own events properly
-    // No special handling needed - they work naturally within React portals
-    
-    // Check for regular cell
-    const cell = target.closest('.vibegridx-cell') as HTMLElement;
-    if (cell) {
-      this.handleCellMouseDown(event, cell);
-      return;
-    }
-    
-    // Check for selection checkbox
-    const checkbox = target.closest('.vibegridx-checkbox-wrapper, .vibegridx-row-checkbox');
-    if (checkbox) {
-      this.handleCheckboxMouseDown(event, checkbox as HTMLElement);
-      return;
-    }
-    
-    // If nothing specific was clicked, ensure focus but don't start any drag
-    this.ensureFocus();
   }
 
   private handleMouseMove(event: MouseEvent): void {
@@ -276,13 +292,18 @@ export class EventDelegationManager {
         dataset: headerCell.dataset
       });
       
-      if (columnId) {
-        // Send XState event for column click (triggers sorting)
+      // Check if we clicked on the sort icon specifically
+      const sortIcon = target.closest('.vibegridx-sort-icon');
+      
+      if (columnId && sortIcon) {
+        // Only trigger sort if we clicked on the sort icon
+        console.log('🎯 EventDelegationManager: Sort icon clicked, triggering sort');
         this.config.tableSend({
           type: 'view.column.click',
           field: columnId // Use 'field' instead of 'columnId' to match view-slice expectation
         });
-        
+      } else if (columnId && !sortIcon) {
+        console.log('🎯 EventDelegationManager: Header clicked but not on sort icon, ignoring');
       }
       return;
     }
@@ -461,6 +482,7 @@ export class EventDelegationManager {
     // Only prepare for drag if it's a basic click (no modifiers)
     if (!event.ctrlKey && !event.shiftKey) {
       // Prepare for potential drag selection
+      const containerRect = this.config.container.getBoundingClientRect();
       const containerCoords = this.convertToContainerCoordinates(event);
       this.dragState = {
         isDragging: false, // Will become true in mousemove if movement detected
@@ -469,7 +491,8 @@ export class EventDelegationManager {
         startPos: { x: containerCoords.x, y: containerCoords.y },
         startColumnId: null,
         startWidth: 0,
-        startX: 0
+        startX: 0,
+        containerRect  // Cache container dimensions at drag start
       };
       
       // Reset drag cell tracking
@@ -484,19 +507,29 @@ export class EventDelegationManager {
     if (!columnId) return;
     
     const target = event.target as Element;
-    const sortIcon = target.closest('.vibegridx-sort-icon');
-    
-    if (sortIcon) {
+    // Check if sort icon without forcing layout
+    if ((target as HTMLElement).classList?.contains('vibegridx-sort-icon') || 
+        (target.parentElement as HTMLElement)?.classList?.contains('vibegridx-sort-icon')) {
       // Sort operation - handle in click, not mousedown
       return;
     }
     
-    // Immediately change cursor to grabbing for column drag
-    document.body.style.cursor = 'grabbing';
-    document.body.classList.add('vibegridx-dragging-active');
+    // Cache container rect once before any style changes
+    const containerRect = this.config.container.getBoundingClientRect();
     
-    // Column drag start
-    const containerCoords = this.convertToContainerCoordinates(event);
+    // Batch DOM changes using requestAnimationFrame to avoid forced reflow
+    requestAnimationFrame(() => {
+      // Change cursor to grabbing for column drag
+      document.body.style.cursor = 'grabbing';
+      document.body.classList.add('vibegridx-dragging-active');
+    });
+    
+    // Column drag start - use cached container rect
+    const containerCoords = {
+      x: event.clientX - containerRect.left,
+      y: event.clientY - containerRect.top
+    };
+    
     this.dragState = {
       isDragging: false,
       dragType: 'column',
@@ -504,7 +537,8 @@ export class EventDelegationManager {
       startPos: { x: containerCoords.x, y: containerCoords.y },
       startColumnId: columnId,
       startWidth: 0,
-      startX: event.clientX
+      startX: event.clientX,
+      containerRect  // Cache container dimensions at drag start
     };
     
     event.preventDefault();
@@ -578,6 +612,7 @@ export class EventDelegationManager {
       }
     }
     
+    const containerRect = this.config.container.getBoundingClientRect();
     this.dragState = {
       isDragging: true,
       dragType: 'resize',
@@ -585,7 +620,8 @@ export class EventDelegationManager {
       startPos: { x: event.clientX, y: event.clientY },
       startColumnId: columnId,
       startWidth: currentWidth,
-      startX: event.clientX
+      startX: event.clientX,
+      containerRect  // Cache container dimensions at drag start
     };
     
     const containerCoords = this.convertToContainerCoordinates(event);
@@ -601,6 +637,7 @@ export class EventDelegationManager {
   }
 
   private handleFillStart(event: MouseEvent): void {
+    const containerRect = this.config.container.getBoundingClientRect();
     const containerCoords = this.convertToContainerCoordinates(event);
     this.dragState = {
       isDragging: true,
@@ -609,7 +646,8 @@ export class EventDelegationManager {
       startPos: { x: containerCoords.x, y: containerCoords.y },
       startColumnId: null,
       startWidth: 0,
-      startX: 0
+      startX: 0,
+      containerRect  // Cache container dimensions at drag start
     };
     
     this.config.tableSend({
@@ -1008,7 +1046,8 @@ export class EventDelegationManager {
       startPos: null,
       startColumnId: null,
       startWidth: 0,
-      startX: 0
+      startX: 0,
+      containerRect: null  // Clear cached container rect
     };
     this.lastDragCell = null;
     this.lastDragOverColumn = null;

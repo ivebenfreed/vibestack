@@ -312,11 +312,28 @@ export function applyDragPreview(
       floatingPreview = document.createElement('div');
       floatingPreview.className = 'vibegridx-drag-preview';
       floatingPreview.textContent = dragPreview.columnName || dragPreview.draggedColumnId;
+      
+      // Set initial position offscreen to measure dimensions without causing reflow
+      floatingPreview.style.position = 'fixed';
+      floatingPreview.style.left = '-9999px';
+      floatingPreview.style.top = '-9999px';
+      floatingPreview.style.display = 'block';
       document.body.appendChild(floatingPreview);
-      console.log('🎯 ApplyDragPreview: Created element', {
-        element: floatingPreview,
-        parent: floatingPreview.parentElement,
-        text: floatingPreview.textContent
+      
+      // Measure dimensions once after adding to DOM
+      const rect = floatingPreview.getBoundingClientRect();
+      const centerOffsetX = rect.width / 2;
+      const centerOffsetY = rect.height / 2;
+      
+      // Store offsets as data attributes to avoid recalculating
+      floatingPreview.dataset.offsetX = centerOffsetX.toString();
+      floatingPreview.dataset.offsetY = centerOffsetY.toString();
+      
+      console.log('🎯 ApplyDragPreview: Created element with offsets', {
+        width: rect.width,
+        height: rect.height,
+        centerOffsetX,
+        centerOffsetY
       });
     }
     
@@ -324,44 +341,34 @@ export function applyDragPreview(
     const newText = dragPreview.columnName || dragPreview.draggedColumnId;
     if (floatingPreview.textContent !== newText) {
       floatingPreview.textContent = newText;
+      // Recalculate offsets if text changed
+      const rect = floatingPreview.getBoundingClientRect();
+      floatingPreview.dataset.offsetX = (rect.width / 2).toString();
+      floatingPreview.dataset.offsetY = (rect.height / 2).toString();
     }
     
-    // Position the preview at mouse coordinates
-    // The coordinates should now be client coordinates (from event.clientX/Y)
-    // Center the preview horizontally and vertically under the cursor
-    const previewRect = floatingPreview.getBoundingClientRect();
-    const centerOffsetX = previewRect.width / 2;
-    const centerOffsetY = previewRect.height / 2;
+    // Use cached offsets or fallback to defaults
+    const centerOffsetX = parseFloat(floatingPreview.dataset.offsetX || '40');
+    const centerOffsetY = parseFloat(floatingPreview.dataset.offsetY || '20');
     
-    console.log('🎯 ApplyDragPreview: Preview dimensions', {
-      width: previewRect.width,
-      height: previewRect.height,
-      centerOffsetX,
-      centerOffsetY
-    });
+    // Use transform for hardware-accelerated positioning
+    const translateX = dragPreview.mouseX - centerOffsetX;
+    const translateY = dragPreview.mouseY - centerOffsetY;
     
-    // Position directly centered under cursor like it's being grabbed
-    const finalLeft = dragPreview.mouseX - centerOffsetX;
-    const finalTop = dragPreview.mouseY - centerOffsetY;
-    
-    floatingPreview.style.left = `${finalLeft}px`;
-    floatingPreview.style.top = `${finalTop}px`;
+    // Use transform for positioning without overwriting other styles
+    floatingPreview.style.left = '0';
+    floatingPreview.style.top = '0';
+    floatingPreview.style.transform = `translate3d(${translateX}px, ${translateY}px, 0)`;
+    floatingPreview.style.willChange = 'transform';
     floatingPreview.style.display = 'block';
     
-    console.log('🎯 ApplyDragPreview: Final position', {
+    console.log('🎯 ApplyDragPreview: Applied transform position', {
       mouseX: dragPreview.mouseX,
       mouseY: dragPreview.mouseY,
-      finalLeft,
-      finalTop,
+      translateX,
+      translateY,
       centerOffsetX,
-      centerOffsetY,
-      styleLeft: floatingPreview.style.left,
-      styleTop: floatingPreview.style.top,
-      computedStyle: {
-        position: window.getComputedStyle(floatingPreview).position,
-        display: window.getComputedStyle(floatingPreview).display,
-        visibility: window.getComputedStyle(floatingPreview).visibility
-      }
+      centerOffsetY
     });
   } else {
     console.log('🎯 ApplyDragPreview: No mouse coordinates provided', {
@@ -370,14 +377,16 @@ export function applyDragPreview(
     });
   }
   
-  // Clear all preview classes and styles
-  header.querySelectorAll('.vibegridx-header-cell').forEach((cell: HTMLElement) => {
-    cell.classList.remove('vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-debug-boundary');
-    cell.style.removeProperty('--drag-offset');
-    cell.style.removeProperty('transform');
-    cell.style.removeProperty('transition');
-    cell.style.removeProperty('border');
-    cell.style.removeProperty('box-shadow');
+  // Use a more efficient selector and batch class operations
+  const classesToRemove = ['vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-debug-boundary'];
+  const headerCells = header.querySelectorAll('.vibegridx-header-cell');
+  
+  // Batch all DOM writes together
+  headerCells.forEach((cell: HTMLElement) => {
+    // Remove multiple classes at once
+    cell.classList.remove(...classesToRemove);
+    // Reset transform and transition in one go
+    cell.style.cssText = cell.style.cssText.replace(/(?:--drag-offset|transform|transition|border|box-shadow):[^;]+;?/g, '');
   });
   
   // Ensure the header maintains its scroll position during drag

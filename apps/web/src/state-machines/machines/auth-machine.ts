@@ -8,6 +8,7 @@ export interface AuthContext {
   authError: string | null;
   sessionExpiry: string | null;
   lastActivity: number;
+  errorRetryCount?: number;
 }
 
 export type AuthEvent =
@@ -15,7 +16,8 @@ export type AuthEvent =
   | { type: 'SIGN_OUT' }
   | { type: 'CHECK_AUTH' }
   | { type: 'CLEAR_ERROR' }
-  | { type: 'RESTORED_SESSION' };
+  | { type: 'RESTORED_SESSION' }
+  | { type: 'RETRY_AUTH' };
 
 export const authMachine = setup({
   types: {
@@ -56,6 +58,26 @@ export const authMachine = setup({
           user: context.user 
         }
       }));
+    },
+    
+    persistAuthState: ({ context }) => {
+      // Persist auth state to localStorage for recovery
+      const stateToStore = {
+        context: {
+          user: context.user,
+          authToken: context.authToken,
+          sessionExpiry: context.sessionExpiry,
+          lastActivity: context.lastActivity
+        },
+        value: 'authenticated'
+      };
+      
+      try {
+        localStorage.setItem('auth-machine-state', JSON.stringify(stateToStore));
+        console.log('[AuthMachine] Persisted auth state to localStorage');
+      } catch (error) {
+        console.error('[AuthMachine] Failed to persist auth state:', error);
+      }
     },
   },
 }).createMachine({
@@ -106,56 +128,94 @@ export const authMachine = setup({
         src: 'checkAuth',
         onDone: [
           {
+            // Successfully authenticated (including from persisted state during errors)
             target: 'authenticated',
-            guard: ({ event }) => !!event.output?.user,
+            guard: ({ event }) => event.output?.authenticated === true && !!event.output?.user,
             actions: [
               assign({
                 user: ({ event }) => event.output.user,
                 authToken: ({ event }) => event.output.authToken,
                 sessionExpiry: ({ event }) => event.output.sessionExpiry,
-                authError: () => null,
+                authError: ({ event }) => event.output.fromPersisted ? 
+                  `Using cached session (${event.output.error})` : null,
                 lastActivity: () => Date.now(),
               }),
               { 
                 type: 'dispatchAuthStateChange',
-                params: { authenticated: true, reason: 'check-success' }
+                params: ({ event }) => ({ 
+                  authenticated: true, 
+                  reason: event.output.fromPersisted ? 'restored-from-persisted' : 'check-success' 
+                })
               },
+              'persistAuthState'
             ]
           },
           {
+            // Definite sign out required (e.g., 401/403 without persisted auth)
             target: 'unauthenticated',
             guard: ({ event }) => event.output?.shouldSignOut === true,
             actions: [
               'clearAuth',
               { 
                 type: 'dispatchAuthStateChange',
-                params: { authenticated: false, reason: 'check-failed' }
+                params: { authenticated: false, reason: 'check-failed-auth' }
               },
             ]
           },
           {
-            // Network/server errors - stay in checking state if we have persisted auth data
+            // Retryable errors - stay authenticated if we have persisted auth
             target: 'authenticated',
             guard: ({ event, context }) => {
-              // Only stay authenticated if we have valid persisted data AND it's a network error
+              // Stay authenticated if:
+              // 1. Error is retryable (network/server/unknown)
+              // 2. We have valid persisted auth data
+              // 3. Session hasn't expired
+              const hasValidAuth = !!context.user && !!context.authToken;
+              const notExpired = !context.sessionExpiry || 
+                                new Date(context.sessionExpiry) > new Date();
+              const isRetryable = event.output?.retryable === true;
+              
               return event.output?.shouldSignOut === false && 
-                     !!context.user && 
-                     !!context.authToken &&
-                     event.output?.errorType === 'network';
+                     hasValidAuth && 
+                     notExpired &&
+                     isRetryable;
             },
             actions: [
               assign({
-                authError: ({ event }) => `Connection issue: ${event.output?.error || 'Network error'}`,
+                authError: ({ event }) => {
+                  const errorType = event.output?.errorType || 'unknown';
+                  const baseError = event.output?.error || 'Connection issue';
+                  return `${errorType === 'network' ? 'Network issue' : 'Temporary error'}: ${baseError}`;
+                },
                 lastActivity: () => Date.now(),
               }),
               { 
                 type: 'dispatchAuthStateChange',
-                params: { authenticated: true, reason: 'persisted-during-network-error' }
+                params: { authenticated: true, reason: 'persisted-during-error' }
+              },
+              'persistAuthState' // Make sure we persist the state
+            ]
+          },
+          {
+            // Error recovery state - for retryable errors without persisted auth
+            target: 'errorRecovery',
+            guard: ({ event }) => {
+              return event.output?.shouldSignOut === false && 
+                     event.output?.retryable === true;
+            },
+            actions: [
+              assign({
+                authError: ({ event }) => event.output?.error || 'Auth check failed',
+                errorRetryCount: 0,
+              }),
+              { 
+                type: 'dispatchAuthStateChange',
+                params: { authenticated: false, reason: 'error-recovery' }
               },
             ]
           },
           {
-            // Unknown errors or no persisted data - sign out to be safe
+            // Final fallback - sign out
             target: 'unauthenticated',
             actions: [
               'clearAuth',
@@ -164,7 +224,7 @@ export const authMachine = setup({
               }),
               { 
                 type: 'dispatchAuthStateChange',
-                params: { authenticated: false, reason: 'check-failed-unknown' }
+                params: { authenticated: false, reason: 'check-failed-fallback' }
               },
             ]
           }
@@ -324,6 +384,79 @@ export const authMachine = setup({
             { 
               type: 'dispatchAuthStateChange',
               params: { authenticated: false, reason: 'sign-out-error' }
+            },
+          ]
+        }
+      }
+    },
+    
+    errorRecovery: {
+      entry: ({ context }) => {
+        console.log('[AuthMachine] Entering error recovery state', {
+          error: context.authError,
+          retryCount: context.errorRetryCount || 0
+        });
+      },
+      
+      // Automatically retry after a delay
+      after: {
+        // Exponential backoff: 2s, 4s, 8s, then give up
+        2000: [
+          {
+            target: 'checking',
+            guard: ({ context }) => (context.errorRetryCount || 0) < 3,
+            actions: assign({
+              errorRetryCount: ({ context }) => (context.errorRetryCount || 0) + 1,
+            })
+          },
+          {
+            // Max retries reached, go to unauthenticated
+            target: 'unauthenticated',
+            actions: [
+              'clearAuth',
+              assign({
+                authError: ({ context }) => `${context.authError} (max retries reached)`,
+              }),
+              { 
+                type: 'dispatchAuthStateChange',
+                params: { authenticated: false, reason: 'error-recovery-failed' }
+              },
+            ]
+          }
+        ]
+      },
+      
+      on: {
+        // Allow manual retry
+        RETRY_AUTH: {
+          target: 'checking',
+          actions: assign({
+            authError: null,
+            errorRetryCount: ({ context }) => (context.errorRetryCount || 0) + 1,
+          })
+        },
+        
+        // Allow manual sign in
+        SIGN_IN: {
+          target: 'signingIn',
+          actions: assign({
+            authError: null,
+            errorRetryCount: 0,
+          })
+        },
+        
+        // If we get a restored session event, go to authenticated
+        RESTORED_SESSION: {
+          target: 'authenticated',
+          actions: [
+            assign({
+              authError: null,
+              errorRetryCount: 0,
+              lastActivity: () => Date.now(),
+            }),
+            { 
+              type: 'dispatchAuthStateChange',
+              params: { authenticated: true, reason: 'session-restored-from-error' }
             },
           ]
         }

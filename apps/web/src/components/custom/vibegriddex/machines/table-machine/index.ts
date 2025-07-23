@@ -30,7 +30,7 @@ import { rendererActor } from '../../actors/renderer-actor';
 import { canvasActor } from '../../actors/canvas-actor';
 import { editActor } from '../../actors/edit-actor';
 import { dragActor } from '../../actors/drag-actor';
-import { dataSubscriptionActor } from '../../actors/data-subscription-actor';
+// Data subscription actor removed - using store subscription
 // No overlay actor needed - canvas subscribes directly to table machine context
 
 // Import view processing
@@ -144,6 +144,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Entity update handler
     onEntityUpdate: input.onEntityUpdate,
     
+    // Domain service for entity operations
+    domainService: input.domainService,
+    
     actors: {
       rendererActor: null,
       canvasActor: null,
@@ -197,7 +200,6 @@ export const tableBaseMachine = setup({
     viewActor,
     editActor,
     dragActor,
-    dataSubscriptionActor,
   },
   
   actions: {
@@ -314,7 +316,12 @@ export const tableBaseMachine = setup({
   id: 'tableBaseMachine',
   context: ({ input }) => {
     try {
-      return createDefaultContext(input);
+      const context = createDefaultContext(input);
+      // Store the storeActor in context for access in entry actions
+      return {
+        ...context,
+        storeActor: input.storeActor
+      };
     } catch (error) {
       console.error('TableMachine: Error creating context:', error);
       // Return a minimal valid context
@@ -432,25 +439,69 @@ export const tableBaseMachine = setup({
     },
     
     active: {
-      entry: [],
-      
       initial: 'idle',
       
-      // Data subscription actor for live updates from Dexie (entities + relationships)
-      invoke: {
-        id: 'dataSubscription',
-        src: 'dataSubscriptionActor',
-        input: ({ context }) => ({ 
-          entityType: context.entityType,
-          includeRelationships: true, // Subscribe to relationship tables too
-          skipInitialEmission: context.hasInitialData // Skip first emission when we have preloaded data
-        }),
-        onError: {
-          actions: ({ event }) => {
-            console.error('❌ TableMachine: Data subscription error:', event);
+      // Set up store subscription immediately on entry
+      entry: [
+        ({ context, self }) => {
+          // Get storeActor from context
+          const storeActor = context.storeActor;
+          
+          console.log('🔍 TableMachine: Setting up store subscription on entry', {
+            hasStoreActor: !!storeActor,
+            storeActorType: typeof storeActor,
+            storeActorState: storeActor?.getSnapshot?.()?.status,
+            storeEntitiesCount: storeActor?.getSnapshot?.()?.context?.entities ? Object.keys(storeActor.getSnapshot().context.entities).length : 0
+          });
+          
+          if (storeActor) {
+            // Subscribe directly to the store actor
+            const subscription = storeActor.subscribe({
+              next: (snapshot) => {
+                console.log('🔍 TableMachine: Store snapshot received via subscription', {
+                  hasEntities: !!snapshot?.context?.entities,
+                  entitiesCount: snapshot?.context?.entities ? Object.keys(snapshot.context.entities).length : 0,
+                  loading: snapshot?.context?.loading,
+                  currentState: (self as any).getSnapshot?.()?.value
+                });
+                
+                // Send event to update entities
+                self.send({ 
+                  type: 'STORE_SNAPSHOT_RECEIVED', 
+                  snapshot 
+                });
+              },
+              error: (error) => {
+                console.error('❌ TableMachine: Store subscription error', error);
+              }
+            });
+            
+            // Store subscription for cleanup
+            (self as any).__storeSubscription = subscription;
+            
+            // Get initial snapshot
+            const initialSnapshot = storeActor.getSnapshot();
+            if (initialSnapshot?.context?.entities && Object.keys(initialSnapshot.context.entities).length > 0) {
+              console.log('🔍 TableMachine: Sending initial store snapshot', {
+                entitiesCount: Object.keys(initialSnapshot.context.entities).length
+              });
+              self.send({ 
+                type: 'STORE_SNAPSHOT_RECEIVED', 
+                snapshot: initialSnapshot 
+              });
+            }
           }
         }
-      },
+      ],
+      exit: [
+        ({ self }) => {
+          console.log('🔍 TableMachine: Cleaning up store subscription');
+          const subscription = (self as any).__storeSubscription;
+          if (subscription) {
+            subscription.unsubscribe();
+          }
+        }
+      ],
       
       states: {
         idle: {
@@ -687,6 +738,7 @@ export const tableBaseMachine = setup({
               ]
             },
             
+            
             // Include all common event handlers in idle state
             ...selectionHandlers,
             ...viewHandlers,
@@ -698,9 +750,29 @@ export const tableBaseMachine = setup({
         },
         
         processingViewData: {
+          entry: [
+            ({ context }) => {
+              console.log('🔍 TableMachine: Entering processingViewData state', {
+                entitiesCount: context.entities?.length || 0,
+                rowsCount: context.rows?.length || 0
+              });
+            }
+          ],
           
           // Allow handling events while processing
           on: {
+            // Handle re-invocation of view actor when new data arrives
+            INVOKE_VIEW_ACTOR: {
+              target: 'processingViewData',
+              reenter: true,
+              actions: [
+                ({ context }) => {
+                  console.log('🔍 TableMachine: Re-invoking view actor with updated entities', {
+                    entitiesCount: context.entities?.length || 0
+                  });
+                }
+              ]
+            },
             
             // Selection events should be queued or handled
             ...selectionHandlers,
@@ -808,6 +880,34 @@ export const tableBaseMachine = setup({
       
       // Handle these events at the active state level
       on: {
+      // Handle store snapshot updates at active level so it's always available
+      STORE_SNAPSHOT_RECEIVED: {
+        actions: [
+          assign({
+            entities: ({ event }) => {
+              console.log('🔍 TableMachine: Processing store snapshot at active level', {
+                hasEntities: !!event.snapshot?.context?.entities,
+                entitiesCount: event.snapshot?.context?.entities ? Object.keys(event.snapshot.context.entities).length : 0,
+                loading: event.snapshot?.context?.loading
+              });
+              
+              if (event.snapshot?.context?.entities) {
+                const entitiesArray = Object.values(event.snapshot.context.entities);
+                console.log('🔍 TableMachine: Updating entities from store', {
+                  entityCount: entitiesArray.length
+                });
+                return entitiesArray;
+              }
+              return [];
+            }
+          }),
+          ({ self }) => {
+            console.log('🔄 TableMachine: Entities updated from store, invoking view actor');
+            self.send({ type: 'INVOKE_VIEW_ACTOR' });
+          }
+        ]
+      },
+      
       // PERFORMANCE: Initialize canvas actor for selection (post-render spawning)
       SPAWN_CANVAS_ACTOR_FOR_SELECTION: {
         actions: [

@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import { VibeGridDex } from '@/components/custom/vibegriddex';
-import { updateTaskUI } from '@/domain-dexie';
+import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex';
+import { updateTaskUI, createTaskUI } from '@/domain-dexie';
 import { Button } from '@/components/ui/button';
 import { db } from '@repo/dataforge/dexie-schema';
-import type { ColumnDef } from '@/components/custom/vibegriddex/column-types';
-import { Task, TaskPriority } from '@repo/dataforge/client-entities';
+import type { Column } from '@/components/custom/vibegriddex/column-types';
+import { Task, TaskPriority, TaskStatus } from '@repo/dataforge/client-entities';
 
 // Type-safe column definitions with compile-time validation
-const createTaskColumns = (): ColumnDef<Task>[] => {
+const createTaskColumns = (): Column<Task>[] => {
   return [
     { 
       id: 'title', 
@@ -19,12 +19,15 @@ const createTaskColumns = (): ColumnDef<Task>[] => {
     },
     { 
       id: 'status', 
-      field: 'statusId', 
+      field: 'status', 
       name: 'Status', 
-      cellType: 'relationship-single', // Validated: string → relationship-single ✓
+      cellType: 'enum', // Status is an enum not a relationship
       editable: true,
-      relationshipTable: 'status_definitions',
-      relationshipDisplayField: 'name'
+      options: [
+        { value: TaskStatus.TODO, label: 'To Do' },
+        { value: TaskStatus.IN_PROGRESS, label: 'In Progress' },
+        { value: TaskStatus.COMPLETED, label: 'Completed' }
+      ]
     },
     { 
       id: 'priority', 
@@ -77,108 +80,13 @@ const createTaskColumns = (): ColumnDef<Task>[] => {
   ];
 };
 
-// Import syncProcessView for processing data in the loader
-import { syncProcessView } from '@/components/custom/vibegriddex/utils/syncViewProcessor';
-
 export const Route = createFileRoute('/_authenticated/debug/vibegriddex-test')({
-  staleTime: 60_000, // Cache for 1 minute
-  loader: async () => {
-    console.log('🔴🔴🔴 VibeGridDex Test Loader: STARTING - This should appear in console!');
-    console.log('📋 VibeGridDex Test Loader: Loading all data...');
-    
-    // Load all data in parallel
-    const [tasks, users, projects, statusDefinitions, statusSets] = await Promise.all([
-      db.tasks.toArray(),
-      db.users.toArray(),
-      db.projects.toArray(),
-      db.status_definitions.toArray(),
-      db.status_sets.toArray()
-    ]);
-    
-    // Build relationship data map
-    const relationshipData = {
-      users: users.reduce((acc, user) => ({ ...acc, [user.id]: user }), {}),
-      projects: projects.reduce((acc, project) => ({ ...acc, [project.id]: project }), {}),
-      status_definitions: statusDefinitions.reduce((acc, status) => ({ ...acc, [status.id]: status }), {}),
-      statusDefinitions: statusDefinitions.reduce((acc, status) => ({ ...acc, [status.id]: status }), {}),
-      status: statusDefinitions.reduce((acc, status) => ({ ...acc, [status.id]: status }), {})
-    };
-    
-    // Create relationship resolvers
-    const relationshipResolvers = {
-      assignee: (id: string) => {
-        const user = relationshipData.users[id];
-        return user?.name || id;
-      },
-      project: (id: string) => {
-        const project = relationshipData.projects[id];
-        return project?.name || id;
-      },
-      status: (id: string) => {
-        const status = relationshipData.status_definitions[id];
-        return status?.name || id;
-      }
-    };
-    
-    // Process the view data
-    const columns = createTaskColumns();
-    const processedData = syncProcessView({
-      entities: tasks,
-      columns,
-      relationshipResolvers,
-      sortBy: [],
-      filters: [],
-      groupBy: [],
-      columnWidths: {},
-      columnVisibility: {},
-      columnOrder: [],
-      enableSelectionColumn: true,
-      rowHeight: 40
-    });
-    
-    console.log('📋 VibeGridDex Test Loader: Data loaded and processed', {
-      taskCount: tasks.length,
-      userCount: users.length,
-      projectCount: projects.length,
-      processedRowCount: processedData.processedRows.length,
-      columnCount: processedData.visibleColumns.length
-    });
-    
-    return {
-      tasks,
-      relationshipData,
-      initialData: {
-        processedRows: processedData.processedRows,
-        visibleColumns: processedData.visibleColumns,
-        coordinateMapping: processedData.coordinateMapping,
-        relationshipData, // Include relationship data directly in initialData
-        relationshipResolvers // Include resolvers too
-      }
-    };
-  },
+  // No loader - data fetching handled by Suspense in component
   component: VibeGridDexTestPage,
 });
 
 function VibeGridDexTestPage() {
-  console.log('🟡🟡🟡 VibeGridDexTestPage: Component RENDERING');
-  
-  // Use direct destructuring to ensure we get the loader data
-  const loaderData = Route.useLoaderData();
-  
-  console.log('VibeGridDexTestPage: Raw loader data', loaderData);
-  
-  const { tasks, relationshipData, initialData } = loaderData || {};
-  
-  console.log('VibeGridDexTestPage: Loader data check', {
-    hasLoaderData: !!loaderData,
-    loaderDataKeys: loaderData ? Object.keys(loaderData) : [],
-    tasksFromLoader: tasks?.length || 0,
-    hasRelationshipData: !!relationshipData,
-    hasInitialData: !!initialData,
-    initialDataKeys: initialData ? Object.keys(initialData) : [],
-    processedRowCount: initialData?.processedRows?.length || 0,
-    visibleColumnCount: initialData?.visibleColumns?.length || 0
-  });
+  console.log('🟡🟡🟡 VibeGridDexTestPage: Component RENDERING with Suspense architecture');
   
   // Setup task status set if it doesn't exist
   const ensureTaskStatusSet = async () => {
@@ -264,7 +172,7 @@ function VibeGridDexTestPage() {
     const testTasks = Array.from({ length: 5 }, (_, i) => ({
       title: `Test Task ${Date.now()}-${i}`,
       description: `Created from VibeGridDex test page`,
-      statusId: availableStatuses.length > 0 ? availableStatuses[i % availableStatuses.length].id : null,
+      status: [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED][i % 3],
       priority: ['low', 'medium', 'high'][i % 3] as any,
       assigneeId: existingUsers.length > 0 ? existingUsers[i % existingUsers.length].id : null,
       projectId: existingProjects.length > 0 ? existingProjects[i % existingProjects.length].id : null,
@@ -278,7 +186,7 @@ function VibeGridDexTestPage() {
         statusId: task.statusId
       });
       
-      await updateTaskUI(crypto.randomUUID(), task);
+      await createTaskUI(task);
     }
     
     console.log('Test tasks created');
@@ -304,23 +212,16 @@ function VibeGridDexTestPage() {
         </div>
       </div>
       
-      <VibeGridDex
+      <VibeGridDexWithSuspense
         tableId="dexie-tasks-test"
         entityType="task"
         columns={createTaskColumns() as any}
+        domainService={{ update: updateTaskUI }}
         height={600}
         enableSelectionColumn={true}
         enableVirtualScrolling={true}
         enableSorting={true}
         enableFiltering={true}
-        initialData={initialData}
-        {...console.log('🟢🟢🟢 Passing initialData to VibeGridDex:', { 
-          hasInitialData: !!initialData,
-          processedRowCount: initialData?.processedRows?.length || 0,
-          visibleColumnCount: initialData?.visibleColumns?.length || 0,
-          hasRelationshipData: !!(initialData as any)?.relationshipData,
-          relationshipDataKeys: Object.keys((initialData as any)?.relationshipData || {})
-        })}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
 import { useLayoutStoreV2 } from '@/stores/layoutStoreV2'
-import { useAuth } from '@/state-machines/orchestrator-hooks-v2'
+import { useAuth } from '@/state-machines'
 
 // Global sidebar width constant
 export const GLOBAL_SIDEBAR_WIDTH = 64

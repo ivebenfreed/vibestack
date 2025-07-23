@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useCallback, useMemo, lazy } from 'react';
-import { useActorRef } from '@xstate/react';
+import React, { useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useActorRef, useSelector } from '@xstate/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { tableBaseMachine } from './machines/table-machine';
 import { 
@@ -29,6 +29,11 @@ import type { RelationshipOptionsProvider } from './types';
 import { createGenericRelationshipProvider } from './providers/generic-relationship-provider-dexie';
 import { useDexieEntityConfig, type VibeGridXEntityType } from './hooks/useDexieEntityConfig';
 import { applyColumnDefaults } from './column-defaults';
+import { addRelationshipProvidersToColumns } from './providers/relationship-provider-factory';
+
+// Import store-based architecture  
+import { useTableData } from './hooks/useTableData';
+import { TableSkeleton } from './components/TableSkeleton';
 
 // ====================================
 // COMPONENT PROPS
@@ -115,17 +120,22 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     return null;
   }, [props.initialData]);
   
-  // Apply defaults to columns
-  const columnsWithDefaults = useMemo(() => {
-    return applyColumnDefaults(props.columns);
-  }, [props.columns]);
+  // Get store first - entities will come from store subscription in table machine
+  const store = (props as any).store;
   
-  // Use entity configuration with explicit columns
-  const dexieEntityConfig = useDexieEntityConfig(
-    props.entityType,
-    columnsWithDefaults,
-    preloadedData
-  );
+  // Apply defaults to columns and add relationship providers
+  const columnsWithDefaults = useMemo(() => {
+    const withDefaults = applyColumnDefaults(props.columns);
+    // Add relationship providers that read from the store
+    return addRelationshipProvidersToColumns(withDefaults, () => store);
+  }, [props.columns, store]);
+  
+  // REMOVED - Store provides all data
+  // const dexieEntityConfig = useDexieEntityConfig(
+  //   props.entityType,
+  //   columnsWithDefaults,
+  //   preloadedData
+  // );
   
   // ====================================
   // REFS AND STATE - MUST BE DECLARED BEFORE ANY RETURNS
@@ -206,178 +216,48 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     return null;
   }, [persistenceKey, tableId, entityType]);
 
-  // Create entity config from dexie data
-  const entityConfig = useMemo(() => {
-    if (!dexieEntityConfig) return null;
-    
-    const providedProviders = props.relationshipOptionsProviders || {};
-    
-    // Use columns with defaults
-    const baseColumns = columnsWithDefaults;
-    
-    // Auto-generate options providers for relationship columns
-    const autoRelationshipOptionsProviders: RelationshipOptionsProviders = {};
-    
-    baseColumns.forEach(column => {
-      const cellType = column.cellType || column.type;
-      if (cellType?.startsWith('relationship') && column.relationshipTable && !providedProviders[column.id]) {
-        // Add entity type to column for filtering
-        const enhancedColumn = {
-          ...column,
-          relationshipEntityType: props.entityType
-        };
-        
-        console.log('🔍 VibeGridDex: Creating generic relationship provider', {
-          columnId: column.id,
-          relationshipTable: column.relationshipTable,
-          entityType: props.entityType,
-          cellType
-        });
-        
-        // Create a Dexie-based provider
-        autoRelationshipOptionsProviders[column.id] = createGenericRelationshipProvider(enhancedColumn, dexieEntityConfig.relationshipData);
-      }
-    });
-    
-    // Merge provided and auto-generated providers
-    const allRelationshipOptionsProviders = { ...autoRelationshipOptionsProviders, ...providedProviders };
-    
-    // Add options providers to columns
-    const columnsWithProviders = baseColumns.map(column => {
-      const provider = allRelationshipOptionsProviders[column.id];
-      if (provider) {
-        return { ...column, relationshipOptionsProvider: provider };
-      }
-      return column;
-    });
-    
-    return {
-      columns: columnsWithProviders,
-      data: dexieEntityConfig.data,
-      relationshipData: dexieEntityConfig.relationshipData,
-      relationshipResolvers: dexieEntityConfig.relationshipResolvers,
-      relationshipOptionsProviders: allRelationshipOptionsProviders,
-      onEntityUpdate: props.onEntityUpdate || dexieEntityConfig.onEntityUpdate  // Allow override
-    };
-  }, [dexieEntityConfig, props.columns, props.relationshipOptionsProviders, props.entityType, props.onEntityUpdate, props.initialData]);
+  // SIMPLIFIED - Store provides all data
+  const columns = columnsWithDefaults;
   
-  // Extract configuration from entity config
-  const columns = entityConfig?.columns || [];
-  const data = entityConfig?.data || [];
-  const relationshipData = entityConfig?.relationshipData || {};
-  const relationshipOptionsProviders = entityConfig?.relationshipOptionsProviders || {};
-  const onEntityUpdate = entityConfig?.onEntityUpdate;
-  const relationshipResolvers = entityConfig?.relationshipResolvers || {};
+  console.log('🔍 VibeGridDex: Store debugging', {
+    hasStore: !!store,
+    storeType: typeof store,
+    storeState: store?.getSnapshot?.()?.status,
+    storeContext: store?.getSnapshot?.()?.context ? 'present' : 'missing',
+    propsKeys: Object.keys(props),
+    hasStoreInProps: 'store' in props
+  });
   
-  // Use data directly from Dexie live query
-  const entities = data || [];
-  
-  // Columns already have providers from entityConfig
-  const columnsWithProviders = columns;
-  
-  // Process data through syncViewProcessor for initial render
-  const processedData = useMemo(() => {
-    // Debug: Check what we're receiving
-    console.log('VibeGridDex: processedData useMemo', {
-      propsInitialData: props.initialData,
-      hasPropsInitialData: !!props.initialData,
-      propsInitialDataType: typeof props.initialData,
-      propsInitialDataKeys: props.initialData ? Object.keys(props.initialData) : []
-    });
-    
-    // If we have initialData from route loader, use that for first render
-    if (props.initialData) {
-      console.log('VibeGridDex: Using initialData from route loader', {
-        rowCount: props.initialData.processedRows?.length || 0,
-        hasProcessedRows: !!props.initialData.processedRows,
-        sampleRow: props.initialData.processedRows?.[0]
-      });
-      return props.initialData;
-    }
-    
-    // Otherwise process entities locally
-    if (!entities || entities.length === 0) {
-      return null;
-    }
-    
-    // Filter out any undefined/null columns
-    const validColumns = columnsWithProviders.filter(col => col != null);
-    
-    console.log('VibeGridDex: Processing data locally', {
-      entityCount: entities.length,
-      columnCount: validColumns.length,
-      hasRelationshipResolvers: !!relationshipResolvers,
-      resolverKeys: relationshipResolvers ? Object.keys(relationshipResolvers) : [],
-      sampleEntity: entities[0]
-    });
-    
-    const viewInput = {
-      entities,
-      columns: validColumns,
-      relationshipResolvers,
-      sortBy: persistedData?.sortBy || [],
-      filters: persistedData?.filters || [],
-      groupBy: persistedData?.groupBy || [],
-      columnWidths: persistedData?.columnWidths || {},
-      columnVisibility: persistedData?.columnVisibility || {},
-      columnOrder: persistedData?.columnOrder || [],
-      enableSelectionColumn: enableSelectionColumn,
-      rowHeight: 40
-    };
-    
-    const processed = syncProcessView(viewInput);
-    console.log('VibeGridDex: Locally processed data:', {
-      entityCount: entities.length,
-      processedRows: processed.processedRows.length,
-      columnCount: validColumns.length,
-      sampleProcessedRow: processed.processedRows[0]
-    });
-    
-    return {
-      processedRows: processed.processedRows,
-      visibleColumns: processed.visibleColumns,
-      coordinateMapping: processed.coordinateMapping
-    };
-  }, [
-    // Only include entities if we don't have initialData
-    // This prevents re-processing when data subscription updates
-    props.initialData ? null : entities, 
-    columnsWithProviders, 
-    relationshipResolvers, 
-    props.initialData
-  ]);
+  // REMOVED - View actor handles processing, not needed here
+  const processedData = null;
 
-  // Create machine configuration
+  // Create machine configuration - SIMPLIFIED for store architecture
   const machineConfig = useMemo(() => {
-    console.log('VibeGridDex: Creating machine config', {
-      hasProcessedData: !!processedData,
-      processedRowCount: processedData?.processedRows?.length || 0,
-      hasInitialData: !!props.initialData,
-      initialDataRowCount: props.initialData?.processedRows?.length || 0,
-      entityCount: entities.length,
-      sampleProcessedRow: processedData?.processedRows?.[0]?.data,
-      hasResolvedValues: processedData?.processedRows?.[0]?.data ? 
-        Object.keys(processedData.processedRows[0].data).filter(k => k.includes('__resolved')).length > 0 : false,
-      columns: columnsWithProviders,
-      columnCount: columnsWithProviders.length,
-      columnIds: columnsWithProviders.map(c => c.id),
-      hasInitialResolvers: !!(props.initialData as any)?.relationshipResolvers,
-      resolverKeys: Object.keys((props.initialData as any)?.relationshipResolvers || {})
+    console.log('🔍 VibeGridDex: Creating machine config with store', {
+      hasStore: !!store,
+      storeType: typeof store,
+      storeActorState: store?.getSnapshot?.()?.status,
+      storeEntityCount: store?.getSnapshot?.()?.context?.entities ? Object.keys(store.getSnapshot().context.entities).length : 0,
+      columnCount: columns.length,
+      startingWithEmptyEntities: true
     });
+    
+    // Store actor in window for table machine to access
+    if (store) {
+      (window as any).__vibegridx_store_actor = store;
+    }
     
     return {
       input: {
         id: tableId,
         entityType: entityType,
-        columns: columnsWithProviders,
+        columns: columns,
         enableSelectionColumn: enableSelectionColumn,
-        entities: entities,
-        data: data,
-        relationshipData: relationshipData,
-        relationshipResolvers: (props.initialData as any)?.relationshipResolvers || relationshipResolvers,
+        entities: [], // Start empty - store subscription will populate
         persistedData: persistedData,
-        initialData: props.initialData || processedData,
-        onEntityUpdate: onEntityUpdate,
+        relationshipResolvers: {}, // NOT NEEDED - store has resolved data
+        storeActor: store, // Store subscription will provide entities
+        domainService: (props as any).domainService, // Pass domain service for edit operations
         settings: {
           enableVirtualScrolling: props.enableVirtualScrolling ?? true,
           enableGrouping: props.enableGrouping ?? true,
@@ -387,7 +267,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
             start: 0,
             end: Math.ceil((typeof height === 'number' ? height : 600) / 40),
             height: typeof height === 'number' ? height : 600,
-            width: typeof width === 'number' ? width : Math.min(800, window.innerWidth - 32), // 32px for margins
+            width: typeof width === 'number' ? width : Math.min(800, window.innerWidth - 32),
             scrollTop: 0,
             scrollLeft: 0,
             itemHeight: 40
@@ -395,7 +275,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         }
       }
     };
-  }, [tableId, entityType, columns, enableSelectionColumn, relationshipResolvers, persistedData, props.initialData, onEntityUpdate, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, height, width]);
+  }, [tableId, entityType, columns, enableSelectionColumn, persistedData, height, width, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, store]);
   
   // Create table actor with the machine config
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
@@ -450,6 +330,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   useEffect(() => {
     return () => {
       delete (window as any).__vibegridx_renderer_options;
+      delete (window as any).__vibegridx_store_actor;
       
       // Import and call cleanupEditingOverlay to ensure global overlay is cleaned up
       import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
@@ -499,62 +380,28 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     vibeGridXApi.hideAllColumns();
   }, [vibeGridXApi]);
 
-  // Send entities synchronously on first render with data
-  if (entities && entities.length > 0 && !entitiesSentRef.current) {
-    const sendStartTime = performance.now();
-    entitiesSentRef.current = true;
-  }
+  // Entities come from store subscription - no need to send manually
 
   // ====================================
   // CONDITIONAL RENDERING - ALL HOOKS HAVE BEEN CALLED ABOVE
   // ====================================
 
-  console.log('VibeGridDex: Configuration status', {
-    entityType,
-    hasConfig: !!dexieEntityConfig,
-    dataCount: data.length,
-    columnCount: columns.length,
-    usingManualColumns: !!props.columns,
-    relationshipDataKeys: Object.keys(relationshipData),
-    relationshipResolverKeys: Object.keys(relationshipResolvers),
-    sampleEntity: data[0]
-  });
-  
-  // Show loading if entity config is not ready yet or columns are empty
-  if (!entityConfig || columns.length === 0) {
-    console.log('VibeGridDex: Waiting for configuration', {
-      hasEntityConfig: !!entityConfig,
-      columnCount: columns.length,
-      dataCount: data.length
+  // Check if we have store and columns
+  if (!store || columns.length === 0) {
+    console.log('VibeGridDex: Waiting for store and columns', {
+      hasStore: !!store,
+      columnCount: columns.length
     });
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
-        Loading configuration...
+        Loading...
       </div>
     );
   }
-  
-  
-  // Validate required props - but allow rendering if we have initialData
-  if (!data && !props.initialData) {
-    console.error('VibeGridDex: data is required. Either provide it directly or use entityType for auto-configuration.');
-    return <div>Error: Missing required data</div>;
-  }
-  
-  if (!columns || columns.length === 0) {
-    console.error('VibeGridDex: columns are required. Either provide them directly or use entityType for auto-configuration.');
-    return <div>Error: Missing required columns</div>;
-  }
-  
-  // Log entity count
-  console.log('VibeGridDex: Entity count:', { 
-    entityCount: entities.length
-  });
 
   // DEBUG: Track rendering - should only happen on prop changes, not XState transitions
   console.log('🎯 VibeGridX: Rendering component (container shell only)', {
-    hasEntities: entities.length > 0,
-    entitiesLength: entities.length,
+    hasStore: !!store,
     renderReason: 'prop_change_or_mount',
     timestamp: performance.now()
   });
@@ -598,10 +445,57 @@ export function VibeGridDex<T extends Record<string, any> = any>(
 }
 
 // ====================================
+// SUSPENSE WRAPPER COMPONENT
+// ====================================
+
+/**
+ * Inner component that uses the Suspense data hook
+ */
+function VibeGridDexInner<T extends Record<string, any> = any>(
+  props: VibeGridDexProps<T> & { store: any }
+): React.ReactElement {
+  // Call the original VibeGridDex with store data
+  return <VibeGridDex {...props} />;
+}
+
+/**
+ * Wrapper component that provides Suspense boundary
+ */
+export function VibeGridDexWithSuspense<T extends Record<string, any> = any>(
+  props: VibeGridDexProps<T>
+): React.ReactElement {
+  const { columns: columnCount } = props;
+  
+  return (
+    <Suspense fallback={<TableSkeleton columns={columnCount?.length || 5} />}>
+      <VibeGridDexSuspenseLoader {...props} />
+    </Suspense>
+  );
+}
+
+/**
+ * Component that loads data with Suspense
+ */
+function VibeGridDexSuspenseLoader<T extends Record<string, any> = any>(
+  props: VibeGridDexProps<T>
+): React.ReactElement {
+  // This hook suspends until data is ready
+  const { store } = useTableData(props.entityType, props.columns);
+  
+  // Pass store to inner component - store contains all data
+  return (
+    <VibeGridDexInner 
+      {...props} 
+      store={store}
+    />
+  );
+}
+
+// ====================================
 // EXPORTS
 // ====================================
 
-// Export the main component
+// Export the main component (without Suspense for backward compatibility)
 export default VibeGridDex;
 
 // Export types for external use

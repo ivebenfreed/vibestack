@@ -245,6 +245,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
 
 /**
  * Get relationship tables that should be subscribed to for a given entity type
+ * @deprecated This is the old hardcoded approach - use column-based discovery instead
  */
 function getRelationshipTablesForEntity(entityType: string): string[] {
   // Common relationships across all entities

@@ -105,6 +105,16 @@ export interface ViewActorOutput {
     columnCount: number;
     timestamp: number;
   };
+  
+  // Relationship tracking for surgical updates
+  relationshipUsage?: {
+    // Map of entity ID -> relationship columns -> relationship IDs used
+    entityRelationships: Map<string, Map<string, string | string[]>>;
+    // Map of relationship ID -> entity IDs that use it
+    reverseIndex: Map<string, Set<string>>;
+    // Map of column ID -> relationship table name
+    columnToTable: Map<string, string>;
+  };
 }
 
 // ====================================
@@ -159,7 +169,7 @@ const createGroupTree = (
   return groupTree;
 };
 
-const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
+const applySorting = (rows: TableRow[], sortBy: SortConfig[], columns?: Column[]): TableRow[] => {
   // If no explicit sort is configured, maintain the original order from entities
   // This preserves the insertion order and prevents re-ordering on updates
   if (sortBy.length === 0) {
@@ -172,13 +182,18 @@ const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
   
   // OPTIMIZATION: Pre-compute sort keys and comparators for better performance
   const sortConfigs = sortBy.map(sort => {
+    // Check if this is a relationship column
+    const column = columns?.find(col => col.id === sort.field);
+    const isRelationship = column && (column.cellType === 'relationship-single' || column.cellType === 'relationship-multi');
+    const effectiveSortField = isRelationship ? `__resolved_${sort.field}` : sort.field;
+    
     // Pre-determine the comparison function based on first non-null value
     let compareFn: (a: any, b: any) => number;
     let sampleValue: any = null;
     
     // Find first non-null value to determine type
     for (const row of rows) {
-      const value = row.data[sort.field];
+      const value = row.data[effectiveSortField];
       if (value != null) {
         sampleValue = value;
         break;
@@ -191,16 +206,17 @@ const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
     } else if (sampleValue instanceof Date) {
       compareFn = (a: Date, b: Date) => a.getTime() - b.getTime();
     } else {
-      // Cache string conversion and use fast comparison
+      // Cache string conversion and use case-insensitive comparison
       compareFn = (a: any, b: any) => {
-        const aStr = String(a);
-        const bStr = String(b);
+        const aStr = String(a).toLowerCase();
+        const bStr = String(b).toLowerCase();
         return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
       };
     }
     
     return {
-      field: sort.field,
+      field: effectiveSortField,
+      originalField: sort.field,
       direction: sort.direction,
       compareFn
     };
@@ -210,14 +226,18 @@ const applySorting = (rows: TableRow[], sortBy: SortConfig[]): TableRow[] => {
   const sortedRows = rows.slice(); // Single slice instead of spread
   
   sortedRows.sort((a, b) => {
-    for (const { field, direction, compareFn } of sortConfigs) {
+    for (const { field, originalField, direction, compareFn } of sortConfigs) {
       const aValue = a.data[field];
       const bValue = b.data[field];
       
-      // Handle null/undefined quickly
-      if (aValue === bValue) continue;
-      if (aValue == null) return 1;
-      if (bValue == null) return -1;
+      // Handle null/undefined - nulls go to bottom for ASC, top for DESC
+      // Check for null, undefined, or empty string
+      const aIsEmpty = aValue == null || aValue === '';
+      const bIsEmpty = bValue == null || bValue === '';
+      
+      if (aIsEmpty && bIsEmpty) continue;
+      if (aIsEmpty) return direction === 'asc' ? 1 : -1;
+      if (bIsEmpty) return direction === 'asc' ? -1 : 1;
       
       const comparison = compareFn(aValue, bValue);
       if (comparison !== 0) {
@@ -387,19 +407,19 @@ const calculateCoordinateMapping = (
 export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }): Promise<ViewActorOutput> => {
   const startTime = performance.now();
   
-  // OPTIMIZATION: Pre-compute relationship columns outside the entity loop
-  const relationshipColumns = input.relationshipResolvers ? 
+  // When using store architecture, relationships are pre-resolved
+  const hasPreResolvedData = input.entities.length > 0 && 
+    input.entities[0].__resolved_project !== undefined;
+  
+  if (hasPreResolvedData) {
+    console.log('[ViewActor] Using pre-resolved data from store');
+  }
+  
+  // OPTIMIZATION: Only compute relationship columns if not pre-resolved
+  const relationshipColumns = (!hasPreResolvedData && input.relationshipResolvers) ? 
     input.columns.filter(col => {
       const cellType = col.cellType || col.type;
       const hasResolver = !!input.relationshipResolvers![col.id];
-      
-      console.log('[ViewActor] Checking relationship column', {
-        columnId: col.id,
-        field: col.field,
-        cellType,
-        hasResolver,
-        relationshipTable: col.relationshipTable
-      });
       
       return cellType?.startsWith('relationship') && hasResolver;
     }).map(col => ({
@@ -408,36 +428,75 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
       resolvedKey: `__resolved_${col.id}`
     })) : [];
     
-  console.log('[ViewActor] Relationship columns to resolve', {
-    count: relationshipColumns.length,
-    columns: relationshipColumns.map(c => ({ field: c.field, resolvedKey: c.resolvedKey }))
+  console.log('[ViewActor] Processing mode', {
+    hasPreResolvedData,
+    relationshipColumnsToResolve: relationshipColumns.length
   });
   
-  // Step 1: Convert entities to TableRows with optimized relationship resolution
+  // Initialize relationship tracking
+  const entityRelationships = new Map<string, Map<string, string | string[]>>();
+  const reverseIndex = new Map<string, Set<string>>();
+  const columnToTable = new Map<string, string>();
+  
+  // Track column to table mappings
+  input.columns.forEach(col => {
+    if (col.relationshipTable) {
+      columnToTable.set(col.id, col.relationshipTable);
+    }
+  });
+
+  // Step 1: Convert entities to TableRows
   const relationshipStartTime = performance.now();
   const allRows: TableRow[] = input.entities.map((entity, index) => {
-    // OPTIMIZATION: Single-pass relationship resolution using reduce
-    const resolvedData = relationshipColumns.length > 0 ? 
-      relationshipColumns.reduce((data, { field, resolver, resolvedKey }) => {
-        const value = entity[field];
-        if (value != null) {
-          const resolved = resolver(value);
-          data[resolvedKey] = resolved;
-          
-          // Log first few resolutions for debugging
-          if (index < 2) {
-            console.log('[ViewActor] Resolving relationship', {
-              entityId: entity.id,
-              field,
-              value,
-              resolved,
-              resolvedKey
-            });
+    // Track relationships for this entity (if not pre-resolved)
+    const entityRelMap = new Map<string, string | string[]>();
+    
+    // Skip resolution if data is pre-resolved from store
+    const resolvedData = hasPreResolvedData ? entity : 
+      relationshipColumns.length > 0 ? 
+        relationshipColumns.reduce((data, { field, resolver, resolvedKey }) => {
+          const value = entity[field];
+          if (value != null) {
+            const resolved = resolver(value);
+            data[resolvedKey] = resolved;
+            
+            // Track relationship usage
+            entityRelMap.set(field, value);
+            
+            // Update reverse index
+            if (Array.isArray(value)) {
+              value.forEach(v => {
+                if (!reverseIndex.has(v)) {
+                  reverseIndex.set(v, new Set());
+                }
+                reverseIndex.get(v)!.add(entity.id);
+              });
+            } else {
+              if (!reverseIndex.has(value)) {
+                reverseIndex.set(value, new Set());
+              }
+              reverseIndex.get(value)!.add(entity.id);
+            }
+            
+            // Log first few resolutions for debugging
+            if (index < 2) {
+              console.log('[ViewActor] Resolving relationship', {
+                entityId: entity.id,
+                field,
+                value,
+                resolved,
+                resolvedKey
+              });
+            }
           }
-        }
-        return data;
-      }, { ...entity }) : 
-      entity;
+          return data;
+        }, { ...entity }) : 
+        entity;
+    
+    // Store entity relationship mapping
+    if (entityRelMap.size > 0) {
+      entityRelationships.set(entity.id, entityRelMap);
+    }
     
     return {
       id: entity.id,
@@ -455,7 +514,7 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
   
   // Step 2: Apply data transformations
   const filteredRows = applyFilters(allRows, input.filters);
-  const sortedRows = applySorting(filteredRows, input.sortBy);
+  const sortedRows = applySorting(filteredRows, input.sortBy, input.columns);
   const groupTree = createGroupTree(sortedRows, input.groupBy, input.columns);
   
   // Data transformation completed
@@ -545,7 +604,15 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
       rowCount: sortedRows.length,
       columnCount: visibleColumns.length,
       timestamp: Date.now()
-    }
+    },
+    // Include relationship tracking if we have any relationships
+    ...(entityRelationships.size > 0 ? {
+      relationshipUsage: {
+        entityRelationships,
+        reverseIndex,
+        columnToTable
+      }
+    } : {})
   };
   
   // Processing completed - performance info available in debug mode

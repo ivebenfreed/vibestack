@@ -45,12 +45,21 @@ export const authClient = createAuthClient({
       maxDelay: import.meta.env.DEV ? 5000 : 60000, // Longer max delay in production
       shouldRetry: (response: Response | null) => {
         // Always retry on network failures (response is null)
-        if (response === null) return true;
+        if (response === null) {
+          console.log('[AUTH] Network failure detected, will retry');
+          return true;
+        }
         
         // Retry on 5xx server errors
-        if (response.status >= 500) return true;
+        if (response.status >= 500) {
+          console.log(`[AUTH] Server error ${response.status} detected, will retry`);
+          return true;
+        }
         
         // Don't retry on 4xx client errors (auth failures, validation errors, etc.)
+        if (response.status >= 400 && response.status < 500) {
+          console.log(`[AUTH] Client error ${response.status} detected, will not retry`);
+        }
         return false;
       }
     },

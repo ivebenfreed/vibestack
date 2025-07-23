@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAppInit, useSystem } from '@/state-machines/orchestrator-hooks-v2';
+import { useAppInit, useSystem } from '@/state-machines';
 import { SyncManager, SyncState } from '@/sync/SyncManager';
 
 export type FlowStatus = 'idle' | 'sending' | 'receiving' | 'acknowledged' | 'processed' | 'error' | 'timeout';

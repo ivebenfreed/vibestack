@@ -1,396 +1,125 @@
 /**
- * Dexie-based Task Domain
+ * Task Domain - Re-export from new domain service architecture
  * 
- * This is a parallel implementation that uses Dexie live queries instead of atomic stores.
- * It provides the same interface as the atomic store version but uses Dexie for data persistence and reactivity.
- * 
- * Uses the same 3-path pattern as the XState domain:
- * - UI operations: Include manual sync tracking via trackOutgoingChange
- * - Incoming operations: Server sync without tracking (to avoid loops)
- * - Direct Dexie updates: For live queries to react
+ * This file now re-exports from the new formalized domain services.
+ * The old implementation has been moved to task-service.ts
  */
 
-import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
+import { domainServices } from './index';
+import type { Task } from '@repo/dataforge/client-entities';
+import type { CreateTaskInput, UpdateTaskInput } from './task-service';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@repo/dataforge/dexie-schema';
-import { nanoid } from 'nanoid';
-import { trackOutgoingChange } from '@/db/dexie-change-tracking';
+
+// Re-export types
+export type { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
+export type { CreateTaskInput, UpdateTaskInput } from './task-service';
 
 // ============================================================================
-// Types
+// Function Exports (for backward compatibility)
 // ============================================================================
 
-export interface CreateTaskInput {
-  title: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  projectId?: string;
-  assigneeId?: string;
-  dueDate?: string;
-  estimatedDuration?: number;
-  order?: number;
-}
+export const createTaskUI = (input: CreateTaskInput): Promise<Task> => domainServices.task.createUI(input);
+export const updateTaskUI = (id: string, updates: UpdateTaskInput): Promise<Task> => domainServices.task.updateUI(id, updates);
+export const deleteTaskUI = (id: string): Promise<boolean> => domainServices.task.deleteUI(id);
+export const createTaskIncoming = (task: Task): Promise<Task> => domainServices.task.createIncoming(task);
+export const updateTaskIncoming = (id: string, updates: Partial<Task>): Promise<Task> => domainServices.task.updateIncoming(id, updates);
+export const deleteTaskIncoming = (id: string): Promise<boolean> => domainServices.task.deleteIncoming(id);
 
-export interface UpdateTaskInput {
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  projectId?: string;
-  assigneeId?: string;
-  dueDate?: string;
-  estimatedDuration?: number;
-  actualDuration?: number;
-  completedAt?: string;
-  order?: number;
-  blockedReason?: string;
-}
-
-// ============================================================================
-// UI Operations (with sync tracking)
-// ============================================================================
-
-/**
- * Create Task from UI - includes manual sync tracking
- */
-export async function createTaskUI(taskData: CreateTaskInput): Promise<Task> {
-  const task: Task = {
-    id: nanoid(),
-    title: taskData.title,
-    description: taskData.description || '',
-    status: taskData.status || 'todo',
-    priority: taskData.priority || 'medium',
-    projectId: taskData.projectId,
-    assigneeId: taskData.assigneeId,
-    dueDate: taskData.dueDate,
-    estimatedDuration: taskData.estimatedDuration,
-    actualDuration: undefined,
-    order: taskData.order || 0,
-    blockedReason: undefined,
-    completedAt: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    clientId: 'dexie-client', // TODO: Get from sync context
-    userId: 'current-user', // TODO: Get from auth context
-    // Legacy fields for compatibility
-    legacyStatus: taskData.status || 'todo',
-    statusId: undefined, // TODO: Map from status to statusId
-    startDate: undefined,
-  };
-
-  // Apply to Dexie
-  await db.tasks.add(task);
-  
-  // Track for outgoing sync
-  await trackOutgoingChange('tasks', 'insert', task);
-  
-  return task;
-}
-
-/**
- * Update Task from UI - includes manual sync tracking
- */
-export async function updateTaskUI(taskId: string, updates: UpdateTaskInput): Promise<Task> {
-  const existingTask = await db.tasks.get(taskId);
-  if (!existingTask) {
-    throw new Error(`Task ${taskId} not found`);
+// Bulk operations
+export async function bulkCreateTasksUI(tasksData: CreateTaskInput[]): Promise<Task[]> {
+  const tasks: Task[] = [];
+  for (const taskData of tasksData) {
+    const task = await createTaskUI(taskData);
+    tasks.push(task);
   }
-
-  const updatedTask: Task = {
-    ...existingTask,
-    ...updates,
-    updatedAt: new Date().toISOString(),
-    // Handle status updates
-    legacyStatus: updates.status || existingTask.legacyStatus,
-    // Handle completion
-    completedAt: updates.status === 'completed' ? new Date().toISOString() : existingTask.completedAt,
-  };
-
-  // Apply to Dexie
-  await db.tasks.put(updatedTask);
-  
-  // Track for outgoing sync
-  await trackOutgoingChange('tasks', 'update', updatedTask);
-  
-  return updatedTask;
+  return tasks;
 }
 
-/**
- * Delete Task from UI - includes manual sync tracking
- */
-export async function deleteTaskUI(taskId: string): Promise<boolean> {
-  const existingTask = await db.tasks.get(taskId);
-  if (!existingTask) {
-    return false;
-  }
-
-  try {
-    await db.transaction('rw', db.tasks, db.task_tags, db.task_dependencies, async () => {
-      // Delete the task
-      await db.tasks.delete(taskId);
-      
-      // Clean up relationships
-      await db.task_tags.where('taskId').equals(taskId).delete();
-      await db.task_dependencies.where('dependentTaskId').equals(taskId).delete();
-      await db.task_dependencies.where('dependencyTaskId').equals(taskId).delete();
-    });
-    
-    // Track for outgoing sync (use the existing task data for the delete operation)
-    await trackOutgoingChange('tasks', 'delete', existingTask);
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting task:', error);
-    return false;
-  }
-}
-
-// ============================================================================
-// Incoming Operations (no sync tracking)
-// ============================================================================
-
-/**
- * Create Task from incoming sync - no tracking to avoid loops
- */
-export async function createTaskIncoming(taskData: Task): Promise<Task> {
-  // Apply to Dexie without tracking
-  await db.tasks.add(taskData);
-  return taskData;
-}
-
-/**
- * Update Task from incoming sync - no tracking to avoid loops
- */
-export async function updateTaskIncoming(taskId: string, updates: Partial<Task>): Promise<Task> {
-  const existingTask = await db.tasks.get(taskId);
-  if (!existingTask) {
-    throw new Error(`Task ${taskId} not found`);
-  }
-
-  const updatedTask: Task = {
-    ...existingTask,
-    ...updates,
-  };
-
-  // Apply to Dexie without tracking
-  await db.tasks.put(updatedTask);
-  return updatedTask;
-}
-
-/**
- * Delete Task from incoming sync - no tracking to avoid loops
- */
-export async function deleteTaskIncoming(taskId: string): Promise<boolean> {
-  try {
-    await db.transaction('rw', db.tasks, db.task_tags, db.task_dependencies, async () => {
-      // Delete the task
-      await db.tasks.delete(taskId);
-      
-      // Clean up relationships
-      await db.task_tags.where('taskId').equals(taskId).delete();
-      await db.task_dependencies.where('dependentTaskId').equals(taskId).delete();
-      await db.task_dependencies.where('dependencyTaskId').equals(taskId).delete();
-    });
-    
-    return true;
-  } catch (error) {
-    console.error('Error deleting task:', error);
-    return false;
-  }
-}
-
-/**
- * Bulk create tasks from incoming sync
- */
 export async function bulkCreateTasksIncoming(tasksData: Task[]): Promise<Task[]> {
-  if (tasksData.length === 0) return [];
-  
-  console.log(`[TaskDomain] Bulk creating ${tasksData.length} tasks from incoming sync`);
-  const startTime = Date.now();
-  
-  try {
-    // Apply to Dexie without tracking
-    await db.tasks.bulkAdd(tasksData);
-    
-    const processingTime = Date.now() - startTime;
-    const throughput = (tasksData.length / processingTime) * 1000;
-    console.log(`[TaskDomain] ✅ Bulk inserted ${tasksData.length} tasks in ${processingTime}ms (${throughput.toFixed(0)} tasks/sec)`);
-    
-    return tasksData;
-  } catch (error) {
-    console.error(`[TaskDomain] ❌ Bulk insert failed for ${tasksData.length} tasks:`, error);
-    throw error;
-  }
+  return domainServices.task.bulkCreateIncoming(tasksData);
 }
 
 // ============================================================================
-// Bulk Operations
-// ============================================================================
-
-/**
- * Bulk create tasks from UI - includes manual sync tracking
- */
-export async function bulkCreateTasksUI(tasks: CreateTaskInput[]): Promise<Task[]> {
-  const taskEntities: Task[] = tasks.map(taskData => ({
-    id: nanoid(),
-    title: taskData.title,
-    description: taskData.description || '',
-    status: taskData.status || 'todo',
-    priority: taskData.priority || 'medium',
-    projectId: taskData.projectId,
-    assigneeId: taskData.assigneeId,
-    dueDate: taskData.dueDate,
-    estimatedDuration: taskData.estimatedDuration,
-    actualDuration: undefined,
-    order: taskData.order || 0,
-    blockedReason: undefined,
-    completedAt: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    clientId: 'dexie-client',
-    userId: 'current-user',
-    legacyStatus: taskData.status || 'todo',
-    statusId: undefined,
-    startDate: undefined,
-  }));
-
-  await db.tasks.bulkAdd(taskEntities);
-  
-  // Track each task for outgoing sync
-  for (const task of taskEntities) {
-    await trackOutgoingChange('tasks', 'insert', task);
-  }
-  
-  return taskEntities;
-}
-
-// ============================================================================
-// Live Query Hooks (Replace Atomic Store Hooks)
+// Live Query Hooks (kept for backward compatibility)
 // ============================================================================
 
 export const useTaskQueries = {
   /**
-   * Get all tasks (sorted by creation date)
+   * Get all tasks (reactive)
    */
   allTasks: () => {
-    return useLiveQuery(async () => {
-      const tasks = await db.tasks.toArray();
-      return tasks.sort((a, b) => {
-        // Add defensive checks for createdAt
-        const aCreatedAt = a?.createdAt || new Date().toISOString();
-        const bCreatedAt = b?.createdAt || new Date().toISOString();
-        return new Date(bCreatedAt).getTime() - new Date(aCreatedAt).getTime();
-      });
-    });
+    return useLiveQuery(() => db.tasks.toArray()) || [];
   },
 
   /**
-   * Get a single task by ID
+   * Get tasks by project (reactive)
    */
-  taskById: (id: string) => {
-    return useLiveQuery(async () => {
-      return await db.tasks.get(id);
-    }, [id]);
+  byProject: (projectId: string) => {
+    return useLiveQuery(
+      () => projectId ? db.tasks.where('projectId').equals(projectId).toArray() : [],
+      [projectId]
+    ) || [];
   },
 
   /**
-   * Get tasks by project ID
+   * Get tasks by assignee (reactive)
    */
-  tasksByProject: (projectId: string) => {
-    return useLiveQuery(async () => {
-      if (!projectId) return [];
-      const tasks = await db.tasks.where('projectId').equals(projectId).toArray();
-      return tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
-    }, [projectId]);
+  byAssignee: (userId: string) => {
+    return useLiveQuery(
+      () => userId ? db.tasks.where('assigneeId').equals(userId).toArray() : [],
+      [userId]
+    ) || [];
   },
 
   /**
-   * Get tasks by assignee ID
+   * Get tasks by status (reactive)
    */
-  tasksByAssignee: (assigneeId: string) => {
-    return useLiveQuery(async () => {
-      if (!assigneeId) return [];
-      return await db.tasks.where('assigneeId').equals(assigneeId).toArray();
-    }, [assigneeId]);
+  byStatus: (status: string) => {
+    return useLiveQuery(
+      () => status ? db.tasks.where('status').equals(status).toArray() : [],
+      [status]
+    ) || [];
   },
 
   /**
-   * Get tasks by status
+   * Get task by ID (reactive)
    */
-  tasksByStatus: (status: TaskStatus) => {
-    return useLiveQuery(async () => {
-      return await db.tasks.where('status').equals(status).toArray();
-    }, [status]);
+  byId: (taskId: string) => {
+    return useLiveQuery(
+      () => taskId ? db.tasks.get(taskId) : undefined,
+      [taskId]
+    );
   },
 
   /**
-   * Get task count
+   * Get task count (reactive)
    */
-  taskCount: () => {
-    return useLiveQuery(async () => {
-      return await db.tasks.count();
-    });
+  count: () => {
+    return useLiveQuery(() => db.tasks.count()) || 0;
   },
 
   /**
-   * Get task statistics
+   * Get task count by project (reactive)
    */
-  taskStats: () => {
-    return useLiveQuery(async () => {
-      const tasks = await db.tasks.toArray();
-      
-      const stats = {
-        total: tasks.length,
-        completed: tasks.filter(t => t.status === 'completed').length,
-        inProgress: tasks.filter(t => t.status === 'in_progress').length,
-        todo: tasks.filter(t => t.status === 'todo').length,
-        overdue: tasks.filter(t => {
-          if (!t.dueDate) return false;
-          return new Date(t.dueDate) < new Date() && t.status !== 'completed';
-        }).length,
-        byStatus: new Map<TaskStatus, number>(),
-        byPriority: new Map<TaskPriority, number>(),
-      };
-
-      // Group by status
-      tasks.forEach(task => {
-        const statusCount = stats.byStatus.get(task.status) || 0;
-        stats.byStatus.set(task.status, statusCount + 1);
-        
-        const priorityCount = stats.byPriority.get(task.priority) || 0;
-        stats.byPriority.set(task.priority, priorityCount + 1);
-      });
-
-      return stats;
-    });
+  countByProject: (projectId: string) => {
+    return useLiveQuery(
+      () => projectId ? db.tasks.where('projectId').equals(projectId).count() : 0,
+      [projectId]
+    ) || 0;
   },
 
   /**
-   * Get recent tasks (last 10)
+   * Get overdue tasks (reactive)
    */
-  recentTasks: () => {
-    return useLiveQuery(async () => {
-      const tasks = await db.tasks.orderBy('updatedAt').reverse().limit(10).toArray();
-      return tasks;
-    });
-  },
-
-  /**
-   * Search tasks by title/description
-   */
-  searchTasks: (query: string) => {
-    return useLiveQuery(async () => {
-      if (!query.trim()) return [];
-      
-      const tasks = await db.tasks.toArray();
-      const searchLower = query.toLowerCase();
-      
-      return tasks.filter(task => 
-        task.title.toLowerCase().includes(searchLower) ||
-        (task.description && task.description.toLowerCase().includes(searchLower))
-      );
-    }, [query]);
+  overdue: () => {
+    return useLiveQuery(() => {
+      const now = new Date().toISOString();
+      return db.tasks
+        .where('dueDate')
+        .below(now)
+        .and(task => task.status !== 'completed')
+        .toArray();
+    }) || [];
   },
 };
-

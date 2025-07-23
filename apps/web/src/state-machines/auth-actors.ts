@@ -50,25 +50,66 @@ export const checkAuthActor = fromPromise(async () => {
   } catch (error) {
     console.error('[checkAuthActor] Auth check failed:', error);
     
+    // Try to get persisted auth data before deciding what to do
+    const persistedAuth = localStorage.getItem('auth-machine-state');
+    const hasValidPersistedAuth = (() => {
+      if (!persistedAuth) return false;
+      try {
+        const parsed = JSON.parse(persistedAuth);
+        const hasUser = !!parsed?.context?.user;
+        const hasToken = !!parsed?.context?.authToken;
+        const notExpired = !parsed?.context?.sessionExpiry || 
+                          new Date(parsed.context.sessionExpiry) > new Date();
+        return hasUser && hasToken && notExpired;
+      } catch {
+        return false;
+      }
+    })();
+    
     // Analyze the error to determine if it's a network issue or auth failure
     const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Better error detection including response status
     const isNetworkError = errorMessage.includes('fetch') || 
                           errorMessage.includes('network') || 
                           errorMessage.includes('timeout') ||
                           errorMessage.includes('ECONNREFUSED') ||
                           errorMessage.includes('ENOTFOUND') ||
-                          errorMessage.includes('Failed to fetch');
+                          errorMessage.includes('Failed to fetch') ||
+                          errorMessage.includes('NetworkError');
     
-    // Check if it's an HTTP error with status
+    // Check if it's an HTTP error with status - be more specific
     const isServerError = errorMessage.includes('500') || 
                          errorMessage.includes('502') || 
                          errorMessage.includes('503') || 
-                         errorMessage.includes('504');
+                         errorMessage.includes('504') ||
+                         errorMessage.includes('INTERNAL_SERVER_ERROR') ||
+                         errorMessage.includes('Internal Server Error');
     
     const isAuthError = errorMessage.includes('401') || 
                        errorMessage.includes('403') || 
                        errorMessage.includes('Unauthorized') ||
-                       errorMessage.includes('Forbidden');
+                       errorMessage.includes('Forbidden') ||
+                       errorMessage.includes('UNAUTHORIZED');
+    
+    // If we have valid persisted auth and it's a server/network error, stay authenticated
+    if ((isNetworkError || isServerError) && hasValidPersistedAuth) {
+      console.log('[checkAuthActor] Server/network error but have valid persisted auth, staying authenticated');
+      try {
+        const parsed = JSON.parse(persistedAuth!);
+        return {
+          authenticated: true,
+          user: parsed.context.user,
+          authToken: parsed.context.authToken,
+          sessionExpiry: parsed.context.sessionExpiry,
+          fromPersisted: true,
+          errorType: 'recoverable',
+          error: errorMessage
+        };
+      } catch {
+        // Fall through to normal error handling
+      }
+    }
     
     if (isNetworkError || isServerError) {
       // Network/server errors - don't sign out, keep trying
@@ -77,10 +118,21 @@ export const checkAuthActor = fromPromise(async () => {
         authenticated: false, 
         shouldSignOut: false, 
         errorType: 'network',
-        error: errorMessage 
+        error: errorMessage,
+        retryable: true
       };
     } else if (isAuthError) {
-      // Actual auth errors - sign out
+      // Actual auth errors - only sign out if we don't have valid persisted auth
+      if (hasValidPersistedAuth) {
+        console.log('[checkAuthActor] Auth error but have valid persisted session, not signing out yet');
+        return { 
+          authenticated: false, 
+          shouldSignOut: false, 
+          errorType: 'auth',
+          error: errorMessage,
+          retryable: true
+        };
+      }
       console.log('[checkAuthActor] Authentication error detected, will sign out');
       return { 
         authenticated: false, 
@@ -95,7 +147,8 @@ export const checkAuthActor = fromPromise(async () => {
         authenticated: false, 
         shouldSignOut: false, 
         errorType: 'unknown',
-        error: errorMessage 
+        error: errorMessage,
+        retryable: true
       };
     }
   }
