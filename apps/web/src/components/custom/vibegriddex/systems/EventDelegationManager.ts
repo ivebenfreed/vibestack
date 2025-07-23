@@ -20,6 +20,8 @@ import type { ViewportInfo, CellRef } from '../types';
 export interface EventDelegationConfig {
   container: HTMLElement;
   tableSend: ActorRefFrom<typeof tableBaseMachine>['send'];
+  // Add a getter function to always get the current tableSend
+  getTableSend?: () => ActorRefFrom<typeof tableBaseMachine>['send'];
 }
 
 // ====================================
@@ -233,16 +235,19 @@ export class EventDelegationManager {
         
         switch (this.dragState.dragType) {
           case 'selection':
-            this.config.tableSend({ type: 'selection.drag.end' });
+            const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'selection.drag.end' });
             break;
           case 'column':
             this.handleColumnDragEnd(event);
             break;
           case 'resize':
-            this.config.tableSend({ type: 'view.columns.resize.end' });
+            const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'view.columns.resize.end' });
             break;
           case 'fill':
-            this.config.tableSend({ type: 'FILL_COMPLETE', fillCells: new Set() });
+            const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'FILL_COMPLETE', fillCells: new Set() });
             break;
         }
       } else if (this.dragState.dragType === 'column') {
@@ -298,7 +303,8 @@ export class EventDelegationManager {
       if (columnId && sortIcon) {
         // Only trigger sort if we clicked on the sort icon
         console.log('🎯 EventDelegationManager: Sort icon clicked, triggering sort');
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'view.column.click',
           field: columnId // Use 'field' instead of 'columnId' to match view-slice expectation
         });
@@ -349,7 +355,8 @@ export class EventDelegationManager {
       
       if (rowId && columnId) {
         // Start editing on double-click - works anywhere in the cell
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'edit.cell.start',
           rowId,
           columnId
@@ -392,13 +399,15 @@ export class EventDelegationManager {
         }
         
         // Then ensure edit mode is ended
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'edit.ensure.end'
         });
         
         // Small delay to allow state to settle before starting new edit
         setTimeout(() => {
-          this.config.tableSend({
+          const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
             type: 'edit.cell.start.single',
             rowId,
             columnId,
@@ -417,7 +426,8 @@ export class EventDelegationManager {
     event.preventDefault();
     
     // Start editing immediately on content click
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'edit.cell.start.single',
       rowId,
       columnId,
@@ -462,7 +472,8 @@ export class EventDelegationManager {
       }
       
       // Then ensure edit mode is ended
-      this.config.tableSend({
+      const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
         type: 'edit.ensure.end'
       });
     }
@@ -471,7 +482,8 @@ export class EventDelegationManager {
     this.ensureFocus();
     
     // Start cell selection
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'selection.cell.select',
       rowId,
       columnId,
@@ -566,7 +578,8 @@ export class EventDelegationManager {
       if (rowId) {
         console.log('🎯 EventDelegationManager: Row checkbox clicked', { rowId });
         // Send XState event for row selection toggle (correct event name)
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'selection.checkbox.toggle',
           rowId,
           ctrlKey: event.ctrlKey,
@@ -586,7 +599,8 @@ export class EventDelegationManager {
       const isCurrentlyChecked = checkboxInput?.checked || false;
       
       // If currently checked, deselect all; if not checked, select all
-      this.config.tableSend({
+      const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
         type: isCurrentlyChecked ? 'selection.checkbox.none' : 'selection.checkbox.all'
       });
     }
@@ -625,7 +639,8 @@ export class EventDelegationManager {
     };
     
     const containerCoords = this.convertToContainerCoordinates(event);
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'view.columns.resize.start',
       columnId,
       x: containerCoords.x,
@@ -650,7 +665,8 @@ export class EventDelegationManager {
       containerRect  // Cache container dimensions at drag start
     };
     
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'FILL_START',
       direction: 'vertical'
     });
@@ -675,7 +691,8 @@ export class EventDelegationManager {
       
       if (deltaX > 5 || deltaY > 5) {
         this.dragState.isDragging = true;
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'selection.drag.start',
           startCell: this.dragState.startCell!
         });
@@ -697,7 +714,8 @@ export class EventDelegationManager {
           // Only send update if we've moved to a different cell
           if (currentCellKey !== this.lastDragCell) {
             this.lastDragCell = currentCellKey;
-            this.config.tableSend({
+            const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
               type: 'selection.drag.move',
               currentCell: { rowId, columnId }
             });
@@ -720,7 +738,8 @@ export class EventDelegationManager {
       if (deltaX > 5 || deltaY > 5) {
         this.dragState.isDragging = true;
         const containerCoords = this.convertToContainerCoordinates(event);
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'view.columns.drag.start',
           columnId: this.dragState.startColumnId!,
           x: containerCoords.x,
@@ -764,7 +783,8 @@ export class EventDelegationManager {
           const freshEvent = { clientX: currentClientX, clientY: currentClientY } as MouseEvent;
           const containerCoords = this.convertToContainerCoordinates(freshEvent);
           
-          this.config.tableSend({
+          const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
             type: 'view.columns.drag.move',
             x: containerCoords.x,
             y: containerCoords.y,
@@ -779,7 +799,8 @@ export class EventDelegationManager {
       // Enough time has passed, send immediately and update timestamp
       this.lastDragMoveTime = now;
       const containerCoords = this.convertToContainerCoordinates(event);
-      this.config.tableSend({
+      const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
         type: 'view.columns.drag.move',
         x: containerCoords.x,
         y: containerCoords.y,
@@ -791,7 +812,8 @@ export class EventDelegationManager {
 
   private handleResizeDrag(event: MouseEvent): void {
     const containerCoords = this.convertToContainerCoordinates(event);
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'view.columns.resize.move',
       x: containerCoords.x
     });
@@ -800,7 +822,8 @@ export class EventDelegationManager {
   private handleFillDrag(event: MouseEvent): void {
     // Fill drag logic would go here
     // For now, just send preview event
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'FILL_PREVIEW',
       previewCells: new Set()
     });
@@ -818,7 +841,8 @@ export class EventDelegationManager {
       clientY: event.clientY
     });
     
-    this.config.tableSend({
+    const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
       type: 'view.columns.drag.end',
       columnId: this.dragState.startColumnId!,
       x: containerCoords.x,
@@ -844,7 +868,8 @@ export class EventDelegationManager {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault();
       
-      this.config.tableSend({
+      const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
         type: 'keyboard.arrow',
         direction: event.key.replace('Arrow', '').toLowerCase() as any,
         extend: event.shiftKey
@@ -856,7 +881,8 @@ export class EventDelegationManager {
     switch (event.key) {
       case 'Enter':
         event.preventDefault();
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'keyboard.enter',
           shift: event.shiftKey
         });
@@ -864,7 +890,8 @@ export class EventDelegationManager {
         
       case 'Tab':
         event.preventDefault();
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'keyboard.tab',
           shift: event.shiftKey
         });
@@ -872,34 +899,39 @@ export class EventDelegationManager {
         
       case 'Escape':
         event.preventDefault();
-        this.config.tableSend({ type: 'keyboard.escape' });
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'keyboard.escape' });
         break;
         
       case 'Delete':
       case 'Backspace':
         event.preventDefault();
-        this.config.tableSend({ type: 'keyboard.delete' });
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'keyboard.delete' });
         break;
         
       // Handle Ctrl/Cmd combinations
       case 'a':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          this.config.tableSend({ type: 'keyboard.selectAll' });
+          const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'keyboard.selectAll' });
         }
         break;
         
       case 'c':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          this.config.tableSend({ type: 'keyboard.copy' });
+          const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'keyboard.copy' });
         }
         break;
         
       case 'v':
         if (event.ctrlKey || event.metaKey) {
           event.preventDefault();
-          this.config.tableSend({ type: 'keyboard.paste' });
+          const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({ type: 'keyboard.paste' });
         }
         break;
     }
@@ -938,7 +970,8 @@ export class EventDelegationManager {
           visibleRows: [] // TODO: Calculate visible rows
         };
         
-        this.config.tableSend({
+        const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
           type: 'view.viewport.update',
           viewport: viewportInfo
         });
@@ -993,7 +1026,8 @@ export class EventDelegationManager {
         if (stillLeavingEditingArea) {
           console.log('🎯 EventDelegationManager: Focus left editing area, ensuring edit mode ends');
           // Don't cancel - let the blur handlers commit first, then just ensure we exit edit mode
-          this.config.tableSend({
+          const send = this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
+    send({
             type: 'edit.ensure.end'
           });
         } else {

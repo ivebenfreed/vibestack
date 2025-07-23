@@ -348,7 +348,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     
     const delegationConfig: EventDelegationConfig = {
       container: containerRef.current,
-      tableSend
+      tableSend,
+      // Provide a getter to always get the current tableSend
+      getTableSend: () => tableActor.send
     };
     
     const delegationManager = new EventDelegationManager(delegationConfig);
@@ -362,7 +364,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         eventDelegationManagerRef.current = null;
       }
     };
-  }, [tableSend]);
+  }, [tableSend, tableActor]);
 
   // Create public API
   const vibeGridXApi = useVibeGridXApi(tableSend, null, tableActor, rendererRef);
