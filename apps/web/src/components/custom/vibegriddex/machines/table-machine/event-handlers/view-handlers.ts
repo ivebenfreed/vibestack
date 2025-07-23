@@ -868,21 +868,8 @@ export const viewHandlers = {
   // DIMENSIONS RECALCULATION - SINGLE SOURCE OF TRUTH
   'dimensions.recalculate': {
     actions: [
-      assign({
-        coordinateMapping: ({ context }) => {
-          // Use the new recalculateCoordinateMapping action format
-          return dimensionActions.recalculateCoordinateMapping.coordinateMapping({
-            context
-          }, {
-            columns: context.columns,
-            columnOrder: context.columnOrder,
-            columnVisibility: context.columnVisibility,
-            columnWidths: context.coordinateMapping?.columns ? 
-              Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width])) : 
-              {}
-          });
-        }
-      }),
+      // Use the actual dimension action directly
+      dimensionActions.recalculateCoordinateMapping,
       
       // Forward updated coordinates to canvas for overlay sync
       ({ context, self }) => {
@@ -966,13 +953,26 @@ export const viewHandlers = {
           
           const { columnId, currentWidth } = context.columnResizeState;
           
-          // Use the updateColumnWidth action to update coordinate mapping
-          return dimensionActions.updateColumnWidth.coordinateMapping({
-            context
-          }, {
-            columnId,
-            width: currentWidth
+          // Update column width in coordinate mapping
+          const newColumns = context.coordinateMapping.columns.map(col => {
+            if (col.columnId === columnId) {
+              return { ...col, width: currentWidth };
+            }
+            return col;
           });
+          
+          // Recalculate offsets
+          let currentOffset = 0;
+          newColumns.forEach(col => {
+            col.offset = currentOffset;
+            currentOffset += col.width;
+          });
+          
+          return {
+            ...context.coordinateMapping,
+            columns: newColumns,
+            version: context.coordinateMapping.version + 1
+          };
         }
       }),
       
@@ -1048,13 +1048,26 @@ export const viewHandlers = {
           
           const { columnId, currentWidth } = context.columnResizeState;
           
-          // Use the updateColumnWidth action to update coordinate mapping
-          return dimensionActions.updateColumnWidth.coordinateMapping({
-            context
-          }, {
-            columnId,
-            width: currentWidth
+          // Update column width in coordinate mapping
+          const newColumns = context.coordinateMapping.columns.map(col => {
+            if (col.columnId === columnId) {
+              return { ...col, width: currentWidth };
+            }
+            return col;
           });
+          
+          // Recalculate offsets
+          let currentOffset = 0;
+          newColumns.forEach(col => {
+            col.offset = currentOffset;
+            currentOffset += col.width;
+          });
+          
+          return {
+            ...context.coordinateMapping,
+            columns: newColumns,
+            version: context.coordinateMapping.version + 1
+          };
         }
       }),
       
