@@ -193,14 +193,20 @@ async function transformJunctionTableChange(
   if (!junctionInfo) return null;
   
   try {
+    // Convert camelCase column names to snake_case for WAL extraction
+    const sourceColumnSnake = camelToSnake(junctionInfo.sourceColumn);
+    const targetColumnSnake = camelToSnake(junctionInfo.targetColumn);
+    
     // Extract entity IDs from junction table operation
-    const sourceId = extractColumnValue(change, junctionInfo.sourceColumn);
-    const targetId = extractColumnValue(change, junctionInfo.targetColumn);
+    const sourceId = extractColumnValue(change, sourceColumnSnake);
+    const targetId = extractColumnValue(change, targetColumnSnake);
     
     if (!sourceId) {
       replicationLogger.warn('Could not extract source ID from junction table change', {
         table: change.table,
-        sourceColumn: junctionInfo.sourceColumn
+        sourceColumn: junctionInfo.sourceColumn,
+        sourceColumnSnake: sourceColumnSnake,
+        availableColumns: change.columnnames || []
       }, MODULE_NAME);
       return null;
     }
@@ -565,6 +571,11 @@ function addFilterReason(reasons: Record<string, number>, reason: string) {
 // Helper function to convert snake_case to camelCase
 function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// Helper function to convert camelCase to snake_case
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
 
 // Helper function to convert snake_case object keys to camelCase

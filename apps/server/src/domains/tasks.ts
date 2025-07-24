@@ -287,6 +287,201 @@ export class TaskRepository extends BaseServerRepository<Task> {
   }
 
   /**
+   * Update task tags using junction table manipulation
+   * Used by sync operations - preserves clientId
+   * Follows the same pattern as ProjectRepository.updateMembers
+   */
+  async updateTags(taskId: string, newTagIds: string[], skipValidation = false): Promise<any[]> {
+    // Skip task existence check if already validated upstream
+    if (!skipValidation) {
+      const task = await this.findById(taskId);
+      if (!task) {
+        throw new Error(`Task with ID ${taskId} not found`);
+      }
+    }
+
+    // Get current tag relationships
+    const currentTagsQuery = `
+      SELECT tag_id 
+      FROM task_tags 
+      WHERE task_id = $1
+    `;
+    const currentTagsResult = await this.neonService.query(currentTagsQuery, [taskId]);
+    
+    // Debug log to understand the structure
+    console.log('[TaskRepository] currentTagsResult structure:', {
+      type: typeof currentTagsResult,
+      isArray: Array.isArray(currentTagsResult),
+      hasRows: currentTagsResult && 'rows' in currentTagsResult,
+      keys: currentTagsResult ? Object.keys(currentTagsResult) : null,
+      sample: currentTagsResult ? JSON.stringify(currentTagsResult).substring(0, 200) : null
+    });
+    
+    // Handle both possible structures - array or object with rows
+    const rows = Array.isArray(currentTagsResult) ? currentTagsResult : currentTagsResult?.rows || [];
+    const currentTagIds = new Set<string>(rows.map((row: any) => row.tag_id as string));
+    
+    // Calculate differences
+    const newTagIdSet = new Set(newTagIds);
+    const toAdd = newTagIds.filter(id => !currentTagIds.has(id));
+    const toRemove = Array.from(currentTagIds).filter(id => !newTagIdSet.has(id));
+    
+    // Early return if no changes needed
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      console.log(`[TaskRepository] No tag changes needed for task ${taskId}`);
+      // Return current tags
+      const tagsQuery = `
+        SELECT t.* 
+        FROM tags t
+        JOIN task_tags tt ON t.id = tt.tag_id 
+        WHERE tt.task_id = $1
+      `;
+      const tagsResult = await this.neonService.query(tagsQuery, [taskId]);
+      return Array.isArray(tagsResult) ? tagsResult : tagsResult?.rows || [];
+    }
+
+    console.log(`[TaskRepository] Updating tags for task ${taskId}:`, {
+      currentCount: currentTagIds.size,
+      newCount: newTagIds.length,
+      toAdd: toAdd.length,
+      toRemove: toRemove.length,
+      skipValidation
+    });
+    
+    // Apply only the differences
+    if (toRemove.length > 0) {
+      // Use proper array parameter syntax for Neon driver
+      const placeholders = toRemove.map((_, index) => `$${index + 2}`).join(', ');
+      const deleteQuery = `DELETE FROM task_tags WHERE task_id = $1 AND tag_id IN (${placeholders})`;
+      
+      await this.neonService.query(deleteQuery, [taskId, ...toRemove]);
+    }
+    
+    if (toAdd.length > 0) {
+      // Use bulk insert with proper parameter handling
+      if (toAdd.length === 1) {
+        const insertQuery = `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`;
+        await this.neonService.query(insertQuery, [taskId, toAdd[0]]);
+      } else {
+        // Multiple inserts - each row needs (task_id, tag_id)
+        const valuesClauses = toAdd.map((_, index) => {
+          const offset = index * 2;
+          return `($${offset + 1}, $${offset + 2})`;
+        }).join(', ');
+        
+        const insertQuery = `INSERT INTO task_tags (task_id, tag_id) VALUES ${valuesClauses} ON CONFLICT DO NOTHING`;
+        const params: string[] = [];
+        toAdd.forEach(tagId => params.push(taskId, tagId));
+        
+        await this.neonService.query(insertQuery, params);
+      }
+    }
+
+    // Return the updated tags
+    const tagsQuery = `
+      SELECT t.* 
+      FROM tags t
+      JOIN task_tags tt ON t.id = tt.tag_id 
+      WHERE tt.task_id = $1
+    `;
+    const tagsResult = await this.neonService.query(tagsQuery, [taskId]);
+    return Array.isArray(tagsResult) ? tagsResult : tagsResult?.rows || [];
+  }
+
+  /**
+   * Update task dependencies using junction table manipulation
+   * Used by sync operations - preserves clientId
+   * Follows the same pattern as ProjectRepository.updateMembers
+   */
+  async updateDependencies(taskId: string, newDependencyIds: string[], skipValidation = false): Promise<any[]> {
+    // Skip task existence check if already validated upstream
+    if (!skipValidation) {
+      const task = await this.findById(taskId);
+      if (!task) {
+        throw new Error(`Task with ID ${taskId} not found`);
+      }
+    }
+
+    // Get current dependency relationships (this task depends on other tasks)
+    const currentDepsQuery = `
+      SELECT dependency_task_id 
+      FROM task_dependencies 
+      WHERE dependent_task_id = $1
+    `;
+    const currentDepsResult = await this.neonService.query(currentDepsQuery, [taskId]);
+    
+    // Handle both possible structures - array or object with rows
+    const rows = Array.isArray(currentDepsResult) ? currentDepsResult : currentDepsResult?.rows || [];
+    const currentDepIds = new Set<string>(rows.map((row: any) => row.dependency_task_id as string));
+    
+    // Calculate differences
+    const newDepIdSet = new Set(newDependencyIds);
+    const toAdd = newDependencyIds.filter(id => !currentDepIds.has(id));
+    const toRemove = Array.from(currentDepIds).filter(id => !newDepIdSet.has(id));
+    
+    // Early return if no changes needed
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      console.log(`[TaskRepository] No dependency changes needed for task ${taskId}`);
+      // Return current dependencies
+      const depsQuery = `
+        SELECT t.* 
+        FROM tasks t
+        JOIN task_dependencies td ON t.id = td.dependency_task_id 
+        WHERE td.dependent_task_id = $1
+      `;
+      const depsResult = await this.neonService.query(depsQuery, [taskId]);
+      return depsResult;
+    }
+
+    console.log(`[TaskRepository] Updating dependencies for task ${taskId}:`, {
+      currentCount: currentDepIds.size,
+      newCount: newDependencyIds.length,
+      toAdd: toAdd.length,
+      toRemove: toRemove.length,
+      skipValidation
+    });
+    
+    // Apply only the differences
+    if (toRemove.length > 0) {
+      // Use proper array parameter syntax for Neon driver
+      const placeholders = toRemove.map((_, index) => `$${index + 2}`).join(', ');
+      const deleteQuery = `DELETE FROM task_dependencies WHERE dependent_task_id = $1 AND dependency_task_id IN (${placeholders})`;
+      
+      await this.neonService.query(deleteQuery, [taskId, ...toRemove]);
+    }
+    
+    if (toAdd.length > 0) {
+      // Use bulk insert with proper parameter handling
+      if (toAdd.length === 1) {
+        const insertQuery = `INSERT INTO task_dependencies (dependent_task_id, dependency_task_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`;
+        await this.neonService.query(insertQuery, [taskId, toAdd[0]]);
+      } else {
+        // Multiple inserts - each row needs (dependent_task_id, dependency_task_id)
+        const valuesClauses = toAdd.map((_, index) => {
+          const offset = index * 2;
+          return `($${offset + 1}, $${offset + 2})`;
+        }).join(', ');
+        
+        const insertQuery = `INSERT INTO task_dependencies (dependent_task_id, dependency_task_id) VALUES ${valuesClauses} ON CONFLICT DO NOTHING`;
+        const params: string[] = [];
+        toAdd.forEach(depId => params.push(taskId, depId));
+        
+        await this.neonService.query(insertQuery, params);
+      }
+    }
+
+    // Return the updated dependencies
+    const depsQuery = `
+      SELECT t.* 
+      FROM tasks t
+      JOIN task_dependencies td ON t.id = td.dependency_task_id 
+      WHERE td.dependent_task_id = $1
+    `;
+    const depsResult = await this.neonService.query(depsQuery, [taskId]);
+    return depsResult;
+  }
+
+  /**
    * Delete task
    */
   async delete(id: string): Promise<boolean> {

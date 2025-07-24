@@ -13,6 +13,17 @@ const __dirname = path.dirname(__filename);
 const PACKAGE_ROOT = path.resolve(__dirname, '../..');
 
 /**
+ * Convert database column name to TypeScript property name (camelCase)
+ * Examples: 
+ * - user_id -> userId
+ * - project_id -> projectId
+ * - status_set_id -> statusSetId
+ */
+function convertDbColumnToPropertyName(columnName: string): string {
+  return columnName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+/**
  * Get table hierarchy based on entity relationships
  * Returns a map of table name to dependency level
  * Level 0 = no dependencies (root)
@@ -337,6 +348,13 @@ function generateContextOutput(
             if ([ 'one-to-many', 'many-to-many' ].includes(originalRelationMeta.relationType)) {
                 relationTsType += '[]';
             }
+            
+            // Check for self-referencing relationships and wrap in Promise<>
+            const isSelfReferencing = targetTypeName === entityName;
+            if (isSelfReferencing) {
+                relationTsType = `Promise<${relationTsType}>`;
+            }
+            
             const nullable = originalRelationMeta.options?.nullable ? '?' : '!';
             // NO relation decorators here
             classOutput += `  ${propertyName}${nullable}: ${relationTsType};\n\n`;
@@ -911,16 +929,20 @@ function extractJunctionTableInfo(entities: Function[], filter: MetadataFilter):
                 junctionTables.add(`"${junctionTableName}"`);
                 
                 // Extract column information
-                let sourceColumn = 'id';
-                let targetColumn = 'id';
+                let sourceColumnDb = `${entityName.toLowerCase()}_id`;
+                let targetColumnDb = `${targetEntityName.toLowerCase()}_id`;
                 
                 if (joinTableMeta.joinColumns && joinTableMeta.joinColumns.length > 0) {
-                    sourceColumn = joinTableMeta.joinColumns[0].name || `${entityName.toLowerCase()}_id`;
+                    sourceColumnDb = joinTableMeta.joinColumns[0].name || `${entityName.toLowerCase()}_id`;
                 }
                 
                 if (joinTableMeta.inverseJoinColumns && joinTableMeta.inverseJoinColumns.length > 0) {
-                    targetColumn = joinTableMeta.inverseJoinColumns[0].name || `${targetEntityName.toLowerCase()}_id`;
+                    targetColumnDb = joinTableMeta.inverseJoinColumns[0].name || `${targetEntityName.toLowerCase()}_id`;
                 }
+                
+                // Convert database column names to TypeScript property names (camelCase for Dexie schema)
+                const sourceColumn = convertDbColumnToPropertyName(sourceColumnDb);
+                const targetColumn = convertDbColumnToPropertyName(targetColumnDb);
                 
                 // Add to mapping (only if not already added to avoid duplicates)
                 if (!junctionMapping[`"${junctionTableName}"`]) {

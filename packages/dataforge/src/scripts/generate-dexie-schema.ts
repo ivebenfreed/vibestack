@@ -528,6 +528,15 @@ export const ENTITY_TABLES = [
 ${entities.map(e => `  '${e.tableName}'`).join(',\n')}
 ] as const;
 
+// Export domain tables separately for generators
+export const CLIENT_DOMAIN_TABLES = [
+${entities.filter(e => {
+  // System tables based on context
+  const systemTables = ['client_migration_status', 'local_changes', 'sync_metadata'];
+  return !systemTables.includes(e.tableName);
+}).map(e => `  '${e.tableName}'`).join(',\n')}
+] as const;
+
 export const JUNCTION_TABLES = [
 ${junctionTables.map(j => `  '${j.name}'`).join(',\n')}
 ] as const;

@@ -51,7 +51,7 @@ export class Comment extends BaseDomainEntity {
 
   author?: User;
 
-  parent?: Comment;
+  parent?: Promise<Comment>;
 
   task?: Task;
 
@@ -199,9 +199,9 @@ export class Tag extends BaseDomainEntity {
 
   tagSet!: TagSet;
 
-  parent?: Tag;
+  parent?: Promise<Tag>;
 
-  children!: Tag[];
+  children!: Promise<Tag[]>;
 
   tasks!: Task[];
 
@@ -269,9 +269,9 @@ export class Task extends BaseDomainEntity {
 
   assignee?: User;
 
-  dependencies!: Task[];
+  dependencies!: Promise<Task[]>;
 
-  tasksDependentOnThis!: Task[];
+  tasksDependentOnThis!: Promise<Task[]>;
 
 }
 
@@ -1194,41 +1194,41 @@ export const CLIENT_JUNCTION_TABLE_MAPPING = {
   "project_members": {
     sourceEntity: 'Project',
     sourceTable: '"projects"',
-    sourceColumn: 'project_id',
+    sourceColumn: 'projectId',
     targetEntity: 'User',
-    targetColumn: 'user_id',
+    targetColumn: 'userId',
     relationName: 'members'
   },
   "project_status_sets": {
     sourceEntity: 'Project',
     sourceTable: '"projects"',
-    sourceColumn: 'project_id',
+    sourceColumn: 'projectId',
     targetEntity: 'StatusSet',
-    targetColumn: 'status_set_id',
+    targetColumn: 'statusSetId',
     relationName: 'statusSets'
   },
   "project_tag_sets": {
     sourceEntity: 'Project',
     sourceTable: '"projects"',
-    sourceColumn: 'project_id',
+    sourceColumn: 'projectId',
     targetEntity: 'TagSet',
-    targetColumn: 'tag_set_id',
+    targetColumn: 'tagSetId',
     relationName: 'tagSets'
   },
   "task_tags": {
     sourceEntity: 'Task',
     sourceTable: '"tasks"',
-    sourceColumn: 'task_id',
+    sourceColumn: 'taskId',
     targetEntity: 'Tag',
-    targetColumn: 'tag_id',
+    targetColumn: 'tagId',
     relationName: 'tags'
   },
   "task_dependencies": {
     sourceEntity: 'Task',
     sourceTable: '"tasks"',
-    sourceColumn: 'dependent_task_id',
+    sourceColumn: 'dependentTaskId',
     targetEntity: 'Task',
-    targetColumn: 'dependency_task_id',
+    targetColumn: 'dependencyTaskId',
     relationName: 'dependencies'
   },
 } as const;
@@ -1299,22 +1299,22 @@ export const CLIENT_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
       {
         junctionTable: 'project_members',
         relationName: 'members',
-        sourceColumn: 'project_id',
-        targetColumn: 'user_id',
+        sourceColumn: 'projectId',
+        targetColumn: 'userId',
         targetEntity: 'users',
       },
       {
         junctionTable: 'project_status_sets',
         relationName: 'statusSets',
-        sourceColumn: 'project_id',
-        targetColumn: 'status_set_id',
+        sourceColumn: 'projectId',
+        targetColumn: 'statusSetId',
         targetEntity: 'statussets',
       },
       {
         junctionTable: 'project_tag_sets',
         relationName: 'tagSets',
-        sourceColumn: 'project_id',
-        targetColumn: 'tag_set_id',
+        sourceColumn: 'projectId',
+        targetColumn: 'tagSetId',
         targetEntity: 'tagsets',
       },
     ],
@@ -1372,15 +1372,15 @@ export const CLIENT_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
       {
         junctionTable: 'task_tags',
         relationName: 'tags',
-        sourceColumn: 'task_id',
-        targetColumn: 'tag_id',
+        sourceColumn: 'taskId',
+        targetColumn: 'tagId',
         targetEntity: 'tags',
       },
       {
         junctionTable: 'task_dependencies',
         relationName: 'dependencies',
-        sourceColumn: 'dependent_task_id',
-        targetColumn: 'dependency_task_id',
+        sourceColumn: 'dependentTaskId',
+        targetColumn: 'dependencyTaskId',
         targetEntity: 'tasks',
       },
     ],

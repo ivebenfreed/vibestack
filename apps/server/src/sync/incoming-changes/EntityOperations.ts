@@ -342,20 +342,13 @@ export class EntityOperations {
       }
       
       // Clean snake_case duplicates first, then ensure date objects
-      const cleanedData = this.ensureDateObjects(updateData);
+      const processedData = this.ensureDateObjects(updateData);
       
-      // Remove many-to-many relationship fields that can't be updated directly
-      const relationshipFields = ['tags', 'dependencies', 'tasksDependentOnThis'];
-      for (const field of relationshipFields) {
-        if (field in cleanedData) {
-          syncLogger.debug(`Removing many-to-many relationship field from update`, {
-            table,
-            field,
-            value: cleanedData[field]
-          }, MODULE_NAME);
-          delete cleanedData[field];
-        }
-      }
+      // Separate relationship fields from regular entity fields
+      const relationshipFields = ['tags', 'dependencies', 'tasksDependentOnThis', 'members', 'statusSets', 'tagSets'];
+      const { entityFieldsData, relationshipFieldsData } = this.separateRelationshipFields(processedData, relationshipFields);
+      
+      const cleanedData = entityFieldsData;
 
       syncLogger.debug('Data processing for update operation', {
         table,
@@ -480,6 +473,9 @@ export class EntityOperations {
           success: true
         }, MODULE_NAME);
         
+        // Handle relationship field updates if present
+        await this.processRelationshipFieldUpdates(table, id, relationshipFieldsData);
+        
         return result;
       }
       
@@ -527,6 +523,9 @@ export class EntityOperations {
               id,
               resultType: typeof upsertResult
             }, MODULE_NAME);
+            
+            // Handle relationship field updates if present
+            await this.processRelationshipFieldUpdates(table, id, relationshipFieldsData);
             
             return upsertResult;
           } else {
@@ -1155,6 +1154,85 @@ export class EntityOperations {
         
         throw new Error(`Repository method not found for removing relationship '${relationName}'`);
       }
+    }
+  }
+
+  /**
+   * Separate relationship fields from regular entity fields
+   * This prevents TypeORM from trying to update many-to-many relationships directly
+   */
+  private separateRelationshipFields(
+    data: Record<string, any>, 
+    relationshipFieldNames: string[]
+  ): { entityFieldsData: Record<string, any>; relationshipFieldsData: Record<string, any> } {
+    const entityFieldsData: Record<string, any> = {};
+    const relationshipFieldsData: Record<string, any> = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (relationshipFieldNames.includes(key)) {
+        relationshipFieldsData[key] = value;
+        syncLogger.debug(`Separated relationship field from entity update`, {
+          field: key,
+          hasValue: value !== undefined && value !== null,
+          valueType: Array.isArray(value) ? 'array' : typeof value,
+          arrayLength: Array.isArray(value) ? value.length : undefined
+        }, MODULE_NAME);
+      } else {
+        entityFieldsData[key] = value;
+      }
+    }
+    
+    return { entityFieldsData, relationshipFieldsData };
+  }
+
+  /**
+   * Process relationship field updates by converting them to relationship update format
+   * and using the universal relationship handling system
+   */
+  private async processRelationshipFieldUpdates(
+    table: string, 
+    entityId: string, 
+    relationshipFieldsData: Record<string, any>
+  ): Promise<void> {
+    const relationshipUpdates = Object.entries(relationshipFieldsData)
+      .filter(([key, value]) => value !== undefined && value !== null)
+      .map(([relationName, relationshipData]) => {
+        // Convert relationship field data to relationship update format
+        let targetIds: string[];
+        
+        if (Array.isArray(relationshipData)) {
+          // Handle array of objects or IDs
+          targetIds = relationshipData.map(item => 
+            typeof item === 'string' ? item : item.id
+          ).filter(id => id); // Remove any undefined/null IDs
+        } else {
+          // Handle single relationship (shouldn't happen for many-to-many, but be safe)
+          targetIds = [];
+          syncLogger.warn(`Unexpected non-array relationship data for many-to-many field`, {
+            table,
+            entityId,
+            relationName,
+            dataType: typeof relationshipData
+          }, MODULE_NAME);
+        }
+        
+        return {
+          relationName,
+          operation: 'set' as const, // Always use 'set' operation for field updates
+          targetIds
+        };
+      });
+    
+    if (relationshipUpdates.length > 0) {
+      syncLogger.debug(`Processing relationship field updates`, {
+        table,
+        entityId,
+        updateCount: relationshipUpdates.length,
+        relations: relationshipUpdates.map(ru => `${ru.relationName}:${ru.targetIds.length}`)
+      }, MODULE_NAME);
+      
+      // Use existing relationship update processing with validation skipped
+      await this.processEntityRelationshipUpdates(table, entityId, relationshipUpdates, true);
     }
   }
 
