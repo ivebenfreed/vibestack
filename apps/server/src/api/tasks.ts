@@ -51,8 +51,8 @@ tasks.post('/', async (c) => {
     const neonService = new NeonService(c);
     const taskRepo = new TaskRepository(neonService);
     
-    // The repository will handle validation and defaults
-    const result = await taskRepo.create(body);
+    // Use systemCreate for API operations to clear clientId
+    const result = await taskRepo.systemCreate(body);
     
     return c.json(createSuccessResponse(result), 201);
   } catch (err) {

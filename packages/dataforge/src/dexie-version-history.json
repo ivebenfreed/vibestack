@@ -1,5 +1,5 @@
 {
-  "currentVersion": 6,
+  "currentVersion": 7,
   "versions": [
     {
       "version": 1,
@@ -129,6 +129,29 @@
         "project_members": "[projectId+userId], projectId, userId",
         "project_status_sets": "[projectId+statussetId], projectId, statussetId",
         "project_tag_sets": "[projectId+tagsetId], projectId, tagsetId",
+        "task_tags": "[taskId+tagId], taskId, tagId",
+        "task_dependencies": "[dependentTaskId+dependencyTaskId], dependentTaskId, dependencyTaskId"
+      }
+    },
+    {
+      "version": 7,
+      "generatedAt": "2025-07-24T11:48:10.757Z",
+      "schemaHash": "1bc9fca49f2df8f3",
+      "stores": {
+        "client_migration_status": "id",
+        "comments": "id, authorId, parentId, taskId, projectId, updatedAt, clientId",
+        "local_changes": "id, processedSync, updatedAt",
+        "projects": "id, ownerId, updatedAt, clientId, status",
+        "status_definitions": "id, statusSetId, updatedAt, clientId, name, isDefault",
+        "status_sets": "id, updatedAt, clientId",
+        "sync_metadata": "id, clientId",
+        "tags": "id, tagSetId, parentId, updatedAt, clientId, name",
+        "tag_sets": "id, updatedAt, clientId",
+        "tasks": "id, statusId, projectId, assigneeId, updatedAt, clientId, [statusId+priority], legacyStatus",
+        "users": "id, updatedAt, clientId, &email",
+        "project_members": "[projectId+userId], projectId, userId",
+        "project_status_sets": "[projectId+statusSetId], projectId, statusSetId",
+        "project_tag_sets": "[projectId+tagSetId], projectId, tagSetId",
         "task_tags": "[taskId+tagId], taskId, tagId",
         "task_dependencies": "[dependentTaskId+dependencyTaskId], dependentTaskId, dependencyTaskId"
       }

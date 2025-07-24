@@ -11,7 +11,8 @@ const config = {
     'src/generated/rdg-column-configurations.ts',
     'src/generated/vibegridx-columns.ts',
     'src/generated/*-operations.ts',
-    'src/generated/dexie-schema.ts'
+    'src/generated/dexie-schema.ts',
+    'src/generated/dexie-domain-services.ts'
   ],
   format: ['esm'],
   dts: true, // Changed from experimentalDts to generate individual .d.ts files

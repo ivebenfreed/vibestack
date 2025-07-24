@@ -100,6 +100,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
 
   /**
    * Update task status (specialized method)
+   * Used by sync operations - preserves clientId
    */
   async updateStatus(id: string, status: TaskStatus): Promise<Task | null> {
     // Set completedAt based on status
@@ -110,11 +111,33 @@ export class TaskRepository extends BaseServerRepository<Task> {
   }
 
   /**
+   * System update task status - clears clientId
+   * Used by API endpoints and system operations
+   */
+  async systemUpdateStatus(id: string, status: TaskStatus): Promise<Task | null> {
+    // Set completedAt based on status
+    const completedAt = status === TaskStatus.COMPLETED ? new Date() : null;
+    
+    // Use parent class systemUpdate method
+    return await this.systemUpdate(id, { legacyStatus: status, completedAt } as TaskUpdateInput);
+  }
+
+  /**
    * Update task time range (specialized method)
+   * Used by sync operations - preserves clientId
    */
   async updateTimeRange(id: string, timeRange: string): Promise<Task | null> {
     // Use parent class update method
     return await this.update(id, { timeRange } as TaskUpdateInput);
+  }
+
+  /**
+   * System update task time range - clears clientId
+   * Used by API endpoints and system operations
+   */
+  async systemUpdateTimeRange(id: string, timeRange: string): Promise<Task | null> {
+    // Use parent class systemUpdate method
+    return await this.systemUpdate(id, { timeRange } as TaskUpdateInput);
   }
 
   /**
@@ -154,6 +177,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
 
   /**
    * Add tag to task
+   * Used by sync operations - preserves clientId
    */
   async addTag(id: string, tag: string): Promise<Task | null> {
     try {
@@ -185,6 +209,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
 
   /**
    * Remove tag from task
+   * Used by sync operations - preserves clientId
    */
   async removeTag(id: string, tag: string): Promise<Task | null> {
     try {
@@ -201,6 +226,67 @@ export class TaskRepository extends BaseServerRepository<Task> {
         Task,
         { id } as FindOptionsWhere<Task>,
         { legacyTags: updatedTags } as DeepPartial<Task>
+      );
+      
+      // Return updated task
+      return await this.findById(id);
+    } catch (error) {
+      console.error('Error removing tag:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * System add tag to task - clears clientId
+   * Used by API endpoints and system operations
+   */
+  async systemAddTag(id: string, tag: string): Promise<Task | null> {
+    try {
+      // First get the current task to check existing tags
+      const task = await this.findById(id);
+      if (!task) return null;
+      
+      // Check if tag already exists
+      const tags = task.legacyTags || [];
+      if (!tags.includes(tag)) {
+        // Add the tag and update using system method
+        tags.push(tag);
+        
+        // Update using the system update method
+        await this.neonService.update(
+          Task,
+          { id } as FindOptionsWhere<Task>,
+          { legacyTags: tags, clientId: null } as DeepPartial<Task>
+        );
+      }
+      
+      // Return updated task
+      return await this.findById(id);
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * System remove tag from task - clears clientId
+   * Used by API endpoints and system operations
+   */
+  async systemRemoveTag(id: string, tag: string): Promise<Task | null> {
+    try {
+      // First get the current task
+      const task = await this.findById(id);
+      if (!task) return null;
+      
+      // Remove the tag if it exists
+      const tags = task.legacyTags || [];
+      const updatedTags = tags.filter(t => t !== tag);
+      
+      // Update using the system update method
+      await this.neonService.update(
+        Task,
+        { id } as FindOptionsWhere<Task>,
+        { legacyTags: updatedTags, clientId: null } as DeepPartial<Task>
       );
       
       // Return updated task

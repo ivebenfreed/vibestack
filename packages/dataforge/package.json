@@ -32,6 +32,10 @@
       "types": "./dist/dexie-schema.d.ts",
       "import": "./dist/dexie-schema.js"
     },
+    "./dexie-domain-services": {
+      "types": "./dist/dexie-domain-services.d.ts",
+      "import": "./dist/dexie-domain-services.js"
+    },
     "./entities/*": {
       "types": "./dist/entities/*.d.ts",
       "import": "./dist/entities/*.js",
@@ -57,7 +61,8 @@
     "generate-rdg-columns": "tsx src/scripts/generate-rdg-columns.ts",
     "generate-crud-operations": "node --loader ts-node/esm src/scripts/generate-crud-operations.ts",
     "generate-dexie-schema": "tsx src/scripts/generate-dexie-schema.ts",
-    "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-dexie-schema",
+    "generate-dexie-domain-services": "node --loader ts-node/esm src/scripts/generate-dexie-domain-services.ts",
+    "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-dexie-schema && pnpm run generate-dexie-domain-services",
     "compile": "tsup",
     "build": "pnpm run forge:build",
     "migration:generate:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",

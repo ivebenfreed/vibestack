@@ -181,7 +181,7 @@ function extractAllEntityMetadata(): Map<string, EntityMetadata> {
     const metadata = extractEntityMetadata(entityName, schemaOptions, entityClass);
     
     // Extract indexes from schema and entity class
-    const indexedFields = extractIndexedFields(schemaOptions, entityClass);
+    const indexedFields = extractIndexedFields(schemaOptions, entityClass, metadata);
     metadata.indexedFields = indexedFields;
     
     entityMetadataMap.set(entityName, metadata);
@@ -193,25 +193,43 @@ function extractAllEntityMetadata(): Map<string, EntityMetadata> {
 /**
  * Extract indexed fields from entity schema and TypeORM metadata
  */
-function extractIndexedFields(schemaOptions: any, entityClass?: Function): string[] {
+function extractIndexedFields(schemaOptions: any, entityClass?: Function, metadata?: EntityMetadata): string[] {
   const indexedFields: string[] = [];
+  const columnNameToPropertyMap = new Map<string, string>();
+  
+  // Build mapping from database column names to TypeScript property names
+  if (metadata) {
+    for (const field of metadata.fields) {
+      if (field.dbName && field.dbName !== field.name) {
+        columnNameToPropertyMap.set(field.dbName, field.name);
+      }
+    }
+  }
+  
+  // Helper function to convert database column name to property name
+  const toPropertyName = (columnName: string): string => {
+    return columnNameToPropertyMap.get(columnName) || columnName;
+  };
   
   // Extract indexes from schema
   if (schemaOptions.indices) {
     for (const index of schemaOptions.indices) {
       if (typeof index === 'string') {
-        indexedFields.push(index);
+        indexedFields.push(toPropertyName(index));
       } else if (index.columnNames && Array.isArray(index.columnNames)) {
-        indexedFields.push(...index.columnNames);
+        // Convert column names to property names
+        const propertyNames = index.columnNames.map(toPropertyName);
+        indexedFields.push(...propertyNames);
       }
     }
   }
   
   // Also check for individual column indexes
   if (schemaOptions.columns) {
-    for (const [columnName, columnDef] of Object.entries(schemaOptions.columns)) {
+    for (const [propertyName, columnDef] of Object.entries(schemaOptions.columns)) {
       if ((columnDef as any).index === true) {
-        indexedFields.push(columnName);
+        // propertyName is already the TypeScript property name
+        indexedFields.push(propertyName);
       }
     }
   }
@@ -248,6 +266,7 @@ function extractJunctionTables(entityMetadataMap: Map<string, EntityMetadata>): 
         const tableName = relationship.joinTable;
         
         // Determine column names based on naming patterns
+        // Use camelCase for Dexie properties
         let columns: Array<{ name: string; type: string }>;
         let indexes: string[];
         
@@ -282,10 +301,22 @@ function extractJunctionTables(entityMetadataMap: Map<string, EntityMetadata>): 
             { name: 'taskId', type: 'string' }
           ];
           indexes = ['[projectId+taskId]', 'projectId', 'taskId'];
+        } else if (tableName === 'project_status_sets') {
+          columns = [
+            { name: 'projectId', type: 'string' },
+            { name: 'statusSetId', type: 'string' }
+          ];
+          indexes = ['[projectId+statusSetId]', 'projectId', 'statusSetId'];
+        } else if (tableName === 'project_tag_sets') {
+          columns = [
+            { name: 'projectId', type: 'string' },
+            { name: 'tagSetId', type: 'string' }
+          ];
+          indexes = ['[projectId+tagSetId]', 'projectId', 'tagSetId'];
         } else {
-          // Generic pattern
-          const sourceEntity = entityName.toLowerCase();
-          const targetEntity = relationship.targetEntity.toLowerCase();
+          // Generic pattern - use camelCase
+          const sourceEntity = entityName.charAt(0).toLowerCase() + entityName.slice(1);
+          const targetEntity = relationship.targetEntity.charAt(0).toLowerCase() + relationship.targetEntity.slice(1);
           columns = [
             { name: `${sourceEntity}Id`, type: 'string' },
             { name: `${targetEntity}Id`, type: 'string' }
@@ -327,7 +358,7 @@ function generateEntityIndexes(metadata: EntityMetadata): string[] {
     }
   }
   
-  // Add foreign keys
+  // Add foreign keys (using TypeScript property names)
   for (const field of metadata.fields) {
     if (field.category === 'relationship-foreign-key' && field.name !== 'id') {
       addIndex(field.name);
