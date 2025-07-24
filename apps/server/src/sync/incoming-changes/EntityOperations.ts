@@ -343,6 +343,19 @@ export class EntityOperations {
       
       // Clean snake_case duplicates first, then ensure date objects
       const cleanedData = this.ensureDateObjects(updateData);
+      
+      // Remove many-to-many relationship fields that can't be updated directly
+      const relationshipFields = ['tags', 'dependencies', 'tasksDependentOnThis'];
+      for (const field of relationshipFields) {
+        if (field in cleanedData) {
+          syncLogger.debug(`Removing many-to-many relationship field from update`, {
+            table,
+            field,
+            value: cleanedData[field]
+          }, MODULE_NAME);
+          delete cleanedData[field];
+        }
+      }
 
       syncLogger.debug('Data processing for update operation', {
         table,

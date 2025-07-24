@@ -114,6 +114,52 @@ const createTaskColumns = (): Column<Task>[] => {
       field: 'updatedAt', 
       name: 'Updated', 
       cellType: 'date' // Validated: Date → date ✓
+    },
+    // Diagnostic columns to show set information
+    {
+      id: 'statusSetInfo',
+      field: 'statusId',
+      name: 'Status Set',
+      cellType: 'custom',
+      editable: false,
+      customRender: async (value, row) => {
+        if (!value) return 'No Status';
+        
+        // Get the status definition
+        const statusDef = await domainServices.statusDefinition.resolveStatus(value);
+        if (!statusDef || !statusDef.statusSetId) return 'Unknown';
+        
+        // Get the status set
+        const statusSet = await domainServices.statusDefinition.resolveStatusSet(statusDef.statusSetId);
+        return statusSet ? `${statusSet.name} (${statusSet.entityType})` : 'Unknown Set';
+      }
+    },
+    {
+      id: 'tagSetInfo',
+      field: 'tags',
+      name: 'Tag Sets',
+      cellType: 'custom',
+      editable: false,
+      customRender: async (value, row) => {
+        if (!row.tags || row.tags.length === 0) return 'No Tags';
+        
+        // Get tags for this task
+        const tags = await domainServices.task.getTags(row.id);
+        if (tags.length === 0) return 'No Tags';
+        
+        // Get unique tag sets
+        const tagSetMap = new Map<string, string>();
+        for (const tag of tags) {
+          if (tag.tagSetId) {
+            const tagSet = await domainServices.tag.resolveTagSet(tag.tagSetId);
+            if (tagSet) {
+              tagSetMap.set(tagSet.id, tagSet.name);
+            }
+          }
+        }
+        
+        return Array.from(tagSetMap.values()).join(', ') || 'No Sets';
+      }
     }
   ];
 };

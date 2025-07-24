@@ -31,12 +31,15 @@ export default function TasksTableView() {
   const columns: Column<Task>[] = [
     { id: 'title', field: 'title', name: 'Title', cellType: 'text', width: 300, editable: true },
     { id: 'description', field: 'description', name: 'Description', cellType: 'text', width: 400, editable: true },
-    { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 150, editable: true,
-      options: [
-        { value: 'todo', label: 'To Do' },
-        { value: 'in_progress', label: 'In Progress' },
-        { value: 'completed', label: 'Completed' }
-      ]
+    { id: 'statusId', field: 'statusId', name: 'Status', cellType: 'relationship-single', 
+      width: 150, editable: true,
+      relationshipTable: 'status_definitions',
+      relationshipDisplayField: 'name',
+      relationshipFilter: async () => {
+        // Only show status definitions for tasks
+        const statusDefs = await domainServices.statusDefinition.getStatusDefinitionsForEntityType('task');
+        return statusDefs.map(sd => sd.id);
+      }
     },
     { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 120, editable: true,
       options: [
@@ -44,6 +47,22 @@ export default function TasksTableView() {
         { value: 'medium', label: 'Medium' },
         { value: 'high', label: 'High' }
       ]
+    },
+    { id: 'tags', field: 'tags', name: 'Tags', cellType: 'relationship-multi',
+      width: 250, editable: true,
+      relationshipTable: 'tags',
+      relationshipDisplayField: 'name',
+      junctionTable: 'task_tags',
+      junctionSourceField: 'task_id',
+      junctionTargetField: 'tag_id',
+      relationshipFilter: async (task) => {
+        // Filter tags based on the task's project
+        if (task?.projectId) {
+          const tags = await domainServices.tag.getTagsForProject(task.projectId);
+          return tags.map(t => t.id);
+        }
+        return [];
+      }
     },
     { id: 'dueDate', field: 'dueDate', name: 'Due Date', cellType: 'date', width: 150, editable: true },
     { id: 'projectId', field: 'projectId', name: 'Project', cellType: 'relationship-single', 
