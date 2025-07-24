@@ -18,13 +18,28 @@ const createTaskColumns = (): Column<Task>[] => {
       editable: true 
     },
     { 
-      id: 'status', 
-      field: 'status', 
+      id: 'statusId', 
+      field: 'statusId', 
       name: 'Status', 
-      cellType: 'enum', // Status is an enum not a relationship
+      cellType: 'relationship-single',
+      editable: true,
+      relationshipTable: 'status_definitions',
+      relationshipDisplayField: 'name',
+      // We'll add a custom filter to only show statuses for 'task' entity type
+      relationshipFilter: async () => {
+        // Get status definitions for tasks only
+        const statusDefinitions = await domainServices.statusDefinition.getStatusDefinitionsForEntityType('task');
+        return statusDefinitions.map(sd => sd.id);
+      }
+    },
+    { 
+      id: 'legacyStatus', 
+      field: 'legacyStatus', 
+      name: 'Legacy Status', 
+      cellType: 'enum',
       editable: true,
       options: [
-        { value: TaskStatus.TODO, label: 'To Do' },
+        { value: TaskStatus.OPEN, label: 'Open' },
         { value: TaskStatus.IN_PROGRESS, label: 'In Progress' },
         { value: TaskStatus.COMPLETED, label: 'Completed' }
       ]
@@ -40,6 +55,29 @@ const createTaskColumns = (): Column<Task>[] => {
         { value: TaskPriority.MEDIUM, label: 'Medium' },
         { value: TaskPriority.HIGH, label: 'High' }
       ]
+    },
+    {
+      id: 'tags',
+      field: 'tags',
+      name: 'Tags',
+      cellType: 'relationship-multi',
+      editable: true,
+      relationshipTable: 'tags',
+      relationshipDisplayField: 'name',
+      // Junction table configuration for many-to-many
+      junctionTable: 'task_tags',
+      junctionSourceField: 'task_id',
+      junctionTargetField: 'tag_id',
+      // Filter tags based on current project context
+      relationshipFilter: async (task) => {
+        if (task?.projectId) {
+          // Get tags available for this project
+          const tags = await domainServices.tag.getTagsForProject(task.projectId);
+          return tags.map(t => t.id);
+        }
+        // If no project, show no tags
+        return [];
+      }
     },
     { 
       id: 'assignee', 

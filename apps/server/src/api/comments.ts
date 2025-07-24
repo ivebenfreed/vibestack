@@ -63,8 +63,8 @@ comments.post('/', async (c) => {
     const neonService = new NeonService(c);
     const commentRepo = new CommentRepository(neonService);
     
-    // The repository will handle validation
-    const result = await commentRepo.create(body);
+    // Use systemCreate for API operations to clear clientId
+    const result = await commentRepo.systemCreate(body);
     
     return c.json(createSuccessResponse(result), 201);
   } catch (err) {
@@ -139,8 +139,8 @@ comments.patch('/:id', async (c) => {
       );
     }
     
-    // Update the comment
-    await commentRepo.update(id, body);
+    // Use systemUpdate for API operations to clear clientId
+    await commentRepo.systemUpdate(id, body);
     
     // Always fetch the updated comment to return the most recent state
     const updatedComment = await commentRepo.findById(id);

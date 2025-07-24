@@ -55,8 +55,8 @@ users.post('/', async (c) => {
     const neonService = new NeonService(c);
     const userRepo = new UserRepository(neonService);
     
-    // The repository will handle validation and defaults
-    const result = await userRepo.create(body);
+    // Use systemCreate for API operations to clear clientId
+    const result = await userRepo.systemCreate(body);
     
     return c.json(createSuccessResponse(result), 201);
   } catch (err) {
@@ -125,8 +125,8 @@ users.patch('/:id', async (c) => {
       );
     }
     
-    // Update the user
-    await userRepo.update(id, body);
+    // Use systemUpdate for API operations to clear clientId
+    await userRepo.systemUpdate(id, body);
     
     // Always fetch the updated user to return the most recent state
     const updatedUser = await userRepo.findById(id);

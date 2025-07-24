@@ -17,6 +17,10 @@ import { TaskDomainService } from './task-service';
 import { ProjectDomainService } from './project-service';
 import { UserDomainService } from './user-service';
 import { CommentDomainService } from './comment-service';
+import { StatusDefinitionDomainService } from './status-definition-service';
+import { TagDomainService } from './tag-service';
+import { TagSetDomainService } from './tagset-service';
+import { StatusSetDomainService } from './statusset-service';
 
 // ============================================================================
 // Domain Service Instances
@@ -30,6 +34,10 @@ export const domainServices = {
   project: new ProjectDomainService(),
   user: new UserDomainService(),
   comment: new CommentDomainService(),
+  statusDefinition: new StatusDefinitionDomainService(),
+  tag: new TagDomainService(),
+  tagSet: new TagSetDomainService(),
+  statusSet: new StatusSetDomainService(),
 } as const;
 
 // ============================================================================
@@ -56,12 +64,20 @@ export type { CreateTaskInput, UpdateTaskInput } from './task-service';
 export type { CreateProjectInput, UpdateProjectInput } from './project-service';
 export type { CreateUserInput, UpdateUserInput } from './user-service';
 export type { CreateCommentInput, UpdateCommentInput } from './comment-service';
+export type { CreateStatusDefinitionInput, UpdateStatusDefinitionInput, StatusDefinitionRelationshipContext } from './status-definition-service';
+export type { CreateTagInput, UpdateTagInput, TagRelationshipContext } from './tag-service';
+export type { CreateTagSetInput, UpdateTagSetInput } from './tagset-service';
+export type { CreateStatusSetInput, UpdateStatusSetInput } from './statusset-service';
 
 // Export service classes for extension
 export { TaskDomainService } from './task-service';
 export { ProjectDomainService } from './project-service';
 export { UserDomainService } from './user-service';
 export { CommentDomainService } from './comment-service';
+export { StatusDefinitionDomainService } from './status-definition-service';
+export { TagDomainService } from './tag-service';
+export { TagSetDomainService } from './tagset-service';
+export { StatusSetDomainService } from './statusset-service';
 export { BaseDomainService } from './base-domain-service';
 
 // Re-export types from dataforge for convenience
@@ -70,6 +86,10 @@ export type {
   Project,
   User,
   Comment,
+  StatusDefinition,
+  StatusSet,
+  Tag,
+  TagSet,
   TaskStatus,
   TaskPriority,
   ProjectStatus,

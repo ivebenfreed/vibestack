@@ -7,35 +7,14 @@
 
 import { StatusSet } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
+import { statussetDexieService } from '@repo/dataforge/dexie-domain';
+import type { CreateStatusSetInput, UpdateStatusSetInput } from '@repo/dataforge/statusset-operations';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
 import { trackOutgoingChange } from '@/db/dexie-change-tracking';
 
-// ============================================================================
-// Input Types
-// ============================================================================
-
-export interface CreateStatusSetInput {
-  name: string;
-  entityType: string;
-  description?: string;
-  isSystem?: boolean;
-  isActive?: boolean;
-  defaultColor?: string;
-  displayOrder?: number;
-  metadata?: any;
-}
-
-export interface UpdateStatusSetInput {
-  name?: string;
-  entityType?: string;
-  description?: string;
-  isSystem?: boolean;
-  isActive?: boolean;
-  defaultColor?: string;
-  displayOrder?: number;
-  metadata?: any;
-}
+// Re-export types from DataForge
+export type { CreateStatusSetInput, UpdateStatusSetInput } from '@repo/dataforge/statusset-operations';
 
 // ============================================================================
 // StatusSet Domain Service Implementation

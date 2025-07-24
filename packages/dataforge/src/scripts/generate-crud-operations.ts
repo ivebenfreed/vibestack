@@ -437,21 +437,49 @@ function generateManyToManyHandling(entityMetadata: EntityMetadata): string {
         let junctionTable, entityColumn, relatedColumn;
         if (entityName === 'Project' && field.name === 'members') {
           junctionTable = 'project_members';
-          entityColumn = 'project_id';
-          relatedColumn = 'user_id';
+          entityColumn = 'projectId';
+          relatedColumn = 'userId';
+        } else if (entityName === 'Project' && field.name === 'statusSets') {
+          junctionTable = 'project_status_sets';
+          entityColumn = 'projectId';
+          relatedColumn = 'statusSetId';
+        } else if (entityName === 'Project' && field.name === 'tagSets') {
+          junctionTable = 'project_tag_sets';
+          entityColumn = 'projectId';
+          relatedColumn = 'tagSetId';
         } else if (entityName === 'User' && field.name === 'memberProjects') {
           junctionTable = 'project_members';
-          entityColumn = 'user_id';
-          relatedColumn = 'project_id';
+          entityColumn = 'userId';
+          relatedColumn = 'projectId';
+        } else if (entityName === 'Task' && field.name === 'tags') {
+          junctionTable = 'task_tags';
+          entityColumn = 'taskId';
+          relatedColumn = 'tagId';
         } else if (entityName === 'Task' && field.name === 'dependencies') {
           junctionTable = 'task_dependencies';
-          entityColumn = 'task_id';
-          relatedColumn = 'dependency_id';
+          entityColumn = 'dependentTaskId';
+          relatedColumn = 'dependencyTaskId';
+        } else if (entityName === 'Task' && field.name === 'tasksDependentOnThis') {
+          junctionTable = 'task_dependencies';
+          entityColumn = 'dependencyTaskId';
+          relatedColumn = 'dependentTaskId';
+        } else if (entityName === 'Tag' && field.name === 'tasks') {
+          junctionTable = 'task_tags';
+          entityColumn = 'tagId';
+          relatedColumn = 'taskId';
+        } else if (entityName === 'StatusSet' && field.name === 'projects') {
+          junctionTable = 'project_status_sets';
+          entityColumn = 'statusSetId';
+          relatedColumn = 'projectId';
+        } else if (entityName === 'TagSet' && field.name === 'projects') {
+          junctionTable = 'project_tag_sets';
+          entityColumn = 'tagSetId';
+          relatedColumn = 'projectId';
         } else {
-          // Default naming convention
+          // Default naming convention using camelCase
           junctionTable = `${entityMetadata.tableName}_${field.name}`;
-          entityColumn = `${lowerEntityName}_id`;
-          relatedColumn = `${field.name}_id`;
+          entityColumn = `${lowerEntityName}Id`;
+          relatedColumn = `${field.name}Id`;
         }
         
         return `
@@ -461,7 +489,7 @@ function generateManyToManyHandling(entityMetadata: EntityMetadata): string {
         .createQueryBuilder()
         .delete()
         .from('${junctionTable}')
-        .where('${entityColumn} = :${lowerEntityName}Id', { ${lowerEntityName}Id })
+        .where('"${entityColumn}" = :${lowerEntityName}Id', { ${lowerEntityName}Id })
         .execute();
       
       // Add new relations if any
@@ -472,8 +500,8 @@ function generateManyToManyHandling(entityMetadata: EntityMetadata): string {
         
         // Insert new relations directly
         const values = relatedIds.map((relatedId: string) => ({ 
-          ${entityColumn}: ${lowerEntityName}Id, 
-          ${relatedColumn}: relatedId 
+          ['${entityColumn}']: ${lowerEntityName}Id, 
+          ['${relatedColumn}']: relatedId 
         }));
         await ${lowerEntityName}Repo
           .createQueryBuilder()

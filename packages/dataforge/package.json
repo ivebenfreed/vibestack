@@ -36,6 +36,14 @@
       "types": "./dist/dexie-domain-services.d.ts",
       "import": "./dist/dexie-domain-services.js"
     },
+    "./dexie-domain": {
+      "types": "./dist/dexie-domain/index.d.ts",
+      "import": "./dist/dexie-domain/index.js"
+    },
+    "./dexie-domain/*": {
+      "types": "./dist/dexie-domain/*.d.ts",
+      "import": "./dist/dexie-domain/*.js"
+    },
     "./entities/*": {
       "types": "./dist/entities/*.d.ts",
       "import": "./dist/entities/*.js",

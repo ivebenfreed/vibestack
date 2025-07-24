@@ -147,7 +147,7 @@ export function initializeAuth(env: Env) {
     },
     secret: env.BETTER_AUTH_SECRET,
     baseUrl: env.ENVIRONMENT === "development" 
-      ? "http://localhost:5173"  // ✅ FIX: HTTP for development
+      ? "http://localhost:5173"  // Frontend URL - Vite proxies /api/* to backend
       : env.ENVIRONMENT === "staging" 
         ? "https://dev.codevibesmatter.com" 
         : "https://app.codevibesmatter.com",
@@ -190,8 +190,14 @@ export function initializeAuth(env: Env) {
             ? "https://dev.codevibesmatter.com" 
             : "https://app.codevibesmatter.com";
         
-        // Ensure we have a full URL - if data.url is relative, make it absolute
-        const fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
+        // Fix the URL for development - replace 127.0.0.1 with localhost:5173
+        let fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
+        
+        // In development, Better Auth may use 127.0.0.1 from the proxy request
+        // Replace it with the correct localhost URL
+        if (env.ENVIRONMENT === "development" && fullUrl.includes('http://127.0.0.1/')) {
+          fullUrl = fullUrl.replace('http://127.0.0.1/', 'http://localhost:5173/');
+        }
         
         try {
           if (isInvitation) {

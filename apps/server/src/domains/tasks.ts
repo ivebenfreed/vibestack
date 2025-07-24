@@ -252,16 +252,12 @@ export class TaskRepository extends BaseServerRepository<Task> {
         // Add the tag and update using system method
         tags.push(tag);
         
-        // Update using the system update method
-        await this.neonService.update(
-          Task,
-          { id } as FindOptionsWhere<Task>,
-          { legacyTags: tags, clientId: null } as DeepPartial<Task>
-        );
+        // Use the base class systemUpdate method
+        return await this.systemUpdate(id, { legacyTags: tags } as TaskUpdateInput);
       }
       
-      // Return updated task
-      return await this.findById(id);
+      // No change needed, return existing task
+      return task;
     } catch (error) {
       console.error('Error adding tag:', error);
       throw error;
@@ -282,15 +278,8 @@ export class TaskRepository extends BaseServerRepository<Task> {
       const tags = task.legacyTags || [];
       const updatedTags = tags.filter(t => t !== tag);
       
-      // Update using the system update method
-      await this.neonService.update(
-        Task,
-        { id } as FindOptionsWhere<Task>,
-        { legacyTags: updatedTags, clientId: null } as DeepPartial<Task>
-      );
-      
-      // Return updated task
-      return await this.findById(id);
+      // Use the base class systemUpdate method
+      return await this.systemUpdate(id, { legacyTags: updatedTags } as TaskUpdateInput);
     } catch (error) {
       console.error('Error removing tag:', error);
       throw error;

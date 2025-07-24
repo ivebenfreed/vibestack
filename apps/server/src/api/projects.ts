@@ -61,8 +61,8 @@ projects.post('/', async (c) => {
     const neonService = new NeonService(c);
     const projectRepo = new ProjectRepository(neonService);
 
-    // The repository will handle defaults and validation
-    const result = await projectRepo.create(body);
+    // Use systemCreate for API operations to clear clientId
+    const result = await projectRepo.systemCreate(body);
 
     return c.json(createSuccessResponse(result), 201);
   } catch (err) {
@@ -137,8 +137,8 @@ projects.patch('/:id', async (c) => {
       );
     }
 
-    // Update the project with the provided data
-    await projectRepo.update(id, body);
+    // Use systemUpdate for API operations to clear clientId
+    await projectRepo.systemUpdate(id, body);
 
     // Always fetch the updated project to return the most recent state
     const updatedProject = await projectRepo.findById(id);

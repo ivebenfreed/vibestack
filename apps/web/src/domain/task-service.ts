@@ -7,40 +7,14 @@
 
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
+import { taskDexieService } from '@repo/dataforge/dexie-domain';
+import type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
 import { trackOutgoingChange } from '@/db/dexie-change-tracking';
 
-// ============================================================================
-// Input Types
-// ============================================================================
-
-export interface CreateTaskInput {
-  title: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  projectId?: string;
-  assigneeId?: string;
-  dueDate?: string;
-  estimatedDuration?: number;
-  order?: number;
-}
-
-export interface UpdateTaskInput {
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  projectId?: string;
-  assigneeId?: string;
-  dueDate?: string;
-  estimatedDuration?: number;
-  actualDuration?: number;
-  completedAt?: string;
-  order?: number;
-  blockedReason?: string;
-}
+// Re-export types from DataForge
+export type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
 
 // ============================================================================
 // Task Domain Service Implementation
@@ -67,33 +41,8 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     // Apply defaults and transformations
     const processedInput = this.beforeCreate ? this.beforeCreate(input) : input;
     
-    const now = new Date().toISOString();
-    const task: Task = {
-      id: nanoid(),
-      title: processedInput.title,
-      description: processedInput.description || '',
-      // Use legacyStatus for compatibility with existing code
-      legacyStatus: processedInput.status || 'open',
-      status: processedInput.status || TaskStatus.TODO,
-      priority: processedInput.priority || TaskPriority.MEDIUM,
-      projectId: processedInput.projectId || null,
-      assigneeId: processedInput.assigneeId || null,
-      dueDate: processedInput.dueDate || null,
-      estimatedDuration: processedInput.estimatedDuration || null,
-      actualDuration: null,
-      completedAt: null,
-      order: processedInput.order || 0,
-      blockedReason: null,
-      timeRange: null,
-      startDate: null,
-      legacyTags: [],
-      createdAt: now,
-      updatedAt: now,
-      clientId: nanoid(),
-    } as Task;
-    
-    // Save to Dexie
-    await db.tasks.add(task);
+    // Use generated Dexie service for creation
+    const task = await taskDexieService.create(processedInput);
     
     // Track for outgoing sync
     await trackOutgoingChange('tasks', 'insert', task);
@@ -113,7 +62,7 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   }
   
   async updateUI(id: string, updates: UpdateTaskInput): Promise<Task> {
-    const existing = await db.tasks.get(id);
+    const existing = await taskDexieService.getById(id);
     if (!existing) {
       throw new Error(`Task ${id} not found`);
     }
@@ -129,10 +78,8 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
       : updates;
     
     // Handle special business logic
-    const finalUpdates: Partial<Task> = {
+    const finalUpdates: UpdateTaskInput = {
       ...processedUpdates,
-      // Sync legacy status field
-      legacyStatus: processedUpdates.status || existing.legacyStatus,
       // Auto-set completedAt when marking as completed
       completedAt: processedUpdates.status === TaskStatus.COMPLETED && !existing.completedAt
         ? new Date().toISOString()
@@ -141,8 +88,20 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
           : existing.completedAt,
     };
     
-    // Use base class helper for common update logic
-    const updated = await this.performUpdate(id, finalUpdates);
+    // Use generated Dexie service for update
+    const updated = await taskDexieService.update(id, finalUpdates);
+    if (!updated) {
+      throw new Error(`Failed to update task ${id}`);
+    }
+    
+    // Track for outgoing sync
+    await trackOutgoingChange('tasks', 'update', updated);
+    
+    console.log('[TaskService] Updated task', {
+      id: updated.id,
+      updates: finalUpdates,
+      trackingSync: true
+    });
     
     // Call after hook if defined
     if (this.afterUpdate) {
@@ -153,7 +112,25 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   }
   
   async deleteUI(id: string): Promise<boolean> {
-    return this.performDelete(id);
+    const existing = await taskDexieService.getById(id);
+    if (!existing) {
+      return false;
+    }
+    
+    // Use generated Dexie service for deletion
+    const result = await taskDexieService.delete(id);
+    
+    if (result) {
+      // Track for outgoing sync
+      await trackOutgoingChange('tasks', 'delete', { id });
+      
+      console.log('[TaskService] Deleted task', {
+        id,
+        trackingSync: true
+      });
+    }
+    
+    return result;
   }
   
   // ============================================================================
@@ -170,7 +147,7 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   }
   
   async updateIncoming(id: string, updates: Partial<Task>): Promise<Task> {
-    const existing = await db.tasks.get(id);
+    const existing = await taskDexieService.getById(id);
     if (!existing) {
       throw new Error(`Task ${id} not found`);
     }
@@ -191,15 +168,11 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   }
   
   async deleteIncoming(id: string): Promise<boolean> {
-    const existing = await db.tasks.get(id);
-    if (!existing) {
-      return false;
+    const result = await taskDexieService.delete(id);
+    if (result) {
+      console.log('[TaskService] Deleted task from incoming sync', { id });
     }
-    
-    await db.tasks.delete(id);
-    console.log('[TaskService] Deleted task from incoming sync', { id });
-    
-    return true;
+    return result;
   }
   
   // ============================================================================
@@ -298,5 +271,49 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
    */
   async updateStatus(taskId: string, status: TaskStatus): Promise<Task> {
     return this.updateUI(taskId, { status });
+  }
+  
+  // ============================================================================
+  // Relationship Resolvers (from generated service)
+  // ============================================================================
+  
+  /**
+   * Get tags for a task
+   */
+  async getTags(taskId: string) {
+    return taskDexieService.getTags(taskId);
+  }
+  
+  /**
+   * Set tags for a task
+   */
+  async setTags(taskId: string, tagIds: string[]) {
+    await taskDexieService.setTags(taskId, tagIds);
+    // Track the change for sync
+    const task = await taskDexieService.getById(taskId);
+    if (task) {
+      await trackOutgoingChange('tasks', 'update', task);
+    }
+  }
+  
+  /**
+   * Resolve status definition
+   */
+  async resolveStatus(statusId: string) {
+    return taskDexieService.resolveStatus_id(statusId);
+  }
+  
+  /**
+   * Resolve project
+   */
+  async resolveProject(projectId: string) {
+    return taskDexieService.resolveProject_id(projectId);
+  }
+  
+  /**
+   * Resolve assignee
+   */
+  async resolveAssignee(assigneeId: string) {
+    return taskDexieService.resolveAssignee_id(assigneeId);
   }
 }

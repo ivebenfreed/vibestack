@@ -24,6 +24,7 @@ import { Route as authVerifyEmailImport } from './routes/(auth)/verify-email'
 import { Route as authSignUpImport } from './routes/(auth)/sign-up'
 import { Route as authSignIn2Import } from './routes/(auth)/sign-in-2'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
+import { Route as authResetPasswordImport } from './routes/(auth)/reset-password'
 import { Route as authOtpVerifyImport } from './routes/(auth)/otp-verify'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as authForgotPasswordImport } from './routes/(auth)/forgot-password'
@@ -50,7 +51,6 @@ import { Route as AuthenticatedDebugVibeganttImport } from './routes/_authentica
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
-import { Route as authResetPasswordTokenImport } from './routes/(auth)/reset-password.$token'
 import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authenticated/settings/admin.users'
 
 // Create Virtual Routes
@@ -132,6 +132,12 @@ const authSignIn2Route = authSignIn2Import.update({
 const authSignInRoute = authSignInImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const authResetPasswordRoute = authResetPasswordImport.update({
+  id: '/(auth)/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -346,12 +352,6 @@ const AuthenticatedDebugKanbanRoute = AuthenticatedDebugKanbanImport.update({
   getParentRoute: () => AuthenticatedDebugRouteRoute,
 } as any)
 
-const authResetPasswordTokenRoute = authResetPasswordTokenImport.update({
-  id: '/(auth)/reset-password/$token',
-  path: '/reset-password/$token',
-  getParentRoute: () => rootRoute,
-} as any)
-
 const AuthenticatedSettingsAdminUsersRoute =
   AuthenticatedSettingsAdminUsersImport.update({
     id: '/admin/users',
@@ -417,6 +417,13 @@ declare module '@tanstack/react-router' {
       path: '/otp-verify'
       fullPath: '/otp-verify'
       preLoaderRoute: typeof authOtpVerifyImport
+      parentRoute: typeof rootRoute
+    }
+    '/(auth)/reset-password': {
+      id: '/(auth)/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof authResetPasswordImport
       parentRoute: typeof rootRoute
     }
     '/(auth)/sign-in': {
@@ -488,13 +495,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/(auth)/reset-password/$token': {
-      id: '/(auth)/reset-password/$token'
-      path: '/reset-password/$token'
-      fullPath: '/reset-password/$token'
-      preLoaderRoute: typeof authResetPasswordTokenImport
-      parentRoute: typeof rootRoute
     }
     '/_authenticated/debug/kanban': {
       id: '/_authenticated/debug/kanban'
@@ -769,6 +769,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/otp-verify': typeof authOtpVerifyRoute
+  '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-in-2': typeof authSignIn2Route
   '/sign-up': typeof authSignUpRoute
@@ -779,7 +780,6 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
-  '/reset-password/$token': typeof authResetPasswordTokenRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
@@ -812,6 +812,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/otp-verify': typeof authOtpVerifyRoute
+  '/reset-password': typeof authResetPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/sign-in-2': typeof authSignIn2Route
   '/sign-up': typeof authSignUpRoute
@@ -822,7 +823,6 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
-  '/reset-password/$token': typeof authResetPasswordTokenRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
@@ -859,6 +859,7 @@ export interface FileRoutesById {
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/otp-verify': typeof authOtpVerifyRoute
+  '/(auth)/reset-password': typeof authResetPasswordRoute
   '/(auth)/sign-in': typeof authSignInRoute
   '/(auth)/sign-in-2': typeof authSignIn2Route
   '/(auth)/sign-up': typeof authSignUpRoute
@@ -869,7 +870,6 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/(auth)/reset-password/$token': typeof authResetPasswordTokenRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
@@ -907,6 +907,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/otp'
     | '/otp-verify'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-in-2'
     | '/sign-up'
@@ -917,7 +918,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
-    | '/reset-password/$token'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
@@ -949,6 +949,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/otp'
     | '/otp-verify'
+    | '/reset-password'
     | '/sign-in'
     | '/sign-in-2'
     | '/sign-up'
@@ -959,7 +960,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
-    | '/reset-password/$token'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
@@ -994,6 +994,7 @@ export interface FileRouteTypes {
     | '/(auth)/forgot-password'
     | '/(auth)/otp'
     | '/(auth)/otp-verify'
+    | '/(auth)/reset-password'
     | '/(auth)/sign-in'
     | '/(auth)/sign-in-2'
     | '/(auth)/sign-up'
@@ -1004,7 +1005,6 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
-    | '/(auth)/reset-password/$token'
     | '/_authenticated/debug/kanban'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
@@ -1039,6 +1039,7 @@ export interface RootRouteChildren {
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authOtpRoute: typeof authOtpRoute
   authOtpVerifyRoute: typeof authOtpVerifyRoute
+  authResetPasswordRoute: typeof authResetPasswordRoute
   authSignInRoute: typeof authSignInRoute
   authSignIn2Route: typeof authSignIn2Route
   authSignUpRoute: typeof authSignUpRoute
@@ -1048,7 +1049,6 @@ export interface RootRouteChildren {
   errors404Route: typeof errors404Route
   errors500Route: typeof errors500Route
   errors503Route: typeof errors503Route
-  authResetPasswordTokenRoute: typeof authResetPasswordTokenRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
@@ -1058,6 +1058,7 @@ const rootRouteChildren: RootRouteChildren = {
   authForgotPasswordRoute: authForgotPasswordRoute,
   authOtpRoute: authOtpRoute,
   authOtpVerifyRoute: authOtpVerifyRoute,
+  authResetPasswordRoute: authResetPasswordRoute,
   authSignInRoute: authSignInRoute,
   authSignIn2Route: authSignIn2Route,
   authSignUpRoute: authSignUpRoute,
@@ -1067,7 +1068,6 @@ const rootRouteChildren: RootRouteChildren = {
   errors404Route: errors404Route,
   errors500Route: errors500Route,
   errors503Route: errors503Route,
-  authResetPasswordTokenRoute: authResetPasswordTokenRoute,
 }
 
 export const routeTree = rootRoute
@@ -1086,6 +1086,7 @@ export const routeTree = rootRoute
         "/(auth)/forgot-password",
         "/(auth)/otp",
         "/(auth)/otp-verify",
+        "/(auth)/reset-password",
         "/(auth)/sign-in",
         "/(auth)/sign-in-2",
         "/(auth)/sign-up",
@@ -1094,8 +1095,7 @@ export const routeTree = rootRoute
         "/(errors)/403",
         "/(errors)/404",
         "/(errors)/500",
-        "/(errors)/503",
-        "/(auth)/reset-password/$token"
+        "/(errors)/503"
       ]
     },
     "/_authenticated": {
@@ -1157,6 +1157,9 @@ export const routeTree = rootRoute
     "/(auth)/otp-verify": {
       "filePath": "(auth)/otp-verify.tsx"
     },
+    "/(auth)/reset-password": {
+      "filePath": "(auth)/reset-password.tsx"
+    },
     "/(auth)/sign-in": {
       "filePath": "(auth)/sign-in.tsx"
     },
@@ -1187,9 +1190,6 @@ export const routeTree = rootRoute
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",
       "parent": "/_authenticated"
-    },
-    "/(auth)/reset-password/$token": {
-      "filePath": "(auth)/reset-password.$token.tsx"
     },
     "/_authenticated/debug/kanban": {
       "filePath": "_authenticated/debug/kanban.tsx",

@@ -7,39 +7,14 @@
 
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
+import { projectDexieService } from '@repo/dataforge/dexie-domain';
+import type { CreateProjectInput, UpdateProjectInput } from '@repo/dataforge/project-operations';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
 import { trackOutgoingChange } from '@/db/dexie-change-tracking';
 
-// ============================================================================
-// Input Types
-// ============================================================================
-
-export interface CreateProjectInput {
-  name: string;
-  description?: string;
-  status?: ProjectStatus;
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-  startDate?: string;
-  endDate?: string;
-  budget?: number;
-  ownerId?: string;
-  tags?: string[];
-}
-
-export interface UpdateProjectInput {
-  name?: string;
-  description?: string;
-  status?: ProjectStatus;
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-  startDate?: string;
-  endDate?: string;
-  budget?: number;
-  actualCost?: number;
-  ownerId?: string;
-  tags?: string[];
-  completedAt?: string;
-}
+// Re-export types from DataForge
+export type { CreateProjectInput, UpdateProjectInput } from '@repo/dataforge/project-operations';
 
 // ============================================================================
 // Project Domain Service Implementation

@@ -12,7 +12,8 @@ import { PasswordInput } from '@/components/password-input'
 import { authClient } from '@/lib/auth'
 import { toast } from 'sonner'
 
-const resetPasswordSearchSchema = z.object({
+// Search params schema to handle ?token=xxx format
+const searchSchema = z.object({
   token: z.string().optional(),
 })
 
@@ -28,15 +29,14 @@ const formSchema = z
     path: ['confirmPassword'],
   })
 
-export const Route = createFileRoute('/(auth)/reset-password/$token')({
+export const Route = createFileRoute('/(auth)/reset-password')({
   component: ResetPasswordPage,
-  validateSearch: resetPasswordSearchSchema,
+  validateSearch: searchSchema,
 })
 
 function ResetPasswordPage() {
   const navigate = useNavigate()
-  const { token } = Route.useParams() // Get token from URL params
-  const searchParams = Route.useSearch()
+  const { token } = Route.useSearch() // Get token from query params
   
   const [isLoading, setIsLoading] = useState(false)
   const [resetStatus, setResetStatus] = useState<'pending' | 'success' | 'error'>('pending')

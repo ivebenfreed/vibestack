@@ -123,7 +123,7 @@ tasks.patch('/:id', async (c) => {
     
     // Handle status updates separately to manage completedAt
     if (body.status && body.status !== existingTask.status) {
-      await taskRepo.updateStatus(id, body.status);
+      await taskRepo.systemUpdateStatus(id, body.status);
       // Remove status from body to avoid duplicate updates
       delete body.status;
     }
@@ -131,7 +131,7 @@ tasks.patch('/:id', async (c) => {
     // Update the remaining fields if any
     let updatedTask;
     if (Object.keys(body).length > 0) {
-      updatedTask = await taskRepo.update(id, body);
+      updatedTask = await taskRepo.systemUpdate(id, body);
     }
     
     // Always fetch the latest task data to return the most recent state
