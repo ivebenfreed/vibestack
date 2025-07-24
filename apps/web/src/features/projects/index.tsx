@@ -4,7 +4,7 @@ import ProjectsProvider from './context/projects-context';
 import { ProjectsDialogs } from './components/projects-dialogs';
 import { ProjectsPrimaryButtons } from './components/projects-primary-buttons';
 import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex/VibeGridDex';
-import { updateProjectUI } from '@/domain-dexie/project';
+import { domainServices } from '@/domain';
 import type { Project } from '@repo/dataforge/client-entities';
 import type { Column } from '@/components/custom/vibegriddex/column-types';
 
@@ -74,7 +74,7 @@ const Projects: React.FC = () => {
           tableId="projects-table"
           entityType="project"
           columns={columns}
-          domainService={{ update: updateProjectUI }}
+          onEntityUpdate={(id, updates) => domainServices.project.updateUI(id, updates)}
           height={600}
           className="border border-border rounded-lg"
           enableSorting

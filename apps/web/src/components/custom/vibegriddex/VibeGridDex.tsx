@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useMemo, lazy, Suspense } from '
 import { useActorRef, useSelector } from '@xstate/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { tableBaseMachine } from './machines/table-machine';
+import { toast } from 'sonner';
 import { 
   type InitializationRefs 
 } from './VibeGridXCore';
@@ -22,7 +23,7 @@ import { syncProcessView } from './utils/syncViewProcessor';
 import './vibegridx.css';
 
 // Import Dexie domain services and queries
-import * as dexieDomains from '@/domain-dexie';
+import * as dexieDomains from '@/domain';
 
 // Import provider utilities
 import type { RelationshipOptionsProvider } from './types';
@@ -71,6 +72,7 @@ interface VibeGridDexProps<T = any> {
   onEditingChange?: (editingCell: CellRef | null) => void;
   onPerformanceUpdate?: (metrics: any) => void;
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
+  onBatchEntityUpdate?: (updates: Array<{ id: string; updates: Record<string, any> }>) => Promise<void> | void;
   
   // Performance options
   enableVirtualScrolling?: boolean;
@@ -257,7 +259,12 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         persistedData: persistedData,
         relationshipResolvers: {}, // NOT NEEDED - store has resolved data
         storeActor: store, // Store subscription will provide entities
-        domainService: (props as any).domainService, // Pass domain service for edit operations
+        onEntityUpdate: props.onEntityUpdate, // Pass update handler from props
+        onBatchEntityUpdate: props.onBatchEntityUpdate, // Pass batch update handler from props
+        onNotification: (message: string, type: 'info' | 'warning' | 'error' | 'success') => {
+          // Show toast notification
+          toast[type](message);
+        },
         settings: {
           enableVirtualScrolling: props.enableVirtualScrolling ?? true,
           enableGrouping: props.enableGrouping ?? true,

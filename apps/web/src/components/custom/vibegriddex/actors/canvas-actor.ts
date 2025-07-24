@@ -31,6 +31,7 @@ export type CanvasActorEvent =
   | { type: 'UPDATE_COLUMN_RESIZE'; resizeState: any }
   | { type: 'SHOW_COPY_INDICATOR'; isCut: boolean }
   | { type: 'HIDE_COPY_INDICATOR' }
+  | { type: 'UPDATE_CLIPBOARD_VISUAL'; clipboardState: { copiedCells: Set<string>; isCut: boolean; visualPositions?: VisualCellPosition[] } | null; viewport: ViewportInfo }
   | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[]; selectedRows?: Set<string> }
   | { type: 'RENDER_FILL_HANDLE_ROW_SELECTION'; selectedRows: Set<string>; visualCells: VisualCellPosition[] }
   | { type: 'RENDER_FILL_PREVIEW'; previewCells: Set<string>; viewport: ViewportInfo }
@@ -49,6 +50,7 @@ export type CanvasActorResponse =
   | { type: 'FILL_START'; direction: 'vertical' | 'horizontal' }
   | { type: 'FILL_PREVIEW'; previewCells: Set<string> }
   | { type: 'FILL_COMPLETE'; fillCells: Set<string> }
+  | { type: 'FILL_CELLS_CALCULATED'; fillCells: Set<string> }
   | { type: 'FILL_CANCEL' }
   | { type: 'COPY'; cells: Set<string> }
   | { type: 'CUT'; cells: Set<string> }
@@ -236,6 +238,34 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           canvas.hideCopyIndicator();
           break;
           
+        case 'UPDATE_CLIPBOARD_VISUAL':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot update clipboard visual - canvas not initialized');
+            return;
+          }
+          console.log('CanvasActor: Updating clipboard visual', {
+            hasClipboard: !!event.clipboardState,
+            cellCount: event.clipboardState?.copiedCells.size || 0,
+            isCut: event.clipboardState?.isCut || false,
+            hasVisualPositions: !!event.clipboardState?.visualPositions
+          });
+          
+          // Update clipboard overlay if available
+          const clipboardOverlay = (canvas as any).getClipboardOverlay();
+          if (clipboardOverlay) {
+            // Use visual positions if available
+            if (event.clipboardState?.visualPositions && event.clipboardState.visualPositions.length > 0) {
+              clipboardOverlay.updateIndicatorWithVisualPositions(
+                event.clipboardState.visualPositions,
+                event.clipboardState.isCut
+              );
+            } else {
+              // Fall back to coordinate-based calculation
+              clipboardOverlay.updateIndicator(event.clipboardState, event.viewport);
+            }
+          }
+          break;
+          
         case 'RENDER_FILL_HANDLE':
           if (!canvas) {
             console.warn('CanvasActor: Cannot render fill handle - canvas not initialized');
@@ -317,6 +347,48 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           canvas.hideEditingOverlay();
           break;
           
+        case 'CALCULATE_FILL_PREVIEW':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot calculate fill preview - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Calculating fill preview');
+          const fillHandleLayerPreview = (canvas as any).getFillHandleLayer();
+          const previewCells = fillHandleLayerPreview.calculateFillPreviewCells(
+            event.dragPos,
+            event.selectedCells,
+            event.viewport
+          );
+          
+          // Send back the calculated preview cells
+          sendBack({
+            type: 'FILL_PREVIEW',
+            previewCells: previewCells
+          });
+          break;
+          
+        case 'CALCULATE_FILL_COMPLETE':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot calculate fill complete - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Calculating fill complete');
+          const fillHandleLayerComplete = (canvas as any).getFillHandleLayer();
+          const fillCells = fillHandleLayerComplete.calculateFillPreviewCells(
+            event.dragPos,
+            event.selectedCells,
+            event.viewport
+          );
+          
+          // Send back a different event name to avoid re-triggering the handler
+          sendBack({
+            type: 'FILL_CELLS_CALCULATED',
+            fillCells: fillCells
+          });
+          break;
+          
         case 'DESTROY':
           console.log('CanvasActor: Destroying canvas overlay');
           
@@ -361,7 +433,7 @@ export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
     [
       'INITIALIZE', 'UPDATE_SELECTION', 'UPDATE_SELECTION_VISUAL', 'UPDATE_COORDINATES', 'UPDATE_VIEWPORT',
       'UPDATE_COLUMN_DRAG', 'UPDATE_COLUMN_RESIZE', 'SHOW_COPY_INDICATOR', 
-      'HIDE_COPY_INDICATOR', 'RENDER_FILL_HANDLE', 'RENDER_FILL_HANDLE_ROW_SELECTION', 'RENDER_FILL_PREVIEW',
+      'HIDE_COPY_INDICATOR', 'UPDATE_CLIPBOARD_VISUAL', 'RENDER_FILL_HANDLE', 'RENDER_FILL_HANDLE_ROW_SELECTION', 'RENDER_FILL_PREVIEW',
       'CLEAR_FILL_PREVIEW', 'HIDE_FILL_HANDLE', 'DESTROY'
     ].includes(event.type);
 }
@@ -373,7 +445,7 @@ export function isCanvasActorResponse(response: any): response is CanvasActorRes
   return response && typeof response.type === 'string' && 
     [
       'CANVAS_READY', 'CANVAS_DEFERRED_READY', 'SELECTION_UPDATED', 'CANVAS_COORDINATES_UPDATED', 'VIEWPORT_UPDATED',
-      'FILL_START', 'FILL_PREVIEW', 'FILL_COMPLETE', 'FILL_CANCEL',
+      'FILL_START', 'FILL_PREVIEW', 'FILL_COMPLETE', 'FILL_CELLS_CALCULATED', 'FILL_CANCEL',
       'COPY', 'CUT', 'PASTE', 'CLEAR_CLIPBOARD', 'CANVAS_ERROR'
     ].includes(response.type);
 }

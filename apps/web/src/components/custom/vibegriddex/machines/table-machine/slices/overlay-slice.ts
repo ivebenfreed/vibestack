@@ -3,7 +3,7 @@
 // ====================================
 
 import { assign } from 'xstate';
-import type { CellRef, ViewportInfo } from '../../../types';
+import type { CellRef, ViewportInfo, VibeGridClipboardData } from '../../../types';
 
 // ====================================
 // STATE INTERFACE
@@ -32,11 +32,8 @@ export interface OverlayState {
     previewCells: Set<string>;
   } | null;
   
-  // Clipboard state
-  clipboardState: {
-    copiedCells: Set<string>;
-    isCut: boolean;
-  } | null;
+  // Clipboard state - now stores rich data
+  clipboardState: VibeGridClipboardData | null;
   
   // Shape visibility flags
   shapesVisible: {
@@ -92,16 +89,16 @@ export const createInitialOverlayState = (initialViewport?: ViewportInfo): Overl
 
 export const overlayActions = {
   updateViewport: assign({
-    viewport: (_, event: any) => event.viewport
+    viewport: ({ event }: any) => event.viewport
   }),
 
   updateCoordinateMapping: assign({
-    coordinateMapping: (_, event: any) => event.mapping
+    coordinateMapping: ({ event }: any) => event.mapping
   }),
 
   updateSelectedCells: assign({
-    selectedCells: (_, event: any) => new Set(event.cells),
-    shapesVisible: ({ context }: any) => ({
+    selectedCells: ({ event }: any) => new Set(event.cells),
+    shapesVisible: ({ context, event }: any) => ({
       ...context.shapesVisible,
       selection: event.cells.size > 0,
       fillHandle: event.cells.size > 0
@@ -109,12 +106,12 @@ export const overlayActions = {
   }),
 
   setAnchorCell: assign({
-    anchorCell: (_, event: any) => event.anchor
+    anchorCell: ({ event }: any) => event.anchor
   }),
 
   updateEditingCell: assign({
-    editingCell: (_, event: any) => event.cell,
-    shapesVisible: ({ context }: any) => ({
+    editingCell: ({ event }: any) => event.cell,
+    shapesVisible: ({ context, event }: any) => ({
       ...context.shapesVisible,
       editing: !!event.cell
     })
@@ -160,10 +157,7 @@ export const overlayActions = {
   }),
 
   setClipboard: assign({
-    clipboardState: (_, event: any) => ({
-      copiedCells: new Set(event.cells),
-      isCut: event.isCut || false
-    }),
+    clipboardState: ({ event }: any) => event.clipboardData,
     shapesVisible: ({ context }: any) => ({
       ...context.shapesVisible,
       copyIndicator: true
@@ -186,7 +180,7 @@ export const overlayActions = {
   }),
 
   updatePerformanceMetrics: assign({
-    lastRenderTime: (_, event: any) => event.duration,
+    lastRenderTime: ({ event }: any) => event.duration,
     renderCount: ({ context }: any) => context.renderCount + 1
   })
 };

@@ -39,7 +39,7 @@ function TaskViewLoader({ view }: { view: string }) {
  * Features:
  * - Performant tab switching with lazy loading
  * - Automatic component unmounting for memory efficiency  
- * - Three views: Table (VibeGridOptimus), Kanban, Timeline
+ * - Three views: Table (VibeGridDex), Kanban, Timeline
  * - Shared state management via XState atoms
  */
 const Tasks: React.FC = () => {

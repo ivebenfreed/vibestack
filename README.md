@@ -316,8 +316,8 @@ pnpm type-check
 5. Make changes offline, reconnect, verify sync
 
 **Performance Testing:**
-1. Use VibeGridFinal with large datasets (1000+ rows)
-2. Verify cell rendering stays under 50ms
+1. Test with large datasets (1000+ rows)
+2. Verify performance stays optimal
 3. Test bulk operations and sync performance
 4. Monitor WebSocket connection stability
 
@@ -357,7 +357,6 @@ pnpm cli init-dataforge
 
 ### Performance Benchmarks
 
-- **VibeGridFinal Cell Rendering**: ~45ms universal cell renderer
 - **WebSocket Sync Latency**: <2 seconds for typical changes
 - **Database Query Performance**: Optimized with single-query updates
 - **Bundle Size**: Monitored for optimal loading times

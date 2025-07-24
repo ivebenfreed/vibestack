@@ -30,7 +30,6 @@ const DebugSidebarContent = React.memo(function DebugSidebarContent() {
       title: "Data Tables",
       items: [
         { title: "VibeGrid Native", url: "/debug/vibegrid-native", icon: Grid3X3 },
-        { title: "VibeGridFinal Tasks", url: "/debug/vibegridfinal-tasks", icon: Grid3X3 },
       ]
     },
     {

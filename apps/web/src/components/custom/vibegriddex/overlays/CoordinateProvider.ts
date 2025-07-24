@@ -11,6 +11,7 @@ import type { ViewportInfo } from '../types';
  */
 export interface CoordinateProvider {
   getCoordinateManager(): VibeGridXCoordinateManager | null;
+  getCoordinateMapping?(): any; // New method for coordinate mapping
 }
 
 /**
@@ -19,6 +20,22 @@ export interface CoordinateProvider {
  */
 export class CoordinateHelper {
   constructor(private provider: CoordinateProvider) {}
+  
+  getColumnWidth(columnId: string): number {
+    // Try coordinate mapping first
+    if (this.provider.getCoordinateMapping) {
+      const mapping = this.provider.getCoordinateMapping();
+      if (mapping) {
+        const colData = mapping.columns?.find((c: any) => c.columnId === columnId);
+        if (colData) {
+          return colData.width || 100;
+        }
+      }
+    }
+    
+    // Fall back to default
+    return 100;
+  }
 
   getCellPosition(rowId: string, columnId: string): { x: number; y: number; row: number; column: number } | null {
     const manager = this.provider.getCoordinateManager();
@@ -46,6 +63,15 @@ export class CoordinateHelper {
     columnId: string, 
     viewport: ViewportInfo
   ): { x: number; y: number } | null {
+    // Try to use coordinate mapping first (new approach)
+    if (this.provider.getCoordinateMapping) {
+      const mapping = this.provider.getCoordinateMapping();
+      if (mapping) {
+        return this.getCellPositionFromMapping(rowId, columnId, viewport, mapping);
+      }
+    }
+    
+    // Fall back to coordinate manager (legacy)
     const manager = this.provider.getCoordinateManager();
     if (!manager) {
       console.warn('CoordinateHelper: No coordinate manager available');
@@ -63,6 +89,42 @@ export class CoordinateHelper {
     // Return the viewport-relative position
     // The coordinate manager already calculated the viewport-relative position
     return viewportAwarePosition.viewport;
+  }
+  
+  private getCellPositionFromMapping(
+    rowId: string,
+    columnId: string,
+    viewport: ViewportInfo,
+    mapping: any
+  ): { x: number; y: number } | null {
+    // Find row data
+    const rowData = mapping.rows?.find((r: any) => r.rowId === rowId);
+    if (!rowData) {
+      console.warn('CoordinateHelper: Row not found in mapping', { rowId, rowCount: mapping.rows?.length });
+      return null;
+    }
+    
+    // Find column data
+    const colData = mapping.columns?.find((c: any) => c.columnId === columnId);
+    if (!colData) {
+      console.warn('CoordinateHelper: Column not found in mapping', { columnId, columnCount: mapping.columns?.length });
+      return null;
+    }
+    
+    // Calculate viewport-relative position
+    const rowHeight = viewport.itemHeight || 40;
+    const absoluteY = rowData.sortedIndex * rowHeight; // Use sortedIndex instead of offset
+    const viewportY = absoluteY - viewport.scrollTop;
+    
+    // Check if row is visible in viewport
+    if (viewportY + rowHeight < 0 || viewportY > viewport.height) {
+      return null; // Row is outside viewport
+    }
+    
+    return {
+      x: colData.offset,
+      y: viewportY
+    };
   }
 
   parseCellKey(cellKey: string): { rowId: string; columnId: string } | null {
@@ -108,15 +170,6 @@ export class CoordinateHelper {
     return new Set();
   }
 
-  getColumnWidth(columnId: string): number {
-    const manager = this.provider.getCoordinateManager();
-    if (!manager) {
-      return 120; // default width
-    }
-
-    const column = manager.getColumn(columnId);
-    return column?.width || 120;
-  }
 
   getRowHeight(): number {
     // For now, return fixed height
@@ -125,6 +178,15 @@ export class CoordinateHelper {
   }
 
   getAllRowIds(): string[] {
+    // Try coordinate mapping first
+    if (this.provider.getCoordinateMapping) {
+      const mapping = this.provider.getCoordinateMapping();
+      if (mapping && mapping.rows) {
+        return mapping.rows.map((r: any) => r.rowId);
+      }
+    }
+    
+    // Fall back to coordinate manager
     const manager = this.provider.getCoordinateManager();
     if (!manager) {
       return [];
@@ -133,6 +195,15 @@ export class CoordinateHelper {
   }
 
   getAllColumnIds(): string[] {
+    // Try coordinate mapping first
+    if (this.provider.getCoordinateMapping) {
+      const mapping = this.provider.getCoordinateMapping();
+      if (mapping && mapping.columns) {
+        return mapping.columns.map((c: any) => c.columnId);
+      }
+    }
+    
+    // Fall back to coordinate manager
     const manager = this.provider.getCoordinateManager();
     if (!manager) {
       return [];

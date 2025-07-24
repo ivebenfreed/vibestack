@@ -196,11 +196,9 @@ Each entity has its own domain module containing repository and service layers:
 - `apps/web/src/domain/index.ts` - Domain factory for centralized creation
 
 ### Database & Data Display Architecture
-**Current Standard: XState Atoms + VibeGridFinal**
+**Current Standard: XState Atoms**
 - **XState Atomic Stores**: All data managed via XState atoms (`tasksAtom`, `projectsAtom`, etc.)
 - **Surgical Selectors**: Use `useSelector` with `shallowEqual` for precise updates
-- **VibeGridFinal**: High-performance data grid for all tabular data (45ms cell rendering)
-- **DirectUsagePattern**: Enforced architectural pattern for table components
 
 **Legacy (Disabled in Debug Only):**
 - Live query hooks (`useLiveEntity`, `useLiveEntityIncremental`, `useLiveChanges`) 
@@ -245,7 +243,6 @@ New kanban board implementation for task visualization:
 - Implement batch operations for bulk changes
 - **Use XState atoms with surgical selectors** instead of live query hooks
 - Use atomic state for shared, frequently-updated data
-- **Use VibeGridFinal for all tabular data** (high-performance 45ms cell rendering)
 - Use direct database queries for analytics and one-time operations
 
 ### Code Quality Requirements
@@ -311,7 +308,6 @@ The project includes comprehensive sync functionality tests:
 5. **Create Domain Module**: Add repository + service in `apps/web/src/domain/`
 6. **Add to Domain Factory**: Include in `apps/web/src/domain/index.ts`
 7. **Use XState Atoms**: All entities automatically get atoms in domain layer
-8. **Use VibeGridFinal**: For tabular data display with DirectUsagePattern
 
 ### Adding New Features
 1. Follow domain-driven design principles with DataForge entities as foundation
@@ -323,43 +319,6 @@ The project includes comprehensive sync functionality tests:
 7. Write tests for critical functionality
 
 ### Data Visualization Components
-
-#### VibeGridFinal - Standard Data Table Component
-**Location**: `apps/web/src/components/custom/vibegridfinal/core/VibeGridFinal.tsx`
-
-**Key Features:**
-- **High Performance**: 45ms universal cell renderer
-- **DirectUsagePattern**: Enforced architectural pattern with TypeScript validation
-- **XState Integration**: Built-in persistence and state management
-- **Auto-Generated Columns**: Uses DataForge column configurations
-- **Relationship Support**: Built-in handling for foreign key relationships
-
-**Usage Pattern:**
-```typescript
-// 1. Import generated columns and create usage pattern
-import { TaskColumns } from '@repo/dataforge/column-configurations'
-import { createDirectUsagePattern } from '@/components/custom/vibegridfinal/utils/patterns'
-
-// 2. Use XState selectors for data
-const tasks = useSelector(tasksAtom, (tasksRecord) => Object.values(tasksRecord), shallowEqual)
-
-// 3. Create DirectUsagePattern with handlers
-const usagePattern = createDirectUsagePattern<Task>({
-  useBalancedSelector: () => tasks,
-  handleSave: async (id, column, value) => { /* update logic */ },
-  columns: TaskColumns,
-  relationshipData: { /* foreign key data */ }
-})
-
-// 4. Render VibeGridFinal
-<VibeGridFinal
-  data={tasks}
-  columns={columns}
-  relationshipData={relationshipData}
-  onSave={handleSave}
-  __usagePattern={usagePattern}
-/>
-```
 
 #### New Task Visualization Components
 **Kanban View**: `apps/web/src/features/tasks/TasksKanban.tsx`
@@ -408,7 +367,7 @@ const usagePattern = createDirectUsagePattern<Task>({
 
 ## Important Architectural Patterns
 
-### VibeGridNative Usage (Alternative to VibeGridFinal)
+### VibeGridNative Usage
 - **Performance**: 42.54ms universal cell renderer
 - **Generated Columns**: Auto-generated from DataForge entities
 - **Usage**: Import from `@repo/dataforge/column-configurations`

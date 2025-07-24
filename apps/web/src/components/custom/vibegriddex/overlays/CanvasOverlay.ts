@@ -195,9 +195,12 @@ export class CanvasOverlay implements CoordinateProvider {
     return this.fillHandleLayer;
   }
   
-  private getClipboardOverlay(): ClipboardOverlay {
+  public getClipboardOverlay(): ClipboardOverlay {
     if (!this.clipboardOverlay) {
-      console.log('CanvasOverlay: Lazily creating ClipboardOverlay');
+      console.log('CanvasOverlay: Lazily creating ClipboardOverlay', {
+        hasCoordinateMapping: !!this.coordinateMapping,
+        hasCoordinateManager: !!this.coordinateManager
+      });
       this.ensureStageInitialized();
       this.clipboardOverlay = new ClipboardOverlay(
         this.layer,
@@ -485,12 +488,17 @@ export class CanvasOverlay implements CoordinateProvider {
     console.log('CanvasOverlay: Coordinate manager set');
   }
   
-  // Get coordinate manager
+  // Get coordinate manager (legacy)
   getCoordinateManager(): VibeGridXCoordinateManager | null {
     if (!this.coordinateManager) {
       console.warn('CanvasOverlay.getCoordinateManager: coordinateManager is null');
     }
     return this.coordinateManager;
+  }
+  
+  // Get coordinate mapping (new approach)
+  getCoordinateMapping(): any {
+    return this.coordinateMapping;
   }
   
   /**

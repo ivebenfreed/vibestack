@@ -204,7 +204,7 @@ export class FillHandleLayer {
       }
       
       if (position) {
-        const columnWidth = this.config.dimensionManager.getColumnWidth(parsed.columnId);
+        const columnWidth = this.coordinateHelper.getColumnWidth(parsed.columnId) || 100;
         // Create preview shape
         const shape = new Konva.Rect({
           x: position.x,
@@ -594,7 +594,7 @@ export class FillHandleLayer {
       
       const position = this.coordinateHelper.getCellPositionWithViewport(parsed.rowId, parsed.columnId, viewport);
       if (position) {
-        const columnWidth = this.config.dimensionManager.getColumnWidth(parsed.columnId);
+        const columnWidth = this.coordinateHelper.getColumnWidth(parsed.columnId) || 100;
         const cellRight = position.x + columnWidth;
         const cellBottom = position.y + this.config.cellHeight;
         
@@ -626,6 +626,7 @@ export class FillHandleLayer {
     interceptor.style.pointerEvents = 'all';
     interceptor.style.cursor = 'crosshair';
     interceptor.setAttribute('data-fill-handle-interceptor', 'true');
+    interceptor.className = 'vibegridx-fill-handle'; // Add the class that EventDelegationManager looks for
     
     // Add hover effects
     interceptor.addEventListener('mouseenter', () => {
@@ -638,81 +639,8 @@ export class FillHandleLayer {
       this.shrinkFillHandle();
     });
     
-    // Add drag functionality
-    let isDragging = false;
-    let startY = 0;
-    
-    interceptor.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      isDragging = true;
-      startY = e.clientY;
-      
-      // Start fill operation
-      this.callbacks.onFillStart('vertical');
-    });
-    
-    // Global mouse events for dragging
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      const deltaY = e.clientY - startY;
-      // Convert screen coordinates to canvas coordinates
-      const canvasContainer = this.stage.container();
-      const containerRect = canvasContainer.getBoundingClientRect();
-      const canvasX = e.clientX - containerRect.left;
-      const canvasY = e.clientY - containerRect.top;
-      
-      // Calculate fill preview
-      const selectedCells = this.callbacks.getSelectedCells();
-      const viewport = this.callbacks.getViewport();
-      if (viewport && selectedCells.size > 0) {
-        const previewCells = this.calculateFillPreviewCells(
-          { x: canvasX, y: canvasY },
-          selectedCells,
-          viewport
-        );
-        this.renderFillPreview(previewCells, viewport);
-        this.callbacks.onFillPreview(previewCells);
-      }
-    };
-    
-    const handleMouseUp = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      isDragging = false;
-      
-      // Convert screen coordinates to canvas coordinates
-      const canvasContainer = this.stage.container();
-      const containerRect = canvasContainer.getBoundingClientRect();
-      const canvasX = e.clientX - containerRect.left;
-      const canvasY = e.clientY - containerRect.top;
-      
-      // Complete fill operation
-      const selectedCells = this.callbacks.getSelectedCells();
-      const viewport = this.callbacks.getViewport();
-      if (viewport && selectedCells.size > 0) {
-        const fillCells = this.calculateFillPreviewCells(
-          { x: canvasX, y: canvasY },
-          selectedCells,
-          viewport
-        );
-        
-        this.clearFillPreview();
-        this.callbacks.onFillComplete(fillCells);
-      }
-      
-      // Remove global listeners
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    
-    // Add global listeners when drag starts
-    interceptor.addEventListener('mousedown', () => {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    });
+    // Remove our custom event handling - EventDelegationManager will handle it
+    // We just need the visual DOM element with the right class
     
     // Add to canvas container, not document body
     const canvasContainer = this.stage.container();

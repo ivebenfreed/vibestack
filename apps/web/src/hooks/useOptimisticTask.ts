@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from '@xstate/store/react';
 import { shallowEqual } from '@xstate/store';
 import type { Task } from '@repo/dataforge/client-entities';
-import { tasksAtom, getTaskDependencies } from '@/domain/task';
-import { updateTaskUI } from '@repo/dataforge/task-operations';
+import { tasksAtom } from '@/domain/task';
+import { domainServices } from '@/domain';
 
 interface OptimisticTaskState {
   task: Task | null;
@@ -83,9 +83,8 @@ export function useOptimisticTask(taskId: string | null) {
     }));
 
     try {
-      // Update database - live changes will reconcile atom
-      const dependencies = await getTaskDependencies();
-      await updateTaskUI(taskId, updates, dependencies);
+      // Update database using domain services
+      await domainServices.task.updateUI(taskId, updates);
       
       // Keep optimistic state until live changes update the atom
       setOptimisticState(prev => ({
@@ -162,9 +161,8 @@ export function useOptimisticTasks(taskIds: string[] = []) {
     setPendingUpdates(prev => new Set([...prev, taskId]));
 
     try {
-      // Update database - live changes will reconcile atom
-      const dependencies = await getTaskDependencies();
-      await updateTaskUI(taskId, updates, dependencies);
+      // Update database using domain services
+      await domainServices.task.updateUI(taskId, updates);
       
       // Remove from pending after successful update
       setPendingUpdates(prev => {

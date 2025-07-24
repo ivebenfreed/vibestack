@@ -539,8 +539,6 @@ function DebugNavigation({ isCollapsed, onNavigate }: {
         { label: 'Sync Test', href: '/debug/sync-test' },
         { label: 'Database', href: '/debug/database' },
         { label: 'Integrity', href: '/debug/integrity' },
-        { label: 'Optimistic Updates', href: '/debug/optimistic-test' },
-        { label: 'VibeGridOptimus Demo', href: '/debug/grid-optimus-projects' },
         { label: 'Kanban Debug', href: '/debug/kanban' },
         { label: 'React Flow Positioning', href: '/debug/reactflow-positioning' },
       ]

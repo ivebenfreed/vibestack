@@ -34,7 +34,6 @@ const navigationItems = [
   { id: 'debug', label: 'Debug', href: '/debug', icon: Bug },
   { id: 'debug-sync', label: 'Debug - Sync', href: '/debug/sync', icon: Bug },
   { id: 'debug-database', label: 'Debug - Database', href: '/debug/database', icon: Bug },
-  { id: 'debug-vibegrid', label: 'Debug - VibeGridOptimus', href: '/debug/grid-optimus-projects', icon: Bug },
 ]
 
 export function CommandMenu() {

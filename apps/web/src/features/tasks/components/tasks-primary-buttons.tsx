@@ -1,6 +1,6 @@
 import { IconDownload, IconPlus } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
-import { createTaskUI } from '@/domain/task'
+import { domainServices } from '@/domain'
 import { TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
 
 export function TasksPrimaryButtons() {
@@ -9,7 +9,7 @@ export function TasksPrimaryButtons() {
     const title = prompt('Enter task title:')
     if (title) {
       try {
-        await createTaskUI({
+        await domainServices.task.createUI({
           title,
           status: TaskStatus.OPEN,
           priority: TaskPriority.MEDIUM

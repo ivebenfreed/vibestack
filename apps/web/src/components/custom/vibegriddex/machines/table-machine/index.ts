@@ -20,6 +20,7 @@ import { keyboardHandlers } from './event-handlers/keyboard-handlers';
 import { editHandlers } from './event-handlers/edit-handlers';
 import { dragHandlers } from './event-handlers/drag-handlers';
 import { fillHandlers } from './event-handlers/fill-handlers';
+import { clipboardHandlers } from './event-handlers/clipboard-handlers';
 
 // Import helpers
 import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
@@ -144,8 +145,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Entity update handler
     onEntityUpdate: input.onEntityUpdate,
     
-    // Domain service for entity operations
-    domainService: input.domainService,
+    // Notification handler
+    onNotification: input.onNotification,
     
     actors: {
       rendererActor: null,
@@ -745,7 +746,8 @@ export const tableBaseMachine = setup({
             ...keyboardHandlers,
             ...editHandlers,
             ...dragHandlers,
-            ...fillHandlers
+            ...fillHandlers,
+            ...clipboardHandlers
           }
         },
         
@@ -779,7 +781,8 @@ export const tableBaseMachine = setup({
             ...keyboardHandlers,
             ...editHandlers,
             ...dragHandlers,
-            ...fillHandlers
+            ...fillHandlers,
+            ...clipboardHandlers
           },
           
           invoke: {
@@ -1075,6 +1078,9 @@ export const tableBaseMachine = setup({
       
       // Fill events (from canvas actor)
       ...fillHandlers,
+      
+      // Clipboard events
+      ...clipboardHandlers,
       
       // Legacy edit events (now handled by edit slice)
       'edit.legacy.*': {

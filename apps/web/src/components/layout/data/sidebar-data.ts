@@ -348,11 +348,6 @@ export const globalSidebarData: GlobalSidebarSection[] = [
           },
 
           {
-            title: 'VibeGridFinal Tasks',
-            url: '/debug/vibegridfinal-tasks',
-            icon: IconChecklist,
-          },
-          {
             title: 'Kanban Debug',
             url: '/debug/kanban',
             icon: IconChecklist,

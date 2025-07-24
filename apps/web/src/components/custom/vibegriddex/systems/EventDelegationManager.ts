@@ -249,7 +249,12 @@ export class EventDelegationManager {
             this.send({ type: 'view.columns.resize.end' });
             break;
           case 'fill':
-            this.send({ type: 'FILL_COMPLETE', fillCells: new Set() });
+            const containerCoords = this.convertToContainerCoordinates(event);
+            this.send({ 
+              type: 'FILL_COMPLETE', 
+              x: containerCoords.x,
+              y: containerCoords.y
+            });
             break;
         }
       } else if (this.dragState.dragType === 'column') {
@@ -805,11 +810,17 @@ export class EventDelegationManager {
   }
 
   private handleFillDrag(event: MouseEvent): void {
-    // Fill drag logic would go here
-    // For now, just send preview event
+    if (!this.dragState.isDragging || this.dragState.dragType !== 'fill') return;
+    
+    // Convert to container coordinates
+    const containerCoords = this.convertToContainerCoordinates(event);
+    
+    // Send the mouse position to the fill system
+    // The FillHandleLayer will calculate the preview cells based on position
     this.send({
-      type: 'FILL_PREVIEW',
-      previewCells: new Set()
+      type: 'FILL_MOVE',
+      x: containerCoords.x,
+      y: containerCoords.y
     });
   }
 

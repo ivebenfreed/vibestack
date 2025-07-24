@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
-import { createTaskUI, updateTaskUI, deleteTaskUI } from '@/domain/task'
+import { domainServices } from '@/domain'
 
 type TasksDialogType = 'create' | 'update' | 'delete' | 'import'
 
@@ -42,7 +42,7 @@ export default function TasksProvider({ children }: Props) {
   const [open, setOpen] = useDialogState<TasksDialogType>(null)
   const [currentRow, setCurrentRow] = useState<Task | null>(null)
   
-  // Create a new task using the 3-path architecture
+  // Create a new task using domain services
   const createTask = useCallback(async (taskData: {
     title: string;
     projectId?: string;
@@ -56,25 +56,25 @@ export default function TasksProvider({ children }: Props) {
     tags?: string[];
   }) => {
     console.log('[TasksContext] Creating task with data:', taskData);
-    return await createTaskUI(taskData);
+    return await domainServices.task.createUI(taskData);
   }, []);
 
-  // Update an existing task using the 3-path architecture
+  // Update an existing task using domain services
   const updateTask = useCallback(async (id: string, changes: Partial<Task>) => {
     console.log('[TasksContext] Updating task with id:', id, 'and changes:', changes);
-    return await updateTaskUI(id, changes);
+    return await domainServices.task.updateUI(id, changes);
   }, []);
 
-  // Delete a task using the 3-path architecture
+  // Delete a task using domain services
   const deleteTask = useCallback(async (id: string) => {
     console.log('[TasksContext] Deleting task with id:', id);
-    return await deleteTaskUI(id);
+    return await domainServices.task.deleteUI(id);
   }, []);
 
-  // Update a task's status using the 3-path architecture
+  // Update a task's status using domain services
   const updateTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
     console.log('[TasksContext] Updating task status with id:', id, 'and status:', status);
-    return await updateTaskUI(id, { status });
+    return await domainServices.task.updateUI(id, { status });
   }, []);
 
   return (

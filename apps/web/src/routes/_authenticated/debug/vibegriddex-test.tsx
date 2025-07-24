@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex';
-import { updateTaskUI, createTaskUI } from '@/domain-dexie';
+import { domainServices } from '@/domain';
 import { Button } from '@/components/ui/button';
 import { db } from '@repo/dataforge/dexie-schema';
 import type { Column } from '@/components/custom/vibegriddex/column-types';
@@ -186,7 +186,7 @@ function VibeGridDexTestPage() {
         statusId: task.statusId
       });
       
-      await createTaskUI(task);
+      await domainServices.task.createUI(task);
     }
     
     console.log('Test tasks created');
@@ -216,7 +216,7 @@ function VibeGridDexTestPage() {
         tableId="dexie-tasks-test"
         entityType="task"
         columns={createTaskColumns() as any}
-        domainService={{ update: updateTaskUI }}
+        onEntityUpdate={(id, updates) => domainServices.task.updateUI(id, updates)}
         height={600}
         enableSelectionColumn={true}
         enableVirtualScrolling={true}

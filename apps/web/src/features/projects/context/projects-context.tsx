@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
-import { createProjectUI, updateProjectUI, deleteProjectUI } from '@/domain/project';
+import { domainServices } from '@/domain';
 
 interface ProjectContextType {
   selectedProject: Project | null;
@@ -36,11 +36,11 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
   const [isUpdateDrawerOpen, setIsUpdateDrawerOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Create a new project using the 3-path architecture
+  // Create a new project using domain services
   const createProject = useCallback(async (projectData: { name: string; description?: string; status?: ProjectStatus }) => {
     console.log('Creating project with data:', projectData);
     
-    const created = await createProjectUI({
+    const created = await domainServices.project.createUI({
       name: projectData.name,
       description: projectData.description || '',
       status: projectData.status || ProjectStatus.ACTIVE
@@ -56,11 +56,11 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
     return created;
   }, []);
 
-  // Update an existing project using the 3-path architecture
+  // Update an existing project using domain services
   const updateProject = useCallback(async (id: string, changes: Partial<Project>) => {
     console.log('Updating project with id:', id, 'and changes:', changes);
     
-    const updated = await updateProjectUI(id, changes);
+    const updated = await domainServices.project.updateUI(id, changes);
     
     // Dispatch a custom event to notify that a project was updated
     const event = new CustomEvent('project-updated', { 
@@ -72,11 +72,11 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
     return updated;
   }, []);
 
-  // Delete a project using the 3-path architecture
+  // Delete a project using domain services
   const deleteProject = useCallback(async (id: string) => {
     console.log('Deleting project with id:', id);
     
-    const success = await deleteProjectUI(id);
+    const success = await domainServices.project.deleteUI(id);
     
     if (success) {
       // Dispatch a custom event to notify that a project was deleted

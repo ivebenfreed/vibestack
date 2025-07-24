@@ -1,8 +1,8 @@
 import { useMemo, useState, useEffect } from 'react';
 import { db } from '@repo/dataforge/dexie-schema';
 import type { Column } from '../types';
-// Import Dexie domain UI operations that include sync tracking
-import { updateTaskUI, updateProjectUI, updateUserUI, updateCommentUI } from '@/domain-dexie';
+// Import Dexie domain services
+import { domainServices } from '@/domain';
 import { getUniqueRelationshipTables } from '../utils/relationship-discovery';
 
 // Entity types we support
@@ -15,16 +15,16 @@ function getUpdateFunction(entityType: VibeGridXEntityType | null) {
     
     switch (entityType) {
       case 'task':
-        await updateTaskUI(id, updates);
+        await domainServices.task.updateUI(id, updates);
         break;
       case 'project':
-        await updateProjectUI(id, updates);
+        await domainServices.project.updateUI(id, updates);
         break;
       case 'user':
-        await updateUserUI(id, updates);
+        await domainServices.user.updateUI(id, updates);
         break;
       case 'comment':
-        await updateCommentUI(id, updates);
+        await domainServices.comment.updateUI(id, updates);
         break;
       default:
         console.warn(`[useDexieEntityConfig] No update handler for entity type: ${entityType}`);

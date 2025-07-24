@@ -302,6 +302,9 @@ export interface TableContext {
   // Entity update handler for self-contained saves
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
   
+  // Notification handler for user feedback
+  onNotification?: (message: string, type: 'info' | 'warning' | 'error' | 'success') => void;
+  
   // View state management (moved from viewCoordinator)
   sortBy: SortConfig[];
   filters: FilterConfig[];
@@ -349,14 +352,14 @@ export interface TableContext {
   
   // Relationship cache removed - now handled by store actor
   
-  // Domain service for all data operations (maintains sync tracking)
-  domainService?: any; // Generic service interface
-  
   // Relationship data from store for edit dropdowns
   relationshipData?: {
     projects: any[];
     users: any[];
   };
+  
+  // Clipboard state (from overlay slice)
+  clipboardState?: VibeGridClipboardData | null;
 }
 
 export interface SelectionContext {
@@ -537,11 +540,11 @@ export interface TableConfig {
   enableSelectionColumn?: boolean;
   persistedData?: any; // Persisted UI state from localStorage (sync machine pattern)
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void; // Generic entity update handler
+  onNotification?: (message: string, type: 'info' | 'warning' | 'error' | 'success') => void; // Notification handler
   
   // New store-based architecture
   store?: any; // Table data store instance from useTableData hook
   storeActor?: any; // XState store actor for data subscription
-  domainService?: any; // Domain service for data operations
   initialRows?: any[]; // Pre-resolved rows for immediate render
 }
 
@@ -658,3 +661,9 @@ export interface DataChangesEvent {
   table: string;
   changes: EntityChange[];
 }
+
+// ====================================
+// CLIPBOARD TYPES
+// ====================================
+
+export * from './types/clipboard-types'

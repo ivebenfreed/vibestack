@@ -304,15 +304,11 @@ export const createTaskAdapter = (): DomainAtomAdapter => {
 };
 ```
 
-### 2. Replace Existing Grids
+### 2. Use VibeGridX
 
-Gradually replace VibeGridFinal with VibeGridX:
+Use VibeGridX for data grid needs:
 
 ```tsx
-// Before
-<VibeGridFinal data={tasks} columns={TaskColumns} />
-
-// After  
 <VibeGridX entityType="task" height={600} />
 ```
 

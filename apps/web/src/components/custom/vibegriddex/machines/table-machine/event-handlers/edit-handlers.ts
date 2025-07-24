@@ -560,72 +560,54 @@ export const editHandlers = {
             });
           }
           
-          // Use domain service if available, otherwise fall back to onEntityUpdate
-          const hasDomainService = !!context.domainService;
-          console.log('TableMachine: Checking update handler availability', {
-            hasDomainService,
-            hasOnEntityUpdate: hasEntityUpdateHandler,
-            domainServiceType: typeof context.domainService,
-            onEntityUpdateType: typeof context.onEntityUpdate
-          });
-          
-          if (context.domainService) {
+          // Use onEntityUpdate for updates
+          if (context.onEntityUpdate && typeof context.onEntityUpdate === 'function') {
             const updates = { [field]: event.value };
             
-            console.log('TableMachine: Using domain service for update', {
+            console.log('TableMachine: Using onEntityUpdate for update', {
               rowId,
               updates,
-              field,
-              serviceName: context.domainService.constructor?.name
+              field
             });
             
-            // Use domain service update method (maintains sync tracking)
-            context.domainService.update(rowId, updates)
-              .then(() => {
-                console.log('TableMachine: Domain service update successful', { rowId, field });
-                // Remove optimistic operation on success
-                self.send({
-                  type: 'edit.operation.remove',
-                  operationId
-                });
-              })
-              .catch((error: any) => {
-                console.error('TableMachine: Domain service update failed', {
-                  rowId,
-                  field,
-                  error
-                });
-                // Emit error event
-                self.send({
+            // Use onEntityUpdate method (maintains sync tracking)
+            const updateResult = context.onEntityUpdate(rowId, updates);
+            
+            // Handle both sync and async updates
+            if (updateResult instanceof Promise) {
+              updateResult
+                .then(() => {
+                  console.log('TableMachine: Entity update successful', { rowId, field });
+                  // Remove optimistic operation on success
+                  self.send({
+                    type: 'edit.operation.remove',
+                    operationId
+                  });
+                })
+                .catch((error: any) => {
+                  console.error('TableMachine: Entity update failed', {
+                    rowId,
+                    field,
+                    error
+                  });
+                  // Emit error event
+                  self.send({
                   type: 'edit.error',
                   message: `Failed to update ${field}: ${error.message}`,
                   errors: [error.message]
                 });
+                // Revert optimistic update
+                self.send({
+                  type: 'edit.operation.revert',
+                  operationId
+                });
               });
-          } else if (context.onEntityUpdate) {
-            // Fall back to legacy onEntityUpdate if no domain service
-            const updates = { [field]: event.value };
-            
-            console.log('TableMachine: Calling onEntityUpdate (legacy)', {
-              rowId,
-              updates,
-              field,
-              functionName: context.onEntityUpdate.name
-            });
-            
-            try {
-              // Fire and forget - don't await
-              const result = context.onEntityUpdate(rowId, updates);
-              console.log('TableMachine: onEntityUpdate called successfully', {
-                rowId,
-                updates,
-                result: result instanceof Promise ? 'Promise' : result
-              });
-            } catch (error) {
-              console.error('TableMachine: Error calling onEntityUpdate', {
-                rowId,
-                updates,
-                error
+            } else {
+              // Sync update completed
+              console.log('TableMachine: Entity update successful (sync)', { rowId, field });
+              self.send({
+                type: 'edit.operation.remove',
+                operationId
               });
             }
           } else {
