@@ -409,7 +409,7 @@ export const viewActor = fromPromise(async ({ input }: { input: ViewActorInput }
   
   // When using store architecture, relationships are pre-resolved
   const hasPreResolvedData = input.entities.length > 0 && 
-    input.entities[0].__resolved_project !== undefined;
+    input.entities[0] && Object.keys(input.entities[0]).some(key => key.startsWith('__resolved_'));
   
   if (hasPreResolvedData) {
     console.log('[ViewActor] Using pre-resolved data from store');

@@ -8,6 +8,7 @@ import {
   relationshipSingle,
   relationshipMulti,
 } from '../cell-renderers';
+import { relationshipMultiBadge, relationshipMultiBadgeString } from '../cell-renderers/relationship/multi-badge';
 
 // ====================================
 // CELL RENDERING PIPELINE
@@ -30,8 +31,8 @@ export class CellPipeline {
     json: text, // JSON displayed as text (could be enhanced later)
     relationship: relationshipSingle, // Default to single
     'relationship-single': relationshipSingle,
-    'relationship-multi': relationshipMulti,
-    'relationship-collection': relationshipMulti, // Collections use multi renderer
+    'relationship-multi': relationshipMultiBadgeString, // Use badge string renderer
+    'relationship-collection': relationshipMultiBadgeString, // Collections use badge renderer
   };
 
   /**
@@ -70,6 +71,26 @@ export class CellPipeline {
    */
   static createCellContent(value: any, column: Column, rowData: any): HTMLElement {
     const content = document.createElement('div');
+    const cellType = column.cellType || column.type;
+    
+    // Special handling for multi-relationship badges
+    if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
+      // Use the badge renderer that returns HTMLElement
+      const badgeContent = relationshipMultiBadge(value, column, rowData);
+      
+      // Clear default styles for badge container
+      Object.assign(content.style, {
+        width: '100%',
+        padding: '4px 12px',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      });
+      
+      content.appendChild(badgeContent);
+      return content;
+    }
+    
+    // Default styles for other cell types
     Object.assign(content.style, {
       width: '100%',
       overflow: 'hidden',
@@ -81,7 +102,6 @@ export class CellPipeline {
     
     // Set content efficiently - pass row data for relationship resolution
     const cellContent = this.renderValue(value, column, rowData);
-    const cellType = column.cellType || column.type;
     
     // Check if column is editable
     const isEditable = column.editable !== false; // Default to true unless explicitly false

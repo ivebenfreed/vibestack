@@ -315,6 +315,35 @@
   transition: all 0.2s;
 }
 
+/* Multi-Badge Container Styles */
+.vibegridx-multi-badge-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.vibegridx-multi-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vibegridx-badge-more {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+  font-weight: 600;
+}
+
+.vibegridx-empty-badge {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 .vibegridx-badge--primary {
   background-color: hsl(var(--primary) / 0.1);
   color: hsl(var(--primary));
