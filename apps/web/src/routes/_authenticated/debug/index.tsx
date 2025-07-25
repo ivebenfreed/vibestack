@@ -68,6 +68,13 @@ function DebugIndexPage() {
       path: '/debug/vibegantt',
       color: 'border-rose-500/20 hover:border-rose-500/30 bg-rose-500/5 dark:border-rose-400/20 dark:hover:border-rose-400/30 dark:bg-rose-400/5',
       badge: 'VIBEGANTT'
+    },
+    {
+      title: '🔗 Junction Tables',
+      description: 'Debug many-to-many relationships and junction tables. Test project members, task tags, and relationship sync operations.',
+      path: '/debug/junction-tables',
+      color: 'border-indigo-500/20 hover:border-indigo-500/30 bg-indigo-500/5 dark:border-indigo-400/20 dark:hover:border-indigo-400/30 dark:bg-indigo-400/5',
+      badge: 'RELATIONSHIPS'
     }
   ]
 
@@ -104,6 +111,8 @@ function DebugIndexPage() {
                   ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300 border border-amber-500/20'
                   : page.badge === 'VIBEGANTT'
                   ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300 border border-rose-500/20'
+                  : page.badge === 'RELATIONSHIPS'
+                  ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -124,6 +133,7 @@ function DebugIndexPage() {
                    : page.badge === 'STATUS DEBUG' ? '🔍 Open Status Test'
                    : page.badge === 'VIBEGRIDDEX' ? '🔥 Open VibeGridDex Test'
                    : page.badge === 'VIBEGANTT' ? '📊 Open VibeGantt Debug'
+                   : page.badge === 'RELATIONSHIPS' ? '🔗 Open Junction Tables'
                    : 'Open Tool'}
                 </Button>
               </Link>
