@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useActorRef, useSelector } from '@xstate/react';
-import { useLiveQuery } from 'dexie-react-hooks';
+// useLiveQuery removed - handled by XState store
 import { tableBaseMachine } from './machines/table-machine';
 import { toast } from 'sonner';
 import { 
@@ -32,9 +32,7 @@ type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment';
 import { applyColumnDefaults } from './column-defaults';
 import { addRelationshipProvidersToColumns } from './providers/relationship-provider-factory';
 
-// Import store-based architecture  
-import { useTableData } from './hooks/useTableData';
-import { TableSkeleton } from './components/TableSkeleton';
+// Store-based architecture removed - using direct Dexie subscriptions in XState
 
 // ====================================
 // COMPONENT PROPS
@@ -107,30 +105,31 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       // Get relationship data from initialData
       const relationshipData = (props.initialData as any).relationshipData || {};
       
-      console.log('🔍 VibeGridDex: Preparing preloaded data', {
-        entityCount: entities.length,
-        relationshipDataKeys: Object.keys(relationshipData),
-        hasRelationshipData: Object.keys(relationshipData).length > 0,
-        initialDataKeys: Object.keys(props.initialData),
-        // Debug: Show the actual structure
-        initialDataStructure: props.initialData,
-        relationshipDataExtracted: relationshipData
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 VibeGridDex: Preparing preloaded data', {
+          entityCount: entities.length,
+          relationshipDataKeys: Object.keys(relationshipData),
+          hasRelationshipData: Object.keys(relationshipData).length > 0,
+          initialDataKeys: Object.keys(props.initialData),
+          // Debug: Show the actual structure
+          initialDataStructure: props.initialData,
+          relationshipDataExtracted: relationshipData
+        });
+      }
       
       return { entities, relationshipData };
     }
     return null;
   }, [props.initialData]);
   
-  // Get store first - entities will come from store subscription in table machine
-  const store = (props as any).store;
+  // Store will be created by XState machine - no React hooks needed
   
   // Apply defaults to columns and add relationship providers
   const columnsWithDefaults = useMemo(() => {
     const withDefaults = applyColumnDefaults(props.columns);
-    // Add relationship providers that read from the store
-    return addRelationshipProvidersToColumns(withDefaults, () => store);
-  }, [props.columns, store]);
+    // Relationship providers will be handled by the store
+    return addRelationshipProvidersToColumns(withDefaults, () => null);
+  }, [props.columns]);
   
   // REMOVED - Store provides all data
   // const dexieEntityConfig = useDexieEntityConfig(
@@ -187,64 +186,75 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   
   // Load persisted state before creating machine config
   const persistenceKey = `vibegridx-${tableId}-state`;
+  const loadedPersistedDataRef = useRef<boolean>(false);
+  
+  // Store the loaded persisted data in a ref to survive re-renders
+  const persistedDataRef = useRef<any>(undefined);
+  
   const persistedData = useMemo(() => {
+    // If we already have data in the ref, return it
+    if (persistedDataRef.current !== undefined) {
+      return persistedDataRef.current;
+    }
+    
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(persistenceKey);
         if (stored) {
           const parsed = JSON.parse(stored);
           
-          // Enhanced logging to show what's being loaded
-          console.log('🟢 VibeGridX: LOADING persisted state from localStorage', {
-            key: persistenceKey,
-            tableId: tableId,
-            entityType: entityType,
-            snapshotSize: stored.length,
-            loadedData: parsed.context,
-            timestamp: new Date().toISOString()
-          });
+          // Store in ref for future renders
+          persistedDataRef.current = parsed.context;
+          
+          // Only log in development
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🟢 VibeGridX: LOADING persisted state from localStorage', {
+              key: persistenceKey,
+              tableId: tableId,
+              entityType: entityType,
+              snapshotSize: stored.length,
+              loadedData: parsed.context,
+              hasContext: 'context' in parsed,
+              timestamp: new Date().toISOString()
+            });
+          }
           
           // Return the context data for machine initialization
           return parsed.context;
         } else {
-          console.log('🟡 VibeGridX: No persisted state found for', persistenceKey);
+          // Mark as null so we don't try to load again
+          persistedDataRef.current = null;
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🟡 VibeGridX: No persisted state found for', persistenceKey);
+          }
           return null;
         }
       } catch (error) {
+        // Mark as null so we don't try to load again
+        persistedDataRef.current = null;
         console.error('🔴 VibeGridX: FAILED to restore persisted state:', error);
         return null;
       }
     }
+    persistedDataRef.current = null;
     return null;
-  }, [persistenceKey, tableId, entityType]);
+  }, [persistenceKey]); // Depend on persistenceKey only
 
   // SIMPLIFIED - Store provides all data
   const columns = columnsWithDefaults;
   
-  console.log('🔍 VibeGridDex: Store debugging', {
-    hasStore: !!store,
-    storeType: typeof store,
-    storeState: store?.getSnapshot?.()?.status,
-    storeContext: store?.getSnapshot?.()?.context ? 'present' : 'missing',
-    propsKeys: Object.keys(props),
-    hasStoreInProps: 'store' in props
-  });
+  // Store debugging removed - store created by XState machine
   
 
-  // Create machine configuration - SIMPLIFIED for store architecture
+  // Create machine configuration - XState will create store internally
   const machineConfig = useMemo(() => {
-    console.log('🔍 VibeGridDex: Creating machine config with store', {
-      hasStore: !!store,
-      storeType: typeof store,
-      storeActorState: store?.getSnapshot?.()?.status,
-      storeEntityCount: store?.getSnapshot?.()?.context?.entities ? Object.keys(store.getSnapshot().context.entities).length : 0,
-      columnCount: columns.length,
-      startingWithEmptyEntities: true
-    });
-    
-    // Store actor in window for table machine to access
-    if (store) {
-      (window as any).__vibegridx_store_actor = store;
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 VibeGridDex: Creating machine config', {
+        entityType: entityType,
+        columnCount: columns.length,
+        tableId: tableId
+      });
     }
     
     return {
@@ -253,10 +263,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         entityType: entityType,
         columns: columns,
         enableSelectionColumn: enableSelectionColumn,
-        entities: [], // Start empty - store subscription will populate
+        entities: [], // Start empty - store will populate via liveQuery
         persistedData: persistedData,
-        relationshipResolvers: {}, // NOT NEEDED - store has resolved data
-        storeActor: store, // Store subscription will provide entities
+        relationshipResolvers: {}, // Store will handle relationships
         onEntityUpdate: props.onEntityUpdate, // Pass update handler from props
         onBatchEntityUpdate: props.onBatchEntityUpdate, // Pass batch update handler from props
         onNotification: (message: string, type: 'info' | 'warning' | 'error' | 'success') => {
@@ -280,40 +289,14 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         }
       }
     };
-  }, [tableId, entityType, columns, enableSelectionColumn, persistedData, height, width, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize, store]);
+  }, [tableId, entityType, columns, enableSelectionColumn, persistedData, height, width, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize]);
   
   // Create table actor with the machine config
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
   const tableSend = tableActor.send;
   
-  // Subscribe to state changes and persist
-  useEffect(() => {
-    const subscription = tableActor.subscribe((snapshot) => {
-      // Only persist certain state properties
-      const stateToPersist = {
-        columnOrder: snapshot.context.columnOrder,
-        columnVisibility: snapshot.context.columnVisibility,
-        columnWidths: snapshot.context.columnWidths,
-        sortBy: snapshot.context.sortBy,
-        filters: snapshot.context.filters,
-        groupBy: snapshot.context.groupBy
-      };
-      
-      try {
-        localStorage.setItem(persistenceKey, JSON.stringify(stateToPersist));
-        console.log('💾 VibeGridDex: Persisted state', {
-          key: persistenceKey,
-          columnOrder: stateToPersist.columnOrder
-        });
-      } catch (error) {
-        console.error('Failed to persist VibeGridDex state:', error);
-      }
-    });
-    
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [tableActor, persistenceKey]);
+  // The table machine handles persistence internally via persistSnapshot action
+  // No need for duplicate persistence logic here
   
   // Create renderer options
   const rendererOptions = useMemo(() => ({
@@ -335,9 +318,11 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
     if (node && !rendererInitializedRef.current) {
       const initStartTime = performance.now();
-      console.log('🚀 VibeGridX: Container attached, initializing renderer synchronously:', {
-        timestamp: initStartTime
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🚀 VibeGridX: Container attached, initializing renderer synchronously:', {
+          timestamp: initStartTime
+        });
+      }
       
       const optionsWithContainer = {
         ...pendingRendererOptionsRef.current,
@@ -346,15 +331,20 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       
       (window as any).__vibegridx_renderer_options = optionsWithContainer;
       
-      console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER synchronously:', {
-        timestamp: performance.now()
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER synchronously:', {
+          timestamp: performance.now()
+        });
+      }
+      // Defer renderer initialization to avoid blocking React's batching
+      requestAnimationFrame(() => {
+        tableSend({
+          type: 'INITIALIZE_RENDERER',
+          options: optionsWithContainer
+        });
+        
+        rendererInitializedRef.current = true;
       });
-      tableSend({
-        type: 'INITIALIZE_RENDERER',
-        options: optionsWithContainer
-      });
-      
-      rendererInitializedRef.current = true;
     }
     
     containerRef.current = node;
@@ -364,7 +354,12 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   useEffect(() => {
     return () => {
       delete (window as any).__vibegridx_renderer_options;
-      delete (window as any).__vibegridx_store_actor;
+      
+      // Cleanup store if exists
+      if ((window as any).__vibegridx_store_cleanup) {
+        (window as any).__vibegridx_store_cleanup();
+        delete (window as any).__vibegridx_store_cleanup;
+      }
       
       // Import and call cleanupEditingOverlay to ensure global overlay is cleaned up
       import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
@@ -378,7 +373,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   useEffect(() => {
     if (!containerRef.current) return;
     
-    console.log('🎯 VibeGridX: Initializing unified event system');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🎯 VibeGridX: Initializing unified event system');
+    }
     
     const delegationConfig: EventDelegationConfig = {
       container: containerRef.current,
@@ -390,7 +387,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     const delegationManager = new EventDelegationManager(delegationConfig);
     eventDelegationManagerRef.current = delegationManager;
     
-    console.log('✅ VibeGridX: Unified event system active');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ VibeGridX: Unified event system active');
+    }
     
     return () => {
       if (eventDelegationManagerRef.current) {
@@ -422,10 +421,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   // CONDITIONAL RENDERING - ALL HOOKS HAVE BEEN CALLED ABOVE
   // ====================================
 
-  // Check if we have store and columns
-  if (!store || columns.length === 0) {
-    console.log('VibeGridDex: Waiting for store and columns', {
-      hasStore: !!store,
+  // Check if we have columns (store will be created by XState)
+  if (columns.length === 0) {
+    console.log('VibeGridDex: Waiting for columns', {
       columnCount: columns.length
     });
     return (
@@ -436,11 +434,13 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   }
 
   // DEBUG: Track rendering - should only happen on prop changes, not XState transitions
-  console.log('🎯 VibeGridX: Rendering component (container shell only)', {
-    hasStore: !!store,
-    renderReason: 'prop_change_or_mount',
-    timestamp: performance.now()
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🎯 VibeGridX: Rendering component (container shell only)', {
+      entityType: entityType,
+      renderReason: 'prop_change_or_mount',
+      timestamp: performance.now()
+    });
+  }
 
   return (
     <div
@@ -480,52 +480,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   );
 }
 
-// ====================================
-// SUSPENSE WRAPPER COMPONENT
-// ====================================
-
-/**
- * Inner component that uses the Suspense data hook
- */
-function VibeGridDexInner<T extends Record<string, any> = any>(
-  props: VibeGridDexProps<T> & { store: any }
-): React.ReactElement {
-  // Call the original VibeGridDex with store data
-  return <VibeGridDex {...props} />;
-}
-
-/**
- * Wrapper component that provides Suspense boundary
- */
-export function VibeGridDexWithSuspense<T extends Record<string, any> = any>(
-  props: VibeGridDexProps<T>
-): React.ReactElement {
-  const { columns: columnCount } = props;
-  
-  return (
-    <Suspense fallback={<TableSkeleton columns={columnCount?.length || 5} />}>
-      <VibeGridDexSuspenseLoader {...props} />
-    </Suspense>
-  );
-}
-
-/**
- * Component that loads data with Suspense
- */
-function VibeGridDexSuspenseLoader<T extends Record<string, any> = any>(
-  props: VibeGridDexProps<T>
-): React.ReactElement {
-  // This hook suspends until data is ready
-  const { store } = useTableData(props.entityType, props.columns);
-  
-  // Pass store to inner component - store contains all data
-  return (
-    <VibeGridDexInner 
-      {...props} 
-      store={store}
-    />
-  );
-}
+// Suspense wrapper components removed - XState handles data loading directly
 
 // ====================================
 // EXPORTS

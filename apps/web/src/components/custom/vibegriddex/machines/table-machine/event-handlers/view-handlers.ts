@@ -41,13 +41,10 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Send sort update to store
+      // Send sort update to atomic store
       ({ context }) => {
         if (context.storeActor) {
-          context.storeActor.send({
-            type: 'SET_SORT_BY',
-            sortBy: context.sortBy
-          });
+          context.storeActor.send({ type: 'setSortBy', sortBy: context.sortBy });
         }
       }
     ]
@@ -84,13 +81,10 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Send sort update to store
+      // Send sort update to atomic store
       ({ context }) => {
         if (context.storeActor) {
-          context.storeActor.send({
-            type: 'SET_SORT_BY',
-            sortBy: context.sortBy
-          });
+          context.storeActor.send({ type: 'setSortBy', sortBy: context.sortBy });
         }
       }
     ]
@@ -103,13 +97,10 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Send filter update to store
+      // Send filter update to atomic store
       ({ context }) => {
         if (context.storeActor) {
-          context.storeActor.send({
-            type: 'SET_FILTERS',
-            filters: context.filters
-          });
+          context.storeActor.send({ type: 'setFilters', filters: context.filters });
         }
       }
     ]
@@ -126,7 +117,7 @@ export const viewHandlers = {
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'SET_GROUP_BY',
+            type: 'setGroupBy',
             groupBy: context.groupBy
           });
         }
@@ -156,7 +147,7 @@ export const viewHandlers = {
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'SET_COLUMN_VISIBILITY',
+            type: 'setColumnVisibility',
             columnVisibility: context.columnVisibility
           });
         }
@@ -185,7 +176,7 @@ export const viewHandlers = {
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'SET_COLUMN_VISIBILITY',
+            type: 'setColumnVisibility',
             columnVisibility: context.columnVisibility
           });
         }
@@ -211,7 +202,7 @@ export const viewHandlers = {
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'SET_COLUMN_VISIBILITY',
+            type: 'setColumnVisibility',
             columnVisibility: context.columnVisibility
           });
         }
@@ -237,7 +228,7 @@ export const viewHandlers = {
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'SET_COLUMN_VISIBILITY',
+            type: 'setColumnVisibility',
             columnVisibility: context.columnVisibility
           });
         }
@@ -837,7 +828,7 @@ export const viewHandlers = {
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'SET_COLUMN_ORDER',
+            type: 'setColumnOrder',
             columnOrder: context.columnOrder
           });
         }

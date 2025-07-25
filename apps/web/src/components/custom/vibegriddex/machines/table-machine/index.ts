@@ -33,6 +33,10 @@ import { dragActor } from '../../actors/drag-actor';
 // Data subscription actor removed - using store subscription
 // No overlay actor needed - canvas subscribes directly to table machine context
 
+// Import atomic store setup utilities  
+import { createTableStoreLogic, loadInitialData, setupGranularSubscriptions } from '../../stores/table-data-store-atomic';
+import { createActor } from 'xstate';
+
 
 // ====================================
 // CONTEXT CREATION
@@ -167,7 +171,10 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // (hasInitialData already set above at line 112)
     
     // Timer for batching view updates during rapid data changes
-    pendingViewUpdateTimer: null
+    pendingViewUpdateTimer: null,
+    
+    // Atomic store actor (will be created in initializing state)
+    storeActor: null
   };
 };
 
@@ -313,11 +320,7 @@ export const tableBaseMachine = setup({
   context: ({ input }) => {
     try {
       const context = createDefaultContext(input);
-      // Store the storeActor in context for access in entry actions
-      return {
-        ...context,
-        storeActor: input.storeActor
-      };
+      return context;
     } catch (error) {
       console.error('TableMachine: Error creating context:', error);
       // Return a minimal valid context
@@ -347,7 +350,8 @@ export const tableBaseMachine = setup({
         columnVisibility: {},
         columnOrder: [],
         hiddenColumnCount: 0,
-        viewport: null
+        viewport: null,
+        storeActor: null
       };
     }
   },
@@ -365,6 +369,97 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
+        // Create store actor with atomic mutations and Promise.all loader
+        assign({
+          storeActor: ({ context, self }) => {
+            console.log('TableMachine: Creating atomic store actor for', context.entityType);
+            const storeLogic = createTableStoreLogic(context.entityType, context.columns);
+            const storeActor = createActor(storeLogic);
+            storeActor.start();
+            
+            // Subscribe to store changes and forward to table machine
+            console.log('TableMachine: Setting up store subscription', { 
+              hasSubscribe: typeof storeActor.subscribe === 'function',
+              storeActorKeys: Object.keys(storeActor)
+            });
+            
+            // Get initial snapshot to verify structure
+            const initialSnapshot = storeActor.getSnapshot();
+            console.log('🔍 TableMachine: Initial store snapshot', {
+              initialSnapshot,
+              hasContext: !!initialSnapshot?.context,
+              contextKeys: initialSnapshot?.context ? Object.keys(initialSnapshot.context) : [],
+              entityCount: initialSnapshot?.context?.entities ? Object.keys(initialSnapshot.context.entities).length : 0
+            });
+            
+            const subscription = storeActor.subscribe((snapshot) => {
+              console.log('🔍 TableMachine: Atomic store snapshot received', {
+                snapshot,
+                hasContext: !!snapshot?.context,
+                hasEntities: !!snapshot?.context?.entities,
+                entitiesCount: snapshot?.context?.entities ? Object.keys(snapshot.context.entities).length : 0,
+                rowCount: snapshot?.context?.processedRows?.length || 0,
+                loading: snapshot?.context?.loading,
+                currentState: (self as any).getSnapshot?.()?.value
+              });
+              
+              self.send({ 
+                type: 'STORE_SNAPSHOT_RECEIVED', 
+                snapshot 
+              });
+            });
+            
+            console.log('TableMachine: Store subscription created', { hasSubscription: !!subscription });
+            
+            // Load initial data with Promise.all then setup granular subscriptions
+            loadInitialData(context.entityType, context.columns)
+              .then(({ entities, relationships, pagination }) => {
+                console.log('TableMachine: Promise.all initial load complete', {
+                  entityCount: Object.keys(entities).length,
+                  relationshipTables: Object.keys(relationships),
+                  paginationEnabled: !!pagination
+                });
+                
+                // Set initial data atomically using event
+                storeActor.send({ type: 'setInitialData', entities, relationships });
+                
+                // Set pagination if needed
+                if (pagination) {
+                  storeActor.send({ type: 'setPagination', pagination });
+                }
+                
+                // SYNCHRONOUS: Send data directly to table machine (bypass subscription timing)
+                console.log('🚀 TableMachine: Sending data SYNCHRONOUSLY to avoid timing issues');
+                self.send({
+                  type: 'STORE_DATA_UPDATED',
+                  entities: Object.values(entities),
+                  loading: false,
+                  source: 'synchronous_initial_load'
+                });
+                
+                // Setup granular subscriptions for live updates
+                // Only enable if not in pagination mode (for now)
+                if (!pagination) {
+                  const cleanup = setupGranularSubscriptions(storeActor, context.entityType, context.columns);
+                  
+                  // Store cleanup in global registry
+                  (window as any).__vibegridx_store_cleanup = () => {
+                    cleanup();
+                    storeActor.stop();
+                  };
+                } else {
+                  console.log('📊 TableMachine: Pagination mode - live queries disabled for performance');
+                }
+              })
+              .catch(error => {
+                console.error('TableMachine: Initial data load failed', error);
+                storeActor.send({ type: 'setError', error: error.message });
+              });
+            
+            return storeActor;
+          }
+        }),
+        
         // Spawn essential actors (canvas deferred to post-render)
         assign({
           actors: ({ context, spawn }) => ({
@@ -436,64 +531,46 @@ export const tableBaseMachine = setup({
     active: {
       initial: 'idle',
       
-      // Set up store subscription immediately on entry
+      // Store subscription is now set up in initializing state
       entry: [
+        // Check if we have data that needs initial rendering
         ({ context, self }) => {
-          // Get storeActor from context
-          const storeActor = context.storeActor;
-          
-          console.log('🔍 TableMachine: Setting up store subscription on entry', {
-            hasStoreActor: !!storeActor,
-            storeActorType: typeof storeActor,
-            storeActorState: storeActor?.getSnapshot?.()?.status,
-            storeEntitiesCount: storeActor?.getSnapshot?.()?.context?.entities ? Object.keys(storeActor.getSnapshot().context.entities).length : 0
+          console.log('🔍 TableMachine: Entering active state', {
+            hasRows: context.rows.length > 0,
+            rowCount: context.rows.length,
+            hasRenderer: !!context.actors.rendererActor
           });
           
-          if (storeActor) {
-            // Subscribe directly to the store actor
-            const subscription = storeActor.subscribe({
-              next: (snapshot) => {
-                console.log('🔍 TableMachine: Store snapshot received via subscription', {
-                  hasEntities: !!snapshot?.context?.entities,
-                  entitiesCount: snapshot?.context?.entities ? Object.keys(snapshot.context.entities).length : 0,
-                  loading: snapshot?.context?.loading,
-                  currentState: (self as any).getSnapshot?.()?.value
-                });
-                
-                // Send event to update entities
-                self.send({ 
-                  type: 'STORE_SNAPSHOT_RECEIVED', 
-                  snapshot 
-                });
-              },
-              error: (error) => {
-                console.error('❌ TableMachine: Store subscription error', error);
-              }
+          // If we have rows but haven't rendered yet, trigger initial render
+          if (context.rows.length > 0 && context.actors.rendererActor) {
+            console.log('🔍 TableMachine: Triggering initial render on active entry');
+            
+            // Get visible columns
+            const visibleColumns = context.columns.filter(col => 
+              context.columnVisibility[col.id] !== false
+            );
+            
+            // Apply column order
+            const orderedColumns = context.columnOrder.length > 0
+              ? context.columnOrder
+                  .map(colId => visibleColumns.find(col => col.id === colId))
+                  .filter(Boolean)
+              : visibleColumns;
+            
+            // Add selection column if enabled
+            const columnsWithSelection = context.enableSelectionColumn
+              ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
+              : orderedColumns;
+            
+            // Send coordinate calculation request
+            context.actors.rendererActor.send({
+              type: 'CALCULATE_COORDINATES',
+              rows: context.rows,
+              columns: columnsWithSelection,
+              columnWidths: context.coordinateMapping?.columns
+                ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
+                : undefined
             });
-            
-            // Store subscription for cleanup
-            (self as any).__storeSubscription = subscription;
-            
-            // Get initial snapshot
-            const initialSnapshot = storeActor.getSnapshot();
-            if (initialSnapshot?.context?.entities && Object.keys(initialSnapshot.context.entities).length > 0) {
-              console.log('🔍 TableMachine: Sending initial store snapshot', {
-                entitiesCount: Object.keys(initialSnapshot.context.entities).length
-              });
-              self.send({ 
-                type: 'STORE_SNAPSHOT_RECEIVED', 
-                snapshot: initialSnapshot 
-              });
-            }
-          }
-        }
-      ],
-      exit: [
-        ({ self }) => {
-          console.log('🔍 TableMachine: Cleaning up store subscription');
-          const subscription = (self as any).__storeSubscription;
-          if (subscription) {
-            subscription.unsubscribe();
           }
         }
       ],
@@ -503,6 +580,7 @@ export const tableBaseMachine = setup({
           entry: [],
           
           on: {
+            
             
             // Handle data updates from subscription actor (only for entity mode, not manual mode)
             DATA_UPDATE: {
@@ -1486,6 +1564,38 @@ on: {
         error: event.error,
         context: event.context || 'unknown'
       }))
+    },
+    
+    // Handle initial data load from store (can happen in any state)
+    STORE_DATA_UPDATED: {
+      actions: [
+        assign({
+          entities: ({ event }) => event.entities || [],
+          rows: ({ event }) => {
+            const entities = event.entities || [];
+            return entities.map((entity: any) => ({
+              id: entity.id,
+              data: entity,
+              metadata: {
+                isSelected: false,
+                isDirty: false,
+                isGroup: false,
+                level: 0
+              }
+            }));
+          },
+          visibleRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id),
+          allRowIds: ({ event }) => (event.entities || []).map((e: any) => e.id)
+        }),
+        ({ context, self }) => {
+          console.log('TableMachine: STORE_DATA_UPDATED - Initial data loaded', {
+            entityCount: context.entities.length,
+            rowCount: context.rows.length,
+            source: (event as any).source,
+            currentState: self.getSnapshot().value
+          });
+        }
+      ]
     },
     
     // Forward events to canvas from any state

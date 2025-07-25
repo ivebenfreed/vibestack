@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex/VibeGridDex'
+import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex'
 import { domainServices } from '@/domain'
 import { useTheme } from '@/context/theme-context'
 import type { Task } from '@repo/dataforge/client-entities'
@@ -74,7 +74,7 @@ export default function TasksTableView() {
   ]
 
   return (
-    <VibeGridDexWithSuspense
+    <VibeGridDex
       tableId="tasks-table-v2"
       entityType="task"
       columns={columns}
