@@ -397,6 +397,20 @@ export const tableBaseMachine = setup({
               storeActorKeys: Object.keys(storeActor)
             });
             
+            // Set up persistence subscription for display state changes
+            storeActor.subscribe((snapshot) => {
+              if (snapshot?.context && !snapshot.context.loading) {
+                // Debounce persistence to avoid too many writes
+                if ((context as any)._persistenceTimer) {
+                  clearTimeout((context as any)._persistenceTimer);
+                }
+                (context as any)._persistenceTimer = setTimeout(() => {
+                  const { saveDisplayState } = require('../stores/table-data-store-atomic');
+                  saveDisplayState(context.entityType, snapshot.context);
+                }, 500); // 500ms debounce
+              }
+            });
+            
             // Get initial snapshot to verify structure
             const initialSnapshot = storeActor.getSnapshot();
             console.log('🔍 TableMachine: Initial store snapshot', {

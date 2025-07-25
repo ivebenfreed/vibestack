@@ -26,23 +26,34 @@ export function VibeGridXHeader({
   const [hiddenColumnCount, setHiddenColumnCount] = React.useState(0);
   
   React.useEffect(() => {
-    if (!tableActor) return;
+    // Get store actor from window (set by table machine)
+    const storeActor = (window as any).__vibegridx_store_actor;
+    if (!storeActor) return;
     
-    const subscription = tableActor.subscribe((snapshot) => {
+    // Get initial state
+    const initialSnapshot = storeActor.getSnapshot();
+    if (initialSnapshot?.context) {
+      setColumnVisibility(initialSnapshot.context.columnVisibility || {});
+      setHiddenColumnCount(initialSnapshot.context.hiddenColumnCount || 0);
+    }
+    
+    // Subscribe to store changes
+    const subscription = storeActor.subscribe((snapshot: any) => {
       try {
-        // Read column visibility directly from TableMachine context
-        const newColumnVisibility = snapshot.context.columnVisibility || {};
-        const newHiddenColumnCount = snapshot.context.hiddenColumnCount || 0;
-        
-        setColumnVisibility(newColumnVisibility);
-        setHiddenColumnCount(newHiddenColumnCount);
+        if (snapshot?.context) {
+          const newColumnVisibility = snapshot.context.columnVisibility || {};
+          const newHiddenColumnCount = snapshot.context.hiddenColumnCount || 0;
+          
+          setColumnVisibility(newColumnVisibility);
+          setHiddenColumnCount(newHiddenColumnCount);
+        }
       } catch (error) {
-        console.warn('Failed to get column visibility state:', error);
+        console.warn('Failed to get column visibility state from store:', error);
       }
     });
     
     return () => subscription.unsubscribe();
-  }, [tableActor]);
+  }, [tableActor]); // Keep tableActor dependency to re-subscribe when it changes
 
   return (
     <div className={`vibegridx-header-toolbar flex items-center justify-between p-2 border-b bg-muted/50 ${className}`}>

@@ -25,16 +25,22 @@ const MEMORY_LIMITS = {
 // ====================================
 
 export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
+  // Load persisted display state
+  const persistedState = loadDisplayState(entityType);
+  
   return fromStore({
     context: {
       entityType,
       entities: {} as Record<string, any>, // Raw resolved entities
       relationships: {} as Record<string, Record<string, any>>, // Lookup tables
       processedRows: [] as any[], // Table-ready rows for renderer
-      sortBy: [] as Array<{ field: string; direction: 'asc' | 'desc' }>,
-      filters: [] as Array<{ field: string; operator: string; value: any }>,
-      columnVisibility: {} as Record<string, boolean>,
-      columnOrder: [] as string[],
+      sortBy: persistedState?.sortBy || [] as Array<{ field: string; direction: 'asc' | 'desc' }>,
+      filters: persistedState?.filters || [] as Array<{ field: string; operator: string; value: any }>,
+      columnVisibility: persistedState?.columnVisibility || {} as Record<string, boolean>,
+      columnOrder: persistedState?.columnOrder || [] as string[],
+      columnWidths: persistedState?.columnWidths || {} as Record<string, number>, // Column width persistence
+      hiddenColumnCount: 0, // Track number of hidden columns
+      groupBy: persistedState?.groupBy || [] as string[], // Grouping configuration
       loading: true,
       error: null as string | null,
       lastProcessedAt: 0,
@@ -105,6 +111,9 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
             return columns.map(col => col.id);
           }
           return context.columnOrder;
+        },
+        hiddenColumnCount: (context) => {
+          return Object.values(context.columnVisibility).filter(v => !v).length;
         }
       },
       
@@ -298,11 +307,94 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       },
       
       setColumnVisibility: {
-        columnVisibility: (context, event: { columnVisibility: Record<string, boolean> }) => event.columnVisibility
+        columnVisibility: (context, event: { columnVisibility: Record<string, boolean> }) => event.columnVisibility,
+        hiddenColumnCount: (context, event) => {
+          const visibility = event.columnVisibility;
+          return Object.values(visibility).filter(v => !v).length;
+        }
+      },
+      
+      toggleColumnVisibility: {
+        columnVisibility: (context, event: { columnId: string }) => {
+          const newVisibility = {
+            ...context.columnVisibility,
+            [event.columnId]: !context.columnVisibility[event.columnId]
+          };
+          return newVisibility;
+        },
+        hiddenColumnCount: (context, event) => {
+          const newVisibility = {
+            ...context.columnVisibility,
+            [event.columnId]: !context.columnVisibility[event.columnId]
+          };
+          return Object.values(newVisibility).filter(v => !v).length;
+        }
+      },
+      
+      showAllColumns: {
+        columnVisibility: (context) => {
+          const allVisible: Record<string, boolean> = {};
+          // Set all columns to visible
+          if (columns) {
+            columns.forEach(col => {
+              allVisible[col.id] = true;
+            });
+          }
+          // Also ensure any existing columns are visible
+          Object.keys(context.columnVisibility).forEach(id => {
+            allVisible[id] = true;
+          });
+          return allVisible;
+        },
+        hiddenColumnCount: 0
+      },
+      
+      hideAllColumns: {
+        columnVisibility: (context) => {
+          const allHidden: Record<string, boolean> = {};
+          // Set all columns to hidden except selection column
+          if (columns) {
+            columns.forEach(col => {
+              allHidden[col.id] = col.id === '__selection' ? true : false;
+            });
+          }
+          // Also hide any existing columns except selection
+          Object.keys(context.columnVisibility).forEach(id => {
+            allHidden[id] = id === '__selection' ? true : false;
+          });
+          return allHidden;
+        },
+        hiddenColumnCount: (context) => {
+          let count = 0;
+          if (columns) {
+            count = columns.filter(col => col.id !== '__selection').length;
+          }
+          return count;
+        }
       },
       
       setColumnOrder: {
         columnOrder: (context, event: { columnOrder: string[] }) => event.columnOrder
+      },
+      
+      reorderColumns: {
+        columnOrder: (context, event: { fromIndex: number; toIndex: number }) => {
+          const newOrder = [...context.columnOrder];
+          const [removed] = newOrder.splice(event.fromIndex, 1);
+          newOrder.splice(event.toIndex, 0, removed);
+          return newOrder;
+        }
+      },
+      
+      setColumnWidths: {
+        columnWidths: (context, event: { columnWidths: Record<string, number> }) => event.columnWidths
+      },
+      
+      setColumnWidth: {
+        columnWidths: (context, event: { columnId: string; width: number }) => ({
+          ...context.columnWidths,
+          [event.columnId]: event.width
+        })
       },
       
       setGroupBy: {
@@ -824,6 +916,50 @@ export function setupGranularSubscriptions(
     console.log('📊 TableStore: Cleaning up granular subscriptions');
     subscriptions.forEach(sub => sub.unsubscribe());
   };
+}
+
+// ====================================
+// PERSISTENCE HELPERS
+// ====================================
+
+const STORAGE_KEY_PREFIX = 'vibegridx_display_';
+
+export function saveDisplayState(entityType: string, state: any) {
+  try {
+    const key = `${STORAGE_KEY_PREFIX}${entityType}`;
+    const displayState = {
+      columnOrder: state.columnOrder,
+      columnVisibility: state.columnVisibility,
+      columnWidths: state.columnWidths,
+      sortBy: state.sortBy,
+      filters: state.filters,
+      groupBy: state.groupBy,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(key, JSON.stringify(displayState));
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📊 TableStore: Saved display state', { entityType, displayState });
+    }
+  } catch (error) {
+    console.error('Failed to save display state:', error);
+  }
+}
+
+export function loadDisplayState(entityType: string): any | null {
+  try {
+    const key = `${STORAGE_KEY_PREFIX}${entityType}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 TableStore: Loaded display state', { entityType, parsed });
+      }
+      return parsed;
+    }
+  } catch (error) {
+    console.error('Failed to load display state:', error);
+  }
+  return null;
 }
 
 // ====================================

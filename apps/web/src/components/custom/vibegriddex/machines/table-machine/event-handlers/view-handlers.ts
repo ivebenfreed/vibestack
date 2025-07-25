@@ -143,12 +143,12 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Send column visibility update to store
-      ({ context }) => {
+      // Send column visibility toggle to store
+      ({ context, event }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'setColumnVisibility',
-            columnVisibility: context.columnVisibility
+            type: 'toggleColumnVisibility',
+            columnId: event.columnId
           });
         }
       }
@@ -198,12 +198,11 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Send column visibility update to store
+      // Send show all columns event to store
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'setColumnVisibility',
-            columnVisibility: context.columnVisibility
+            type: 'showAllColumns'
           });
         }
       }
@@ -224,12 +223,11 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Send column visibility update to store
+      // Send hide all columns event to store
       ({ context }) => {
         if (context.storeActor) {
           context.storeActor.send({
-            type: 'setColumnVisibility',
-            columnVisibility: context.columnVisibility
+            type: 'hideAllColumns'
           });
         }
       }
@@ -299,6 +297,17 @@ export const viewHandlers = {
             event: {
               type: 'HIDE_FILL_HANDLE'
             }
+          });
+        }
+      },
+      
+      // Send column reorder event to store
+      ({ context, event }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'reorderColumns',
+            fromIndex: event.fromIndex,
+            toIndex: event.toIndex
           });
         }
       },
@@ -1114,6 +1123,18 @@ export const viewHandlers = {
       
       // Persist the state
       'persistSnapshot',
+      
+      // Send column width update to store
+      ({ context }) => {
+        if (context.storeActor && context.columnResizeState) {
+          const { columnId, currentWidth } = context.columnResizeState;
+          context.storeActor.send({
+            type: 'setColumnWidth',
+            columnId,
+            width: currentWidth
+          });
+        }
+      },
       
       // Increment version to trigger re-render
       assign({
