@@ -1,6 +1,6 @@
 import React from 'react'
 import { useSelector } from '@xstate/store/react'
-import { projectsAtom } from '@/domain/project'
+import { projectsAtom } from '@/domain-xstate/project'
 import { Dot } from 'lucide-react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { useDualSidebar } from '@/components/layout/dual-sidebar/DualSidebarProvider'

@@ -21,10 +21,10 @@ import { ThemeProvider } from './context/theme-context'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
-// Import domain utilities for atomic store access
-import { taskUtils } from '@/domain/task'
-import { projectUtils } from '@/domain/project'
-import { userUtils } from '@/domain/user'
+// TODO: Migrate to Dexie - these imports need to be updated to use the new domain services
+// import { taskUtils } from '@/domain-xstate/task'
+// import { projectUtils } from '@/domain-xstate/project'
+// import { userUtils } from '@/domain-xstate/user'
 
 // 🔥 DEXIE INTEGRATION FLOW:
 // 1. main.tsx: Creates router and renders root providers
@@ -150,10 +150,11 @@ async function initializeApp() {
 
 // Wrapper component to provide atom setters via router context - Phase 4: Atomic Integration
 function AppWithRouterContext() {
+  // TODO: Migrate to Dexie - need to update to use new domain services
   // Direct access to the set methods from the atomic stores
-  const setTaskAtoms = taskUtils.loadTasks
-  const setProjectAtoms = projectUtils.loadProjects
-  const setUserAtoms = userUtils.loadUsers
+  // const setTaskAtoms = taskUtils.loadTasks
+  // const setProjectAtoms = projectUtils.loadProjects
+  // const setUserAtoms = userUtils.loadUsers
 
   return (
     <RouterProvider 
@@ -161,9 +162,10 @@ function AppWithRouterContext() {
       context={{ 
         // ❌ DISABLED: Moved away from traditional queries per universal-reactive-data-pattern
         // queryClient,
-        setTaskAtoms,
-        setProjectAtoms,
-        setUserAtoms
+        // TODO: Migrate to Dexie - temporarily disabled until migration is complete
+        setTaskAtoms: undefined as any,
+        setProjectAtoms: undefined as any,
+        setUserAtoms: undefined as any
       }} 
     />
   )

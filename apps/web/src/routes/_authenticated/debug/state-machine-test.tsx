@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import React from 'react'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { tasksAtom } from '@/domain/task'
+import { tasksAtom } from '@/domain-xstate/task'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 export const Route = createFileRoute('/_authenticated/debug/state-machine-test')({

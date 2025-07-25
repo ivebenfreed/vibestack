@@ -1,8 +1,8 @@
 import { createStore } from '@xstate/store'
 import { useSelector } from '@xstate/store/react'
-import { projectsAtom, projectUtils } from '@/domain/project'
-import { tasksAtom, taskUtils } from '@/domain/task'
-import { usersAtom, userUtils } from '@/domain/user'
+import { projectsAtom, projectUtils } from '@/domain-xstate/project'
+import { tasksAtom, taskUtils } from '@/domain-xstate/task'
+import { usersAtom, userUtils } from '@/domain-xstate/user'
 import { type NavGroup } from '@/components/layout/types'
 import { 
   generateProjectsSection, 

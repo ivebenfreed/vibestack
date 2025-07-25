@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { projectsAtom, useProjectAtoms } from '@/domain/project'
+import { projectsAtom, useProjectAtoms } from '@/domain-xstate/project'
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities'
 import { 
   Home, 

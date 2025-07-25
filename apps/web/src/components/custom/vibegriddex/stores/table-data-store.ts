@@ -29,12 +29,54 @@ export interface RelationshipMap {
   };
 }
 
+export interface SortConfig {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface FilterConfig {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' | 
+            'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'in' | 'not_in' | 'regex';
+  value: any;
+  negate?: boolean;
+  caseSensitive?: boolean;
+}
+
+export interface TableRow {
+  id: string;
+  data: Record<string, any>;
+  metadata: {
+    isSelected: boolean;
+    isDirty: boolean;
+    isGroup: boolean;
+    level: number;
+  };
+}
+
 export interface TableStoreContext {
   entityType: string;
+  
+  // Raw data
   entities: Record<string, any>;
   relationships: Record<string, Record<string, any>>; // Dynamic relationship tables
+  
+  // View configuration
+  sortBy: SortConfig[];
+  filters: FilterConfig[];
+  groupBy: string[];
+  columnVisibility: Record<string, boolean>;
+  columnOrder: string[];
+  
+  // Processed data (computed)
+  processedRows: TableRow[];
+  visibleRows: TableRow[];
+  totalRowCount: number;
+  
+  // Metadata
   loading: boolean;
   error: string | null;
+  lastProcessedAt: number;
 }
 
 // ====================================
@@ -47,7 +89,14 @@ export type TableStoreEvent =
   | { type: 'ENTITIES_CHANGED'; changes: EntityChange[] }
   | { type: 'RELATIONSHIP_DATA_UPDATED'; table: string; data: any[] }
   | { type: 'SET_LOADING'; loading: boolean }
-  | { type: 'SET_ERROR'; error: string | null };
+  | { type: 'SET_ERROR'; error: string | null }
+  | { type: 'SET_SORT_BY'; sortBy: SortConfig[] }
+  | { type: 'SET_FILTERS'; filters: FilterConfig[] }
+  | { type: 'SET_GROUP_BY'; groupBy: string[] }
+  | { type: 'SET_COLUMN_VISIBILITY'; columnVisibility: Record<string, boolean> }
+  | { type: 'SET_COLUMN_ORDER'; columnOrder: string[] }
+  | { type: 'TOGGLE_COLUMN_VISIBILITY'; columnId: string }
+  | { type: 'REPROCESS_DATA' };
 
 // ====================================
 // HELPERS
@@ -88,6 +137,146 @@ function getChangedFields(oldEntity: any, newEntity: any): string[] {
   return changedFields;
 }
 
+/**
+ * Apply sorting to rows
+ */
+function applySorting(rows: TableRow[], sortBy: SortConfig[]): TableRow[] {
+  if (sortBy.length === 0) return rows;
+  
+  const sortedRows = rows.slice();
+  
+  sortedRows.sort((a, b) => {
+    for (const sort of sortBy) {
+      const aValue = a.data[sort.field];
+      const bValue = b.data[sort.field];
+      
+      // Handle null/undefined
+      const aIsEmpty = aValue == null || aValue === '';
+      const bIsEmpty = bValue == null || bValue === '';
+      
+      if (aIsEmpty && bIsEmpty) continue;
+      if (aIsEmpty) return sort.direction === 'asc' ? 1 : -1;
+      if (bIsEmpty) return sort.direction === 'asc' ? -1 : 1;
+      
+      // Compare values
+      let comparison = 0;
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        comparison = aValue - bValue;
+      } else if (aValue instanceof Date && bValue instanceof Date) {
+        comparison = aValue.getTime() - bValue.getTime();
+      } else {
+        const aStr = String(aValue).toLowerCase();
+        const bStr = String(bValue).toLowerCase();
+        comparison = aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+      }
+      
+      if (comparison !== 0) {
+        return sort.direction === 'desc' ? -comparison : comparison;
+      }
+    }
+    return 0;
+  });
+  
+  return sortedRows;
+}
+
+/**
+ * Apply filters to rows
+ */
+function applyFilters(rows: TableRow[], filters: FilterConfig[]): TableRow[] {
+  if (filters.length === 0) return rows;
+  
+  return rows.filter(row => {
+    return filters.every(filter => {
+      const value = row.data[filter.field];
+      let matches = false;
+      
+      switch (filter.operator) {
+        case 'equals':
+          matches = value === filter.value;
+          break;
+        case 'not_equals':
+          matches = value !== filter.value;
+          break;
+        case 'contains':
+          matches = String(value).toLowerCase().includes(String(filter.value).toLowerCase());
+          break;
+        case 'not_contains':
+          matches = !String(value).toLowerCase().includes(String(filter.value).toLowerCase());
+          break;
+        case 'starts_with':
+          matches = String(value).toLowerCase().startsWith(String(filter.value).toLowerCase());
+          break;
+        case 'ends_with':
+          matches = String(value).toLowerCase().endsWith(String(filter.value).toLowerCase());
+          break;
+        case 'greater_than':
+          matches = Number(value) > Number(filter.value);
+          break;
+        case 'less_than':
+          matches = Number(value) < Number(filter.value);
+          break;
+        case 'is_empty':
+          matches = value == null || value === '';
+          break;
+        case 'is_not_empty':
+          matches = value != null && value !== '';
+          break;
+        case 'in':
+          matches = Array.isArray(filter.value) && filter.value.includes(value);
+          break;
+        case 'not_in':
+          matches = Array.isArray(filter.value) && !filter.value.includes(value);
+          break;
+        case 'regex':
+          try {
+            const regex = new RegExp(filter.value, filter.caseSensitive ? 'g' : 'gi');
+            matches = regex.test(String(value));
+          } catch {
+            matches = false;
+          }
+          break;
+        default:
+          matches = true;
+      }
+      
+      return filter.negate ? !matches : matches;
+    });
+  });
+}
+
+/**
+ * Process entities into table rows with all transformations
+ */
+function processEntities(
+  entities: Record<string, any>,
+  sortBy: SortConfig[],
+  filters: FilterConfig[]
+): { processedRows: TableRow[], totalRowCount: number } {
+  // Convert entities to table rows
+  const allRows: TableRow[] = Object.values(entities).map(entity => ({
+    id: entity.id,
+    data: entity,
+    metadata: {
+      isSelected: false,
+      isDirty: false,
+      isGroup: false,
+      level: 0
+    }
+  }));
+  
+  // Apply filters
+  const filteredRows = applyFilters(allRows, filters);
+  
+  // Apply sorting
+  const sortedRows = applySorting(filteredRows, sortBy);
+  
+  return {
+    processedRows: sortedRows,
+    totalRowCount: filteredRows.length
+  };
+}
+
 // ====================================
 // STORE LOGIC
 // ====================================
@@ -96,14 +285,23 @@ function getChangedFields(oldEntity: any, newEntity: any): string[] {
  * Create XState Store logic for table data with atomic updates
  * This returns actor logic that can be used with createActor
  */
-export const createTableStoreLogic = (entityType: string) => {
+export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
   return fromStore<TableStoreContext, TableStoreEvent>({
     context: {
       entityType,
       entities: {},
       relationships: {}, // Dynamic - will be populated based on columns
+      sortBy: [],
+      filters: [],
+      groupBy: [],
+      columnVisibility: columns ? Object.fromEntries(columns.map(col => [col.id, true])) : {},
+      columnOrder: columns ? columns.map(col => col.id) : [],
+      processedRows: [],
+      visibleRows: [],
+      totalRowCount: 0,
       loading: true,
-      error: null
+      error: null,
+      lastProcessedAt: 0
     },
     on: {
       ENTITIES_LOADED: (context, event) => {
@@ -118,11 +316,22 @@ export const createTableStoreLogic = (entityType: string) => {
           entities[entity.id] = entity;
         });
         
+        // Process entities with current view settings
+        const { processedRows, totalRowCount } = processEntities(
+          entities,
+          context.sortBy,
+          context.filters
+        );
+        
         return {
           ...context,
           entities,
+          processedRows,
+          visibleRows: processedRows, // For now, all processed rows are visible
+          totalRowCount,
           loading: false,
-          error: null
+          error: null,
+          lastProcessedAt: Date.now()
         };
       },
       
@@ -136,20 +345,32 @@ export const createTableStoreLogic = (entityType: string) => {
           entityType: context.entityType
         });
         
+        let newEntities = context.entities;
+        
         if (operation === 'delete') {
           const { [id]: removed, ...rest } = context.entities;
-          return {
-            ...context,
-            entities: rest
+          newEntities = rest;
+        } else {
+          newEntities = {
+            ...context.entities,
+            [id]: data
           };
         }
         
+        // Reprocess data with updated entities
+        const { processedRows, totalRowCount } = processEntities(
+          newEntities,
+          context.sortBy,
+          context.filters
+        );
+        
         return {
           ...context,
-          entities: {
-            ...context.entities,
-            [id]: data
-          }
+          entities: newEntities,
+          processedRows,
+          visibleRows: processedRows,
+          totalRowCount,
+          lastProcessedAt: Date.now()
         };
       },
       
@@ -169,9 +390,20 @@ export const createTableStoreLogic = (entityType: string) => {
           }
         });
         
+        // Reprocess data with updated entities
+        const { processedRows, totalRowCount } = processEntities(
+          newEntities,
+          context.sortBy,
+          context.filters
+        );
+        
         return {
           ...context,
-          entities: newEntities
+          entities: newEntities,
+          processedRows,
+          visibleRows: processedRows,
+          totalRowCount,
+          lastProcessedAt: Date.now()
         };
       },
       
@@ -204,7 +436,91 @@ export const createTableStoreLogic = (entityType: string) => {
         ...context,
         error: event.error,
         loading: false
-      })
+      }),
+      
+      SET_SORT_BY: (context, event) => {
+        console.log('📊 TableStore: Setting sort by', event.sortBy);
+        
+        // Reprocess data with new sort
+        const { processedRows, totalRowCount } = processEntities(
+          context.entities,
+          event.sortBy,
+          context.filters
+        );
+        
+        return {
+          ...context,
+          sortBy: event.sortBy,
+          processedRows,
+          visibleRows: processedRows,
+          totalRowCount,
+          lastProcessedAt: Date.now()
+        };
+      },
+      
+      SET_FILTERS: (context, event) => {
+        console.log('📊 TableStore: Setting filters', event.filters);
+        
+        // Reprocess data with new filters
+        const { processedRows, totalRowCount } = processEntities(
+          context.entities,
+          context.sortBy,
+          event.filters
+        );
+        
+        return {
+          ...context,
+          filters: event.filters,
+          processedRows,
+          visibleRows: processedRows,
+          totalRowCount,
+          lastProcessedAt: Date.now()
+        };
+      },
+      
+      SET_GROUP_BY: (context, event) => ({
+        ...context,
+        groupBy: event.groupBy
+      }),
+      
+      SET_COLUMN_VISIBILITY: (context, event) => ({
+        ...context,
+        columnVisibility: event.columnVisibility
+      }),
+      
+      SET_COLUMN_ORDER: (context, event) => ({
+        ...context,
+        columnOrder: event.columnOrder
+      }),
+      
+      TOGGLE_COLUMN_VISIBILITY: (context, event) => {
+        const currentVisibility = context.columnVisibility[event.columnId] ?? true;
+        return {
+          ...context,
+          columnVisibility: {
+            ...context.columnVisibility,
+            [event.columnId]: !currentVisibility
+          }
+        };
+      },
+      
+      REPROCESS_DATA: (context) => {
+        console.log('📊 TableStore: Reprocessing data');
+        
+        const { processedRows, totalRowCount } = processEntities(
+          context.entities,
+          context.sortBy,
+          context.filters
+        );
+        
+        return {
+          ...context,
+          processedRows,
+          visibleRows: processedRows,
+          totalRowCount,
+          lastProcessedAt: Date.now()
+        };
+      }
     }
   });
 };
@@ -364,10 +680,44 @@ export function setupDexieSubscriptions(
  * Create table store actor logic that can be used with createActor
  * Returns XState-compatible actor logic from fromStore
  */
-export function createTableStoreActor(entityType: string) {
-  console.log('📊 TableStore: Creating store logic for', entityType);
+export function createTableStoreActor(entityType: string, columns?: any[]) {
+  console.log('📊 TableStore: Creating store logic for', entityType, {
+    columnCount: columns?.length || 0
+  });
   
   // fromStore returns actor logic, not a store instance
   // This logic can be passed to createActor
-  return createTableStoreLogic(entityType);
+  return createTableStoreLogic(entityType, columns);
+}
+
+// ====================================
+// STORE SELECTORS
+// ====================================
+
+/**
+ * Get visible columns from store context
+ */
+export function getVisibleColumns(context: TableStoreContext, allColumns: any[]): any[] {
+  if (!allColumns || allColumns.length === 0) return [];
+  
+  // Filter by visibility
+  const visibleColumns = allColumns.filter(col => 
+    context.columnVisibility[col.id] !== false && col.id !== '__selection'
+  );
+  
+  // Apply column order
+  if (context.columnOrder && context.columnOrder.length > 0) {
+    const orderedColumns = context.columnOrder
+      .filter(colId => colId !== '__selection')
+      .map(colId => visibleColumns.find(col => col.id === colId))
+      .filter(Boolean);
+    
+    // Add any columns not in the order at the end
+    const orderedIds = new Set(orderedColumns.map(col => col.id));
+    const unorderedColumns = visibleColumns.filter(col => !orderedIds.has(col.id));
+    
+    return [...orderedColumns, ...unorderedColumns];
+  }
+  
+  return visibleColumns;
 }

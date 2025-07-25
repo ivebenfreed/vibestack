@@ -111,8 +111,8 @@ async function fetchTableData(entityType: string, columns?: Column[]): Promise<T
       relationshipTables: Object.keys(relationshipData).length
     });
     
-    // Create store actor (fromCallback doesn't use input)
-    const storeLogic = createTableStoreActor(entityType);
+    // Create store actor with columns for initial state
+    const storeLogic = createTableStoreActor(entityType, columns);
     const storeActor = createActor(storeLogic);
     
     // Add snapshot listener for debugging

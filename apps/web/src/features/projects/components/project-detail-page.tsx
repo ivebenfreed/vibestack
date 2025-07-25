@@ -15,8 +15,8 @@ import { Label } from '@/components/ui/label'
 import { LiveQueryPerformanceMonitor } from '../../debug/components/LiveQueryPerformanceMonitor'
 import ProjectTasksSection from './project-tasks-section'
 import { useSelector } from '@xstate/store/react'
-import { projectsAtom } from '@/domain/project'
-import { usersAtom } from '@/domain/user'
+import { projectsAtom } from '@/domain-xstate/project'
+import { usersAtom } from '@/domain-xstate/user'
 import { shallowEqual } from '@xstate/store'
 
 interface ProjectDetailPageProps {

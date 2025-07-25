@@ -8,14 +8,14 @@
 
 import * as clientEntities from '@repo/dataforge/client-entities'
 import { CLIENT_DOMAIN_TABLES } from '@repo/dataforge/client-entities'
-import { atomActions as taskAtomActions, taskUtils } from '@/domain/task'
-import { atomActions as projectAtomActions, projectUtils } from '@/domain/project'
-import { atomActions as userAtomActions, userUtils } from '@/domain/user'
-import { atomActions as commentAtomActions, commentUtils } from '@/domain/comment'
-import { atomActions as statusDefinitionAtomActions, statusDefinitionUtils } from '@/domain/status-definition'
-import { atomActions as statusSetAtomActions, statusSetUtils } from '@/domain/status-set'
-import { atomActions as tagAtomActions, tagUtils } from '@/domain/tag'
-import { atomActions as tagSetAtomActions, tagSetUtils } from '@/domain/tag-set'
+import { atomActions as taskAtomActions, taskUtils } from '@/domain-xstate/task'
+import { atomActions as projectAtomActions, projectUtils } from '@/domain-xstate/project'
+import { atomActions as userAtomActions, userUtils } from '@/domain-xstate/user'
+import { atomActions as commentAtomActions, commentUtils } from '@/domain-xstate/comment'
+import { atomActions as statusDefinitionAtomActions, statusDefinitionUtils } from '@/domain-xstate/status-definition'
+import { atomActions as statusSetAtomActions, statusSetUtils } from '@/domain-xstate/status-set'
+import { atomActions as tagAtomActions, tagUtils } from '@/domain-xstate/tag'
+import { atomActions as tagSetAtomActions, tagSetUtils } from '@/domain-xstate/tag-set'
 
 // Dynamic imports will be used for generated operations
 import type { EntityConfig, AtomActions } from '@/types/live-changes'
@@ -96,7 +96,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   Task: {
     updateItem: (id: string, updates: any) => {
       // Use live changes path function for proper 3-path architecture
-      import('@/domain/task').then(({ updateTaskLiveChanges }) => {
+      import('@/domain-xstate/task').then(({ updateTaskLiveChanges }) => {
         updateTaskLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import task live changes functions:', error)
@@ -105,7 +105,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/task').then(({ deleteTaskLiveChanges }) => {
+      import('@/domain-xstate/task').then(({ deleteTaskLiveChanges }) => {
         deleteTaskLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import task live changes functions:', error)
@@ -115,7 +115,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
     },
     hasItem: (id: string) => {
       // Import and check the atom directly to avoid circular dependencies
-      const { tasksAtom } = require('@/domain/task')
+      const { tasksAtom } = require('@/domain-xstate/task')
       const tasksRecord = tasksAtom.get()
       return id in tasksRecord
     },
@@ -126,7 +126,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   Project: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/project').then(({ updateProjectLiveChanges }) => {
+      import('@/domain-xstate/project').then(({ updateProjectLiveChanges }) => {
         updateProjectLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import project live changes functions:', error)
@@ -135,7 +135,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/project').then(({ deleteProjectLiveChanges }) => {
+      import('@/domain-xstate/project').then(({ deleteProjectLiveChanges }) => {
         deleteProjectLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import project live changes functions:', error)
@@ -144,7 +144,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { projectsAtom } = require('@/domain/project')
+      const { projectsAtom } = require('@/domain-xstate/project')
       const projectsRecord = projectsAtom.get()
       return id in projectsRecord
     },
@@ -155,7 +155,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   User: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/user').then(({ updateUserLiveChanges }) => {
+      import('@/domain-xstate/user').then(({ updateUserLiveChanges }) => {
         updateUserLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import user live changes functions:', error)
@@ -164,7 +164,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/user').then(({ deleteUserLiveChanges }) => {
+      import('@/domain-xstate/user').then(({ deleteUserLiveChanges }) => {
         deleteUserLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import user live changes functions:', error)
@@ -173,7 +173,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { usersAtom } = require('@/domain/user')
+      const { usersAtom } = require('@/domain-xstate/user')
       const usersRecord = usersAtom.get()
       return id in usersRecord
     },
@@ -184,7 +184,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   Comment: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/comment').then(({ updateCommentLiveChanges }) => {
+      import('@/domain-xstate/comment').then(({ updateCommentLiveChanges }) => {
         updateCommentLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import comment live changes functions:', error)
@@ -193,7 +193,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/comment').then(({ deleteCommentLiveChanges }) => {
+      import('@/domain-xstate/comment').then(({ deleteCommentLiveChanges }) => {
         deleteCommentLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import comment live changes functions:', error)
@@ -202,7 +202,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { commentsAtom } = require('@/domain/comment')
+      const { commentsAtom } = require('@/domain-xstate/comment')
       const commentsRecord = commentsAtom.get()
       return id in commentsRecord
     },
@@ -213,7 +213,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   StatusDefinition: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/status-definition').then(({ updateStatusDefinitionLiveChanges }) => {
+      import('@/domain-xstate/status-definition').then(({ updateStatusDefinitionLiveChanges }) => {
         updateStatusDefinitionLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import status definition live changes functions:', error)
@@ -222,7 +222,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/status-definition').then(({ deleteStatusDefinitionLiveChanges }) => {
+      import('@/domain-xstate/status-definition').then(({ deleteStatusDefinitionLiveChanges }) => {
         deleteStatusDefinitionLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import status definition live changes functions:', error)
@@ -231,7 +231,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { statusDefinitionsAtom } = require('@/domain/status-definition')
+      const { statusDefinitionsAtom } = require('@/domain-xstate/status-definition')
       const statusDefinitionsRecord = statusDefinitionsAtom.get()
       return id in statusDefinitionsRecord
     },
@@ -242,7 +242,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   StatusSet: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/status-set').then(({ updateStatusSetLiveChanges }) => {
+      import('@/domain-xstate/status-set').then(({ updateStatusSetLiveChanges }) => {
         updateStatusSetLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import status set live changes functions:', error)
@@ -251,7 +251,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/status-set').then(({ deleteStatusSetLiveChanges }) => {
+      import('@/domain-xstate/status-set').then(({ deleteStatusSetLiveChanges }) => {
         deleteStatusSetLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import status set live changes functions:', error)
@@ -260,7 +260,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { statusSetsAtom } = require('@/domain/status-set')
+      const { statusSetsAtom } = require('@/domain-xstate/status-set')
       const statusSetsRecord = statusSetsAtom.get()
       return id in statusSetsRecord
     },
@@ -271,7 +271,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   Tag: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/tag').then(({ updateTagLiveChanges }) => {
+      import('@/domain-xstate/tag').then(({ updateTagLiveChanges }) => {
         updateTagLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import tag live changes functions:', error)
@@ -280,7 +280,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/tag').then(({ deleteTagLiveChanges }) => {
+      import('@/domain-xstate/tag').then(({ deleteTagLiveChanges }) => {
         deleteTagLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import tag live changes functions:', error)
@@ -289,7 +289,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { tagsAtom } = require('@/domain/tag')
+      const { tagsAtom } = require('@/domain-xstate/tag')
       const tagsRecord = tagsAtom.get()
       return id in tagsRecord
     },
@@ -300,7 +300,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
   
   TagSet: {
     updateItem: (id: string, updates: any) => {
-      import('@/domain/tag-set').then(({ updateTagSetLiveChanges }) => {
+      import('@/domain-xstate/tag-set').then(({ updateTagSetLiveChanges }) => {
         updateTagSetLiveChanges(id, updates)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import tag set live changes functions:', error)
@@ -309,7 +309,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     removeItem: (id: string) => {
-      import('@/domain/tag-set').then(({ deleteTagSetLiveChanges }) => {
+      import('@/domain-xstate/tag-set').then(({ deleteTagSetLiveChanges }) => {
         deleteTagSetLiveChanges(id)
       }).catch(error => {
         console.error('[LiveChangesConfig] Failed to import tag set live changes functions:', error)
@@ -318,7 +318,7 @@ const DOMAIN_ACTIONS: Record<string, AtomActions> = {
       })
     },
     hasItem: (id: string) => {
-      const { tagSetsAtom } = require('@/domain/tag-set')
+      const { tagSetsAtom } = require('@/domain-xstate/tag-set')
       const tagSetsRecord = tagSetsAtom.get()
       return id in tagSetsRecord
     },

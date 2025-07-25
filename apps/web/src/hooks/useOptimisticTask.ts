@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from '@xstate/store/react';
 import { shallowEqual } from '@xstate/store';
 import type { Task } from '@repo/dataforge/client-entities';
-import { tasksAtom } from '@/domain/task';
+import { tasksAtom } from '@/domain-xstate/task';
 import { domainServices } from '@/domain';
 
 interface OptimisticTaskState {
