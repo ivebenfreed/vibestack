@@ -36,6 +36,7 @@ import { dragActor } from '../../actors/drag-actor';
 // Import atomic store setup utilities  
 import { createTableStoreLogic, loadInitialData, setupGranularSubscriptions } from '../../stores/table-data-store-atomic';
 import { createActor } from 'xstate';
+import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
 
 
 // ====================================
@@ -89,10 +90,20 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Create overlay state
   const overlayState = createInitialOverlayState(input.settings?.initialViewport);
   
+  // Add relationship providers to columns - they'll use the store actor from context
+  const columnsWithProviders = addRelationshipProvidersToColumns(
+    input.columns || [],
+    function() { 
+      // This will be called when the provider needs data
+      // At that point, the store actor will be available in context
+      return this?.storeActor || (window as any).__vibegridx_store_actor;
+    }
+  );
+
   return {
     id: input.id,
     entityType: input.entityType,
-    columns: input.columns || [],
+    columns: columnsWithProviders,
     rows: hasInitialData ? input.initialData.processedRows : [], // Use pre-processed rows if available
     visibleRowIds: initialRowIds,
     allRowIds: initialRowIds,
@@ -377,6 +388,9 @@ export const tableBaseMachine = setup({
             const storeActor = createActor(storeLogic);
             storeActor.start();
             
+            // Store in window for relationship providers
+            (window as any).__vibegridx_store_actor = storeActor;
+            
             // Subscribe to store changes and forward to table machine
             console.log('TableMachine: Setting up store subscription', { 
               hasSubscribe: typeof storeActor.subscribe === 'function',
@@ -446,6 +460,7 @@ export const tableBaseMachine = setup({
                   (window as any).__vibegridx_store_cleanup = () => {
                     cleanup();
                     storeActor.stop();
+                    delete (window as any).__vibegridx_store_actor;
                   };
                 } else {
                   console.log('📊 TableMachine: Pagination mode - live queries disabled for performance');

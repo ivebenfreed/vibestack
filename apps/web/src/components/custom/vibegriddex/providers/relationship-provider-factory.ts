@@ -11,12 +11,14 @@ import type { RelationshipOptionsProvider, EnumOption } from '../types';
  * Creates a relationship options provider that reads from the store
  * @param relationshipTable - The table to read relationships from (e.g., 'users', 'projects')
  * @param getStore - Function to get the current store actor
+ * @param relationshipFilter - Optional filter function to limit options based on current row
  */
 export function createStoreRelationshipProvider(
   relationshipTable: string,
-  getStore: () => any
+  getStore: () => any,
+  relationshipFilter?: (row: any) => Promise<string[]> | string[]
 ): RelationshipOptionsProvider {
-  return async () => {
+  return async (cellRef, getCurrentRow) => {
     const store = getStore();
     if (!store) {
       console.warn('RelationshipProvider: No store available');
@@ -38,10 +40,31 @@ export function createStoreRelationshipProvider(
     }
 
     // Convert to options format
-    const options: EnumOption[] = Object.values(relationshipData).map((entity: any) => ({
+    let options: EnumOption[] = Object.values(relationshipData).map((entity: any) => ({
       value: entity.id,
       label: entity.name || entity.displayName || entity.title || entity.id
     }));
+
+    // Apply filter if provided
+    if (relationshipFilter && getCurrentRow) {
+      const currentRow = getCurrentRow();
+      if (currentRow) {
+        try {
+          const allowedIds = await relationshipFilter(currentRow);
+          // Filter options to only include allowed IDs
+          options = options.filter(option => allowedIds.includes(option.value));
+          
+          console.log('🔍 RelationshipProvider: Applied filter', {
+            relationshipTable,
+            originalCount: Object.keys(relationshipData).length,
+            filteredCount: options.length,
+            allowedIds: allowedIds.slice(0, 5)
+          });
+        } catch (error) {
+          console.error('RelationshipProvider: Error applying filter', error);
+        }
+      }
+    }
 
     console.log('🔍 RelationshipProvider: Generated options from store', {
       relationshipTable,
@@ -72,7 +95,8 @@ export function addRelationshipProvidersToColumns(
           ...column,
           relationshipOptionsProvider: createStoreRelationshipProvider(
             column.relationshipTable,
-            getStore
+            getStore,
+            column.relationshipFilter // Pass the filter if present
           )
         };
       }

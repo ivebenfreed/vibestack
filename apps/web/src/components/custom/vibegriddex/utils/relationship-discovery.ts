@@ -8,11 +8,16 @@
 import type { Column } from '../types';
 
 export interface RelationshipConfig {
-  fieldName: string;           // e.g., 'projectId', 'assigneeId'
-  columnId: string;            // e.g., 'project', 'assignee'
-  relationshipTable: string;   // e.g., 'projects', 'users'
+  fieldName: string;           // e.g., 'projectId', 'assigneeId', 'tags'
+  columnId: string;            // e.g., 'project', 'assignee', 'tags'
+  relationshipTable: string;   // e.g., 'projects', 'users', 'tags'
   displayField: string;        // e.g., 'name', 'displayName'
   resolvedFieldName: string;   // e.g., '__resolved_project'
+  // For many-to-many relationships
+  junctionTable?: string;      // e.g., 'task_tags'
+  junctionSourceField?: string; // e.g., 'task_id'
+  junctionTargetField?: string; // e.g., 'tag_id'
+  isMultiple?: boolean;        // true for relationship-multi
 }
 
 /**
@@ -33,7 +38,12 @@ export function discoverRelationships(columns: Column[]): RelationshipConfig[] {
         columnId: column.id,
         relationshipTable: column.relationshipTable,
         displayField: column.relationshipDisplayField || 'name',
-        resolvedFieldName: `__resolved_${column.id}`
+        resolvedFieldName: `__resolved_${column.id}`,
+        // Add junction table info if present
+        junctionTable: (column as any).junctionTable,
+        junctionSourceField: (column as any).junctionSourceField,
+        junctionTargetField: (column as any).junctionTargetField,
+        isMultiple: cellType === 'relationship-multi'
       });
     }
   });
@@ -48,6 +58,17 @@ export function getUniqueRelationshipTables(columns: Column[]): string[] {
   const relationships = discoverRelationships(columns);
   const tables = new Set(relationships.map(r => r.relationshipTable));
   return Array.from(tables);
+}
+
+/**
+ * Gets unique junction tables from columns
+ */
+export function getUniqueJunctionTables(columns: Column[]): string[] {
+  const relationships = discoverRelationships(columns);
+  const junctionTables = relationships
+    .filter(r => r.junctionTable)
+    .map(r => r.junctionTable!);
+  return Array.from(new Set(junctionTables));
 }
 
 /**

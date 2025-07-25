@@ -5,6 +5,7 @@ import type { Subscription } from 'dexie';
 import { 
   discoverRelationships, 
   getUniqueRelationshipTables,
+  getUniqueJunctionTables,
   resolveEntityRelationships,
   type RelationshipConfig
 } from '../utils/relationship-discovery';
@@ -389,13 +390,16 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     entities = await db[entityTableName].toArray();
   }
   
-  // Get relationship tables we need to load
+  // Get relationship tables and junction tables we need to load
   const relationshipTables = columns ? getUniqueRelationshipTables(columns) : [];
+  const junctionTables = columns ? getUniqueJunctionTables(columns) : [];
+  const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   
-  // Load relationships in parallel
-  const relationshipDataArrays = await Promise.all(
-    relationshipTables.map(tableName => (db as any)[tableName].toArray())
-  );
+  // Load relationships and junctions in parallel
+  const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
+    Promise.all(relationshipTables.map(tableName => (db as any)[tableName].toArray())),
+    Promise.all(junctionTables.map(tableName => (db as any)[tableName].toArray()))
+  ]);
   
   // Build relationship lookup tables
   const relationships: Record<string, Record<string, any>> = {};
@@ -407,11 +411,70 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     relationships[tableName] = relationshipLookup;
   });
   
+  // Process junction data to add to entities
+  const junctionsByEntity: Record<string, Record<string, string[]>> = {};
+  junctionTables.forEach((tableName, index) => {
+    const junctionData = junctionDataArrays[index];
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📊 TableStore: Processing junction table', {
+        tableName,
+        junctionDataCount: junctionData.length,
+        sampleJunction: junctionData[0]
+      });
+    }
+    
+    // Find which relationship config uses this junction table
+    const config = relationshipConfigs.find(c => c.junctionTable === tableName);
+    if (config) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 TableStore: Found config for junction table', {
+          tableName,
+          fieldName: config.fieldName,
+          sourceField: config.junctionSourceField,
+          targetField: config.junctionTargetField
+        });
+      }
+      
+      junctionData.forEach((junction: any) => {
+        // For task_tags, the fields are taskId and tagId
+        const entityId = tableName === 'task_tags' ? junction.taskId : junction[config.junctionSourceField!];
+        const targetId = tableName === 'task_tags' ? junction.tagId : junction[config.junctionTargetField!];
+        
+        if (entityId && targetId) {
+          if (!junctionsByEntity[entityId]) {
+            junctionsByEntity[entityId] = {};
+          }
+          if (!junctionsByEntity[entityId][config.fieldName]) {
+            junctionsByEntity[entityId][config.fieldName] = [];
+          }
+          junctionsByEntity[entityId][config.fieldName].push(targetId);
+        }
+      });
+    } else {
+      console.warn('📊 TableStore: No config found for junction table', tableName);
+    }
+  });
+  
+  if (process.env.NODE_ENV === 'development') {
+    const entitiesWithJunctions = Object.keys(junctionsByEntity).length;
+    console.log('📊 TableStore: Junction data processed', {
+      entitiesWithJunctionData: entitiesWithJunctions,
+      sampleEntityId: Object.keys(junctionsByEntity)[0],
+      sampleJunctionData: junctionsByEntity[Object.keys(junctionsByEntity)[0]]
+    });
+  }
+  
   // Resolve all entities to final table shape
-  const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   const resolvedEntities: Record<string, any> = {};
   entities.forEach(entity => {
-    const resolvedEntity = resolveEntityRelationships(entity, relationships, relationshipConfigs);
+    // Merge junction data into entity
+    const entityWithJunctions = {
+      ...entity,
+      ...(junctionsByEntity[entity.id] || {})
+    };
+    
+    const resolvedEntity = resolveEntityRelationships(entityWithJunctions, relationships, relationshipConfigs);
     resolvedEntities[entity.id] = resolvedEntity;
   });
   
@@ -420,9 +483,21 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
       entityCount: entities.length,
       totalCount,
       relationshipTables: Object.keys(relationships),
+      junctionTables,
       resolvedEntityCount: Object.keys(resolvedEntities).length,
       paginationEnabled: needsPagination
     });
+    
+    // Debug: Check if any entities have tags
+    const entitiesWithTags = Object.values(resolvedEntities).filter((e: any) => e.tags && e.tags.length > 0);
+    if (entitiesWithTags.length > 0) {
+      console.log('📊 TableStore: Found entities with tags', {
+        count: entitiesWithTags.length,
+        sample: entitiesWithTags[0],
+        sampleTags: entitiesWithTags[0].tags,
+        sampleResolvedTags: entitiesWithTags[0].__resolved_tags
+      });
+    }
   }
   
   return { 
@@ -456,13 +531,16 @@ export async function loadPage(
     .limit(pageSize)
     .toArray();
   
-  // Get relationship tables we need to load
+  // Get relationship tables and junction tables we need to load
   const relationshipTables = columns ? getUniqueRelationshipTables(columns) : [];
+  const junctionTables = columns ? getUniqueJunctionTables(columns) : [];
+  const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   
-  // Load relationships in parallel
-  const relationshipDataArrays = await Promise.all(
-    relationshipTables.map(tableName => (db as any)[tableName].toArray())
-  );
+  // Load relationships and junctions in parallel
+  const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
+    Promise.all(relationshipTables.map(tableName => (db as any)[tableName].toArray())),
+    Promise.all(junctionTables.map(tableName => (db as any)[tableName].toArray()))
+  ]);
   
   // Build relationship lookup tables
   const relationships: Record<string, Record<string, any>> = {};
@@ -474,11 +552,70 @@ export async function loadPage(
     relationships[tableName] = relationshipLookup;
   });
   
+  // Process junction data to add to entities
+  const junctionsByEntity: Record<string, Record<string, string[]>> = {};
+  junctionTables.forEach((tableName, index) => {
+    const junctionData = junctionDataArrays[index];
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📊 TableStore: Processing junction table', {
+        tableName,
+        junctionDataCount: junctionData.length,
+        sampleJunction: junctionData[0]
+      });
+    }
+    
+    // Find which relationship config uses this junction table
+    const config = relationshipConfigs.find(c => c.junctionTable === tableName);
+    if (config) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 TableStore: Found config for junction table', {
+          tableName,
+          fieldName: config.fieldName,
+          sourceField: config.junctionSourceField,
+          targetField: config.junctionTargetField
+        });
+      }
+      
+      junctionData.forEach((junction: any) => {
+        // For task_tags, the fields are taskId and tagId
+        const entityId = tableName === 'task_tags' ? junction.taskId : junction[config.junctionSourceField!];
+        const targetId = tableName === 'task_tags' ? junction.tagId : junction[config.junctionTargetField!];
+        
+        if (entityId && targetId) {
+          if (!junctionsByEntity[entityId]) {
+            junctionsByEntity[entityId] = {};
+          }
+          if (!junctionsByEntity[entityId][config.fieldName]) {
+            junctionsByEntity[entityId][config.fieldName] = [];
+          }
+          junctionsByEntity[entityId][config.fieldName].push(targetId);
+        }
+      });
+    } else {
+      console.warn('📊 TableStore: No config found for junction table', tableName);
+    }
+  });
+  
+  if (process.env.NODE_ENV === 'development') {
+    const entitiesWithJunctions = Object.keys(junctionsByEntity).length;
+    console.log('📊 TableStore: Junction data processed', {
+      entitiesWithJunctionData: entitiesWithJunctions,
+      sampleEntityId: Object.keys(junctionsByEntity)[0],
+      sampleJunctionData: junctionsByEntity[Object.keys(junctionsByEntity)[0]]
+    });
+  }
+  
   // Resolve all entities to final table shape
-  const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   const resolvedEntities: Record<string, any> = {};
   entities.forEach(entity => {
-    const resolvedEntity = resolveEntityRelationships(entity, relationships, relationshipConfigs);
+    // Merge junction data into entity
+    const entityWithJunctions = {
+      ...entity,
+      ...(junctionsByEntity[entity.id] || {})
+    };
+    
+    const resolvedEntity = resolveEntityRelationships(entityWithJunctions, relationships, relationshipConfigs);
     resolvedEntities[entity.id] = resolvedEntity;
   });
   

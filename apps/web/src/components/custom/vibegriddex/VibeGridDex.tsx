@@ -124,11 +124,9 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   
   // Store will be created by XState machine - no React hooks needed
   
-  // Apply defaults to columns and add relationship providers
+  // Apply defaults to columns - relationship providers will be added by the table machine
   const columnsWithDefaults = useMemo(() => {
-    const withDefaults = applyColumnDefaults(props.columns);
-    // Relationship providers will be handled by the store
-    return addRelationshipProvidersToColumns(withDefaults, () => null);
+    return applyColumnDefaults(props.columns);
   }, [props.columns]);
   
   // REMOVED - Store provides all data
