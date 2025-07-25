@@ -8,11 +8,34 @@ const __dirname = path.dirname(__filename);
 const PACKAGE_ROOT = path.resolve(__dirname, '../..');
 
 // ============================================================================
+// Types and Interfaces
+// ============================================================================
+
+interface RelationshipInfo {
+  propertyName: string;
+  type: 'many-to-many' | 'one-to-many' | 'many-to-one';
+  targetEntity: string;
+  junctionTable?: string;
+  joinColumn?: string;
+  inverseJoinColumn?: string;
+}
+
+interface EntityInfo {
+  name: string;
+  tableName: string;
+  relationships: RelationshipInfo[];
+}
+
+// ============================================================================
 // Main Generation Function
 // ============================================================================
 
 async function generateDexieDomainServices() {
   console.log('[generate-dexie-domain-services] Starting generation...');
+  
+  // Read the generated client entities to get relationship information
+  const clientEntitiesPath = path.join(PACKAGE_ROOT, 'src/generated/client-entities.ts');
+  const clientEntitiesContent = await fs.readFile(clientEntitiesPath, 'utf-8');
   
   // Read the generated dexie schema to get entity information
   const schemaPath = path.join(PACKAGE_ROOT, 'src/generated/dexie-schema.ts');
@@ -49,11 +72,20 @@ async function generateDexieDomainServices() {
     domainTables = Object.keys(tableToEntityMap).filter(t => !systemTables.includes(t));
   }
   
-  // Convert table names to entity info using the map
-  const entities = domainTables.map(tableName => ({
-    name: tableToEntityMap[tableName] || tableNameToEntityName(tableName),
-    tableName: tableName
-  }));
+  // Extract junction table mapping and relationship configs from client entities
+  const junctionTableMapping = extractJunctionTableMapping(clientEntitiesContent);
+  const relationshipConfigs = extractRelationshipConfigs(clientEntitiesContent);
+  
+  // Convert table names to entity info using the map and extract relationships
+  const entities: EntityInfo[] = domainTables.map(tableName => {
+    const entityName = tableToEntityMap[tableName] || tableNameToEntityName(tableName);
+    const relationships = extractRelationshipsForEntity(entityName, tableName, junctionTableMapping, relationshipConfigs);
+    return {
+      name: entityName,
+      tableName: tableName,
+      relationships
+    };
+  });
   
   console.log('Generating domain services for:', entities.map(e => e.name));
   
@@ -80,6 +112,116 @@ async function generateDexieDomainServices() {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Extract junction table mapping from client entities content
+ */
+function extractJunctionTableMapping(content: string): any {
+  const match = content.match(/export const CLIENT_JUNCTION_TABLE_MAPPING = \{([\s\S]*?)\} as const;/);
+  if (!match) return {};
+  
+  try {
+    // Create a function that returns the object
+    const fn = new Function('return {' + match[1] + '};');
+    return fn();
+  } catch (e) {
+    console.warn('Could not parse junction table mapping:', e);
+    return {};
+  }
+}
+
+/**
+ * Extract relationship configs from client entities content
+ */
+function extractRelationshipConfigs(content: string): any {
+  const match = content.match(/export const CLIENT_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = \{([\s\S]*?)\} as const;/);
+  if (!match) return {};
+  
+  try {
+    // Create a function that returns the object
+    const fn = new Function('return {' + match[1] + '};');
+    return fn();
+  } catch (e) {
+    console.warn('Could not parse relationship configs:', e);
+    return {};
+  }
+}
+
+/**
+ * Extract relationship information for a given entity
+ */
+function extractRelationshipsForEntity(
+  entityName: string,
+  tableName: string,
+  junctionTableMapping: any,
+  relationshipConfigs: any
+): RelationshipInfo[] {
+  const relationships: RelationshipInfo[] = [];
+  
+  // Extract junction relationships from mapping
+  Object.entries(junctionTableMapping).forEach(([junctionTable, config]: [string, any]) => {
+    if (config.sourceEntity === entityName) {
+      relationships.push({
+        propertyName: config.relationName,
+        type: 'many-to-many',
+        targetEntity: config.targetEntity,
+        junctionTable: junctionTable,
+        joinColumn: config.sourceColumn,
+        inverseJoinColumn: config.targetColumn
+      });
+    }
+  });
+  
+  // Extract other relationships from relationship configs
+  const entityConfig = relationshipConfigs[tableName] || relationshipConfigs[entityName.toLowerCase()];
+  if (entityConfig) {
+    // Add many-to-one relationships
+    if (entityConfig.requiredReferences) {
+      entityConfig.requiredReferences.forEach((ref: any) => {
+        const propertyName = ref.field.replace(/Id$/, ''); // Remove 'Id' suffix
+        relationships.push({
+          propertyName: propertyName,
+          type: 'many-to-one',
+          targetEntity: tableNameToEntityName(ref.targetEntity)
+        });
+      });
+    }
+    
+    // Add self-references
+    if (entityConfig.selfReferences) {
+      entityConfig.selfReferences.forEach((ref: any) => {
+        relationships.push({
+          propertyName: ref.field,
+          type: 'many-to-one',
+          targetEntity: entityName
+        });
+      });
+    }
+  }
+  
+  // Infer one-to-many relationships from other entities' many-to-one
+  Object.entries(relationshipConfigs).forEach(([otherTable, otherConfig]: [string, any]) => {
+    if (otherConfig.requiredReferences) {
+      otherConfig.requiredReferences.forEach((ref: any) => {
+        if (ref.targetEntity === tableName) {
+          const otherEntityName = tableNameToEntityName(otherTable);
+          const propertyName = otherEntityName.toLowerCase() + 's'; // Simple pluralization
+          
+          // Check if we already have this relationship
+          if (!relationships.some(r => r.propertyName === propertyName)) {
+            relationships.push({
+              propertyName: propertyName,
+              type: 'one-to-many',
+              targetEntity: otherEntityName
+            });
+          }
+        }
+      });
+    }
+  });
+  
+  return relationships;
+}
 
 function tableNameToEntityName(tableName: string): string {
   // Convert snake_case to PascalCase
@@ -122,13 +264,6 @@ function generateEntityDomainService(entity: { name: string; tableName: string }
  */
 
 import { db } from '../dexie-schema.js';
-
-export interface ${entity.name}RelationshipContext {
-  entityType?: string;
-  projectId?: string;
-  userId?: string;
-  currentEntity?: any;
-}
 
 export class ${entity.name}DexieService {
   /**
@@ -181,7 +316,7 @@ export class ${entity.name}DexieService {
     await db.${entity.tableName}.delete(id);
     return true;
   }
-${generateSpecialMethods(entity)}
+${generateSpecialMethods(entity)}${generateRelationshipMethods(entity)}
 }
 
 // Export singleton instance
@@ -189,11 +324,10 @@ export const ${lowerName}DexieService = new ${entity.name}DexieService();
 `;
 }
 
-function generateSpecialMethods(entity: { name: string; tableName: string }): string {
+function generateSpecialMethods(entity: EntityInfo): string {
   const methods: string[] = [];
   
-  // Add special methods for specific entities
-  // These could be made more dynamic by reading relationship metadata
+  // Add entity-specific custom methods that aren't standard relationships
   if (entity.name === 'StatusDefinition') {
     methods.push(`
   /**
@@ -239,100 +373,197 @@ function generateSpecialMethods(entity: { name: string; tableName: string }): st
   }`);
   }
   
-  if (entity.name === 'Project') {
+  // Note: Project.members and Task.tags relationships are now handled by generateRelationshipMethods
+  
+  return methods.length > 0 ? '\n' + methods.join('\n') + '\n' : '';
+}
+
+/**
+ * Generate comprehensive relationship methods for an entity
+ */
+function generateRelationshipMethods(entity: EntityInfo): string {
+  const methods: string[] = [];
+  
+  // Group relationships by type
+  const manyToManyRelations = entity.relationships.filter(r => r.type === 'many-to-many');
+  const oneToManyRelations = entity.relationships.filter(r => r.type === 'one-to-many');
+  const manyToOneRelations = entity.relationships.filter(r => r.type === 'many-to-one');
+  
+  // Generate many-to-many relationship methods
+  for (const relation of manyToManyRelations) {
+    const methodBaseName = relation.propertyName.charAt(0).toUpperCase() + relation.propertyName.slice(1);
+    const targetTableName = camelToSnakeCase(relation.targetEntity) + 's';
+    const targetIdField = relation.inverseJoinColumn || `${camelToSnakeCase(relation.targetEntity)}_id`;
+    const sourceIdField = relation.joinColumn || `${camelToSnakeCase(entity.name)}_id`;
+    
+    // Get method
     methods.push(`
   /**
-   * Resolve User for a given ID
+   * Get ${relation.propertyName} for this ${entity.name}
    */
-  async resolveOwner(id: string): Promise<any> {
-    return await db.users.get(id);
-  }
-
-  /**
-   * Get Users for a Project
-   */
-  async getUsers(projectId: string): Promise<any[]> {
-    const junctions = await db.project_members
-      .where('projectId')
-      .equals(projectId)
+  async get${methodBaseName}(${camelCase(entity.name)}Id: string): Promise<any[]> {
+    const junctions = await db.${relation.junctionTable}
+      .where('${sourceIdField}')
+      .equals(${camelCase(entity.name)}Id)
       .toArray();
     
-    const userIds = junctions.map(j => j.userId);
-    const users = await db.users.bulkGet(userIds);
+    const targetIds = junctions.map(j => j.${targetIdField});
+    const targets = await db.${targetTableName}.bulkGet(targetIds);
     
-    return users.filter(u => u !== undefined);
-  }
-  
+    return targets.filter(t => t !== undefined);
+  }`);
+    
+    // Set method
+    methods.push(`
   /**
-   * Set Users for a Project
+   * Set ${relation.propertyName} for this ${entity.name}
    */
-  async setUsers(projectId: string, userIds: string[]): Promise<void> {
-    await db.transaction('rw', db.project_members, async () => {
+  async set${methodBaseName}(${camelCase(entity.name)}Id: string, targetIds: string[]): Promise<void> {
+    await db.transaction('rw', db.${relation.junctionTable}, async () => {
       // Remove existing relationships
-      await db.project_members
-        .where('projectId')
-        .equals(projectId)
+      await db.${relation.junctionTable}
+        .where('${sourceIdField}')
+        .equals(${camelCase(entity.name)}Id)
         .delete();
       
       // Add new relationships
-      if (userIds.length > 0) {
-        await db.project_members.bulkAdd(
-          userIds.map(userId => ({
-            projectId: projectId,
-            userId: userId,
-            role: 'member'
+      if (targetIds.length > 0) {
+        const now = new Date();
+        await db.${relation.junctionTable}.bulkAdd(
+          targetIds.map(targetId => ({
+            ${sourceIdField}: ${camelCase(entity.name)}Id,
+            ${targetIdField}: targetId,
+            createdAt: now,
+            updatedAt: now
           }))
         );
       }
     });
   }`);
-  }
-  
-  if (entity.name === 'Task') {
+    
+    // Add method
     methods.push(`
   /**
-   * Get Tags for a Task
+   * Add ${relation.propertyName} to this ${entity.name}
    */
-  async getTags(taskId: string): Promise<any[]> {
-    const junctions = await db.task_tags
-      .where('taskId')
-      .equals(taskId)
-      .toArray();
+  async add${methodBaseName}(${camelCase(entity.name)}Id: string, targetIds: string[]): Promise<void> {
+    if (targetIds.length === 0) return;
     
-    const tagIds = junctions.map(j => j.tagId);
-    const tags = await db.tags.bulkGet(tagIds);
+    const now = new Date();
+    const newRelations = targetIds.map(targetId => ({
+      ${sourceIdField}: ${camelCase(entity.name)}Id,
+      ${targetIdField}: targetId,
+      createdAt: now,
+      updatedAt: now
+    }));
     
-    return tags.filter(t => t !== undefined);
+    await db.${relation.junctionTable}.bulkAdd(newRelations);
+  }`);
+    
+    // Remove method
+    methods.push(`
+  /**
+   * Remove ${relation.propertyName} from this ${entity.name}
+   */
+  async remove${methodBaseName}(${camelCase(entity.name)}Id: string, targetIds: string[]): Promise<void> {
+    if (targetIds.length === 0) return;
+    
+    await db.${relation.junctionTable}
+      .where('${sourceIdField}')
+      .equals(${camelCase(entity.name)}Id)
+      .and(item => targetIds.includes(item.${targetIdField}))
+      .delete();
+  }`);
+    
+    // Has method
+    methods.push(`
+  /**
+   * Check if ${entity.name} has a specific ${relation.targetEntity}
+   */
+  async has${methodBaseName.slice(0, -1)}(${camelCase(entity.name)}Id: string, targetId: string): Promise<boolean> {
+    const count = await db.${relation.junctionTable}
+      .where('[${sourceIdField}+${targetIdField}]')
+      .equals([${camelCase(entity.name)}Id, targetId])
+      .count();
+    
+    return count > 0;
+  }`);
+    
+    // Count method
+    methods.push(`
+  /**
+   * Get count of ${relation.propertyName} for this ${entity.name}
+   */
+  async get${methodBaseName}Count(${camelCase(entity.name)}Id: string): Promise<number> {
+    return await db.${relation.junctionTable}
+      .where('${sourceIdField}')
+      .equals(${camelCase(entity.name)}Id)
+      .count();
+  }`);
   }
   
+  // Generate many-to-one relationship methods (simple resolver)
+  for (const relation of manyToOneRelations) {
+    const methodName = relation.propertyName.charAt(0).toUpperCase() + relation.propertyName.slice(1);
+    const targetTableName = camelToSnakeCase(relation.targetEntity) + 's';
+    const foreignKeyField = `${relation.propertyName}Id`;
+    
+    methods.push(`
   /**
-   * Set Tags for a Task
+   * Resolve ${relation.propertyName} for a given ID
    */
-  async setTags(taskId: string, tagIds: string[]): Promise<void> {
-    await db.transaction('rw', db.task_tags, async () => {
-      // Remove existing relationships
-      await db.task_tags
-        .where('taskId')
-        .equals(taskId)
-        .delete();
-      
-      // Add new relationships
-      if (tagIds.length > 0) {
-        await db.task_tags.bulkAdd(
-          tagIds.map(tagId => ({
-            taskId: taskId,
-            tagId: tagId
-          }))
-        );
-      }
-    });
+  async resolve${methodName}(id: string): Promise<any> {
+    return await db.${targetTableName}.get(id);
+  }`);
+  }
+  
+  // Generate one-to-many relationship methods
+  for (const relation of oneToManyRelations) {
+    const methodBaseName = relation.propertyName.charAt(0).toUpperCase() + relation.propertyName.slice(1);
+    const targetTableName = camelToSnakeCase(relation.targetEntity) + 's';
+    const foreignKeyField = `${camelCase(entity.name)}Id`;
+    
+    methods.push(`
+  /**
+   * Get ${relation.propertyName} for this ${entity.name}
+   */
+  async get${methodBaseName}(${camelCase(entity.name)}Id: string): Promise<any[]> {
+    return await db.${targetTableName}
+      .where('${foreignKeyField}')
+      .equals(${camelCase(entity.name)}Id)
+      .toArray();
+  }`);
+    
+    methods.push(`
+  /**
+   * Get count of ${relation.propertyName} for this ${entity.name}
+   */
+  async get${methodBaseName}Count(${camelCase(entity.name)}Id: string): Promise<number> {
+    return await db.${targetTableName}
+      .where('${foreignKeyField}')
+      .equals(${camelCase(entity.name)}Id)
+      .count();
   }`);
   }
   
   return methods.length > 0 ? '\n' + methods.join('\n') + '\n' : '';
 }
 
-function generateIndexFile(entities: { name: string; tableName: string }[]): string {
+/**
+ * Convert camelCase to snake_case
+ */
+function camelToSnakeCase(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`).replace(/^_/, '');
+}
+
+/**
+ * Convert PascalCase to camelCase
+ */
+function camelCase(str: string): string {
+  return str.charAt(0).toLowerCase() + str.slice(1);
+}
+
+function generateIndexFile(entities: EntityInfo[]): string {
   const imports = entities.map(e => {
     const lowerName = e.name.toLowerCase();
     return `import { ${e.name}DexieService, ${lowerName}DexieService } from './${lowerName}-dexie-service.js';`;
@@ -354,10 +585,6 @@ function generateIndexFile(entities: { name: string; tableName: string }[]): str
     return `  ${serviceName}: ${lowerName}DexieService,`;
   }).join('\n');
   
-  const typeExports = entities.map(e => 
-    `export type { ${e.name}RelationshipContext } from './${e.name.toLowerCase()}-dexie-service.js';`
-  ).join('\n');
-  
   return `/**
  * Auto-generated Dexie Domain Services Index
  * 
@@ -377,9 +604,6 @@ ${exports}
 export const dexieDomainServices = {
 ${serviceMap}
 };
-
-// Re-export types
-${typeExports}
 `;
 }
 
