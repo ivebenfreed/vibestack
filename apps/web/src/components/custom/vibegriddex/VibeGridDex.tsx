@@ -286,6 +286,35 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   const tableActor = useActorRef(tableBaseMachine, machineConfig);
   const tableSend = tableActor.send;
   
+  // Subscribe to state changes and persist
+  useEffect(() => {
+    const subscription = tableActor.subscribe((snapshot) => {
+      // Only persist certain state properties
+      const stateToPersist = {
+        columnOrder: snapshot.context.columnOrder,
+        columnVisibility: snapshot.context.columnVisibility,
+        columnWidths: snapshot.context.columnWidths,
+        sortBy: snapshot.context.sortBy,
+        filters: snapshot.context.filters,
+        groupBy: snapshot.context.groupBy
+      };
+      
+      try {
+        localStorage.setItem(persistenceKey, JSON.stringify(stateToPersist));
+        console.log('💾 VibeGridDex: Persisted state', {
+          key: persistenceKey,
+          columnOrder: stateToPersist.columnOrder
+        });
+      } catch (error) {
+        console.error('Failed to persist VibeGridDex state:', error);
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [tableActor, persistenceKey]);
+  
   // Create renderer options
   const rendererOptions = useMemo(() => ({
     enableSelectionColumn: enableSelectionColumn,
