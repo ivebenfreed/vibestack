@@ -147,8 +147,23 @@ function applySorting(rows: TableRow[], sortBy: SortConfig[]): TableRow[] {
   
   sortedRows.sort((a, b) => {
     for (const sort of sortBy) {
-      const aValue = a.data[sort.field];
-      const bValue = b.data[sort.field];
+      // Check for resolved relationship values first
+      const resolvedFieldName = `__resolved_${sort.field}`;
+      let aValue = a.data[resolvedFieldName] !== undefined ? a.data[resolvedFieldName] : a.data[sort.field];
+      let bValue = b.data[resolvedFieldName] !== undefined ? b.data[resolvedFieldName] : b.data[sort.field];
+      
+      // Debug logging for relationship sorting
+      if (sort.field === 'projectId' && Math.random() < 0.05) {
+        console.log('🔍 Sorting by project:', {
+          field: sort.field,
+          aRaw: a.data[sort.field],
+          aResolved: a.data[resolvedFieldName],
+          aUsed: aValue,
+          bRaw: b.data[sort.field],
+          bResolved: b.data[resolvedFieldName],
+          bUsed: bValue
+        });
+      }
       
       // Handle null/undefined
       const aIsEmpty = aValue == null || aValue === '';

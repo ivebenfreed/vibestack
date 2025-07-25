@@ -354,6 +354,18 @@ export const viewActions = {
     }
   }),
   
+  updateColumnDragPosition: assign({
+    columnDragState: ({ context, event }: any) => {
+      if (!context.columnDragState) return null;
+      
+      return {
+        ...context.columnDragState,
+        currentX: event.x,
+        currentY: event.y
+      };
+    }
+  }),
+  
   endColumnDrag: assign({
     columnDragState: null
   }),

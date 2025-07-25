@@ -1220,6 +1220,136 @@ export const viewHandlers = {
         }
       }
     ]
+  },
+
+  // Column drag event handlers
+  'view.column.drag.start': {
+    actions: [
+      viewActions.startColumnDrag,
+      
+      ({ event, context }) => {
+        console.log('TableMachine: Column drag started via view event', {
+          columnId: event.columnId,
+          position: { x: event.x, y: event.y }
+        });
+        
+        // Apply initial drag preview to hide the original column
+        if (context.actors?.rendererActor && context.coordinateMapping) {
+          const dragPreview = calculateDragPreview(
+            event.x,
+            event.columnId,
+            context.coordinateMapping,
+            context.viewport?.scrollLeft || 0
+          );
+          
+          // Mark as initial preview and add column name
+          (dragPreview as any).isInitialPreview = true;
+          
+          // Find column name from columns
+          const column = context.columns.find((col: any) => col.id === event.columnId);
+          if (column) {
+            dragPreview.columnName = column.name || column.id;
+          }
+          
+          const renderer = context.actors.rendererActor.getSnapshot().context as any;
+          if (renderer?.renderer?.domManager) {
+            applyDragPreview(dragPreview, renderer.renderer.domManager);
+          }
+        }
+      }
+    ]
+  },
+
+  'view.column.drag.move': {
+    actions: [
+      viewActions.updateColumnDragPosition,
+      
+      // Calculate and apply drag preview
+      ({ event, context }) => {
+        if (context.columnDragState && context.actors?.rendererActor) {
+          // Get container bounds for relative positioning
+          const renderer = context.actors.rendererActor.getSnapshot().context as any;
+          const container = renderer?.renderer?.domManager?.getElement('container');
+          let relativeX = event.x;
+          
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            relativeX = event.x - rect.left;
+          }
+          
+          const dragPreview = calculateDragPreview(
+            relativeX,
+            context.columnDragState.draggedColumnId,
+            context.coordinateMapping,
+            context.viewport?.scrollLeft || 0
+          );
+          
+          // Add mouse position for floating preview
+          dragPreview.mouseX = event.x;
+          dragPreview.mouseY = event.y;
+          
+          // Apply preview to DOM
+          if (renderer?.renderer?.domManager) {
+            applyDragPreview(dragPreview, renderer.renderer.domManager);
+          }
+        }
+      }
+    ]
+  },
+
+  'view.column.drag.end': {
+    actions: [
+      // Calculate final position and trigger reorder
+      ({ event, context, self }) => {
+        if (context.columnDragState && context.coordinateMapping) {
+          // Get container bounds for relative positioning
+          const renderer = context.actors.rendererActor.getSnapshot().context as any;
+          const container = renderer?.renderer?.domManager?.getElement('container');
+          let relativeX = event.clientX;
+          
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            relativeX = event.clientX - rect.left;
+          }
+          
+          const dragPreview = calculateDragPreview(
+            relativeX,
+            context.columnDragState.draggedColumnId,
+            context.coordinateMapping,
+            context.viewport?.scrollLeft || 0
+          );
+          
+          const currentIndex = context.columnOrder.indexOf(context.columnDragState.draggedColumnId);
+          
+          // Only reorder if position actually changed
+          if (dragPreview.targetIndex !== -1 && dragPreview.targetIndex !== currentIndex) {
+            console.log('TableMachine: Column reorder needed', {
+              from: currentIndex,
+              to: dragPreview.targetIndex
+            });
+            
+            // Send reorder event
+            self.send({
+              type: 'view.columns.reorder',
+              fromIndex: currentIndex,
+              toIndex: dragPreview.targetIndex
+            });
+          }
+        }
+      },
+      
+      viewActions.endColumnDrag,
+      
+      // Clear any remaining preview
+      ({ context }) => {
+        if (context.actors?.rendererActor) {
+          const renderer = context.actors.rendererActor.getSnapshot().context as any;
+          if (renderer?.renderer?.domManager) {
+            clearDragPreview(renderer.renderer.domManager);
+          }
+        }
+      }
+    ]
   }
 };
 

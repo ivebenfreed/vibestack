@@ -147,7 +147,10 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               ...storedOptions,
               ...event.options,
               onStateChange: (state: any) => {
-                console.log('RendererActor: Received state change from TableRenderer:', state);
+                // Reduce logging for performance
+                if (state.type !== 'render.complete' || Math.random() < 0.05) {
+                  console.log('RendererActor: Received state change from TableRenderer:', state);
+                }
                 
                 // Handle canvas container ready event
                 if (state.type === 'canvas.container.ready') {
@@ -160,7 +163,10 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                 
                 // Handle render complete event
                 if (state.type === 'render.complete') {
-                  console.log('RendererActor: Render complete, emitting RENDER_COMPLETE');
+                  // Only log occasionally for performance
+                  if (Math.random() < 0.05) {
+                    console.log('RendererActor: Render complete, emitting RENDER_COMPLETE');
+                  }
                   sendBack({
                     type: 'RENDER_COMPLETE',
                     renderTime: state.renderTime,
@@ -170,7 +176,9 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                   
                   // PERFORMANCE: Initialize canvas post-render to avoid blocking critical path
                   if (renderer && typeof renderer.initializeCanvasPostRender === 'function') {
-                    console.log('RendererActor: Triggering canvas initialization post-render');
+                    if (Math.random() < 0.05) {
+                      console.log('RendererActor: Triggering canvas initialization post-render');
+                    }
                     renderer.initializeCanvasPostRender();
                   }
                 }
@@ -179,6 +187,31 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
                 if (storedOptions.onStateChange) {
                   storedOptions.onStateChange(state);
                 }
+              },
+              
+              // Column drag callbacks
+              onColumnDragStart: (columnId: string, x: number, y: number) => {
+                sendBack({
+                  type: 'view.column.drag.start',
+                  columnId,
+                  x,
+                  y
+                });
+              },
+              
+              onColumnDragMove: (x: number, y: number) => {
+                sendBack({
+                  type: 'view.column.drag.move',
+                  x,
+                  y
+                });
+              },
+              
+              onColumnDragEnd: (clientX: number) => {
+                sendBack({
+                  type: 'view.column.drag.end',
+                  clientX
+                });
               }
             };
             

@@ -116,20 +116,61 @@ export class RenderPipeline {
         this.config.onScroll?.(initialViewport);
       } else {
         // Subsequent renders: use RAF for better performance
-        console.log('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
-          rowCount: state.rows.length,
-          columnCount: state.columns?.length,
-          timestamp: performance.now(),
-          firstRenderComplete: this.firstRenderComplete
-        });
+        // Reduce logging frequency for performance
+        if (Math.random() < 0.1) {
+          console.log('🎨 RenderOrchestrator: Using RAF render path (subsequent render)', {
+            rowCount: state.rows.length,
+            columnCount: state.columns?.length,
+            timestamp: performance.now(),
+            firstRenderComplete: this.firstRenderComplete
+          });
+        }
+        
+        // Batch all DOM reads before RAF to avoid forced reflows
+        const measurements = this.batchMeasureDOMElements();
+        const visibleRange = this.config.virtualGrid.getVisibleRange();
+        const rowHeight = this.config.virtualGrid.getRowHeight();
+        
+        // Pre-calculate viewport updates before RAF
+        let viewportHeight = measurements.viewport.client.height;
+        let viewportWidth = measurements.viewport.client.width;
+        
+        // Fallback logic if viewport has no dimensions
+        if (!viewportHeight || viewportHeight === 0) {
+          viewportHeight = measurements.container.client.height || 
+                           measurements.table.client.height || 
+                           600;
+        }
+        
+        if (!viewportWidth || viewportWidth === 0) {
+          viewportWidth = measurements.container.client.width || 
+                          measurements.table.client.width || 
+                          Math.min(800, window.innerWidth - 32);
+        }
+        
+        const scrollTop = measurements.viewport.scroll.top;
+        const scrollLeft = measurements.viewport.scroll.left;
+        
+        // Calculate new viewport before RAF
+        const currentViewport = this.config.virtualGrid.calculateViewportFromScroll(
+          scrollTop,
+          viewportHeight,
+          viewportWidth,
+          state.rows.length
+        );
+        
+        // Update virtual grid with new viewport (just updates internal state, no DOM)
+        const hasViewportChanged = this.config.virtualGrid.updateViewport(currentViewport, state.rows.length);
         
         requestAnimationFrame(() => {
-          console.log('🎨 RenderOrchestrator: RAF callback executing', {
-            timestamp: performance.now()
-          });
+          // Reduce logging for performance
+          if (Math.random() < 0.05) {
+            console.log('🎨 RenderOrchestrator: RAF callback executing', {
+              timestamp: performance.now()
+            });
+          }
           
-          // Batch all operations in single frame for better performance
-          this.updateViewport(state);
+          // Only DOM writes in RAF - no reads
           this.config.rowRenderingEngine.renderVisibleRows(state);
           this.config.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
           
@@ -137,15 +178,15 @@ export class RenderPipeline {
           const renderTime = this.config.performanceMonitor.endRender(state.rows.length);
           this.config.performanceMonitor.recordPhase('total', renderTime);
           
-          // Send viewport update for canvas overlay
+          // Send viewport update for canvas overlay using pre-measured values
           const viewport: ViewportInfo = {
             start: this.config.virtualGrid.getVisibleRange().start,
             end: this.config.virtualGrid.getVisibleRange().end,
-            height: this.config.domManager.getElement('viewport').clientHeight,
-            width: this.config.domManager.getElement('viewport').clientWidth,
-            scrollTop: this.config.domManager.getElement('viewport').scrollTop,
-            scrollLeft: this.config.domManager.getElement('viewport').scrollLeft,
-            itemHeight: this.config.virtualGrid.getRowHeight()
+            height: viewportHeight,
+            width: viewportWidth,
+            scrollTop: scrollTop,
+            scrollLeft: scrollLeft,
+            itemHeight: rowHeight
           };
           
           this.config.onScroll?.(viewport);
