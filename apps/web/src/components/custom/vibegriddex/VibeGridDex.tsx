@@ -19,7 +19,6 @@ import type { TableRenderer } from './renderers/core/TableRenderer';
 import { CanvasOverlay } from './overlays/CanvasOverlay';
 import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
 import { VibeGridXHeader } from './components/VibeGridXHeader';
-import { syncProcessView } from './utils/syncViewProcessor';
 import './vibegridx.css';
 
 // Import Dexie domain services and queries
@@ -28,7 +27,8 @@ import * as dexieDomains from '@/domain';
 // Import provider utilities
 import type { RelationshipOptionsProvider } from './types';
 import { createGenericRelationshipProvider } from './providers/generic-relationship-provider-dexie';
-import { useDexieEntityConfig, type VibeGridXEntityType } from './hooks/useDexieEntityConfig';
+// Entity type for VibeGrid
+type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment';
 import { applyColumnDefaults } from './column-defaults';
 import { addRelationshipProvidersToColumns } from './providers/relationship-provider-factory';
 
@@ -230,8 +230,6 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     hasStoreInProps: 'store' in props
   });
   
-  // REMOVED - View actor handles processing, not needed here
-  const processedData = null;
 
   // Create machine configuration - SIMPLIFIED for store architecture
   const machineConfig = useMemo(() => {

@@ -125,6 +125,17 @@ export class IncomingChangeService {
     try {
       console.log(`[IncomingChangeService] Processing ${changes.length} incoming changes (${messageType})`);
 
+      // Handle empty changes array (common for junction tables with no data)
+      if (changes.length === 0) {
+        console.log(`[IncomingChangeService] Empty changes array for ${messageType} - will still send acknowledgment`);
+        
+        // Report completion with empty arrays
+        this.callbacks.onChangesProcessed?.(changes, results);
+        
+        console.log(`[IncomingChangeService] Empty processing complete - returning empty results`);
+        return results;
+      }
+
       const batchSize = this.config.batchSize || 50;
       
       // Process in batches
@@ -400,6 +411,32 @@ export class IncomingChangeService {
           await db.tag_sets.bulkPut(entitiesData);
           break;
           
+        // Junction tables
+        case 'project_members':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} project_members into IndexedDB`);
+          await db.project_members.bulkPut(entitiesData);
+          break;
+          
+        case 'project_status_sets':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} project_status_sets into IndexedDB`);
+          await db.project_status_sets.bulkPut(entitiesData);
+          break;
+          
+        case 'project_tag_sets':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} project_tag_sets into IndexedDB`);
+          await db.project_tag_sets.bulkPut(entitiesData);
+          break;
+          
+        case 'task_tags':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} task_tags into IndexedDB`);
+          await db.task_tags.bulkPut(entitiesData);
+          break;
+          
+        case 'task_dependencies':
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} task_dependencies into IndexedDB`);
+          await db.task_dependencies.bulkPut(entitiesData);
+          break;
+          
         default:
           // Fallback to individual processing for unknown tables
           console.warn(`[IncomingChangeService] No bulk handler for ${table}, falling back to individual processing`);
@@ -583,11 +620,26 @@ export class IncomingChangeService {
         case 'tag_sets':
           await this.applyTagSetChange(change);
           break;
+        // Junction tables
+        case 'project_members':
+        case 'project_status_sets':
+        case 'project_tag_sets':
+        case 'task_tags':
+        case 'task_dependencies':
+          console.log(`[IncomingChangeService] 🔧 Processing junction table ${change.table} with data:`, change.data);
+          await this.applyJunctionTableChange(change);
+          break;
         default:
           throw new Error(`No incoming function support for table: ${change.table}`);
       }
 
       console.log(`[IncomingChangeService] Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
+      
+      // Process relationship updates if present
+      if (change.relationshipUpdates && change.relationshipUpdates.length > 0) {
+        console.log(`[IncomingChangeService] Processing ${change.relationshipUpdates.length} relationship updates for ${change.table}:${change.data.id}`);
+        await this.applyRelationshipUpdates(change);
+      }
       
       return {
         change,
@@ -801,6 +853,48 @@ export class IncomingChangeService {
   }
 
   /**
+   * Apply relationship updates for a change
+   */
+  private async applyRelationshipUpdates(change: TableChange): Promise<void> {
+    if (!change.relationshipUpdates || change.relationshipUpdates.length === 0) {
+      return;
+    }
+    
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    const { RelationshipSyncHelper } = await import('./RelationshipSyncHelper');
+    const { CLIENT_JUNCTION_TABLE_MAPPING } = await import('@repo/dataforge/client-entities');
+    
+    for (const update of change.relationshipUpdates) {
+      // Find the junction table configuration
+      const junctionConfig = Object.entries(CLIENT_JUNCTION_TABLE_MAPPING).find(
+        ([_, config]) => config.sourceEntity === change.table && config.relationName === update.relationName
+      );
+      
+      if (!junctionConfig) {
+        console.warn(`[IncomingChangeService] No junction table config found for ${change.table}.${update.relationName}`);
+        continue;
+      }
+      
+      const [junctionTable, config] = junctionConfig;
+      
+      try {
+        await RelationshipSyncHelper.processIncomingRelationshipUpdates(
+          change,
+          junctionTable,
+          config.sourceColumn,
+          config.targetColumn,
+          db
+        );
+        
+        console.log(`[IncomingChangeService] Successfully processed relationship update for ${change.table}.${update.relationName}`);
+      } catch (error) {
+        console.error(`[IncomingChangeService] Error processing relationship update for ${change.table}.${update.relationName}:`, error);
+        throw error;
+      }
+    }
+  }
+  
+  /**
    * Apply tag set changes using Dexie only
    */
   private async applyTagSetChange(change: TableChange): Promise<void> {
@@ -825,6 +919,69 @@ export class IncomingChangeService {
       
       default:
         throw new Error(`Unknown tag set operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Convert snake_case field names to camelCase
+   */
+  private convertJunctionTableFieldNames(data: any, table: string): any {
+    const converted = { ...data };
+    
+    // Convert all snake_case fields to camelCase
+    for (const [key, value] of Object.entries(converted)) {
+      if (key.includes('_')) {
+        const camelCaseKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        converted[camelCaseKey] = value;
+        delete converted[key];
+      }
+    }
+    
+    return converted;
+  }
+  
+  /**
+   * Apply junction table changes using Dexie only
+   */
+  private async applyJunctionTableChange(change: TableChange): Promise<void> {
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    const table = change.table;
+    
+    // Convert snake_case field names to camelCase for Dexie
+    const convertedData = this.convertJunctionTableFieldNames(change.data, table);
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting into junction table ${table}`, convertedData);
+        await (db as any)[table].put(convertedData);
+        break;
+      
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating junction table ${table}`, convertedData);
+        await (db as any)[table].put(convertedData);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting from junction table ${table}`);
+        // Junction tables typically use composite keys, so we need to handle deletion differently
+        const junctionData = change.data as any;
+        if (table === 'project_members' && junctionData.projectId && junctionData.userId) {
+          await db.project_members.where('[projectId+userId]').equals([junctionData.projectId, junctionData.userId]).delete();
+        } else if (table === 'task_tags' && junctionData.taskId && junctionData.tagId) {
+          await db.task_tags.where('[taskId+tagId]').equals([junctionData.taskId, junctionData.tagId]).delete();
+        } else if (table === 'project_status_sets' && junctionData.projectId && junctionData.statusSetId) {
+          await db.project_status_sets.where('[projectId+statusSetId]').equals([junctionData.projectId, junctionData.statusSetId]).delete();
+        } else if (table === 'project_tag_sets' && junctionData.projectId && junctionData.tagSetId) {
+          await db.project_tag_sets.where('[projectId+tagSetId]').equals([junctionData.projectId, junctionData.tagSetId]).delete();
+        } else if (table === 'task_dependencies' && junctionData.dependentTaskId && junctionData.dependencyTaskId) {
+          await db.task_dependencies.where('[dependentTaskId+dependencyTaskId]').equals([junctionData.dependentTaskId, junctionData.dependencyTaskId]).delete();
+        } else {
+          console.warn(`[IncomingChangeService] Unable to delete from junction table ${table} - missing key fields`);
+        }
+        break;
+      
+      default:
+        throw new Error(`Unknown junction table operation: ${change.operation}`);
     }
   }
 

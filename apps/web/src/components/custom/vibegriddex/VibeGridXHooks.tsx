@@ -97,19 +97,18 @@ export const useRenderStateExtractor = () => {
         return null;
       }
       
-      // Use processed rows from ViewActor (Strategic Hybrid Approach)
-      // ViewActor has already processed, sorted, and filtered the data
+      // Use processed rows from store
       let rows = context.rows || [];
       
       if (rows.length === 0) {
-        console.log('getRenderState: No processed rows from ViewActor yet');
+        console.log('getRenderState: No processed rows from store yet');
         return null;
       }
       
       // Use visible columns from context if available, otherwise use all columns
       let columns = context.visibleColumns || providedColumns || context.columns || [];
       
-      console.log('getRenderState: Using processed rows from ViewActor', {
+      console.log('getRenderState: Using processed rows from store', {
         rowCount: rows.length,
         columnsCount: columns.length,
         hasCoordinateMapping: !!context.coordinateMapping
@@ -120,12 +119,12 @@ export const useRenderStateExtractor = () => {
       const columnVisibility = context.columnVisibility || {};
       const columnOrder = context.columnOrder || [];
       
-      // Note: ViewActor has already processed and sorted the rows
-      // No need to apply sorting here - use rows as-is from ViewActor
+      // Note: Store has already processed and sorted the rows
+      // No need to apply sorting here - use rows as-is from store
       
       // Build render state
       const renderState: RenderState = {
-        rows, // Processed and sorted by ViewActor
+        rows, // Processed and sorted by store
         columns,
         selectedCells: new Set<string>(), // Empty by default
         editingCell: null, // No editing by default

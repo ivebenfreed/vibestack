@@ -9,7 +9,7 @@ import type {
 import type { MinimalContext } from '../types/hono';
 import { syncLogger } from '../middleware/logger';
 import { sql } from '../lib/db';
-import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+import { SERVER_DOMAIN_TABLE_HIERARCHY, SERVER_JUNCTION_TABLES } from '@repo/dataforge/server-entities';
 import type { QueryResultRow } from '@neondatabase/serverless';
 import { getDBClient } from '../lib/db';
 import type { WebSocket } from '../types/cloudflare';
@@ -92,15 +92,21 @@ function cleanTableName(table: string): string {
  * Convert table records to TableChange format with PostgreSQL field transformations
  */
 function recordsToChanges(table: string, records: QueryResultRow[]): TableChange[] {
+  const cleanedTable = cleanTableName(table);
+  const isJunctionTable = SERVER_JUNCTION_TABLES.includes(table);
+  
   return records.map(record => {
     // Transform PostgreSQL fields before creating TableChange
-    const transformedRecord = transformPostgreSQLFields(record, cleanTableName(table));
+    const transformedRecord = transformPostgreSQLFields(record, cleanedTable);
     
     return {
-      table: cleanTableName(table),
+      table: cleanedTable,
       operation: 'insert' as const,
       data: transformedRecord,
-      updatedAt: (transformedRecord as any).updated_at?.toISOString() || new Date().toISOString()
+      // Junction tables don't have updated_at fields, so use current timestamp
+      updatedAt: isJunctionTable 
+        ? new Date().toISOString()
+        : ((transformedRecord as any).updated_at?.toISOString() || new Date().toISOString())
     };
   });
 }
@@ -116,8 +122,52 @@ async function getTableChunk<T extends QueryResultRow>(
   const { chunkSize = DEFAULT_CHUNK_SIZE, cursor = null } = options;
   const cleanedTable = cleanTableName(table);
   
+  // Check if this is a junction table (they don't have repositories)
+  const isJunctionTable = SERVER_JUNCTION_TABLES.includes(table);
+  
+  if (isJunctionTable) {
+    syncLogger.debug('Using raw SQL for junction table chunk', { table: cleanedTable, cursor, chunkSize }, MODULE_NAME);
+    
+    // Junction tables use raw SQL directly since they don't have repositories
+    // They also don't have id fields, so we'll use simple OFFSET pagination
+    const query = `
+      SELECT *
+      FROM ${table}
+      ORDER BY 1, 2 ASC
+      LIMIT ${chunkSize + 1}
+      ${cursor ? `OFFSET ${cursor}` : ''}
+    `;
+
+    const client = getDBClient(context);
+    
+    try {
+      await client.connect();
+      
+      const result = await client.query<T>(
+        query,
+        []
+      );
+
+      // Check if there are more records
+      const hasMore = result.rows.length > chunkSize;
+      const items = hasMore ? result.rows.slice(0, chunkSize) : result.rows;
+      const nextCursor = cursor ? String(Number(cursor) + items.length) : String(items.length);
+
+      return {
+        items,
+        nextCursor: hasMore ? nextCursor : null,
+        hasMore
+      };
+    } catch (fallbackError) {
+      syncLogger.error('Database query error', { table: cleanedTable, error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) }, MODULE_NAME);
+      throw fallbackError;
+    } finally {
+      await client.end();
+    }
+  }
+  
   try {
-    // Try using repository first
+    // Try using repository for entity tables
     const repositories = createRepositoryContainer(context);
     const repository = repositories.getRepository(cleanedTable);
     
@@ -226,8 +276,46 @@ async function processTable(
 ): Promise<number> {
   const cleanedTable = cleanTableName(table);
   
+  // Check if this is a junction table (they don't have repositories)
+  const isJunctionTable = SERVER_JUNCTION_TABLES.includes(table);
+  
+  if (isJunctionTable) {
+    syncLogger.debug('Processing junction table with raw SQL', { table: cleanedTable }, MODULE_NAME);
+    
+    // Junction tables use raw SQL directly since they don't have repositories
+    return await processTableInChunks(
+      context,
+      table,
+      async (records, chunkNum, total) => {
+        const changes = recordsToChanges(table, records);
+        
+        const initChangesMsg: ServerInitChangesMessage = {
+          type: 'srv_init_changes',
+          messageId: `srv_${Date.now()}`,
+          timestamp: Date.now(),
+          clientId,
+          changes,
+          sequence: {
+            table: cleanedTable,
+            chunk: chunkNum,
+            total
+          }
+        };
+        await messageHandler.send(initChangesMsg);
+        
+        // Wait for client to acknowledge receipt
+        await messageHandler.waitForMessage(
+          'clt_init_received',
+          (msg) => msg.table === cleanedTable && msg.chunk === chunkNum,
+          300000  // 5 minute timeout for large table chunks
+        );
+      },
+      { chunkSize: WS_CHUNK_SIZE }
+    );
+  }
+  
   try {
-    // Try using repository for more efficient streaming
+    // Try using repository for entity tables
     const repositories = createRepositoryContainer(context);
     const repository = repositories.getRepository(cleanedTable);
     
@@ -389,12 +477,15 @@ export async function performInitialSync(
     // Save initial state once at the beginning
     await stateManager.saveInitialSyncProgress(clientId, syncState);
 
-    // Get ordered tables for sync
-    const sortedTables = Object.keys(SERVER_DOMAIN_TABLE_HIERARCHY).sort((a, b) => {
+    // Get ordered tables for sync - entities first, then junction tables
+    const sortedEntityTables = Object.keys(SERVER_DOMAIN_TABLE_HIERARCHY).sort((a, b) => {
       const levelA = SERVER_DOMAIN_TABLE_HIERARCHY[a as TableName];
       const levelB = SERVER_DOMAIN_TABLE_HIERARCHY[b as TableName];
       return levelA - levelB;
     });
+    
+    // Combine entity tables and junction tables
+    const sortedTables = [...sortedEntityTables, ...SERVER_JUNCTION_TABLES];
 
     // Track sync progress metrics
     let totalRecords = 0;
@@ -428,7 +519,8 @@ export async function performInitialSync(
         clientId, 
         table: tableName, 
         records: tableRecords,
-        progress: `${processedTables}/${sortedTables.length} tables`
+        progress: `${processedTables}/${sortedTables.length} tables`,
+        isJunctionTable: SERVER_JUNCTION_TABLES.includes(tableName)
       }, MODULE_NAME);
     }
 

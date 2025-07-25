@@ -41,8 +41,15 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Trigger view processing
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send sort update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_SORT_BY',
+            sortBy: context.sortBy
+          });
+        }
+      }
     ]
   },
   
@@ -77,8 +84,15 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Trigger view processing
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send sort update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_SORT_BY',
+            sortBy: context.sortBy
+          });
+        }
+      }
     ]
   },
   
@@ -89,8 +103,15 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Trigger view processing
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send filter update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_FILTERS',
+            filters: context.filters
+          });
+        }
+      }
     ]
   },
   
@@ -101,8 +122,15 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Trigger view processing
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send group update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_GROUP_BY',
+            groupBy: context.groupBy
+          });
+        }
+      }
     ]
   },
   
@@ -124,8 +152,15 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Trigger view processing to update visible columns
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send column visibility update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_COLUMN_VISIBILITY',
+            columnVisibility: context.columnVisibility
+          });
+        }
+      }
     ]
   },
   
@@ -146,8 +181,15 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Trigger view processing to update visible columns
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send column visibility update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_COLUMN_VISIBILITY',
+            columnVisibility: context.columnVisibility
+          });
+        }
+      }
     ]
   },
   
@@ -165,8 +207,15 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Trigger view processing to update visible columns
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send column visibility update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_COLUMN_VISIBILITY',
+            columnVisibility: context.columnVisibility
+          });
+        }
+      }
     ]
   },
   
@@ -184,8 +233,15 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Trigger view processing to update visible columns
-      raise({ type: 'INVOKE_VIEW_ACTOR' })
+      // Send column visibility update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_COLUMN_VISIBILITY',
+            columnVisibility: context.columnVisibility
+          });
+        }
+      }
     ]
   },
   
@@ -256,10 +312,7 @@ export const viewHandlers = {
         }
       },
       
-      // Need to reprocess view data to update coordinate mappings
-      ({ self }) => {
-        self.send({ type: 'INVOKE_VIEW_ACTOR' });
-      }
+      // Store automatically reprocesses data when view state changes
     ]
   },
   
@@ -298,10 +351,7 @@ export const viewHandlers = {
       // Trigger coordinate recalculation for layout changes
       raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
       
-      // Need to reprocess view data to update coordinate mappings
-      ({ self }) => {
-        self.send({ type: 'INVOKE_VIEW_ACTOR' });
-      }
+      // Store automatically reprocesses data when view state changes
     ]
   },
   
@@ -790,8 +840,15 @@ export const viewHandlers = {
       // Persist the state
       'persistSnapshot',
       
-      // Trigger view processing to apply new column order
-      raise({ type: 'INVOKE_VIEW_ACTOR' }),
+      // Send column order update to store
+      ({ context }) => {
+        if (context.storeActor) {
+          context.storeActor.send({
+            type: 'SET_COLUMN_ORDER',
+            columnOrder: context.columnOrder
+          });
+        }
+      },
       
       // Emit event for UI feedback
       emit({ type: 'view.drag.ended' }),
@@ -1112,6 +1169,43 @@ export const viewHandlers = {
       // Recalculate coordinate mapping whenever column layout changes
       dimensionActions.recalculateCoordinateMapping,
       
+      // Trigger full render with new column order
+      ({ context, self }) => {
+        if (context.actors?.rendererActor) {
+          console.log('🔄 COLUMN_LAYOUT_CHANGED: Triggering full render with new column order', {
+            columnOrder: context.columnOrder,
+            columnCount: context.columns.length
+          });
+          
+          // Get visible columns in the new order
+          const visibleColumns = context.columns.filter(col => 
+            context.columnVisibility[col.id] !== false
+          );
+          
+          // Apply the new column order
+          const orderedColumns = context.columnOrder.length > 0
+            ? context.columnOrder
+                .map(colId => visibleColumns.find(col => col.id === colId))
+                .filter(Boolean)
+            : visibleColumns;
+          
+          // Add selection column if enabled
+          const columnsWithSelection = context.enableSelectionColumn
+            ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
+            : orderedColumns;
+          
+          // Send CALCULATE_COORDINATES which will trigger a full render
+          context.actors.rendererActor.send({
+            type: 'CALCULATE_COORDINATES',
+            rows: context.rows,
+            columns: columnsWithSelection,
+            columnWidths: context.coordinateMapping?.columns
+              ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
+              : undefined
+          });
+        }
+      },
+      
       // Forward updated coordinates to canvas for overlay sync
       ({ context, self }) => {
         if (context.actors?.canvasActor) {
@@ -1121,21 +1215,6 @@ export const viewHandlers = {
             event: {
               type: 'UPDATE_COORDINATES',
               mapping: context.coordinateMapping
-            }
-          });
-        }
-      },
-      
-      // Forward updated coordinates to renderer for passive consumption
-      ({ context, self }) => {
-        if (context.actors?.rendererActor) {
-          console.log('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to renderer');
-          self.send({
-            type: 'FORWARD_TO_RENDERER', 
-            event: {
-              type: 'UPDATE_COORDINATES',
-              mapping: context.coordinateMapping,
-              version: context.coordinateMapping.version
             }
           });
         }

@@ -30,6 +30,7 @@ export type RendererActorEvent =
   | { type: 'UPDATE_SELECTED_ROWS'; selectedRows: Set<string> }
   | { type: 'REMOVE_ROW'; rowId: string }
   | { type: 'SURGICAL_UPDATE'; changes: any[]; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
+  | { type: 'CALCULATE_COORDINATES'; rows: any[]; columns: Column[]; columnWidths?: Record<string, number> }
   | { type: 'DESTROY' };
 
 export type RendererActorResponse =
@@ -40,8 +41,68 @@ export type RendererActorResponse =
   | { type: 'COLUMNS_UPDATED' }
   | { type: 'COLUMN_WIDTH_UPDATED' }
   | { type: 'COORDINATES_UPDATED' }
+  | { type: 'COORDINATES_CALCULATED'; mapping: any; version: number }
   | { type: 'SELECTED_ROWS_UPDATED' }
   | { type: 'RENDERER_ERROR'; error: string };
+
+// ====================================
+// COORDINATE CALCULATION
+// ====================================
+
+interface CoordinateMapping {
+  rows: Array<{
+    rowId: string;
+    originalIndex: number;
+    sortedIndex: number;
+  }>;
+  columns: Array<{
+    columnId: string;
+    index: number;
+    offset: number;
+    width: number;
+  }>;
+  version: number;
+  sortBy: any[];
+}
+
+function calculateCoordinateMapping(
+  rows: any[],
+  columns: Column[],
+  columnWidths?: Record<string, number>
+): CoordinateMapping {
+  const startTime = performance.now();
+  
+  // Calculate row mapping
+  const rowMapping = rows.map((row, index) => ({
+    rowId: row.id,
+    originalIndex: index,
+    sortedIndex: index
+  }));
+  
+  // Calculate column mapping with offsets
+  let currentOffset = 0;
+  const columnMapping = columns.map((column, index) => {
+    const width = columnWidths?.[column.id] || column.width || 120;
+    const mapping = {
+      columnId: column.id,
+      index,
+      offset: currentOffset,
+      width
+    };
+    currentOffset += width;
+    return mapping;
+  });
+  
+  const calculationTime = performance.now() - startTime;
+  console.log('RendererActor: Coordinate calculation completed in', calculationTime.toFixed(2) + 'ms');
+  
+  return {
+    rows: rowMapping,
+    columns: columnMapping,
+    version: Date.now(),
+    sortBy: []
+  };
+}
 
 // ====================================
 // RENDERER ACTOR
@@ -465,6 +526,34 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           const domManagerClear = (renderer as any).domManager;
           if (domManagerClear) {
             clearDragPreview(domManagerClear);
+          }
+          break;
+          
+        case 'CALCULATE_COORDINATES':
+          console.log('RendererActor: Calculating coordinates', {
+            rowCount: event.rows.length,
+            columnCount: event.columns.length,
+            hasColumnWidths: !!event.columnWidths
+          });
+          
+          try {
+            const coordinateMapping = calculateCoordinateMapping(
+              event.rows,
+              event.columns,
+              event.columnWidths
+            );
+            
+            sendBack({
+              type: 'COORDINATES_CALCULATED',
+              mapping: coordinateMapping,
+              version: coordinateMapping.version
+            });
+          } catch (error) {
+            console.error('RendererActor: Error calculating coordinates:', error);
+            sendBack({
+              type: 'RENDERER_ERROR',
+              error: `Failed to calculate coordinates: ${error.message}`
+            });
           }
           break;
           

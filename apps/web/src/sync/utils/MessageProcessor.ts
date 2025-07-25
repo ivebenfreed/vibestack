@@ -116,11 +116,11 @@ export class MessageProcessor {
     sendEvent: (event: any) => void
   ): void {
     const changes = message.changes || [];
-    if (changes.length === 0) return;
-
+    
     console.log(`[MessageProcessor] 📥 Sending INCOMING_CHANGES event for ${changes.length} changes (${messageType})`);
     
-    // Send INCOMING_CHANGES event to state machine for all change types
+    // Send INCOMING_CHANGES event to state machine for all change types (including empty chunks)
+    // Empty chunks still need acknowledgments during initial sync
     sendEvent({ 
       type: 'INCOMING_CHANGES', 
       changes, 

@@ -14,34 +14,13 @@ export interface TableDataStore {
   };
 }
 
-export interface EntityChange {
-  id: string;
-  operation: 'insert' | 'update' | 'delete';
-  data: any;
-  resolved?: any;
-  changedFields?: string[];
-}
-
 export interface RelationshipData {
   id: string;
   name: string;
   [key: string]: any;
 }
 
-// ====================================
-// STORE EVENTS
-// ====================================
-
-export type TableStoreEvent = 
-  | { 
-      type: 'ENTITY_CHANGES'; 
-      changes: EntityChange[];
-    }
-  | { 
-      type: 'RELATIONSHIP_DATA_UPDATED'; 
-      table: string; 
-      data: RelationshipData[];
-    };
+// Note: TableStoreEvent is now imported from table-data-store.ts
 
 // ====================================
 // STORE ACTOR TYPES
@@ -81,3 +60,14 @@ export interface RelationshipUsage {
   users: Set<string>;
   [key: string]: Set<string>;
 }
+
+// Re-export types from table-data-store
+export { 
+  TableStoreContext, 
+  TableStoreEvent as TableStoreEventType, 
+  SortConfig, 
+  FilterConfig, 
+  TableRow,
+  EntityChange,
+  getVisibleColumns 
+} from './table-data-store';
