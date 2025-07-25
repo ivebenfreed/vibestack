@@ -266,6 +266,8 @@ export function applyDragPreview(
   
   // Create or update floating drag preview that follows mouse
   if (dragPreview.mouseX !== undefined && dragPreview.mouseY !== undefined) {
+    let floatingPreview = document.querySelector('.vibegridx-drag-preview') as HTMLElement;
+    
     // Only log on initial creation
     if (!floatingPreview) {
       console.log('🎯 ApplyDragPreview: Creating floating preview', {
@@ -273,8 +275,6 @@ export function applyDragPreview(
         draggedColumnId: dragPreview.draggedColumnId
       });
     }
-    
-    let floatingPreview = document.querySelector('.vibegridx-drag-preview') as HTMLElement;
     
     if (!floatingPreview) {
       // Create floating preview element
