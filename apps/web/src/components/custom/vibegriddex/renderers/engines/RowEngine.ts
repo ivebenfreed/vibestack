@@ -275,11 +275,14 @@ export class RowEngine {
       totalCells += this.getColumnCount(state);
     });
     
-    console.log('🎨 RowEngine: Row processing complete', {
-      existingRows: existingRowCount,
-      newRows: newRowCount,
-      totalRows: rows.length
-    });
+    // Only log occasionally for performance
+    if (Math.random() < 0.05) {
+      console.log('🎨 RowEngine: Row processing complete', {
+        existingRows: existingRowCount,
+        newRows: newRowCount,
+        totalRows: rows.length
+      });
+    }
     
     // Single DOM append for all new rows
     if (newRowElements.length > 0) {

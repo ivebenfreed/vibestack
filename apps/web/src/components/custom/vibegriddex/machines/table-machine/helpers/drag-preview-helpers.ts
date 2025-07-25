@@ -256,95 +256,65 @@ export function applyDragPreview(
   
   // Hide the original column if this is the initial preview
   if ((dragPreview as any).isInitialPreview) {
-    console.log('🎯 ApplyDragPreview: Hiding original column for initial preview', {
-      columnId: dragPreview.draggedColumnId
-    });
-    
     const draggingColumn = header.querySelector(`[data-column="${dragPreview.draggedColumnId}"]`) as HTMLElement;
     if (draggingColumn) {
-      console.log('🎯 ApplyDragPreview: Found column to hide', {
-        column: draggingColumn,
-        dataset: draggingColumn.dataset,
-        before: {
-          opacity: draggingColumn.style.opacity,
-          visibility: draggingColumn.style.visibility
-        }
-      });
-      
       draggingColumn.style.opacity = '0';
       draggingColumn.style.visibility = 'hidden';
       draggingColumn.style.pointerEvents = 'none';
-      
-      console.log('🎯 ApplyDragPreview: Column hidden', {
-        after: {
-          opacity: draggingColumn.style.opacity,
-          visibility: draggingColumn.style.visibility,
-          pointerEvents: draggingColumn.style.pointerEvents
-        }
-      });
-    } else {
-      console.warn('🎯 ApplyDragPreview: Could not find column to hide', {
-        columnId: dragPreview.draggedColumnId,
-        selector: `[data-column="${dragPreview.draggedColumnId}"]`,
-        headerChildren: Array.from(header.children).map(el => ({
-          tag: el.tagName,
-          class: el.className,
-          dataset: (el as HTMLElement).dataset
-        }))
-      });
     }
   }
   
   // Create or update floating drag preview that follows mouse
   if (dragPreview.mouseX !== undefined && dragPreview.mouseY !== undefined) {
-    console.log('🎯 ApplyDragPreview: Creating/updating floating preview', {
-      mouseX: dragPreview.mouseX,
-      mouseY: dragPreview.mouseY,
-      columnName: dragPreview.columnName,
-      draggedColumnId: dragPreview.draggedColumnId
-    });
+    // Only log on initial creation
+    if (!floatingPreview) {
+      console.log('🎯 ApplyDragPreview: Creating floating preview', {
+        columnName: dragPreview.columnName,
+        draggedColumnId: dragPreview.draggedColumnId
+      });
+    }
     
     let floatingPreview = document.querySelector('.vibegridx-drag-preview') as HTMLElement;
     
     if (!floatingPreview) {
       // Create floating preview element
-      console.log('🎯 ApplyDragPreview: Creating new floating preview element');
       floatingPreview = document.createElement('div');
       floatingPreview.className = 'vibegridx-drag-preview';
       floatingPreview.textContent = dragPreview.columnName || dragPreview.draggedColumnId;
       
-      // Set initial position offscreen to measure dimensions without causing reflow
+      // Set positioning styles
       floatingPreview.style.position = 'fixed';
-      floatingPreview.style.left = '-9999px';
-      floatingPreview.style.top = '-9999px';
-      floatingPreview.style.display = 'block';
+      floatingPreview.style.left = '0';
+      floatingPreview.style.top = '0';
+      floatingPreview.style.willChange = 'transform';
+      floatingPreview.style.pointerEvents = 'none';
+      
+      // Estimate dimensions instead of measuring to avoid reflow
+      const text = dragPreview.columnName || dragPreview.draggedColumnId;
+      const estimatedWidth = Math.max(60, text.length * 8 + 24); // 8px per char + padding
+      const estimatedHeight = 36; // Standard height for drag preview
+      
+      // Store estimated offsets
+      floatingPreview.dataset.offsetX = (estimatedWidth / 2).toString();
+      floatingPreview.dataset.offsetY = (estimatedHeight / 2).toString();
+      
+      // Apply initial transform before adding to DOM
+      const initialX = dragPreview.mouseX - (estimatedWidth / 2);
+      const initialY = dragPreview.mouseY - (estimatedHeight / 2);
+      floatingPreview.style.transform = `translate3d(${initialX}px, ${initialY}px, 0)`;
+      
       document.body.appendChild(floatingPreview);
-      
-      // Measure dimensions once after adding to DOM
-      const rect = floatingPreview.getBoundingClientRect();
-      const centerOffsetX = rect.width / 2;
-      const centerOffsetY = rect.height / 2;
-      
-      // Store offsets as data attributes to avoid recalculating
-      floatingPreview.dataset.offsetX = centerOffsetX.toString();
-      floatingPreview.dataset.offsetY = centerOffsetY.toString();
-      
-      console.log('🎯 ApplyDragPreview: Created element with offsets', {
-        width: rect.width,
-        height: rect.height,
-        centerOffsetX,
-        centerOffsetY
-      });
     }
     
     // Update text content if column name changed
     const newText = dragPreview.columnName || dragPreview.draggedColumnId;
     if (floatingPreview.textContent !== newText) {
       floatingPreview.textContent = newText;
-      // Recalculate offsets if text changed
-      const rect = floatingPreview.getBoundingClientRect();
-      floatingPreview.dataset.offsetX = (rect.width / 2).toString();
-      floatingPreview.dataset.offsetY = (rect.height / 2).toString();
+      // Re-estimate offsets without measuring DOM
+      const estimatedWidth = Math.max(60, newText.length * 8 + 24);
+      const estimatedHeight = 36;
+      floatingPreview.dataset.offsetX = (estimatedWidth / 2).toString();
+      floatingPreview.dataset.offsetY = (estimatedHeight / 2).toString();
     }
     
     // Use cached offsets or fallback to defaults
@@ -362,14 +332,7 @@ export function applyDragPreview(
     floatingPreview.style.willChange = 'transform';
     floatingPreview.style.display = 'block';
     
-    console.log('🎯 ApplyDragPreview: Applied transform position', {
-      mouseX: dragPreview.mouseX,
-      mouseY: dragPreview.mouseY,
-      translateX,
-      translateY,
-      centerOffsetX,
-      centerOffsetY
-    });
+    // Remove excessive logging for performance
   } else {
     console.log('🎯 ApplyDragPreview: No mouse coordinates provided', {
       mouseX: dragPreview.mouseX,
@@ -377,17 +340,26 @@ export function applyDragPreview(
     });
   }
   
-  // Use a more efficient selector and batch class operations
-  const classesToRemove = ['vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-debug-boundary'];
-  const headerCells = header.querySelectorAll('.vibegridx-header-cell');
-  
-  // Batch all DOM writes together
-  headerCells.forEach((cell: HTMLElement) => {
-    // Remove multiple classes at once
-    cell.classList.remove(...classesToRemove);
-    // Reset transform and transition in one go
-    cell.style.cssText = cell.style.cssText.replace(/(?:--drag-offset|transform|transition|border|box-shadow):[^;]+;?/g, '');
-  });
+  // Only update columns if we have shifts to apply
+  if (dragPreview.columnsToShift.length > 0) {
+    // Use a more efficient selector and batch class operations
+    const classesToRemove = ['vibegridx-will-move-left', 'vibegridx-will-move-right', 'vibegridx-debug-boundary'];
+    const headerCells = header.querySelectorAll('.vibegridx-header-cell');
+    
+    // Create a set of columns that need to shift for faster lookup
+    const shiftingColumns = new Set(dragPreview.columnsToShift.map(s => s.columnId));
+    
+    // Batch all DOM writes together
+    headerCells.forEach((cell: HTMLElement) => {
+      const columnId = cell.dataset.column;
+      if (columnId && !shiftingColumns.has(columnId)) {
+        // Only reset styles for columns that aren't shifting
+        cell.classList.remove(...classesToRemove);
+        // Reset transform and transition in one go
+        cell.style.cssText = cell.style.cssText.replace(/(?:--drag-offset|transform|transition|border|box-shadow):[^;]+;?/g, '');
+      }
+    });
+  }
   
   // Ensure the header maintains its scroll position during drag
   if (header) {
@@ -397,25 +369,30 @@ export function applyDragPreview(
   // Apply shifts to columns that need to move
   // Process column shifts
   
-  dragPreview.columnsToShift.forEach(({ columnId, direction, offset }) => {
-    const cell = header.querySelector(`[data-column="${columnId}"]`) as HTMLElement;
-    if (cell) {
-      // Apply shift to column
-      
-      // Remove opposite direction class if present
-      cell.classList.remove(`vibegridx-will-move-${direction === 'left' ? 'right' : 'left'}`);
-      
-      cell.classList.add(`vibegridx-will-move-${direction}`);
-      cell.style.setProperty('--drag-offset', `${offset}px`);
-      cell.style.transition = 'transform 0.2s ease-out';
-      
-      // Apply transform relative to the cell, not affecting parent scroll
-      const xOffset = direction === 'right' ? offset : -offset;
-      cell.style.transform = `translateX(${xOffset}px)`;
-    } else {
-      console.warn('ApplyDragPreview: Column cell not found', columnId);
-    }
-  });
+  // Apply shifts in a single pass
+  if (dragPreview.columnsToShift.length > 0) {
+    // Build a map of column shifts for efficiency
+    const shiftMap = new Map(dragPreview.columnsToShift.map(s => [s.columnId, s]));
+    
+    // Apply all shifts in one DOM query
+    header.querySelectorAll('.vibegridx-header-cell').forEach((cell: HTMLElement) => {
+      const columnId = cell.dataset.column;
+      if (columnId && shiftMap.has(columnId)) {
+        const { direction, offset } = shiftMap.get(columnId)!;
+        
+        // Remove opposite direction class if present
+        cell.classList.remove(`vibegridx-will-move-${direction === 'left' ? 'right' : 'left'}`);
+        
+        cell.classList.add(`vibegridx-will-move-${direction}`);
+        cell.style.setProperty('--drag-offset', `${offset}px`);
+        cell.style.transition = 'transform 0.2s ease-out';
+        
+        // Apply transform relative to the cell, not affecting parent scroll
+        const xOffset = direction === 'right' ? offset : -offset;
+        cell.style.transform = `translateX(${xOffset}px)`;
+      }
+    });
+  }
 
   // Update drop indicator position
   let dropIndicator = header.querySelector('.vibegridx-column-drop-indicator') as HTMLElement;

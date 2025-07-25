@@ -515,18 +515,12 @@ export const viewHandlers = {
         const targetIndexChanged = dragPreview.targetIndex !== lastTargetIndex;
         
         if (mouseXChanged || mouseYChanged || targetIndexChanged) {
-          console.log('🎯 ViewHandler: Updating drag preview', {
-            targetIndex: dragPreview.targetIndex,
-            mouseX: dragPreview.mouseX,
-            mouseY: dragPreview.mouseY,
-            clientX: event.clientX,
-            clientY: event.clientY,
-            columnName: dragPreview.columnName,
-            previewActive: context.columnDragState.previewActive,
-            changes: {
-              mouseXChanged,
-              mouseYChanged,
-              targetIndexChanged
+          // Only log significant changes
+          if (targetIndexChanged) {
+            console.log('🎯 ViewHandler: Drag target changed', {
+              targetIndex: dragPreview.targetIndex,
+              columnName: dragPreview.columnName
+            });
             }
           });
           
