@@ -32,16 +32,7 @@ export function relationshipMultiBadge(
     items = value.map(id => String(id));
   }
   
-  // Debug logging for tags
-  if (column.id === 'tags') {
-    console.log(`🔍 MultiBadge: Rendering tags`, {
-      columnId: column.id,
-      rawValue: value,
-      resolvedValue: rowData?.[`__resolved_${column.id}`],
-      finalItems: items,
-      hasRowData: !!rowData
-    });
-  }
+  // Remove debug logging for performance
 
   // Handle empty state
   if (items.length === 0) {
@@ -62,17 +53,7 @@ export function relationshipMultiBadge(
     overflow: hidden;
   `;
 
-  // Create measurement container (hidden)
-  const measureContainer = document.createElement('div');
-  measureContainer.style.cssText = `
-    position: absolute;
-    visibility: hidden;
-    display: flex;
-    gap: 4px;
-  `;
-  document.body.appendChild(measureContainer);
-
-  // Create all badges for measurement
+  // Create all badges
   const badges: HTMLElement[] = items.map((item, index) => {
     const badge = createBadge(item, index);
     return badge;
@@ -88,28 +69,14 @@ export function relationshipMultiBadge(
     // Clear existing badges
     badgesWrapper.innerHTML = '';
     
-    // Add badges to measure container to get their widths
-    const tempMeasureContainer = document.createElement('div');
-    tempMeasureContainer.style.cssText = `
-      position: absolute;
-      visibility: hidden;
-      display: flex;
-      gap: 4px;
-    `;
-    document.body.appendChild(tempMeasureContainer);
-    
-    const badgeWidths: number[] = [];
-
-    // Measure each badge
-    badges.forEach((badge, index) => {
-      const tempBadge = badge.cloneNode(true) as HTMLElement;
-      tempMeasureContainer.appendChild(tempBadge);
-      const width = tempBadge.offsetWidth;
-      badgeWidths[index] = width;
-    });
-
-    // Clean up measurement container
-    document.body.removeChild(tempMeasureContainer);
+    // Estimate badge widths without DOM manipulation to avoid reflows
+    // Average character width in pixels for text-xs (12px) font
+    const avgCharWidth = 6;
+    const badgePadding = 16; // px-2 = 8px * 2
+    const borderWidth = 1; // border
+    const badgeWidths: number[] = items.map(item => 
+      Math.ceil(item.length * avgCharWidth + badgePadding + borderWidth * 2)
+    );
 
     // First pass: try to fit all badges without reserving space for "+X more"
     let currentWidth = 0;
@@ -168,9 +135,6 @@ export function relationshipMultiBadge(
 
   // Initial render with column width
   renderBadges(getAvailableWidth());
-  
-  // Clean up original measurement container
-  document.body.removeChild(measureContainer);
 
   container.appendChild(badgesWrapper);
   

@@ -40,6 +40,8 @@ export interface RenderContext {
 export class RenderPipeline {
   private config: RenderPipelineConfig;
   private isFirstRender = true;
+  private lastRenderedDataVersion: number = -1;
+  private pendingRenderFrame: number | null = null;
   
   constructor(config: RenderPipelineConfig) {
     this.config = config;
@@ -162,35 +164,50 @@ export class RenderPipeline {
         // Update virtual grid with new viewport (just updates internal state, no DOM)
         const hasViewportChanged = this.config.virtualGrid.updateViewport(currentViewport, state.rows.length);
         
-        requestAnimationFrame(() => {
-          // Reduce logging for performance
-          if (Math.random() < 0.05) {
-            console.log('🎨 RenderOrchestrator: RAF callback executing', {
-              timestamp: performance.now()
-            });
+        // Get the updated visible range after viewport update
+        const updatedVisibleRange = this.config.virtualGrid.getVisibleRange();
+        
+        // Only render if viewport actually changed or if data changed
+        if (hasViewportChanged || this.hasDataChanged(state)) {
+          // Cancel any pending render frame to prevent duplicate renders
+          if (this.pendingRenderFrame !== null) {
+            cancelAnimationFrame(this.pendingRenderFrame);
           }
           
-          // Only DOM writes in RAF - no reads
-          this.config.rowRenderingEngine.renderVisibleRows(state);
-          this.config.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
-          
-          // Performance timing
-          const renderTime = this.config.performanceMonitor.endRender(state.rows.length);
-          this.config.performanceMonitor.recordPhase('total', renderTime);
-          
-          // Send viewport update for canvas overlay using pre-measured values
-          const viewport: ViewportInfo = {
-            start: this.config.virtualGrid.getVisibleRange().start,
-            end: this.config.virtualGrid.getVisibleRange().end,
-            height: viewportHeight,
-            width: viewportWidth,
-            scrollTop: scrollTop,
-            scrollLeft: scrollLeft,
-            itemHeight: rowHeight
-          };
-          
-          this.config.onScroll?.(viewport);
-        });
+          this.pendingRenderFrame = requestAnimationFrame(() => {
+            this.pendingRenderFrame = null;
+            // Reduce logging for performance
+            if (Math.random() < 0.05) {
+              console.log('🎨 RenderOrchestrator: RAF callback executing', {
+                timestamp: performance.now()
+              });
+            }
+            
+            // Only DOM writes in RAF - no reads
+            this.config.rowRenderingEngine.renderVisibleRows(state);
+            this.config.rowRenderingEngine.applyOptimisticOperations(state.optimisticOperations);
+            
+            // Performance timing
+            const renderTime = this.config.performanceMonitor.endRender(state.rows.length);
+            this.config.performanceMonitor.recordPhase('total', renderTime);
+            
+            // Send viewport update for canvas overlay using pre-calculated values
+            const viewport: ViewportInfo = {
+              start: updatedVisibleRange.start,
+              end: updatedVisibleRange.end,
+              height: viewportHeight,
+              width: viewportWidth,
+              scrollTop: scrollTop,
+              scrollLeft: scrollLeft,
+              itemHeight: rowHeight
+            };
+            
+            this.config.onScroll?.(viewport);
+          });
+        } else {
+          // Skip render if nothing changed
+          this.config.performanceMonitor.endRender(state.rows.length);
+        }
       }
       
     } finally {
@@ -307,6 +324,11 @@ export class RenderPipeline {
    */
   resetFirstRender(): void {
     this.isFirstRender = true;
+    // Cancel any pending renders
+    if (this.pendingRenderFrame !== null) {
+      cancelAnimationFrame(this.pendingRenderFrame);
+      this.pendingRenderFrame = null;
+    }
   }
   
   /**
@@ -314,5 +336,17 @@ export class RenderPipeline {
    */
   getIsFirstRender(): boolean {
     return this.isFirstRender;
+  }
+  
+  /**
+   * Check if data has changed since last render
+   */
+  private hasDataChanged(state: RenderState): boolean {
+    const currentVersion = state.version || 0;
+    const hasChanged = currentVersion !== this.lastRenderedDataVersion;
+    if (hasChanged) {
+      this.lastRenderedDataVersion = currentVersion;
+    }
+    return hasChanged;
   }
 }
