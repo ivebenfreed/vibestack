@@ -521,8 +521,7 @@ export const viewHandlers = {
               targetIndex: dragPreview.targetIndex,
               columnName: dragPreview.columnName
             });
-            }
-          });
+          }
           
           // Store new position and target
           (context as any)._lastDragMouseX = event.clientX || event.x;
