@@ -98,21 +98,52 @@ export function resolveEntityRelationships(
   const resolved = { ...entity };
   
   relationshipConfigs.forEach(config => {
-    const relationshipId = entity[config.fieldName];
-    if (relationshipId && relationships[config.relationshipTable]) {
-      const relatedEntity = relationships[config.relationshipTable][relationshipId];
-      if (relatedEntity) {
-        resolved[config.resolvedFieldName] = 
-          relatedEntity[config.displayField] || 
-          relatedEntity.name || 
-          relatedEntity.displayName || 
-          relatedEntity.title || 
-          relationshipId;
+    const relationshipValue = entity[config.fieldName];
+    
+    // Minimal logging for debugging - only for first few entities
+    if (config.fieldName === 'tags' && relationshipValue && relationshipValue.length > 0 && Math.random() < 0.05) {
+      console.log(`🔍 Relationship Discovery: Processing ${relationshipValue.length} tags for entity ${entity.id}`);
+    }
+    
+    if (relationshipValue && relationships[config.relationshipTable]) {
+      // Handle many-to-many relationships (arrays) and single relationships
+      if (Array.isArray(relationshipValue)) {
+        // Many-to-many relationship
+        const resolvedNames = relationshipValue
+          .map(id => {
+            const relatedEntity = relationships[config.relationshipTable][id];
+            return relatedEntity ? (
+              relatedEntity[config.displayField] || 
+              relatedEntity.name || 
+              relatedEntity.displayName || 
+              relatedEntity.title || 
+              id
+            ) : null;
+          })
+          .filter(name => name !== null);
+        
+        resolved[config.resolvedFieldName] = resolvedNames;
+        
+        // Minimal logging for debugging - only sample entities
+        if (config.fieldName === 'tags' && resolvedNames.length > 0 && Math.random() < 0.05) {
+          console.log(`🔍 Relationship Discovery: Resolved ${resolvedNames.length} tag names for entity ${entity.id}:`, resolvedNames);
+        }
       } else {
-        resolved[config.resolvedFieldName] = '';
+        // Single relationship
+        const relatedEntity = relationships[config.relationshipTable][relationshipValue];
+        if (relatedEntity) {
+          resolved[config.resolvedFieldName] = 
+            relatedEntity[config.displayField] || 
+            relatedEntity.name || 
+            relatedEntity.displayName || 
+            relatedEntity.title || 
+            relationshipValue;
+        } else {
+          resolved[config.resolvedFieldName] = '';
+        }
       }
     } else {
-      resolved[config.resolvedFieldName] = '';
+      resolved[config.resolvedFieldName] = Array.isArray(relationshipValue) ? [] : '';
     }
   });
   

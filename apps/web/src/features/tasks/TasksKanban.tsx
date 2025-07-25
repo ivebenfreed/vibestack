@@ -265,7 +265,7 @@ export default function TasksKanban() {
     // ✅ CHANGE DETECTION: Only update if status actually changed
     if (newStatus && originalTask.status !== newStatus) {
       console.log(`🔄 Status change: ${originalTask.status} → ${newStatus}`)
-      const { updateTaskUI } = await import('@/domain/task')
+      const { updateTaskUI } = await import('@/domain/task-service')
       await updateTaskUI(activeId, { status: newStatus })
     } else {
       console.log('🚫 No status change needed - skipping update')

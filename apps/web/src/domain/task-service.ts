@@ -61,6 +61,36 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     return task;
   }
   
+  // ============================================================================
+  // Many-to-Many Relationship Operations
+  // ============================================================================
+  
+  /**
+   * Get tags for a specific task
+   */
+  async getTaskTags(taskId: string): Promise<string[]> {
+    const tags = await taskDexieService.getTags(taskId);
+    const tagIds = tags.map(tag => tag.id);
+    return tagIds;
+  }
+  
+  /**
+   * Get tags for multiple tasks (batch operation)
+   */
+  async getTagsForTasks(taskIds: string[]): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+    
+    // Use the generated service methods
+    await Promise.all(
+      taskIds.map(async (taskId) => {
+        const tagIds = await this.getTaskTags(taskId);
+        result.set(taskId, tagIds);
+      })
+    );
+    
+    return result;
+  }
+  
   async updateUI(id: string, updates: UpdateTaskInput): Promise<Task> {
     const existing = await taskDexieService.getById(id);
     if (!existing) {

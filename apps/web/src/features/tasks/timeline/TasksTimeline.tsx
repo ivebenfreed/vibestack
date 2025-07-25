@@ -391,7 +391,7 @@ function TasksTimelineInner() {
           )
           
           // Update the actual task in the database
-          import('@/domain/task').then(({ updateTaskUI }) => {
+          import('@/domain/task-service').then(({ updateTaskUI }) => {
             updateTaskUI(change.id, {
               startDate: updatedData.startDate,
               dueDate: updatedData.endDate
@@ -754,7 +754,7 @@ function TasksTimelineInner() {
                       const finalData = finalNode.data as any
                       
                       // Update the actual task in the database with final dates
-                      import('@/domain/task').then(({ updateTaskUI }) => {
+                      import('@/domain/task-service').then(({ updateTaskUI }) => {
                         updateTaskUI(node.id, {
                           startDate: finalData.startDate,
                           dueDate: finalData.endDate

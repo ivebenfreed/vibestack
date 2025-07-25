@@ -74,7 +74,7 @@ export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ projectId:
     }
 
     try {
-      const { updateProjectUI } = await import('@/domain/project')
+      const { updateProjectUI } = await import('@/domain/project-service')
       await updateProjectUI(finalProject.id, { [fieldName]: value })
       toast.success(`Project ${fieldName} updated successfully.`)
     } catch (err) {
@@ -91,7 +91,7 @@ export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ projectId:
     }
 
     try {
-      const { updateProjectMembersUI } = await import('@/domain/project')
+      const { updateProjectMembersUI } = await import('@/domain/project-service')
       await updateProjectMembersUI(finalProject.id, userIds)
       toast.success('Project members updated successfully.')
     } catch (err) {

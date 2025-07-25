@@ -115,9 +115,9 @@ async function loadProjectsForSidebar() {
 
   
   // ✅ CHECK ATOMS FIRST: Route loaders likely already populated them
-  const { projectsAtom } = await import('@/domain/project')
-  const { tasksAtom } = await import('@/domain/task')
-  const { usersAtom } = await import('@/domain/user')
+  const { projectsAtom } = await import('@/domain/project-service')
+  const { tasksAtom } = await import('@/domain/task-service')
+  const { usersAtom } = await import('@/domain/user-service')
   
   const currentProjects = projectsAtom.get()
   const currentTasks = tasksAtom.get()
@@ -144,9 +144,9 @@ async function loadProjectsForSidebar() {
   try {
     // 🎯 SERIALIZED: Load atoms sequentially to avoid PGlite database contention
     console.log('[SidebarNavigation] Loading atoms sequentially to prevent database conflicts...')
-    const { projectUtils } = await import('@/domain/project')
-    const { taskUtils } = await import('@/domain/task')
-    const { userUtils } = await import('@/domain/user')
+    const { projectUtils } = await import('@/domain/project-service')
+    const { taskUtils } = await import('@/domain/task-service')
+    const { userUtils } = await import('@/domain/user-service')
     
     await projectUtils.ensureLoaded()
     await taskUtils.ensureLoaded()

@@ -56,7 +56,7 @@ const taskKanbanConfig = createVibeKanConfig<Task, TaskStatus>({
   ),
   
   onStatusChange: async (taskId, newStatus) => {
-    const { updateTaskUI } = await import('@/domain/task')
+    const { updateTaskUI } = await import('@/domain/task-service')
     await updateTaskUI(taskId, { status: newStatus })
   },
 })

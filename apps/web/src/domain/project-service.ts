@@ -80,6 +80,35 @@ export class ProjectDomainService extends BaseDomainService<Project, CreateProje
     return project;
   }
   
+  // ============================================================================
+  // Many-to-Many Relationship Operations
+  // ============================================================================
+  
+  /**
+   * Get members for a specific project
+   */
+  async getProjectMembers(projectId: string): Promise<string[]> {
+    const members = await projectDexieService.getMembers(projectId);
+    return members.map(member => member.id);
+  }
+  
+  /**
+   * Get members for multiple projects (batch operation)
+   */
+  async getMembersForProjects(projectIds: string[]): Promise<Map<string, string[]>> {
+    const result = new Map<string, string[]>();
+    
+    // Use the generated service methods
+    await Promise.all(
+      projectIds.map(async (projectId) => {
+        const memberIds = await this.getProjectMembers(projectId);
+        result.set(projectId, memberIds);
+      })
+    );
+    
+    return result;
+  }
+  
   async updateUI(id: string, updates: UpdateProjectInput): Promise<Project> {
     const existing = await db.projects.get(id);
     if (!existing) {

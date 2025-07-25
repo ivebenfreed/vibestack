@@ -505,16 +505,29 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       },
       
       REPROCESS_DATA: (context) => {
-        console.log('📊 TableStore: Reprocessing data');
+        console.log('📊 TableStore: Reprocessing data with relationship updates');
+        
+        // Re-resolve all entities with current relationship data
+        let entitiesWithUpdatedRelationships = context.entities;
+        if (columns) {
+          const relationshipConfigs = discoverRelationships(columns);
+          entitiesWithUpdatedRelationships = Object.fromEntries(
+            Object.entries(context.entities).map(([id, entity]) => [
+              id,
+              resolveEntityRelationships(entity, context.relationships, relationshipConfigs)
+            ])
+          );
+        }
         
         const { processedRows, totalRowCount } = processEntities(
-          context.entities,
+          entitiesWithUpdatedRelationships,
           context.sortBy,
           context.filters
         );
         
         return {
           ...context,
+          entities: entitiesWithUpdatedRelationships,
           processedRows,
           visibleRows: processedRows,
           totalRowCount,
@@ -540,6 +553,21 @@ export function setupDexieSubscriptions(
   console.log('📊 TableStore: Setting up Dexie subscriptions for', entityType);
   
   const subscriptions: Subscription[] = [];
+  
+  // Debounce reprocessing to prevent excessive calls
+  let reprocessTimeout: NodeJS.Timeout | null = null;
+  const debounceReprocess = () => {
+    if (reprocessTimeout) {
+      clearTimeout(reprocessTimeout);
+    }
+    reprocessTimeout = setTimeout(() => {
+      storeActor.send({ type: 'REPROCESS_DATA' });
+      reprocessTimeout = null;
+    }, 50); // 50ms debounce
+  };
+  
+  // Track first change events to ignore them
+  const firstChangeFlags = new Map<string, boolean>();
   const entityTableName = `${entityType}s`;
   
   // Helper to resolve entity relationships dynamically based on columns
@@ -556,13 +584,17 @@ export function setupDexieSubscriptions(
   // Subscribe to main entity changes
   const entitySub = liveQuery(() => db[entityTableName].toArray()).subscribe({
     next: (entities) => {
+      // Ignore the first change event as data is already loaded in useTableData
+      if (!firstChangeFlags.has(entityTableName)) {
+        firstChangeFlags.set(entityTableName, true);
+        console.log('📊 TableStore: Ignoring first entities subscription event for', entityTableName);
+        return;
+      }
+      
       console.log('📊 TableStore: Entities subscription update', {
         table: entityTableName,
         count: entities.length
       });
-      
-      // Load initial entities
-      storeActor.send({ type: 'ENTITIES_LOADED', entities });
       
       // Get current state from the store actor
       const storeSnapshot = storeActor.getSnapshot();
@@ -571,24 +603,61 @@ export function setupDexieSubscriptions(
         return;
       }
       
+      // Don't override existing entities if they're already loaded and resolved
+      // This prevents losing junction table data that was loaded in useTableData
+      const currentEntities = storeSnapshot.context.entities;
+      const hasExistingData = Object.keys(currentEntities).length > 0;
+      
+      if (!hasExistingData) {
+        console.log('📊 TableStore: No existing entities, loading initial data');
+        storeActor.send({ type: 'ENTITIES_LOADED', entities });
+        return;
+      }
+      
+      // For subsequent updates, only process entities that have actually changed
+      // This preserves junction table data loaded elsewhere
       const resolved = entities.map(entity => 
         resolveEntity(entity, storeSnapshot.context.relationships)
       );
       
       // Detect changes
       const changes: EntityChange[] = [];
-      const currentEntities = storeSnapshot.context.entities;
       
       // Check for new or updated entities
       resolved.forEach(entity => {
         const oldEntity = currentEntities[entity.id];
-        if (!oldEntity || hasContentChanged(oldEntity, entity)) {
+        if (!oldEntity) {
+          // New entity - add it but preserve any existing junction data if available
+          const existingResolved = currentEntities[entity.id];
+          const finalEntity = existingResolved || entity;
           changes.push({
             id: entity.id,
-            operation: oldEntity ? 'update' : 'insert',
-            data: entity,
-            resolved: entity,
-            changedFields: oldEntity ? getChangedFields(oldEntity, entity) : []
+            operation: 'insert',
+            data: finalEntity,
+            resolved: finalEntity,
+            changedFields: []
+          });
+        } else if (hasContentChanged(oldEntity, entity)) {
+          // Updated entity - merge with existing to preserve junction data
+          const preservedJunctionFields = ['tags', 'members']; // Common junction fields
+          const mergedEntity = { ...entity };
+          
+          // Preserve junction fields that exist in the old entity but not in the new raw entity
+          preservedJunctionFields.forEach(field => {
+            if (oldEntity[field] && !entity[field]) {
+              mergedEntity[field] = oldEntity[field];
+              console.log(`📊 TableStore: Preserving junction field '${field}' for entity ${entity.id}`);
+            }
+          });
+          
+          const finalEntity = resolveEntity(mergedEntity, storeSnapshot.context.relationships);
+          
+          changes.push({
+            id: entity.id,
+            operation: 'update',
+            data: finalEntity,
+            resolved: finalEntity,
+            changedFields: getChangedFields(oldEntity, finalEntity)
           });
         }
       });
@@ -606,6 +675,7 @@ export function setupDexieSubscriptions(
       
       // Send changes if any
       if (changes.length > 0) {
+        console.log('📊 TableStore: Sending entity changes', { changeCount: changes.length });
         storeActor.send({ type: 'ENTITIES_CHANGED', changes });
       }
     },
@@ -631,29 +701,28 @@ export function setupDexieSubscriptions(
       
       const sub = liveQuery(() => table.toArray()).subscribe({
         next: (data) => {
+          // Ignore the first change event as relationship data is already loaded in useTableData
+          if (!firstChangeFlags.has(tableName)) {
+            firstChangeFlags.set(tableName, true);
+            console.log('📊 TableStore: Ignoring first relationship subscription event for', tableName);
+            return;
+          }
+          
           storeActor.send({ type: 'RELATIONSHIP_DATA_UPDATED', table: tableName, data });
           
-          // After updating relationship data, re-resolve all entities
-          // This ensures UI updates when related data changes
-          const storeSnapshot = storeActor.getSnapshot();
-          if (storeSnapshot && storeSnapshot.context.entities) {
-            const entities = Object.values(storeSnapshot.context.entities);
-            const relationships = {
-              ...storeSnapshot.context.relationships,
-              [tableName]: data.reduce((acc: any, item: any) => {
-                acc[item.id] = item;
-                return acc;
-              }, {})
-            };
-            
-            // Re-resolve all entities with updated relationship data
+          // Only reprocess if this relationship table actually affects the display
+          // Check if any of the relationship configs use this table
+          if (columns) {
             const relationshipConfigs = discoverRelationships(columns);
-            const resolvedEntities = entities.map(entity => 
-              resolveEntityRelationships(entity, relationships, relationshipConfigs)
-            );
+            const usesThisTable = relationshipConfigs.some(config => config.relationshipTable === tableName);
             
-            // Send updated entities
-            storeActor.send({ type: 'ENTITIES_LOADED', entities: resolvedEntities });
+            if (usesThisTable) {
+              const storeSnapshot = storeActor.getSnapshot();
+              if (storeSnapshot && storeSnapshot.context.entities && Object.keys(storeSnapshot.context.entities).length > 0) {
+                console.log(`📊 TableStore: Relationship table ${tableName} affects display, debouncing reprocess`);
+                debounceReprocess();
+              }
+            }
           }
         },
         error: (error) => {
@@ -668,6 +737,9 @@ export function setupDexieSubscriptions(
   // Return cleanup function
   return () => {
     console.log('📊 TableStore: Cleaning up subscriptions');
+    if (reprocessTimeout) {
+      clearTimeout(reprocessTimeout);
+    }
     subscriptions.forEach(sub => sub.unsubscribe());
   };
 }

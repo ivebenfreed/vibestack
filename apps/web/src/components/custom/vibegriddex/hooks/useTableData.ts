@@ -5,6 +5,7 @@ import { createActor } from 'xstate';
 import type { TableDataResult } from '../stores/types';
 import { discoverRelationships, getUniqueRelationshipTables, resolveEntityRelationships } from '../utils/relationship-discovery';
 import type { Column } from '../types';
+import { domainServices } from '@/domain';
 
 // ====================================
 // CACHE MANAGEMENT
@@ -50,7 +51,86 @@ async function fetchTableData(entityType: string, columns?: Column[]): Promise<T
         configs: relationshipConfigs.length
       });
       
-      // Extract unique IDs for each relationship
+      // 1. First, handle junction tables for many-to-many relationships
+      const junctionDataMap = new Map<string, Map<string, string[]>>();
+      
+      // Find columns with junction tables
+      const junctionColumns = columns.filter(col => 
+        col.cellType === 'relationship-multi' && col.junctionTable
+      );
+      
+      console.log('🔍 useTableData: Processing junction tables', {
+        junctionColumns: junctionColumns.map(col => ({
+          columnId: col.id,
+          junctionTable: col.junctionTable,
+          sourceField: col.junctionSourceField,
+          targetField: col.junctionTargetField
+        }))
+      });
+      
+      // Load junction table data using domain services
+      for (const column of junctionColumns) {
+        if (!column.junctionTable || !column.junctionSourceField || !column.junctionTargetField) {
+          console.warn('⚠️ useTableData: Missing junction table config for column:', column.id);
+          continue;
+        }
+        
+        let relationshipMap: Map<string, string[]>;
+        
+        // Use appropriate domain service based on the relationship type
+        if (column.junctionTable === 'task_tags' && entityType === 'task') {
+          const entityIds = entities.map(e => e.id);
+          console.log(`🔍 useTableData: Loading task tags for ${entityIds.length} tasks:`, entityIds);
+          relationshipMap = await domainServices.task.getTagsForTasks(entityIds);
+          console.log(`🔍 useTableData: Loaded task tags using domain service:`, relationshipMap);
+        } else if (column.junctionTable === 'project_members' && entityType === 'project') {
+          const entityIds = entities.map(e => e.id);
+          console.log(`🔍 useTableData: Loading project members for ${entityIds.length} projects:`, entityIds);
+          relationshipMap = await domainServices.project.getMembersForProjects(entityIds);
+          console.log(`🔍 useTableData: Loaded project members using domain service:`, relationshipMap);
+        } else {
+          // Fallback to raw query for unsupported junction tables
+          console.warn('⚠️ useTableData: No domain service for junction table:', column.junctionTable);
+          const junctionTable = (db as any)[column.junctionTable];
+          if (!junctionTable) {
+            console.warn('⚠️ useTableData: Junction table not found:', column.junctionTable);
+            continue;
+          }
+          
+          const junctionRecords = await junctionTable.toArray();
+          relationshipMap = new Map<string, string[]>();
+          junctionRecords.forEach((record: any) => {
+            const sourceId = record[column.junctionSourceField];
+            const targetId = record[column.junctionTargetField];
+            
+            if (!relationshipMap.has(sourceId)) {
+              relationshipMap.set(sourceId, []);
+            }
+            relationshipMap.get(sourceId)!.push(targetId);
+          });
+        }
+        
+        junctionDataMap.set(column.field || column.id, relationshipMap);
+      }
+      
+      // 2. Apply junction data to entities
+      const entitiesWithJunctions = entities.map(entity => {
+        const enhanced = { ...entity };
+        
+        junctionDataMap.forEach((relationshipMap, fieldName) => {
+          const relatedIds = relationshipMap.get(entity.id) || [];
+          enhanced[fieldName] = relatedIds;
+          
+          // Only log if debugging specific entities
+          if (fieldName === 'tags' && relatedIds.length > 0 && entity.id.startsWith('debug')) {
+            console.log(`🔍 useTableData: Applied tags to task ${entity.id}:`, relatedIds);
+          }
+        });
+        
+        return enhanced;
+      });
+      
+      // 3. Extract unique IDs for each relationship (now including junction relationships)
       const idsByTable = new Map<string, Set<string>>();
       
       relationshipConfigs.forEach(config => {
@@ -59,7 +139,7 @@ async function fetchTableData(entityType: string, columns?: Column[]): Promise<T
         }
         const ids = idsByTable.get(config.relationshipTable)!;
         
-        entities.forEach(entity => {
+        entitiesWithJunctions.forEach(entity => {
           const value = entity[config.fieldName];
           if (value) {
             if (Array.isArray(value)) {
@@ -71,7 +151,7 @@ async function fetchTableData(entityType: string, columns?: Column[]): Promise<T
         });
       });
       
-      // Fetch all relationship data in parallel
+      // 4. Fetch all relationship data in parallel
       const fetchPromises = Array.from(idsByTable.entries()).map(async ([tableName, ids]) => {
         if (ids.size === 0) return { tableName, data: [] };
         
@@ -86,12 +166,13 @@ async function fetchTableData(entityType: string, columns?: Column[]): Promise<T
           .anyOf(Array.from(ids))
           .toArray();
           
+        console.log(`🔍 useTableData: Loaded ${data.length} records from ${tableName} for ${ids.size} IDs`);
         return { tableName, data };
       });
       
       const results = await Promise.all(fetchPromises);
       
-      // Build relationship maps
+      // 5. Build relationship maps
       results.forEach(({ tableName, data }) => {
         relationshipData[tableName] = {};
         data.forEach((item: any) => {
@@ -99,10 +180,15 @@ async function fetchTableData(entityType: string, columns?: Column[]): Promise<T
         });
       });
       
-      // Pre-resolve entities
-      resolvedEntities = entities.map(entity => 
+      // 6. Pre-resolve entities (using entities with junction data)
+      resolvedEntities = entitiesWithJunctions.map(entity => 
         resolveEntityRelationships(entity, relationshipData, relationshipConfigs)
       );
+      
+      console.log('🔍 useTableData: Relationship resolution complete', {
+        resolvedEntitiesCount: resolvedEntities.length,
+        relationshipTablesLoaded: Object.keys(relationshipData).length
+      });
     }
     
     const fetchTime = performance.now() - startTime;

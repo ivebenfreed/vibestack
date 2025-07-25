@@ -31,8 +31,8 @@ export class CellPipeline {
     json: text, // JSON displayed as text (could be enhanced later)
     relationship: relationshipSingle, // Default to single
     'relationship-single': relationshipSingle,
-    'relationship-multi': relationshipMultiBadgeString, // Use badge string renderer
-    'relationship-collection': relationshipMultiBadgeString, // Collections use badge renderer
+    'relationship-multi': relationshipMultiBadgeString, // Fallback for string rendering
+    'relationship-collection': relationshipMultiBadgeString, // Fallback for string rendering
   };
 
   /**
@@ -90,6 +90,9 @@ export class CellPipeline {
       return content;
     }
     
+    // Check if column is editable
+    const isEditable = column.editable !== false; // Default to true unless explicitly false
+    
     // Default styles for other cell types
     Object.assign(content.style, {
       width: '100%',
@@ -102,9 +105,6 @@ export class CellPipeline {
     
     // Set content efficiently - pass row data for relationship resolution
     const cellContent = this.renderValue(value, column, rowData);
-    
-    // Check if column is editable
-    const isEditable = column.editable !== false; // Default to true unless explicitly false
     
     if (isEditable) {
       // Create wrapper element for editable content

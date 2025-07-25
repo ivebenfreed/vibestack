@@ -1,7 +1,7 @@
 /**
  * MultiRelationshipEditor - For multi-relationship/many-to-many fields
  * 
- * ✅ ADAPTED: From VibeGridOptimus MultiRelationshipEditor
+ * ✅ ADAPTED: Uses ComboboxEditor with multi-select for consistency
  * ✅ TAG INTERFACE: Shows selected items as removable badges
  * ✅ SEARCH: Instant filtering for relationship options
  * ✅ KEYBOARD NAV: Full keyboard navigation support
@@ -9,11 +9,8 @@
  */
 
 import React from 'react';
-import { cn } from '@/lib/utils';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Badge } from '@/components/ui/badge';
-import { Check, X } from 'lucide-react';
-import type { CellRef, Column } from '../../types';
+import { ComboboxEditor } from './ComboboxEditor';
+import type { CellRef, Column, RelationshipContext } from '../../types';
 
 interface MultiRelationshipEditorProps {
   cell: CellRef;
@@ -34,204 +31,56 @@ export function MultiRelationshipEditor({
   onCancel,
   relationshipContext
 }: MultiRelationshipEditorProps) {
-  const [selectedValues, setSelectedValues] = React.useState<string[]>([]);
-  const [searchValue, setSearchValue] = React.useState('');
-  const [highlightedIndex, setHighlightedIndex] = React.useState(0);
-  const [hasCommitted, setHasCommitted] = React.useState(false);
+  
+  // Convert array value to string array for ComboboxEditor
+  const getInitialSelectedValues = (value: any[]): string[] => {
+    if (!Array.isArray(value)) return [];
+    return value.map(item => {
+      if (typeof item === 'string') return item;
+      else if (typeof item === 'object' && item?.id) return item.id;
+      return String(item);
+    });
+  };
 
-  // For relationship fields, we'll use the relationshipOptionsProvider from the column
-  const [options, setOptions] = React.useState<Array<{value: string; label: string}>>([]);
-  const [loadingOptions, setLoadingOptions] = React.useState(false);
+  const stringArrayValue = getInitialSelectedValues(initialValue || []);
 
-  // Load options from provider if available
-  React.useEffect(() => {
-    if (column.relationshipOptionsProvider) {
-      setLoadingOptions(true);
-      const context = {
-        currentEntity: null,
-        column: column,
-        fieldName: column.field || column.id
-      };
-      
-      Promise.resolve(column.relationshipOptionsProvider(context))
-        .then(providerOptions => {
-          setOptions(providerOptions.map(opt => ({
-            value: String(opt.value),
-            label: opt.label
-          })));
-        })
-        .catch(error => {
-          console.error('Failed to load relationship options:', error);
-          setOptions([]);
-        })
-        .finally(() => {
-          setLoadingOptions(false);
-        });
-    }
-  }, [column]);
-
-  // Initialize selected values
-  React.useEffect(() => {
-    const getInitialSelectedValues = (value: any[]): string[] => {
-      if (!Array.isArray(value)) return [];
-      return value.map(item => {
-        if (typeof item === 'string') return item;
-        else if (typeof item === 'object' && item?.id) return item.id;
-        return String(item);
-      });
-    };
-    
-    setSelectedValues(getInitialSelectedValues(initialValue || []));
-  }, [initialValue]);
-
-  // Filter options based on search
-  const filteredOptions = React.useMemo(() => {
-    if (!searchValue) return options;
-    return options.filter(option => 
-      option.label.toLowerCase().includes(searchValue.toLowerCase()) ||
-      option.value.toLowerCase().includes(searchValue.toLowerCase())
-    );
-  }, [options, searchValue]);
-
-  // Handle keyboard navigation
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
-          setHighlightedIndex(prev => 
-            prev < filteredOptions.length - 1 ? prev + 1 : prev
-          );
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          setHighlightedIndex(prev => prev > 0 ? prev - 1 : prev);
-          break;
-        case 'Enter':
-          e.preventDefault();
-          if (filteredOptions[highlightedIndex]) {
-            handleToggleItem(filteredOptions[highlightedIndex].value);
-          } else {
-            handleCommit(selectedValues);
-          }
-          break;
-        case 'Escape':
-          e.preventDefault();
-          handleCancel();
-          break;
-        case 'Tab':
-          e.preventDefault();
-          handleCommit(selectedValues);
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [filteredOptions, highlightedIndex, selectedValues]);
-
-  const handleToggleItem = (value: string) => {
-    let newValues: string[];
-    if (selectedValues.includes(value)) {
-      newValues = selectedValues.filter(v => v !== value);
+  const handleCommit = (value: any) => {
+    // ComboboxEditor returns array for multi-select
+    if (Array.isArray(value)) {
+      onCommit(value);
     } else {
-      newValues = [...selectedValues, value];
+      onCommit([]);
     }
-    setSelectedValues(newValues);
   };
 
-  const handleRemoveItem = (value: string) => {
-    const newValues = selectedValues.filter(v => v !== value);
-    setSelectedValues(newValues);
-  };
+  // Create proper RelationshipContext for ComboboxEditor
+  const relationshipContextForCombobox: RelationshipContext | undefined = 
+    relationshipContext ? {
+      currentEntity: (relationshipContext as any).currentEntity || null,
+      column: column,
+      fieldName: column.field || column.id
+    } : undefined;
 
-  const handleCommit = (values: string[]) => {
-    if (hasCommitted) return;
-    setHasCommitted(true);
-    onCommit(values);
-  };
-
-  const handleCancel = () => {
-    if (hasCommitted) return;
-    setHasCommitted(true);
-    onCancel();
-  };
-
-  // Reset highlighted index when filtered options change
-  React.useEffect(() => {
-    setHighlightedIndex(0);
-  }, [filteredOptions]);
+  console.log('🔍 MultiRelationshipEditor: Creating relationship context', {
+    columnId: column.id,
+    hasRelationshipContext: !!relationshipContext,
+    relationshipTable: column.relationshipTable,
+    hasProvider: !!column.relationshipOptionsProvider,
+    initialValueCount: stringArrayValue.length,
+    relationshipContextForCombobox: relationshipContextForCombobox
+  });
 
   return (
-    <div className="w-full h-full">
-      <div className="border rounded-md shadow-lg bg-background">
-        {/* Selected items display */}
-        {selectedValues.length > 0 && (
-          <div className="flex flex-wrap gap-1 p-2 border-b">
-            {selectedValues.map((value) => {
-              const option = options.find(opt => opt.value === value);
-              return (
-                <Badge
-                  key={value}
-                  variant="secondary"
-                  className="text-xs flex items-center gap-1"
-                >
-                  {option?.label || value}
-                  <X
-                    className="h-3 w-3 cursor-pointer hover:text-destructive"
-                    onClick={() => handleRemoveItem(value)}
-                  />
-                </Badge>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Search and options */}
-        <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Search options..."
-            value={searchValue}
-            onValueChange={setSearchValue}
-            autoFocus
-            className="border-none focus:ring-0"
-          />
-          <CommandList className="max-h-48 overflow-auto">
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {filteredOptions.map((option, index) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.value}
-                  onSelect={() => handleToggleItem(option.value)}
-                  className={cn(
-                    "cursor-pointer",
-                    index === highlightedIndex && "bg-accent"
-                  )}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedValues.includes(option.value) ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <span>{option.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-
-        {/* Commit button */}
-        <div className="p-2 border-t">
-          <button
-            onClick={() => handleCommit(selectedValues)}
-            className="w-full px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90"
-          >
-            Done ({selectedValues.length} selected)
-          </button>
-        </div>
-      </div>
-    </div>
+    <ComboboxEditor
+      cell={cell}
+      column={column}
+      initialValue={stringArrayValue}
+      onCommit={handleCommit}
+      onCancel={onCancel}
+      placeholder="Select items..."
+      searchPlaceholder="Search..."
+      isMultiSelect={true}
+      relationshipContext={relationshipContextForCombobox}
+    />
   );
 }
