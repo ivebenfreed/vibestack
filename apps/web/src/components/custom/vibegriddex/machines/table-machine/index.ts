@@ -185,7 +185,10 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     pendingViewUpdateTimer: null,
     
     // Atomic store actor (will be created in initializing state)
-    storeActor: null
+    storeActor: null,
+    
+    // Column widths from store (for initial render)
+    columnWidths: {}
   };
 };
 
@@ -362,7 +365,8 @@ export const tableBaseMachine = setup({
         columnOrder: [],
         hiddenColumnCount: 0,
         viewport: null,
-        storeActor: null
+        storeActor: null,
+        columnWidths: {}
       };
     }
   },
@@ -405,8 +409,9 @@ export const tableBaseMachine = setup({
                   clearTimeout((context as any)._persistenceTimer);
                 }
                 (context as any)._persistenceTimer = setTimeout(() => {
-                  const { saveDisplayState } = require('../stores/table-data-store-atomic');
-                  saveDisplayState(context.entityType, snapshot.context);
+                  import('../../stores/table-data-store-atomic').then(({ saveDisplayState }) => {
+                    saveDisplayState(context.entityType, snapshot.context);
+                  });
                 }, 500); // 500ms debounce
               }
             });
@@ -596,9 +601,9 @@ export const tableBaseMachine = setup({
               type: 'CALCULATE_COORDINATES',
               rows: context.rows,
               columns: columnsWithSelection,
-              columnWidths: context.coordinateMapping?.columns
+              columnWidths: context.columnWidths || (context.coordinateMapping?.columns
                 ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
-                : undefined
+                : undefined)
             });
           }
         }
@@ -977,7 +982,8 @@ export const tableBaseMachine = setup({
             sortBy: ({ event }) => event.snapshot?.context?.sortBy || [],
             filters: ({ event }) => event.snapshot?.context?.filters || [],
             columnVisibility: ({ event }) => event.snapshot?.context?.columnVisibility || {},
-            columnOrder: ({ event }) => event.snapshot?.context?.columnOrder || []
+            columnOrder: ({ event }) => event.snapshot?.context?.columnOrder || [],
+            columnWidths: ({ event }) => event.snapshot?.context?.columnWidths || {}
           }),
           
           // Calculate coordinates and render only if needed
@@ -1018,9 +1024,9 @@ export const tableBaseMachine = setup({
                 type: 'CALCULATE_COORDINATES',
                 rows: context.rows,
                 columns: columnsWithSelection,
-                columnWidths: context.coordinateMapping?.columns
+                columnWidths: context.columnWidths || (context.coordinateMapping?.columns
                   ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
-                  : undefined
+                  : undefined)
               });
             }
           }

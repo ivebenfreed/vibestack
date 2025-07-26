@@ -1118,6 +1118,16 @@ export const viewHandlers = {
             columns: newColumns,
             version: context.coordinateMapping.version + 1
           };
+        },
+        // Also update columnWidths in context
+        columnWidths: ({ context }) => {
+          if (!context.columnResizeState) return context.columnWidths || {};
+          
+          const { columnId, currentWidth } = context.columnResizeState;
+          return {
+            ...context.columnWidths,
+            [columnId]: currentWidth
+          };
         }
       }),
       
@@ -1141,8 +1151,16 @@ export const viewHandlers = {
         version: ({ context }) => context.version + 1
       }),
       
-      // Trigger coordinate recalculation for layout changes
-      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
+      // Send the updated coordinates directly to renderer
+      ({ context, self }) => {
+        if (context.actors.rendererActor && context.coordinateMapping) {
+          context.actors.rendererActor.send({
+            type: 'UPDATE_COORDINATES',
+            mapping: context.coordinateMapping,
+            version: context.coordinateMapping.version
+          });
+        }
+      },
       
       // Clear the resize state (do this last)
       viewActions.endColumnResize,
@@ -1204,9 +1222,9 @@ export const viewHandlers = {
             type: 'CALCULATE_COORDINATES',
             rows: context.rows,
             columns: columnsWithSelection,
-            columnWidths: context.coordinateMapping?.columns
+            columnWidths: context.columnWidths || (context.coordinateMapping?.columns
               ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
-              : undefined
+              : undefined)
           });
         }
       },
