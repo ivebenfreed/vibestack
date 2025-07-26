@@ -759,8 +759,8 @@ export const viewHandlers = {
         version: ({ context }) => context.version + 1
       }),
       
-      // Trigger coordinate recalculation
-      raise({ type: 'COLUMN_LAYOUT_CHANGED' }),
+      // Trigger coordinate recalculation with optimization hint
+      raise({ type: 'COLUMN_LAYOUT_CHANGED', isReorderOnly: true }),
       
       // Clear drag preview and restore column visibility
       ({ context }) => {
@@ -769,41 +769,25 @@ export const viewHandlers = {
             type: 'CLEAR_DRAG_PREVIEW'
           });
           
-          // Restore column visibility and cursor
-          const domManager = (context.actors.rendererActor.getSnapshot().context as any)?.renderer?.domManager;
-          if (domManager) {
-            const header = domManager.getElement('header');
-            console.log('🎯 ViewHandler: Restoring column visibility');
-            header.querySelectorAll('.vibegridx-header-cell').forEach((el: HTMLElement) => {
-              console.log('🎯 ViewHandler: Restoring column', {
-                column: el.dataset.column,
-                before: {
-                  opacity: el.style.opacity,
-                  pointerEvents: el.style.pointerEvents,
-                  visibility: el.style.visibility
-                }
-              });
-              el.style.opacity = '';
-              el.style.pointerEvents = '';
-              el.style.visibility = '';
-            });
-          }
-          
-          // Restore cursor
-          document.body.style.cursor = '';
-          document.body.classList.remove('vibegridx-dragging-active');
+          // Skip DOM manipulation if columns will be re-rendered anyway
+          // The COLUMN_LAYOUT_CHANGED event will trigger a full re-render
+          // which will reset all column styles automatically
         }
       },
       
       // Clear drag state
       viewActions.clearColumnDrag,
       
-      // Clear stored drag tracking state
+      // Clear stored drag tracking state and restore cursor
       ({ context }) => {
         delete (context as any)._lastDragTargetIndex;
         delete (context as any)._calculatedTargetIndex;
         delete (context as any)._lastDragMouseX;
         delete (context as any)._lastDragMouseY;
+        
+        // Restore cursor
+        document.body.style.cursor = '';
+        document.body.classList.remove('vibegridx-dragging-active');
       },
       
       // Clear selection when columns are reordered via drag
@@ -1192,12 +1176,15 @@ export const viewHandlers = {
       // Recalculate coordinate mapping whenever column layout changes
       dimensionActions.recalculateCoordinateMapping,
       
-      // Trigger full render with new column order
-      ({ context, self }) => {
+      // Trigger render with optimization for reorder-only changes
+      ({ context, self, event }) => {
         if (context.actors?.rendererActor) {
-          console.log('🔄 COLUMN_LAYOUT_CHANGED: Triggering full render with new column order', {
+          const isReorderOnly = (event as any).isReorderOnly;
+          
+          console.log('🔄 COLUMN_LAYOUT_CHANGED: Triggering render', {
             columnOrder: context.columnOrder,
-            columnCount: context.columns.length
+            columnCount: context.columns.length,
+            isReorderOnly
           });
           
           // Get visible columns in the new order
@@ -1217,15 +1204,24 @@ export const viewHandlers = {
             ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
             : orderedColumns;
           
-          // Send CALCULATE_COORDINATES which will trigger a full render
-          context.actors.rendererActor.send({
-            type: 'CALCULATE_COORDINATES',
-            rows: context.rows,
-            columns: columnsWithSelection,
-            columnWidths: context.columnWidths || (context.coordinateMapping?.columns
-              ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
-              : undefined)
-          });
+          if (isReorderOnly) {
+            // For reorder-only changes, just update the column order without full recalculation
+            context.actors.rendererActor.send({
+              type: 'UPDATE_COLUMN_ORDER',
+              columns: columnsWithSelection,
+              mapping: context.coordinateMapping
+            });
+          } else {
+            // Send CALCULATE_COORDINATES which will trigger a full render
+            context.actors.rendererActor.send({
+              type: 'CALCULATE_COORDINATES',
+              rows: context.rows,
+              columns: columnsWithSelection,
+              columnWidths: context.columnWidths || (context.coordinateMapping?.columns
+                ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
+                : undefined)
+            });
+          }
         }
       },
       

@@ -27,6 +27,7 @@ export type RendererActorEvent =
   | { type: 'UPDATE_COLUMNS'; columns: any[] }
   | { type: 'UPDATE_COLUMN_WIDTH'; columnId: string; width: number }
   | { type: 'UPDATE_COORDINATES'; mapping: any; version: number }
+  | { type: 'UPDATE_COLUMN_ORDER'; columns: any[]; mapping: any }
   | { type: 'UPDATE_SELECTED_ROWS'; selectedRows: Set<string> }
   | { type: 'REMOVE_ROW'; rowId: string }
   | { type: 'SURGICAL_UPDATE'; changes: any[]; relationshipResolvers?: Record<string, (id: string | string[]) => string> }
@@ -392,6 +393,38 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           }
           
           sendBack({ type: 'COORDINATES_UPDATED' });
+          break;
+          
+        case 'UPDATE_COLUMN_ORDER':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update column order - renderer not initialized');
+            return;
+          }
+          
+          console.log('RendererActor: Updating column order (optimized path):', {
+            columnCount: event.columns.length,
+            hasMapping: !!event.mapping
+          });
+          
+          // Update columns with new order
+          if (renderer.updateColumns) {
+            renderer.updateColumns(event.columns);
+          }
+          
+          // Update coordinate mapping without triggering full render
+          if (renderer.updateCoordinateMapping && event.mapping) {
+            renderer.updateCoordinateMapping(event.mapping, event.mapping.version);
+          }
+          
+          // Efficiently reorder column headers without measuring DOM
+          if (renderer.reorderColumnHeaders) {
+            renderer.reorderColumnHeaders(event.columns);
+          } else if (renderer.updateColumnOrder) {
+            // Fallback method if available
+            renderer.updateColumnOrder(event.columns.map(col => col.id));
+          }
+          
+          sendBack({ type: 'COLUMNS_UPDATED' });
           break;
           
         case 'RENDER':
