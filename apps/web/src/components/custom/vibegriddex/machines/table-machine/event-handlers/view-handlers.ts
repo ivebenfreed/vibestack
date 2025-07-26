@@ -1217,8 +1217,16 @@ export const viewHandlers = {
       },
       
       // Forward updated coordinates to canvas for overlay sync
-      ({ context, self }) => {
+      ({ context, self, event }) => {
         if (context.actors?.canvasActor) {
+          const isReorderOnly = (event as any).isReorderOnly;
+          
+          // Skip canvas update for column-only reorder to avoid forced reflow
+          if (isReorderOnly) {
+            console.log('🔄 COLUMN_LAYOUT_CHANGED: Skipping canvas update for column reorder (optimization)');
+            return;
+          }
+          
           console.log('🔄 COLUMN_LAYOUT_CHANGED: Forwarding updated coordinates to canvas');
           self.send({
             type: 'FORWARD_TO_CANVAS',
