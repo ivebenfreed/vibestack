@@ -512,8 +512,19 @@ export class CanvasOverlay implements CoordinateProvider {
       columnCount: mapping.columns?.length || 0
     });
     
-    // PERFORMANCE: Store mapping for later use, don't process now
+    // PERFORMANCE: Check if this is just a column reorder (rows unchanged)
+    const isColumnOnlyChange = this.coordinateMapping && 
+      this.coordinateMapping.rows?.length === mapping.rows?.length &&
+      JSON.stringify(this.coordinateMapping.rows) === JSON.stringify(mapping.rows);
+    
+    // Store mapping for later use
     this.coordinateMapping = mapping;
+    
+    // For column-only changes, skip overlay updates to avoid forced reflows
+    if (isColumnOnlyChange) {
+      console.log('CanvasOverlay: Column-only change detected, skipping overlay updates');
+      return;
+    }
     
     // Update overlays that need coordinate mapping
     if (this.columnDragOverlay) {

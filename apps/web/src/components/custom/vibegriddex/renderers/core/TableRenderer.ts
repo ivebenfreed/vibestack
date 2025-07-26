@@ -561,51 +561,6 @@ export class TableRenderer {
     }
   }
   
-  /**
-   * Update columns without triggering a full render
-   * Used for optimized column operations
-   */
-  updateColumns(columns: Column[]): void {
-    console.log('TableRenderer: Updating columns');
-    
-    // Store columns in state manager for next render
-    const lastRenderState = this.stateManager.getLastRenderState();
-    if (lastRenderState) {
-      this.stateManager.setLastRenderState({
-        ...lastRenderState,
-        columns
-      });
-    }
-  }
-  
-  /**
-   * Optimized column header reordering without full render pipeline
-   * Used for column drag operations to avoid forced reflows
-   */
-  reorderColumnHeaders(columns: Column[]): void {
-    console.log('TableRenderer: Reordering column headers (optimized path)');
-    
-    // Get header container
-    const headerRow = this.domManager.getElement('headerRow');
-    if (!headerRow) return;
-    
-    // Create a document fragment for efficient DOM manipulation
-    const fragment = document.createDocumentFragment();
-    
-    // Move headers in the new order
-    columns.forEach(column => {
-      const headerCell = headerRow.querySelector(`[data-column-id="${column.id}"]`);
-      if (headerCell) {
-        fragment.appendChild(headerCell);
-      }
-    });
-    
-    // Apply all changes at once
-    headerRow.innerHTML = '';
-    headerRow.appendChild(fragment);
-    
-    console.log('TableRenderer: Column headers reordered without forced reflow');
-  }
 
   destroy(): void {
     this.performanceMonitor.cancelFrameTracking();

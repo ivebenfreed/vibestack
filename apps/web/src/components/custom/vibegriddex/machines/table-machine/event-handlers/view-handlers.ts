@@ -1204,24 +1204,15 @@ export const viewHandlers = {
             ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
             : orderedColumns;
           
-          if (isReorderOnly) {
-            // For reorder-only changes, just update the column order without full recalculation
-            context.actors.rendererActor.send({
-              type: 'UPDATE_COLUMN_ORDER',
-              columns: columnsWithSelection,
-              mapping: context.coordinateMapping
-            });
-          } else {
-            // Send CALCULATE_COORDINATES which will trigger a full render
-            context.actors.rendererActor.send({
-              type: 'CALCULATE_COORDINATES',
-              rows: context.rows,
-              columns: columnsWithSelection,
-              columnWidths: context.columnWidths || (context.coordinateMapping?.columns
-                ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
-                : undefined)
-            });
-          }
+          // Always send CALCULATE_COORDINATES to ensure both headers and cells are updated properly
+          context.actors.rendererActor.send({
+            type: 'CALCULATE_COORDINATES',
+            rows: context.rows,
+            columns: columnsWithSelection,
+            columnWidths: context.columnWidths || (context.coordinateMapping?.columns
+              ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
+              : undefined)
+          });
         }
       },
       
