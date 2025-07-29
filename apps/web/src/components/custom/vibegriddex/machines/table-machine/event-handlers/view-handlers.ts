@@ -640,11 +640,9 @@ export const viewHandlers = {
   // Column resize events
   'view.columns.resize.start': {
     actions: [
-      
-      // Emit event for UI feedback
-      emit(({ context, event }) => ({
-        type: 'view.resize.started',
-        columnResizeState: context.columnResizeState || {
+      // Store resize state in context
+      assign({
+        columnResizeState: ({ event }) => ({
           isResizing: true,
           resizingColumnId: event.columnId,
           columnId: event.columnId,
@@ -654,7 +652,13 @@ export const viewHandlers = {
           previewWidth: event.width,
           minWidth: 50,
           maxWidth: 1000
-        }
+        })
+      }),
+      
+      // Emit event for UI feedback
+      emit(({ context }) => ({
+        type: 'view.resize.started',
+        columnResizeState: context.columnResizeState
       })),
       
       ({ event }) => {
@@ -669,6 +673,22 @@ export const viewHandlers = {
   
   'view.columns.resize.move': {
     actions: [
+      // Update resize state with new width based on mouse position
+      assign({
+        columnResizeState: ({ context, event }) => {
+          if (!context.columnResizeState) return context.columnResizeState;
+          
+          const { startX, startWidth, minWidth, maxWidth } = context.columnResizeState;
+          const delta = event.x - startX;
+          const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + delta));
+          
+          return {
+            ...context.columnResizeState,
+            currentWidth: newWidth,
+            previewWidth: newWidth
+          };
+        }
+      }),
       
       // Update coordinate mapping with new column width (immutably)
       assign({
@@ -838,7 +858,10 @@ export const viewHandlers = {
         }
       },
       
-      // Clear the resize state is handled by the store
+      // Clear the resize state
+      assign({
+        columnResizeState: () => null
+      }),
       
       // Emit event for UI feedback
       emit({ type: 'view.resize.ended' })
@@ -847,6 +870,10 @@ export const viewHandlers = {
   
   'view.columns.resize.cancel': {
     actions: [
+      // Clear the resize state
+      assign({
+        columnResizeState: () => null
+      }),
       
       // Emit event for UI feedback
       emit({ type: 'view.resize.cancelled' }),

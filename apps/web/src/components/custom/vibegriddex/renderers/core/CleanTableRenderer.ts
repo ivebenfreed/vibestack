@@ -1321,6 +1321,31 @@ export class CleanTableRenderer {
       version,
       columnCount: mapping?.columns?.length
     });
+    
+    // Apply new column widths to DOM immediately
+    this.applyColumnWidths(mapping);
+  }
+  
+  private applyColumnWidths(mapping: any): void {
+    if (!mapping?.columns) return;
+    
+    // Update header cell widths
+    mapping.columns.forEach((colMapping: any) => {
+      const headerCell = this.header?.querySelector(`[data-column="${colMapping.columnId}"]`) as HTMLElement;
+      if (headerCell) {
+        headerCell.style.width = `${colMapping.width}px`;
+      }
+      
+      // Update body cell widths for all visible rows
+      const bodyCells = this.tbody?.querySelectorAll(`[data-column="${colMapping.columnId}"]`) as NodeListOf<HTMLElement>;
+      bodyCells?.forEach(cell => {
+        cell.style.width = `${colMapping.width}px`;
+      });
+    });
+    
+    console.log('CleanTableRenderer: Applied column widths to DOM', {
+      columnCount: mapping.columns.length
+    });
   }
   
   // ====================================
