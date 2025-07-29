@@ -1,7 +1,6 @@
 import Konva from 'konva';
 import type { ViewportInfo } from '../types';
-import type { CoordinateProvider } from './CoordinateProvider';
-import { CoordinateHelper } from './CoordinateProvider';
+import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
 
 // ====================================
@@ -17,7 +16,6 @@ export interface SelectionOverlayConfig {
 
 export class SelectionOverlay {
   private layer: Konva.Layer;
-  private coordinateHelper: CoordinateHelper;
   private config: SelectionOverlayConfig;
   
   // Selection shapes
@@ -28,11 +26,9 @@ export class SelectionOverlay {
   
   constructor(
     layer: Konva.Layer,
-    coordinateProvider: CoordinateProvider,
     config: SelectionOverlayConfig
   ) {
     this.layer = layer;
-    this.coordinateHelper = new CoordinateHelper(coordinateProvider);
     this.config = config;
     
     // Initial layer setup complete

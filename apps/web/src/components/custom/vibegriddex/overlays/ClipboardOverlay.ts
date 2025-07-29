@@ -1,7 +1,6 @@
 import Konva from 'konva';
 import type { ViewportInfo } from '../types';
-import type { CoordinateProvider } from './CoordinateProvider';
-import { CoordinateHelper } from './CoordinateProvider';
+import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 
 // ====================================
 // CLIPBOARD OVERLAY
@@ -15,7 +14,7 @@ export interface ClipboardOverlayConfig {
 
 export class ClipboardOverlay {
   private layer: Konva.Layer;
-  private coordinateHelper: CoordinateHelper;
+  private coordinateMapping: CoordinateMapping | null = null;
   private config: ClipboardOverlayConfig;
   
   // Clipboard indicator
@@ -23,16 +22,23 @@ export class ClipboardOverlay {
   
   constructor(
     layer: Konva.Layer,
-    coordinateProvider: CoordinateProvider,
+    coordinateProvider: any, // CanvasOverlay that provides coordinate mapping
     config: ClipboardOverlayConfig
   ) {
     this.layer = layer;
-    this.coordinateHelper = new CoordinateHelper(coordinateProvider);
+    this.coordinateMapping = coordinateProvider.getCoordinateMapping();
     this.config = {
       copyColor: '#10b981',
       cutColor: '#ef4444',
       ...config
     };
+  }
+  
+  /**
+   * Update coordinate mapping when it changes
+   */
+  updateCoordinateMapping(mapping: CoordinateMapping): void {
+    this.coordinateMapping = mapping;
   }
   
   updateIndicator(
@@ -119,10 +125,14 @@ export class ClipboardOverlay {
         continue;
       }
       
-      const parsed = this.coordinateHelper.parseCellKey(cellKey);
-      if (!parsed) continue;
+      const [rowId, columnId] = cellKey.split(':');
+      if (!this.coordinateMapping || !rowId || !columnId) continue;
       
-      const columnWidth = this.coordinateHelper.getColumnWidth(parsed.columnId);
+      // Find column in coordinate mapping
+      const colData = this.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
+      if (!colData) continue;
+      
+      const columnWidth = colData.width;
       const width = columnWidth || 100;
       const height = this.config.cellHeight;
       
@@ -147,16 +157,30 @@ export class ClipboardOverlay {
   }
   
   private getPositionForCell(cellKey: string, viewport: ViewportInfo): { x: number; y: number } | null {
-    const parsed = this.coordinateHelper.parseCellKey(cellKey);
-    if (!parsed) {
-      console.warn('ClipboardOverlay: Failed to parse cell key', { cellKey });
+    const [rowId, columnId] = cellKey.split(':');
+    if (!this.coordinateMapping || !rowId || !columnId) {
+      console.warn('ClipboardOverlay: Failed to parse cell key or no coordinate mapping', { cellKey });
       return null;
     }
     
-    const position = this.coordinateHelper.getCellPositionWithViewport(parsed.rowId, parsed.columnId, viewport);
+    // Find row and column in coordinate mapping
+    const rowIndex = this.coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
+    const colData = this.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
+    
+    if (rowIndex === -1 || !colData) {
+      return null;
+    }
+    
+    // Calculate position using coordinate mapping
+    const position = {
+      x: colData.offset || 0,
+      y: rowIndex * this.config.cellHeight
+    };
+    
     console.log('ClipboardOverlay: getPositionForCell', {
       cellKey,
-      parsed,
+      rowId,
+      columnId,
       position,
       viewport: { scrollTop: viewport.scrollTop, scrollLeft: viewport.scrollLeft }
     });

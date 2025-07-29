@@ -5,8 +5,7 @@ import type { OverlayConfig, VisualCellPosition } from './OverlayTypes';
 import { DEFAULT_CONFIG } from './OverlayTypes';
 // overlayMachine removed - using direct canvas actor approach
 // ActorRef import removed - no longer needed
-import type { VibeGridXCoordinateManager } from '../coordinates/VibeGridXCoordinateManager';
-import type { CoordinateProvider } from './CoordinateProvider';
+// VibeGridXCoordinateManager and CoordinateProvider removed - using coordinate mapping directly
 import { FillHandleLayer } from './FillHandleLayer';
 import { SelectionOverlay } from './SelectionOverlay';
 import { EditingCanvasOverlay } from './EditingCanvasOverlay';
@@ -23,7 +22,7 @@ import { calculateVisualPositions } from '../machines/table-machine/helpers/visu
 // SIMPLIFIED CANVAS OVERLAY
 // ====================================
 
-export class CanvasOverlay implements CoordinateProvider {
+export class CanvasOverlay {
   private container: HTMLElement;
   private stage: Konva.Stage;
   private layer: Konva.Layer;
@@ -31,8 +30,7 @@ export class CanvasOverlay implements CoordinateProvider {
   
   // Machine removed - using direct canvas actor approach
   
-  // Direct reference to coordinate manager
-  private coordinateManager: VibeGridXCoordinateManager | null = null;
+  // Coordinate manager removed - using coordinate mapping directly
   
   // Stored coordinate mapping for lazy processing
   private coordinateMapping: any = null;
@@ -66,8 +64,7 @@ export class CanvasOverlay implements CoordinateProvider {
     this.container = container;
     this.config = { ...DEFAULT_CONFIG, ...config };
     
-    // Coordinate manager from config or will be set via setCoordinateManager method
-    this.coordinateManager = this.config.coordinateManager || null;
+    // Coordinate manager removed - using coordinate mapping directly
     
     // PERFORMANCE: Pre-calculate dimensions but defer Stage creation
     this.cachedDimensions = {
@@ -147,7 +144,6 @@ export class CanvasOverlay implements CoordinateProvider {
       
       this.selectionOverlay = new SelectionOverlay(
         this.layer,
-        this, // Pass self as coordinate provider
         {
           selectionColor: this.config.selectionColor,
           selectionBorderColor: this.config.selectionBorderColor,
@@ -198,8 +194,7 @@ export class CanvasOverlay implements CoordinateProvider {
   public getClipboardOverlay(): ClipboardOverlay {
     if (!this.clipboardOverlay) {
       console.log('CanvasOverlay: Lazily creating ClipboardOverlay', {
-        hasCoordinateMapping: !!this.coordinateMapping,
-        hasCoordinateManager: !!this.coordinateManager
+        hasCoordinateMapping: !!this.coordinateMapping
       });
       this.ensureStageInitialized();
       this.clipboardOverlay = new ClipboardOverlay(
@@ -482,19 +477,7 @@ export class CanvasOverlay implements CoordinateProvider {
   // PUBLIC API
   // ====================================
   
-  // Set the coordinate manager reference directly
-  setCoordinateManager(manager: VibeGridXCoordinateManager): void {
-    this.coordinateManager = manager;
-    console.log('CanvasOverlay: Coordinate manager set');
-  }
-  
-  // Get coordinate manager (legacy)
-  getCoordinateManager(): VibeGridXCoordinateManager | null {
-    if (!this.coordinateManager) {
-      console.warn('CanvasOverlay.getCoordinateManager: coordinateManager is null');
-    }
-    return this.coordinateManager;
-  }
+  // Coordinate manager methods removed - using coordinate mapping directly
   
   // Get coordinate mapping (new approach)
   getCoordinateMapping(): any {
@@ -532,6 +515,12 @@ export class CanvasOverlay implements CoordinateProvider {
     }
     if (this.columnResizeOverlay) {
       this.columnResizeOverlay.updateCoordinateMapping(mapping);
+    }
+    if (this.fillHandleLayer) {
+      this.fillHandleLayer.updateCoordinateMapping(mapping);
+    }
+    if (this.clipboardOverlay) {
+      this.clipboardOverlay.updateCoordinateMapping(mapping);
     }
     
     // Legacy coordinate manager update will happen when actually needed

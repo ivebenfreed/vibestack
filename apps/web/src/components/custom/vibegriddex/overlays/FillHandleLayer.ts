@@ -1,8 +1,7 @@
 import Konva from 'konva';
 import type { ViewportInfo } from '../types';
 // OverlayMachineActor removed - using direct canvas actor approach
-import type { CoordinateProvider } from './CoordinateProvider';
-import { CoordinateHelper } from './CoordinateProvider';
+import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { VisualCellPosition } from './OverlayTypes';
 
 // ====================================
@@ -29,7 +28,7 @@ export class FillHandleLayer {
   private fillHandleLayer: Konva.Layer; // Dedicated interactive layer
   private config: FillHandleConfig;
   private callbacks: FillHandleCallbacks;
-  private coordinateHelper: CoordinateHelper;
+  private coordinateMapping: CoordinateMapping | null = null;
   
   // Fill handle state
   private activeFillHandle: Konva.Rect | null = null;
@@ -40,12 +39,12 @@ export class FillHandleLayer {
   
   constructor(
     stage: Konva.Stage,
-    coordinateProvider: CoordinateProvider,
+    coordinateProvider: any, // CanvasOverlay that provides coordinate mapping
     config: FillHandleConfig,
     callbacks: FillHandleCallbacks
   ) {
     this.stage = stage;
-    this.coordinateHelper = new CoordinateHelper(coordinateProvider);
+    this.coordinateMapping = coordinateProvider.getCoordinateMapping();
     this.config = config;
     this.callbacks = callbacks;
     
@@ -71,6 +70,13 @@ export class FillHandleLayer {
   // ====================================
   // PUBLIC API
   // ====================================
+  
+  /**
+   * Update coordinate mapping when it changes
+   */
+  updateCoordinateMapping(mapping: CoordinateMapping): void {
+    this.coordinateMapping = mapping;
+  }
   
   // setMachine removed - using direct canvas actor approach
   
@@ -190,21 +196,27 @@ export class FillHandleLayer {
     let configuredShapes = 0;
     for (const cellKey of previewCells) {
       
-      const parsed = this.coordinateHelper.parseCellKey(cellKey);
-      if (!parsed) {
-        console.warn('FillHandleLayer: Failed to parse cell key', cellKey);
+      const [rowId, columnId] = cellKey.split(':');
+      if (!this.coordinateMapping) {
+        console.warn('FillHandleLayer: No coordinate mapping available');
         continue;
       }
       
-      const position = this.coordinateHelper.getCellPositionWithViewport(parsed.rowId, parsed.columnId, viewport);
+      // Find row and column in coordinate mapping
+      const rowIndex = this.coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
+      const colData = this.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
       
-      // Skip if position not found
-      if (!position) {
+      if (rowIndex === -1 || !colData) {
         continue;
       }
       
-      if (position) {
-        const columnWidth = this.coordinateHelper.getColumnWidth(parsed.columnId) || 100;
+      // Calculate position using coordinate mapping
+      const position = {
+        x: colData.offset || 0,
+        y: rowIndex * this.config.cellHeight
+      };
+      
+      const columnWidth = colData.width || 100;
         // Create preview shape
         const shape = new Konva.Rect({
           x: position.x,
@@ -281,14 +293,14 @@ export class FillHandleLayer {
     // Get all selected columns for vertical fill
     const selectedColumns = new Set<string>();
     selectedCells.forEach(cellKey => {
-      const parsed = this.coordinateHelper.parseCellKey(cellKey);
-      if (parsed) {
-        selectedColumns.add(parsed.columnId);
+      const [rowId, columnId] = cellKey.split(':');
+      if (columnId) {
+        selectedColumns.add(columnId);
       }
     });
     
-    // Get all available row IDs from the coordinate system
-    const allRowIds = this.coordinateHelper.getAllRowIds();
+    // Get all available row IDs from the coordinate mapping
+    const allRowIds = this.coordinateMapping?.rows.map((r: any) => r.rowId) || [];
     
     if (allRowIds.length === 0) {
       console.warn('FillHandleLayer: No row mappings available in coordinate system');
@@ -298,9 +310,9 @@ export class FillHandleLayer {
     // Find bottom-most row index in the selection
     let maxRowIndex = -1;
     selectedCells.forEach(cellKey => {
-      const parsed = this.coordinateHelper.parseCellKey(cellKey);
-      if (parsed) {
-        const rowIndex = allRowIds.indexOf(parsed.rowId);
+      const [rowId] = cellKey.split(':');
+      if (rowId) {
+        const rowIndex = allRowIds.indexOf(rowId);
         if (rowIndex !== -1) {
           maxRowIndex = Math.max(maxRowIndex, rowIndex);
         }
@@ -589,12 +601,19 @@ export class FillHandleLayer {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
     for (const cellKey of selectedCells) {
-      const parsed = this.coordinateHelper.parseCellKey(cellKey);
-      if (!parsed) continue;
+      const [rowId, columnId] = cellKey.split(':');
+      if (!this.coordinateMapping || !rowId || !columnId) continue;
       
-      const position = this.coordinateHelper.getCellPositionWithViewport(parsed.rowId, parsed.columnId, viewport);
-      if (position) {
-        const columnWidth = this.coordinateHelper.getColumnWidth(parsed.columnId) || 100;
+      // Find row and column in coordinate mapping
+      const rowIndex = this.coordinateMapping.rows.findIndex((r: any) => r.rowId === rowId);
+      const colData = this.coordinateMapping.columns.find((c: any) => c.columnId === columnId);
+      
+      if (rowIndex !== -1 && colData) {
+        const position = {
+          x: colData.offset || 0,
+          y: rowIndex * this.config.cellHeight
+        };
+        const columnWidth = colData.width || 100;
         const cellRight = position.x + columnWidth;
         const cellBottom = position.y + this.config.cellHeight;
         
