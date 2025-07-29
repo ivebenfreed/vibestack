@@ -859,11 +859,19 @@ export class CleanTableRenderer {
   }
   
   // New method to handle drag position updates from EventDelegationManager
-  updateDragPosition(params: { draggedColumnId: string; columnName: string; mouseX: number; mouseY: number }): void {
-    if (!this.dragState.columnId || this.dragState.columnId !== params.draggedColumnId) {
-      // Initialize drag state if needed
-      this.dragState.columnId = params.draggedColumnId;
-      this.dragState.type = 'column';
+  updateDragPosition(params: { mouseX: number; mouseY: number }): void {
+    console.log('CleanTableRenderer: updateDragPosition called', {
+      params,
+      dragState: this.dragState,
+      hasDragState: !!this.dragState,
+      hasColumnId: !!this.dragState?.columnId
+    });
+    
+    if (!this.dragState || !this.dragState.columnId) {
+      console.warn('CleanTableRenderer: No active drag state', {
+        dragState: this.dragState
+      });
+      return;
     }
     
     // Calculate target position
@@ -882,6 +890,24 @@ export class CleanTableRenderer {
     let closestBoundaryIndex = -1;
     
     // Get the bounds of the dragged column
+    if (draggedIndex === -1 || draggedIndex >= headerCells.length) {
+      console.warn('CleanTableRenderer: Dragged column not found in visible columns', {
+        draggedColumnId: this.dragState.columnId,
+        visibleColumns: visibleColumns.map(c => c.id)
+      });
+      // Apply drag preview without drop indicator
+      const column = this.state?.columns.find(col => col.id === this.dragState.columnId);
+      this.applyDragPreview({
+        draggedColumnId: this.dragState.columnId,
+        columnName: column?.name || this.dragState.columnId,
+        mouseX: params.mouseX,
+        mouseY: params.mouseY,
+        targetIndex: targetIndex,
+        isInitialPreview: false
+      });
+      return;
+    }
+    
     const draggedCell = headerCells[draggedIndex] as HTMLElement;
     const draggedRect = draggedCell.getBoundingClientRect();
     
@@ -929,9 +955,10 @@ export class CleanTableRenderer {
     });
     
     // Apply drag preview with calculated target
+    const column = this.state?.columns.find(col => col.id === this.dragState.columnId);
     const dragPreviewData: any = {
-      draggedColumnId: params.draggedColumnId,
-      columnName: params.columnName,
+      draggedColumnId: this.dragState.columnId,
+      columnName: column?.name || this.dragState.columnId,
       mouseX: params.mouseX,
       mouseY: params.mouseY,
       targetIndex: targetIndex,

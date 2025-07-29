@@ -558,8 +558,6 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           // Let renderer handle all drag calculations internally
           if ('updateDragPosition' in renderer && typeof renderer.updateDragPosition === 'function') {
             renderer.updateDragPosition({
-              draggedColumnId: event.draggedColumnId,
-              columnName: event.columnName,
               mouseX: event.mouseX,
               mouseY: event.mouseY
             });

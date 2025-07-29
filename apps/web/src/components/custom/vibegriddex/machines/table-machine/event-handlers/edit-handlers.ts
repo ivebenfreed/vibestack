@@ -651,7 +651,19 @@ export const editHandlers = {
       
       editActions.commitEdit,
       
-      // Clear editing state after commit
+      // Add a delay before clearing edit state to allow update to render
+      ({ context, self }) => {
+        setTimeout(() => {
+          // Clear editing state after delay
+          self.send({ type: 'CLEAR_EDIT_DELAYED' });
+        }, 150); // 150ms delay to allow render
+      }
+    ]
+  },
+
+  'CLEAR_EDIT_DELAYED': {
+    actions: [
+      // Clear editing state
       editActions.clearEdit,
       
       // Update overlay state
@@ -664,7 +676,7 @@ export const editHandlers = {
         try {
           if (globalEditingOverlay) {
             globalEditingOverlay.hide();
-            console.log('EditHandlers: Editor hidden directly');
+            console.log('EditHandlers: Editor hidden after delay');
           }
         } catch (error) {
           console.error('EditHandlers: Error hiding editor', error);

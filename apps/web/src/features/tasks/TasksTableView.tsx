@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex'
 import { domainServices } from '@/domain'
 import { useTheme } from '@/context/theme-context'
+import { createEntityTagFilter } from '@/domain/helpers/tag-filters'
 import type { Task } from '@repo/dataforge/client-entities'
 import type { Column } from '@/components/custom/vibegriddex/column-types'
 
@@ -55,60 +56,9 @@ export default function TasksTableView() {
       junctionTable: 'task_tags',
       junctionSourceField: 'task_id',
       junctionTargetField: 'tag_id',
-      // Filter to show only tags from the "Task Tags" tag set
-      relationshipFilter: async () => {
-        console.log('📊 TasksTableView: Running tag filter');
-        
-        try {
-          // Get all tag sets to debug
-          const allTagSets = await domainServices.tagSet.getActiveTagSets();
-          console.log('📊 TasksTableView: All tag sets', {
-            count: allTagSets.length,
-            tagSets: allTagSets.map(ts => ({ id: ts.id, name: ts.name }))
-          });
-          
-          // Try multiple tag set names
-          const possibleNames = ['task_tags', 'Task Tags', 'task-tags', 'Task-Tags'];
-          let taskTagSet = null;
-          
-          for (const name of possibleNames) {
-            taskTagSet = await domainServices.tagSet.getTagSetByName(name);
-            if (taskTagSet) {
-              console.log(`📊 TasksTableView: Found tag set with name: ${name}`);
-              break;
-            }
-          }
-          
-          if (!taskTagSet) {
-            console.warn('TasksTableView: Task Tags tag set not found, showing all tags');
-            // Return all tags if we can't find the specific tag set
-            const allTags = await domainServices.tag.getAllTags();
-            console.log('📊 TasksTableView: Showing all tags', {
-              count: allTags.length,
-              tags: allTags.slice(0, 5).map(tag => ({ id: tag.id, name: tag.name, tagSetId: tag.tagSetId }))
-            });
-            return allTags.map(tag => tag.id);
-          }
-          
-          console.log('📊 TasksTableView: Found task tag set', {
-            id: taskTagSet.id,
-            name: taskTagSet.name
-          });
-          
-          // Get all tags for this tag set
-          const tags = await domainServices.tag.getTagsByTagSet(taskTagSet.id);
-          console.log('📊 TasksTableView: Tags for task tag set', {
-            count: tags.length,
-            tags: tags.map(tag => ({ id: tag.id, name: tag.name }))
-          });
-          
-          return tags.map(tag => tag.id);
-        } catch (error) {
-          console.error('TasksTableView: Error in tag filter', error);
-          // Return empty array on error to prevent crash
-          return [];
-        }
-      }
+      // Show all tags until we have proper tag set associations
+      // TODO: Re-enable smart filtering once tags are properly associated with tag sets
+      // relationshipFilter: createEntityTagFilter('task')
     },
     { id: 'dueDate', field: 'dueDate', name: 'Due Date', cellType: 'date', width: 150, editable: true },
     { id: 'projectId', field: 'projectId', name: 'Project', cellType: 'relationship-single', 

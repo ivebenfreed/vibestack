@@ -463,6 +463,50 @@ function JunctionTablesDebug() {
         </CardContent>
       </Card>
 
+      {/* Tag Sets Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tag Sets Overview</CardTitle>
+          <CardDescription>All tag sets and their associated tags</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {tagSets.map((tagSet) => {
+              const tagSetTags = tags.filter(t => t.tagSetId === tagSet.id);
+              return (
+                <div key={tagSet.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className="text-lg font-semibold">{tagSet.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        ID: <span className="font-mono">{tagSet.id}</span>
+                      </p>
+                      {tagSet.category && (
+                        <p className="text-sm text-muted-foreground">
+                          Category: <Badge variant="outline">{tagSet.category}</Badge>
+                        </p>
+                      )}
+                    </div>
+                    <Badge>{tagSetTags.length} tags</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {tagSetTags.map(tag => (
+                      <Badge 
+                        key={tag.id} 
+                        variant="secondary"
+                        style={{ backgroundColor: tag.color, color: 'white' }}
+                      >
+                        {tag.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Available Entities */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
@@ -499,20 +543,27 @@ function JunctionTablesDebug() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Color</TableHead>
+                  <TableHead>Tag Set</TableHead>
+                  <TableHead>Tag Set ID</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tags.slice(0, 5).map((tag) => (
-                  <TableRow key={tag.id}>
-                    <TableCell>{tag.name}</TableCell>
-                    <TableCell>
-                      <div 
-                        className="w-6 h-6 rounded"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {tags.map((tag) => {
+                  const tagSet = tagSets.find(ts => ts.id === tag.tagSetId);
+                  return (
+                    <TableRow key={tag.id}>
+                      <TableCell>{tag.name}</TableCell>
+                      <TableCell>
+                        <div 
+                          className="w-6 h-6 rounded"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                      </TableCell>
+                      <TableCell>{tagSet?.name || 'Unknown'}</TableCell>
+                      <TableCell className="text-xs font-mono">{tag.tagSetId}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

@@ -243,16 +243,17 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           
           // Update corresponding row in processedRows
           const rowIndex = context.processedRows.findIndex(row => row.id === event.entity.id);
+          let updatedRows: any[];
+          
           if (rowIndex !== -1) {
-            const updatedRows = [...context.processedRows];
+            updatedRows = [...context.processedRows];
             updatedRows[rowIndex] = {
               ...updatedRows[rowIndex],
               data: resolvedEntity
             };
-            return updatedRows;
           } else {
             // New entity - add to processed rows
-            return [...context.processedRows, {
+            updatedRows = [...context.processedRows, {
               id: event.entity.id,
               data: resolvedEntity,
               metadata: {
@@ -263,6 +264,73 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
               }
             }];
           }
+          
+          // Check if we need to re-sort
+          if (context.sortBy.length > 0) {
+            // Check if any sorted field was updated or if sorting by updatedAt
+            const needsResort = context.sortBy.some(sort => {
+              // Always re-sort if sorting by updatedAt since it likely changed
+              if (sort.field === 'updatedAt') return true;
+              
+              // Check if the sorted field value changed
+              if (rowIndex !== -1) {
+                const oldValue = context.processedRows[rowIndex].data[sort.field];
+                const newValue = resolvedEntity[sort.field];
+                return oldValue !== newValue;
+              }
+              
+              return false; // New entity, no need to re-sort existing
+            });
+            
+            if (needsResort) {
+              if (process.env.NODE_ENV === 'development') {
+                console.log('📊 TableStore: Re-sorting after entity update', {
+                  entityId: event.entity.id,
+                  sortBy: context.sortBy,
+                  reason: context.sortBy.some(s => s.field === 'updatedAt') ? 'updatedAt field' : 'sorted field changed'
+                });
+              }
+              
+              // Re-apply sort
+              updatedRows = [...updatedRows].sort((a, b) => {
+                for (const sort of context.sortBy) {
+                  const aValue = a.data[sort.field];
+                  const bValue = b.data[sort.field];
+                  
+                  // Handle null/undefined
+                  if (aValue == null && bValue == null) continue;
+                  if (aValue == null) return sort.direction === 'asc' ? -1 : 1;
+                  if (bValue == null) return sort.direction === 'asc' ? 1 : -1;
+                  
+                  let comparison = 0;
+                  
+                  // Date comparison
+                  if (aValue instanceof Date || (typeof aValue === 'string' && !isNaN(Date.parse(aValue)))) {
+                    const aDate = aValue instanceof Date ? aValue : new Date(aValue);
+                    const bDate = bValue instanceof Date ? bValue : new Date(bValue);
+                    comparison = aDate.getTime() - bDate.getTime();
+                  }
+                  // Number comparison
+                  else if (typeof aValue === 'number' && typeof bValue === 'number') {
+                    comparison = aValue - bValue;
+                  }
+                  // String comparison (case-insensitive)
+                  else {
+                    const aStr = String(aValue).toLowerCase();
+                    const bStr = String(bValue).toLowerCase();
+                    comparison = aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+                  }
+                  
+                  if (comparison !== 0) {
+                    return sort.direction === 'desc' ? -comparison : comparison;
+                  }
+                }
+                return 0;
+              });
+            }
+          }
+          
+          return updatedRows;
         },
         originalRows: (context, event) => {
           // Also update originalRows to maintain unsorted order consistency

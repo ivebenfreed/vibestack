@@ -451,14 +451,10 @@ export const viewHandlers = {
           return;
         }
         
-        const draggedColumnId = (context as any)._draggedColumnId || event.columnId;
-        const column = context.columns.find(col => col.id === draggedColumnId);
-        
-        // Send simple drag update to renderer - let it calculate everything
+        // The renderer should already have the drag state from APPLY_DRAG_PREVIEW
+        // Just send the mouse position update
         context.actors.rendererActor.send({
           type: 'UPDATE_DRAG_POSITION',
-          draggedColumnId: draggedColumnId,
-          columnName: column?.name || draggedColumnId,
           mouseX: event.clientX || event.x,
           mouseY: event.clientY || event.y
         });

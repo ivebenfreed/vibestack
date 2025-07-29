@@ -177,6 +177,103 @@ export class TagDomainService extends BaseDomainService<Tag, CreateTagInput, Upd
     return tags;
   }
   
+  /**
+   * Get tags for a specific entity type
+   * This intelligently matches tag sets to entity types
+   * 
+   * @param entityType - The entity type (e.g., 'task', 'project', 'user')
+   * @param includeEmpty - If true, returns all tags when no specific tag set has tags
+   * @returns Tags that are appropriate for the entity type
+   */
+  async getTagsForEntityType(entityType: string, includeEmpty: boolean = true): Promise<Tag[]> {
+    // Get all tag sets
+    const tagSets = await db.tag_sets.toArray();
+    
+    console.log(`TagService: All tag sets in database:`, tagSets.map(ts => ({ 
+      id: ts.id, 
+      name: ts.name, 
+      category: ts.category,
+      isActive: ts.isActive
+    })));
+    
+    // Smart matching: look for tag sets that match the entity type
+    const matchingTagSets = tagSets.filter(ts => {
+      const name = ts.name.toLowerCase();
+      const entityLower = entityType.toLowerCase();
+      
+      // Direct matches: task_tags, project_tags, etc.
+      if (name === `${entityLower}_tags` || name === `${entityLower}-tags`) {
+        console.log(`TagService: Matched tag set '${ts.name}' by direct match`);
+        return true;
+      }
+      
+      // Plural matches: tasks_tags, projects_tags
+      if (name === `${entityLower}s_tags` || name === `${entityLower}s-tags`) {
+        console.log(`TagService: Matched tag set '${ts.name}' by plural match`);
+        return true;
+      }
+      
+      // Category matches: if category matches entity type
+      if (ts.category && ts.category.toLowerCase() === entityLower) {
+        console.log(`TagService: Matched tag set '${ts.name}' by category match`);
+        return true;
+      }
+      
+      // Name contains entity type: e.g., "Task Priority Tags"
+      if (name.includes(entityLower)) {
+        console.log(`TagService: Matched tag set '${ts.name}' by name contains`);
+        return true;
+      }
+      
+      return false;
+    });
+    
+    if (matchingTagSets.length === 0) {
+      console.log(`TagService: No tag sets found for entity type '${entityType}', returning all active tags`);
+      // Fallback: return all active tags
+      const allTags = await db.tags.toArray();
+      return allTags.filter(tag => {
+        const tagSet = tagSets.find(ts => ts.id === tag.tagSetId);
+        return tagSet && tagSet.isActive;
+      });
+    }
+    
+    // Get all tags from matching tag sets
+    const tagSetIds = matchingTagSets.map(ts => ts.id);
+    
+    // Debug: Check what we're querying
+    console.log(`TagService: Querying tags with tagSetIds:`, tagSetIds);
+    
+    // Get all tags and filter manually (Dexie anyOf might have issues)
+    const allTags = await db.tags.toArray();
+    
+    // Debug: Show what tagSetIds exist in the tags
+    const uniqueTagSetIds = [...new Set(allTags.map(t => t.tagSetId))];
+    console.log(`TagService: Unique tagSetIds in all tags:`, uniqueTagSetIds);
+    console.log(`TagService: Sample tags with their tagSetIds:`, allTags.slice(0, 5).map(t => ({
+      id: t.id,
+      name: t.name,
+      tagSetId: t.tagSetId
+    })));
+    
+    const tags = allTags.filter(tag => tagSetIds.includes(tag.tagSetId));
+    
+    console.log(`TagService: Found ${tags.length} tags for entity type '${entityType}'`, {
+      matchingTagSets: matchingTagSets.map(ts => ({ id: ts.id, name: ts.name, category: ts.category })),
+      tagCount: tags.length,
+      allTagsCount: allTags.length,
+      sampleTags: tags.slice(0, 3).map(t => ({ id: t.id, name: t.name, tagSetId: t.tagSetId }))
+    });
+    
+    // If no tags found but we have matching tag sets, and includeEmpty is true, return all tags
+    if (tags.length === 0 && matchingTagSets.length > 0 && includeEmpty) {
+      console.log(`TagService: No tags in matching tag sets for '${entityType}', returning all tags`);
+      return allTags;
+    }
+    
+    return tags;
+  }
+  
   // ============================================================================
   // Incoming Operations (no sync tracking)
   // ============================================================================
