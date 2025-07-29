@@ -186,6 +186,18 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
     return junctions.map(j => j.projectId);
   }
   
+  /**
+   * Get tag set by name
+   */
+  async getTagSetByName(name: string): Promise<TagSet | null> {
+    const tagSet = await db.tag_sets
+      .where('name')
+      .equals(name)
+      .first();
+    
+    return tagSet || null;
+  }
+  
   // ============================================================================
   // Incoming Operations (no sync tracking)
   // ============================================================================
