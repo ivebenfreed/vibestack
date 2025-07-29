@@ -83,6 +83,13 @@ program
     }
   });
 
+const VIBESTACK_LOGO = `
+██    ██ ██ ██████ ██████ ███████ ████████  █████   ██████ ██   ██
+██    ██ ██ ██   █ ██     ██         ██    ██   ██ ██      ██  ██ 
+██    ██ ██ ██████ █████  ███████    ██    ███████ ██      █████  
+██    ██ ██ ██   █ ██          ██    ██    ██   ██ ██      ██  ██ 
+ ██████  ██ ██████ ██████ ███████    ██    ██   ██  ██████ ██   ██`;
+
 async function main() {
   // Handle interactive mode separately from command mode
   const args = process.argv.slice(2);
@@ -95,6 +102,11 @@ async function main() {
     program.parse(process.argv);
     return;
   }
+  
+  // Clear console and show logo for interactive mode
+  console.clear();
+  console.log(VIBESTACK_LOGO);
+  console.log('\nWelcome to VibeStack CLI\n');
   
   // Interactive mode - manually parse --env option
   const availableEnvs = getAvailableEnvironments();

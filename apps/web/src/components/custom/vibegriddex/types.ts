@@ -305,13 +305,7 @@ export interface TableContext {
   // Notification handler for user feedback
   onNotification?: (message: string, type: 'info' | 'warning' | 'error' | 'success') => void;
   
-  // View state management (moved from viewCoordinator)
-  sortBy: SortConfig[];
-  filters: FilterConfig[];
-  groupBy: string[];
-  columnVisibility: Record<string, boolean>;
-  columnOrder: string[];
-  hiddenColumnCount: number;
+  // View state now managed by store actor
   
   // Current viewport for coordinate calculations
   viewport: ViewportInfo | null;

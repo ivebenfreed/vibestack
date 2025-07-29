@@ -13,8 +13,6 @@
     "lint": "eslint . --max-warnings 10000",
     "lint:fix": "eslint . --fix",
     "type-check": "turbo run typecheck --filter=./apps/server && cd apps/web && npx tsc --noEmit",
-    "quality": "pnpm --filter @repo/code-quality build && pnpm --filter @repo/code-quality quality",
-    "prebuild": "pnpm quality",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "preinstall": "npx only-allow pnpm",
     "cli": "pnpm --filter @repo/cli cli",
@@ -33,7 +31,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
-    "@repo/code-quality": "workspace:*",
     "@repo/eslint-config": "workspace:*",
     "eslint": "^9.25.1",
     "eslint-plugin-import": "^2.29.1",

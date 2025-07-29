@@ -122,6 +122,13 @@ export const viewActions = {
         return context.sortBy;
       }
       
+      console.log('toggleSort: Current sortBy state', { 
+        currentSortBy: context.sortBy,
+        currentSortByDetails: context.sortBy.map(s => ({ field: s.field, direction: s.direction })),
+        field,
+        shiftKey 
+      });
+      
       const existingSort = context.sortBy.find(s => s.field === field);
       let newSortBy: SortConfig[];
       
@@ -132,18 +139,25 @@ export const viewActions = {
             ? context.sortBy.map(s => s.field === field ? { ...s, direction: 'desc' } : s)
             : [{ field: field, direction: 'desc' }];
         } else {
+          // desc -> remove (no sort)
           newSortBy = shiftKey
             ? context.sortBy.filter(s => s.field !== field)
             : [];
         }
       } else {
-        // Add new sort
+        // No existing sort - add new sort as 'asc'
         newSortBy = shiftKey
           ? [...context.sortBy, { field: field, direction: 'asc' }]
           : [{ field: field, direction: 'asc' }];
       }
       
-      console.log('toggleSort: Updating sort', { field, shiftKey, newSortBy });
+      console.log('toggleSort: Result', { 
+        existingSort,
+        newSortBy,
+        transition: existingSort 
+          ? `${existingSort.direction} -> ${newSortBy.find(s => s.field === field)?.direction || 'none'}`
+          : 'none -> asc'
+      });
       return newSortBy;
     }
   }),

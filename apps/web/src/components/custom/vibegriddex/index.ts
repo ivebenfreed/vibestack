@@ -51,7 +51,7 @@ export { tableBaseMachine, createTableEvent, measurePerformance } from './machin
 // HYBRID RENDERING
 // ====================================
 
-export { TableRenderer } from './renderers';
+export { CleanTableRenderer as TableRenderer } from './renderers';
 
 // Entity integration removed - table machine now subscribes directly to atoms
 
@@ -59,12 +59,7 @@ export { TableRenderer } from './renderers';
 // VIRTUALIZATION
 // ====================================
 
-// Virtualization exports removed - using renderer's internal VirtualScrollManager
-// export {
-//   VirtualScrollManager,
-//   createVirtualScrollManager,
-//   useVirtualScrollManager
-// } from './virtualization/VirtualScrollManager';
+// Virtualization handled internally by CleanTableRenderer
 
 // ====================================
 // CANVAS OVERLAYS

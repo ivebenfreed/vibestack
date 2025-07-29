@@ -14,7 +14,7 @@
 import { fromCallback } from 'xstate';
 import { CanvasOverlay } from '../overlays/CanvasOverlay';
 import type { ViewportInfo, CellRef } from '../types';
-import type { CoordinateMapping } from '../coordinates/VibeGridXCoordinateManager';
+import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { OverlayConfig, VisualCellPosition } from '../overlays/OverlayTypes';
 
 // ====================================

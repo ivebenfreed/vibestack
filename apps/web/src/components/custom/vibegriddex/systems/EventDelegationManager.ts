@@ -2,9 +2,8 @@
 // UNIFIED EVENT DELEGATION MANAGER
 // ====================================
 // 
-// This replaces all the competing event systems:
-// - VibeGridXEvents.tsx React handlers
-// - EventSystem.ts DOM handlers  
+// Unified event handling system that replaces:
+// - React event handlers
 // - Individual canvas/overlay handlers
 //
 // Single source of truth for ALL user interactions
@@ -56,7 +55,7 @@ export class EventDelegationManager {
     return this.config.getTableSend ? this.config.getTableSend() : this.config.tableSend;
   }
   private lastDragMoveTime = 0;
-  private readonly DRAG_MOVE_THROTTLE_MS = 16; // ~60fps
+  private readonly DRAG_MOVE_THROTTLE_MS = 50; // ~20fps for smoother performance
   
   // Bound handlers for cleanup
   private boundHandlers = {
@@ -121,7 +120,7 @@ export class EventDelegationManager {
     container.addEventListener('focusin', this.boundHandlers.handleFocusIn);
     container.addEventListener('focusout', this.boundHandlers.handleFocusOut);
     
-    // Scroll delegation - DISABLED: EventSystem in renderer handles scroll
+    // Scroll delegation - DISABLED: CleanTableRenderer handles scroll internally
     // this.setupScrollListener();
     
     console.log('🎯 EventDelegationManager: Event listeners attached');
@@ -840,7 +839,9 @@ export class EventDelegationManager {
       type: 'view.columns.drag.end',
       columnId: this.dragState.startColumnId!,
       x: containerCoords.x,
-      y: containerCoords.y
+      y: containerCoords.y,
+      clientX: event.clientX,
+      clientY: event.clientY
     });
   }
 
@@ -1091,7 +1092,7 @@ export class EventDelegationManager {
     document.removeEventListener('mousemove', this.boundHandlers.handleMouseMove);
     document.removeEventListener('mouseup', this.boundHandlers.handleMouseUp);
     
-    // Scroll handling disabled - EventSystem in renderer handles it
+    // Scroll handling disabled - CleanTableRenderer handles it internally
     
     this.isDestroyed = true;
     console.log('🎯 EventDelegationManager: Destroyed');

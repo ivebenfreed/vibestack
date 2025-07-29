@@ -3,9 +3,11 @@ import { useActorRef, useSelector } from '@xstate/react';
 // useLiveQuery removed - handled by XState store
 import { tableBaseMachine } from './machines/table-machine';
 import { toast } from 'sonner';
-import { 
-  type InitializationRefs 
-} from './VibeGridXCore';
+// InitializationRefs type moved inline since VibeGridXCore was removed
+type InitializationRefs = {
+  rendererRef: React.MutableRefObject<any>;
+  canvasRef: React.MutableRefObject<any>;
+};
 // PortalCanvasOverlayProvider removed - using embedded canvas approach
 // Legacy event handlers removed - using unified EventDelegationManager only
 import { EventDelegationManager, type EventDelegationConfig } from './systems/EventDelegationManager';
@@ -15,9 +17,9 @@ import {
   useVibeGridXApi
 } from './VibeGridXHooks';
 import type { RenderState, TableRow, CellRef, Column, RelationshipOptionsProviders } from './types';
-import type { TableRenderer } from './renderers/core/TableRenderer';
+// TableRenderer removed - using CleanTableRenderer via actor
 import { CanvasOverlay } from './overlays/CanvasOverlay';
-import { createVibeGridXCoordinateManager, type VibeGridXCoordinateManager } from './coordinates/VibeGridXCoordinateManager';
+// Deprecated coordinate manager removed - using dimensions-slice coordinate mapping
 import { VibeGridXHeader } from './components/VibeGridXHeader';
 import './vibegridx.css';
 
@@ -142,7 +144,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<TableRenderer | null>(null);
+  // rendererRef removed - using CleanTableRenderer via actor system
   const canvasOverlayRef = useRef<CanvasOverlay | null>(null);
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
@@ -306,8 +308,19 @@ export function VibeGridDex<T extends Record<string, any> = any>(
           console.warn('Slow render detected:', event);
         }
       }
+    },
+    onColumnClick: (field: string) => {
+      console.log('VibeGridDex: Column clicked for sort:', field);
+      // Send to table machine, not directly to store
+      // The table machine will handle the toggle logic and update the store
+      tableSend({ type: 'view.column.click', field });
+    },
+    onColumnDragEnd: (event: any) => {
+      console.log('VibeGridDex: Column drag ended, forwarding to table machine:', event);
+      // Forward the reorder event to the table machine
+      tableSend(event);
     }
-  }), [enableSelectionColumn]);
+  }), [enableSelectionColumn, tableActor]);
   
   // Store pending options for when container is ready
   pendingRendererOptionsRef.current = rendererOptions;
@@ -352,6 +365,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   useEffect(() => {
     return () => {
       delete (window as any).__vibegridx_renderer_options;
+      delete (window as any).__vibegridx_renderer_instance;
       
       // Cleanup store if exists
       if ((window as any).__vibegridx_store_cleanup) {
@@ -398,7 +412,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   }, [tableSend, tableActor]);
 
   // Create public API
-  const vibeGridXApi = useVibeGridXApi(tableSend, null, tableActor, rendererRef);
+  const vibeGridXApi = useVibeGridXApi(tableSend, null, tableActor, null);
   
   // Column visibility handlers
   const handleToggleColumn = useCallback((columnId: string) => {

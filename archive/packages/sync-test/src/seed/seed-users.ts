@@ -5,7 +5,7 @@ import { UserRole } from '@repo/dataforge/generated/server-entities';
 // --- API Response Type Definitions ---
 interface ApiResponse {
   message?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   [key: string]: any; // Allow other properties
 }
 
@@ -210,7 +210,7 @@ export async function main() {
   }
 }
 
-main().catch(e => {
-  console.error("Unhandled error in main execution:", e);
-  process.exit(1);
-});
+// main().catch(e => {
+//   console.error("Unhandled error in main execution:", e);
+//   process.exit(1);
+// });

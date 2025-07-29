@@ -49,7 +49,7 @@ export default function TasksTableView() {
       ]
     },
     { id: 'tags', field: 'tags', name: 'Tags', cellType: 'relationship-multi',
-      width: 250, editable: true,
+      width: 250, editable: true, sortable: false,
       relationshipTable: 'tags',
       relationshipDisplayField: 'name',
       junctionTable: 'task_tags',
