@@ -28,16 +28,33 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
   // Load persisted display state
   const persistedState = loadDisplayState(entityType);
   
+  // Initialize columns with the correct order if persisted
+  let initialColumns = columns || [];
+  if (persistedState?.columnOrder && persistedState.columnOrder.length > 0 && columns) {
+    // Reorder columns based on persisted order
+    const columnMap = new Map(columns.map(col => [col.id, col]));
+    initialColumns = persistedState.columnOrder
+      .map(id => columnMap.get(id))
+      .filter(Boolean) as any[];
+    
+    // Add any new columns that weren't in the persisted order
+    const orderedIds = new Set(persistedState.columnOrder);
+    const newColumns = columns.filter(col => !orderedIds.has(col.id));
+    initialColumns.push(...newColumns);
+  }
+  
   return fromStore({
     context: {
       entityType,
+      columns: initialColumns, // Full column objects in order
       entities: {} as Record<string, any>, // Raw resolved entities
       relationships: {} as Record<string, Record<string, any>>, // Lookup tables
       processedRows: [] as any[], // Table-ready rows for renderer
+      originalRows: [] as any[], // Original unsorted order for restoration
       sortBy: persistedState?.sortBy || [] as Array<{ field: string; direction: 'asc' | 'desc' }>,
       filters: persistedState?.filters || [] as Array<{ field: string; operator: string; value: any }>,
       columnVisibility: persistedState?.columnVisibility || {} as Record<string, boolean>,
-      columnOrder: persistedState?.columnOrder || [] as string[],
+      columnOrder: persistedState?.columnOrder || [] as string[], // Keep for backward compatibility during transition
       columnWidths: persistedState?.columnWidths || {} as Record<string, number>, // Column width persistence
       hiddenColumnCount: 0, // Track number of hidden columns
       groupBy: persistedState?.groupBy || [] as string[], // Grouping configuration
@@ -69,7 +86,7 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
         processedRows: (context, event) => {
           // Convert entities to table rows
           const entityValues = Object.values(event.entities);
-          const processedRows = entityValues.map((entity: any) => ({
+          let processedRows = entityValues.map((entity: any) => ({
             id: entity.id,
             data: entity, // This should contain fully resolved relationship data
             metadata: {
@@ -79,6 +96,63 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
               level: 0
             }
           }));
+          
+          // Apply persisted sort if it exists
+          if (context.sortBy.length > 0) {
+            processedRows = [...processedRows].sort((a, b) => {
+              for (const sort of context.sortBy) {
+                const aValue = a.data[sort.field];
+                const bValue = b.data[sort.field];
+                
+                // Handle null/undefined
+                if (aValue == null && bValue == null) continue;
+                if (aValue == null) return sort.direction === 'asc' ? 1 : -1;
+                if (bValue == null) return sort.direction === 'asc' ? -1 : 1;
+                
+                // Compare values normally
+                let comparison = 0;
+                if (typeof aValue === 'number' && typeof bValue === 'number') {
+                  comparison = aValue - bValue;
+                } else if (aValue instanceof Date && bValue instanceof Date) {
+                  comparison = aValue.getTime() - bValue.getTime();
+                } else {
+                  const aStr = String(aValue).toLowerCase();
+                  const bStr = String(bValue).toLowerCase();
+                  comparison = aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+                }
+                
+                if (comparison !== 0) {
+                  const result = sort.direction === 'desc' ? -comparison : comparison;
+                  
+                  // Debug logging for initial sort
+                  if (process.env.NODE_ENV === 'development' && sort.field === 'title') {
+                    console.log('📊 TableStore: Initial sort application', {
+                      field: sort.field,
+                      direction: sort.direction,
+                      aValue: String(aValue).substring(0, 20),
+                      bValue: String(bValue).substring(0, 20),
+                      comparison,
+                      result,
+                      shouldABeFirst: result < 0
+                    });
+                  }
+                  
+                  return result;
+                }
+              }
+              return 0;
+            });
+            
+            if (process.env.NODE_ENV === 'development' && context.sortBy[0]?.field === 'title') {
+              console.log('📊 TableStore: Initial data sorted with persisted state', {
+                sortBy: context.sortBy,
+                firstThree: processedRows.slice(0, 3).map(row => ({
+                  id: row.id,
+                  title: row.data.title
+                }))
+              });
+            }
+          }
           
           // Debug: Show sample resolved entity to verify relationship resolution
           if (process.env.NODE_ENV === 'development' && entityValues.length > 0) {
@@ -95,6 +169,20 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           }
           
           return processedRows;
+        },
+        originalRows: (context, event) => {
+          // Store the original unsorted order for restoration when sort is cleared
+          const entityValues = Object.values(event.entities);
+          return entityValues.map((entity: any) => ({
+            id: entity.id,
+            data: entity,
+            metadata: {
+              isSelected: false,
+              isDirty: false,
+              isGroup: false,
+              level: 0
+            }
+          }));
         },
         loading: false,
         error: null,
@@ -152,6 +240,33 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           } else {
             // New entity - add to processed rows
             return [...context.processedRows, {
+              id: event.entity.id,
+              data: resolvedEntity,
+              metadata: {
+                isSelected: false,
+                isDirty: false,
+                isGroup: false,
+                level: 0
+              }
+            }];
+          }
+        },
+        originalRows: (context, event) => {
+          // Also update originalRows to maintain unsorted order consistency
+          const relationshipConfigs = discoverRelationships(columns || []);
+          const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
+          
+          const rowIndex = context.originalRows.findIndex(row => row.id === event.entity.id);
+          if (rowIndex !== -1) {
+            const updatedRows = [...context.originalRows];
+            updatedRows[rowIndex] = {
+              ...updatedRows[rowIndex],
+              data: resolvedEntity
+            };
+            return updatedRows;
+          } else {
+            // New entity - add to original rows (append to maintain insertion order)
+            return [...context.originalRows, {
               id: event.entity.id,
               data: resolvedEntity,
               metadata: {
@@ -255,14 +370,30 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       setSortBy: {
         sortBy: (context, event: { sortBy: Array<{ field: string; direction: 'asc' | 'desc' }> }) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('📊 TableStore: Setting sort configuration', { sortBy: event.sortBy });
+            console.log('📊 TableStore: Setting sort configuration', { 
+              oldSortBy: context.sortBy,
+              newSortBy: event.sortBy,
+              isClearing: event.sortBy.length === 0,
+              timestamp: Date.now()
+            });
           }
           return event.sortBy;
         },
         processedRows: (context, event) => {
+          // If clearing sort, restore original order
+          if (event.sortBy.length === 0) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('📊 TableStore: Clearing sort, restoring original order', {
+                originalRowCount: context.originalRows.length,
+                currentRowCount: context.processedRows.length
+              });
+            }
+            return [...context.originalRows];
+          }
+          
           // Re-sort processed rows
           if (event.sortBy.length > 0 && context.processedRows.length > 0) {
-            return [...context.processedRows].sort((a, b) => {
+            const sortedRows = [...context.processedRows].sort((a, b) => {
               for (const sort of event.sortBy) {
                 const aValue = a.data[sort.field];
                 const bValue = b.data[sort.field];
@@ -272,7 +403,39 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
                 if (aValue == null) return sort.direction === 'asc' ? 1 : -1;
                 if (bValue == null) return sort.direction === 'asc' ? -1 : 1;
                 
-                // Compare values
+                // Special handling for statusId - use sortOrder from relationship data
+                if (sort.field === 'statusId' && context.relationships?.status_definitions) {
+                  const aStatus = context.relationships.status_definitions[aValue];
+                  const bStatus = context.relationships.status_definitions[bValue];
+                  
+                  if (aStatus?.sortOrder != null && bStatus?.sortOrder != null) {
+                    const comparison = aStatus.sortOrder - bStatus.sortOrder;
+                    if (comparison !== 0) {
+                      return sort.direction === 'desc' ? -comparison : comparison;
+                    }
+                  }
+                }
+                
+                // Handle array fields (multi-relationships) - sort by count or first item
+                if (Array.isArray(aValue) && Array.isArray(bValue)) {
+                  // Sort by count of items
+                  const comparison = aValue.length - bValue.length;
+                  if (comparison !== 0) {
+                    return sort.direction === 'desc' ? -comparison : comparison;
+                  }
+                  // If counts are equal, compare first items if they exist
+                  if (aValue.length > 0 && bValue.length > 0) {
+                    const aFirst = String(aValue[0]).toLowerCase();
+                    const bFirst = String(bValue[0]).toLowerCase();
+                    const firstComparison = aFirst < bFirst ? -1 : aFirst > bFirst ? 1 : 0;
+                    if (firstComparison !== 0) {
+                      return sort.direction === 'desc' ? -firstComparison : firstComparison;
+                    }
+                  }
+                  continue;
+                }
+                
+                // Compare values normally
                 let comparison = 0;
                 if (typeof aValue === 'number' && typeof bValue === 'number') {
                   comparison = aValue - bValue;
@@ -285,11 +448,39 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
                 }
                 
                 if (comparison !== 0) {
-                  return sort.direction === 'desc' ? -comparison : comparison;
+                  const result = sort.direction === 'desc' ? -comparison : comparison;
+                  
+                  // Debug logging for sort verification
+                  if (process.env.NODE_ENV === 'development' && sort.field === 'title') {
+                    console.log('📊 TableStore: Sort comparison debug', {
+                      field: sort.field,
+                      direction: sort.direction,
+                      aValue: String(aValue).substring(0, 20),
+                      bValue: String(bValue).substring(0, 20),
+                      comparison,
+                      result,
+                      shouldABeFirst: result < 0
+                    });
+                  }
+                  
+                  return result;
                 }
               }
               return 0;
             });
+            
+            // Debug logging for sort result
+            if (process.env.NODE_ENV === 'development' && event.sortBy[0]?.field === 'title') {
+              console.log('📊 TableStore: Sort applied, first 3 results', {
+                sortBy: event.sortBy,
+                firstThree: sortedRows.slice(0, 3).map(row => ({
+                  id: row.id,
+                  title: row.data.title
+                }))
+              });
+            }
+            
+            return sortedRows;
           }
           return context.processedRows;
         },
@@ -378,11 +569,89 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
       },
       
       reorderColumns: {
+        columns: (context, event: { fromIndex: number; toIndex: number }) => {
+          console.log('🔄 Store: reorderColumns called', {
+            fromIndex: event.fromIndex,
+            toIndex: event.toIndex,
+            currentColumns: context.columns.map(c => c.id),
+            visibility: context.columnVisibility
+          });
+          
+          // Get visible columns only (excluding selection column)
+          const visibleColumns = context.columns.filter((col: any) => 
+            col.id !== '__selection' && context.columnVisibility[col.id] !== false
+          );
+          
+          console.log('🔄 Store: Visible columns before reorder', visibleColumns.map(c => c.id));
+          
+          // Apply reorder to visible columns
+          const newVisibleOrder = [...visibleColumns];
+          const [removed] = newVisibleOrder.splice(event.fromIndex, 1);
+          newVisibleOrder.splice(event.toIndex, 0, removed);
+          
+          console.log('🔄 Store: Visible columns after reorder', {
+            moved: removed.id,
+            from: event.fromIndex,
+            to: event.toIndex,
+            newOrder: newVisibleOrder.map(c => c.id)
+          });
+          
+          // Create a new columns array maintaining hidden columns in their positions
+          const newColumns: any[] = [];
+          const addedColumns = new Set<string>();
+          
+          // Process each column in the original order
+          for (const column of context.columns) {
+            // Special handling for selection column - skip it
+            if (column.id === '__selection') {
+              continue;
+            }
+            
+            // If this column is hidden, add it in its original position
+            if (context.columnVisibility[column.id] === false) {
+              newColumns.push(column);
+              addedColumns.add(column.id);
+              continue;
+            }
+            
+            // For visible columns, add the next one from our reordered list
+            if (!addedColumns.has(column.id)) {
+              const nextVisible = newVisibleOrder.find(col => !addedColumns.has(col.id));
+              if (nextVisible) {
+                newColumns.push(nextVisible);
+                addedColumns.add(nextVisible.id);
+              }
+            }
+          }
+          
+          // Add any remaining visible columns that weren't added
+          // (this shouldn't happen but is a safety check)
+          newVisibleOrder.forEach(col => {
+            if (!addedColumns.has(col.id)) {
+              newColumns.push(col);
+              addedColumns.add(col.id);
+            }
+          });
+          
+          console.log('🔄 Store: Final column order', {
+            oldOrder: context.columns.map(c => c.id),
+            newOrder: newColumns.map(c => c.id),
+            changed: JSON.stringify(newColumns.map(c => c.id)) !== JSON.stringify(context.columns.map(c => c.id))
+          });
+          
+          // Save the new column order to persistence
+          saveDisplayState(context.entityType, {
+            ...context,
+            columns: newColumns,
+            columnOrder: newColumns.map(c => c.id) // Keep for backward compatibility
+          });
+          
+          return newColumns;
+        },
+        // Also update columnOrder for backward compatibility
         columnOrder: (context, event: { fromIndex: number; toIndex: number }) => {
-          const newOrder = [...context.columnOrder];
-          const [removed] = newOrder.splice(event.fromIndex, 1);
-          newOrder.splice(event.toIndex, 0, removed);
-          return newOrder;
+          // This will be computed from the new columns array
+          return context.columns.map(c => c.id);
         }
       },
       
@@ -928,7 +1197,7 @@ export function saveDisplayState(entityType: string, state: any) {
   try {
     const key = `${STORAGE_KEY_PREFIX}${entityType}`;
     const displayState = {
-      columnOrder: state.columnOrder,
+      columnOrder: state.columns ? state.columns.map(c => c.id) : state.columnOrder,
       columnVisibility: state.columnVisibility,
       columnWidths: state.columnWidths,
       sortBy: state.sortBy,

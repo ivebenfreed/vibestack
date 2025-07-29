@@ -12,7 +12,7 @@
 // ====================================
 
 import { fromCallback } from 'xstate';
-import type { TableRenderer } from '../renderers/core/TableRenderer';
+import type { CleanTableRenderer } from '../renderers/core/CleanTableRenderer';
 import type { RenderState, RendererOptions, ViewportInfo, Column } from '../types';
 
 // ====================================
@@ -109,7 +109,7 @@ function calculateCoordinateMapping(
 // ====================================
 
 export const rendererActor = fromCallback<RendererActorEvent, RendererActorResponse>(({ sendBack, receive }) => {
-  let renderer: TableRenderer | null = null;
+  let renderer: CleanTableRenderer | null = null;
   let renderState: RenderState | null = null;
   let isInitializing = false;
   let isInitialized = false;
@@ -139,8 +139,8 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           
           isInitializing = true;
           
-          // Import TableRenderer dynamically to avoid circular imports
-          import('../renderers/core/TableRenderer').then(({ TableRenderer }) => {
+          // Import CleanTableRenderer dynamically to avoid circular imports
+          import('../renderers/core/CleanTableRenderer').then(({ CleanTableRenderer }) => {
             // Merge stored options from window with event options
             const storedOptions = (window as any).__vibegridx_renderer_options || {};
             const mergedOptions = {
@@ -234,9 +234,12 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
               } : null
             });
             
-            renderer = new TableRenderer(mergedOptions);
+            renderer = new CleanTableRenderer(mergedOptions);
             isInitializing = false;
             isInitialized = true;
+            
+            // Store renderer instance on window for access by view handlers
+            (window as any).__vibegridx_renderer_instance = renderer;
             
             console.log('RendererActor: Renderer created successfully', {
               renderer,
@@ -282,6 +285,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             }
           }).catch((error) => {
             console.error('RendererActor: Failed to create renderer:', error);
+            console.error('Full error:', error.stack);
             isInitializing = false; // Reset flag on error
             sendBack({ 
               type: 'RENDERER_ERROR', 
@@ -537,13 +541,30 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             return;
           }
           
-          // Import and use the drag preview helper
-          const { applyDragPreview } = await import('../machines/table-machine/helpers/drag-preview-helpers');
+          // Call the drag preview method on the renderer
+          if ('applyDragPreview' in renderer && typeof renderer.applyDragPreview === 'function') {
+            renderer.applyDragPreview(event.dragPreview);
+          } else {
+            console.warn('RendererActor: Renderer does not have applyDragPreview method');
+          }
+          break;
           
-          // Get DOM manager from renderer
-          const domManager = (renderer as any).domManager;
-          if (domManager && event.dragPreview) {
-            applyDragPreview(event.dragPreview, domManager);
+        case 'UPDATE_DRAG_POSITION':
+          if (!renderer) {
+            console.warn('RendererActor: Cannot update drag position - renderer not initialized');
+            return;
+          }
+          
+          // Let renderer handle all drag calculations internally
+          if ('updateDragPosition' in renderer && typeof renderer.updateDragPosition === 'function') {
+            renderer.updateDragPosition({
+              draggedColumnId: event.draggedColumnId,
+              columnName: event.columnName,
+              mouseX: event.mouseX,
+              mouseY: event.mouseY
+            });
+          } else {
+            console.warn('RendererActor: Renderer does not have updateDragPosition method');
           }
           break;
           
@@ -553,13 +574,11 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             return;
           }
           
-          // Import and use the drag preview helper
-          const { clearDragPreview } = await import('../machines/table-machine/helpers/drag-preview-helpers');
-          
-          // Get DOM manager from renderer
-          const domManagerClear = (renderer as any).domManager;
-          if (domManagerClear) {
-            clearDragPreview(domManagerClear);
+          // Call the clear drag preview method on the renderer
+          if ('clearDragPreview' in renderer && typeof renderer.clearDragPreview === 'function') {
+            renderer.clearDragPreview();
+          } else {
+            console.warn('RendererActor: Renderer does not have clearDragPreview method');
           }
           break;
           
@@ -597,6 +616,8 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
           if (renderer) {
             renderer.destroy?.();
             renderer = null;
+            // Clean up window reference
+            delete (window as any).__vibegridx_renderer_instance;
           }
           break;
           

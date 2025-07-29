@@ -59,7 +59,6 @@ export interface DimensionsState {
  */
 const buildColumnCoordinates = (
   columns: Column[],
-  columnOrder: string[],
   columnVisibility: Record<string, boolean>,
   columnWidths?: Record<string, number>
 ): ColumnCoordinate[] => {
@@ -76,36 +75,25 @@ const buildColumnCoordinates = (
   });
   currentOffset += SELECTION_COLUMN_WIDTH;
   
-  // Add visible columns in order
-  for (const columnId of columnOrder) {
-    if (columnId === SELECTION_COLUMN_ID) continue;
-    
-    const column = columns.find(col => col.id === columnId);
-    if (column && columnVisibility[columnId] !== false) {
-      const width = columnWidths?.[columnId] || column.width || DEFAULT_COLUMN_WIDTH;
-      coordinates.push({
-        columnId: column.id,
-        index: currentIndex++,
-        offset: currentOffset,
-        width
-      });
-      currentOffset += width;
-    }
-  }
-  
-  // Add any remaining visible columns not in order
-  const processedIds = new Set([SELECTION_COLUMN_ID, ...columnOrder]);
+  // Add visible columns in the order they appear in the columns array
   for (const column of columns) {
-    if (!processedIds.has(column.id) && columnVisibility[column.id] !== false) {
-      const width = columnWidths?.[column.id] || column.width || DEFAULT_COLUMN_WIDTH;
-      coordinates.push({
-        columnId: column.id,
-        index: currentIndex++,
-        offset: currentOffset,
-        width
-      });
-      currentOffset += width;
-    }
+    // Skip if column is undefined or doesn't have an id
+    if (!column || !column.id) continue;
+    
+    // Skip selection column - it's already added
+    if (column.id === SELECTION_COLUMN_ID) continue;
+    
+    // Skip hidden columns
+    if (columnVisibility[column.id] === false) continue;
+    
+    const width = columnWidths?.[column.id] || column.width || DEFAULT_COLUMN_WIDTH;
+    coordinates.push({
+      columnId: column.id,
+      index: currentIndex++,
+      offset: currentOffset,
+      width
+    });
+    currentOffset += width;
   }
   
   return coordinates;
@@ -133,22 +121,25 @@ export const createInitialDimensionsState = (
   rowHeight: number = DEFAULT_ROW_HEIGHT,
   columnOrder: string[] = [],
   columnVisibility: Record<string, boolean> = {},
-  columnWidths?: Record<string, number>
+  columnWidths?: Record<string, number>,
+  storeActor?: any
 ): DimensionsState => {
-  // Default visibility - all columns visible
+  // Create a minimal initial coordinate mapping
+  // This will be recalculated when store data becomes available
+  const initialColumns = columns.length > 0 ? columns : [];
   const visibility = Object.keys(columnVisibility).length > 0 
     ? columnVisibility 
-    : Object.fromEntries(columns.map(col => [col.id, true]));
+    : Object.fromEntries(initialColumns.map(col => [col.id, true]));
   
-  // Default order - all columns
-  const order = columnOrder.length > 0 
-    ? columnOrder 
-    : columns.map(col => col.id);
+  console.log('🔧 Creating initial dimensions state', {
+    columnsCount: initialColumns.length,
+    rowCount
+  });
   
-  // Build coordinate mapping
+  // Build initial coordinate mapping - will be replaced when store syncs
   const coordinateMapping: CoordinateMapping = {
     rows: buildRowCoordinates(rowCount, rowHeight),
-    columns: buildColumnCoordinates(columns, order, visibility, columnWidths),
+    columns: buildColumnCoordinates(initialColumns, visibility, columnWidths),
     version: 0
   };
   
@@ -165,26 +156,42 @@ export const createInitialDimensionsState = (
 
 export const dimensionActions = {
   /**
-   * Recalculate coordinate mapping when layout changes
+   * Calculate coordinates directly from store data - no persistent mapping
    */
   recalculateCoordinateMapping: assign({
     coordinateMapping: ({ context }) => {
-      // Get current column widths from existing coordinate mapping
-      const currentColumnWidths = context.coordinateMapping?.columns ? 
-        Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width])) : 
-        {};
+      // Get columns and visibility directly from store
+      const storeSnapshot = context.storeActor?.getSnapshot();
+      const storeColumns = storeSnapshot?.context?.columns || context.columns;
+      const columnVisibility = storeSnapshot?.context?.columnVisibility || context.columnVisibility || {};
+      const columnWidths = storeSnapshot?.context?.columnWidths || context.columnWidths || {};
+      
+      console.log('🔄 Recalculating coordinates from store data', {
+        storeColumnsCount: storeColumns.length,
+        storeColumnIds: storeColumns.map(c => c.id),
+        visibilityKeys: Object.keys(columnVisibility),
+        visibility: columnVisibility,
+        widthKeys: Object.keys(columnWidths),
+        hiddenColumns: Object.entries(columnVisibility).filter(([_, visible]) => visible === false).map(([id]) => id)
+      });
       
       const columnCoordinates = buildColumnCoordinates(
-        context.columns,
-        context.columnOrder,
-        context.columnVisibility,
-        currentColumnWidths
+        storeColumns,
+        columnVisibility,
+        columnWidths
       );
       
+      console.log('🔄 Built column coordinates', {
+        coordinatesCount: columnCoordinates.length,
+        coordinateIds: columnCoordinates.map(c => c.columnId)
+      });
+      
+      const rowCoordinates = buildRowCoordinates(context.totalRows, context.rowHeight);
+      
       return {
-        rows: context.coordinateMapping.rows,
+        rows: rowCoordinates,
         columns: columnCoordinates,
-        version: context.coordinateMapping.version + 1
+        version: (context.coordinateMapping?.version || 0) + 1
       };
     }
   }),

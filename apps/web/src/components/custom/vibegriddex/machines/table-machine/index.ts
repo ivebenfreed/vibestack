@@ -8,7 +8,6 @@ import type { TableContext, TableEvents, TableConfig, RenderState } from '../../
 // Import slices
 import { createInitialDimensionsState, dimensionActions } from './slices/dimensions-slice';
 import { createInitialSelectionState, selectionActions } from './slices/selection-slice';
-import { createInitialViewState, viewActions } from './slices/view-slice';
 import { createInitialEditState, editActions } from './slices/edit-slice';
 import { createInitialDragState, dragActions } from './slices/drag-slice';
 import { createInitialOverlayState, overlayActions } from './slices/overlay-slice';
@@ -24,6 +23,34 @@ import { clipboardHandlers } from './event-handlers/clipboard-handlers';
 
 // Import helpers
 import { createViewportFromScroll, calculateVisualPositions } from './helpers/visual-position-helpers';
+
+// ====================================
+// CENTRALIZED COLUMN HELPERS
+// ====================================
+
+/**
+ * Get visible columns from store data with proper ordering
+ * Single source of truth for column visibility logic
+ */
+const getVisibleColumnsFromStore = (storeActor: any, fallbackColumns: any[] = []) => {
+  const storeSnapshot = storeActor?.getSnapshot();
+  const storeColumns = storeSnapshot?.context?.columns || fallbackColumns;
+  const columnVisibility = storeSnapshot?.context?.columnVisibility || {};
+  
+  // Filter out selection column and hidden columns
+  return storeColumns.filter(col => 
+    col.id !== '__selection' && columnVisibility[col.id] !== false
+  );
+};
+
+/**
+ * Add selection column if enabled
+ */
+const addSelectionColumnIfEnabled = (columns: any[], enableSelectionColumn: boolean) => {
+  return enableSelectionColumn
+    ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...columns]
+    : columns;
+};
 
 // Import actors
 import { rendererActor } from '../../actors/renderer-actor';
@@ -60,21 +87,17 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Load persisted data if available (sync machine pattern)
   const persistedData = input.persistedData;
   
-  // Create view state with persisted view settings FIRST (needed for column order)
-  const viewState = createInitialViewState(
-    input.entityType,
-    input.columns || [],
-    input.settings?.initialViewport,
-    persistedData // Pass all persisted data for view state initialization
-  );
+  // View state is now managed by the store - just get column order for coordinate mapping
+  const persistedColumnOrder = persistedData?.columnOrder || [];
+  const persistedColumnVisibility = persistedData?.columnVisibility || {};
   
   // Create dimension state with persisted column widths
   const dimensionState = createInitialDimensionsState(
     input.columns || [],
     initialRowCount,
     rowHeight,
-    viewState.columnOrder, // Pass column order for coordinate mapping
-    viewState.columnVisibility, // Pass column visibility
+    persistedColumnOrder, // Pass column order for coordinate mapping
+    persistedColumnVisibility, // Pass column visibility
     persistedData?.columnWidths // Pass persisted column widths
   );
   
@@ -130,8 +153,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Spread selection state
     ...selectionState,
     
-    // Spread view state
-    ...viewState,
+    // View state now managed by store - just keep viewport for coordinate calculations
+    viewport: input.settings?.initialViewport || null,
     
     // Spread edit state
     ...editState,
@@ -226,8 +249,7 @@ export const tableBaseMachine = setup({
     // Selection actions  
     ...selectionActions,
     
-    // View actions
-    ...viewActions,
+    // View actions removed - now handled by store
     
     // Edit actions
     ...editActions,
@@ -282,26 +304,27 @@ export const tableBaseMachine = setup({
       }
     },
     
-    // Persistence action
+    // Persistence action - now persists to store
     persistSnapshot: ({ context, self }) => {
       if (typeof window === 'undefined') return;
       
       const key = `vibegridx-${context.id}-state`;
       try {
-        // Don't use getPersistedSnapshot - just save what we need
-        const currentState = self.getSnapshot();
+        // Get view state from store actor
+        const storeSnapshot = context.storeActor?.getSnapshot();
+        const storeContext = storeSnapshot?.context;
         
         const stateToPersist = {
-          value: currentState.value,
+          value: self.getSnapshot().value,
           context: {
-            // Only persist the UI state fields we care about
+            // Only persist the UI state fields from store
             rowHeight: context.rowHeight,
-            sortBy: context.sortBy,
-            filters: context.filters,
-            groupBy: context.groupBy,
-            columnVisibility: context.columnVisibility,
-            columnOrder: context.columnOrder,
-            hiddenColumnCount: context.hiddenColumnCount,
+            sortBy: storeContext?.sortBy || [],
+            filters: storeContext?.filters || [],
+            groupBy: storeContext?.groupBy || [],
+            columnVisibility: storeContext?.columnVisibility || {},
+            columnOrder: storeContext?.columnOrder || [],
+            hiddenColumnCount: Object.values(storeContext?.columnVisibility || {}).filter(v => !v).length,
             settings: context.settings,
             viewport: context.viewport,
             // Persist column widths from coordinate mapping
@@ -358,12 +381,6 @@ export const tableBaseMachine = setup({
         totalRows: 0,
         selectedCells: new Set(),
         anchorCell: null,
-        sortBy: [],
-        filters: [],
-        groupBy: [],
-        columnVisibility: {},
-        columnOrder: [],
-        hiddenColumnCount: 0,
         viewport: null,
         storeActor: null,
         columnWidths: {}
@@ -579,22 +596,9 @@ export const tableBaseMachine = setup({
           if (context.rows.length > 0 && context.actors.rendererActor) {
             console.log('🔍 TableMachine: Triggering initial render on active entry');
             
-            // Get visible columns
-            const visibleColumns = context.columns.filter(col => 
-              context.columnVisibility[col.id] !== false
-            );
-            
-            // Apply column order
-            const orderedColumns = context.columnOrder.length > 0
-              ? context.columnOrder
-                  .map(colId => visibleColumns.find(col => col.id === colId))
-                  .filter(Boolean)
-              : visibleColumns;
-            
-            // Add selection column if enabled
-            const columnsWithSelection = context.enableSelectionColumn
-              ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
-              : orderedColumns;
+            // Get visible columns using centralized logic
+            const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
+            const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
             
             // Send coordinate calculation request
             context.actors.rendererActor.send({
@@ -856,179 +860,50 @@ export const tableBaseMachine = setup({
       
       // Handle these events at the active state level
       on: {
-      // Handle store snapshot updates at active level so it's always available
+      // Handle store snapshot updates - simplified flow
       STORE_SNAPSHOT_RECEIVED: {
         actions: [
-          // Check if update affects visible rows or sorted columns
-          ({ context, event, self }) => {
-            const oldRows = context.rows;
-            const newRows = event.snapshot?.context?.processedRows || [];
-            const oldSortBy = context.sortBy || [];
-            const newSortBy = event.snapshot?.context?.sortBy || [];
-            const viewport = context.viewport;
-            
-            // Determine if we need to re-render
-            let needsRender = false;
-            let renderType: 'full' | 'surgical' | 'none' = 'none';
-            let reason = '';
-            
-            // If no viewport, always render (initial load or no virtualization)
-            if (!viewport) {
-              needsRender = true;
-              renderType = 'full';
-              reason = 'no_viewport';
-            } else {
-              // Check if sorting configuration changed
-              const sortingChanged = JSON.stringify(oldSortBy) !== JSON.stringify(newSortBy);
-              
-              // Check if row order changed (affects sorting or structural changes)
-              const orderChanged = oldRows.length !== newRows.length ||
-                oldRows.some((row, idx) => newRows[idx]?.id !== row.id);
-              
-              // Check if any visible rows changed content
-              const visibleRowsChanged = oldRows.slice(viewport.start, viewport.end + 1).some((oldRow, idx) => {
-                const newRow = newRows[viewport.start + idx];
-                return !newRow || oldRow.id !== newRow.id || 
-                       JSON.stringify(oldRow.data) !== JSON.stringify(newRow.data);
-              });
-              
-              // IMPORTANT: Check if updates affect sorted columns
-              // Even if the changed row isn't visible, if it affects a sorted column,
-              // we need to retrigger the sort as it could change row positions
-              const sortedFields = new Set(newSortBy.map(sort => sort.field));
-              let affectsSortedColumns = false;
-              
-              if (sortedFields.size > 0 && !orderChanged) {
-                // Compare all rows to detect changes to sorted fields
-                // We need to check beyond just visible rows for sort impact
-                for (let i = 0; i < Math.max(oldRows.length, newRows.length); i++) {
-                  const oldRow = oldRows[i];
-                  const newRow = newRows[i];
-                  
-                  if (!oldRow || !newRow || oldRow.id !== newRow.id) {
-                    continue; // Skip structural changes (already handled by orderChanged)
-                  }
-                  
-                  // Check if any sorted field changed in this row
-                  for (const fieldName of sortedFields) {
-                    const oldValue = oldRow.data?.[fieldName];
-                    const newValue = newRow.data?.[fieldName];
-                    
-                    if (oldValue !== newValue) {
-                      affectsSortedColumns = true;
-                      console.log('🔍 TableMachine: Detected change to sorted field', {
-                        rowId: newRow.id,
-                        field: fieldName,
-                        oldValue,
-                        newValue,
-                        isVisible: i >= viewport.start && i <= viewport.end
-                      });
-                      break;
-                    }
-                  }
-                  
-                  if (affectsSortedColumns) break;
-                }
-              }
-              
-              // Determine render need and type
-              if (sortingChanged) {
-                needsRender = true;
-                renderType = 'full';
-                reason = 'sorting_config_changed';
-              } else if (orderChanged) {
-                needsRender = true;
-                renderType = 'full';
-                reason = 'row_order_changed';
-              } else if (affectsSortedColumns) {
-                needsRender = true;
-                renderType = 'full'; // Sort changes require full render
-                reason = 'sorted_column_affected';
-              } else if (visibleRowsChanged) {
-                needsRender = true;
-                renderType = 'surgical';
-                reason = 'visible_content_changed';
-              }
-              
-              console.log('🔍 TableMachine: Store update visibility check', {
-                oldRowCount: oldRows.length,
-                newRowCount: newRows.length,
-                viewport: `${viewport.start}-${viewport.end}`,
-                sortedFields: Array.from(sortedFields),
-                sortingChanged,
-                orderChanged,
-                visibleRowsChanged,
-                affectsSortedColumns,
-                needsRender,
-                renderType,
-                reason
-              });
-            }
-            
-            // Store render decision for next action
-            (context as any).__renderDecision = { needsRender, renderType, reason };
-          },
-          
           // Update context with processed data from store
           assign({
-            entities: ({ event }) => {
-              if (event.snapshot?.context?.entities) {
-                return Object.values(event.snapshot.context.entities);
-              }
-              return [];
-            },
+            entities: ({ event }) => event.snapshot?.context?.entities ? Object.values(event.snapshot.context.entities) : [],
             rows: ({ event }) => event.snapshot?.context?.processedRows || [],
             visibleRowIds: ({ event }) => event.snapshot?.context?.processedRows?.map((r: any) => r.id) || [],
             sortBy: ({ event }) => event.snapshot?.context?.sortBy || [],
             filters: ({ event }) => event.snapshot?.context?.filters || [],
             columnVisibility: ({ event }) => event.snapshot?.context?.columnVisibility || {},
             columnOrder: ({ event }) => event.snapshot?.context?.columnOrder || [],
-            columnWidths: ({ event }) => event.snapshot?.context?.columnWidths || {}
+            columnWidths: ({ event }) => event.snapshot?.context?.columnWidths || {},
+            // CRITICAL: Update columns from store to get the correct order!
+            columns: ({ event }) => event.snapshot?.context?.columns || []
           }),
           
-          // Calculate coordinates and render only if needed
+          // Recalculate coordinate mapping with the new columns from store
+          dimensionActions.recalculateCoordinateMapping,
+          
+          // Always render when store emits new data - store decides what changed
           ({ context, self }) => {
-            const renderDecision = (context as any).__renderDecision || { needsRender: true, renderType: 'full', reason: 'default' };
-            
-            if (!renderDecision.needsRender) {
-              console.log('🔍 TableMachine: Skipping render - no changes needed');
+            if (!context.actors.rendererActor) {
+              console.log('🔍 TableMachine: No renderer actor available');
               return;
             }
             
-            if (context.actors.rendererActor) {
-              console.log('🔍 TableMachine: Requesting coordinate calculation from renderer', {
-                rowCount: context.rows.length,
-                columnCount: context.columns.length,
-                renderType: renderDecision.renderType,
-                reason: renderDecision.reason
-              });
-              
-              // Get visible columns based on store state
-              const visibleColumns = context.columns.filter(col => 
-                context.columnVisibility[col.id] !== false
-              );
-              
-              // Apply column order
-              const orderedColumns = context.columnOrder.length > 0
-                ? context.columnOrder
-                    .map(colId => visibleColumns.find(col => col.id === colId))
-                    .filter(Boolean)
-                : visibleColumns;
-              
-              // Add selection column if enabled
-              const columnsWithSelection = context.enableSelectionColumn
-                ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
-                : orderedColumns;
-              
-              context.actors.rendererActor.send({
-                type: 'CALCULATE_COORDINATES',
-                rows: context.rows,
-                columns: columnsWithSelection,
-                columnWidths: context.columnWidths || (context.coordinateMapping?.columns
-                  ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
-                  : undefined)
-              });
-            }
+            console.log('🔍 TableMachine: Store update received, rendering', {
+              rowCount: context.rows.length,
+              columnCount: context.columns.length
+            });
+            
+            // Get visible columns using centralized logic
+            const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
+            const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
+            
+            context.actors.rendererActor.send({
+              type: 'CALCULATE_COORDINATES',
+              rows: context.rows,
+              columns: columnsWithSelection,
+              columnWidths: context.columnWidths || (context.coordinateMapping?.columns
+                ? Object.fromEntries(context.coordinateMapping.columns.map(col => [col.columnId, col.width]))
+                : undefined)
+            });
           }
         ]
       },
@@ -1055,20 +930,13 @@ export const tableBaseMachine = setup({
           // Send render command to renderer with full state
           ({ context }) => {
             if (context.actors.rendererActor) {
-              // Get ordered visible columns
-              const visibleColumns = context.columns.filter(col => 
-                context.columnVisibility[col.id] !== false
-              );
+              // Get visible columns using centralized logic
+              const visibleColumns = getVisibleColumnsFromStore(context.storeActor, context.columns);
+              const columnsWithSelection = addSelectionColumnIfEnabled(visibleColumns, context.enableSelectionColumn);
               
-              const orderedColumns = context.columnOrder.length > 0
-                ? context.columnOrder
-                    .map(colId => visibleColumns.find(col => col.id === colId))
-                    .filter(Boolean)
-                : visibleColumns;
-              
-              const columnsWithSelection = context.enableSelectionColumn
-                ? [{ id: '__selection', field: '__selection', name: 'Select', width: 48 }, ...orderedColumns]
-                : orderedColumns;
+              // Get store state for render data
+              const storeSnapshot = context.storeActor?.getSnapshot();
+              const columnVisibility = storeSnapshot?.context?.columnVisibility || {};
               
               context.actors.rendererActor.send({
                 type: 'RENDER',
@@ -1080,9 +948,8 @@ export const tableBaseMachine = setup({
                   groupedData: [],
                   optimisticOperations: new Map(),
                   version: context.version,
-                  sortBy: context.sortBy,
-                  columnVisibility: context.columnVisibility,
-                  columnOrder: context.columnOrder,
+                  sortBy: storeSnapshot?.context?.sortBy || [],
+                  columnVisibility: columnVisibility,
                   coordinateMapping: context.coordinateMapping
                 }
               });
