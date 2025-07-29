@@ -853,6 +853,49 @@ export class IncomingChangeService {
   }
 
   /**
+   * Helper to match table names with entity names
+   * Handles various formats: 'tasks' -> 'Task', '"tasks"' -> 'Task', etc.
+   */
+  private matchTableToEntity(tableName: string, entityName: string): boolean {
+    // Remove quotes if present
+    const cleanTable = tableName.replace(/^"(.*)"$/, '$1');
+    
+    // Special case handling for known irregular plurals and naming patterns
+    const specialCases: Record<string, string[]> = {
+      'StatusDefinition': ['status_definitions', 'statusdefinitions'],
+      'StatusSet': ['status_sets', 'statussets'],
+      'TagSet': ['tag_sets', 'tagsets'],
+      'ChangeHistory': ['change_history', 'changehistory'],
+    };
+    
+    // Check special cases first
+    if (specialCases[entityName]) {
+      if (specialCases[entityName].includes(cleanTable)) {
+        return true;
+      }
+    }
+    
+    // Convert entity name to table name format (e.g., 'Task' -> 'tasks')
+    const entityAsTable = entityName.toLowerCase() + 's';
+    const entityAsTableAlt = entityName.toLowerCase();
+    
+    // Convert camelCase/PascalCase to snake_case
+    const entityAsSnakeCase = entityName
+      .replace(/([A-Z])/g, '_$1')
+      .toLowerCase()
+      .replace(/^_/, '');
+    const entityAsSnakeCasePlural = entityAsSnakeCase + 's';
+    
+    // Check various matching patterns
+    return cleanTable === entityAsTable ||           // tasks === tasks
+           cleanTable === entityAsTableAlt ||         // task === task
+           cleanTable === entityName ||               // Task === Task
+           cleanTable === entityName.toLowerCase() || // task === task
+           cleanTable === entityAsSnakeCase ||        // status_definition === status_definition
+           cleanTable === entityAsSnakeCasePlural;    // status_definitions === status_definitions
+  }
+
+  /**
    * Apply relationship updates for a change
    */
   private async applyRelationshipUpdates(change: TableChange): Promise<void> {
@@ -865,13 +908,21 @@ export class IncomingChangeService {
     const { CLIENT_JUNCTION_TABLE_MAPPING } = await import('@repo/dataforge/client-entities');
     
     for (const update of change.relationshipUpdates) {
-      // Find the junction table configuration
+      // Find the junction table configuration with flexible matching
       const junctionConfig = Object.entries(CLIENT_JUNCTION_TABLE_MAPPING).find(
-        ([_, config]) => config.sourceEntity === change.table && config.relationName === update.relationName
+        ([_, config]) => {
+          // Match table name flexibly
+          const tableMatches = this.matchTableToEntity(change.table, config.sourceEntity) ||
+                              config.sourceTable === `"${change.table}"` ||
+                              config.sourceTable === change.table;
+          
+          return tableMatches && config.relationName === update.relationName;
+        }
       );
       
       if (!junctionConfig) {
         console.warn(`[IncomingChangeService] No junction table config found for ${change.table}.${update.relationName}`);
+        console.warn(`[IncomingChangeService] Available configs:`, Object.entries(CLIENT_JUNCTION_TABLE_MAPPING).map(([k, v]) => `${v.sourceEntity}.${v.relationName}`));
         continue;
       }
       
