@@ -45,6 +45,10 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
   const [hasCommitted, setHasCommitted] = React.useState(false)
   const [dynamicOptions, setDynamicOptions] = React.useState<any[]>([])
   const [isLoadingOptions, setIsLoadingOptions] = React.useState(false)
+  // For multi-select, track selected values separately
+  const [selectedValues, setSelectedValues] = React.useState<string[]>(
+    isMultiSelect && Array.isArray(initialValue) ? initialValue : []
+  )
 
   // Load options from provider if available
   React.useEffect(() => {
@@ -157,10 +161,19 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
           break
         case 'Enter':
           e.preventDefault()
-          if (filteredOptions[highlightedIndex]) {
-            handleSelect(filteredOptions[highlightedIndex].value)
+          if (isMultiSelect) {
+            if (filteredOptions[highlightedIndex]) {
+              handleSelect(filteredOptions[highlightedIndex].value)
+            } else if (e.ctrlKey || e.metaKey) {
+              // Ctrl/Cmd+Enter commits multi-select
+              handleCommit(selectedValues)
+            }
           } else {
-            handleCommit(initialValue) // Commit current state if no options to select
+            if (filteredOptions[highlightedIndex]) {
+              handleSelect(filteredOptions[highlightedIndex].value)
+            } else {
+              handleCommit(initialValue)
+            }
           }
           break
         case 'Escape':
@@ -169,11 +182,16 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
           break
         case 'Tab':
           e.preventDefault()
-          // Handle Tab like Enter - select current and close
-          if (filteredOptions[highlightedIndex]) {
-            handleSelect(filteredOptions[highlightedIndex].value)
+          if (isMultiSelect) {
+            // For multi-select, Tab commits the current selection
+            handleCommit(selectedValues)
           } else {
-            handleCommit(initialValue) // Commit current state and navigate
+            // For single-select, Tab behaves like Enter
+            if (filteredOptions[highlightedIndex]) {
+              handleSelect(filteredOptions[highlightedIndex].value)
+            } else {
+              handleCommit(initialValue)
+            }
           }
           break
       }
@@ -181,11 +199,29 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [filteredOptions, highlightedIndex, initialValue])
+  }, [filteredOptions, highlightedIndex, initialValue, selectedValues, isMultiSelect])
 
   const handleSelect = (value: string) => {
-    const finalValue = value === '__null__' ? null : value
-    handleCommit(finalValue)
+    if (isMultiSelect) {
+      // For multi-select, toggle the value in the array
+      const newValues = [...selectedValues]
+      const index = newValues.indexOf(value)
+      
+      if (index >= 0) {
+        // Remove if already selected
+        newValues.splice(index, 1)
+      } else {
+        // Add if not selected
+        newValues.push(value)
+      }
+      
+      setSelectedValues(newValues)
+      // Don't commit immediately for multi-select
+    } else {
+      // For single-select, just set the value and commit
+      const finalValue = value === '__null__' ? null : value
+      handleCommit(finalValue)
+    }
   }
 
   const handleCommit = (value: any) => {
@@ -263,7 +299,7 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
                             className={cn(
                               "mr-2 h-4 w-4",
                               isMultiSelect 
-                                ? (Array.isArray(initialValue) && initialValue.includes(option.value) ? "opacity-100" : "opacity-0")
+                                ? (selectedValues.includes(option.value) ? "opacity-100" : "opacity-0")
                                 : (initialValue === option.value || (initialValue === null && option.value === '__null__') ? "opacity-100" : "opacity-0")
                             )}
                           />
@@ -282,6 +318,33 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
             </>
           )}
         </CommandList>
+        {isMultiSelect && (
+          <div className="flex items-center justify-between p-2 border-t text-xs text-muted-foreground">
+            <span>{selectedValues.length} selected</span>
+            <div className="flex gap-2">
+              <button
+                className="px-2 py-1 text-xs rounded hover:bg-accent"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCancel();
+                }}
+              >
+                Cancel (Esc)
+              </button>
+              <button
+                className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCommit(selectedValues);
+                }}
+              >
+                Done (Tab)
+              </button>
+            </div>
+          </div>
+        )}
       </Command>
     </div>
   )

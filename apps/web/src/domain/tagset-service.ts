@@ -190,10 +190,9 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
    * Get tag set by name
    */
   async getTagSetByName(name: string): Promise<TagSet | null> {
-    const tagSet = await db.tag_sets
-      .where('name')
-      .equals(name)
-      .first();
+    // Since 'name' is not indexed, we need to use toArray and filter
+    const tagSets = await db.tag_sets.toArray();
+    const tagSet = tagSets.find(ts => ts.name === name);
     
     return tagSet || null;
   }
