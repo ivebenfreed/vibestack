@@ -38,6 +38,18 @@ export function createStoreRelationshipProvider(
       console.warn(`RelationshipProvider: No data for table ${relationshipTable}`);
       return [];
     }
+    
+    // Debug tags specifically
+    if (relationshipTable === 'tags' && process.env.NODE_ENV === 'development') {
+      console.log('🔍 RelationshipProvider: Tags data from store', {
+        tagCount: Object.keys(relationshipData).length,
+        sampleTags: Object.values(relationshipData).slice(0, 3).map((tag: any) => ({
+          id: tag.id,
+          name: tag.name,
+          tagSetId: tag.tagSetId
+        }))
+      });
+    }
 
     // Convert to options format
     let options: EnumOption[] = Object.values(relationshipData).map((entity: any) => {
@@ -80,8 +92,18 @@ export function createStoreRelationshipProvider(
           relationshipTable,
           originalCount: Object.keys(relationshipData).length,
           filteredCount: options.length,
-          allowedIds: allowedIds.slice(0, 5)
+          allowedIds: allowedIds.slice(0, 5),
+          filteredOptions: options.slice(0, 3).map(opt => ({ value: opt.value, label: opt.label }))
         });
+        
+        // Debug empty results for tags
+        if (relationshipTable === 'tags' && options.length === 0) {
+          console.warn('🔍 RelationshipProvider: No tags after filter!', {
+            originalTagIds: Object.keys(relationshipData).slice(0, 10),
+            allowedIds: allowedIds,
+            hasCurrentEntity: !!context?.currentEntity
+          });
+        }
       } catch (error) {
         console.error('RelationshipProvider: Error applying filter', error);
       }

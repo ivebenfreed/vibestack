@@ -783,6 +783,19 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
       relationshipLookup[item.id] = item;
     });
     relationships[tableName] = relationshipLookup;
+    
+    // Debug tag loading
+    if (tableName === 'tags' && process.env.NODE_ENV === 'development') {
+      console.log('📊 TableStore: Loaded tags into relationships', {
+        tagCount: relationshipDataArrays[index].length,
+        sampleTags: relationshipDataArrays[index].slice(0, 3).map((tag: any) => ({
+          id: tag.id,
+          name: tag.name,
+          tagSetId: tag.tagSetId,
+          color: tag.color
+        }))
+      });
+    }
   });
   
   // Process junction data to add to entities
@@ -924,6 +937,19 @@ export async function loadPage(
       relationshipLookup[item.id] = item;
     });
     relationships[tableName] = relationshipLookup;
+    
+    // Debug tag loading
+    if (tableName === 'tags' && process.env.NODE_ENV === 'development') {
+      console.log('📊 TableStore: Loaded tags into relationships', {
+        tagCount: relationshipDataArrays[index].length,
+        sampleTags: relationshipDataArrays[index].slice(0, 3).map((tag: any) => ({
+          id: tag.id,
+          name: tag.name,
+          tagSetId: tag.tagSetId,
+          color: tag.color
+        }))
+      });
+    }
   });
   
   // Process junction data to add to entities
