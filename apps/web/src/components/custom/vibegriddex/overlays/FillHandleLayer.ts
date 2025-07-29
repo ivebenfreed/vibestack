@@ -217,26 +217,25 @@ export class FillHandleLayer {
       };
       
       const columnWidth = colData.width || 100;
-        // Create preview shape
-        const shape = new Konva.Rect({
-          x: position.x,
-          y: position.y,
-          width: columnWidth - 1,
-          height: this.config.cellHeight - 1,
-          fill: this.config.selectionBorderColor,
-          opacity: 0.3,
-          stroke: this.config.selectionBorderColor,
-          strokeWidth: 1,
-          dash: [3, 3],
-          visible: true
-        });
-        
-        this.layer.add(shape);
-        this.activeFillPreviewShapes.push(shape);
-        configuredShapes++;
-      }
+      
+      // Create preview shape
+      const shape = new Konva.Rect({
+        x: position.x,
+        y: position.y,
+        width: columnWidth - 1,
+        height: this.config.cellHeight - 1,
+        fill: this.config.selectionBorderColor,
+        opacity: 0.3,
+        stroke: this.config.selectionBorderColor,
+        strokeWidth: 1,
+        dash: [3, 3],
+        visible: true
+      });
+      
+      this.layer.add(shape);
+      this.activeFillPreviewShapes.push(shape);
+      configuredShapes++;
     }
-    
     
     this.layer.batchDraw();
   }
