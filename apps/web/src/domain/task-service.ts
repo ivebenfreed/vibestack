@@ -308,6 +308,26 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   // ============================================================================
   
   /**
+   * Get a fully resolved task with all relationships populated
+   * This includes the tags array and resolved display names
+   */
+  async getFullyResolvedTask(taskId: string): Promise<Task | null> {
+    const task = await taskDexieService.getById(taskId);
+    if (!task) {
+      return null;
+    }
+    
+    // Add many-to-many relationships
+    const tags = await this.getTaskTags(taskId);
+    task.tags = tags;
+    
+    // Note: Display name resolution (__resolved_ fields) happens in the table store
+    // This method ensures the entity has all its relationship arrays
+    
+    return task;
+  }
+  
+  /**
    * Get tags for a task
    */
   async getTags(taskId: string) {

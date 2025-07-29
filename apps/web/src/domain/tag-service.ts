@@ -149,6 +149,13 @@ export class TagDomainService extends BaseDomainService<Tag, CreateTagInput, Upd
   }
   
   /**
+   * Get all tags
+   */
+  async getAllTags(): Promise<Tag[]> {
+    return tagDexieService.getAll();
+  }
+  
+  /**
    * Get tags for a specific project
    * This uses the generated convenience method
    */

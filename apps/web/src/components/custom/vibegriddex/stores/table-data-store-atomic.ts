@@ -210,13 +210,26 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           if (process.env.NODE_ENV === 'development') {
             console.log('📊 TableStore: Updating single entity atomically', {
               entityId: event.entity.id,
-              entityType: context.entityType
+              entityType: context.entityType,
+              hasTagsField: 'tags' in event.entity,
+              tagsValue: event.entity.tags,
+              entityKeys: Object.keys(event.entity).sort()
             });
           }
           
           // Resolve entity with current relationships
           const relationshipConfigs = discoverRelationships(columns || []);
           const resolvedEntity = resolveEntityRelationships(event.entity, context.relationships, relationshipConfigs);
+          
+          if (process.env.NODE_ENV === 'development' && event.entity.tags) {
+            console.log('📊 TableStore: Entity resolution result', {
+              entityId: event.entity.id,
+              originalTags: event.entity.tags,
+              resolvedTags: resolvedEntity.__resolved_tags,
+              hasRelationshipData: !!context.relationships.tags,
+              tagCount: context.relationships.tags ? Object.keys(context.relationships.tags).length : 0
+            });
+          }
           
           return {
             ...context.entities,
@@ -1039,14 +1052,72 @@ export function setupGranularSubscriptions(
   
   // Entity changes - send events to store
   console.log('📊 TableStore: Creating entity subscription for', entityTableName);
-  const entitySub = liveQuery(() => db[entityTableName].toArray()).subscribe({
+  const relationshipConfigs = columns ? discoverRelationships(columns) : [];
+  
+  const entitySub = liveQuery(async () => {
+    // Fetch entities
+    const entities = await db[entityTableName].toArray();
+    
+    // Fetch junction table data (like task_tags)
+    const junctionTables = columns ? getUniqueJunctionTables(columns) : [];
+    const junctionDataArrays = await Promise.all(
+      junctionTables.map(tableName => (db as any)[tableName].toArray())
+    );
+    
+    // Process junction data to add to entities
+    const junctionsByEntity: Record<string, Record<string, string[]>> = {};
+    junctionTables.forEach((tableName, index) => {
+      const junctionData = junctionDataArrays[index];
+      const config = relationshipConfigs.find(c => c.junctionTable === tableName);
+      
+      if (config) {
+        junctionData.forEach((junction: any) => {
+          // For task_tags, the fields are taskId and tagId
+          const entityId = tableName === 'task_tags' ? junction.taskId : junction[config.junctionSourceField!];
+          const targetId = tableName === 'task_tags' ? junction.tagId : junction[config.junctionTargetField!];
+          
+          if (entityId && targetId) {
+            if (!junctionsByEntity[entityId]) {
+              junctionsByEntity[entityId] = {};
+            }
+            if (!junctionsByEntity[entityId][config.fieldName]) {
+              junctionsByEntity[entityId][config.fieldName] = [];
+            }
+            junctionsByEntity[entityId][config.fieldName].push(targetId);
+          }
+        });
+      }
+    });
+    
+    // Add junction data to entities
+    let entitiesWithJunctions = 0;
+    entities.forEach(entity => {
+      const junctions = junctionsByEntity[entity.id];
+      if (junctions) {
+        Object.entries(junctions).forEach(([fieldName, targetIds]) => {
+          entity[fieldName] = targetIds;
+          entitiesWithJunctions++;
+        });
+      }
+    });
+    
+    if (process.env.NODE_ENV === 'development' && junctionTables.length > 0) {
+      console.log('📊 TableStore: LiveQuery junction processing', {
+        junctionTables,
+        totalEntities: entities.length,
+        entitiesWithJunctions,
+        sampleEntity: entities.find(e => e.tags?.length > 0)
+      });
+    }
+    
+    return entities;
+  }).subscribe({
     next: (entities) => {
       if (!initialLoadComplete) return;
       
       // Get current relationships from store for resolution
       const storeSnapshot = storeActor.getSnapshot();
       const currentRelationships = storeSnapshot?.context?.relationships || {};
-      const relationshipConfigs = columns ? discoverRelationships(columns) : [];
       
       // Create lookup map for current entities (resolved)
       const currentEntityMap: Record<string, any> = {};
@@ -1067,9 +1138,50 @@ export function setupGranularSubscriptions(
         if (!previousEntity) {
           addedIds.push(entityId);
           storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
-        } else if (JSON.stringify(previousEntity) !== JSON.stringify(resolvedEntity)) {
-          changedIds.push(entityId);
-          storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
+        } else {
+          // Deep comparison of resolved entities
+          const prevStr = JSON.stringify(previousEntity);
+          const currStr = JSON.stringify(resolvedEntity);
+          if (prevStr !== currStr) {
+            // Debug what changed
+            if (process.env.NODE_ENV === 'development' && changedIds.length < 3) {
+              const prevKeys = Object.keys(previousEntity).sort();
+              const currKeys = Object.keys(resolvedEntity).sort();
+              
+              // Find missing and added keys
+              const missingKeys = prevKeys.filter(k => !currKeys.includes(k));
+              const addedKeys = currKeys.filter(k => !prevKeys.includes(k));
+              
+              console.log('📊 UpdateCheck: Entity change detected', {
+                entityId,
+                previousKeys: prevKeys,
+                currentKeys: currKeys,
+                missingKeys,
+                addedKeys,
+                // Show first difference
+                sample: (() => {
+                  // Check all keys from both objects
+                  const allKeys = new Set([...prevKeys, ...currKeys]);
+                  for (const key of allKeys) {
+                    const prevVal = previousEntity[key];
+                    const currVal = resolvedEntity[key];
+                    if (JSON.stringify(prevVal) !== JSON.stringify(currVal)) {
+                      return {
+                        key,
+                        prev: prevVal,
+                        curr: currVal,
+                        prevType: prevVal === undefined ? 'undefined' : prevVal === null ? 'null' : typeof prevVal,
+                        currType: currVal === undefined ? 'undefined' : currVal === null ? 'null' : typeof currVal
+                      };
+                    }
+                  }
+                  return null;
+                })()
+              });
+            }
+            changedIds.push(entityId);
+            storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
+          }
         }
       });
       
@@ -1083,7 +1195,7 @@ export function setupGranularSubscriptions(
       
       // Only log if there were actual changes
       if (addedIds.length > 0 || changedIds.length > 0 || deletedIds.length > 0) {
-        console.log('📊 TableStore: Granular entity update', {
+        console.log('📊 UpdateCheck: Granular entity update summary', {
           table: entityTableName,
           totalEntities: entities.length,
           added: addedIds.length,

@@ -55,14 +55,9 @@ export default function TasksTableView() {
       junctionTable: 'task_tags',
       junctionSourceField: 'task_id',
       junctionTargetField: 'tag_id',
-      relationshipFilter: async (task) => {
-        // Filter tags based on the task's project
-        if (task?.projectId) {
-          const tags = await domainServices.tag.getTagsForProject(task.projectId);
-          return tags.map(t => t.id);
-        }
-        return [];
-      }
+      // For now, show all tags regardless of project
+      // In the future, we could implement a smarter filter that prioritizes project tags
+      relationshipFilter: undefined
     },
     { id: 'dueDate', field: 'dueDate', name: 'Due Date', cellType: 'date', width: 150, editable: true },
     { id: 'projectId', field: 'projectId', name: 'Project', cellType: 'relationship-single', 

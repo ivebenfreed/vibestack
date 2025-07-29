@@ -223,39 +223,62 @@ export const ComboboxEditor: React.FC<ComboboxEditorProps> = ({
           ) : (
             <>
               <CommandEmpty>No results found.</CommandEmpty>
-              <CommandGroup>
-            {filteredOptions.map((option, index) => (
-              <CommandItem
-                key={option.value}
-                value={option.value}
-                onSelect={() => {
-                  console.log('ComboboxEditor: onSelect called', option.value);
-                  handleSelect(option.value);
-                }}
-                onClick={(e) => {
-                  console.log('ComboboxEditor: onClick called', option.value);
-                  e.stopPropagation();
-                  handleSelect(option.value);
-                }}
-                className={cn(
-                  "cursor-pointer",
-                  index === highlightedIndex && "bg-accent"
-                )}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    isMultiSelect 
-                      ? (Array.isArray(initialValue) && initialValue.includes(option.value) ? "opacity-100" : "opacity-0")
-                      : (initialValue === option.value || (initialValue === null && option.value === '__null__') ? "opacity-100" : "opacity-0")
-                  )}
-                />
-                <span className={option.value === '__null__' ? 'text-muted-foreground italic' : ''}>
-                  {option.label}
-                </span>
-              </CommandItem>
-            ))}
-              </CommandGroup>
+              {/* Group options by their group property */}
+              {(() => {
+                // Group the filtered options
+                const grouped = filteredOptions.reduce((acc, option) => {
+                  const group = option.group || 'Other';
+                  if (!acc[group]) acc[group] = [];
+                  acc[group].push(option);
+                  return acc;
+                }, {} as Record<string, EnumOption[]>);
+                
+                // Sort groups
+                const sortedGroups = Object.keys(grouped).sort();
+                
+                // Render grouped options
+                return sortedGroups.map(groupName => (
+                  <CommandGroup key={groupName} heading={groupName}>
+                    {grouped[groupName].map((option, groupIndex) => {
+                      const globalIndex = filteredOptions.findIndex(o => o.value === option.value);
+                      return (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          onSelect={() => {
+                            console.log('ComboboxEditor: onSelect called', option.value);
+                            handleSelect(option.value);
+                          }}
+                          onClick={(e) => {
+                            console.log('ComboboxEditor: onClick called', option.value);
+                            e.stopPropagation();
+                            handleSelect(option.value);
+                          }}
+                          className={cn(
+                            "cursor-pointer",
+                            globalIndex === highlightedIndex && "bg-accent"
+                          )}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              isMultiSelect 
+                                ? (Array.isArray(initialValue) && initialValue.includes(option.value) ? "opacity-100" : "opacity-0")
+                                : (initialValue === option.value || (initialValue === null && option.value === '__null__') ? "opacity-100" : "opacity-0")
+                            )}
+                          />
+                          <span 
+                            className={option.value === '__null__' ? 'text-muted-foreground italic' : ''}
+                            style={option.color ? { color: option.color } : undefined}
+                          >
+                            {option.label}
+                          </span>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                ));
+              })()}
             </>
           )}
         </CommandList>

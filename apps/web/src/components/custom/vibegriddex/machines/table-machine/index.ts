@@ -116,10 +116,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
   // Add relationship providers to columns - they'll use the store actor from context
   const columnsWithProviders = addRelationshipProvidersToColumns(
     input.columns || [],
-    function() { 
-      // This will be called when the provider needs data
-      // At that point, the store actor will be available in context
-      return this?.storeActor || (window as any).__vibegridx_store_actor;
+    () => {
+      // Use window fallback since we don't have context here
+      return (window as any).__vibegridx_store_actor;
     }
   );
 

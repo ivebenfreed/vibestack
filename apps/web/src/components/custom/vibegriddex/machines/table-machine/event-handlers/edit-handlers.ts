@@ -65,7 +65,15 @@ function ensureEditingOverlay(context: any, self?: any): EditingOverlay {
       relationshipContext: {
         relationshipResolvers: context.relationshipResolvers,
         // Get store actor from context to access relationship data
-        getStore: () => context.storeActor || (window as any).__vibegridx_store_actor
+        getStore: () => {
+          const store = context.storeActor || (window as any).__vibegridx_store_actor;
+          console.log('EditHandlers: getStore called', { 
+            hasContextStore: !!context.storeActor, 
+            hasWindowStore: !!(window as any).__vibegridx_store_actor,
+            store: store
+          });
+          return store;
+        }
       },
       getRowData: (rowId: string) => {
         // Find the entity data by row ID
@@ -474,8 +482,23 @@ export const editHandlers = {
           Object.assign(context, { entities: updatedEntities });
           
           // Then update row data
+          const currentRowData = context.rows[rowIndex].data;
+          
+          // Debug: Log current resolved fields
+          const resolvedFields = Object.keys(currentRowData).filter(k => k.startsWith('__resolved_'));
+          if (resolvedFields.length > 0) {
+            console.log('TableMachine: Current resolved fields before update', {
+              rowId,
+              resolvedFields,
+              resolvedValues: resolvedFields.reduce((acc, key) => {
+                acc[key] = currentRowData[key];
+                return acc;
+              }, {} as any)
+            });
+          }
+          
           const updatedRowData = {
-            ...context.rows[rowIndex].data,
+            ...currentRowData,
             [field]: event.value
           };
           

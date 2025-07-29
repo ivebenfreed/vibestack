@@ -1356,8 +1356,13 @@ export class CleanTableRenderer {
     const row = this.state?.rows.find(r => r.id === rowId);
     if (!row) return;
     
-    // Update data
+    // Update data - this should already be fully resolved from the store
     row.data = newData;
+    
+    console.log('CleanTableRenderer: Row updated with store data', {
+      rowId,
+      hasResolvedValues: Object.keys(newData).filter(k => k.includes('__resolved_')).length > 0
+    });
     
     // Re-render cells if row is visible
     const rowEl = this.rowElements.get(rowId);

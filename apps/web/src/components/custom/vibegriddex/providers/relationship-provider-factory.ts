@@ -18,7 +18,7 @@ export function createStoreRelationshipProvider(
   getStore: () => any,
   relationshipFilter?: (row: any) => Promise<string[]> | string[]
 ): RelationshipOptionsProvider {
-  return async (cellRef, getCurrentRow) => {
+  return async (context) => {
     const store = getStore();
     if (!store) {
       console.warn('RelationshipProvider: No store available');
@@ -40,29 +40,50 @@ export function createStoreRelationshipProvider(
     }
 
     // Convert to options format
-    let options: EnumOption[] = Object.values(relationshipData).map((entity: any) => ({
-      value: entity.id,
-      label: entity.name || entity.displayName || entity.title || entity.id
-    }));
+    let options: EnumOption[] = Object.values(relationshipData).map((entity: any) => {
+      const option: EnumOption = {
+        value: entity.id,
+        label: entity.name || entity.displayName || entity.title || entity.id
+      };
+      
+      // For tags, add color and group by tagSetId
+      if (relationshipTable === 'tags' && entity.tagSetId) {
+        option.color = entity.color;
+        option.group = entity.tagSetId;
+      }
+      
+      return option;
+    });
+    
+    // Resolve tag set names for grouping
+    if (relationshipTable === 'tags' && snapshot.context.relationships.tag_sets) {
+      const tagSets = snapshot.context.relationships.tag_sets;
+      options = options.map(option => {
+        if (option.group && tagSets[option.group]) {
+          return {
+            ...option,
+            group: tagSets[option.group].name || 'Other'
+          };
+        }
+        return option;
+      });
+    }
 
     // Apply filter if provided
-    if (relationshipFilter && getCurrentRow) {
-      const currentRow = getCurrentRow();
-      if (currentRow) {
-        try {
-          const allowedIds = await relationshipFilter(currentRow);
-          // Filter options to only include allowed IDs
-          options = options.filter(option => allowedIds.includes(option.value));
-          
-          console.log('🔍 RelationshipProvider: Applied filter', {
-            relationshipTable,
-            originalCount: Object.keys(relationshipData).length,
-            filteredCount: options.length,
-            allowedIds: allowedIds.slice(0, 5)
-          });
-        } catch (error) {
-          console.error('RelationshipProvider: Error applying filter', error);
-        }
+    if (relationshipFilter && context?.currentEntity) {
+      try {
+        const allowedIds = await relationshipFilter(context.currentEntity);
+        // Filter options to only include allowed IDs
+        options = options.filter(option => allowedIds.includes(option.value));
+        
+        console.log('🔍 RelationshipProvider: Applied filter', {
+          relationshipTable,
+          originalCount: Object.keys(relationshipData).length,
+          filteredCount: options.length,
+          allowedIds: allowedIds.slice(0, 5)
+        });
+      } catch (error) {
+        console.error('RelationshipProvider: Error applying filter', error);
       }
     }
 
