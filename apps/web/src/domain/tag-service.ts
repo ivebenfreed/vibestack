@@ -166,11 +166,15 @@ export class TagDomainService extends BaseDomainService<Tag, CreateTagInput, Upd
   
   /**
    * Get tags by tag set
-   * This uses the generated convenience method
    */
   async getTagsByTagSet(tagSetId: string): Promise<Tag[]> {
-    // Use the generated method directly
-    return tagDexieService.getTagsByTagSet(tagSetId);
+    // Query tags directly by tagSetId
+    const tags = await db.tags
+      .where('tagSetId')
+      .equals(tagSetId)
+      .toArray();
+    
+    return tags;
   }
   
   // ============================================================================

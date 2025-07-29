@@ -657,6 +657,22 @@ export class IncomingChangeService {
   }
 
   /**
+   * Helper to merge incoming update data with existing record
+   * This prevents partial updates from clearing existing fields
+   */
+  private async mergeUpdateData(table: any, id: string, incomingData: any): Promise<any> {
+    const existing = await table.get(id);
+    if (existing) {
+      // Merge incoming data with existing, preserving client-side fields
+      return {
+        ...existing,
+        ...incomingData
+      };
+    }
+    return incomingData;
+  }
+
+  /**
    * Apply task changes using Dexie only
    */
   private async applyTaskChange(change: TableChange): Promise<void> {
@@ -671,7 +687,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating task ${change.data.id} in IndexedDB`);
-        await db.tasks.put(change.data as any);
+        const mergedTask = await this.mergeUpdateData(db.tasks, change.data.id, change.data);
+        await db.tasks.put(mergedTask);
         break;
       
       case 'delete':
@@ -699,7 +716,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating project ${change.data.id} in IndexedDB`);
-        await db.projects.put(change.data as any);
+        const mergedProject = await this.mergeUpdateData(db.projects, change.data.id, change.data);
+        await db.projects.put(mergedProject);
         break;
       
       case 'delete':
@@ -727,7 +745,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating user ${change.data.id} in IndexedDB`);
-        await db.users.put(change.data as any);
+        const mergedUser = await this.mergeUpdateData(db.users, change.data.id, change.data);
+        await db.users.put(mergedUser);
         break;
       
       case 'delete':
@@ -755,7 +774,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating comment ${change.data.id} in IndexedDB`);
-        await db.comments.put(change.data as any);
+        const mergedComment = await this.mergeUpdateData(db.comments, change.data.id, change.data);
+        await db.comments.put(mergedComment);
         break;
       
       case 'delete':
@@ -783,7 +803,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
-        await db.status_sets.put(change.data as any);
+        const mergedStatusSet = await this.mergeUpdateData(db.status_sets, change.data.id, change.data);
+        await db.status_sets.put(mergedStatusSet);
         break;
       
       case 'delete':
@@ -811,7 +832,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
-        await db.status_definitions.put(change.data as any);
+        const mergedStatusDef = await this.mergeUpdateData(db.status_definitions, change.data.id, change.data);
+        await db.status_definitions.put(mergedStatusDef);
         break;
       
       case 'delete':
@@ -839,7 +861,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag ${change.data.id} in IndexedDB`);
-        await db.tags.put(change.data as any);
+        const mergedTag = await this.mergeUpdateData(db.tags, change.data.id, change.data);
+        await db.tags.put(mergedTag);
         break;
       
       case 'delete':
@@ -960,7 +983,8 @@ export class IncomingChangeService {
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
-        await db.tag_sets.put(change.data as any);
+        const mergedTagSet = await this.mergeUpdateData(db.tag_sets, change.data.id, change.data);
+        await db.tag_sets.put(mergedTagSet);
         break;
       
       case 'delete':
