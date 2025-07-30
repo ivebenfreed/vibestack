@@ -805,14 +805,29 @@ export const viewHandlers = {
       
       // Trigger a full re-render with updated column widths
       ({ context }) => {
-        if (context.actors?.rendererActor) {
+        if (context.actors?.rendererActor && context.coordinateMapping) {
+          // Merge column widths from coordinate mapping into columns
+          const columnsWithWidths = context.columns.map(col => {
+            const coordCol = context.coordinateMapping.columns.find(c => c.columnId === col.id);
+            return coordCol ? { ...col, width: coordCol.width } : col;
+          });
+          
           context.actors.rendererActor.send({
-            type: 'RENDER_CELLS',
-            rows: context.rows,
-            columns: context.columns,
-            coordinateMapping: context.coordinateMapping,
-            selection: context.selection,
-            editingState: context.editingState
+            type: 'RENDER',
+            state: {
+              rows: context.rows,
+              columns: columnsWithWidths,
+              selectedCells: context.selectedCells,
+              editingCell: null,
+              groupedData: [],
+              optimisticOperations: new Map(),
+              viewport: context.viewport,
+              coordinateMapping: context.coordinateMapping,
+              columnVisibility: context.columnVisibility,
+              columnOrder: context.columnOrder,
+              sortBy: context.sortBy,
+              version: context.version + 1
+            }
           });
         }
       },

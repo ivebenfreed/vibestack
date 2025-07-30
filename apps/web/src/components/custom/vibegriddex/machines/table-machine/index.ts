@@ -976,11 +976,20 @@ export const tableBaseMachine = setup({
               const storeSnapshot = context.storeActor?.getSnapshot();
               const columnVisibility = storeSnapshot?.context?.columnVisibility || {};
               
+              // Merge column widths from coordinate mapping into columns
+              const columnsWithWidths = columnsWithSelection.map(col => {
+                if (context.coordinateMapping) {
+                  const coordCol = context.coordinateMapping.columns.find(c => c.columnId === col.id);
+                  return coordCol ? { ...col, width: coordCol.width } : col;
+                }
+                return col;
+              });
+              
               context.actors.rendererActor.send({
                 type: 'RENDER',
                 state: {
                   rows: context.rows,
-                  columns: columnsWithSelection,
+                  columns: columnsWithWidths,
                   selectedCells: context.selectedCells,
                   editingCell: null,
                   groupedData: [],
