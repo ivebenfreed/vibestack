@@ -3,10 +3,10 @@
 // DO NOT EDIT MANUALLY
 
 export const dynamicServerConfig = {
-  port: 5173,
+  port: 5174,
   proxy: {
     '/api': {
-      target: 'http://127.0.0.1:8787',
+      target: 'http://127.0.0.1:8788',
       secure: false,
       changeOrigin: true,
       ws: true,
