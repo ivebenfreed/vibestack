@@ -441,10 +441,13 @@ body.vibegridx-dragging-active * {
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
-  display: inline-flex;
-  align-items: center;
+  display: inline-block; /* inline-block to keep highlight around text only */
   min-height: 1.2em;
   min-width: 20px;
+  max-width: 100%; /* Ensure it doesn't exceed cell width */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vibegridx-cell-content-editable:hover {
@@ -458,10 +461,13 @@ body.vibegridx-dragging-active * {
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
-  display: inline-flex;
-  align-items: center;
+  display: inline-block; /* inline-block to keep highlight around text only */
   min-height: 1.2em;
   min-width: 20px;
+  max-width: 100%; /* Ensure it doesn't exceed cell width */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vibegridx-cell-text-editable:hover {
@@ -486,10 +492,14 @@ body.vibegridx-dragging-active * {
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
-  display: inline-flex;
-  align-items: center;
+  display: inline-block; /* inline-block to keep highlight around text only */
   min-height: 1.2em;
   min-width: 20px;
+  max-width: 100%; /* Ensure it doesn't exceed cell width */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right; /* Keep numbers right-aligned */
 }
 
 .vibegridx-cell-number-editable:hover {

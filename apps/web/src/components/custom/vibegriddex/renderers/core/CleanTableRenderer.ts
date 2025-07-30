@@ -474,7 +474,8 @@ export class CleanTableRenderer {
       height: `${ROW_HEIGHT}px`,
       borderRight: '1px solid var(--border)',
       flexShrink: '0',
-      overflow: 'hidden' // Add overflow hidden to cell
+      overflow: 'hidden', // Add overflow hidden to cell
+      minWidth: '0' // Allow flex children to shrink below their content size
     });
     
     return cell;

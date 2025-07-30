@@ -78,13 +78,8 @@ export class CellPipeline {
       // Use the badge renderer that returns HTMLElement
       const badgeContent = relationshipMultiBadge(value, column, rowData);
       
-      // Clear default styles for badge container
-      Object.assign(content.style, {
-        width: '100%',
-        // Remove padding - let the cell handle it
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      });
+      // Override default styles for badge container
+      content.style.padding = '4px 12px'; // Different padding for badge container
       
       content.appendChild(badgeContent);
       return content;
@@ -95,12 +90,9 @@ export class CellPipeline {
     
     // Default styles for other cell types
     Object.assign(content.style, {
-      width: '100%',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      // Remove padding - let the cell handle it via CSS
-      boxSizing: 'border-box'
+      padding: '0 12px', // Horizontal padding only
+      boxSizing: 'border-box',
+      width: '100%'
     });
     
     // Set content efficiently - pass row data for relationship resolution
