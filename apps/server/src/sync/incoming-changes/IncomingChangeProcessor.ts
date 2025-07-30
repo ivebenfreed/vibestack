@@ -68,16 +68,21 @@ export class IncomingChangeProcessor {
       // Process changes and detect conflicts
       const { results, conflictedChanges } = await this.processAllChanges(optimizedChangesResult.changes);
       
-      // Summarize results
+      // Summarize results and extract error context
       const summary = this.summarizeResults(results);
+      const affectedTables = [...new Set(optimizedChangesResult.changes.map(c => c.table))];
       
-      // Send applied acknowledgment
+      // Send applied acknowledgment with error context
       try {
         await this.sendChangesApplied(
           clientId, 
           changeIds,
           summary.allSuccessful,
-          summary.lastError
+          summary.lastError,
+          summary.lastError ? {
+            affectedTables,
+            failedChangeCount: optimizedChangesResult.changes.length - summary.appliedCount
+          } : undefined
         );
       } catch (appliedError) {
         syncLogger.error(`Failed to send applied acknowledgment for client ${clientId}`, {
@@ -115,10 +120,34 @@ export class IncomingChangeProcessor {
     } catch (error) {
       syncLogger.error(`Processing failed for client ${clientId}`, {
         clientId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       }, MODULE_NAME);
       
-      // Send error response
+      // Extract affected tables from the changes
+      const affectedTables = [...new Set(changes.map(c => c.table))];
+      
+      // Send proper error acknowledgment via srv_changes_applied
+      try {
+        await this.sendChangesApplied(
+          clientId,
+          changes.map(change => (change.data as any).id),
+          false, // success = false
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            affectedTables,
+            failedChangeCount: changes.length
+          }
+        );
+      } catch (ackError) {
+        syncLogger.error(`Failed to send error acknowledgment to client ${clientId}`, {
+          clientId,
+          originalError: error instanceof Error ? error.message : String(error),
+          ackError: ackError instanceof Error ? ackError.message : String(ackError)
+        }, MODULE_NAME);
+      }
+      
+      // Also send srv_error for backwards compatibility
       try {
         await this.sendError(clientId, error instanceof Error ? error : new Error(String(error)));
       } catch (errorSendError) {
@@ -390,8 +419,28 @@ export class IncomingChangeProcessor {
     clientId: string,
     changeIds: string[],
     success: boolean,
-    error?: Error
+    error?: Error,
+    errorContext?: {
+      affectedTables?: string[];
+      failedChangeCount?: number;
+      errorType?: 'database' | 'validation' | 'conflict' | 'unknown';
+    }
   ): Promise<void> {
+    // Create structured error information
+    let errorInfo: string | undefined;
+    if (error) {
+      const errorData = {
+        message: error.message,
+        type: errorContext?.errorType || this.classifyError(error),
+        details: {
+          affectedTables: errorContext?.affectedTables || [],
+          failedChangeCount: errorContext?.failedChangeCount || changeIds.length,
+          stack: this.env.NODE_ENV === 'development' ? error.stack : undefined
+        }
+      };
+      errorInfo = JSON.stringify(errorData);
+    }
+
     const message: ServerAppliedMessage = {
       type: 'srv_changes_applied',
       messageId: `srv_${Date.now()}`,
@@ -399,7 +448,7 @@ export class IncomingChangeProcessor {
       clientId,
       appliedChanges: changeIds,
       success,
-      error: error?.message
+      error: errorInfo
     };
 
     try {
@@ -437,6 +486,25 @@ export class IncomingChangeProcessor {
     }
   }
   
+  /**
+   * Classify error type based on error message/type
+   */
+  private classifyError(error: Error): 'database' | 'validation' | 'conflict' | 'unknown' {
+    const message = error.message.toLowerCase();
+    
+    if (error instanceof DatabaseError || message.includes('database') || message.includes('constraint')) {
+      return 'database';
+    }
+    if (error instanceof ValidationError || message.includes('validation') || message.includes('invalid')) {
+      return 'validation';
+    }
+    if (error instanceof CRDTConflictError || message.includes('conflict') || message.includes('crdt')) {
+      return 'conflict';
+    }
+    
+    return 'unknown';
+  }
+
   /**
    * Set statement timeout
    */

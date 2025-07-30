@@ -240,7 +240,41 @@ export class MessageProcessor {
         }
         // Note: Dexie system doesn't need to handle 'received' acknowledgments
       } else if (messageType === 'srv_changes_applied') {
-        syncLogger.info('message', 'Server confirmed changes were applied');
+        // Check if there was an error
+        if (!message.success && message.error) {
+          try {
+            // Try to parse structured error information
+            const errorInfo = typeof message.error === 'string' ? JSON.parse(message.error) : message.error;
+            
+            console.error('[MessageProcessor] ❌ Server failed to apply changes:', {
+              message: errorInfo.message,
+              type: errorInfo.type,
+              affectedTables: errorInfo.details?.affectedTables,
+              failedChangeCount: errorInfo.details?.failedChangeCount,
+              clientId: message.clientId,
+              timestamp: new Date(message.timestamp).toISOString()
+            });
+            
+            // Log stack trace in development mode
+            if (errorInfo.details?.stack) {
+              console.error('[MessageProcessor] Stack trace:', errorInfo.details.stack);
+            }
+            
+            syncLogger.error('message', `Server changes failed: ${errorInfo.message}`, {
+              errorType: errorInfo.type,
+              affectedTables: errorInfo.details?.affectedTables,
+              failedCount: errorInfo.details?.failedChangeCount
+            });
+          } catch (parseError) {
+            // Fallback for non-JSON error messages
+            console.error('[MessageProcessor] ❌ Server failed to apply changes:', message.error);
+            syncLogger.error('message', `Server changes failed: ${message.error}`);
+          }
+        } else {
+          syncLogger.info('message', 'Server confirmed changes were applied');
+          console.log('[MessageProcessor] ✅ Server successfully applied changes');
+        }
+        
         console.log('[MessageProcessor] srv_changes_applied message full content:', JSON.stringify(message, null, 2));
         console.log('[MessageProcessor] Services available:', {
           hasOutgoing: !!services.outgoing,

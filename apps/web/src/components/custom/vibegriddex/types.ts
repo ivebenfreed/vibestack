@@ -464,8 +464,8 @@ export type TableEvents =
   | { type: 'view.columns.order.set'; order: string[] }
   | { type: 'view.columns.order.reset' }
   | { type: 'view.columns.resize.start'; columnId: string; x: number; width: number }
-  | { type: 'view.columns.resize.move'; x: number }
-  | { type: 'view.columns.resize.end' }
+  | { type: 'view.columns.resize.move'; columnId: string; width: number; x: number }
+  | { type: 'view.columns.resize.end'; columnId: string; width: number }
   | { type: 'view.columns.resize.cancel' }
   | { type: 'view.column.resized'; columnId: string; width: number } // Event from view coordinator to parent
   

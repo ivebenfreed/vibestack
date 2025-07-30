@@ -81,7 +81,7 @@ export class CellPipeline {
       // Clear default styles for badge container
       Object.assign(content.style, {
         width: '100%',
-        padding: '4px 12px',
+        // Remove padding - let the cell handle it
         boxSizing: 'border-box',
         overflow: 'hidden'
       });
@@ -99,7 +99,7 @@ export class CellPipeline {
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap',
-      padding: '8px 12px',
+      // Remove padding - let the cell handle it via CSS
       boxSizing: 'border-box'
     });
     
@@ -147,6 +147,14 @@ export class CellPipeline {
       }
       
       content.appendChild(wrapper);
+      
+      // Add tooltip for truncated editable content
+      requestAnimationFrame(() => {
+        if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
+          wrapper.title = cellContent;
+          wrapper.style.cursor = 'help';
+        }
+      });
     } else {
       // Non-editable content - render normally
       if (cellType === 'enum' || cellType?.startsWith('relationship')) {
@@ -155,6 +163,22 @@ export class CellPipeline {
         content.textContent = cellContent;
       }
     }
+    
+    // Add tooltip for truncated content
+    // Use requestAnimationFrame to ensure layout is complete
+    requestAnimationFrame(() => {
+      if (content.scrollWidth > content.clientWidth) {
+        // For HTML content (badges), extract text content
+        const tooltipText = cellType === 'enum' || cellType?.startsWith('relationship') 
+          ? content.textContent || ''
+          : cellContent;
+        
+        if (tooltipText && tooltipText !== 'Click to edit') {
+          content.title = tooltipText;
+          content.style.cursor = 'help';
+        }
+      }
+    });
     
     return content;
   }

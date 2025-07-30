@@ -291,11 +291,20 @@ export class CleanTableRenderer {
       contentWrapper.style.alignItems = 'center';
       contentWrapper.style.flex = '1';
       contentWrapper.style.gap = '4px';
+      contentWrapper.style.overflow = 'hidden'; // Add overflow hidden
       
       const content = document.createElement('span');
       content.className = 'vibegridx-header-text';
       content.textContent = column.name || column.id;
       contentWrapper.appendChild(content);
+      
+      // Add tooltip for truncated header text
+      requestAnimationFrame(() => {
+        if (content.scrollWidth > content.clientWidth) {
+          content.title = column.name || column.id;
+          content.style.cursor = 'help';
+        }
+      });
       
       // Sort indicator
       if (column.sortable !== false) {
@@ -464,7 +473,8 @@ export class CleanTableRenderer {
       width: `${colMapping.width}px`,
       height: `${ROW_HEIGHT}px`,
       borderRight: '1px solid var(--border)',
-      flexShrink: '0'
+      flexShrink: '0',
+      overflow: 'hidden' // Add overflow hidden to cell
     });
     
     return cell;
