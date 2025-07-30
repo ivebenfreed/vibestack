@@ -299,8 +299,8 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
                   
                   // Handle null/undefined
                   if (aValue == null && bValue == null) continue;
-                  if (aValue == null) return sort.direction === 'asc' ? -1 : 1;
-                  if (bValue == null) return sort.direction === 'asc' ? 1 : -1;
+                  if (aValue == null) return sort.direction === 'asc' ? 1 : -1;
+                  if (bValue == null) return sort.direction === 'asc' ? -1 : 1;
                   
                   let comparison = 0;
                   
