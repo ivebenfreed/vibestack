@@ -2,9 +2,6 @@ name = "vibestack-server"
 compatibility_date = "2023-12-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Local environment configuration
-[env.local]
-
 # Enable observability logging for all environments
 [observability.logs]
 enabled = true
@@ -17,34 +14,38 @@ local_protocol = "http"
 upstream_protocol = "http"
 host = "127.0.0.1"
 
+# Local environment configuration
+[env.local]
+
 # Environment variables
-[vars]
+[env.local.vars]
 ENVIRONMENT = "local"
 WEB_PORT = "5174"
 SERVER_PORT = "8788"
+
+# KV Namespace for client cache
+[[env.local.kv_namespaces]]
+binding = "CLIENT_CACHE"
+id = "01453e5dc2ff4cf8a061a25b95501df0"
+
+# Durable Objects
+[[env.local.durable_objects.bindings]]
+name = "SYNC"
+class_name = "SyncDO"
+
+[[env.local.durable_objects.bindings]]
+name = "REPLICATION"
+class_name = "ReplicationDO"
+
+# Durable Objects migrations
+[[env.local.migrations]]
+tag = "v1"
+new_classes = ["SyncDO", "ReplicationDO"]
 
 # Module aliases (correct syntax)
 [alias]
 "debug" = "./src/shims/debug.ts"
 "app-root-path" = "./src/lib/app-root-path-shim.ts"
-
-# Specify ESM format
-[build]
-format = "modules"
-rules = [
-    { type = "ESModule", globs = ["**/*.js", "**/*.ts"] }
-]
-
-# KV Namespace for client cache
-[kv_namespaces]
-CLIENT_CACHE = { binding = "CLIENT_CACHE", id = "01453e5dc2ff4cf8a061a25b95501df0" }
-
-# Durable Objects
-[durable_objects]
-bindings = [
-    { name = "SYNC", class_name = "SyncDO" },
-    { name = "REPLICATION", class_name = "ReplicationDO" }
-]
 
 # Enable unlimited Workers for testing
 [limits]
