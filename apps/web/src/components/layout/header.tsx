@@ -143,7 +143,11 @@ export const Header = ({
     >
       {showSidebarTrigger && (
         <>
-          <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
+          <SidebarTrigger 
+            variant='outline' 
+            className='scale-125 sm:scale-100' 
+            data-testid="sidebar-toggle"
+          />
           <Separator orientation='vertical' className='h-6' />
         </>
       )}
@@ -153,7 +157,7 @@ export const Header = ({
         <SyncStatusIcon />
         <RefreshButton />
         <ThemeSwitch />
-        <ProfileDropdown />
+        <ProfileDropdown data-testid="user-menu" />
       </div>
     </header>
   )

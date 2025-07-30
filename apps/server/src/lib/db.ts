@@ -1,4 +1,4 @@
-import { Client, QueryResultRow } from '@neondatabase/serverless';
+import { Client, QueryResultRow, neonConfig } from '@neondatabase/serverless';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 import type { AppContext, MinimalContext } from '../types/hono';
@@ -18,15 +18,27 @@ export function addConnectTimeout(url: string): string {
 // Initialize database client
 export const getDBClient = (c: AppContext | MinimalContext | { env: { DATABASE_URL: string } }) => {
   try {
-    const url = 'env' in c && typeof c.env === 'object' && c.env !== null ? c.env.DATABASE_URL : undefined;
+    const url = 'env' in c && typeof c.env === 'object' && c.env !== null 
+      ? c.env.DATABASE_URL
+      : undefined;
+      
     if (!url) {
       throw new Error('DATABASE_URL environment variable is not set');
+    }
+    
+    // Check if this is a local development URL
+    const isLocal = url.includes('localtest.me');
+    
+    // Configure for local HTTP proxy if needed
+    if (isLocal) {
+      neonConfig.fetchEndpoint = 'http://db.localtest.me:4444/sql';
+      neonConfig.fetchFunction = fetch;
     }
     
     const urlWithTimeout = addConnectTimeout(url);
     return new Client({
       connectionString: urlWithTimeout,
-      ssl: true
+      ssl: !isLocal // No SSL for local connections
     });
   } catch (error) {
     console.error('Error creating database client:', error);

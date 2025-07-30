@@ -16,6 +16,15 @@ echo ""
 echo "1️⃣ Configuring ports and environment..."
 PR_NUMBER=${PR_NUMBER} node scripts/setup-dev-ports.js
 
+# Step 1.5: Copy Claude configuration
+echo "   📋 Copying Claude configuration..."
+if [ -d "../vibestack/.claude" ]; then
+    cp -r ../vibestack/.claude ./.claude
+    echo "   ✅ Claude config copied"
+else
+    echo "   ⚠️  No Claude config found to copy"
+fi
+
 # Step 2: Start Docker containers with PR-specific ports
 echo ""
 echo "2️⃣ Starting Docker containers..."

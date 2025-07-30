@@ -36,7 +36,7 @@ export function NavGroup({ title, items }: NavGroup) {
   const href = useLocation({ select: (location) => location.href })
   
   return (
-    <SidebarGroup>
+    <SidebarGroup data-testid={`nav-group-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <SidebarGroupLabel>{title}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
@@ -74,7 +74,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
   // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
   
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem data-testid={`nav-item-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
       <SidebarMenuButton
         asChild
         isActive={checkIsActive(href, item)}
@@ -84,6 +84,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
           to={item.url} 
           onClick={() => setOpenMobile(false)}
           preload={false}
+          data-testid={`nav-link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
         >
           {item.icon && <item.icon />}
           <span>{item.title}</span>

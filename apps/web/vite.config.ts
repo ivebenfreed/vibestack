@@ -5,6 +5,20 @@ import tailwindcss from '@tailwindcss/vite'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
+import fs from 'fs'
+
+// Try to load dynamic server configuration if it exists
+let dynamicServerConfig = {};
+try {
+  const configPath = path.resolve(__dirname, './vite.server.config.js');
+  if (fs.existsSync(configPath)) {
+    const { dynamicServerConfig: config } = await import(configPath);
+    dynamicServerConfig = config;
+    console.log('Using dynamic server configuration');
+  }
+} catch (e) {
+  // Ignore - use defaults
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -141,8 +155,10 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
     },
-    proxy: {
-      // Proxy requests starting with /api to your backend server
+    // Merge default config with dynamic config
+    ...(dynamicServerConfig.port ? { port: dynamicServerConfig.port } : {}),
+    proxy: dynamicServerConfig.proxy || {
+      // Default proxy configuration
       '/api': {
         target: 'http://127.0.0.1:8787', // Target is HTTP, matching frontend protocol
         secure: false, // Allow self-signed certificates from the backend (wrangler dev)

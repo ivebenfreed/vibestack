@@ -30,16 +30,19 @@ const apiApp = new Hono<AppBindings>().basePath('/api');
 
 // Add Hono's CORS middleware FIRST
 apiApp.use('*', cors({
-  origin: (origin) => {
-    // Dynamically allow the specific frontend origin
-    // or potentially others in the future
+  origin: (origin, c) => {
+    // Get dynamic web port from environment
+    const webPort = c.env.WEB_PORT || '5173';
+    
+    // Build allowed origins dynamically
     const allowedOrigins = [
-      'https://127.0.0.1:5173', 
-      'http://127.0.0.1:5173', 
-      'http://localhost:5173',
+      `https://127.0.0.1:${webPort}`, 
+      `http://127.0.0.1:${webPort}`, 
+      `http://localhost:${webPort}`,
       'https://dev.codevibesmatter.com',
       'https://app.codevibesmatter.com'
     ];
+    
     if (!origin) {
       // For requests without origin, we return null to avoid setting the header
       return null;
@@ -66,6 +69,40 @@ apiApp.use('*', createStructuredLogger());
 // Mount the bootstrap router BEFORE authMiddleware
 // This ensures it's not protected by standard authentication
 apiApp.route('/bootstrap', bootstrapRouter);
+
+// Add public health endpoints BEFORE authMiddleware
+apiApp.get('/health', (c) => c.text('Server OK'));
+apiApp.get('/db/health', async (c) => {
+  try {
+    const url = c.env.DATABASE_URL;
+    if (!url) {
+      return c.json({
+        success: false,
+        data: { healthy: false, error: 'DATABASE_URL not set' }
+      }, 503);
+    }
+    
+    const isLocal = url.includes('localtest.me');
+    
+    return c.json({
+      success: true,
+      data: {
+        healthy: true,
+        mode: isLocal ? 'local' : 'remote',
+        proxy: isLocal ? 'http://db.localtest.me:4444/sql' : 'neon-serverless',
+        message: `Database configured in ${isLocal ? 'local' : 'remote'} mode`
+      }
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      data: {
+        healthy: false,
+        error: error instanceof Error ? error.message : 'Configuration error'
+      }
+    }, 503);
+  }
+});
 
 // Apply the authentication middleware to check session status on all requests
 // for routes mounted AFTER this middleware.
@@ -121,10 +158,11 @@ const worker = {
     if (url.pathname === '/api/sync') {
       // --- BEGIN CORS CHECK for /api/sync ---
       const origin = request.headers.get('Origin');
+      const webPort = env.WEB_PORT || '5173';
       const allowedOrigins = [
-        'https://127.0.0.1:5173', 
-        'http://127.0.0.1:5173', 
-        'http://localhost:5173',
+        `https://127.0.0.1:${webPort}`, 
+        `http://127.0.0.1:${webPort}`, 
+        `http://localhost:${webPort}`,
         'https://dev.codevibesmatter.com',
         'https://app.codevibesmatter.com'
       ]; // Match the API allowed origins

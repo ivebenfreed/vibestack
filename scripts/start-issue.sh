@@ -90,8 +90,33 @@ fi
 # Switch to worktree
 cd "$WORKTREE_PATH"
 
+# Copy Claude configuration if it exists
 echo ""
-echo "2️⃣ Setting up PR environment..."
+echo "1.5️⃣ Copying Claude configuration..."
+if [ -d "../vibestack/.claude" ]; then
+    cp -r ../vibestack/.claude ./.claude
+    echo "   ✅ Claude config copied to worktree"
+else
+    echo "   ⚠️  No Claude config found to copy"
+fi
+
+echo ""
+echo "2️⃣ Installing dependencies..."
+echo "   🔄 Running pnpm install..."
+pnpm install
+
+echo ""
+echo "2.5️⃣ Copying generated files..."
+echo "   📁 Copying DataForge generated files from main repo..."
+if [ -d "../vibestack/packages/dataforge/src/generated" ]; then
+    cp -r ../vibestack/packages/dataforge/src/generated/* ./packages/dataforge/src/generated/ 2>/dev/null || true
+    echo "   ✅ Generated files copied"
+else
+    echo "   ⚠️  No generated files found to copy"
+fi
+
+echo ""
+echo "3️⃣ Setting up PR environment..."
 if [ -f "./scripts/setup-pr-env.sh" ]; then
     PR_NUMBER="$ISSUE_NUMBER" ./scripts/setup-pr-env.sh
 else

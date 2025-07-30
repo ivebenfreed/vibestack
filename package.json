@@ -71,21 +71,6 @@
     "node": ">=18",
     "pnpm": ">=8"
   },
-  "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@electric-sql/pglite": "^0.3.0",
-    "@electric-sql/pglite-react": "^0.2.18",
-    "@electric-sql/pglite-repl": "^0.2.18",
-    "@modelcontextprotocol/server-brave-search": "^0.6.2",
-    "@modelcontextprotocol/server-postgres": "^0.6.2",
-    "hono": "^4.7.8",
-    "jotai": "^2.12.5",
-    "position-observer": "^1.0.0",
-    "rich-textarea": "^0.26.4",
-    "tailwindcss": "^4.1.4"
-  },
   "pnpm": {
     "overrides": {
       "kysely": "^0.27.0"

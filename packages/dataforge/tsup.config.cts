@@ -15,42 +15,27 @@ const config = {
     'src/generated/dexie-domain/*.ts'
   ],
   format: ['esm'],
-  dts: {
-    // Skip type generation for dexie-domain files to avoid circular reference issues
-    entry: [
-      'src/generated/client-entities.ts', 
-      'src/generated/server-entities.ts', 
-      'src/generated/column-configurations.ts',
-      'src/generated/rdg-column-configurations.ts',
-      'src/generated/vibegridx-columns.ts',
-      'src/generated/comment-operations.ts',
-      'src/generated/project-operations.ts',
-      'src/generated/statusdefinition-operations.ts',
-      'src/generated/statusset-operations.ts',
-      'src/generated/tag-operations.ts',
-      'src/generated/tagset-operations.ts',
-      'src/generated/task-operations.ts',
-      'src/generated/user-operations.ts',
-      'src/generated/crud-operations.ts',
-      'src/generated/dexie-schema.ts',
-      'src/generated/dexie-domain-services.ts'
-    ]
-  },
+  dts: false, // Skip type generation due to circular references
   clean: true,
   platform: 'node',
   target: 'es2020',
-  noExternal: ['./src/**'],
-  external: [
-    'typeorm',
-    'reflect-metadata',
-    'class-validator',
-    '@electric-sql/pglite',
-    'pg',
-    'dexie',
-  ],
+  bundle: false,  // Don't bundle dependencies
+  splitting: false,
   treeshake: false,
+  minify: false,
+  sourcemap: false,
   esbuildOptions(options: import('esbuild').BuildOptions) {
     options.tsconfig = 'tsconfig.json';
+    // Ignore the .pnpm store and node_modules
+    options.external = [
+      '...',  // Mark everything as external
+      './...',
+      '../...',
+      '../../...',
+      'node_modules/*',
+      '.pnpm/*',
+      '*.node'
+    ];
   }
 };
 

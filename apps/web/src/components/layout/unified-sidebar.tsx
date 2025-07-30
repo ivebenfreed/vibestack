@@ -134,11 +134,13 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
             ))}
           </div>
 
-          {/* Context-sensitive content */}
-          <ContextualNavigation 
-            location={location.pathname} 
-            isCollapsed={isCollapsed} 
-          />
+          {/* Context-sensitive content - but NOT debug */}
+          {!location.pathname.startsWith('/debug') && (
+            <ContextualNavigation 
+              location={location.pathname} 
+              isCollapsed={isCollapsed} 
+            />
+          )}
 
           {/* Always show divider between main content and bottom nav */}
           <Separator className="my-4" />
@@ -154,6 +156,17 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
               />
             ))}
           </div>
+          
+          {/* Debug navigation - shown AFTER bottom navigation */}
+          {location.pathname.startsWith('/debug') && (
+            <>
+              <Separator className="my-4" />
+              <ContextualNavigation 
+                location={location.pathname} 
+                isCollapsed={isCollapsed} 
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

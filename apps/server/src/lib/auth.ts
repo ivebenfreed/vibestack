@@ -10,6 +10,39 @@ import { Kysely, PostgresDialect } from 'kysely';
 import { dbLogger } from '../middleware/logger';
 import { Resend } from 'resend';
 
+// Helper function to get allowed origins based on dynamic ports
+function getAllowedOrigins(env: Env): string[] {
+  const webPort = env.WEB_PORT || '5173';
+  const origins = [
+    `https://127.0.0.1:${webPort}`,
+    `http://127.0.0.1:${webPort}`,
+    `http://localhost:${webPort}`,
+  ];
+  
+  // Add production origins
+  if (env.ENVIRONMENT === 'production' || env.ENVIRONMENT === 'staging') {
+    origins.push(
+      'https://dev.codevibesmatter.com',
+      'https://app.codevibesmatter.com'
+    );
+  }
+  
+  return origins;
+}
+
+// Helper function to get base URL based on environment
+function getBaseUrl(env: Env): string {
+  const webPort = env.WEB_PORT || '5173';
+  
+  if (env.ENVIRONMENT === "development") {
+    return `http://localhost:${webPort}`;
+  } else if (env.ENVIRONMENT === "staging") {
+    return "https://dev.codevibesmatter.com";
+  } else {
+    return "https://app.codevibesmatter.com";
+  }
+}
+
 // Type for Hono context including Auth variables
 export type AuthType = {
   Variables: {
@@ -126,16 +159,12 @@ export function initializeAuth(env: Env) {
     }
   });
 
+  const trustedOrigins = getAllowedOrigins(env);
+  
   dbLogger.debug("Initializing Better Auth", {
     databaseUrlType: typeof env.DATABASE_URL,
     secretType: typeof env.BETTER_AUTH_SECRET,
-    trustedOrigins: [
-      'https://127.0.0.1:5173', 
-      'http://127.0.0.1:5173', 
-      'http://localhost:5173',
-      'https://dev.codevibesmatter.com',
-      'https://app.codevibesmatter.com'
-    ]
+    trustedOrigins: trustedOrigins
   }, 'auth');
 
   const runtimeAuthConfig = {
@@ -146,11 +175,7 @@ export function initializeAuth(env: Env) {
       casing: "snake" as const // Use literal type
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseUrl: env.ENVIRONMENT === "development" 
-      ? "http://localhost:5173"  // Frontend URL - Vite proxies /api/* to backend
-      : env.ENVIRONMENT === "staging" 
-        ? "https://dev.codevibesmatter.com" 
-        : "https://app.codevibesmatter.com",
+    baseUrl: getBaseUrl(env),
     cookieOptions: {
       secure: env.ENVIRONMENT !== "development", // ✅ FIX: Only secure in production/staging
       sameSite: "lax",
@@ -158,13 +183,7 @@ export function initializeAuth(env: Env) {
       // ✅ FIX: Set domain for development to work with Vite proxy
       domain: env.ENVIRONMENT === "development" ? "localhost" : undefined,
     },
-    trustedOrigins: [
-      'https://127.0.0.1:5173', 
-      'http://127.0.0.1:5173', 
-      'http://localhost:5173',
-      'https://dev.codevibesmatter.com',
-      'https://app.codevibesmatter.com'
-    ] as string[],
+    trustedOrigins: trustedOrigins as string[],
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
@@ -184,19 +203,16 @@ export function initializeAuth(env: Env) {
         const isInvitation = data.url.includes('/set-password');
         
         // Get the base URL for the current environment
-        const baseUrl = env.ENVIRONMENT === "development" 
-          ? "http://localhost:5173"  
-          : env.ENVIRONMENT === "staging" 
-            ? "https://dev.codevibesmatter.com" 
-            : "https://app.codevibesmatter.com";
+        const baseUrl = getBaseUrl(env);
         
-        // Fix the URL for development - replace 127.0.0.1 with localhost:5173
+        // Fix the URL for development - replace 127.0.0.1 with localhost:PORT
         let fullUrl = data.url.startsWith('http') ? data.url : `${baseUrl}${data.url}`;
         
         // In development, Better Auth may use 127.0.0.1 from the proxy request
         // Replace it with the correct localhost URL
+        const webPort = env.WEB_PORT || '5173';
         if (env.ENVIRONMENT === "development" && fullUrl.includes('http://127.0.0.1/')) {
-          fullUrl = fullUrl.replace('http://127.0.0.1/', 'http://localhost:5173/');
+          fullUrl = fullUrl.replace('http://127.0.0.1/', `http://localhost:${webPort}/`);
         }
         
         try {
@@ -335,11 +351,7 @@ export function initializeAuth(env: Env) {
           const resend = new Resend(env.RESEND_API_KEY);
           
           // Get the base URL for the current environment
-          const baseUrl = env.ENVIRONMENT === "development" 
-            ? "http://localhost:5173"  
-            : env.ENVIRONMENT === "staging" 
-              ? "https://dev.codevibesmatter.com" 
-              : "https://app.codevibesmatter.com";
+          const baseUrl = getBaseUrl(env);
           
           try {
             let subject = '';

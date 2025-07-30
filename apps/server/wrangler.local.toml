@@ -1,0 +1,41 @@
+name = "vibestack"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+send_metrics = false
+
+[build]
+command = ""
+watch_dir = "src"
+
+[build.upload]
+rules = [
+  { type = "CompiledWasm", globs = ["**/*.wasm"], fallthrough = true }
+]
+
+# Module aliases to fix TypeORM compatibility
+[alias]
+"debug" = "./src/shims/debug.ts"
+"app-root-path" = "./src/lib/app-root-path-shim.ts"
+
+[durable_objects]
+bindings = [
+  { name = "SYNC", class_name = "SyncDO" },
+  { name = "REPLICATION", class_name = "ReplicationDO" },
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncDO", "ReplicationDO"]
+
+[[kv_namespaces]]
+binding = "CLIENT_CACHE"
+id = "01453e5dc2ff4cf8a061a25b95501df0"
+
+[dev]
+port = 8787
+
+[vars]
+LOG_LEVEL = "info"
+ENABLE_PERFORMANCE_LOGS = "false"
+LOG_TIMESTAMP_FORMAT = "iso"

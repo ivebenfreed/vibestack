@@ -381,7 +381,7 @@ authRouter.post("/admin/users/:id/send-reset-email", adminAuthMiddleware, async 
       body: {
         email: user.email,
         redirectTo: `${c.env.ENVIRONMENT === "development" 
-          ? "http://localhost:5173" 
+          ? `http://localhost:${c.env.WEB_PORT || '5173'}` 
           : c.env.ENVIRONMENT === "staging" 
             ? "https://dev.codevibesmatter.com" 
             : "https://app.codevibesmatter.com"}/reset-password`
@@ -501,7 +501,7 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
     // Send invitation email with signup link
     const resend = new Resend(c.env.RESEND_API_KEY);
     const baseUrl = c.env.ENVIRONMENT === "development" 
-      ? "http://localhost:5173"  
+      ? `http://localhost:${c.env.WEB_PORT || '5173'}`  
       : c.env.ENVIRONMENT === "staging" 
         ? "https://dev.codevibesmatter.com" 
         : "https://app.codevibesmatter.com";
