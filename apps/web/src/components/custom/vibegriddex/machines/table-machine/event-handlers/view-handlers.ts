@@ -803,6 +803,20 @@ export const viewHandlers = {
         }
       },
       
+      // Trigger a full re-render with updated column widths
+      ({ context }) => {
+        if (context.actors?.rendererActor) {
+          context.actors.rendererActor.send({
+            type: 'RENDER_CELLS',
+            rows: context.rows,
+            columns: context.columns,
+            coordinateMapping: context.coordinateMapping,
+            selection: context.selection,
+            editingState: context.editingState
+          });
+        }
+      },
+      
       // Increment version to trigger re-render
       assign({
         version: ({ context }) => context.version + 1
