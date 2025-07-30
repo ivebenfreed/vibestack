@@ -26,7 +26,15 @@ const config = {
   sourcemap: false,
   esbuildOptions(options: import('esbuild').BuildOptions) {
     options.tsconfig = 'tsconfig.json';
-  }
+    // Skip platform-specific optional dependencies
+    options.platform = 'node';
+    options.loader = {
+      '.node': 'empty'
+    };
+  },
+  // Skip these dependencies entirely
+  noExternal: [],
+  external: ['fsevents']
 };
 
 module.exports = defineConfig(config); 
