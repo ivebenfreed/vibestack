@@ -479,6 +479,11 @@ body.vibegridx-dragging-active * {
   cursor: pointer;
   transition: opacity 0.15s ease;
   border-radius: 4px;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vibegridx-cell-badge-editable:hover {
@@ -612,8 +617,7 @@ body.vibegridx-dragging-active * {
 
 /* Relationship badge styling */
 .vibegridx-relationship-badge {
-  display: inline-flex;
-  align-items: center;
+  display: inline-block; /* Changed from inline-flex to allow text truncation */
   padding: 2px 8px;
   border-radius: 4px;
   font-size: inherit; /* Inherit from parent (13px) instead of fixed 12px */
@@ -621,6 +625,10 @@ body.vibegridx-dragging-active * {
   background-color: var(--primary);
   color: var(--primary-foreground);
   border: 1px solid var(--primary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vibegridx-relationship-badge.vibegridx-relationship-small {

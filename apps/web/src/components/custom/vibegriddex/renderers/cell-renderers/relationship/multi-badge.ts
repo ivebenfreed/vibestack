@@ -61,7 +61,8 @@ export function relationshipMultiBadge(
 
   // Use column width directly - more reliable than DOM measurement at render time
   const getAvailableWidth = () => {
-    return column.width ? column.width - 24 : 200; // Account for padding
+    // Account for cell padding (12px * 2) and some buffer for safety
+    return column.width ? column.width - 32 : 200; // Increased padding buffer
   };
   
   // Function to render badges with given width
@@ -98,7 +99,7 @@ export function relationshipMultiBadge(
       badges.forEach(badge => badgesWrapper.appendChild(badge.cloneNode(true)));
     } else {
       // We need to show "+X more" - recalculate with reserved space
-      const moreButtonWidth = 50; // Approximate width of "+X more" badge
+      const moreButtonWidth = 60; // Increased width for "+X more" badge to prevent cutoff
       const availableWidthWithMore = availableContainerWidth - moreButtonWidth;
       
       // Recalculate how many badges fit with "+X more" reserved
@@ -182,8 +183,8 @@ export function relationshipMultiBadgeString(
   // Adaptive display based on column width and text length
   const columnWidth = column.width || 220;
   const estimatedBadgeWidth = 60; // Average badge width
-  const moreButtonWidth = 50;
-  const availableWidth = columnWidth - 24; // Account for padding
+  const moreButtonWidth = 60; // Match the DOM version
+  const availableWidth = columnWidth - 32; // Match the DOM version padding
   
   // Calculate approximate number of badges that can fit
   let maxDisplay = Math.max(1, Math.floor(availableWidth / estimatedBadgeWidth));

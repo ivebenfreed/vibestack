@@ -142,14 +142,19 @@ export class CellPipeline {
       
       // Add tooltip for truncated editable content
       requestAnimationFrame(() => {
-        if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
-          // For enum and relationship badges, extract text content
-          if (cellType === 'enum' || cellType?.startsWith('relationship')) {
+        // For single relationships and enums in editable mode
+        if (cellType === 'relationship-single' || cellType === 'relationship' || cellType === 'enum') {
+          if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
             wrapper.title = wrapper.textContent || '';
-          } else {
+          }
+        } else if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
+          // Multi-relationships are handled differently - they have their own container
+          // The tooltip will be set on the outer content div
+        } else {
+          // Regular text content
+          if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
             wrapper.title = cellContent;
           }
-          // Don't change cursor - keep the default pointer cursor
         }
       });
     } else {
@@ -164,23 +169,28 @@ export class CellPipeline {
     // Add tooltip for truncated content
     // Use requestAnimationFrame to ensure layout is complete
     requestAnimationFrame(() => {
-      // For multi-relationship badges, check the inner container
-      const elementToCheck = cellType === 'relationship-multi' || cellType === 'relationship-collection'
-        ? content.querySelector('.vibegridx-multi-badge-container') || content
-        : content;
-        
-      if (elementToCheck.scrollWidth > elementToCheck.clientWidth) {
-        // For HTML content (badges), extract text content properly
-        if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
-          // Get all badge text values
-          const badges = content.querySelectorAll('.vibegridx-badge');
-          const badgeTexts = Array.from(badges).map(badge => badge.textContent).filter(Boolean);
-          if (badgeTexts.length > 0) {
-            content.title = badgeTexts.join(', ');
+      if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
+        // Multi-relationship badges handle their own tooltips
+        // The renderer already adds tooltips to individual badges and the "+X more" indicator
+        // We should NOT interfere with this
+        return;
+      } else if (cellType === 'relationship-single' || cellType === 'relationship') {
+        // Single relationship: check if the badge text is truncated
+        if (content.scrollWidth > content.clientWidth) {
+          // Extract text from the badge HTML
+          const badgeText = content.textContent?.trim();
+          if (badgeText && badgeText !== 'Select...') {
+            content.title = badgeText;
           }
-        } else if (cellType === 'enum' || cellType?.startsWith('relationship')) {
+        }
+      } else if (cellType === 'enum') {
+        // Enum: check if badge is truncated
+        if (content.scrollWidth > content.clientWidth) {
           content.title = content.textContent || '';
-        } else {
+        }
+      } else {
+        // Regular text content
+        if (content.scrollWidth > content.clientWidth) {
           content.title = cellContent;
         }
       }
