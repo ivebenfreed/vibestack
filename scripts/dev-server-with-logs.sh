@@ -11,11 +11,20 @@ PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 if [[ "$PWD" == *"apps/server"* ]]; then
     # Running from apps/server directory (via turbo)
     LOG_DIR="logs"
-    WRANGLER_CMD="wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1 --port 8787"
+    # Check for generated config first, otherwise use default
+    if [ -f "wrangler.generated.toml" ]; then
+        WRANGLER_CMD="wrangler dev --config wrangler.generated.toml --var LOG_LEVEL:info --ip 127.0.0.1"
+    else
+        WRANGLER_CMD="wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1"
+    fi
 else
     # Running from project root or scripts directory
     LOG_DIR="$PROJECT_ROOT/apps/server/logs"
-    WRANGLER_CMD="cd $PROJECT_ROOT/apps/server && wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1 --port 8787"
+    if [ -f "$PROJECT_ROOT/apps/server/wrangler.generated.toml" ]; then
+        WRANGLER_CMD="cd $PROJECT_ROOT/apps/server && wrangler dev --config wrangler.generated.toml --var LOG_LEVEL:info --ip 127.0.0.1"
+    else
+        WRANGLER_CMD="cd $PROJECT_ROOT/apps/server && wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1"
+    fi
 fi
 
 LOG_FILE="$LOG_DIR/server.log"
