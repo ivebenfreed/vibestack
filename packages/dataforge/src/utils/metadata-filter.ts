@@ -23,7 +23,7 @@ export class MetadataFilter {
             absolute: true
         });
 
-        console.log('Found entity files:', entityFiles);
+        console.log(`Found ${entityFiles.length} entity files`);
         const entities: Function[] = [];
 
         for (const file of entityFiles) {
