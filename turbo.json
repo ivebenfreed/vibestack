@@ -11,7 +11,17 @@
       "cache": false,
       "dependsOn": ["^build"]
     },
+    "dev:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
     "dev:debug": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:debug:local": {
       "persistent": true,
       "cache": false,
       "dependsOn": ["^build"]
@@ -21,7 +31,36 @@
       "cache": false,
       "dependsOn": ["^build"]
     },
+    "dev:info:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:pr": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:pr:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:no-logs": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:no-logs:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
     "_start_servers_for_pwa_test": {
+      "persistent": true,
+      "cache": false
+    },
+    "_start_servers_for_pwa_test:local": {
       "persistent": true,
       "cache": false
     },
