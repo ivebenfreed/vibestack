@@ -9,6 +9,7 @@ import {
   relationshipMulti,
 } from '../cell-renderers';
 import { relationshipMultiBadge, relationshipMultiBadgeString } from '../cell-renderers/relationship/multi-badge';
+import { relationshipSingleBadge } from '../cell-renderers/relationship/single';
 
 // ====================================
 // CELL RENDERING PIPELINE
@@ -85,6 +86,18 @@ export class CellPipeline {
       return content;
     }
     
+    // Special handling for single relationship badges
+    if (cellType === 'relationship-single' || cellType === 'relationship') {
+      // Use the DOM badge renderer that returns HTMLElement
+      const badgeContent = relationshipSingleBadge(value, column, rowData);
+      
+      // Override default styles for badge container
+      content.style.padding = '4px 12px'; // Different padding for badge container
+      
+      content.appendChild(badgeContent);
+      return content;
+    }
+    
     // Check if column is editable
     const isEditable = column.editable !== false; // Default to true unless explicitly false
     
@@ -142,15 +155,12 @@ export class CellPipeline {
       
       // Add tooltip for truncated editable content
       requestAnimationFrame(() => {
-        // For single relationships and enums in editable mode
-        if (cellType === 'relationship-single' || cellType === 'relationship' || cellType === 'enum') {
+        // Relationships are now handled by their DOM renderers
+        if (cellType === 'enum') {
           if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
             wrapper.title = wrapper.textContent || '';
           }
-        } else if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
-          // Multi-relationships are handled differently - they have their own container
-          // The tooltip will be set on the outer content div
-        } else {
+        } else if (!cellType?.startsWith('relationship')) {
           // Regular text content
           if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
             wrapper.title = cellContent;
@@ -169,20 +179,9 @@ export class CellPipeline {
     // Add tooltip for truncated content
     // Use requestAnimationFrame to ensure layout is complete
     requestAnimationFrame(() => {
-      if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
-        // Multi-relationship badges handle their own tooltips
-        // The renderer already adds tooltips to individual badges and the "+X more" indicator
-        // We should NOT interfere with this
+      // Relationships are handled by their DOM renderers
+      if (cellType?.startsWith('relationship')) {
         return;
-      } else if (cellType === 'relationship-single' || cellType === 'relationship') {
-        // Single relationship: check if the badge text is truncated
-        if (content.scrollWidth > content.clientWidth) {
-          // Extract text from the badge HTML
-          const badgeText = content.textContent?.trim();
-          if (badgeText && badgeText !== 'Select...') {
-            content.title = badgeText;
-          }
-        }
       } else if (cellType === 'enum') {
         // Enum: check if badge is truncated
         if (content.scrollWidth > content.clientWidth) {
