@@ -1,23 +1,43 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ContentContainer } from '@/components/layout/content-container';
 import ProjectsProvider from './context/projects-context';
 import { ProjectsDialogs } from './components/projects-dialogs';
 import { ProjectsPrimaryButtons } from './components/projects-primary-buttons';
-import { VibeGridDexWithSuspense } from '@/components/custom/vibegriddex/VibeGridDex';
+import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex';
 import { domainServices } from '@/domain';
+import { useTheme } from '@/context/theme-context';
+import { createEntityTagFilter } from '@/domain/helpers/tag-filters';
 import type { Project } from '@repo/dataforge/client-entities';
 import type { Column } from '@/components/custom/vibegriddex/column-types';
 
 /**
  * Main Projects Feature Component
- * Using VibeGridDex for Dexie-based data grid with Suspense
+ * Using VibeGridDex for Dexie-based data grid
  */
 const Projects: React.FC = () => {
-  // Define columns for Project entity (responsive widths to prevent overflow)
+  
+  // Get theme and resolve 'system' to actual theme
+  const { theme } = useTheme()
+  const effectiveTheme = theme === 'system' 
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : theme
+
+  // Define batch update handler for better performance with fill operations
+  const handleBatchUpdate = useCallback(async (updates: Array<{ id: string; updates: Record<string, any> }>) => {
+    try {
+      await domainServices.project.batchUpdateUI(updates);
+      console.log('ProjectsTableView: Batch update completed', { count: updates.length });
+    } catch (error) {
+      console.error('ProjectsTableView: Batch update failed', error);
+      throw error; // Re-throw to let VibeGridDex handle the error
+    }
+  }, []);
+
+  // Define columns for Project entity
   const columns: Column<Project>[] = [
-    { id: 'name', field: 'name', name: 'Name', cellType: 'text', width: 200 },
-    { id: 'description', field: 'description', name: 'Description', cellType: 'text', width: 300 },
-    { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 120,
+    { id: 'name', field: 'name', name: 'Name', cellType: 'text', width: 300, editable: true },
+    { id: 'description', field: 'description', name: 'Description', cellType: 'text', width: 400, editable: true },
+    { id: 'status', field: 'status', name: 'Status', cellType: 'enum', width: 150, editable: true,
       options: [
         { value: 'active', label: 'Active' },
         { value: 'in_progress', label: 'In Progress' },
@@ -25,7 +45,7 @@ const Projects: React.FC = () => {
         { value: 'on_hold', label: 'On Hold' }
       ]
     },
-    { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 100,
+    { id: 'priority', field: 'priority', name: 'Priority', cellType: 'enum', width: 120, editable: true,
       options: [
         { value: 'low', label: 'Low' },
         { value: 'medium', label: 'Medium' },
@@ -33,14 +53,20 @@ const Projects: React.FC = () => {
         { value: 'critical', label: 'Critical' }
       ]
     },
-    { id: 'startDate', field: 'startDate', name: 'Start Date', cellType: 'date', width: 130 },
-    { id: 'endDate', field: 'endDate', name: 'End Date', cellType: 'date', width: 130 },
+    { id: 'tagSets', field: 'tagSets', name: 'Tag Sets', cellType: 'relationship-multi',
+      width: 250, editable: true, sortable: false,
+      relationshipTable: 'tag_sets',
+      relationshipDisplayField: 'name',
+      junctionTable: 'project_tag_sets',
+      junctionSourceField: 'project_id',
+      junctionTargetField: 'tag_set_id'
+    },
+    { id: 'startDate', field: 'startDate', name: 'Start Date', cellType: 'date', width: 150, editable: true },
+    { id: 'endDate', field: 'endDate', name: 'End Date', cellType: 'date', width: 150, editable: true },
     { id: 'ownerId', field: 'ownerId', name: 'Owner', cellType: 'relationship-single',
-      width: 150, relationshipTable: 'users', relationshipDisplayField: 'name' },
-    { id: 'tags', field: 'tags', name: 'Tags', cellType: 'relationship-multi',
-      width: 180, relationshipTable: 'tags', relationshipDisplayField: 'name' },
-    { id: 'createdAt', field: 'createdAt', name: 'Created', cellType: 'date', width: 130, editable: false },
-    { id: 'updatedAt', field: 'updatedAt', name: 'Updated', cellType: 'date', width: 130, editable: false }
+      width: 180, relationshipTable: 'users', relationshipDisplayField: 'name', editable: true },
+    { id: 'createdAt', field: 'createdAt', name: 'Created', cellType: 'date', width: 150, editable: false },
+    { id: 'updatedAt', field: 'updatedAt', name: 'Updated', cellType: 'date', width: 150, editable: false }
   ]
 
   // Error state
@@ -70,11 +96,12 @@ const Projects: React.FC = () => {
         </div>
 
         {/* Data Grid */}
-        <VibeGridDexWithSuspense
-          tableId="projects-table"
+        <VibeGridDex
+          tableId="projects-table-v2"
           entityType="project"
           columns={columns}
           onEntityUpdate={(id, updates) => domainServices.project.updateUI(id, updates)}
+          onBatchEntityUpdate={handleBatchUpdate}
           height={600}
           className="border border-border rounded-lg"
           enableSorting

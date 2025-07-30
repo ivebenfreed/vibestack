@@ -394,25 +394,6 @@ export interface DragContext {
   constraints: Record<string, any>;
 }
 
-// Column drag state for header reordering
-export interface ColumnDragState {
-  isDragging: boolean;
-  draggedColumnId: string | null;
-  draggedColumnIndex: number;
-  currentDropIndex: number;
-  mouseX: number;
-  mouseY: number;
-}
-
-// Column resize state
-export interface ColumnResizeState {
-  isResizing: boolean;
-  resizingColumnId: string | null;
-  startX: number;
-  startWidth: number;
-  currentX: number;
-  previewWidth: number;
-}
 
 // Row selection state
 export interface RowSelectionState {
@@ -500,8 +481,8 @@ export type TableEvents =
   | { type: 'ACTOR_STOPPED'; actorType: string; actorId: string }
   
   // Resize state events from view coordinator
-  | { type: 'view.resize.started'; columnResizeState: ColumnResizeState }
-  | { type: 'view.resize.updated'; columnResizeState: ColumnResizeState }
+  | { type: 'view.resize.started'; columnId: string; startX: number; startWidth: number }
+  | { type: 'view.resize.updated'; columnId: string; width: number }
   | { type: 'view.resize.ended' }
   | { type: 'view.resize.cancelled' }
   

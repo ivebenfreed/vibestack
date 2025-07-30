@@ -311,7 +311,7 @@ export class EventDelegationManager {
         console.log('🎯 EventDelegationManager: Sort icon clicked, triggering sort');
         this.send({
           type: 'view.column.click',
-          field: columnId // Use 'field' instead of 'columnId' to match view-slice expectation
+          field: columnId
         });
       } else if (columnId && !sortIcon) {
         console.log('🎯 EventDelegationManager: Header clicked but not on sort icon, ignoring');

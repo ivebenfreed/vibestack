@@ -430,13 +430,9 @@ export const viewHandlers = {
       // Emit event for UI feedback
       emit(({ event }) => ({
         type: 'view.drag.started',
-        columnDragState: {
-          columnId: event.columnId,
-          startX: event.x,
-          startY: event.y,
-          mouseX: event.x,
-          mouseY: event.y
-        }
+        columnId: event.columnId,
+        startX: event.x,
+        startY: event.y
       })),
       
     ]
@@ -461,9 +457,8 @@ export const viewHandlers = {
       },
       
       // Emit event for UI feedback
-      emit(({ context }) => ({
-        type: 'view.drag.updated',
-        columnDragState: context.columnDragState
+      emit(() => ({
+        type: 'view.drag.updated'
       }))
     ]
   },
@@ -636,25 +631,12 @@ export const viewHandlers = {
   // Column resize events
   'view.columns.resize.start': {
     actions: [
-      // Store resize state in context
-      assign({
-        columnResizeState: ({ event }) => ({
-          isResizing: true,
-          resizingColumnId: event.columnId,
-          columnId: event.columnId,
-          startX: event.x,
-          startWidth: event.width,
-          currentWidth: event.width,
-          previewWidth: event.width,
-          minWidth: 50,
-          maxWidth: 1000
-        })
-      }),
-      
       // Emit event for UI feedback
-      emit(({ context }) => ({
+      emit(({ event }) => ({
         type: 'view.resize.started',
-        columnResizeState: context.columnResizeState
+        columnId: event.columnId,
+        startX: event.x,
+        startWidth: event.width
       })),
       
       ({ event }) => {
@@ -669,36 +651,20 @@ export const viewHandlers = {
   
   'view.columns.resize.move': {
     actions: [
-      // Update resize state with new width based on mouse position
-      assign({
-        columnResizeState: ({ context, event }) => {
-          if (!context.columnResizeState) return context.columnResizeState;
-          
-          const { startX, startWidth, minWidth, maxWidth } = context.columnResizeState;
-          const delta = event.x - startX;
-          const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + delta));
-          
-          return {
-            ...context.columnResizeState,
-            currentWidth: newWidth,
-            previewWidth: newWidth
-          };
-        }
-      }),
       
       // Update coordinate mapping with new column width (immutably)
       assign({
-        coordinateMapping: ({ context }) => {
-          if (!context.coordinateMapping || !context.columnResizeState) {
+        coordinateMapping: ({ context, event }) => {
+          if (!context.coordinateMapping) {
             return context.coordinateMapping;
           }
           
-          const { columnId, currentWidth } = context.columnResizeState;
+          const { columnId, width } = event;
           
           // Update column width in coordinate mapping
           const newColumns = context.coordinateMapping.columns.map(col => {
             if (col.columnId === columnId) {
-              return { ...col, width: currentWidth };
+              return { ...col, width: width };
             }
             return col;
           });
@@ -764,9 +730,10 @@ export const viewHandlers = {
       },
       
       // Emit event for UI feedback  
-      emit(({ context }) => ({
+      emit(({ event }) => ({
         type: 'view.resize.updated',
-        columnResizeState: context.columnResizeState
+        columnId: event.columnId,
+        width: event.width
       })),
       
       // Column resize move handled
@@ -776,24 +743,24 @@ export const viewHandlers = {
   'view.columns.resize.end': {
     actions: [
       // Log the final state before any modifications
-      ({ context }) => {
+      ({ event }) => {
         console.log('TableMachine: Column resize ended', {
-          columnId: context.columnResizeState?.columnId,
-          finalWidth: context.columnResizeState?.currentWidth
+          columnId: event.columnId,
+          finalWidth: event.width
         });
       },
       
       // Update coordinate mapping with final width
       assign({
-        coordinateMapping: ({ context }) => {
-          if (!context.columnResizeState) return context.coordinateMapping;
+        coordinateMapping: ({ context, event }) => {
+          if (!context.coordinateMapping) return context.coordinateMapping;
           
-          const { columnId, currentWidth } = context.columnResizeState;
+          const { columnId, width } = event;
           
           // Update column width in coordinate mapping
           const newColumns = context.coordinateMapping.columns.map(col => {
             if (col.columnId === columnId) {
-              return { ...col, width: currentWidth };
+              return { ...col, width: width };
             }
             return col;
           });
@@ -812,13 +779,11 @@ export const viewHandlers = {
           };
         },
         // Also update columnWidths in context
-        columnWidths: ({ context }) => {
-          if (!context.columnResizeState) return context.columnWidths || {};
-          
-          const { columnId, currentWidth } = context.columnResizeState;
+        columnWidths: ({ context, event }) => {
+          const { columnId, width } = event;
           return {
             ...context.columnWidths,
-            [columnId]: currentWidth
+            [columnId]: width
           };
         }
       }),
@@ -827,13 +792,13 @@ export const viewHandlers = {
       'persistSnapshot',
       
       // Send column width update to store
-      ({ context }) => {
-        if (context.storeActor && context.columnResizeState) {
-          const { columnId, currentWidth } = context.columnResizeState;
+      ({ context, event }) => {
+        if (context.storeActor) {
+          const { columnId, width } = event;
           context.storeActor.send({
             type: 'setColumnWidth',
             columnId,
-            width: currentWidth
+            width: width
           });
         }
       },
@@ -854,11 +819,6 @@ export const viewHandlers = {
         }
       },
       
-      // Clear the resize state
-      assign({
-        columnResizeState: () => null
-      }),
-      
       // Emit event for UI feedback
       emit({ type: 'view.resize.ended' })
     ]
@@ -866,11 +826,6 @@ export const viewHandlers = {
   
   'view.columns.resize.cancel': {
     actions: [
-      // Clear the resize state
-      assign({
-        columnResizeState: () => null
-      }),
-      
       // Emit event for UI feedback
       emit({ type: 'view.resize.cancelled' }),
       

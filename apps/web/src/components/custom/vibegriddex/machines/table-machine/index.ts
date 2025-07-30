@@ -880,15 +880,54 @@ export const tableBaseMachine = setup({
           dimensionActions.recalculateCoordinateMapping,
           
           // Always render when store emits new data - store decides what changed
-          ({ context, self }) => {
+          ({ context, self, event }) => {
             if (!context.actors.rendererActor) {
               console.log('🔍 TableMachine: No renderer actor available');
               return;
             }
             
+            // Enhanced logging to track relationship updates
+            const previousRows = (self as any).getSnapshot?.()?.context?.rows || [];
+            const relationshipColumns = context.columns.filter(col => 
+              col.cellType?.startsWith('relationship') || col.type?.startsWith('relationship')
+            );
+            
+            // Check if any relationship data changed
+            let relationshipChanges = [];
+            if (previousRows.length === context.rows.length) {
+              for (let i = 0; i < context.rows.length; i++) {
+                const prevRow = previousRows[i];
+                const newRow = context.rows[i];
+                if (prevRow && newRow && prevRow.id === newRow.id) {
+                  relationshipColumns.forEach(col => {
+                    const prevValue = prevRow.data[col.field];
+                    const newValue = newRow.data[col.field];
+                    const prevResolved = prevRow.data[`__resolved_${col.id}`];
+                    const newResolved = newRow.data[`__resolved_${col.id}`];
+                    
+                    if (JSON.stringify(prevValue) !== JSON.stringify(newValue) || 
+                        JSON.stringify(prevResolved) !== JSON.stringify(newResolved)) {
+                      relationshipChanges.push({
+                        rowId: newRow.id,
+                        column: col.name,
+                        field: col.field,
+                        oldValue: prevValue,
+                        newValue: newValue,
+                        oldResolved: prevResolved,
+                        newResolved: newResolved
+                      });
+                    }
+                  });
+                }
+              }
+            }
+            
             console.log('🔍 TableMachine: Store update received, rendering', {
               rowCount: context.rows.length,
-              columnCount: context.columns.length
+              columnCount: context.columns.length,
+              relationshipColumns: relationshipColumns.map(c => c.name),
+              relationshipChanges: relationshipChanges.length > 0 ? relationshipChanges : 'none',
+              lastProcessedAt: event.snapshot?.context?.lastProcessedAt
             });
             
             // Get visible columns using centralized logic

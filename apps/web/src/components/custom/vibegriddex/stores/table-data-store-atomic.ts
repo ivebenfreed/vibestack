@@ -390,13 +390,51 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           );
           
           if (affectedConfigs.length > 0) {
-            // Re-resolve affected entities
+            // Create updated relationships with the new data
+            const relationshipLookup: Record<string, any> = {};
+            event.data.forEach((item: any) => {
+              relationshipLookup[item.id] = item;
+            });
+            
+            const updatedRelationships = {
+              ...context.relationships,
+              [event.table]: relationshipLookup
+            };
+            
+            // Re-resolve affected entities with the NEW relationships
             const updatedEntities = { ...context.entities };
+            let changedCount = 0;
             Object.keys(updatedEntities).forEach(entityId => {
               const originalEntity = updatedEntities[entityId];
-              const newResolvedEntity = resolveEntityRelationships(originalEntity, context.relationships, relationshipConfigs);
+              const newResolvedEntity = resolveEntityRelationships(originalEntity, updatedRelationships, relationshipConfigs);
+              
+              // Check if resolution actually changed anything
+              const oldResolved = resolveEntityRelationships(originalEntity, context.relationships, relationshipConfigs);
+              const hasChanges = JSON.stringify(oldResolved) !== JSON.stringify(newResolvedEntity);
+              if (hasChanges) {
+                changedCount++;
+                if (process.env.NODE_ENV === 'development' && changedCount <= 3) {
+                  console.log('📊 TableStore: Entity resolution changed', {
+                    entityId,
+                    table: event.table,
+                    affectedColumns: affectedConfigs.map(c => c.columnId),
+                    oldValue: oldResolved[`__resolved_${affectedConfigs[0]?.columnId}`],
+                    newValue: newResolvedEntity[`__resolved_${affectedConfigs[0]?.columnId}`]
+                  });
+                }
+              }
+              
               updatedEntities[entityId] = newResolvedEntity;
             });
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('📊 TableStore: Re-resolved entities after relationship change', {
+                table: event.table,
+                totalEntities: Object.keys(updatedEntities).length,
+                changedEntities: changedCount
+              });
+            }
+            
             return updatedEntities;
           }
           
@@ -410,10 +448,38 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           );
           
           if (affectedConfigs.length > 0) {
-            return context.processedRows.map(row => ({
-              ...row,
-              data: context.entities[row.id] // Use re-resolved entities
-            }));
+            // First, we need to get the updated entities from the entities assignment
+            // Create updated relationships with the new data
+            const relationshipLookup: Record<string, any> = {};
+            event.data.forEach((item: any) => {
+              relationshipLookup[item.id] = item;
+            });
+            
+            const updatedRelationships = {
+              ...context.relationships,
+              [event.table]: relationshipLookup
+            };
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('📊 TableStore: Re-processing rows due to relationship change', {
+                table: event.table,
+                affectedColumns: affectedConfigs.map(c => c.columnId),
+                rowCount: context.processedRows.length,
+                sampleBeforeUpdate: context.processedRows[0]?.data,
+                relationshipDataCount: event.data.length
+              });
+            }
+            
+            // Re-resolve ALL entities with the new relationships and update processedRows
+            return context.processedRows.map(row => {
+              const originalEntity = context.entities[row.id];
+              const newResolvedEntity = resolveEntityRelationships(originalEntity, updatedRelationships, relationshipConfigs);
+              
+              return {
+                ...row,
+                data: newResolvedEntity
+              };
+            });
           }
           
           return context.processedRows;
@@ -1330,6 +1396,12 @@ export function setupGranularSubscriptions(
       console.log('📊 TableStore: Creating relationship subscription for', tableName);
       const sub = liveQuery(() => table.toArray()).subscribe({
         next: (data) => {
+          console.log('📊 TableStore: Relationship subscription fired for', tableName, {
+            initialLoadComplete,
+            dataCount: data.length,
+            timestamp: new Date().toISOString()
+          });
+          
           if (!initialLoadComplete) return;
           
           // Create lookup map for current data
@@ -1358,10 +1430,36 @@ export function setupGranularSubscriptions(
           
           // Only send update if there were actual changes
           if (hasChanges) {
-            console.log('📊 TableStore: Granular relationship update', {
+            // Enhanced logging to show what changed
+            let changeDetails = {
+              added: [] as string[],
+              updated: [] as string[],
+              removed: [] as string[]
+            };
+            
+            // Find added and updated items
+            data.forEach((item: any) => {
+              const previousItem = previousData[item.id];
+              if (!previousItem) {
+                changeDetails.added.push(item.id);
+              } else if (JSON.stringify(previousItem) !== JSON.stringify(item)) {
+                changeDetails.updated.push(item.id);
+              }
+            });
+            
+            // Find removed items
+            Object.keys(previousData).forEach(id => {
+              if (!currentDataMap[id]) {
+                changeDetails.removed.push(id);
+              }
+            });
+            
+            console.log('📊 TableStore: Granular relationship update detected', {
               tableName,
               count: data.length,
-              previousCount: Object.keys(previousData).length
+              previousCount: Object.keys(previousData).length,
+              changes: changeDetails,
+              sampleItem: data[0]
             });
             
             // Send event to update relationship table
