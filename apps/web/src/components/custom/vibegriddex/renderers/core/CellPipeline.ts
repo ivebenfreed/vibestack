@@ -144,7 +144,7 @@ export class CellPipeline {
       requestAnimationFrame(() => {
         if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
           wrapper.title = cellContent;
-          wrapper.style.cursor = 'help';
+          // Don't change cursor - keep the default pointer cursor
         }
       });
     } else {
@@ -167,7 +167,7 @@ export class CellPipeline {
         
         if (tooltipText && tooltipText !== 'Click to edit') {
           content.title = tooltipText;
-          content.style.cursor = 'help';
+          // Don't change cursor for non-editable content either
         }
       }
     });

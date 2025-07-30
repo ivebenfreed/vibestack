@@ -302,7 +302,7 @@ export class CleanTableRenderer {
       requestAnimationFrame(() => {
         if (content.scrollWidth > content.clientWidth) {
           content.title = column.name || column.id;
-          content.style.cursor = 'help';
+          // Keep default cursor
         }
       });
       
