@@ -143,7 +143,12 @@ export class CellPipeline {
       // Add tooltip for truncated editable content
       requestAnimationFrame(() => {
         if (wrapper.scrollWidth > wrapper.clientWidth && !isEmpty) {
-          wrapper.title = cellContent;
+          // For enum and relationship badges, extract text content
+          if (cellType === 'enum' || cellType?.startsWith('relationship')) {
+            wrapper.title = wrapper.textContent || '';
+          } else {
+            wrapper.title = cellContent;
+          }
           // Don't change cursor - keep the default pointer cursor
         }
       });
@@ -159,15 +164,24 @@ export class CellPipeline {
     // Add tooltip for truncated content
     // Use requestAnimationFrame to ensure layout is complete
     requestAnimationFrame(() => {
-      if (content.scrollWidth > content.clientWidth) {
-        // For HTML content (badges), extract text content
-        const tooltipText = cellType === 'enum' || cellType?.startsWith('relationship') 
-          ? content.textContent || ''
-          : cellContent;
+      // For multi-relationship badges, check the inner container
+      const elementToCheck = cellType === 'relationship-multi' || cellType === 'relationship-collection'
+        ? content.querySelector('.vibegridx-multi-badge-container') || content
+        : content;
         
-        if (tooltipText && tooltipText !== 'Click to edit') {
-          content.title = tooltipText;
-          // Don't change cursor for non-editable content either
+      if (elementToCheck.scrollWidth > elementToCheck.clientWidth) {
+        // For HTML content (badges), extract text content properly
+        if (cellType === 'relationship-multi' || cellType === 'relationship-collection') {
+          // Get all badge text values
+          const badges = content.querySelectorAll('.vibegridx-badge');
+          const badgeTexts = Array.from(badges).map(badge => badge.textContent).filter(Boolean);
+          if (badgeTexts.length > 0) {
+            content.title = badgeTexts.join(', ');
+          }
+        } else if (cellType === 'enum' || cellType?.startsWith('relationship')) {
+          content.title = content.textContent || '';
+        } else {
+          content.title = cellContent;
         }
       }
     });
