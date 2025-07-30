@@ -2,6 +2,28 @@
 
 ## A full stack, local first, edge and AI native framework for data intensive web applications.
 
+## 🚨 DEVELOPMENT WORKFLOW
+
+**MANDATORY:** All development must follow the GitHub Issue → Worktree → PR workflow.
+
+### Quick Start
+```bash
+# 1. Create GitHub issue first (get issue number)
+# 2. Start working on the issue
+./scripts/start-issue.sh 123
+
+# 3. When done, cleanup
+./scripts/finish-issue.sh 123
+```
+
+📋 **[READ THE FULL WORKFLOW RULES](./WORKFLOW.md)** - This document contains mandatory workflow rules that all contributors must follow.
+
+### Commands
+- `./scripts/start-issue.sh [N]` - Start work on GitHub issue #N
+- `./scripts/finish-issue.sh [N]` - Cleanup after PR merge  
+- `./scripts/list-issues.sh` - Show active issue worktrees
+- `pnpm dev:local` - Start development server in issue worktree
+
 ## Vision
 
 - ✨ **Offline-First Architecture** - Continue working without an internet connection
@@ -180,8 +202,6 @@ RESEND_API_KEY=re_your_resend_api_key
 ```bash
 # API Connection
 VITE_API_URL=http://127.0.0.1:8787
-VITE_AUTH_ISSUER_URL=http://127.0.0.1:8788
-VITE_AUTH_CLIENT_ID=vibestack-web
 ```
 
 ### Setting Up OAuth Providers
