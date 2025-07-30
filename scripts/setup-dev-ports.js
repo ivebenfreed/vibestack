@@ -40,7 +40,11 @@ async function setupPorts() {
   console.log(`   Proxy Port: ${PROXY_PORT}`);
 
   // Generate dynamic wrangler config
-  require('./generate-wrangler-config');
+  if (process.env.LOCAL_MODE === 'true') {
+    require('./generate-wrangler-local-config');
+  } else {
+    require('./generate-wrangler-config');
+  }
 
   // Generate dynamic vite config
   require('./generate-vite-config');

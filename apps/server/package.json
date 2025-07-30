@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc --noEmit && wrangler deploy --outdir=dist",
     "dev": "bash ../../scripts/dev-server-with-logs.sh",
-    "dev:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
+    "dev:local": "wrangler dev --config wrangler.generated.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
     "dev:pr": "wrangler dev --config wrangler.generated.toml --var LOG_LEVEL:info --ip 127.0.0.1",
     "dev:pr:local": "wrangler dev --config wrangler.generated.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
     "dev:no-logs": "wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1",
