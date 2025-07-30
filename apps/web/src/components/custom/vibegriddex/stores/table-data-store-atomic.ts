@@ -542,8 +542,23 @@ export const createTableStoreLogic = (entityType: string, columns?: any[]) => {
           if (event.sortBy.length > 0 && context.processedRows.length > 0) {
             const sortedRows = [...context.processedRows].sort((a, b) => {
               for (const sort of event.sortBy) {
-                const aValue = a.data[sort.field];
-                const bValue = b.data[sort.field];
+                // Find the column to check if it's a relationship type
+                const column = context.columns.find(col => col.field === sort.field || col.id === sort.field);
+                const isRelationship = column?.cellType?.startsWith('relationship') || column?.type?.startsWith('relationship');
+                
+                // For relationship columns, use resolved values
+                let aValue, bValue;
+                if (isRelationship) {
+                  const resolvedFieldName = `__resolved_${column.id}`;
+                  aValue = a.data[resolvedFieldName];
+                  bValue = b.data[resolvedFieldName];
+                  // Fallback to raw value if resolved not available
+                  if (aValue === undefined) aValue = a.data[sort.field];
+                  if (bValue === undefined) bValue = b.data[sort.field];
+                } else {
+                  aValue = a.data[sort.field];
+                  bValue = b.data[sort.field];
+                }
                 
                 // Handle null/undefined
                 if (aValue == null && bValue == null) continue;
