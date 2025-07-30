@@ -245,7 +245,17 @@ export class EventDelegationManager {
             this.handleColumnDragEnd(event);
             break;
           case 'resize':
-            this.send({ type: 'view.columns.resize.end' });
+            if (this.dragState.startColumnId && this.dragState.startWidth !== undefined && this.dragState.startX !== undefined) {
+              const deltaX = event.clientX - this.dragState.startX;
+              const finalWidth = Math.max(50, this.dragState.startWidth + deltaX);
+              this.send({ 
+                type: 'view.columns.resize.end',
+                columnId: this.dragState.startColumnId,
+                width: finalWidth
+              });
+            } else {
+              this.send({ type: 'view.columns.resize.end' });
+            }
             break;
           case 'fill':
             const containerCoords = this.convertToContainerCoordinates(event);
@@ -801,9 +811,20 @@ export class EventDelegationManager {
   }
 
   private handleResizeDrag(event: MouseEvent): void {
+    if (!this.dragState.startColumnId || this.dragState.startWidth === undefined || this.dragState.startX === undefined) {
+      console.warn('EventDelegationManager: Missing resize state', this.dragState);
+      return;
+    }
+    
+    // Calculate the delta from the start position
+    const deltaX = event.clientX - this.dragState.startX;
+    const newWidth = Math.max(50, this.dragState.startWidth + deltaX); // Minimum width of 50
+    
     const containerCoords = this.convertToContainerCoordinates(event);
     this.send({
       type: 'view.columns.resize.move',
+      columnId: this.dragState.startColumnId,
+      width: newWidth,
       x: containerCoords.x
     });
   }

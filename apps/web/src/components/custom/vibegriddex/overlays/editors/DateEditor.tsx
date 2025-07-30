@@ -25,11 +25,17 @@ export function DateEditor({
   includeTime = false
 }: DateEditorProps) {
   const [value, setValue] = React.useState(initialValue || '');
-  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(true); // Open by default
   
   const parseDate = (dateString: string): Date | null => {
     if (!dateString) return null;
     try {
+      // For date-only strings (YYYY-MM-DD), parse as local date
+      if (dateString.length === 10 && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = dateString.split('-').map(Number);
+        return new Date(year, month - 1, day, 12, 0, 0);
+      }
+      // For datetime strings, use parseISO
       return parseISO(dateString);
     } catch {
       return null;
@@ -67,7 +73,10 @@ export function DateEditor({
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      const formattedDate = formatDate(date);
+      // Ensure we use the date in local timezone, not UTC
+      // Set time to noon to avoid timezone issues
+      const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+      const formattedDate = formatDate(localDate);
       setValue(formattedDate);
       setIsCalendarOpen(false);
       onCommit(formattedDate);
@@ -91,39 +100,37 @@ export function DateEditor({
     );
   }
 
-  // For date only, provide both input and calendar popup
+  // For date only, show calendar directly
   return (
-    <div className="flex gap-1">
-      <Input 
-        type="date"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={handleBlur}
-        autoFocus
-        className="border-2 border-blue-500 shadow-lg flex-1"
+    <div className="p-2 bg-background border rounded-md shadow-lg">
+      <Calendar
+        mode="single"
+        selected={currentDate || undefined}
+        onSelect={handleDateSelect}
+        initialFocus
+        className="rounded-md"
       />
-      
-      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-        <PopoverTrigger asChild>
-          <Button 
-            variant="outline" 
-            size="icon"
-            className="border-2 border-blue-500"
-            type="button"
-          >
-            <CalendarIcon className="h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={currentDate || undefined}
-            onSelect={handleDateSelect}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
+      <div className="flex gap-2 mt-2 px-3 pb-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            setValue('');
+            onCommit(null);
+          }}
+          className="flex-1"
+        >
+          Clear
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onCancel}
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }

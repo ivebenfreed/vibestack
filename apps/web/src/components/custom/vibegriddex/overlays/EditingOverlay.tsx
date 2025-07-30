@@ -132,7 +132,7 @@ export class EditingOverlay {
     
     // Check editor type to determine positioning strategy
     const isTextType = ['text', 'string', 'email', 'url', 'textarea', 'longtext', 'number', 'integer', 'float'].includes(column.cellType || column.type || 'text');
-    const isDropdownType = ['enum', 'select', 'boolean', 'relationship', 'relationship-single', 'relationship-multi', 'relationship-collection'].includes(column.cellType || column.type || 'text');
+    const isDropdownType = ['enum', 'select', 'boolean', 'relationship', 'relationship-single', 'relationship-multi', 'relationship-collection', 'date', 'datetime', 'timestamp'].includes(column.cellType || column.type || 'text');
     
     console.log('🔧 EditingOverlay: Editor type detection', {
       columnType: column.cellType || column.type || 'text',

@@ -383,6 +383,16 @@
   padding-left: 5px;
 }
 
+/* Hide cell content when editing inline (text, number inputs) */
+.vibegridx-cell-content-hidden > * {
+  visibility: hidden;
+}
+
+/* Keep cell content visible for dropdown editing (date, select, relationships) */
+.vibegridx-cell-dropdown-editing {
+  /* Cell content remains visible */
+}
+
 .vibegridx-cell-optimistic .vibegridx-cell-content {
   background-color: var(--info-alpha, rgba(59, 130, 246, 0.1));
   border-left: 3px solid var(--info, #3b82f6);
