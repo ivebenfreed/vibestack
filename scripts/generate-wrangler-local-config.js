@@ -12,8 +12,9 @@ const serverPort = process.env.SERVER_PORT || '8787';
 // Generate a wrangler configuration for local mode
 const wranglerConfig = `name = "vibestack-server"
 main = "src/index.ts"
-compatibility_date = "2023-12-01"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+send_metrics = false
 
 # Enable observability logging for all environments
 [observability.logs]
