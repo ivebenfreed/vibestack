@@ -1,6 +1,5 @@
 import { getMetadataArgsStorage } from 'typeorm';
-import pkg from 'glob';
-const { glob } = pkg;
+import { glob } from 'glob';
 import path from 'path';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';

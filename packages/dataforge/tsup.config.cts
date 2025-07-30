@@ -26,16 +26,6 @@ const config = {
   sourcemap: false,
   esbuildOptions(options: import('esbuild').BuildOptions) {
     options.tsconfig = 'tsconfig.json';
-    // Ignore the .pnpm store and node_modules
-    options.external = [
-      '...',  // Mark everything as external
-      './...',
-      '../...',
-      '../../...',
-      'node_modules/*',
-      '.pnpm/*',
-      '*.node'
-    ];
   }
 };
 
