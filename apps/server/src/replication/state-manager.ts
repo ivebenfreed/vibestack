@@ -58,18 +58,7 @@ export class StateManager {
         databaseUrl: 'env' in c && c.env ? (c.env as any).DATABASE_URL : 'no env'
       }, MODULE_NAME);
       
-      console.log('[DEBUG] About to call client.connect()');
-      try {
-        await client.connect();
-        console.log('[DEBUG] client.connect() succeeded');
-      } catch (connectError) {
-        console.error('[DEBUG] client.connect() failed:', connectError);
-        console.error('[DEBUG] connectError type:', typeof connectError);
-        console.error('[DEBUG] connectError constructor:', connectError?.constructor?.name);
-        console.error('[DEBUG] connectError message:', (connectError as any)?.message);
-        console.error('[DEBUG] connectError stack:', (connectError as any)?.stack);
-        throw connectError;
-      }
+      await client.connect();
       
       try {
         // Get current WAL position
