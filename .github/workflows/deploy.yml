@@ -51,8 +51,8 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
-          # Workaround for rollup optional dependency issue
-          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu
+          # Workaround for native binding issues in CI
+          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu
         
       - name: Run linting
         run: pnpm lint
@@ -107,8 +107,8 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
-          # Workaround for rollup optional dependency issue
-          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu
+          # Workaround for native binding issues in CI
+          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu
         
       - name: Build Dataforge Package
         working-directory: packages/dataforge
@@ -172,8 +172,8 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm install --frozen-lockfile
-          # Workaround for rollup optional dependency issue
-          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu
+          # Workaround for native binding issues in CI
+          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu
         
       - name: Build Dataforge Package
         working-directory: packages/dataforge
