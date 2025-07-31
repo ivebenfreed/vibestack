@@ -46,7 +46,6 @@ import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
-import { Route as AuthenticatedDebugVibegriddexTestImport } from './routes/_authenticated/debug/vibegriddex-test'
 import { Route as AuthenticatedDebugVibeganttImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
@@ -319,13 +318,6 @@ const AuthenticatedProjectsProjectIdRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
-const AuthenticatedDebugVibegriddexTestRoute =
-  AuthenticatedDebugVibegriddexTestImport.update({
-    id: '/vibegriddex-test',
-    path: '/vibegriddex-test',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-
 const AuthenticatedDebugVibeganttRoute =
   AuthenticatedDebugVibeganttImport.update({
     id: '/vibegantt',
@@ -539,13 +531,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugVibeganttImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
-    '/_authenticated/debug/vibegriddex-test': {
-      id: '/_authenticated/debug/vibegriddex-test'
-      path: '/vibegriddex-test'
-      fullPath: '/debug/vibegriddex-test'
-      preLoaderRoute: typeof AuthenticatedDebugVibegriddexTestImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
     '/_authenticated/projects/$projectId': {
       id: '/_authenticated/projects/$projectId'
       path: '/projects/$projectId'
@@ -690,7 +675,6 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
-  AuthenticatedDebugVibegriddexTestRoute: typeof AuthenticatedDebugVibegriddexTestRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -708,8 +692,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
-    AuthenticatedDebugVibegriddexTestRoute:
-      AuthenticatedDebugVibegriddexTestRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
@@ -803,7 +785,6 @@ export interface FileRoutesByFullPath {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
-  '/debug/vibegriddex-test': typeof AuthenticatedDebugVibegriddexTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -847,7 +828,6 @@ export interface FileRoutesByTo {
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
-  '/debug/vibegriddex-test': typeof AuthenticatedDebugVibegriddexTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -895,7 +875,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
-  '/_authenticated/debug/vibegriddex-test': typeof AuthenticatedDebugVibegriddexTestRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -944,7 +923,6 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
-    | '/debug/vibegriddex-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -987,7 +965,6 @@ export interface FileRouteTypes {
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
-    | '/debug/vibegriddex-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -1033,7 +1010,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/vibegantt'
-    | '/_authenticated/debug/vibegriddex-test'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -1147,7 +1123,6 @@ export const routeTree = rootRoute
         "/_authenticated/debug/reactflow-positioning",
         "/_authenticated/debug/state-machine-test",
         "/_authenticated/debug/vibegantt",
-        "/_authenticated/debug/vibegriddex-test",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
@@ -1234,10 +1209,6 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/vibegantt": {
       "filePath": "_authenticated/debug/vibegantt.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/vibegriddex-test": {
-      "filePath": "_authenticated/debug/vibegriddex-test.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/projects/$projectId": {
