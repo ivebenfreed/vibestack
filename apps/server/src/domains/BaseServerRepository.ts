@@ -490,6 +490,6 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
     
     // Fallback to lowercase class name
     const match = className.match(/class\s+(\w+)/);
-    return match ? match[1].toLowerCase() + 's' : 'unknown';
+    return match?.[1] ? match[1].toLowerCase() + 's' : 'unknown';
   }
 } 

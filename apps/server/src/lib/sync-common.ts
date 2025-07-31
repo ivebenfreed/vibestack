@@ -54,10 +54,10 @@ export function compareLSN(lsn1: string, lsn2: string): number {
   const [major2Str, minor2Str] = lsn2.split('/');
   
   // Convert to numbers correctly (both parts are hex)
-  const major1 = parseInt(major1Str, 16); // Fix: Use base 16 for major
-  const minor1 = parseInt(minor1Str, 16); // Hex value
-  const major2 = parseInt(major2Str, 16); // Fix: Use base 16 for major
-  const minor2 = parseInt(minor2Str, 16); // Hex value
+  const major1 = parseInt(major1Str || '0', 16); // Fix: Use base 16 for major
+  const minor1 = parseInt(minor1Str || '0', 16); // Hex value
+  const major2 = parseInt(major2Str || '0', 16); // Fix: Use base 16 for major
+  const minor2 = parseInt(minor2Str || '0', 16); // Hex value
   
   // Compare parts
   if (major1 < major2) return -1;
@@ -187,7 +187,7 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
       ? entityChanges.find(change => change.operation === 'delete')?.data?.updated_at 
       : null;
 
-    let latestChange: TableChange;
+    let latestChange: TableChange | undefined;
     let latestTimestamp: number;
 
     // If there's a delete, only keep it and ignore all other operations
@@ -205,11 +205,11 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
       });
     } else {
       // Original merging logic for non-delete cases
-      latestChange = entityChanges[0];
+      latestChange = entityChanges[0]!;
       latestTimestamp = parseTimestamp((latestChange.data?.updated_at || latestChange.data?.created_at || '') as string);
 
       for (let i = 1; i < entityChanges.length; i++) {
-        const currentChange = entityChanges[i];
+        const currentChange = entityChanges[i]!;
         const currentTimestamp = parseTimestamp((currentChange.data?.updated_at || currentChange.data?.created_at || '') as string);
 
         // Skip outdated changes
@@ -219,7 +219,7 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
         }
 
         // Handle insert + update merge
-        if (latestChange.operation === 'insert' && currentChange.operation === 'update') {
+        if (latestChange && latestChange.operation === 'insert' && currentChange.operation === 'update') {
           latestChange = {
             ...latestChange,
             data: {
@@ -240,7 +240,7 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
           });
         }
         // Handle update + update merge
-        else if (latestChange.operation === 'update' && currentChange.operation === 'update') {
+        else if (latestChange && latestChange.operation === 'update' && currentChange.operation === 'update') {
           latestChange = {
             ...latestChange,
             data: {
@@ -269,7 +269,9 @@ export function deduplicateChanges(changes: TableChange[], clientId?: string): {
     }
 
     // Add the final change to results
-    result.push(latestChange);
+    if (latestChange) {
+      result.push(latestChange);
+    }
   }
 
   // Apply client ID filtering - filters out changes from the same client
@@ -330,8 +332,8 @@ export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
     
     // Examine properties
     if (changes.length > 0 && ordered.length > 0) {
-      console.log('First change before:', Object.keys(changes[0]));
-      console.log('First change after:', Object.keys(ordered[0]));
+      console.log('First change before:', Object.keys(changes[0]!));
+      console.log('First change after:', Object.keys(ordered[0]!));
     }
   }
 

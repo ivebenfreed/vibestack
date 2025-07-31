@@ -419,7 +419,7 @@ export class NeonDriver implements Driver {
         return {
             database: parts.length === 3 ? parts[0] : driverDatabase,
             schema: parts.length >= 2 ? parts[parts.length - 2] : driverSchema,
-            tableName: parts[parts.length - 1],
+            tableName: parts[parts.length - 1]!,
         }
     }
     

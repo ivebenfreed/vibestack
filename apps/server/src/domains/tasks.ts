@@ -30,14 +30,14 @@ export class TaskRepository extends BaseServerRepository<Task> {
   /**
    * Find all tasks
    */
-  async findAll(): Promise<Task[]> {
+  override async findAll(): Promise<Task[]> {
     return await this.neonService.find(Task);
   }
 
   /**
    * Find task by ID
    */
-  async findById(id: string): Promise<Task | null> {
+  override async findById(id: string): Promise<Task | null> {
     return await this.neonService.findOne(Task, { id } as FindOptionsWhere<Task>);
   }
 
@@ -65,7 +65,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
   /**
    * Create a new task with defaults
    */
-  async create(data: TaskCreateInput): Promise<Task> {
+  override async create(data: TaskCreateInput): Promise<Task> {
     // Set default values if not provided
     const taskData = {
       ...data,
@@ -80,7 +80,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
   /**
    * Update a task
    */
-  async update(id: string, data: TaskUpdateInput): Promise<Task | null> {
+  override async update(id: string, data: TaskUpdateInput): Promise<Task | null> {
     // Create task for validation
     const task = new Task();
     Object.assign(task, { id, ...data });
@@ -484,7 +484,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
   /**
    * Delete task
    */
-  async delete(id: string): Promise<boolean> {
+  override async delete(id: string): Promise<boolean> {
     try {
       // First delete all dependencies
       const dependencyQueryBuilder = await this.neonService.createQueryBuilder(Task, 'task');

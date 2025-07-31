@@ -32,7 +32,7 @@ export class TagRepository extends BaseServerRepository<Tag> {
     const result = await this.findBy({ tagSetId: tagSetId });
     // Filter by name if that's what 'key' was supposed to be
     const filtered = result.filter(tag => tag.name === key);
-    return filtered.length > 0 ? filtered[0] : null;
+    return filtered.length > 0 ? filtered[0]! : null;
   }
 
   /**

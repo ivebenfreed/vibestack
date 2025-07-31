@@ -73,48 +73,25 @@ const config = {
     options.loader = {
       '.node': 'empty'
     };
-    // Add esbuild plugin to rewrite imports
-    options.plugins = [
-      {
-        name: 'rewrite-imports',
-        setup(build) {
-          // Transform the output to fix import paths
-          build.onEnd(async (result) => {
-            const fs = require('fs').promises;
-            const path = require('path');
-            
-            // Only process generated files
-            const generatedFiles = [
-              'client-entities.js',
-              'server-entities.js',
-              'comment-operations.js',
-              'project-operations.js',
-              'statusdefinition-operations.js',
-              'statusset-operations.js',
-              'tag-operations.js', 
-              'tagset-operations.js',
-              'task-operations.js',
-              'user-operations.js',
-              'crud-operations.js',
-              'dexie-schema.js'
-            ];
-            
-            for (const file of generatedFiles) {
-              const filePath = path.join(__dirname, 'dist', file);
-              try {
-                let content = await fs.readFile(filePath, 'utf8');
-                // Replace ../entities/ with ./entities/ in imports
-                content = content.replace(/from "\.\.\/entities\//g, 'from "./entities/');
-                content = content.replace(/from '\.\.\/entities\//g, "from './entities/");
-                await fs.writeFile(filePath, content, 'utf8');
-              } catch (e) {
-                // File might not exist, that's ok
-              }
-            }
-          });
-        }
-      }
-    ];
+  },
+  // Run after build to fix imports
+  async onSuccess() {
+    const { promises: fs } = require('fs');
+    const path = require('path');
+    const { execSync } = require('child_process');
+    
+    console.log('Fixing import paths in generated files...');
+    
+    // Use sed to fix all JS files
+    try {
+      execSync('find dist -name "*.js" -type f -exec sed -i \'s|from "../entities/|from "./entities/|g\' {} \\;', {
+        cwd: __dirname,
+        stdio: 'inherit'
+      });
+      console.log('Fixed import paths in all JS files');
+    } catch (e) {
+      console.error('Failed to fix imports:', e);
+    }
   },
   // Skip these dependencies entirely
   noExternal: [],

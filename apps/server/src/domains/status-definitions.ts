@@ -32,7 +32,7 @@ export class StatusDefinitionRepository extends BaseServerRepository<StatusDefin
     const result = await this.findBy({ statusSetId: statusSetId });
     // Filter by name if that's what 'key' was supposed to be
     const filtered = result.filter(sd => sd.name === key);
-    return filtered.length > 0 ? filtered[0] : null;
+    return filtered.length > 0 ? filtered[0]! : null;
   }
 
   /**

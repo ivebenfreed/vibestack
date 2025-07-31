@@ -56,7 +56,7 @@ export class UserRepository extends BaseServerRepository<User> {
   /**
    * Create a new user with defaults
    */
-  async create(data: UserCreateInput): Promise<User> {
+  override async create(data: UserCreateInput): Promise<User> {
     // Set default values if not provided
     const userData = {
       ...data,
@@ -71,7 +71,7 @@ export class UserRepository extends BaseServerRepository<User> {
   /**
    * Delete user with cleanup using TypeORM query builder
    */
-  async delete(id: string): Promise<boolean> {
+  override async delete(id: string): Promise<boolean> {
     // First delete project memberships using TypeORM query builder
     const deleteBuilder = await this.neonService.createQueryBuilder(User, 'pm');
     await deleteBuilder

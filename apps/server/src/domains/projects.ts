@@ -44,7 +44,7 @@ export class ProjectRepository extends BaseServerRepository<Project> {
   /**
    * Create a new project with defaults
    */
-  async create(data: ProjectCreateInput): Promise<Project> {
+  override async create(data: ProjectCreateInput): Promise<Project> {
     // Set default values if not provided
     const projectData = {
       ...data,

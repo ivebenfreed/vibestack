@@ -25,6 +25,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*", "worker-configuration.d.ts"],
+  "include": [
+    "src/**/*", 
+    "worker-configuration.d.ts",
+    "../../packages/dataforge/src/**/*",
+    "../../packages/sync-types/src/**/*"
+  ],
   "exclude": ["node_modules", "dist", ".wrangler", "**/*.test.ts"]
 }

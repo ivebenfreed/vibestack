@@ -395,7 +395,7 @@ export class UniversalEntityDeleter {
           if (matches) {
             const [, table, column, value, whereColumn, whereValue] = matches;
             const sql = `UPDATE ${table} SET ${column} = $1 WHERE ${whereColumn} = $2`;
-            const paramValue = value === 'NULL' ? null : value.replace(/'/g, '');
+            const paramValue = value === 'NULL' ? null : value?.replace(/'/g, '') || '';
             await this.neonService.query(sql, [paramValue, whereValue]);
           }
         }

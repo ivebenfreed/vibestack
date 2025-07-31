@@ -380,10 +380,10 @@ export async function transformWALChanges(
         if (!changesByTable[change.table]) {
           changesByTable[change.table] = {};
         }
-        if (!changesByTable[change.table][change.kind]) {
-          changesByTable[change.table][change.kind] = 0;
+        if (!changesByTable[change.table]![change.kind]) {
+          changesByTable[change.table]![change.kind] = 0;
         }
-        changesByTable[change.table][change.kind]++;
+        changesByTable[change.table]![change.kind]!++;
 
         // ✨ NEW: Check if this is a junction table operation
         if (isJunctionTable(change.table)) {
@@ -409,7 +409,7 @@ export async function transformWALChanges(
           const colCount = Math.min(change.columnnames.length, change.columnvalues.length);
           
           for (let i = 0; i < colCount; i++) {
-            const columnName = change.columnnames[i];
+            const columnName = change.columnnames[i]!;
             let columnValue = change.columnvalues[i];
             
             // Debug logging for client_id before parsing
@@ -427,7 +427,7 @@ export async function transformWALChanges(
             }
             
             // Parse PostgreSQL-specific data types using comprehensive type detection
-            columnValue = parsePostgreSQLValue(columnName, columnValue, change.table);
+            columnValue = parsePostgreSQLValue(columnName, columnValue || '', change.table);
             
             // Debug logging for client_id after parsing
             if (columnName === 'client_id') {
@@ -454,11 +454,11 @@ export async function transformWALChanges(
           const keyCount = Math.min(change.oldkeys.keynames.length, change.oldkeys.keyvalues.length);
           
           for (let i = 0; i < keyCount; i++) {
-            const keyName = change.oldkeys.keynames[i];
+            const keyName = change.oldkeys.keynames[i]!;
             let keyValue = change.oldkeys.keyvalues[i];
             
             // Parse PostgreSQL-specific data types for oldkeys as well
-            keyValue = parsePostgreSQLValue(keyName, keyValue, change.table);
+            keyValue = parsePostgreSQLValue(keyName, keyValue || '', change.table);
             
             snakeCaseData[keyName] = keyValue;
           }
@@ -517,7 +517,7 @@ export async function transformWALChanges(
   for (const [entityKey, relUpdates] of relationshipUpdates.entries()) {
     const [table, entityId] = entityKey.split(':');
     tableChanges.push({
-      table,
+      table: table!,
       operation: 'update',
       data: { id: entityId },
       relationshipUpdates: relUpdates,

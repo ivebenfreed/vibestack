@@ -796,8 +796,8 @@ export function parsePostgreSQLPoint(value: string): { x: number; y: number } | 
   const match = value.match(/^\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)\s*$/);
   if (match) {
     return {
-      x: parseFloat(match[1]),
-      y: parseFloat(match[2])
+      x: parseFloat(match[1]!),
+      y: parseFloat(match[2]!)
     };
   }
   return value; // Return original if parsing fails
@@ -1105,26 +1105,26 @@ export function parsePostgreSQLRangeType(value: string): { type: string; bounds:
   if (!match) return null;
   
   const [, startBound, start, end, endBound] = match;
-  const bounds = startBound + endBound;
+  const bounds = (startBound || '') + (endBound || '');
   
   // Try to determine range type based on content
   let rangeType = 'unknown';
-  if (/^\d{4}-\d{2}-\d{2}/.test(start) || /^\d{4}-\d{2}-\d{2}/.test(end)) {
-    if (start.includes(' ') || end.includes(' ')) {
-      rangeType = start.includes('+') || end.includes('+') ? 'tstzrange' : 'tsrange';
+  if ((start && /^\d{4}-\d{2}-\d{2}/.test(start)) || (end && /^\d{4}-\d{2}-\d{2}/.test(end))) {
+    if ((start?.includes(' ')) || (end?.includes(' '))) {
+      rangeType = (start?.includes('+')) || (end?.includes('+')) ? 'tstzrange' : 'tsrange';
     } else {
       rangeType = 'daterange';
     }
-  } else if (/^-?\d+$/.test(start) || /^-?\d+$/.test(end)) {
+  } else if ((start && /^-?\d+$/.test(start)) || (end && /^-?\d+$/.test(end))) {
     rangeType = 'int4range';
-  } else if (/^-?\d+\.\d+$/.test(start) || /^-?\d+\.\d+$/.test(end)) {
+  } else if ((start && /^-?\d+\.\d+$/.test(start)) || (end && /^-?\d+\.\d+$/.test(end))) {
     rangeType = 'numrange';
   }
   
   return {
     type: rangeType,
     bounds,
-    start: start.trim(),
-    end: end.trim()
+    start: start?.trim() || '',
+    end: end?.trim() || ''
   };
 } 

@@ -247,8 +247,8 @@ export class PollingManager {
       if (changes && changes.length > 0) {
         try {
           // Extract basic info about the WAL entries
-          const firstLSN = changes[0].lsn;
-          const lastLSN = changes[changes.length - 1].lsn;
+          const firstLSN = changes[0]?.lsn;
+          const lastLSN = changes[changes.length - 1]?.lsn;
           
           // Remove redundant parsing - this is already done in processChanges
           // Let processChanges handle the actual parsing and counting
