@@ -23,6 +23,8 @@
     "lint:staged": "./scripts/lint-staged.sh",
     "type-check": "tsc --build --verbose",
     "type-check:watch": "tsc --build --watch",
+    "type-check:quick": "./scripts/quick-type-check.sh",
+    "type-errors": "./scripts/show-type-errors.sh",
     "check": "pnpm run type-check && pnpm run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "preinstall": "npx only-allow pnpm",
