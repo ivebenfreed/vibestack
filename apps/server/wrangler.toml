@@ -2,6 +2,7 @@ name = "vibestack-server"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+account_id = "c5f1240efb99747bc33b0fa1f70dcfb3"
 
 # Enable observability logging for all environments
 [observability.logs]
@@ -53,11 +54,10 @@ crons = ["0 0 * * *"]  # Run once daily at midnight UTC
 
 # KV namespace configuration
 # Development uses a local namespace
-# Temporarily disabled - KV namespace not used in code
-# [[kv_namespaces]]
-# binding = "CLIENT_REGISTRY"
-# id = "0123a474945240d0a7fa19391211c8dd"
-# preview_id = "0123a474945240d0a7fa19391211c8dd"
+[[kv_namespaces]]
+binding = "CLIENT_REGISTRY"
+id = "a794cee3a313416993643848fc738281"
+preview_id = "a794cee3a313416993643848fc738281"
 
 # Staging environment
 [env.staging]
@@ -80,9 +80,9 @@ ENVIRONMENT = "staging"
 NODE_ENV = "staging"
 TYPEORM_LOGGING = true
 
-# [[env.staging.kv_namespaces]]
-# binding = "CLIENT_REGISTRY"
-# id = "0123a474945240d0a7fa19391211c8dd"
+[[env.staging.kv_namespaces]]
+binding = "CLIENT_REGISTRY"
+id = "a794cee3a313416993643848fc738281"
 
 # Production environment
 [env.production]
@@ -105,6 +105,6 @@ ENVIRONMENT = "production"
 NODE_ENV = "production"
 TYPEORM_LOGGING = false
 
-# [[env.production.kv_namespaces]]
-# binding = "CLIENT_REGISTRY"
-# id = "0123a474945240d0a7fa19391211c8dd"
+[[env.production.kv_namespaces]]
+binding = "CLIENT_REGISTRY"
+id = "a794cee3a313416993643848fc738281"

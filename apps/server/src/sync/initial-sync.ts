@@ -19,6 +19,7 @@ import { SERVER_DOMAIN_TABLES } from '@repo/dataforge/server-entities';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import { RepositoryContainer } from '../domains/RepositoryContainer';
 import { transformPostgreSQLFields } from '../lib/sync-common';
+import { transformKeys, snakeToCamel } from '../lib/db';
 
 const MODULE_NAME = 'initial-sync';
 // Smaller chunk sizes help avoid overwhelming the client-side IndexedDB
@@ -99,14 +100,17 @@ function recordsToChanges(table: string, records: QueryResultRow[]): TableChange
     // Transform PostgreSQL fields before creating TableChange
     const transformedRecord = transformPostgreSQLFields(record, cleanedTable);
     
+    // Convert snake_case keys to camelCase for client compatibility
+    const camelCaseRecord = transformKeys(transformedRecord, snakeToCamel);
+    
     return {
       table: cleanedTable,
       operation: 'insert' as const,
-      data: transformedRecord,
+      data: camelCaseRecord,
       // Junction tables don't have updated_at fields, so use current timestamp
       updatedAt: isJunctionTable 
         ? new Date().toISOString()
-        : ((transformedRecord as any).updated_at?.toISOString() || new Date().toISOString())
+        : (camelCaseRecord.updatedAt || new Date().toISOString())
     };
   });
 }
