@@ -1,18 +1,15 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.isTableChange = isTableChange;
-exports.isClientMessageType = isClientMessageType;
 // Type guards
-function isTableChange(payload) {
-    var p = payload;
+export function isTableChange(payload) {
+    const p = payload;
     return p
         && typeof p.table === 'string'
         && ['insert', 'update', 'delete'].includes(p.operation)
         && typeof p.data === 'object'
         && p.data !== null
         && (!p.lsn || typeof p.lsn === 'string') // LSN is optional
-        && typeof p.updated_at === 'string';
+        && typeof p.updatedAt === 'string';
 }
-function isClientMessageType(type) {
+export function isClientMessageType(type) {
     return type.startsWith('clt_');
 }
+//# sourceMappingURL=index.js.map

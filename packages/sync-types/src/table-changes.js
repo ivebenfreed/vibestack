@@ -1,13 +1,19 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.isTableChange = isTableChange;
 // Type guards for message handling
-function isTableChange(payload) {
-    var p = payload;
+export function isTableChange(payload) {
+    const p = payload;
     return p
         && typeof p.table === 'string'
         && ['insert', 'update', 'delete'].includes(p.operation)
         && typeof p.data === 'object'
         && p.data !== null
-        && typeof p.updated_at === 'string';
+        && typeof p.updatedAt === 'string';
 }
+export function isRelationshipUpdate(payload) {
+    const p = payload;
+    return p
+        && typeof p.relationName === 'string'
+        && ['set', 'add', 'remove'].includes(p.operation)
+        && Array.isArray(p.targetIds)
+        && p.targetIds.every(id => typeof id === 'string');
+}
+//# sourceMappingURL=table-changes.js.map

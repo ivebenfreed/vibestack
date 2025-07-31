@@ -38,6 +38,7 @@ coverage
 
 # TypeScript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 next-env.d.ts
 
 # Database
