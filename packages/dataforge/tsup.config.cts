@@ -7,9 +7,6 @@ const config = {
     // Map generated files to root of dist
     'client-entities': 'src/generated/client-entities.ts',
     'server-entities': 'src/generated/server-entities.ts',
-    'column-configurations': 'src/generated/column-configurations.ts',
-    'rdg-column-configurations': 'src/generated/rdg-column-configurations.ts',
-    'vibegridx-columns': 'src/generated/vibegridx-columns.ts',
     'comment-operations': 'src/generated/comment-operations.ts',
     'project-operations': 'src/generated/project-operations.ts',
     'statusdefinition-operations': 'src/generated/statusdefinition-operations.ts',
