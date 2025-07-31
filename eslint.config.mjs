@@ -129,15 +129,10 @@ export default tseslint.config(
       '@typescript-eslint/no-empty-interface': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
       
-      // Async/Promise rules - important but start as warnings
-      '@typescript-eslint/no-floating-promises': ['warn', {
-        ignoreVoid: true,
-        ignoreIIFE: true,
-      }],
-      '@typescript-eslint/no-misused-promises': ['warn', {
-        checksVoidReturn: false,
-      }],
-      '@typescript-eslint/await-thenable': 'warn',
+      // Async/Promise rules - disabled for now (require type information)
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
+      '@typescript-eslint/await-thenable': 'off',
       
       // Override base rules
       'no-console': 'warn',
