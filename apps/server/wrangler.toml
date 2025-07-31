@@ -55,8 +55,8 @@ crons = ["0 0 * * *"]  # Run once daily at midnight UTC
 # Development uses a local namespace
 [[kv_namespaces]]
 binding = "CLIENT_REGISTRY"
-id = "68f6c70b38ff4f1a85a057868cfd11cb"
-preview_id = "68f6c70b38ff4f1a85a057868cfd11cb"
+id = "0123a474945240d0a7fa19391211c8dd"
+preview_id = "0123a474945240d0a7fa19391211c8dd"
 
 # Staging environment
 [env.staging]
@@ -81,7 +81,7 @@ TYPEORM_LOGGING = true
 
 [[env.staging.kv_namespaces]]
 binding = "CLIENT_REGISTRY"
-id = "68f6c70b38ff4f1a85a057868cfd11cb"
+id = "0123a474945240d0a7fa19391211c8dd"
 
 # Production environment
 [env.production]
@@ -106,4 +106,4 @@ TYPEORM_LOGGING = false
 
 [[env.production.kv_namespaces]]
 binding = "CLIENT_REGISTRY"
-id = "68f6c70b38ff4f1a85a057868cfd11cb"
+id = "0123a474945240d0a7fa19391211c8dd"
