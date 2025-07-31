@@ -18,7 +18,7 @@ if [ -z "$ISSUE_NUMBER" ]; then
     echo ""
     echo "This will:"
     echo "  1. Stop PR environment containers"
-    echo "  2. Remove worktree ../vibestack-issue-123"
+    echo "  2. Remove worktree ./worktrees/issue-123"
     echo "  3. Clean up generated config files"
     exit 1
 fi
@@ -30,7 +30,7 @@ if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
 fi
 
 BRANCH_NAME="issue-${ISSUE_NUMBER}"
-WORKTREE_PATH="../vibestack-issue-${ISSUE_NUMBER}"
+WORKTREE_PATH="./worktrees/issue-${ISSUE_NUMBER}"
 
 echo "🧹 Finishing work on GitHub issue #${ISSUE_NUMBER}"
 echo ""

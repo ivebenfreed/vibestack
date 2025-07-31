@@ -66,6 +66,7 @@ const config = {
   treeshake: false,
   minify: false,
   sourcemap: false,
+  swc: false, // Disable SWC to avoid native binding issues
   esbuildOptions(options: import('esbuild').BuildOptions) {
     options.tsconfig = 'tsconfig.json';
     // Skip platform-specific optional dependencies

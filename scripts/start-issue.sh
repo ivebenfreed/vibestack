@@ -17,7 +17,7 @@ if [ -z "$ISSUE_NUMBER" ]; then
     echo "  ./scripts/start-issue.sh 123"
     echo ""
     echo "This will:"
-    echo "  1. Create worktree ../vibestack-issue-123"
+    echo "  1. Create worktree ./worktrees/issue-123"
     echo "  2. Create branch issue-123"
     echo "  3. Setup PR environment with isolated database"
     echo "  4. Start development server"
@@ -31,7 +31,7 @@ if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
 fi
 
 BRANCH_NAME="issue-${ISSUE_NUMBER}"
-WORKTREE_PATH="../vibestack-issue-${ISSUE_NUMBER}"
+WORKTREE_PATH="./worktrees/issue-${ISSUE_NUMBER}"
 
 echo "🚀 Starting work on GitHub issue #${ISSUE_NUMBER}"
 echo ""
@@ -93,8 +93,8 @@ cd "$WORKTREE_PATH"
 # Copy Claude configuration if it exists
 echo ""
 echo "1.5️⃣ Copying Claude configuration..."
-if [ -d "../vibestack/.claude" ]; then
-    cp -r ../vibestack/.claude ./.claude
+if [ -d "./.claude" ]; then
+    cp -r ./.claude "$WORKTREE_PATH/.claude"
     echo "   ✅ Claude config copied to worktree"
 else
     echo "   ⚠️  No Claude config found to copy"
@@ -146,8 +146,8 @@ fi
 echo ""
 echo "2.6️⃣ Copying generated files..."
 echo "   📁 Copying DataForge generated files from main repo..."
-if [ -d "../vibestack/packages/dataforge/src/generated" ]; then
-    cp -r ../vibestack/packages/dataforge/src/generated/* ./packages/dataforge/src/generated/ 2>/dev/null || true
+if [ -d "./packages/dataforge/src/generated" ]; then
+    cp -r ./packages/dataforge/src/generated/* "$WORKTREE_PATH/packages/dataforge/src/generated/" 2>/dev/null || true
     echo "   ✅ Generated files copied"
 else
     echo "   ⚠️  No generated files found to copy"

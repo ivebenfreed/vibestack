@@ -54,3 +54,7 @@ new_classes = ["SyncDO", "ReplicationDO"]
 # Enable unlimited Workers for testing
 [limits]
 cpu_ms = 10_000
+
+# External modules to exclude from bundling
+[bundling]
+external = ["pg"]

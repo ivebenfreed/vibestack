@@ -69,3 +69,6 @@ local-neon/
 packages/cli/.env
 packages/cli/dist
 packages/cli/node_modules
+
+# Git worktrees
+worktrees/

@@ -122,8 +122,9 @@
   "devDependencies": {
     "@faker-js/faker": "^9.7.0",
     "@microsoft/api-extractor": "^7.52.5",
+    "@swc/core-linux-x64-gnu": "^1.13.3",
     "@types/node": "^18.19.87",
-    "tsup": "^8.4.0",
+    "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vitest": "^1.6.1"

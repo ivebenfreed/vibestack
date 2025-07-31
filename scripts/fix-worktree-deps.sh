@@ -13,7 +13,7 @@ if [ -z "$WORKTREE_PATH" ]; then
     echo "Usage: ./scripts/fix-worktree-deps.sh [WORKTREE_PATH]"
     echo ""
     echo "Example:"
-    echo "  ./scripts/fix-worktree-deps.sh ../vibestack-issue-1"
+    echo "  ./scripts/fix-worktree-deps.sh ./worktrees/issue-1"
     exit 1
 fi
 
@@ -43,9 +43,9 @@ pnpm install --force
 
 # Copy generated files
 echo "4️⃣ Copying generated files..."
-if [ -d "../vibestack/packages/dataforge/src/generated" ]; then
+if [ -d "$(git rev-parse --show-toplevel)/packages/dataforge/src/generated" ]; then
     mkdir -p packages/dataforge/src/generated
-    cp -r ../vibestack/packages/dataforge/src/generated/* packages/dataforge/src/generated/
+    cp -r "$(git rev-parse --show-toplevel)/packages/dataforge/src/generated/"* packages/dataforge/src/generated/
     echo "   ✅ Generated files copied"
 fi
 
