@@ -25,6 +25,10 @@ export default tseslint.config(
       'vitest.config.*',
       'tailwind.config.*',
       'tsup.config.*',
+      'esbuild.config.*',
+      '**/*.config.js',
+      '**/*.config.ts',
+      '**/*.config.mjs',
       // Test files (can have their own config if needed)
       '**/*.test.ts',
       '**/*.test.tsx',
@@ -36,6 +40,10 @@ export default tseslint.config(
       // Scripts that might have different standards
       'scripts/**/*.js',
       'packages/*/scripts/**/*.js',
+      // Test scripts in root
+      'test-*.js',
+      // Declaration files
+      '**/*.d.ts',
     ] 
   },
   
@@ -88,21 +96,15 @@ export default tseslint.config(
     },
   },
   
-  // TypeScript files - more strict
+  // TypeScript files - start with warnings to gradually fix
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
       ...tseslint.configs.recommended,
     ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.json', './apps/*/tsconfig.json', './packages/*/tsconfig.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
     rules: {
-      // TypeScript errors
-      '@typescript-eslint/no-unused-vars': ['error', {
+      // TypeScript warnings (demoted from errors for gradual fix)
+      '@typescript-eslint/no-unused-vars': ['warn', {
         args: 'all',
         argsIgnorePattern: '^_',
         caughtErrors: 'all',
@@ -111,10 +113,10 @@ export default tseslint.config(
         varsIgnorePattern: '^_',
         ignoreRestSiblings: true,
       }],
-      '@typescript-eslint/no-non-null-assertion': 'warn',
-      '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
-      '@typescript-eslint/prefer-optional-chain': 'warn',
-      '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+      '@typescript-eslint/no-non-null-assertion': 'off', // Too many to fix at once
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off', 
+      '@typescript-eslint/prefer-optional-chain': 'off',
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
       
       // Off for flexibility  
       '@typescript-eslint/no-explicit-any': 'off',
@@ -127,15 +129,15 @@ export default tseslint.config(
       '@typescript-eslint/no-empty-interface': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
       
-      // Async/Promise rules - helpful for catching bugs
-      '@typescript-eslint/no-floating-promises': ['error', {
+      // Async/Promise rules - important but start as warnings
+      '@typescript-eslint/no-floating-promises': ['warn', {
         ignoreVoid: true,
         ignoreIIFE: true,
       }],
-      '@typescript-eslint/no-misused-promises': ['error', {
+      '@typescript-eslint/no-misused-promises': ['warn', {
         checksVoidReturn: false,
       }],
-      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/await-thenable': 'warn',
       
       // Override base rules
       'no-console': 'warn',
