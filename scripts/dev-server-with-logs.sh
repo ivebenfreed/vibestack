@@ -11,8 +11,10 @@ PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 if [[ "$PWD" == *"apps/server"* ]]; then
     # Running from apps/server directory (via turbo)
     LOG_DIR="logs"
-    # Check for generated config first, otherwise use default
-    if [ -f "wrangler.generated.toml" ]; then
+    # Check for LOCAL_CONFIG env var first, then generated config, otherwise use default
+    if [ -n "$LOCAL_CONFIG" ] && [ -f "$LOCAL_CONFIG" ]; then
+        WRANGLER_CMD="wrangler dev --config $LOCAL_CONFIG --env local --var LOG_LEVEL:info --ip 127.0.0.1"
+    elif [ -f "wrangler.generated.toml" ]; then
         WRANGLER_CMD="wrangler dev --config wrangler.generated.toml --var LOG_LEVEL:info --ip 127.0.0.1"
     else
         WRANGLER_CMD="wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1"
@@ -20,7 +22,9 @@ if [[ "$PWD" == *"apps/server"* ]]; then
 else
     # Running from project root or scripts directory
     LOG_DIR="$PROJECT_ROOT/apps/server/logs"
-    if [ -f "$PROJECT_ROOT/apps/server/wrangler.generated.toml" ]; then
+    if [ -n "$LOCAL_CONFIG" ] && [ -f "$PROJECT_ROOT/apps/server/$LOCAL_CONFIG" ]; then
+        WRANGLER_CMD="cd $PROJECT_ROOT/apps/server && wrangler dev --config $LOCAL_CONFIG --env local --var LOG_LEVEL:info --ip 127.0.0.1"
+    elif [ -f "$PROJECT_ROOT/apps/server/wrangler.generated.toml" ]; then
         WRANGLER_CMD="cd $PROJECT_ROOT/apps/server && wrangler dev --config wrangler.generated.toml --var LOG_LEVEL:info --ip 127.0.0.1"
     else
         WRANGLER_CMD="cd $PROJECT_ROOT/apps/server && wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1"

@@ -2,9 +2,20 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:17
     container_name: vibestack-postgres
-    command: '-d 1'  # Enable debug logging
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_wal_senders=3
+      -c max_replication_slots=3
+      -c max_logical_replication_workers=3
+      -c log_statement=all
+      -c log_replication_commands=on
+      -c logging_collector=on
+      -c log_destination=stderr
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -23,7 +34,7 @@ services:
     image: ghcr.io/timowilhelm/local-neon-http-proxy:main
     container_name: vibestack-neon-proxy
     environment:
-      - PG_CONNECTION_STRING=postgres://postgres:postgres@postgres:5432/vibestack_dev
+      - PG_CONNECTION_STRING=postgres://postgres:postgres@postgres:5432/vibestack_dev?sslmode=disable
     ports:
       - "4444:4444"
     depends_on:

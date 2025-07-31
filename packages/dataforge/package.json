@@ -71,7 +71,7 @@
     "generate-dexie-schema": "tsx src/scripts/generate-dexie-schema.ts",
     "generate-dexie-domain-services": "tsx src/scripts/generate-dexie-domain-services.ts",
     "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-dexie-schema && pnpm run generate-dexie-domain-services",
-    "compile": "tsup",
+    "compile": "tsup && node scripts/fix-imports.js",
     "build": "pnpm run forge:build",
     "migration:generate:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
     "migration:generate:client": "tsx ./node_modules/typeorm/cli.js -d src/datasources/client.ts migration:generate",
@@ -121,7 +121,8 @@
     "seed:task-statuses": "tsx src/seeds/seed-task-statuses.ts",
     "seed:tags": "tsx src/seeds/seed-tags.ts",
     "seed:all": "pnpm run seed:task-statuses && pnpm run seed:tags",
-    "debug:changes": "tsx src/scripts/debug-changes.ts"
+    "debug:changes": "tsx src/scripts/debug-changes.ts",
+    "ensure-docker:local": "node ../../scripts/ensure-docker-services.js"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.1",

@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const serverPort = process.env.SERVER_PORT || '8787';
+const serverPort = process.env.SERVER_PORT || '8788';
 
 // Generate a wrangler configuration for local mode
 const wranglerConfig = `name = "vibestack-server"
@@ -36,10 +36,12 @@ host = "127.0.0.1"
 ENVIRONMENT = "local"
 WEB_PORT = "${process.env.WEB_PORT || '5173'}"
 SERVER_PORT = "${serverPort}"
+DATABASE_URL = "http://db.localtest.me:${process.env.PROXY_PORT || '4444'}/sql"
+DIRECT_DATABASE_URL = "postgres://postgres:postgres@localhost:${process.env.DB_PORT || '5432'}/vibestack_dev"
 
-# KV Namespace for client cache
+# KV Namespace for client registry
 [[env.local.kv_namespaces]]
-binding = "CLIENT_CACHE"
+binding = "CLIENT_REGISTRY"
 id = "01453e5dc2ff4cf8a061a25b95501df0"
 
 # Durable Objects

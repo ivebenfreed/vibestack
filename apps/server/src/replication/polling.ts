@@ -294,10 +294,18 @@ export class PollingManager {
   }
 
   private async pollForChanges(): Promise<WALData[] | null> {
-    const client = getDBClient(this.c);
+    let client;
     
     try {
       const currentLSN = await this.stateManager.getLSN();
+      
+      replicationLogger.debug('Polling for changes', {
+        currentLSN,
+        slot: this.config.slot,
+        batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
+      }, MODULE_NAME);
+      
+      client = getDBClient(this.c);
       await client.connect();
       
       const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
@@ -326,19 +334,49 @@ export class PollingManager {
       return newChanges.length > 0 ? newChanges : null;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      const errorName = err instanceof Error ? err.constructor.name : typeof err;
+      
+      const errorDetails = {
+        error: errorMsg,
+        errorType: errorName,
+        slot: this.config.slot,
+        currentLSN: await this.stateManager.getLSN().catch(() => 'unknown'),
+        stack: errorStack,
+        // Add raw error for debugging if it has additional properties
+        rawError: err && typeof err === 'object' ? Object.getOwnPropertyNames(err).reduce((acc, key) => {
+          try {
+            acc[key] = (err as any)[key];
+          } catch (e) {
+            acc[key] = '[Unserializable]';
+          }
+          return acc;
+        }, {} as any) : String(err)
+      };
       
       if (errorMsg.includes('replication slot') && errorMsg.includes('is active for PID')) {
-        replicationLogger.warn('Replication slot in use by another process during poll', {
-          error: errorMsg,
-          slot: this.config.slot
-        }, MODULE_NAME);
-        
+        replicationLogger.warn('Replication slot in use by another process during poll', errorDetails, MODULE_NAME);
         return null;
-      } else {
-        replicationLogger.error('Polling error', {
-          error: errorMsg
+      } else if (errorMsg.includes('connect') || errorMsg.includes('timeout')) {
+        replicationLogger.error('Database connection failed during polling', {
+          ...errorDetails,
+          possibleCauses: [
+            'DATABASE_URL misconfigured',
+            'Neon HTTP proxy not responding',
+            'PostgreSQL database not running',
+            'Network connectivity issues'
+          ],
+          databaseUrl: 'env' in this.c && this.c.env ? (this.c.env as any).DATABASE_URL || 'undefined' : 'context missing env'
         }, MODULE_NAME);
-        
+        throw err;
+      } else if (errorMsg.includes('does not exist')) {
+        replicationLogger.error('Replication slot does not exist', {
+          ...errorDetails,
+          suggestion: 'Try calling the /api/replication/init endpoint to create the slot'
+        }, MODULE_NAME);
+        throw err;
+      } else {
+        replicationLogger.error('Polling error', errorDetails, MODULE_NAME);
         throw err;
       }
     } finally {

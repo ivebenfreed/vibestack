@@ -106,7 +106,45 @@ echo "   🔄 Running pnpm install..."
 pnpm install
 
 echo ""
-echo "2.5️⃣ Copying generated files..."
+echo "2.5️⃣ Updating package.json with issue number..."
+echo "   📝 Adding issue-${ISSUE_NUMBER} to package name..."
+
+# Update root package.json
+if [ -f "package.json" ]; then
+    # Use Node.js to safely update the package.json
+    node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        pkg.name = 'vibestack-issue-${ISSUE_NUMBER}';
+        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+    "
+    echo "   ✅ Root package.json updated"
+fi
+
+# Update apps/web/package.json
+if [ -f "apps/web/package.json" ]; then
+    node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('apps/web/package.json', 'utf8'));
+        pkg.name = 'vibestack-web-issue-${ISSUE_NUMBER}';
+        fs.writeFileSync('apps/web/package.json', JSON.stringify(pkg, null, 2) + '\n');
+    "
+    echo "   ✅ Web package.json updated"
+fi
+
+# Update apps/server/package.json
+if [ -f "apps/server/package.json" ]; then
+    node -e "
+        const fs = require('fs');
+        const pkg = JSON.parse(fs.readFileSync('apps/server/package.json', 'utf8'));
+        pkg.name = 'server-issue-${ISSUE_NUMBER}';
+        fs.writeFileSync('apps/server/package.json', JSON.stringify(pkg, null, 2) + '\n');
+    "
+    echo "   ✅ Server package.json updated"
+fi
+
+echo ""
+echo "2.6️⃣ Copying generated files..."
 echo "   📁 Copying DataForge generated files from main repo..."
 if [ -d "../vibestack/packages/dataforge/src/generated" ]; then
     cp -r ../vibestack/packages/dataforge/src/generated/* ./packages/dataforge/src/generated/ 2>/dev/null || true

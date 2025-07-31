@@ -488,6 +488,9 @@ function generateContextOutput(
                                 resolvedImportPath = `../entities/${entityName}.js`; // This already has .js
                             }
 
+                            // Keep import paths as-is - the source files need ../entities/ since generated files are in src/generated/
+                            // The tsup build will handle flattening the structure appropriately
+
                             if (!enumsToImport.has(resolvedImportPath)) {
                                 enumsToImport.set(resolvedImportPath, new Set<string>());
                             }

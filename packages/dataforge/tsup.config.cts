@@ -3,17 +3,63 @@ const { defineConfig } = require('tsup');
 
 /** @type {import('tsup').Options} */
 const config = {
-  entry: [
-    'src/generated/client-entities.ts', 
-    'src/generated/server-entities.ts', 
-    'src/generated/column-configurations.ts',
-    'src/generated/rdg-column-configurations.ts',
-    'src/generated/vibegridx-columns.ts',
-    'src/generated/*-operations.ts',
-    'src/generated/dexie-schema.ts',
-    'src/generated/dexie-domain-services.ts',
-    'src/generated/dexie-domain/*.ts'
-  ],
+  entry: {
+    // Map generated files to root of dist
+    'client-entities': 'src/generated/client-entities.ts',
+    'server-entities': 'src/generated/server-entities.ts',
+    'column-configurations': 'src/generated/column-configurations.ts',
+    'rdg-column-configurations': 'src/generated/rdg-column-configurations.ts',
+    'vibegridx-columns': 'src/generated/vibegridx-columns.ts',
+    'comment-operations': 'src/generated/comment-operations.ts',
+    'project-operations': 'src/generated/project-operations.ts',
+    'statusdefinition-operations': 'src/generated/statusdefinition-operations.ts',
+    'statusset-operations': 'src/generated/statusset-operations.ts',
+    'tag-operations': 'src/generated/tag-operations.ts',
+    'tagset-operations': 'src/generated/tagset-operations.ts',
+    'task-operations': 'src/generated/task-operations.ts',
+    'user-operations': 'src/generated/user-operations.ts',
+    'crud-operations': 'src/generated/crud-operations.ts',
+    'dexie-schema': 'src/generated/dexie-schema.ts',
+    'dexie-domain-services': 'src/generated/dexie-domain-services.ts',
+    'dexie-domain/index': 'src/generated/dexie-domain/index.ts',
+    'dexie-domain/comment-dexie-service': 'src/generated/dexie-domain/comment-dexie-service.ts',
+    'dexie-domain/project-dexie-service': 'src/generated/dexie-domain/project-dexie-service.ts',
+    'dexie-domain/statusdefinition-dexie-service': 'src/generated/dexie-domain/statusdefinition-dexie-service.ts',
+    'dexie-domain/statusset-dexie-service': 'src/generated/dexie-domain/statusset-dexie-service.ts',
+    'dexie-domain/tag-dexie-service': 'src/generated/dexie-domain/tag-dexie-service.ts',
+    'dexie-domain/tagset-dexie-service': 'src/generated/dexie-domain/tagset-dexie-service.ts',
+    'dexie-domain/task-dexie-service': 'src/generated/dexie-domain/task-dexie-service.ts',
+    'dexie-domain/user-dexie-service': 'src/generated/dexie-domain/user-dexie-service.ts',
+    // Entity files
+    'entities/Account': 'src/entities/Account.ts',
+    'entities/BaseDomainEntity': 'src/entities/BaseDomainEntity.ts',
+    'entities/BaseSystemEntity': 'src/entities/BaseSystemEntity.ts',
+    'entities/ChangeHistory': 'src/entities/ChangeHistory.ts',
+    'entities/ClientMigration': 'src/entities/ClientMigration.ts',
+    'entities/ClientMigrationStatus': 'src/entities/ClientMigrationStatus.ts',
+    'entities/Comment': 'src/entities/Comment.ts',
+    'entities/JWKS': 'src/entities/JWKS.ts',
+    'entities/LocalChanges': 'src/entities/LocalChanges.ts',
+    'entities/Project': 'src/entities/Project.ts',
+    'entities/Session': 'src/entities/Session.ts',
+    'entities/StatusDefinition': 'src/entities/StatusDefinition.ts',
+    'entities/StatusSet': 'src/entities/StatusSet.ts',
+    'entities/SyncMetadata': 'src/entities/SyncMetadata.ts',
+    'entities/Tag': 'src/entities/Tag.ts',
+    'entities/TagSet': 'src/entities/TagSet.ts',
+    'entities/Task': 'src/entities/Task.ts',
+    'entities/User': 'src/entities/User.ts',
+    'entities/Verification': 'src/entities/Verification.ts',
+    'entities/index': 'src/entities/index.ts',
+    // Utils files
+    'utils/context': 'src/utils/context.ts',
+    'utils/decorators': 'src/utils/decorators.ts',
+    'utils/metadata-extraction': 'src/utils/metadata-extraction.ts',
+    'utils/metadata-filter': 'src/utils/metadata-filter.ts',
+    'utils/table-category': 'src/utils/table-category.ts',
+    'utils/table-registry': 'src/utils/table-registry.ts',
+    'utils/validation': 'src/utils/validation.ts'
+  },
   format: ['esm'],
   dts: false, // Skip type generation due to circular references
   clean: true,
@@ -31,6 +77,48 @@ const config = {
     options.loader = {
       '.node': 'empty'
     };
+    // Add esbuild plugin to rewrite imports
+    options.plugins = [
+      {
+        name: 'rewrite-imports',
+        setup(build) {
+          // Transform the output to fix import paths
+          build.onEnd(async (result) => {
+            const fs = require('fs').promises;
+            const path = require('path');
+            
+            // Only process generated files
+            const generatedFiles = [
+              'client-entities.js',
+              'server-entities.js',
+              'comment-operations.js',
+              'project-operations.js',
+              'statusdefinition-operations.js',
+              'statusset-operations.js',
+              'tag-operations.js', 
+              'tagset-operations.js',
+              'task-operations.js',
+              'user-operations.js',
+              'crud-operations.js',
+              'dexie-schema.js'
+            ];
+            
+            for (const file of generatedFiles) {
+              const filePath = path.join(__dirname, 'dist', file);
+              try {
+                let content = await fs.readFile(filePath, 'utf8');
+                // Replace ../entities/ with ./entities/ in imports
+                content = content.replace(/from "\.\.\/entities\//g, 'from "./entities/');
+                content = content.replace(/from '\.\.\/entities\//g, "from './entities/");
+                await fs.writeFile(filePath, content, 'utf8');
+              } catch (e) {
+                // File might not exist, that's ok
+              }
+            }
+          });
+        }
+      }
+    ];
   },
   // Skip these dependencies entirely
   noExternal: [],

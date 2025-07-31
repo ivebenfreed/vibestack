@@ -33,6 +33,7 @@ apiApp.use('*', cors({
   origin: (origin, c) => {
     // Get dynamic web port from environment
     const webPort = c.env.WEB_PORT || '5173';
+    console.log(`[CORS DEBUG] WEB_PORT from env: ${c.env.WEB_PORT}, using: ${webPort}, checking origin: ${origin}`);
     
     // Build allowed origins dynamically
     const allowedOrigins = [
@@ -159,6 +160,7 @@ const worker = {
       // --- BEGIN CORS CHECK for /api/sync ---
       const origin = request.headers.get('Origin');
       const webPort = env.WEB_PORT || '5173';
+      console.log(`[${requestId}] [Sync CORS DEBUG] WEB_PORT from env: ${env.WEB_PORT}, using: ${webPort}, origin: ${origin}`);
       const allowedOrigins = [
         `https://127.0.0.1:${webPort}`, 
         `http://127.0.0.1:${webPort}`, 

@@ -72,6 +72,17 @@ export class SyncStrategyAnalyzer {
       return { strategy: SyncStrategy.CATCHUP, serverLSN };
     }
     
+    // If client LSN is ahead of server LSN, server was reset - client needs full reset
+    if (compareLSN(clientLSN, serverLSN) > 0) {
+      syncLogger.warn('Client is ahead of server - server was likely reset, forcing client reset', {
+        clientId,
+        clientLSN,
+        serverLSN,
+        reason: 'server_behind_client'
+      }, MODULE_NAME);
+      return { strategy: SyncStrategy.INITIAL, serverLSN };
+    }
+    
     // Client is up to date
     syncLogger.info('Client is up to date', {
       clientId,

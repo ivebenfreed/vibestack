@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const serverPort = process.env.SERVER_PORT || '8787';
+const serverPort = process.env.SERVER_PORT || '8788';
 const webPort = process.env.WEB_PORT || '5173';
 const prNumber = process.env.PR_NUMBER;
 

@@ -42,6 +42,10 @@ function checkPort(port) {
   });
 }
 
+async function isPortInUse(port) {
+  return !(await checkPort(port));
+}
+
 // If called directly, find free ports for all services
 if (require.main === module) {
   (async () => {
@@ -72,4 +76,4 @@ if (require.main === module) {
   })();
 }
 
-module.exports = { findFreePort };
+module.exports = { findFreePort, isPortInUse };

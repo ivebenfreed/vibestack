@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { admin, emailOTP, oneTimeToken } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { NeonHTTPDialect } from "kysely-neon";
+import { neonConfig } from "@neondatabase/serverless";
 import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
 import type { Dialect } from 'kysely';
@@ -139,6 +140,20 @@ export const auth = betterAuth({
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env) {
+  // Configure Neon for local development
+  if (env.ENVIRONMENT === "local" || env.ENVIRONMENT === "development") {
+    dbLogger.debug("Configuring Neon for local development", {
+      databaseUrl: env.DATABASE_URL
+    }, 'auth');
+    
+    neonConfig.fetchEndpoint = (host) => {
+      if (host === 'db.localtest.me') {
+        return 'http://db.localtest.me:4444/sql';
+      }
+      return `https://${host}/sql`;
+    };
+  }
+
   const neonDialect = new NeonHTTPDialect({
     connectionString: env.DATABASE_URL,
   });

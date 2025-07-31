@@ -11,10 +11,14 @@
       "cache": false,
       "dependsOn": ["^build"]
     },
+    "ensure-docker:local": {
+      "cache": false,
+      "outputs": []
+    },
     "dev:local": {
       "persistent": true,
       "cache": false,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "dev:debug": {
       "persistent": true,
@@ -24,7 +28,7 @@
     "dev:debug:local": {
       "persistent": true,
       "cache": false,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "dev:info": {
       "persistent": true,
@@ -34,7 +38,7 @@
     "dev:info:local": {
       "persistent": true,
       "cache": false,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "dev:pr": {
       "persistent": true,
@@ -44,7 +48,7 @@
     "dev:pr:local": {
       "persistent": true,
       "cache": false,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "dev:no-logs": {
       "persistent": true,
@@ -54,7 +58,7 @@
     "dev:no-logs:local": {
       "persistent": true,
       "cache": false,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "_start_servers_for_pwa_test": {
       "persistent": true,
@@ -62,7 +66,8 @@
     },
     "_start_servers_for_pwa_test:local": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["ensure-docker:local"]
     },
     "lint": {
       "outputs": []

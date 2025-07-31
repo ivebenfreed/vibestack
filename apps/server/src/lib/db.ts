@@ -31,15 +31,40 @@ export const getDBClient = (c: AppContext | MinimalContext | { env: { DATABASE_U
     
     // Configure for local HTTP proxy if needed
     if (isLocal) {
-      neonConfig.fetchEndpoint = 'http://db.localtest.me:4444/sql';
+      
+      // Configure for single SQL queries (HTTP)
+      neonConfig.fetchEndpoint = (host) => {
+        const [protocol, port] = host === 'db.localtest.me' ? ['http', 4444] : ['https', 443];
+        return `${protocol}://${host}:${port}/sql`;
+      };
       neonConfig.fetchFunction = fetch;
+      
+      // Configure for Pool connections (WebSocket) - needed for replication
+      const connectionStringUrl = new URL(url);
+      neonConfig.useSecureWebSocket = connectionStringUrl.hostname !== 'db.localtest.me';
+      neonConfig.wsProxy = connectionStringUrl.hostname === 'db.localtest.me' 
+        ? (host) => `${host}:4444/v1` 
+        : undefined;
+      
+      // In Cloudflare Workers, WebSocket is available globally
+      neonConfig.webSocketConstructor = WebSocket;
     }
     
     const urlWithTimeout = addConnectTimeout(url);
-    return new Client({
+    
+    const clientConfig: any = {
       connectionString: urlWithTimeout,
       ssl: !isLocal // No SSL for local connections
-    });
+    };
+    
+    // For local development, force HTTP-only mode
+    if (isLocal) {
+      clientConfig.forceHttp = true;
+      clientConfig.webSocketConstructor = null;
+    }
+    
+    const client = new Client(clientConfig);
+    return client;
   } catch (error) {
     console.error('Error creating database client:', error);
     throw error;

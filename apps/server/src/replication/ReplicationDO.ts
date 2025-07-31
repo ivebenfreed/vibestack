@@ -124,15 +124,41 @@ export class ReplicationDO implements DurableObject {
         firstWALPoll
       };
     } catch (err) {
+      // Properly serialize error objects
       const errorMessage = err instanceof Error ? err.message : String(err);
-      replicationLogger.error('Failed to initialize replication', { 
-        error: errorMessage 
-      }, MODULE_NAME);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      const errorName = err instanceof Error ? err.constructor.name : typeof err;
+      
+      const errorDetails = {
+        error: errorMessage,
+        errorType: errorName,
+        stack: errorStack,
+        config: {
+          slot: this.config.slot,
+          publication: this.config.publication,
+          pollingInterval: this.config.pollingInterval
+        },
+        environment: {
+          databaseUrl: this.env.DATABASE_URL || 'undefined',
+          environment: this.env.ENVIRONMENT || 'undefined'
+        },
+        // Add raw error for debugging if it has additional properties
+        rawError: err && typeof err === 'object' ? Object.getOwnPropertyNames(err).reduce((acc, key) => {
+          try {
+            acc[key] = (err as any)[key];
+          } catch (e) {
+            acc[key] = '[Unserializable]';
+          }
+          return acc;
+        }, {} as any) : String(err)
+      };
+      
+      replicationLogger.error('Failed to initialize replication', errorDetails, MODULE_NAME);
       
       return {
         success: false,
         slotStatus: null,
-        error: errorMessage
+        error: err instanceof Error ? err.message : String(err)
       };
     }
   }
