@@ -1,50 +1,42 @@
 import globals from 'globals'
-import js from '@eslint/js'
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import reactCompiler from 'eslint-plugin-react-compiler'
-import tseslint from 'typescript-eslint'
+import rootConfig from '../../eslint.config.mjs'
 
-export default tseslint.config(
-  { ignores: ['dist', 'src/components/ui'] },
+// Start with root config and add web-specific rules
+export default [
+  ...rootConfig,
   {
-    extends: [
-      js.configs.recommended,
-      ...tseslint.configs.recommended,
-      ...pluginQuery.configs['flat/recommended'],
-    ],
+    ignores: ['dist', 'src/components/ui', 'src/routeTree.gen.ts'],
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
     },
     plugins: {
+      '@tanstack/query': pluginQuery,
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
       'react-compiler': reactCompiler,
     },
     rules: {
+      // React-specific rules
       ...reactHooks.configs.recommended.rules,
       'react-compiler/react-compiler': 'error',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
-      'no-console': 'error',
-      'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        {
-          args: 'all',
-          argsIgnorePattern: '^_',
-          caughtErrors: 'all',
-          caughtErrorsIgnorePattern: '^_',
-          destructuredArrayIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          ignoreRestSiblings: true,
-        },
-      ],
+      
+      // TanStack Query rules
+      ...pluginQuery.configs['flat/recommended'].rules,
+      
+      // Override root config - stricter for web app
+      'no-console': 'error', // Already set in root for web files, but being explicit
     },
-  }
-)
+  },
+]
