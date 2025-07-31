@@ -160,7 +160,7 @@ export default defineConfig({
     proxy: dynamicServerConfig.proxy || {
       // Default proxy configuration
       '/api': {
-        target: 'http://127.0.0.1:8787', // Target is HTTP, matching frontend protocol
+        target: `http://127.0.0.1:${process.env.SERVER_PORT || '8787'}`, // Use dynamic server port
         secure: false, // Allow self-signed certificates from the backend (wrangler dev)
         changeOrigin: true, // Needed when switching between HTTP and HTTPS
         // Don't rewrite the path - server expects /api prefix

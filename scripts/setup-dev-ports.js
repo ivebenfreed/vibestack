@@ -59,8 +59,8 @@ function detectIssueNumber() {
 }
 
 async function setupPorts() {
-  // Auto-detect PR/issue number
-  const prNumber = detectIssueNumber();
+  // Get PR number from environment variable (set in package.json scripts)
+  const prNumber = process.env.PR_NUMBER || '0';
   const offset = parseInt(prNumber) * 10; // Use 10 as offset to avoid conflicts
 
   // Base ports
@@ -69,9 +69,7 @@ async function setupPorts() {
   const BASE_DB_PORT = 5432;
   const BASE_PROXY_PORT = 4444;
 
-  // Deterministic port assignment - no port detection needed
-  // Main dev (PR_NUMBER=0): Use exact base ports
-  // PR branches: Use calculated offset ports  
+  // Calculate ports with offset
   const SERVER_PORT = BASE_SERVER_PORT + offset;
   const WEB_PORT = BASE_WEB_PORT + offset;
   const DB_PORT = BASE_DB_PORT + offset;
@@ -82,15 +80,24 @@ async function setupPorts() {
   process.env.WEB_PORT = WEB_PORT.toString();
   process.env.DB_PORT = DB_PORT.toString();
   process.env.PROXY_PORT = PROXY_PORT.toString();
+  process.env.PR_NUMBER = prNumber;
 
-  console.log(`🔧 Setting up development ports for ${prNumber ? `PR #${prNumber}` : 'main development'}`);
+  console.log(`🔧 Setting up development ports for ${prNumber !== '0' ? `PR #${prNumber}` : 'main development'}`);
   console.log(`   Server Port: ${SERVER_PORT}`);
   console.log(`   Web Port: ${WEB_PORT}`);
   console.log(`   Database Port: ${DB_PORT}`);
   console.log(`   Proxy Port: ${PROXY_PORT}`);
 
-  // Note: Configs are now static - only environment variables are set
-  console.log('✅ Port configuration complete (using static configs)');
+  // Generate dynamic wrangler config
+  require('./generate-wrangler-config');
+
+  // Generate dynamic vite config
+  require('./generate-vite-config');
+
+  // Update environment files
+  require('./update-env-files');
+
+  console.log('✅ Port configuration complete');
 }
 
 // Run the setup
