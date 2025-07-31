@@ -20,10 +20,6 @@
       "types": "./dist/dexie-schema.d.ts",
       "import": "./dist/dexie-schema.js"
     },
-    "./dexie-domain-services": {
-      "types": "./dist/dexie-domain-services.d.ts",
-      "import": "./dist/dexie-domain-services.js"
-    },
     "./dexie-domain": {
       "types": "./dist/dexie-domain/index.d.ts",
       "import": "./dist/dexie-domain/index.js"

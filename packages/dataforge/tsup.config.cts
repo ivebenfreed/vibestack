@@ -17,7 +17,6 @@ const config = {
     'user-operations': 'src/generated/user-operations.ts',
     'crud-operations': 'src/generated/crud-operations.ts',
     'dexie-schema': 'src/generated/dexie-schema.ts',
-    'dexie-domain-services': 'src/generated/dexie-domain-services.ts',
     'dexie-domain/index': 'src/generated/dexie-domain/index.ts',
     'dexie-domain/comment-dexie-service': 'src/generated/dexie-domain/comment-dexie-service.ts',
     'dexie-domain/project-dexie-service': 'src/generated/dexie-domain/project-dexie-service.ts',
