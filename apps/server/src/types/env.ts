@@ -11,7 +11,7 @@ export interface ExecutionContext {
   props: any;
 }
 
-export type DeploymentEnv = 'development' | 'staging' | 'production';
+export type DeploymentEnv = 'development' | 'staging' | 'production' | 'local';
 export type LogLevel = 'error' | 'debug' | 'info' | 'warn';
 
 /**

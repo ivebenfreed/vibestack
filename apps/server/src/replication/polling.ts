@@ -380,13 +380,15 @@ export class PollingManager {
         throw err;
       }
     } finally {
-      try {
-        await client.end();
-      } catch (closeError) {
-        replicationLogger.error('Error closing database connection after polling', {
-          error: closeError instanceof Error ? closeError.message : String(closeError),
-          slot: this.config.slot
-        }, MODULE_NAME);
+      if (client) {
+        try {
+          await client.end();
+        } catch (closeError) {
+          replicationLogger.error('Error closing database connection after polling', {
+            error: closeError instanceof Error ? closeError.message : String(closeError),
+            slot: this.config.slot
+          }, MODULE_NAME);
+        }
       }
     }
   }
