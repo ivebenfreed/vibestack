@@ -71,7 +71,7 @@
     "generate-dexie-schema": "tsx src/scripts/generate-dexie-schema.ts",
     "generate-dexie-domain-services": "tsx src/scripts/generate-dexie-domain-services.ts",
     "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-dexie-schema && pnpm run generate-dexie-domain-services",
-    "compile": "tsup && node scripts/fix-imports.js",
+    "compile": "tsup",
     "build": "pnpm run forge:build",
     "migration:generate:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
     "migration:generate:client": "tsx ./node_modules/typeorm/cli.js -d src/datasources/client.ts migration:generate",
