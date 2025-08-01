@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 // For main development, we don't actually need to check ports
 // The system will fail naturally if ports are in use
@@ -22,7 +23,6 @@ function detectIssueNumber() {
   
   // 2. Git branch name (issue-123, feature-456, pr-789)
   try {
-    const { execSync } = require('child_process');
     const branchName = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
     const match = branchName.match(/(?:issue-|feature-|pr-)(\d+)/);
     if (match) {
@@ -35,7 +35,6 @@ function detectIssueNumber() {
   
   // 3. Package.json name (vibestack-issue-123)
   try {
-    const fs = require('fs');
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     const match = packageJson.name.match(/issue-(\d+)/);
     if (match) {
@@ -75,13 +74,6 @@ async function setupPorts() {
   const DB_PORT = BASE_DB_PORT + offset;
   const PROXY_PORT = BASE_PROXY_PORT + offset;
 
-  // Export for child processes
-  process.env.SERVER_PORT = SERVER_PORT.toString();
-  process.env.WEB_PORT = WEB_PORT.toString();
-  process.env.DB_PORT = DB_PORT.toString();
-  process.env.PROXY_PORT = PROXY_PORT.toString();
-  process.env.PR_NUMBER = prNumber;
-
   console.log(`🔧 Setting up development ports for ${prNumber !== '0' ? `PR #${prNumber}` : 'main development'}`);
   console.log(`   Server Port: ${SERVER_PORT}`);
   console.log(`   Web Port: ${WEB_PORT}`);
@@ -89,6 +81,30 @@ async function setupPorts() {
   console.log(`   Proxy Port: ${PROXY_PORT}`);
 
   console.log('✅ Port configuration complete');
+  
+  // Now execute the turbo command with the environment variables
+  const args = process.argv.slice(2);
+  if (args.length > 0) {
+    const command = args.join(' ');
+    const env = {
+      ...process.env,
+      SERVER_PORT: SERVER_PORT.toString(),
+      WEB_PORT: WEB_PORT.toString(),
+      DB_PORT: DB_PORT.toString(),
+      PROXY_PORT: PROXY_PORT.toString(),
+      PR_NUMBER: prNumber
+    };
+    
+    try {
+      execSync(command, { 
+        stdio: 'inherit',
+        env
+      });
+    } catch (error) {
+      // Exit with the same code as the child process
+      process.exit(error.status || 1);
+    }
+  }
 }
 
 // Run the setup
