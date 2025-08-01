@@ -51,11 +51,8 @@ new_classes = ["SyncDO", "ReplicationDO"]
 [alias]
 "debug" = "./src/shims/debug.ts"
 "app-root-path" = "./src/lib/app-root-path-shim.ts"
+"pg" = "./src/shims/pg.ts"
 
 # Enable unlimited Workers for testing
 [limits]
 cpu_ms = 10_000
-
-# External modules to exclude from bundling
-[bundling]
-external = ["pg"]
