@@ -111,7 +111,9 @@ class BranchDbConfigurator {
   async generateBranchDockerCompose(config) {
     console.log('📝 Generating branch-specific docker-compose...');
     
-    const baseCompose = fs.readFileSync('docker-compose.yml', 'utf8');
+    // Get git root directory to find docker-compose.yml
+    const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+    const baseCompose = fs.readFileSync(path.join(gitRoot, 'docker-compose.yml'), 'utf8');
     
     // Replace ports and container names
     const branchCompose = baseCompose
@@ -121,8 +123,9 @@ class BranchDbConfigurator {
       .replace(/vibestack-neon-proxy/g, `vibestack-neon-proxy-${config.prNumber}`)
       .replace(/vibestack_dev/g, config.dbName);
     
-    fs.writeFileSync(config.compose, branchCompose);
-    console.log(`   ✅ Generated ${config.compose}`);
+    const composePath = path.join(gitRoot, config.compose);
+    fs.writeFileSync(composePath, branchCompose);
+    console.log(`   ✅ Generated ${composePath}`);
   }
 
   async startBranchContainers(config) {
@@ -139,7 +142,9 @@ class BranchDbConfigurator {
         return;
       }
 
-      execSync(`docker-compose -f ${config.compose} up -d`, { stdio: 'inherit' });
+      const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+      const composePath = path.join(gitRoot, config.compose);
+      execSync(`docker compose -f ${composePath} up -d`, { stdio: 'inherit' });
       console.log('   ✅ Containers started');
     } catch (error) {
       throw new Error(`Failed to start containers: ${error.message}`);
