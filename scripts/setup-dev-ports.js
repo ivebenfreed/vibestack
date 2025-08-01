@@ -59,8 +59,8 @@ function detectIssueNumber() {
 }
 
 async function setupPorts() {
-  // Get PR number from environment variable (set in package.json scripts)
-  const prNumber = process.env.PR_NUMBER || '0';
+  // Auto-detect PR/issue number from various sources
+  const prNumber = detectIssueNumber();
   const offset = parseInt(prNumber) * 10; // Use 10 as offset to avoid conflicts
 
   // Base ports
@@ -87,15 +87,6 @@ async function setupPorts() {
   console.log(`   Web Port: ${WEB_PORT}`);
   console.log(`   Database Port: ${DB_PORT}`);
   console.log(`   Proxy Port: ${PROXY_PORT}`);
-
-  // Generate dynamic wrangler config
-  require('./generate-wrangler-config');
-
-  // Generate dynamic vite config
-  require('./generate-vite-config');
-
-  // Update environment files
-  require('./update-env-files');
 
   console.log('✅ Port configuration complete');
 }
