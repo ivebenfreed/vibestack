@@ -28,9 +28,16 @@ class BranchDbConfigurator {
 
   isInWorktree() {
     try {
+      // Get the git root directory (works from any subdirectory)
+      const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
       const worktreeList = execSync('git worktree list', { encoding: 'utf8' });
-      const currentDir = process.cwd();
-      return worktreeList.includes(currentDir) && !currentDir.includes('/vibestack ');
+      
+      // Check if we're in a worktree (not the main repo)
+      const lines = worktreeList.split('\n').filter(line => line.trim());
+      const mainRepo = lines[0].split(/\s+/)[0]; // First line is main repo
+      
+      // Check if the git root is a worktree (not the main repo)
+      return gitRoot !== mainRepo && worktreeList.includes(gitRoot);
     } catch (error) {
       return false;
     }
