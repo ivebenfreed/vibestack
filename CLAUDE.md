@@ -32,6 +32,80 @@ We use a unified ESLint and TypeScript configuration for the entire monorepo:
 2. Fix any issues before pushing
 3. Generated files in `packages/dataforge/src/generated/` are ignored
 
+## Background Process Management
+
+### tmux-based Background Processes
+
+We use tmux to manage long-running background processes without blocking Claude Code. This is especially useful for development servers and build processes.
+
+#### Core Scripts
+
+- **`./scripts/tmux-bg.sh <session-name> <command>`** - Start any command in a background tmux session
+  ```bash
+  ./scripts/tmux-bg.sh dev-servers "pnpm dev:local"
+  ./scripts/tmux-bg.sh build-watch "pnpm build --watch"
+  ```
+
+- **`./scripts/bg-status.sh [session-name]`** - Check status of background processes
+  ```bash
+  ./scripts/bg-status.sh                # List all sessions
+  ./scripts/bg-status.sh dev-servers    # Check specific session
+  ```
+
+- **`./scripts/bg-logs.sh <session-name> [lines]`** - View logs from background processes
+  ```bash
+  ./scripts/bg-logs.sh dev-servers 100  # Last 100 lines
+  ./scripts/bg-logs.sh dev-servers      # Last 50 lines (default)
+  ```
+
+- **`./scripts/bg-stop.sh <session-name>`** - Stop background processes cleanly
+  ```bash
+  ./scripts/bg-stop.sh dev-servers
+  ```
+
+#### Development Server Shortcuts
+
+- **`./scripts/dev-start.sh`** - Start development servers (web + API) in background
+- **`./scripts/dev-logs.sh [lines]`** - Quick access to development server logs
+
+#### Standard Session Names
+
+- `vibestack-dev` - Main development servers (`pnpm dev:local`)
+- `vibestack-build` - Build processes
+- `vibestack-test` - Test runners
+- `vibestack-migrate` - Database migrations
+
+#### Usage Patterns
+
+1. **Starting development servers:**
+   ```bash
+   ./scripts/dev-start.sh  # Starts servers in background
+   # Continue working while servers start up
+   ```
+
+2. **Checking if servers are running:**
+   ```bash
+   ./scripts/bg-status.sh vibestack-dev
+   ```
+
+3. **Viewing server logs while working:**
+   ```bash
+   ./scripts/dev-logs.sh 50  # View last 50 lines
+   ```
+
+4. **Stopping servers when done:**
+   ```bash
+   ./scripts/bg-stop.sh vibestack-dev
+   ```
+
+#### Benefits
+
+- **Non-blocking**: Start long-running processes without waiting
+- **Process safety**: Prevents duplicate server instances
+- **Log access**: View real-time logs from any background process
+- **Clean shutdown**: Graceful process termination with Ctrl-C then force kill
+- **Session persistence**: Processes continue running even if Claude disconnects
+
 ## Interaction Protocol Memorization
 
 - Maintain a precise understanding of the interaction flow between components

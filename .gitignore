@@ -8,6 +8,9 @@ node_modules
 .env.*
 !.env.example
 !.env.*.ts
+
+# Worktree management files
+.worktree-package-backup.json
 !.env.*.d.ts
 !.env.*.example
 

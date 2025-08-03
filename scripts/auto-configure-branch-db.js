@@ -95,34 +95,41 @@ class BranchDbConfigurator {
   }
 
   async setupBranchDatabase(config) {
-    // 1. Generate branch-specific docker-compose
+    // 1. Ensure main database is running first (to clone from)
+    await this.ensureMainDatabaseForCloning();
+    
+    // 2. Generate branch-specific docker-compose
     await this.generateBranchDockerCompose(config);
     
-    // 2. Start branch-specific containers
+    // 3. Start branch-specific containers
     await this.startBranchContainers(config);
     
-    // 3. Wait for database readiness
+    // 4. Wait for database readiness
     await this.waitForDatabase(config);
     
-    // 4. Run migrations
-    await this.runMigrations(config);
+    // 5. Clone database from main
+    await this.cloneDatabaseFromMain(config);
   }
 
   async generateBranchDockerCompose(config) {
     console.log('📝 Generating branch-specific docker-compose...');
     
-    const baseCompose = fs.readFileSync('docker-compose.yml', 'utf8');
+    // Get git root directory to find docker-compose.yml
+    const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+    const baseCompose = fs.readFileSync(path.join(gitRoot, 'docker-compose.yml'), 'utf8');
     
-    // Replace ports and container names
+    // Replace ports and container names, and remove obsolete version
     const branchCompose = baseCompose
+      .replace(/version: ['"]?3\.\d+['"]?\s*\n/g, '')  // Remove version line
       .replace(/5432:5432/g, `${config.postgresPort}:5432`)
       .replace(/4444:4444/g, `${config.neonProxyPort}:4444`)
       .replace(/vibestack-postgres/g, `vibestack-postgres-${config.prNumber}`)
       .replace(/vibestack-neon-proxy/g, `vibestack-neon-proxy-${config.prNumber}`)
       .replace(/vibestack_dev/g, config.dbName);
     
-    fs.writeFileSync(config.compose, branchCompose);
-    console.log(`   ✅ Generated ${config.compose}`);
+    const composePath = path.join(gitRoot, config.compose);
+    fs.writeFileSync(composePath, branchCompose);
+    console.log(`   ✅ Generated ${composePath}`);
   }
 
   async startBranchContainers(config) {
@@ -139,7 +146,9 @@ class BranchDbConfigurator {
         return;
       }
 
-      execSync(`docker-compose -f ${config.compose} up -d`, { stdio: 'inherit' });
+      const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+      const composePath = path.join(gitRoot, config.compose);
+      execSync(`docker compose -f ${composePath} up -d`, { stdio: 'inherit' });
       console.log('   ✅ Containers started');
     } catch (error) {
       throw new Error(`Failed to start containers: ${error.message}`);
@@ -187,24 +196,127 @@ class BranchDbConfigurator {
     }
   }
 
-  async runMigrations(config) {
-    console.log('🔄 Running database migrations...');
+  async ensureMainDatabaseForCloning() {
+    console.log('🔧 Ensuring main database is available for cloning...');
     
     try {
-      // Set environment variables for migration
-      const env = {
-        ...process.env,
-        DATABASE_URL: `postgresql://postgres:postgres@localhost:${config.postgresPort}/${config.dbName}`,
-        DIRECT_DATABASE_URL: `postgresql://postgres:postgres@localhost:${config.postgresPort}/${config.dbName}`
-      };
-
-      execSync('pnpm forge:migrate:run:local', { 
-        stdio: 'inherit',
-        env 
-      });
-      console.log('   ✅ Migrations complete');
+      const runningContainers = execSync('docker ps --format "{{.Names}}"', { encoding: 'utf8' });
+      
+      if (!runningContainers.includes('vibestack-postgres') || !runningContainers.includes('vibestack-neon-proxy')) {
+        console.log('   ⚡ Starting main database containers...');
+        const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+        execSync(`docker compose -f ${path.join(gitRoot, 'docker-compose.yml')} up -d`, { stdio: 'inherit' });
+        
+        // Wait for main database to be ready
+        await this.waitForDatabase({ postgresPort: 5432 });
+      } else {
+        console.log('   ✅ Main database containers already running');
+      }
     } catch (error) {
-      console.warn('   ⚠️  Migration failed, continuing...');
+      console.warn('   ⚠️  Could not ensure main database:', error.message);
+    }
+  }
+
+  async cloneDatabaseFromMain(config) {
+    console.log('🔄 Checking if database needs cloning...');
+    
+    try {
+      const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+      
+      // Check if database already exists
+      const checkDbCommand = `docker exec vibestack-postgres-${config.prNumber} psql -U postgres -lqt | cut -d \\| -f 1 | grep -qw ${config.dbName}`;
+      let dbExists = false;
+      try {
+        execSync(checkDbCommand, { stdio: 'pipe' });
+        dbExists = true;
+      } catch (e) {
+        dbExists = false;
+      }
+      
+      if (dbExists) {
+        // Check if database has tables with actual data
+        try {
+          // Check if users table exists and has data (users table should always have data in a cloned db)
+          const checkDataCommand = `docker exec vibestack-postgres-${config.prNumber} psql -U postgres -d ${config.dbName} -c "SELECT COUNT(*) FROM users;" -t 2>/dev/null`;
+          const userCount = parseInt(execSync(checkDataCommand, { encoding: 'utf8', stdio: 'pipe' }).trim());
+          
+          if (userCount > 0) {
+            console.log(`   ✅ Database already exists with data (${userCount} users), skipping clone`);
+            return;
+          }
+        } catch (e) {
+          // Table doesn't exist or query failed, proceed with cloning
+          console.log('   📊 Database exists but appears empty, will clone from main');
+        }
+      }
+      
+      // Create the database if it doesn't exist
+      execSync(`docker exec vibestack-postgres-${config.prNumber} psql -U postgres -c "CREATE DATABASE ${config.dbName}" || true`, {
+        stdio: 'pipe'
+      });
+      
+      // Check if main database containers are running
+      let mainDbAvailable = false;
+      try {
+        execSync('docker ps | grep -q vibestack-postgres', { stdio: 'pipe' });
+        // Check if main database has data
+        const mainUserCount = parseInt(execSync('docker exec vibestack-postgres psql -U postgres -d vibestack_dev -c "SELECT COUNT(*) FROM users;" -t 2>/dev/null', { 
+          encoding: 'utf8', 
+          stdio: 'pipe' 
+        }).trim());
+        mainDbAvailable = mainUserCount > 0;
+      } catch (e) {
+        mainDbAvailable = false;
+      }
+      
+      if (mainDbAvailable) {
+        console.log('   📦 Cloning database from main...');
+        
+        // Use pg_dump to export from main and pipe to branch database
+        const dumpCommand = `docker exec vibestack-postgres pg_dump -U postgres vibestack_dev`;
+        const restoreCommand = `docker exec -i vibestack-postgres-${config.prNumber} psql -U postgres ${config.dbName}`;
+        
+        execSync(`${dumpCommand} | ${restoreCommand}`, {
+          stdio: 'inherit',
+          shell: true
+        });
+        
+        console.log('   ✅ Database cloned successfully from main');
+      } else {
+        console.log('   ⚠️  Main database not available or empty, attempting to clone from remote...');
+        
+        // Try to get remote database URL from .dev.vars
+        const devVarsPath = path.join(gitRoot, 'apps/server/.dev.vars');
+        if (!fs.existsSync(devVarsPath)) {
+          console.log('   ❌ No .dev.vars file found, skipping remote clone');
+          return;
+        }
+        
+        const devVarsContent = fs.readFileSync(devVarsPath, 'utf8');
+        const databaseUrlMatch = devVarsContent.match(/DATABASE_URL=(.+)/);
+        
+        if (!databaseUrlMatch) {
+          console.log('   ❌ No DATABASE_URL found in .dev.vars, skipping remote clone');
+          return;
+        }
+        
+        const remoteDatabaseUrl = databaseUrlMatch[1].trim();
+        console.log('   🌐 Found remote database URL, cloning from production...');
+        
+        // Use the clone-remote-data.js script
+        const cloneScriptPath = path.join(gitRoot, 'scripts/clone-remote-data.js');
+        const localDatabaseUrl = `postgresql://postgres:postgres@localhost:${config.postgresPort}/${config.dbName}`;
+        
+        execSync(`REMOTE_DATABASE_URL="${remoteDatabaseUrl}" LOCAL_DATABASE_URL="${localDatabaseUrl}" node ${cloneScriptPath}`, {
+          stdio: 'inherit',
+          shell: true
+        });
+        
+        console.log('   ✅ Database cloned successfully from remote');
+      }
+    } catch (error) {
+      console.error('   ❌ Failed to clone database:', error.message);
+      throw error;
     }
   }
 

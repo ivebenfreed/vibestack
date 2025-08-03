@@ -42,19 +42,15 @@ These commands use the current NODE_ENV or default to development:
 ```bash
 # Generate migrations
 pnpm migration:generate:server -- src/migrations/server/MigrationName
-pnpm migration:generate:client -- src/migrations/client/MigrationName
 
 # Run migrations
 pnpm migration:run:server
-pnpm migration:run:client
 
 # Show migration status
 pnpm migration:show:server
-pnpm migration:show:client
 
 # Revert last migration
 pnpm migration:revert:server
-pnpm migration:revert:client
 ```
 
 ### Environment-Specific Commands
@@ -63,9 +59,6 @@ pnpm migration:revert:client
 ```bash
 # Run server migrations on development
 pnpm migration:run:server:dev
-
-# Run client migrations on development
-pnpm migration:run:client:dev
 
 # Generate server migration for development
 pnpm migration:generate:server:dev -- src/migrations/server/MigrationName
@@ -82,9 +75,6 @@ pnpm migration:revert:server:dev
 # Run server migrations on staging
 pnpm migration:run:server:staging
 
-# Run client migrations on staging
-pnpm migration:run:client:staging
-
 # Generate server migration for staging
 pnpm migration:generate:server:staging -- src/migrations/server/MigrationName
 
@@ -100,9 +90,6 @@ pnpm migration:revert:server:staging
 # Run server migrations on production
 pnpm migration:run:server:prod
 
-# Run client migrations on production
-pnpm migration:run:client:prod
-
 # Generate server migration for production
 pnpm migration:generate:server:prod -- src/migrations/server/MigrationName
 
@@ -111,23 +98,6 @@ pnpm migration:show:server:prod
 
 # Revert last migration on production (use with caution!)
 pnpm migration:revert:server:prod
-```
-
-## Client Database (PGLite) Notes
-
-The client database uses PGLite (PostgreSQL in WebAssembly) and stores data in environment-specific directories:
-
-- Development: `./pgdata/development/`
-- Staging: `./pgdata/preview/`
-- Production: `./pgdata/production/`
-
-If you encounter corruption issues with PGLite:
-```bash
-# Remove the corrupted data directory
-rm -rf pgdata/development  # or preview/production
-
-# Re-run migrations
-pnpm migration:run:client:dev
 ```
 
 ## Common Workflows
@@ -185,8 +155,3 @@ pnpm migration:show:server:prod
 - Use `migration:show:server:<env>` to check current state
 - Manually resolve conflicts in migration files if needed
 - Consider using `migration:revert` carefully if needed
-
-### PGLite Issues
-- Clear the pgdata directory for the affected environment
-- Re-run client migrations from scratch
-- Check disk space and permissions

@@ -9,7 +9,8 @@ import {
   Min, 
   IsArray, 
   IsUUID,
-  MaxLength
+  MaxLength,
+  IsBoolean
 } from 'class-validator';
 // Import User and Project for use in decorators
 // The Relation wrapper will handle circular dependencies
