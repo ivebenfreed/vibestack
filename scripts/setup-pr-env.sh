@@ -45,7 +45,7 @@ if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
     docker compose -f docker-compose.pr-${PR_NUMBER}.yml up -d
     
     # Update local database URL for this PR
-    LOCAL_DB_URL="postgresql://postgres:postgres@localhost:${DB_PORT}/vibestack_dev"
+    LOCAL_DB_URL="postgresql://postgres:postgres@localhost:${DB_PORT}/vibestack_dev_issue_${PR_NUMBER}"
 else
     # Use default ports
     docker compose up -d
