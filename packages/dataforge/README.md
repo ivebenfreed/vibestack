@@ -8,7 +8,7 @@ A powerful data layer factory that forges the foundation of VibeStack's data arc
 - Database schema definitions
 - Type-safe interfaces
 - Migration management
-- Dual-database support (PostgreSQL/PGlite)
+- Database support for server and client environments
 
 ⚡ **Type Generation**
 - Build-time type safety
@@ -31,10 +31,41 @@ A powerful data layer factory that forges the foundation of VibeStack's data arc
 
 ## Quick Start
 
+### Environment Setup
+
+DataForge supports both local and remote database development:
+
+```bash
+# Check current environment
+pnpm env:status
+
+# Switch between environments
+pnpm env:use:local   # Use local PostgreSQL
+pnpm env:use:remote  # Use remote/cloud database
+```
+
+### Development Workflow
+
 1. Define your schema in `src/entities/`
 2. Forge your types with `pnpm run forge:build`
 3. Generate migrations with `pnpm run forge:migrate generate <YourMigrationName>`
 4. Deploy with `pnpm run deploy <YourMigrationName>` (or use root command `pnpm run forge:deploy <YourMigrationName>`)
+
+### Entity Update Workflow
+
+For a streamlined entity update experience:
+
+```bash
+# Semi-automated (recommended for complex changes)
+pnpm entity:update
+
+# Fully automated with confirmation
+pnpm entity:update:full
+
+# Target specific environment
+pnpm entity:update:local       # Force local DB
+pnpm entity:update:remote      # Force remote DB
+```
 
 ## Architecture
 
