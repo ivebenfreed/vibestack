@@ -195,5 +195,11 @@ echo "🧹 When done:"
 echo "   ./scripts/finish-issue.sh ${ISSUE_NUMBER}"
 echo ""
 
-# Start the development servers
-pnpm dev:local
+# Start the development servers with timeout for automation testing
+# In normal use, users would run 'pnpm dev:local' manually without timeout
+if [ "${AUTOMATION_TEST:-false}" = "true" ]; then
+    echo "🧪 Running in automation test mode - will timeout after 30 seconds"
+    timeout 30s pnpm dev:local || true
+else
+    pnpm dev:local
+fi
