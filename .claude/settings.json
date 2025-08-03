@@ -1,21 +1,35 @@
 {
+  "permissions": {
+    "allow": ["*"]
+  },
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit|Write",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/post-edit-hook.sh"
+            "command": ".claude/hooks/intercept-pnpm-dev.sh"
           }
         ]
-      },
+      }
+    ],
+    "UserPromptSubmit": [
       {
-        "matcher": "Task",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/verify-changes-with-playwright.sh"
+            "command": ".claude/hooks/add-project-context.sh"
+          }
+        ]
+      }
+    ],
+    "PostContextCompaction": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/preserve-context.sh"
           }
         ]
       }

@@ -157,6 +157,9 @@ export default defineConfig({
     },
     // Merge default config with dynamic config
     ...(dynamicServerConfig.port ? { port: dynamicServerConfig.port } : {}),
+    // IMPORTANT: Fail if port is in use instead of auto-incrementing
+    // This ensures stable ports for Playwright testing and integrations
+    strictPort: true,
     proxy: dynamicServerConfig.proxy || {
       // Default proxy configuration
       '/api': {
