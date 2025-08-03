@@ -10,6 +10,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      playwright:
+        specifier: ^1.54.2
+        version: 1.54.2
     devDependencies:
       '@eslint/js':
         specifier: ^9.25.1
@@ -582,9 +586,6 @@ importers:
 
   packages/dataforge:
     dependencies:
-      '@electric-sql/pglite':
-        specifier: ^0.3.1
-        version: 0.3.1
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -606,9 +607,6 @@ importers:
       typeorm:
         specifier: ^0.3.22
         version: 0.3.22(pg@8.15.6)(reflect-metadata@0.1.14)
-      typeorm-pglite:
-        specifier: ^0.3.2
-        version: 0.3.2(@electric-sql/pglite@0.3.1)
     devDependencies:
       '@faker-js/faker':
         specifier: ^9.7.0
@@ -2397,10 +2395,6 @@ packages:
 
   /@electric-sql/pglite@0.2.17:
     resolution: {integrity: sha512-qEpKRT2oUaWDH6tjRxLHjdzMqRUGYDnGZlKrnL4dJ77JVMcP2Hpo3NYnOSPKdZdeec57B6QPprCUFg0picx5Pw==}
-    dev: false
-
-  /@electric-sql/pglite@0.3.1:
-    resolution: {integrity: sha512-Kpbd2FMXnM5I56ZpMnGKZhv+h31ipeimgyJVb1C+nWFTikp33z0TTwmksEtHpPinuqKiMJblH2OJM0RubKvJgg==}
     dev: false
 
   /@emnapi/runtime@1.4.3:
@@ -11535,6 +11529,14 @@ packages:
   /fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
+  /fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+    requiresBuild: true
+    dev: false
+    optional: true
+
   /fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -13263,6 +13265,22 @@ packages:
       confbox: 0.1.8
       mlly: 1.7.4
       pathe: 2.0.2
+
+  /playwright-core@1.54.2:
+    resolution: {integrity: sha512-n5r4HFbMmWsB4twG7tJLDN9gmBUeSPcsBZiWSE4DnYz9mJMAFqr2ID7+eGC9kpEnxExJ1epttwR59LEWCk8mtA==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dev: false
+
+  /playwright@1.54.2:
+    resolution: {integrity: sha512-Hu/BMoA1NAdRUuulyvQC0pEqZ4vQbGfn8f7wPXcnqQmM+zct9UliKxsIkLNmz/ku7LElUNqmaiv1TG/aL5ACsw==}
+    engines: {node: '>=18'}
+    hasBin: true
+    dependencies:
+      playwright-core: 1.54.2
+    optionalDependencies:
+      fsevents: 2.3.2
+    dev: false
 
   /possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
@@ -15363,14 +15381,6 @@ packages:
       '@electric-sql/pglite': '>= 0.2.12'
     dependencies:
       '@electric-sql/pglite': 0.2.17
-    dev: false
-
-  /typeorm-pglite@0.3.2(@electric-sql/pglite@0.3.1):
-    resolution: {integrity: sha512-/URkIx3MXaRqLKXjGfFY1uq8Fp6qSYTP09NjK6MAbsZhNwe7qAqnaWdTGtJ4aMr2e2TDPXT1rCt+w7xszMUzOg==}
-    peerDependencies:
-      '@electric-sql/pglite': '>= 0.2.12'
-    dependencies:
-      '@electric-sql/pglite': 0.3.1
     dev: false
 
   /typeorm@0.3.22(pg@8.15.6)(reflect-metadata@0.1.14):
