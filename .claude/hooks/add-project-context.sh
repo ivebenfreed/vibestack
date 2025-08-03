@@ -3,8 +3,7 @@
 # Read the JSON input
 INPUT=$(cat)
 
-# Extract the user message
-USER_MESSAGE=$(echo "$INPUT" | jq -r '.userPrompt // ""')
+# SessionStart event - no user message to extract
 
 # Check if we're in a worktree
 WORKTREE_PATH=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
