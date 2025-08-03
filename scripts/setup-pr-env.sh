@@ -35,8 +35,8 @@ if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
     # Generate PR-specific docker-compose with unique container names and volumes
     sed -e "s/\"5432:5432\"/\"${DB_PORT}:5432\"/g" \
         -e "s/\"4444:4444\"/\"${PROXY_PORT}:4444\"/g" \
-        -e "s/vibestack-postgres/vibestack-postgres-pr-${PR_NUMBER}/g" \
-        -e "s/vibestack-neon-proxy/vibestack-neon-proxy-pr-${PR_NUMBER}/g" \
+        -e "s/vibestack-postgres/vibestack-postgres-${PR_NUMBER}/g" \
+        -e "s/vibestack-neon-proxy/vibestack-neon-proxy-${PR_NUMBER}/g" \
         -e "s/vibestack_dev/vibestack_dev_issue_${PR_NUMBER}/g" \
         -e "s/postgres_data:/postgres_data_pr_${PR_NUMBER}:/g" \
         docker-compose.yml > docker-compose.pr-${PR_NUMBER}.yml
