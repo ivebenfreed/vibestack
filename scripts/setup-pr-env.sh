@@ -59,19 +59,9 @@ sleep 5
 echo ""
 echo "3️⃣ Database setup will be handled automatically by pnpm dev:local"
 
-# Step 4: Clone production data automatically if available
-if [ -n "$REMOTE_DATABASE_URL" ]; then
-    echo ""
-    echo "4️⃣ Cloning production data automatically..."
-    echo "   This will replace all local data with current production data."
-    
-    REMOTE_DATABASE_URL="$REMOTE_DATABASE_URL" LOCAL_DATABASE_URL="$LOCAL_DB_URL" node scripts/clone-remote-data.js
-else
-    echo ""
-    echo "4️⃣ Skipping data clone (REMOTE_DATABASE_URL not found)"
-    echo "   To clone production data later, run:"
-    echo "   REMOTE_DATABASE_URL='your-url' node scripts/clone-remote-data.js"
-fi
+# Step 4: Database cloning will be handled by auto-configure-branch-db.js
+echo ""
+echo "4️⃣ Database setup and cloning will be handled automatically by pnpm dev:local"
 
 echo ""
 echo "✅ PR environment setup complete!"
