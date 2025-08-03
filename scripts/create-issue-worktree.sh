@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Start work on a GitHub issue
-# Usage: ./scripts/start-issue.sh [ISSUE_NUMBER]
+# Create a worktree for a GitHub issue with full development environment
+# Usage: ./scripts/create-issue-worktree.sh [ISSUE_NUMBER]
 
 set -e
 
@@ -11,10 +11,10 @@ ISSUE_NUMBER="$1"
 if [ -z "$ISSUE_NUMBER" ]; then
     echo "❌ Error: Issue number is required"
     echo ""
-    echo "Usage: ./scripts/start-issue.sh [ISSUE_NUMBER]"
+    echo "Usage: ./scripts/create-issue-worktree.sh [ISSUE_NUMBER]"
     echo ""
     echo "Example:"
-    echo "  ./scripts/start-issue.sh 123"
+    echo "  ./scripts/create-issue-worktree.sh 123"
     echo ""
     echo "This will:"
     echo "  1. Create worktree ./worktrees/issue-123"
@@ -90,19 +90,38 @@ fi
 # Switch to worktree
 cd "$WORKTREE_PATH"
 
-# Copy Claude configuration if it exists
 echo ""
-echo "1.5️⃣ Copying Claude configuration..."
-if [ -d "./.claude" ]; then
-    cp -r ./.claude "$WORKTREE_PATH/.claude"
-    echo "   ✅ Claude config copied to worktree"
-else
-    echo "   ⚠️  No Claude config found to copy"
-fi
+echo "1.5️⃣ Copying necessary untracked files..."
+# Copy essential untracked files from main repo that aren't in git
+MAIN_REPO_ROOT="$(git worktree list | head -1 | awk '{print $1}')"
+
+# List of files to copy if they exist
+COPY_FILES=(
+  "apps/server/.dev.vars"
+  "apps/server/.dev.vars.local"
+  "apps/web/.env.development"
+  "apps/web/.env.development.generated"
+  ".env.local"
+  "packages/dataforge/.env"
+  "packages/dataforge/.env.local"
+  "packages/dataforge/.env.development"
+  "packages/dataforge/.env.preview"
+  "packages/dataforge/.env.production"
+)
+
+for file in "${COPY_FILES[@]}"; do
+  if [ -f "${MAIN_REPO_ROOT}/${file}" ]; then
+    # Create directory if it doesn't exist
+    mkdir -p "$(dirname "${file}")"
+    cp "${MAIN_REPO_ROOT}/${file}" "${file}"
+    echo "   ✅ Copied ${file}"
+  fi
+done
 
 echo ""
 echo "2️⃣ Installing dependencies..."
 echo "   🔄 Running pnpm install..."
+# Note: postinstall script will handle Claude sync and Playwright MCP setup
 pnpm install
 
 echo ""
@@ -144,16 +163,6 @@ if [ -f "apps/server/package.json" ]; then
 fi
 
 echo ""
-echo "2.6️⃣ Copying generated files..."
-echo "   📁 Copying DataForge generated files from main repo..."
-if [ -d "./packages/dataforge/src/generated" ]; then
-    cp -r ./packages/dataforge/src/generated/* "$WORKTREE_PATH/packages/dataforge/src/generated/" 2>/dev/null || true
-    echo "   ✅ Generated files copied"
-else
-    echo "   ⚠️  No generated files found to copy"
-fi
-
-echo ""
 echo "3️⃣ Setting up PR environment..."
 if [ -f "./scripts/setup-pr-env.sh" ]; then
     PR_NUMBER="$ISSUE_NUMBER" ./scripts/setup-pr-env.sh
@@ -169,10 +178,11 @@ echo "✅ Issue #${ISSUE_NUMBER} environment ready!"
 echo ""
 echo "📍 Current location: $(pwd)"
 echo ""
-echo "🎯 Next steps:"
-echo "   • Start coding your solution"
-echo "   • Run: pnpm dev:local"
-echo "   • Visit: http://localhost:$((5173 + ISSUE_NUMBER * 10))"
+echo "4️⃣ Starting development servers..."
+echo "   🚀 Running pnpm dev:local..."
+echo ""
+echo "📱 Your services will be available at:"
+echo "   • Web: http://localhost:$((5173 + ISSUE_NUMBER * 10))"
 echo "   • API: http://localhost:$((8787 + ISSUE_NUMBER * 10))"
 echo ""
 echo "📝 When ready for PR:"
@@ -183,3 +193,7 @@ echo "   # Include 'Fixes #${ISSUE_NUMBER}' in PR description"
 echo ""
 echo "🧹 When done:"
 echo "   ./scripts/finish-issue.sh ${ISSUE_NUMBER}"
+echo ""
+
+# Start the development servers
+pnpm dev:local
