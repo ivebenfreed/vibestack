@@ -2,6 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## MANDATORY: Automatic tmux Integration
+
+**IMPORTANT**: Claude Code is configured to automatically redirect all long-running development commands to tmux background sessions. This happens transparently via PreToolUse hooks.
+
+### Commands Automatically Redirected to tmux:
+- `pnpm dev` → Runs in `vibestack-dev` tmux session
+- `pnpm dev:local` → Runs in `vibestack-dev` tmux session
+- `pnpm dev:server` → Runs in `vibestack-dev` tmux session
+- `pnpm dev:web` → Runs in `vibestack-dev` tmux session
+- `pnpm build --watch` → Runs in `vibestack-build` tmux session
+- `pnpm test --watch` → Runs in `vibestack-test` tmux session
+- `npm run dev` → Runs in `vibestack-dev` tmux session
+- `yarn dev` → Runs in `vibestack-dev` tmux session
+- `wrangler dev` → Runs in `vibestack-dev` tmux session
+
+### How It Works:
+1. PreToolUse hook intercepts all Bash commands
+2. Development commands are automatically wrapped with `./scripts/tmux-bg.sh`
+3. Commands run in background without blocking Claude Code
+4. Use `./scripts/bg-status.sh` to check running processes
+5. Use `./scripts/bg-logs.sh <session>` to view logs
+
+### DO NOT:
+- Run dev servers directly (they will be redirected automatically)
+- Use `&` or `nohup` for background processes (use tmux instead)
+- Kill processes with `pkill` (use `./scripts/bg-stop.sh`)
+
 ## Development Standards
 
 ### Linting and Type Checking
