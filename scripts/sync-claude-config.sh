@@ -6,7 +6,8 @@
 set -e
 
 WORKTREE_PATH="$1"
-MAIN_REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Get the actual main repository root, not the worktree root
+MAIN_REPO_ROOT="$(git worktree list | head -1 | awk '{print $1}')"
 
 # Function to get PR number from worktree branch
 get_pr_number() {
