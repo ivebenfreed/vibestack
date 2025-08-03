@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "node",
+      "args": ["/home/benfreed/vibestack/scripts/playwright-mcp-wrapper.js"],
+      "env": {}
+    },
+    "neon": {
+      "command": "bunx",
+      "args": ["@neondatabase/mcp-server-neon"],
+      "env": {
+        "NEON_API_KEY": "${NEON_API_KEY}"
+      }
+    }
+  }
+}

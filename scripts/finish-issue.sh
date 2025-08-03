@@ -53,6 +53,15 @@ fi
 # Cleanup PR environment
 echo "1️⃣ Cleaning up PR environment..."
 cd "$WORKTREE_PATH"
+
+# Restore original package names before cleanup (if backup exists)
+if [ -f ".worktree-package-backup.json" ]; then
+    echo "   📦 Restoring original package names..."
+    if [ -f "./scripts/restore-package-names.sh" ]; then
+        ./scripts/restore-package-names.sh restore
+    fi
+fi
+
 PR_NUMBER="$ISSUE_NUMBER" ./scripts/cleanup-pr-env.sh
 
 # Go back to main worktree
