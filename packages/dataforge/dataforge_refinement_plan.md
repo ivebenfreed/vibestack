@@ -14,11 +14,9 @@ This document outlines a comprehensive plan to review, refine, and prepare the `
     *   Handles inheritance from base entities.
     *   Dynamically imports enums.
     *   Includes `getTableHierarchy` for dependency analysis.
-2.  **Datasources (`server.ts`, `client.ts`)**:
+2.  **Datasources (`server.ts`)**:
     *   `server.ts`: Uses PostgreSQL, loads entities directly from `src/entities/*.ts` (original decorator-based files) for CLI operations.
-    *   `client.ts`: Uses PGlite, loads entities from generated `src/generated/client-entities.ts` (EntitySchema objects).
-    *   This difference in entity loading between server and client datasources for TypeORM CLI (migrations) is a key point to ensure consistency.
-    *   Both correctly use `synchronize: false`.
+    *   Uses `synchronize: false`.
 3.  **Trigger Template (`client-id-trigger.template.ts`)**:
     *   Provides a PL/pgSQL function and applies it to tables listed in `SERVER_DOMAIN_TABLES` (from generated code).
     *   Current application process is manual (copy, rename, run) and ripe for automation.
@@ -71,7 +69,7 @@ The following sections detail the planned activities for refining the `dataforge
 
 ### III. Migration Process Refinement
 
-*   **Objective**: Create a robust, clear, and potentially more automated migration workflow for both server (PostgreSQL) and client (PGlite).
+*   **Objective**: Create a robust, clear, and potentially more automated migration workflow for server (PostgreSQL).
 *   **Tasks**:
     1.  **Review Generation Commands**:
         *   Examine TypeORM CLI commands in `package.json`.
@@ -83,9 +81,6 @@ The following sections detail the planned activities for refining the `dataforge
     3.  **Atomicity & Naming**:
         *   Review existing migrations for adherence to atomicity.
         *   Establish clear naming conventions.
-    4.  **PGlite Migrations**:
-        *   Specifically test the migration process for PGlite.
-        *   Review `migration:upload-client` script and its role.
     5.  **Documentation**:
         *   Update `README.md` with detailed instructions for migrations.
 *   **Deliverable**: Suggestions for improving migration tooling, guidelines for handwritten migrations, and updated documentation.
@@ -100,7 +95,7 @@ The following sections detail the planned activities for refining the `dataforge
         *   **Development Guide**: Expand on creating schemas, context, and categories.
         *   **Commands**: Verify all commands and descriptions.
         *   **CRDT Support & Triggers**: Integrate improvements from "Trigger Mechanism Review."
-        *   **Dual-Database**: Explain PostgreSQL/PGlite setup clearly.
+        *   **Database**: Explain PostgreSQL setup clearly.
     3.  **New Sections (Consider Adding)**: Prerequisites, Configuration, Troubleshooting.
     4.  **Tone and Structure**: Ensure logical flow and welcoming tone. Use diagrams if helpful.
 *   **Deliverable**: A revised `README.md` content or a set of specific, actionable changes.
@@ -152,7 +147,6 @@ graph TD
     H --> H1[Review Generation Commands];
     H --> H2[Handwritten vs. Auto-generated Strategy];
     H --> H3[Atomicity & Naming];
-    H --> H4[PGlite Migration Testing];
 
     E --> I[IV. README.md Enhancement];
     I --> I1[Full Content Review & Update];

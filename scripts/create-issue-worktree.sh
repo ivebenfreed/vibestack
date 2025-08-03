@@ -135,12 +135,35 @@ else
 fi
 
 echo ""
-echo "2.5️⃣ Updating package.json with issue number..."
-echo "   📝 Adding issue-${ISSUE_NUMBER} to package name..."
+echo "2.5️⃣ Setting up package name management..."
+echo "   📝 Creating package name backup and issue-specific names..."
+
+# Create a backup of original package names for restoration
+PACKAGE_BACKUP_FILE=".worktree-package-backup.json"
+node -e "
+    const fs = require('fs');
+    const backup = {};
+    
+    // Backup original package names
+    if (fs.existsSync('package.json')) {
+        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        backup.root = pkg.name;
+    }
+    if (fs.existsSync('apps/web/package.json')) {
+        const pkg = JSON.parse(fs.readFileSync('apps/web/package.json', 'utf8'));
+        backup.web = pkg.name;
+    }
+    if (fs.existsSync('apps/server/package.json')) {
+        const pkg = JSON.parse(fs.readFileSync('apps/server/package.json', 'utf8'));
+        backup.server = pkg.name;
+    }
+    
+    fs.writeFileSync('${PACKAGE_BACKUP_FILE}', JSON.stringify(backup, null, 2));
+    console.log('   ✅ Package names backed up to ${PACKAGE_BACKUP_FILE}');
+"
 
 # Update root package.json
 if [ -f "package.json" ]; then
-    # Use Node.js to safely update the package.json
     node -e "
         const fs = require('fs');
         const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -196,8 +219,17 @@ echo "   • Web: http://localhost:$((5173 + ISSUE_NUMBER * 10))"
 echo "   • API: http://localhost:$((8787 + ISSUE_NUMBER * 10))"
 echo ""
 echo "📝 When ready for PR:"
+echo "   📦 Package names are automatically managed - no manual cleanup needed!"
+echo ""
+echo "   Standard git workflow:"
 echo "   git add . && git commit -m 'Your changes'"
 echo "   git push -u origin $BRANCH_NAME"
+echo ""
+echo "   🛡️ Alternative (uses git-safe wrapper for extra protection):"
+echo "   ./scripts/git-safe.sh add ."
+echo "   ./scripts/git-safe.sh commit -m 'Your changes'"
+echo "   ./scripts/git-safe.sh push -u origin $BRANCH_NAME"
+echo ""
 echo "   # Create PR with title: [#${ISSUE_NUMBER}] Your description"
 echo "   # Include 'Fixes #${ISSUE_NUMBER}' in PR description"
 echo ""

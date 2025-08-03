@@ -8,7 +8,7 @@ A powerful data layer factory that forges the foundation of VibeStack's data arc
 - Database schema definitions
 - Type-safe interfaces
 - Migration management
-- Dual-database support (PostgreSQL/PGlite)
+- Database support for server and client environments
 
 ⚡ **Type Generation**
 - Build-time type safety
@@ -31,10 +31,27 @@ A powerful data layer factory that forges the foundation of VibeStack's data arc
 
 ## Quick Start
 
+### Development Workflow
+
 1. Define your schema in `src/entities/`
 2. Forge your types with `pnpm run forge:build`
 3. Generate migrations with `pnpm run forge:migrate generate <YourMigrationName>`
 4. Deploy with `pnpm run deploy <YourMigrationName>` (or use root command `pnpm run forge:deploy <YourMigrationName>`)
+
+### Entity Update Workflow
+
+For a streamlined entity update experience:
+
+```bash
+# Semi-automated (recommended for complex changes)
+pnpm entity:update
+
+# Fully automated with confirmation (runs on both databases)
+pnpm entity:update:full
+
+# Skip confirmation
+pnpm entity:update:full --yes
+```
 
 ## Architecture
 

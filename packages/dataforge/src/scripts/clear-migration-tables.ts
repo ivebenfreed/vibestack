@@ -1,11 +1,9 @@
 import serverDataSource from '../datasources/server.js';
-import clientDataSource from '../datasources/client.js';
 import { DataSource } from 'typeorm';
 
 interface ScriptFlags {
   server: boolean;
   published: boolean;
-  liteLocal: boolean;
   all: boolean;
   help: boolean;
 }
@@ -15,13 +13,12 @@ function parseArgs(): ScriptFlags {
   const flags: ScriptFlags = {
     server: args.includes('--server'),
     published: args.includes('--published'),
-    liteLocal: args.includes('--lite-local'),
     all: args.includes('--all'),
     help: args.includes('--help'),
   };
 
   // If no specific target flags are set, and --all is not set, default to all.
-  if (!flags.server && !flags.published && !flags.liteLocal && !flags.all && !flags.help) {
+  if (!flags.server && !flags.published && !flags.all && !flags.help) {
     flags.all = true; // Default to all if no specific flags and not help
   } // Closing brace for the if statement
   return flags;
@@ -59,7 +56,6 @@ Usage: node dist/scripts/clear-migration-tables.js [options]
 Options:
   --server          Clear server's own migration history (public.migrations on PostgreSQL)
   --published       Clear published client migrations list (public.client_migration on PostgreSQL)
-  --lite-local      Clear local PGlite instance's migration history (public.migrations on PGlite)
   --all             Clear all above migration tables (default if no other option is specified)
   --help            Show this help message
   `);
@@ -85,11 +81,6 @@ async function runClearOperations(): Promise<void> {
     operationAttempted = true;
   }
 
-  if (flags.liteLocal || flags.all) {
-    await clearTable(clientDataSource, 'public.migrations', "local PGlite history (public.migrations)");
-    operationAttempted = true;
-  }
-
   if (!operationAttempted) {
     console.log("No valid operations specified. Use --help for options.");
   }
@@ -108,10 +99,6 @@ async function runClearOperations(): Promise<void> {
     if (serverDataSource.isInitialized) {
       await serverDataSource.destroy();
       console.log('Server datasource destroyed.');
-    }
-    if (clientDataSource.isInitialized) {
-      await clientDataSource.destroy();
-      console.log('Client datasource destroyed.');
     }
   }
 })();
