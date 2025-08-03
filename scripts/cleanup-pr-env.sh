@@ -13,13 +13,29 @@ echo "   PR Number: ${PR_NUMBER:-"main"}"
 if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
     # Stop PR-specific containers
     if [ -f "docker-compose.pr-${PR_NUMBER}.yml" ]; then
-        echo "   Stopping PR-specific containers..."
-        docker-compose -f docker-compose.pr-${PR_NUMBER}.yml down
+        echo "   Stopping PR-specific containers and removing volumes..."
+        docker compose -f docker-compose.pr-${PR_NUMBER}.yml down -v
         
         echo "   Removing PR-specific docker-compose file..."
         rm docker-compose.pr-${PR_NUMBER}.yml
     else
-        echo "   No PR-specific containers found"
+        echo "   No PR-specific docker-compose file found"
+        
+        # Try to clean up containers directly if compose file is missing
+        echo "   Checking for orphaned PR containers..."
+        
+        # Stop and remove containers
+        docker ps -a --format "{{.Names}}" | grep -E "vibestack-(postgres|neon-proxy)-${PR_NUMBER}" | while read container; do
+            echo "   Stopping container: $container"
+            docker stop "$container" 2>/dev/null || true
+            docker rm "$container" 2>/dev/null || true
+        done
+        
+        # Remove volumes
+        docker volume ls --format "{{.Name}}" | grep -E "(issue-${PR_NUMBER}|pr.*${PR_NUMBER})" | while read volume; do
+            echo "   Removing volume: $volume"
+            docker volume rm "$volume" 2>/dev/null || true
+        done
     fi
     
     # Clean up generated configs
