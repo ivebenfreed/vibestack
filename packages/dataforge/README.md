@@ -31,19 +31,6 @@ A powerful data layer factory that forges the foundation of VibeStack's data arc
 
 ## Quick Start
 
-### Environment Setup
-
-DataForge supports both local and remote database development:
-
-```bash
-# Check current environment
-pnpm env:status
-
-# Switch between environments
-pnpm env:use:local   # Use local PostgreSQL
-pnpm env:use:remote  # Use remote/cloud database
-```
-
 ### Development Workflow
 
 1. Define your schema in `src/entities/`
@@ -59,12 +46,11 @@ For a streamlined entity update experience:
 # Semi-automated (recommended for complex changes)
 pnpm entity:update
 
-# Fully automated with confirmation
+# Fully automated with confirmation (runs on both databases)
 pnpm entity:update:full
 
-# Target specific environment
-pnpm entity:update:local       # Force local DB
-pnpm entity:update:remote      # Force remote DB
+# Skip confirmation
+pnpm entity:update:full --yes
 ```
 
 ## Architecture

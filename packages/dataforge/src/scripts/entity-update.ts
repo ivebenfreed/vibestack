@@ -8,14 +8,8 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Check if specific env is requested via DB_TARGET
-const dbTarget = process.env.DB_TARGET || 'local'; // default to local
-const envFile = dbTarget === 'remote' ? '.env.development.remote' : '.env.development.local';
-
-// Load environment
-const envPath = path.resolve(__dirname, `../../${envFile}`);
-console.log(`Loading environment from: ${envFile}`);
-config({ path: envPath });
+// Load default development environment
+config({ path: path.resolve(__dirname, '../../.env.development') });
 
 // Get command line args
 const args = process.argv.slice(2);
@@ -23,14 +17,9 @@ const isFullUpdate = args.includes('--full');
 const skipConfirmation = args.includes('--yes') || args.includes('-y');
 const migrationName = args.find(arg => !arg.startsWith('--') && !arg.startsWith('-')) || 'EntityUpdate';
 
-// Detect database type from environment
-const databaseUrl = process.env.DATABASE_URL || '';
-const dbEnv = process.env.DB_ENV || 'local';
-const isLocalDb = dbEnv === 'local' || databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
-
 console.log('🔨 Entity Update Workflow');
 console.log('========================');
-console.log(`📍 Target: ${dbTarget === 'remote' ? 'Remote/Cloud Database' : 'Local Database'}`);
+console.log('📍 Target: Both Local and Remote Databases');
 
 try {
   // Step 1: Run forge:build
@@ -41,20 +30,19 @@ try {
     // Semi-automated mode - just remind about next steps
     console.log('\n✅ Code generation complete!');
     console.log('\n⚠️  IMPORTANT: Now run:');
-    console.log(`1. pnpm migration:generate:${isLocalDb ? 'local' : 'server'} -- src/migrations/${isLocalDb ? 'server-local' : 'server'}/YourMigrationName`);
+    console.log(`1. pnpm migration:generate:server src/migrations/server/YourMigrationName`);
     console.log('2. Review the generated migration file');
-    console.log(`3. pnpm migration:run:${isLocalDb ? 'local' : 'server'}`);
-    
-    if (isLocalDb) {
-      console.log('\n📍 Note: Using local database configuration');
-    } else {
-      console.log('\n☁️  Note: Using cloud database configuration');
-    }
+    console.log('3. Run migrations on both databases:');
+    console.log('   pnpm migration:run:local    # Local database');
+    console.log('   pnpm migration:run:server   # Remote database');
+    console.log('\n💡 Tip: In development, always run migrations on both databases to keep them in sync!');
   } else {
     // Full automated mode
     console.log('\n🔄 Step 2: Generating migration...');
-    const migrationDir = isLocalDb ? 'server-local' : 'server';
-    const generateCmd = `pnpm migration:generate:${isLocalDb ? 'local' : 'server'} src/migrations/${migrationDir}/${migrationName}`;
+    
+    // In development, always generate for both local and server
+    const migrationDir = 'server';
+    const generateCmd = `pnpm migration:generate:server src/migrations/${migrationDir}/${migrationName}`;
     
     try {
       execSync(generateCmd, { stdio: 'inherit' });
@@ -65,22 +53,29 @@ try {
       const latestMigration = files
         .filter(f => f.endsWith('.ts') && f.includes(migrationName))
         .sort()
-        .pop();
+        .pop() || null;
       
       if (latestMigration) {
         console.log(`\n📄 Generated migration: ${latestMigration}`);
         
         if (skipConfirmation) {
-          console.log('\n🚀 Step 3: Running migration (auto-confirmed)...');
-          execSync(`pnpm migration:run:${isLocalDb ? 'local' : 'server'}`, { stdio: 'inherit' });
-          console.log('\n✅ Entity update complete!');
+          console.log('\n🚀 Step 3: Running migrations on both databases (auto-confirmed)...');
+          
+          // Run on both local and remote in development
+          console.log('\n📍 Running on local database...');
+          execSync('pnpm migration:run:local', { stdio: 'inherit' });
+          
+          console.log('\n☁️  Running on remote database...');
+          execSync('pnpm migration:run:server', { stdio: 'inherit' });
+          
+          console.log('\n✅ Entity update complete on both databases!');
           process.exit(0);
         } else {
           console.log('\n⚠️  WARNING: Please review the migration before proceeding!');
           console.log(`   File: src/migrations/${migrationDir}/${latestMigration}`);
           
           // Ask for confirmation
-          console.log('\n❓ Run this migration? (y/N): ');
+          console.log('\n❓ Run this migration on both local and remote databases? (y/N): ');
           
           // Simple stdin reader for confirmation
           const readline = require('readline').createInterface({
@@ -92,12 +87,20 @@ try {
             readline.close();
             
             if (answer.toLowerCase() === 'y') {
-              console.log('\n🚀 Step 3: Running migration...');
-              execSync(`pnpm migration:run:${isLocalDb ? 'local' : 'server'}`, { stdio: 'inherit' });
-              console.log('\n✅ Entity update complete!');
+              console.log('\n🚀 Step 3: Running migrations on both databases...');
+              
+              // Run on both local and remote in development
+              console.log('\n📍 Running on local database...');
+              execSync('pnpm migration:run:local', { stdio: 'inherit' });
+              
+              console.log('\n☁️  Running on remote database...');
+              execSync('pnpm migration:run:server', { stdio: 'inherit' });
+              
+              console.log('\n✅ Entity update complete on both databases!');
             } else {
-              console.log('\n⏭️  Skipped migration run. You can run it later with:');
-              console.log(`   pnpm migration:run:${isLocalDb ? 'local' : 'server'}`);
+              console.log('\n⏭️  Skipped migration run. You can run them later with:');
+              console.log('   pnpm migration:run:local    # For local database');
+              console.log('   pnpm migration:run:server   # For remote database');
             }
             
             process.exit(0);

@@ -65,37 +65,17 @@ DataForge is the data layer factory for VibeStack that generates schemas, types,
 
 ### Development Environments
 
-DataForge now supports easy switching between local and remote/cloud databases:
+DataForge maintains two development database configurations:
 
-- **`.env.development.local`** - Local PostgreSQL configuration
-- **`.env.development.remote`** - Remote/Neon cloud database configuration
-- **`.env.development`** - Symlink pointing to the active environment
+- **`.env.development`** - Primary development configuration (typically points to remote/Neon)
+- **`.env.local`** - Local PostgreSQL configuration (used by migration:*:local commands)
 
-### Environment Commands
+### Development Philosophy
 
-```bash
-# Switch between environments
-pnpm env:use:local   # Switch to local PostgreSQL
-pnpm env:use:remote  # Switch to remote/cloud database
-pnpm env:status      # Check which environment is active
-
-# Entity update with explicit target
-pnpm entity:update:local       # Use local DB (semi-automated)
-pnpm entity:update:local:full  # Use local DB (fully automated)
-pnpm entity:update:remote      # Use remote DB (semi-automated)
-pnpm entity:update:remote:full # Use remote DB (fully automated)
-
-# Standard commands (use currently active environment)
-pnpm entity:update       # Semi-automated with active env
-pnpm entity:update:full  # Fully automated with active env
-```
-
-### Environment Selection
-
-The entity update commands detect the target database in this order:
-1. **DB_TARGET** environment variable (set by `:local` or `:remote` scripts)
-2. **DB_ENV** from loaded .env file (`local` or `remote`)
-3. **DATABASE_URL** inspection (fallback detection)
+In development, we always keep both local and remote databases in sync. When making entity changes:
+- Migrations are generated once (using remote schema)
+- Migrations are run on BOTH databases automatically
+- This ensures consistency across all development environments
 
 ## Important Commands
 
@@ -155,16 +135,14 @@ When making any changes to entities (adding new entities, modifying fields, chan
 ```bash
 # Option 1: Semi-automated (recommended)
 # Rebuilds everything and reminds you about migrations
-# Auto-detects local vs cloud database
 pnpm entity:update
 
 # Option 2: Fully automated with confirmation
-# Rebuilds, generates migration, asks for confirmation, then runs it
-# Auto-detects local vs cloud database
+# Rebuilds, generates migration, asks for confirmation, then runs on BOTH databases
 pnpm entity:update:full
 
 # Option 3: Fully automated without confirmation (use with caution!)
-# Rebuilds, generates migration, and runs it immediately
+# Rebuilds, generates migration, and runs on both databases immediately
 pnpm entity:update:full --yes
 
 # Option 4: With custom migration name
@@ -175,7 +153,10 @@ pnpm entity:update:full AddPriorityToTask --yes  # Skip confirmation
 # Follow the detailed workflow below
 ```
 
-The `entity:update` commands automatically detect whether you're using a local database (localhost) or cloud database (Neon) based on your `.env.development` file and run the appropriate migration commands.
+The `entity:update:full` command ensures both your local and remote databases stay in sync by:
+1. Generating a single migration from the remote schema
+2. Running the migration on BOTH local and remote databases
+3. This prevents schema drift between development environments
 
 #### 1. Make Entity Changes
 ```bash
