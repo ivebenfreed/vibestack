@@ -54,10 +54,9 @@ fi
 echo "   ⏳ Waiting for PostgreSQL to be ready..."
 sleep 5
 
-# Step 3: Run migrations
+# Step 3: Database setup will be handled by pnpm dev:local
 echo ""
-echo "3️⃣ Running database migrations..."
-pnpm forge:migrate:local
+echo "3️⃣ Database setup will be handled automatically by pnpm dev:local"
 
 # Step 4: Clone production data (optional)
 if [ -n "$REMOTE_DATABASE_URL" ]; then
