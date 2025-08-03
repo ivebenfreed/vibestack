@@ -32,12 +32,13 @@ if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
     DB_PORT=$((5432 + PR_NUMBER * 10))
     PROXY_PORT=$((4444 + PR_NUMBER * 10))
     
-    # Generate PR-specific docker-compose with unique container names
+    # Generate PR-specific docker-compose with unique container names and volumes
     sed -e "s/\"5432:5432\"/\"${DB_PORT}:5432\"/g" \
         -e "s/\"4444:4444\"/\"${PROXY_PORT}:4444\"/g" \
         -e "s/vibestack-postgres/vibestack-postgres-pr-${PR_NUMBER}/g" \
         -e "s/vibestack-neon-proxy/vibestack-neon-proxy-pr-${PR_NUMBER}/g" \
         -e "s/vibestack_dev/vibestack_dev_issue_${PR_NUMBER}/g" \
+        -e "s/postgres_data:/postgres_data_pr_${PR_NUMBER}:/g" \
         docker-compose.yml > docker-compose.pr-${PR_NUMBER}.yml
     
     echo "   Using ports: DB=${DB_PORT}, Proxy=${PROXY_PORT}"
@@ -58,19 +59,13 @@ sleep 5
 echo ""
 echo "3️⃣ Database setup will be handled automatically by pnpm dev:local"
 
-# Step 4: Clone production data (optional)
+# Step 4: Clone production data automatically if available
 if [ -n "$REMOTE_DATABASE_URL" ]; then
     echo ""
-    echo "4️⃣ Cloning production data..."
+    echo "4️⃣ Cloning production data automatically..."
     echo "   This will replace all local data with current production data."
-    read -p "   Continue? (y/N): " -n 1 -r
-    echo
     
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        REMOTE_DATABASE_URL="$REMOTE_DATABASE_URL" LOCAL_DATABASE_URL="$LOCAL_DB_URL" node scripts/clone-remote-data.js
-    else
-        echo "   ⏭️  Skipping data clone (you can run it later)"
-    fi
+    REMOTE_DATABASE_URL="$REMOTE_DATABASE_URL" LOCAL_DATABASE_URL="$LOCAL_DB_URL" node scripts/clone-remote-data.js
 else
     echo ""
     echo "4️⃣ Skipping data clone (REMOTE_DATABASE_URL not found)"
