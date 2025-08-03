@@ -249,23 +249,70 @@ class BranchDbConfigurator {
         }
       }
       
-      console.log('   📦 Cloning database from main...');
-      
       // Create the database if it doesn't exist
       execSync(`docker exec vibestack-postgres-${config.prNumber} psql -U postgres -c "CREATE DATABASE ${config.dbName}" || true`, {
         stdio: 'pipe'
       });
       
-      // Use pg_dump to export from main and pipe to branch database
-      const dumpCommand = `docker exec vibestack-postgres pg_dump -U postgres vibestack_dev`;
-      const restoreCommand = `docker exec -i vibestack-postgres-${config.prNumber} psql -U postgres ${config.dbName}`;
+      // Check if main database containers are running
+      let mainDbAvailable = false;
+      try {
+        execSync('docker ps | grep -q vibestack-postgres', { stdio: 'pipe' });
+        // Check if main database has data
+        const mainUserCount = parseInt(execSync('docker exec vibestack-postgres psql -U postgres -d vibestack_dev -c "SELECT COUNT(*) FROM users;" -t 2>/dev/null', { 
+          encoding: 'utf8', 
+          stdio: 'pipe' 
+        }).trim());
+        mainDbAvailable = mainUserCount > 0;
+      } catch (e) {
+        mainDbAvailable = false;
+      }
       
-      execSync(`${dumpCommand} | ${restoreCommand}`, {
-        stdio: 'inherit',
-        shell: true
-      });
-      
-      console.log('   ✅ Database cloned successfully');
+      if (mainDbAvailable) {
+        console.log('   📦 Cloning database from main...');
+        
+        // Use pg_dump to export from main and pipe to branch database
+        const dumpCommand = `docker exec vibestack-postgres pg_dump -U postgres vibestack_dev`;
+        const restoreCommand = `docker exec -i vibestack-postgres-${config.prNumber} psql -U postgres ${config.dbName}`;
+        
+        execSync(`${dumpCommand} | ${restoreCommand}`, {
+          stdio: 'inherit',
+          shell: true
+        });
+        
+        console.log('   ✅ Database cloned successfully from main');
+      } else {
+        console.log('   ⚠️  Main database not available or empty, attempting to clone from remote...');
+        
+        // Try to get remote database URL from .dev.vars
+        const devVarsPath = path.join(gitRoot, 'apps/server/.dev.vars');
+        if (!fs.existsSync(devVarsPath)) {
+          console.log('   ❌ No .dev.vars file found, skipping remote clone');
+          return;
+        }
+        
+        const devVarsContent = fs.readFileSync(devVarsPath, 'utf8');
+        const databaseUrlMatch = devVarsContent.match(/DATABASE_URL=(.+)/);
+        
+        if (!databaseUrlMatch) {
+          console.log('   ❌ No DATABASE_URL found in .dev.vars, skipping remote clone');
+          return;
+        }
+        
+        const remoteDatabaseUrl = databaseUrlMatch[1].trim();
+        console.log('   🌐 Found remote database URL, cloning from production...');
+        
+        // Use the clone-remote-data.js script
+        const cloneScriptPath = path.join(gitRoot, 'scripts/clone-remote-data.js');
+        const localDatabaseUrl = `postgresql://postgres:postgres@localhost:${config.postgresPort}/${config.dbName}`;
+        
+        execSync(`REMOTE_DATABASE_URL="${remoteDatabaseUrl}" LOCAL_DATABASE_URL="${localDatabaseUrl}" node ${cloneScriptPath}`, {
+          stdio: 'inherit',
+          shell: true
+        });
+        
+        console.log('   ✅ Database cloned successfully from remote');
+      }
     } catch (error) {
       console.error('   ❌ Failed to clone database:', error.message);
       throw error;
