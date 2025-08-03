@@ -14,7 +14,7 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
+    "SessionStart": [
       {
         "hooks": [
           {
