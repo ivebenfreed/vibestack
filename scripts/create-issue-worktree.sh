@@ -125,6 +125,16 @@ echo "   🔄 Running pnpm install..."
 pnpm install
 
 echo ""
+echo "2.1️⃣ Ensuring Claude configuration is synced..."
+# Explicitly sync Claude config in case postinstall didn't work
+if [ -f "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" ]; then
+    "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD"
+    echo "   ✅ Claude configuration synced with database info"
+else
+    echo "   ⚠️ Could not sync Claude config - sync script not found"
+fi
+
+echo ""
 echo "2.5️⃣ Updating package.json with issue number..."
 echo "   📝 Adding issue-${ISSUE_NUMBER} to package name..."
 

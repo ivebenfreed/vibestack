@@ -1,15 +1,5 @@
 # CLAUDE.md
 
-## Current Worktree Configuration
-
-**This is PR #3 worktree with the following ports:**
-
-- Web application: `http://localhost:5203`
-- Server API: `http://localhost:8817`
-- Database: `postgres://postgres:postgres@localhost:5462/vibestack_dev_issue_3`
-- Proxy: Port 4484
-
-
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Development Standards

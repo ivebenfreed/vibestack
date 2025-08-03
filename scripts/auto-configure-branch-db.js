@@ -118,8 +118,9 @@ class BranchDbConfigurator {
     const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
     const baseCompose = fs.readFileSync(path.join(gitRoot, 'docker-compose.yml'), 'utf8');
     
-    // Replace ports and container names
+    // Replace ports and container names, and remove obsolete version
     const branchCompose = baseCompose
+      .replace(/version: ['"]?3\.\d+['"]?\s*\n/g, '')  // Remove version line
       .replace(/5432:5432/g, `${config.postgresPort}:5432`)
       .replace(/4444:4444/g, `${config.neonProxyPort}:4444`)
       .replace(/vibestack-postgres/g, `vibestack-postgres-${config.prNumber}`)
