@@ -279,8 +279,8 @@ export function createNewPGliteDataSource(options: NewPGliteDataSourceOptions): 
 
 // DEPRECATED: This singleton is replaced by the global datasource manager
 // Keeping for backward compatibility but delegating to global implementation
-let dataSource: NewPGliteDataSource | null = null;
-let initializationPromise: Promise<NewPGliteDataSource> | null = null;
+const dataSource: NewPGliteDataSource | null = null;
+const initializationPromise: Promise<NewPGliteDataSource> | null = null;
 
 export async function getNewPGliteDataSource(
     config?: NewPGliteDataSourceOptions

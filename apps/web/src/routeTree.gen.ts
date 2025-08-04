@@ -46,11 +46,13 @@ import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authentic
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedDebugVibeganttTestImport } from './routes/_authenticated/debug/vibegantt-test'
 import { Route as AuthenticatedDebugVibeganttImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugJunctionTablesImport } from './routes/_authenticated/debug/junction-tables'
+import { Route as AuthenticatedDebugGanttTestDataImport } from './routes/_authenticated/debug/gantt-test-data'
 import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authenticated/settings/admin.users'
 
 // Create Virtual Routes
@@ -318,6 +320,13 @@ const AuthenticatedProjectsProjectIdRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
+const AuthenticatedDebugVibeganttTestRoute =
+  AuthenticatedDebugVibeganttTestImport.update({
+    id: '/vibegantt-test',
+    path: '/vibegantt-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 const AuthenticatedDebugVibeganttRoute =
   AuthenticatedDebugVibeganttImport.update({
     id: '/vibegantt',
@@ -349,6 +358,13 @@ const AuthenticatedDebugJunctionTablesRoute =
   AuthenticatedDebugJunctionTablesImport.update({
     id: '/junction-tables',
     path: '/junction-tables',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
+const AuthenticatedDebugGanttTestDataRoute =
+  AuthenticatedDebugGanttTestDataImport.update({
+    id: '/gantt-test-data',
+    path: '/gantt-test-data',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
@@ -496,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/debug/gantt-test-data': {
+      id: '/_authenticated/debug/gantt-test-data'
+      path: '/gantt-test-data'
+      fullPath: '/debug/gantt-test-data'
+      preLoaderRoute: typeof AuthenticatedDebugGanttTestDataImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/junction-tables': {
       id: '/_authenticated/debug/junction-tables'
       path: '/junction-tables'
@@ -529,6 +552,13 @@ declare module '@tanstack/react-router' {
       path: '/vibegantt'
       fullPath: '/debug/vibegantt'
       preLoaderRoute: typeof AuthenticatedDebugVibeganttImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
+    '/_authenticated/debug/vibegantt-test': {
+      id: '/_authenticated/debug/vibegantt-test'
+      path: '/vibegantt-test'
+      fullPath: '/debug/vibegantt-test'
+      preLoaderRoute: typeof AuthenticatedDebugVibeganttTestImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
     '/_authenticated/projects/$projectId': {
@@ -670,11 +700,13 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
   AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
+  AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -684,6 +716,7 @@ interface AuthenticatedDebugRouteRouteChildren {
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
+    AuthenticatedDebugGanttTestDataRoute: AuthenticatedDebugGanttTestDataRoute,
     AuthenticatedDebugJunctionTablesRoute:
       AuthenticatedDebugJunctionTablesRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
@@ -692,6 +725,7 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
     AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
+    AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
@@ -780,11 +814,13 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
+  '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -823,11 +859,13 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
+  '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -870,11 +908,13 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
+  '/_authenticated/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -918,11 +958,13 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
+    | '/debug/vibegantt-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -960,11 +1002,13 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
+    | '/debug/vibegantt-test'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -1005,11 +1049,13 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
+    | '/_authenticated/debug/gantt-test-data'
     | '/_authenticated/debug/junction-tables'
     | '/_authenticated/debug/kanban'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/vibegantt'
+    | '/_authenticated/debug/vibegantt-test'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -1118,11 +1164,13 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/debug/route.tsx",
       "parent": "/_authenticated",
       "children": [
+        "/_authenticated/debug/gantt-test-data",
         "/_authenticated/debug/junction-tables",
         "/_authenticated/debug/kanban",
         "/_authenticated/debug/reactflow-positioning",
         "/_authenticated/debug/state-machine-test",
         "/_authenticated/debug/vibegantt",
+        "/_authenticated/debug/vibegantt-test",
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
@@ -1191,6 +1239,10 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/index.tsx",
       "parent": "/_authenticated"
     },
+    "/_authenticated/debug/gantt-test-data": {
+      "filePath": "_authenticated/debug/gantt-test-data.tsx",
+      "parent": "/_authenticated/debug"
+    },
     "/_authenticated/debug/junction-tables": {
       "filePath": "_authenticated/debug/junction-tables.tsx",
       "parent": "/_authenticated/debug"
@@ -1209,6 +1261,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/vibegantt": {
       "filePath": "_authenticated/debug/vibegantt.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/vibegantt-test": {
+      "filePath": "_authenticated/debug/vibegantt-test.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/projects/$projectId": {

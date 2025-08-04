@@ -48,6 +48,10 @@ export const DEFAULT_DELETION_STRATEGIES = {
     comments: {
       foreignKeyStrategy: 'CASCADE', // Delete task comments
       junctionStrategy: 'CASCADE'
+    },
+    entity_dependencies: {
+      foreignKeyStrategy: 'CASCADE', // Delete entity dependencies when task is deleted
+      junctionStrategy: 'CASCADE'
     }
   } as Record<string, DeletionStrategy>
 } as const;
@@ -120,7 +124,7 @@ export const DELETION_PERFORMANCE_CONFIG = {
  * Helper function to get deletion strategy for a specific scenario
  */
 export function getDeletionStrategy(
-  entityType: 'users' | 'projects' | 'tasks',
+  entityType: 'users' | 'projects' | 'tasks' | 'entity_dependencies',
   customStrategies?: Record<string, DeletionStrategy>
 ): Record<string, DeletionStrategy> {
   switch (entityType) {
@@ -130,6 +134,8 @@ export function getDeletionStrategy(
       return { ...DEFAULT_DELETION_STRATEGIES.projectDeletion, ...customStrategies };
     case 'tasks':
       return { ...DEFAULT_DELETION_STRATEGIES.taskDeletion, ...customStrategies };
+    case 'entity_dependencies':
+      return { default: DEFAULT_DELETION_STRATEGIES.default, ...customStrategies };
     default:
       return { default: DEFAULT_DELETION_STRATEGIES.default, ...customStrategies };
   }

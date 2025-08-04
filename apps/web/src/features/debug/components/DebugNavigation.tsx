@@ -11,6 +11,8 @@ export function DebugNavigation() {
     { path: '/debug/state-machine-test', label: 'State Machine Test' },
     { path: '/debug/query-test', label: 'Query Test' },
     { path: '/debug/reactflow-positioning', label: 'React Flow Positioning' },
+    { path: '/debug/vibegantt', label: 'VibeGantt' },
+    { path: '/debug/gantt-test-data', label: 'Gantt Test Data' },
   ];
   
   return (

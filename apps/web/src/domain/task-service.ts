@@ -367,3 +367,9 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     return taskDexieService.resolveAssignee_id(assigneeId);
   }
 }
+
+// ============================================================================
+// Service Instance
+// ============================================================================
+
+export const taskService = new TaskDomainService();

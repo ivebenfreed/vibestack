@@ -3,7 +3,7 @@ import Tasks from '@/features/tasks'
 import { z } from 'zod'
 
 const tasksSearchSchema = z.object({
-  view: z.enum(['table', 'kanban', 'timeline']).optional(),
+  view: z.enum(['table', 'kanban', 'timeline', 'gantt']).optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/tasks/')({

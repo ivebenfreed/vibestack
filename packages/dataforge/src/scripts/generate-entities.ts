@@ -194,8 +194,10 @@ function resolveColumnType(colMeta: MinimalColumnMetadataArgs): string {
 }
 
 async function generateContextEntities() {
+    console.log('generateContextEntities started');
     const filter = new MetadataFilter();
     const entities = await filter.discoverEntities();
+    console.log('entities discovered:', entities.length);
     
     // Ensure generated directory exists
     const generatedDir = path.join(PACKAGE_ROOT, 'src/generated');
@@ -223,26 +225,17 @@ function generateContextOutput(
 ): string {
     // Separate parts of the output
     let headerOutput = `// Generated ${context} entities - DO NOT EDIT\n\n`;
-    let enumImportOutput = '\n// Enum Imports (dynamically generated)\n'; // Placeholder for dynamic imports
-    let enumExportOutput = '\n// Enum Exports\n'; // Placeholder for re-exports
+    let enumDefinitionOutput = '\n// Enum Definitions (embedded)\n'; // For embedded enum definitions
     let classOutput = '\n// Generated Classes (for type checking and validation)\n'; // For generated classes
     let bodyOutput = '\n// Entity Schemas (for TypeORM metadata)\n'; // For schema definitions
     let footerOutput = '\n// Exports\n'; // For final exports like entity arrays
 
     // Base imports (non-dynamic)
     headerOutput += `import { EntitySchema } from 'typeorm';\n`;
-    headerOutput += `import { BaseDomainEntity } from '../entities/BaseDomainEntity.js';\n`;
-    headerOutput += `import { BaseSystemEntity } from '../entities/BaseSystemEntity.js';\n`;
-    // REMOVE static/hardcoded enum imports here
-    // headerOutput += `import { TaskStatus, TaskPriority } from '../entities/Task.js';\n`;
-    // headerOutput += `import { ProjectStatus } from '../entities/Project.js';\n`;
-    // headerOutput += `import { UserRole } from '../entities/User.js';\n`;
-    // headerOutput += `import { MigrationStatus } from '../entities/ClientMigrationStatus.js';\n`;
-    // headerOutput += `import { MigrationType, MigrationState } from '../entities/ClientMigration.js';\n`;
 
     const storage = getMetadataArgsStorage();
     const includedEntityNames: string[] = [];
-    const enumsToImport = new Map<string, Set<string>>(); // Key: path, Value: Set<EnumName>
+    const enumsToEmbed = new Map<string, { values: any, entityName: string, propertyName: string }>(); // Key: enumName, Value: { values, entityName, propertyName }
 
     // Filter entities using the correct helper functions from context.ts
     const validEntities = entities.filter(entity => {
@@ -262,20 +255,25 @@ function generateContextOutput(
         const inheritsBaseDomain = parent?.name === 'BaseDomainEntity';
         const inheritsBaseSystem = parent?.name === 'BaseSystemEntity';
 
-        // Determine extends clause for Class generation
-        let classExtendsClause = '';
-        if (inheritsBaseDomain) classExtendsClause = ` extends BaseDomainEntity`; // Assume Base classes are imported
-        else if (inheritsBaseSystem) classExtendsClause = ` extends BaseSystemEntity`;
-
         // --- Generate Class Definition --- 
         // NO @Entity decorator here
-        classOutput += `export class ${entityName}${classExtendsClause} {\n`;
+        classOutput += `export class ${entityName} {\n`;
+
+        // Add base class properties if inheriting
+        if (inheritsBaseSystem || inheritsBaseDomain) {
+            classOutput += `  id!: string;\n\n`;
+            classOutput += `  createdAt!: Date;\n\n`;
+            classOutput += `  updatedAt!: Date;\n\n`;
+            if (inheritsBaseDomain) {
+                classOutput += `  clientId?: string;\n\n`;
+            }
+        }
 
         // Add properties to the class based on filtered columns
         columns.forEach(col => {
             const propertyName = col.propertyName;
             // Skip manually added base columns
-            if (['id', 'createdAt'/*, 'clientId'*/].includes(propertyName) && (inheritsBaseDomain || inheritsBaseSystem)) {
+            if (['id', 'createdAt', 'updatedAt', 'clientId'].includes(propertyName) && (inheritsBaseDomain || inheritsBaseSystem)) {
                  return;
             }
 
@@ -488,13 +486,16 @@ function generateContextOutput(
                                 resolvedImportPath = `../entities/${entityName}.js`; // This already has .js
                             }
 
-                            // Keep import paths as-is - the source files need ../entities/ since generated files are in src/generated/
-                            // The tsup build will handle flattening the structure appropriately
-
-                            if (!enumsToImport.has(resolvedImportPath)) {
-                                enumsToImport.set(resolvedImportPath, new Set<string>());
+                            // Instead of tracking imports, store the enum values for embedding
+                            // Get the actual enum values from the options
+                            const enumValues = originalColumnMeta.options?.enum;
+                            if (enumValues && !enumsToEmbed.has(enumIdentifier)) {
+                                enumsToEmbed.set(enumIdentifier, {
+                                    values: enumValues,
+                                    entityName: entityName,
+                                    propertyName: propertyName
+                                });
                             }
-                            enumsToImport.get(resolvedImportPath)!.add(enumIdentifier);
 
                         } else {
                             const errorMessage = `ERROR: Could not determine enum name via @EnumTypeName decorator for enum column ${entityName}.${propertyName}. This decorator is required for 'enum' type columns.`;
@@ -729,17 +730,25 @@ function generateContextOutput(
         bodyOutput += `});\n\n`; // End EntitySchema definition
     });
 
-    // Generate Enum Import Block AND Re-Export Block
-    for (const [resolvedImportPath, enumNames] of enumsToImport.entries()) {
-        if (enumNames.size > 0) {
-            const importList = Array.from(enumNames).sort().join(', ');
-            enumImportOutput += `import { ${importList} } from '${resolvedImportPath}';\n`;
-            // Add re-export statement
-            enumExportOutput += `export { ${importList} } from '${resolvedImportPath}';\n`;
+    // Generate Enum Definitions (embedded instead of imported)
+    for (const [enumName, enumInfo] of enumsToEmbed.entries()) {
+        // Check if the enum values are an object (TypeScript enum) or array
+        if (typeof enumInfo.values === 'object' && !Array.isArray(enumInfo.values)) {
+            // TypeScript enum object - generate as const enum
+            enumDefinitionOutput += `export enum ${enumName} {\n`;
+            for (const [key, value] of Object.entries(enumInfo.values)) {
+                // Skip numeric keys for reverse mapping in numeric enums
+                if (!isNaN(Number(key))) continue;
+                enumDefinitionOutput += `  ${key} = ${typeof value === 'string' ? `'${value}'` : value},\n`;
+            }
+            enumDefinitionOutput += `}\n\n`;
+        } else if (Array.isArray(enumInfo.values)) {
+            // Array of values - generate as string literal union type
+            const values = enumInfo.values.map(v => `'${v}'`).join(' | ');
+            enumDefinitionOutput += `export type ${enumName} = ${values};\n\n`;
         }
     }
-    enumImportOutput += '\n'; // Add newline after imports
-    enumExportOutput += '\n'; // Add newline after exports
+    enumDefinitionOutput += '\n'; // Add newline after definitions
 
     // Generate Footer Content (Exports etc.)
     footerOutput += `// Export entity class array for TypeORM\n`;
@@ -865,8 +874,8 @@ function generateContextOutput(
     const relationshipConfigOutput = generateRelationshipConfigs(validEntities, filter, context);
     footerOutput += relationshipConfigOutput;
 
-    // Combine all parts (include enumExportOutput)
-    return headerOutput + enumImportOutput + enumExportOutput + classOutput + bodyOutput + footerOutput;
+    // Combine all parts (include enumDefinitionOutput instead of imports/exports)
+    return headerOutput + enumDefinitionOutput + classOutput + bodyOutput + footerOutput;
 }
 
 /**

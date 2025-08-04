@@ -1,25 +1,59 @@
 // Generated client entities - DO NOT EDIT
 
 import { EntitySchema } from 'typeorm';
-import { BaseDomainEntity } from '../entities/BaseDomainEntity.js';
-import { BaseSystemEntity } from '../entities/BaseSystemEntity.js';
 
-// Enum Imports (dynamically generated)
-import { MigrationStatus } from '../entities/ClientMigrationStatus.js';
-import { ProjectStatus } from '../entities/Project.js';
-import { TaskPriority, TaskStatus } from '../entities/Task.js';
-import { UserRole } from '../entities/User.js';
+// Enum Definitions (embedded)
+export enum MigrationStatus {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  ROLLED_BACK = 'rolled_back',
+}
 
+export enum DependencyType {
+  FINISH_TO_START = 'finish-to-start',
+  START_TO_START = 'start-to-start',
+  FINISH_TO_FINISH = 'finish-to-finish',
+  START_TO_FINISH = 'start-to-finish',
+}
 
-// Enum Exports
-export { MigrationStatus } from '../entities/ClientMigrationStatus.js';
-export { ProjectStatus } from '../entities/Project.js';
-export { TaskPriority, TaskStatus } from '../entities/Task.js';
-export { UserRole } from '../entities/User.js';
+export enum ProjectStatus {
+  ACTIVE = 'active',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  ON_HOLD = 'on_hold',
+}
+
+export enum TaskStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+}
+
+export enum TaskPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
+export enum UserRole {
+  ADMIN = 'admin',
+  MEMBER = 'member',
+  VIEWER = 'viewer',
+  SUPER_ADMIN = 'super_admin',
+}
+
 
 
 // Generated Classes (for type checking and validation)
-export class ClientMigrationStatus extends BaseSystemEntity {
+export class ClientMigrationStatus {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   migrationName!: string;
 
   schemaVersion!: string;
@@ -38,7 +72,15 @@ export class ClientMigrationStatus extends BaseSystemEntity {
 
 }
 
-export class Comment extends BaseDomainEntity {
+export class Comment {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   content!: string;
 
   authorId?: string;
@@ -59,7 +101,40 @@ export class Comment extends BaseDomainEntity {
 
 }
 
-export class LocalChanges extends BaseSystemEntity {
+export class EntityDependency {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
+  entityType!: string;
+
+  predecessorId!: string;
+
+  successorId!: string;
+
+  type!: DependencyType;
+
+  lagTime?: any;
+
+  lagDays?: number;
+
+  metadata?: any;
+
+  description?: string;
+
+}
+
+export class LocalChanges {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   table!: string;
 
   operation!: string;
@@ -69,8 +144,6 @@ export class LocalChanges extends BaseSystemEntity {
   lsn!: string;
 
   clientSequence?: string;
-
-  updatedAt!: Date;
 
   processedSync!: number;
 
@@ -82,7 +155,15 @@ export class LocalChanges extends BaseSystemEntity {
 
 }
 
-export class Project extends BaseDomainEntity {
+export class Project {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   name!: string;
 
   description?: string;
@@ -103,7 +184,15 @@ export class Project extends BaseDomainEntity {
 
 }
 
-export class StatusDefinition extends BaseDomainEntity {
+export class StatusDefinition {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   statusSetId!: string;
 
   name!: string;
@@ -136,7 +225,15 @@ export class StatusDefinition extends BaseDomainEntity {
 
 }
 
-export class StatusSet extends BaseDomainEntity {
+export class StatusSet {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   name!: string;
 
   entityType!: string;
@@ -159,8 +256,12 @@ export class StatusSet extends BaseDomainEntity {
 
 }
 
-export class SyncMetadata extends BaseSystemEntity {
-  clientId!: string;
+export class SyncMetadata {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
 
   currentLsn!: string;
 
@@ -172,7 +273,15 @@ export class SyncMetadata extends BaseSystemEntity {
 
 }
 
-export class Tag extends BaseDomainEntity {
+export class Tag {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   tagSetId!: string;
 
   name!: string;
@@ -207,7 +316,15 @@ export class Tag extends BaseDomainEntity {
 
 }
 
-export class TagSet extends BaseDomainEntity {
+export class TagSet {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   name!: string;
 
   description?: string;
@@ -234,7 +351,15 @@ export class TagSet extends BaseDomainEntity {
 
 }
 
-export class Task extends BaseDomainEntity {
+export class Task {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   title!: string;
 
   description?: string;
@@ -275,7 +400,15 @@ export class Task extends BaseDomainEntity {
 
 }
 
-export class User extends BaseDomainEntity {
+export class User {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   name!: string;
 
   email!: string;
@@ -406,6 +539,63 @@ export const CommentSchema = new EntitySchema<Comment>({
             joinColumn: { name: 'project_id' },
             nullable: true
         }
+    },
+});
+
+// Schema for EntityDependency
+export const EntityDependencySchema = new EntitySchema<EntityDependency>({
+    target: EntityDependency, // Link to generated class
+    name: 'EntityDependency', 
+    tableName: 'entity_dependencies',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        updatedAt: { name: 'updated_at', type: 'timestamptz', updateDate: true },
+        clientId: { name: 'client_id', type: 'uuid', nullable: true },
+        'entityType': {
+            name: 'entity_type', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 50
+        },
+        'predecessorId': {
+            name: 'predecessor_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+        },
+        'successorId': {
+            name: 'successor_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+        },
+        'type': {
+            name: 'dependency_type', // Explicit DB Name
+            type: 'enum', // Use helper
+            default: "finish-to-start",
+            enum: DependencyType, // Use name from decorator
+        },
+        'lagTime': {
+            name: 'lag_time', // Explicit DB Name
+            type: 'interval', // Use helper
+            nullable: true,
+            comment: 'Positive values delay successor, negative values allow overlap'
+        },
+        'lagDays': {
+            name: 'lag_days', // Explicit DB Name
+            type: 'integer', // Use helper
+            nullable: true,
+            comment: 'Lag time in days. Positive = delay, negative = lead time'
+        },
+        'metadata': {
+            name: 'metadata', // Explicit DB Name
+            type: 'jsonb', // Use helper
+            nullable: true,
+            comment: 'Optional entity-specific metadata'
+        },
+        'description': {
+            name: 'description', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
+        }
+    },
+    relations: {
     },
 });
 
@@ -1112,6 +1302,7 @@ export const UserSchema = new EntitySchema<User>({
 export const clientEntities = [
   ClientMigrationStatusSchema,
   CommentSchema,
+  EntityDependencySchema,
   LocalChangesSchema,
   ProjectSchema,
   StatusDefinitionSchema,
@@ -1126,6 +1317,7 @@ export const clientEntities = [
 // domain tables for client context
 export const CLIENT_DOMAIN_TABLES = [
   '"comments"',
+  '"entity_dependencies"',
   '"projects"',
   '"status_definitions"',
   '"status_sets"',
@@ -1148,6 +1340,7 @@ export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
   '"projects"': 1,
   '"tasks"': 2,
   '"comments"': 3,
+  '"entity_dependencies"': 0,
   '"tag_sets"': 0,
   '"tags"': 1,
 } as const;
@@ -1175,6 +1368,7 @@ export const CLIENT_JUNCTION_TABLES = [
 // Combined entity and junction tables for replication tracking
 export const CLIENT_TRACKED_TABLES = [
   '"comments"',
+  '"entity_dependencies"',
   '"projects"',
   '"status_definitions"',
   '"status_sets"',
@@ -1285,6 +1479,9 @@ export const CLIENT_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
         maxDepth: 5,
       },
     ],
+    customValidators: [],
+  },
+  'entitydependencys': {
     customValidators: [],
   },
   'projects': {

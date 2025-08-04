@@ -249,7 +249,6 @@ class BranchDbConfigurator {
           console.log('   📊 Database exists but appears empty, will clone from main');
         }
       }
-      
       // Create the database if it doesn't exist
       execSync(`docker exec vibestack-postgres-${config.prNumber} psql -U postgres -c "CREATE DATABASE ${config.dbName}" || true`, {
         stdio: 'pipe'

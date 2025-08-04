@@ -5,6 +5,7 @@ import { logger } from 'hono/logger'
 import type { ApiEnv } from '../types/api'
 import { projects } from './projects'
 import { tasks } from './tasks'
+import { entityDependencies, taskDependencies } from './entity-dependencies'
 import { users } from './users'
 import { comments } from './comments'
 import { sync } from './sync'
@@ -28,6 +29,8 @@ api.use('*', logger())
 // Mount routes with proper prefixes
 api.route('/projects', projects)
 api.route('/tasks', tasks)
+api.route('/entity-dependencies', entityDependencies)
+api.route('/task-dependencies', taskDependencies) // Backward compatibility
 api.route('/users', users)
 api.route('/comments', comments)
 api.route('/sync', sync)

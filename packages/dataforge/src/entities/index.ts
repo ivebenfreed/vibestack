@@ -16,5 +16,6 @@ export { SyncMetadata } from './SyncMetadata.js';
 export { Tag } from './Tag.js';
 export { TagSet } from './TagSet.js';
 export { Task } from './Task.js';
+export { EntityDependency, DependencyType } from './EntityDependency.js';
 export { User } from './User.js';
 export { Verification } from './Verification.js';
