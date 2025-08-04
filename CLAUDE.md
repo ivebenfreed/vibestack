@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## Current Worktree Configuration
+
+**This is PR #11 worktree with the following ports:**
+
+- Web application: `http://localhost:5283`
+- Server API: `http://localhost:8897`
+- Database: `postgres://postgres:postgres@localhost:5542/vibestack_dev_issue_11`
+- Proxy: Port 4564
+
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## MANDATORY: Automatic tmux Integration

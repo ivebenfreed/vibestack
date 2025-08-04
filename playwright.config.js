@@ -2,6 +2,10 @@
 import { defineConfig } from '@playwright/test';
 import { execSync } from 'child_process';
 import path from 'path';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env.local
+dotenv.config({ path: '.env.local' });
 
 // Detect issue number from branch name or environment
 function getIssueNumber() {
