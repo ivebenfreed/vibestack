@@ -13,7 +13,7 @@ run_check() {
   
   cd "$dir"
   # Run with 30 second timeout
-  timeout 30s npx tsc --noEmit 2>&1 | tee "${HOME}/vibestack/type-check-${name}.log"
+  timeout 30s npx tsc --noEmit > "${HOME}/vibestack/type-check-${name}.log" 2>&1
   local exit_code=$?
   
   if [ $exit_code -eq 124 ]; then
@@ -35,16 +35,35 @@ run_check "dataforge" "${HOME}/vibestack/packages/dataforge"
 # Summary
 echo "=== Summary ==="
 echo
+total_errors=0
 for log in ${HOME}/vibestack/type-check-*.log; do
   if [ -f "$log" ]; then
     name=$(basename "$log" | sed 's/type-check-//;s/.log//')
+    # Skip the errors log file which is from a different purpose
+    if [ "$name" = "errors" ]; then
+      continue
+    fi
+    # Get error count and ensure it's a number
     count=$(grep -c "error TS" "$log" 2>/dev/null || echo "0")
+    count=$(echo "$count" | tr -d '\n\r ' | head -1)  # Clean up any whitespace/newlines and take first line
+    if ! [[ "$count" =~ ^[0-9]+$ ]]; then
+      count="0"  # Default to 0 if not a valid number
+    fi
     echo "$name: $count errors"
+    total_errors=$((total_errors + count))
   fi
 done
 
 echo
-echo "To see specific errors, check the log files:"
-echo "  type-check-server.log"
-echo "  type-check-web.log"
-echo "  type-check-dataforge.log"
+if [ $total_errors -gt 0 ]; then
+  echo "❌ Total: $total_errors type errors found!"
+  echo
+  echo "To see specific errors, check the log files:"
+  echo "  type-check-server.log"
+  echo "  type-check-web.log"
+  echo "  type-check-dataforge.log"
+  exit 1
+else
+  echo "✅ All type checks passed!"
+  exit 0
+fi
