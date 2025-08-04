@@ -975,8 +975,8 @@ export class SyncOperationTests {
         const existingProjects = this.getExistingEntitiesFromTestData(testData, 'projects');
         const existingUsers = this.getExistingEntitiesFromTestData(testData, 'users');
         
-        let projectId = existingProjects.length > 0 ? existingProjects[0].id : undefined;
-        let assigneeId = existingUsers.length > 0 ? existingUsers[0].id : undefined;
+        const projectId = existingProjects.length > 0 ? existingProjects[0].id : undefined;
+        const assigneeId = existingUsers.length > 0 ? existingUsers[0].id : undefined;
         
         return await service.createTask({
           title: `Sync Test Task ${Date.now()}`,

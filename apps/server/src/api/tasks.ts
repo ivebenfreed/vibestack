@@ -59,7 +59,7 @@ tasks.post('/', async (c) => {
     console.error('Error creating task:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }
@@ -151,7 +151,7 @@ tasks.patch('/:id', async (c) => {
     console.error('Error updating task:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }

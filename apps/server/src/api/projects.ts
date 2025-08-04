@@ -69,7 +69,7 @@ projects.post('/', async (c) => {
     console.error('Error creating project:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }
@@ -157,7 +157,7 @@ projects.patch('/:id', async (c) => {
     console.error('Error updating project:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }

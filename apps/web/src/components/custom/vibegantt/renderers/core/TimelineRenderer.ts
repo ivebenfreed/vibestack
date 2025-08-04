@@ -29,7 +29,7 @@ export class TimelineRenderer {
     // Create header div for labels
     this.headerDiv = this.createHeaderDiv();
     
-    // Append elements
+    // Append elements directly to container
     this.container.appendChild(this.canvas);
     this.container.appendChild(this.headerDiv);
   }
@@ -43,6 +43,7 @@ export class TimelineRenderer {
       left: 0;
       width: 100%;
       height: 100%;
+      display: block;
     `;
     return canvas;
   }
@@ -65,12 +66,37 @@ export class TimelineRenderer {
     // Clear previous content
     this.clear();
     
-    // Update time scale engine
-    this.timeScaleEngine.setZoomLevel(options.zoomLevel);
+    // Note: Don't call setZoomLevel here as it's already set in GanttRenderer with proper pixels per day
+    console.log('TimelineRenderer: Rendering with', {
+      zoomLevel: options.zoomLevel,
+      dayWidth: this.timeScaleEngine.getDayWidth(),
+      dateRange: {
+        start: options.dateRange.start.toISOString(),
+        end: options.dateRange.end.toISOString()
+      }
+    });
     
     // Get time units
     const units = this.timeScaleEngine.getTimeUnits(options.dateRange);
     const headerUnits = this.timeScaleEngine.getHeaderUnits(options.dateRange);
+    
+    // Debug: Log rendering details
+    console.log('TimelineRenderer: Units generated', {
+      zoomLevel: options.zoomLevel,
+      unitsCount: units.length,
+      headerUnitsCount: headerUnits.length,
+      firstUnit: units[0]?.label,
+      firstHeader: headerUnits[0]?.label,
+      dateRange: {
+        start: options.dateRange.start.toISOString(),
+        end: options.dateRange.end.toISOString()
+      }
+    });
+    
+    // Debug: Log if no units are generated
+    if (units.length === 0) {
+      console.warn('TimelineRenderer: No units generated for date range:', options.dateRange);
+    }
     
     // Render grid lines
     this.renderGridLines(units, options);
@@ -128,6 +154,14 @@ export class TimelineRenderer {
   ): void {
     // Clear existing labels
     this.headerDiv.innerHTML = '';
+    
+    // Debug: Only log if there are rendering issues
+    if (units.length === 0 || headerUnits.length === 0) {
+      console.warn('TimelineRenderer: Missing units for label rendering', {
+        units: units.length,
+        headerUnits: headerUnits.length
+      });
+    }
     
     // Render header units (top row)
     if (headerUnits.length > 0) {
@@ -261,8 +295,14 @@ export class TimelineRenderer {
   resize(width: number): void {
     if (this.isDestroyed) return;
     
-    // Canvas will be resized on next render
-    this.canvas.style.width = `${width}px`;
+    // Update container width to match the timeline width  
+    this.container.style.width = `${width}px`;
+    
+    // Update viewport width in TimeScaleEngine for pixel calculations
+    this.timeScaleEngine.setViewportWidth(width);
+    
+    // Canvas width is set to 100% so it will automatically adjust
+    // The actual canvas buffer size is set during render
   }
   
   destroy(): void {

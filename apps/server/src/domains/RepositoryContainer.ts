@@ -8,9 +8,10 @@ import { StatusSetRepository } from './status-sets';
 import { StatusDefinitionRepository } from './status-definitions';
 import { TagSetRepository } from './tag-sets';
 import { TagRepository } from './tags';
+import { EntityDependencyRepository } from './entity-dependencies';
 import { BaseServerRepository } from './BaseServerRepository';
 import { EntityTarget } from 'typeorm';
-import { Project, Task, User, Comment, ChangeHistory, StatusSet, StatusDefinition, TagSet, Tag } from '@repo/dataforge/server-entities';
+import { Project, Task, User, Comment, ChangeHistory, StatusSet, StatusDefinition, TagSet, Tag, EntityDependency } from '@repo/dataforge/server-entities';
 
 /**
  * Central repository container for managing all domain repositories
@@ -26,6 +27,7 @@ export class RepositoryContainer {
   public readonly statusDefinitions: StatusDefinitionRepository;
   public readonly tagSets: TagSetRepository;
   public readonly tags: TagRepository;
+  public readonly entityDependencies: EntityDependencyRepository;
   
   // Map for dynamic repository access - use any for mixed repository types
   private repositoryMap: Map<string, any>;
@@ -41,6 +43,7 @@ export class RepositoryContainer {
     this.statusDefinitions = new StatusDefinitionRepository(neonService);
     this.tagSets = new TagSetRepository(neonService);
     this.tags = new TagRepository(neonService);
+    this.entityDependencies = new EntityDependencyRepository(neonService);
     
     // Create repository map for dynamic access
     this.repositoryMap = new Map();
@@ -53,6 +56,7 @@ export class RepositoryContainer {
     this.repositoryMap.set('status_definitions', this.statusDefinitions);
     this.repositoryMap.set('tag_sets', this.tagSets);
     this.repositoryMap.set('tags', this.tags);
+    this.repositoryMap.set('entity_dependencies', this.entityDependencies);
   }
   
   /**
@@ -105,6 +109,8 @@ export class RepositoryContainer {
       return this.tagSets as unknown as BaseServerRepository<T>;
     } else if (entityClass === Tag) {
       return this.tags as unknown as BaseServerRepository<T>;
+    } else if (entityClass === EntityDependency) {
+      return this.entityDependencies as unknown as BaseServerRepository<T>;
     }
     return undefined;
   }
@@ -140,6 +146,7 @@ export class RepositoryContainer {
     statusDefinitions: boolean;
     tagSets: boolean;
     tags: boolean;
+    entityDependencies: boolean;
     overall: boolean;
   }> {
     try {
@@ -153,10 +160,11 @@ export class RepositoryContainer {
       const statusDefinitionsHealthy = !!this.statusDefinitions;
       const tagSetsHealthy = !!this.tagSets;
       const tagsHealthy = !!this.tags;
+      const entityDependenciesHealthy = !!this.entityDependencies;
       
       const overall = projectsHealthy && tasksHealthy && usersHealthy && commentsHealthy && 
                      changeHistoryHealthy && statusSetsHealthy && statusDefinitionsHealthy && 
-                     tagSetsHealthy && tagsHealthy;
+                     tagSetsHealthy && tagsHealthy && entityDependenciesHealthy;
       
       return {
         projects: projectsHealthy,
@@ -168,6 +176,7 @@ export class RepositoryContainer {
         statusDefinitions: statusDefinitionsHealthy,
         tagSets: tagSetsHealthy,
         tags: tagsHealthy,
+        entityDependencies: entityDependenciesHealthy,
         overall
       };
     } catch (error) {
@@ -181,6 +190,7 @@ export class RepositoryContainer {
         statusDefinitions: false,
         tagSets: false,
         tags: false,
+        entityDependencies: false,
         overall: false
       };
     }

@@ -93,6 +93,7 @@ function logChange(changeRecord: Omit<LocalChanges, 'id'>, transaction?: any): v
 // Tables to track for sync (exclude system tables)
 const TRACKED_TABLES = [
   'tasks',
+  'task_dependencies_scheduling',
   'projects',
   'users',
   'comments',
@@ -103,7 +104,7 @@ const TRACKED_TABLES = [
 ] as const;
 
 // Track if hooks have been initialized to prevent duplicates
-let hooksInitialized = false;
+const hooksInitialized = false;
 
 /**
  * Initialize Dexie change tracking hooks

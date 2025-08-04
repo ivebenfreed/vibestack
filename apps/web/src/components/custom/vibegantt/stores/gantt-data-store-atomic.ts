@@ -287,7 +287,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
           // Remove dependencies involving this task
           const filtered: Record<string, TaskDependency> = {};
           Object.entries(context.dependencies).forEach(([id, dep]) => {
-            if (dep.sourceTaskId !== event.taskId && dep.targetTaskId !== event.taskId) {
+            if (dep.predecessorId !== event.taskId && dep.successorId !== event.taskId) {
               filtered[id] = dep;
             }
           });
@@ -297,7 +297,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
           // Rebuild dependency map without deleted task
           const filtered: Record<string, TaskDependency> = {};
           Object.entries(context.dependencies).forEach(([id, dep]) => {
-            if (dep.sourceTaskId !== event.taskId && dep.targetTaskId !== event.taskId) {
+            if (dep.predecessorId !== event.taskId && dep.successorId !== event.taskId) {
               filtered[id] = dep;
             }
           });
@@ -455,15 +455,15 @@ function buildDependencyMap(
   const map = new Map();
   
   Object.values(dependencies).forEach(dep => {
-    // Update source task (has successors)
-    const sourceNode = map.get(dep.sourceTaskId) || { predecessors: [], successors: [] };
-    sourceNode.successors.push(dep.targetTaskId);
-    map.set(dep.sourceTaskId, sourceNode);
+    // Update predecessor task (has successors)
+    const predecessorNode = map.get(dep.predecessorId) || { predecessors: [], successors: [] };
+    predecessorNode.successors.push(dep.successorId);
+    map.set(dep.predecessorId, predecessorNode);
     
-    // Update target task (has predecessors)
-    const targetNode = map.get(dep.targetTaskId) || { predecessors: [], successors: [] };
-    targetNode.predecessors.push(dep.sourceTaskId);
-    map.set(dep.targetTaskId, targetNode);
+    // Update successor task (has predecessors)
+    const successorNode = map.get(dep.successorId) || { predecessors: [], successors: [] };
+    successorNode.predecessors.push(dep.predecessorId);
+    map.set(dep.successorId, successorNode);
   });
   
   return map;
@@ -697,15 +697,25 @@ export async function loadInitialGanttData(projectId?: string) {
     tagsByTask[tt.taskId].push(tt.tagId);
   });
   
+  // Log before querying dependencies
+  console.log('📊 GanttStore: Querying dependencies for task IDs:', taskIds.slice(0, 5), '...');
+  
   // Load all relationships in parallel
   const [users, projects, statusDefs, tags, dependencies] = await Promise.all([
     assigneeIds.length > 0 ? db.users.where('id').anyOf(assigneeIds).toArray() : [],
     projectIds.length > 0 ? db.projects.where('id').anyOf(projectIds).toArray() : [],
     statusIds.length > 0 ? db.status_definitions.where('id').anyOf(statusIds).toArray() : [],
     tagIds.length > 0 ? db.tags.where('id').anyOf(tagIds).toArray() : [],
-    db.task_dependencies.where('dependentTaskId').anyOf(taskIds)
-      .or('dependencyTaskId').anyOf(taskIds).toArray()
+    db.entity_dependencies.where('entityType').equals('Task')
+      .and(dep => taskIds.includes(dep.predecessorId) || taskIds.includes(dep.successorId))
+      .toArray()
   ]);
+  
+  // Log dependency query results
+  console.log('📊 GanttStore: Raw dependency query result:', {
+    totalFound: dependencies.length,
+    firstFew: dependencies.slice(0, 3)
+  });
   
   // Build relationship lookups
   const relationships = {
@@ -726,16 +736,18 @@ export async function loadInitialGanttData(projectId?: string) {
     resolvedTasks[task.id] = resolved;
   });
   
-  // Convert dependencies to our format
+  // Use dependencies directly in EntityDependency format
   const dependencyMap: Record<string, TaskDependency> = {};
   dependencies.forEach(dep => {
-    const id = `${dep.dependentTaskId}-${dep.dependencyTaskId}`;
-    dependencyMap[id] = {
-      id,
-      sourceTaskId: dep.dependencyTaskId,
-      targetTaskId: dep.dependentTaskId,
+    dependencyMap[dep.id] = {
+      id: dep.id,
+      entityType: 'Task' as const,
+      predecessorId: dep.predecessorId,
+      successorId: dep.successorId,
       type: dep.type || 'finish-to-start',
-      lag: dep.lag || 0
+      lagDays: dep.lagDays || 0,
+      metadata: dep.metadata,
+      description: dep.description
     };
   });
   
@@ -746,6 +758,23 @@ export async function loadInitialGanttData(projectId?: string) {
     paginationEnabled: needsPagination,
     sampleTasks: Object.values(resolvedTasks).slice(0, 3).map(t => ({ id: t.id, title: t.title }))
   });
+  
+  // Log task details for debugging
+  console.log('📊 GanttStore: Task details for project', projectId);
+  Object.values(resolvedTasks).forEach(task => {
+    console.log(`  Task: ${task.id} - ${task.title} (project: ${task.projectId})`);
+  });
+  
+  // Log dependency details
+  console.log('📊 GanttStore: Dependencies found:', dependencies.length);
+  if (dependencies.length > 0) {
+    dependencies.forEach(dep => {
+      console.log(`  Dep: ${dep.id} - ${dep.predecessorId} -> ${dep.successorId} (type: ${dep.type})`);
+    });
+  } else {
+    console.log('  No dependencies found for tasks in this project');
+    console.log('  Task IDs:', taskIds);
+  }
   
   return {
     tasks: resolvedTasks,
@@ -880,14 +909,17 @@ export function setupGranularGanttSubscriptions(
   
   // Subscribe to dependency changes
   const depSub = liveQuery(async () => {
-    let dependencies = await db.task_dependencies.toArray();
+    let dependencies = await db.entity_dependencies
+      .where('entityType')
+      .equals('Task')
+      .toArray();
     
     if (projectId) {
       const projectTasks = await db.tasks.where('projectId').equals(projectId).toArray();
       const projectTaskIds = new Set(projectTasks.map(t => t.id));
       
       dependencies = dependencies.filter(dep => 
-        projectTaskIds.has(dep.dependentTaskId) || projectTaskIds.has(dep.dependencyTaskId)
+        projectTaskIds.has(dep.predecessorId) || projectTaskIds.has(dep.successorId)
       );
     }
     
@@ -896,16 +928,18 @@ export function setupGranularGanttSubscriptions(
     next: (dependencies) => {
       if (!initialLoadComplete) return;
       
-      // Convert to our format
+      // Use dependencies directly in EntityDependency format
       const depMap: Record<string, TaskDependency> = {};
       dependencies.forEach(dep => {
-        const id = `${dep.dependentTaskId}-${dep.dependencyTaskId}`;
-        depMap[id] = {
-          id,
-          sourceTaskId: dep.dependencyTaskId,
-          targetTaskId: dep.dependentTaskId,
+        depMap[dep.id] = {
+          id: dep.id,
+          entityType: 'Task' as const,
+          predecessorId: dep.predecessorId,
+          successorId: dep.successorId,
           type: dep.type || 'finish-to-start',
-          lag: dep.lag || 0
+          lagDays: dep.lagDays || 0,
+          metadata: dep.metadata,
+          description: dep.description
         };
       });
       

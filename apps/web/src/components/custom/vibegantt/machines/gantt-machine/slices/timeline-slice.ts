@@ -1,29 +1,37 @@
 import { assign } from 'xstate';
 import type { GanttMachineContext, GanttEvent, TimeScale } from '../../../types';
-import { TIME_SCALE_CONFIG, RENDER_CONFIG } from '../../../constants';
+import { TIME_SCALE_CONFIG, RENDER_CONFIG, ZOOM_UTILS } from '../../../constants';
 
 export const timelineSlice = {
   initial: 'idle',
   states: {
     idle: {
       on: {
-        ZOOM: {
+        // Handle zoom requests from event delegation
+        ZOOM_REQUEST: {
           actions: [
-            assign({
-              viewConfig: ({ context, event }: { context: GanttMachineContext; event: Extract<GanttEvent, { type: 'ZOOM' }> }) => ({
-                ...context.viewConfig,
-                zoomLevel: event.level,
-              }),
-              timelineLayout: ({ context, event }: { context: GanttMachineContext; event: Extract<GanttEvent, { type: 'ZOOM' }> }) => {
-                const config = TIME_SCALE_CONFIG[event.level];
-                const dayWidth = config.minPixelsPerUnit;
-                return {
-                  ...context.timelineLayout,
-                  dayWidth,
-                };
-              },
-            }),
-            'queueTimelineRender',
+            // Forward zoom event to store with calculated level/factor
+            ({ context, event }) => {
+              if (context.dataStore) {
+                // Get current zoom from store
+                const storeSnapshot = context.dataStore.getSnapshot();
+                const { zoomLevel, zoomFactor } = storeSnapshot.context;
+                
+                // Calculate next zoom using ZOOM_UTILS
+                const nextZoom = ZOOM_UTILS.calculateNextZoom(
+                  zoomLevel,
+                  zoomFactor,
+                  event.direction
+                );
+                
+                // Send UPDATE_ZOOM to store
+                context.dataStore.send({
+                  type: 'UPDATE_ZOOM',
+                  level: nextZoom.level,
+                  factor: nextZoom.factor
+                });
+              }
+            }
           ],
         },
         PAN: {
@@ -31,15 +39,16 @@ export const timelineSlice = {
         },
         SCROLL: {
           actions: [
-            assign({
-              viewport: ({ context, event }: { context: GanttMachineContext; event: Extract<GanttEvent, { type: 'SCROLL' }> }) => ({
-                ...context.viewport,
-                scrollX: event.scrollX,
-                scrollY: event.scrollY,
-              }),
-            }),
-            'updateVisibleRange',
-            'queueViewportRender',
+            // Forward scroll event to store
+            ({ context, event }) => {
+              if (context.dataStore) {
+                context.dataStore.send({
+                  type: 'UPDATE_SCROLL',
+                  x: event.scrollX,
+                  y: event.scrollY
+                });
+              }
+            }
           ],
         },
       },

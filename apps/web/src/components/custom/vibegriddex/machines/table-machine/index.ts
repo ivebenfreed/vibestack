@@ -674,7 +674,7 @@ export const tableBaseMachine = setup({
                       } : null
                     });
                     
-                    let updatedEntities = [...context.entities];
+                    const updatedEntities = [...context.entities];
                     
                     for (const change of event.changes) {
                       const index = updatedEntities.findIndex(e => e.id === change.id);
@@ -893,7 +893,7 @@ export const tableBaseMachine = setup({
             );
             
             // Check if any relationship data changed
-            let relationshipChanges = [];
+            const relationshipChanges = [];
             if (previousRows.length === context.rows.length) {
               for (let i = 0; i < context.rows.length; i++) {
                 const prevRow = previousRows[i];

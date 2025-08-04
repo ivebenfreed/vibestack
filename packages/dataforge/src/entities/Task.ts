@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, ManyToMany, JoinTable, JoinColumn, Check } from 'typeorm';
+import { Entity, Column, ManyToOne, ManyToMany, OneToMany, JoinTable, JoinColumn, Check } from 'typeorm';
 import { 
   IsString, 
   MinLength, 
@@ -137,7 +137,7 @@ export class Task extends BaseDomainEntity {
   @JoinColumn({ name: "assignee_id" })
   assignee?: Promise<import('./User.js').User>;
   
-  @ManyToMany(() => Task, task => task.tasksDependentOnThis) // Updated to point to the new inverse property
+  @ManyToMany(() => Task, task => task.tasksDependentOnThis)
   @JoinTable({
     name: 'task_dependencies',
     joinColumn: { name: 'dependent_task_id', referencedColumnName: 'id' },

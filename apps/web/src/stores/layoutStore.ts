@@ -174,7 +174,7 @@ export const useLayoutStore = {
     window.addEventListener('resize', updateViewport)
     
     // Watch for sidebar state changes using MutationObserver
-    let sidebarObserver: MutationObserver | null = null
+    const sidebarObserver: MutationObserver | null = null
     
     // 🎯 SMOOTH TRANSITIONS: Minimal debounce to update content width right after sidebar transition
     const debouncedSidebarUpdate = debounce(() => {

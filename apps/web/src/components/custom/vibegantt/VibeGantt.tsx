@@ -1,25 +1,19 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMachine } from '@xstate/react';
 import { ganttMachine } from './machines/gantt-machine';
-import { GanttEventDelegationManager } from './systems/GanttEventDelegationManager';
 import type { VibeGanttProps, GanttEvent } from './types';
 import { DEFAULT_VIEW_CONFIG } from './constants';
+import './vibegantt.css';
 
 export function VibeGantt({
-  tasks,
-  dependencies = [],
-  resources = [],
+  projectId,
+  domainService,
   viewConfig = {},
-  onTaskUpdate,
-  onTaskCreate,
-  onTaskDelete,
-  onDependencyCreate,
-  onDependencyDelete,
   className = '',
   height = 600,
+  initialData,
 }: VibeGanttProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const eventManagerRef = useRef<GanttEventDelegationManager | null>(null);
   const rendererInitializedRef = useRef(false);
   
   // Create merged view config
@@ -28,8 +22,14 @@ export function VibeGantt({
     [viewConfig]
   );
   
-  // Initialize machine
-  const [state, send, actor] = useMachine(ganttMachine);
+  // Initialize machine with project ID and domain service
+  const [state, send, actor] = useMachine(ganttMachine, {
+    input: {
+      projectId,
+      domainService,
+      initialData,
+    },
+  });
   
   // Handle event delegation
   const handleGanttEvent = useCallback((event: GanttEvent) => {
@@ -56,27 +56,18 @@ export function VibeGantt({
         }
       });
       
-      // Initialize event manager
-      if (!eventManagerRef.current) {
-        eventManagerRef.current = new GanttEventDelegationManager(node, handleGanttEvent);
-      }
+      // Event manager is now handled by the renderer itself
+      // The renderer has direct access to the task elements it creates
       
       rendererInitializedRef.current = true;
     }
     containerRef.current = node;
   }, [send, handleGanttEvent, height]);
   
-  // Initialize with data after renderer is ready
-  useEffect(() => {
-    if (rendererInitializedRef.current) {
-      send({
-        type: 'INITIALIZE',
-        tasks,
-        dependencies,
-      });
-    }
-  }, [tasks, dependencies, send]);
+  // The store will handle data loading, no need to pass tasks/dependencies
   
+  // Zoom is now handled directly by the renderer
+
   // Handle resize
   useEffect(() => {
     if (!containerRef.current) return;
@@ -99,24 +90,18 @@ export function VibeGantt({
     };
   }, [send]);
   
-  // Subscribe to machine events for external callbacks
+  // Domain service handles all updates through the machine
+  
+  // Cleanup on unmount
   useEffect(() => {
-    const subscription = actor.subscribe((snapshot) => {
-      // Handle task updates
-      if (snapshot.event?.type === 'TASK_UPDATE' && onTaskUpdate) {
-        const task = snapshot.context.tasks.get(snapshot.event.taskId);
-        if (task) {
-          onTaskUpdate(task);
-        }
-      }
-      
-      // Handle other events...
-    });
-    
     return () => {
-      subscription.unsubscribe();
+      // Event manager cleanup not needed - handled by renderer
+      
+      // Clean up global references
+      delete (window as any).__vibegantt_renderer_options;
+      delete (window as any).__vibegantt_store_actor;
     };
-  }, [actor, onTaskUpdate, onTaskCreate, onTaskDelete, onDependencyCreate, onDependencyDelete]);
+  }, []);
   
   // Render
   return (
@@ -136,4 +121,4 @@ export function VibeGantt({
 }
 
 // Export types for consumers
-export type { GanttTask, TaskDependency, GanttViewConfig } from './types';
+export type { GanttTask, TaskDependency, GanttViewConfig, Resource } from './types';

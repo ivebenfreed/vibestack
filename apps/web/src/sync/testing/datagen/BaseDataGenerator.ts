@@ -178,7 +178,7 @@ export abstract class BaseDataGenerator {
     
     const isUnique = this.schema.constraints?.unique?.includes(field);
     
-    let baseValue = template
+    const baseValue = template
       .replace('{{index}}', String(index + 1))
       .replace('{{timestamp}}', String(Date.now()));
     
