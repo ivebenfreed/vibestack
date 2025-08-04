@@ -30,9 +30,11 @@ test.describe('Issue 11: Entity Dependencies Sync Verification', () => {
     // Wait for the login form
     await page.waitForSelector('input[name="email"]', { timeout: 10000 });
     
-    // Login with test credentials
-    await page.fill('input[name="email"]', 'ben@getelevra.com');
-    await page.fill('input[name="password"]', 'M@ntl4EuroBarn');
+    // Login with test credentials from environment
+    const email = process.env.VIBE_DEV_EMAIL || 'test@example.com';
+    const password = process.env.VIBE_DEV_PASSWORD || 'password123';
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', password);
     
     // Click the login button
     await page.click('button[type="submit"]');
