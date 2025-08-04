@@ -374,7 +374,7 @@ export class IncomingChangeService {
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
       if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
-        const tableName = table.replace(/_/g, ''); // Convert snake_case to camelCase for Dexie table names
+        const tableName = this.snakeToCamel(table); // Convert snake_case to camelCase for Dexie table names
         const dexieTable = (db as any)[tableName];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
@@ -385,7 +385,7 @@ export class IncomingChangeService {
       } 
       // Check if it's a junction table
       else if (CLIENT_JUNCTION_TABLE_MAPPING[table]) {
-        const dexieTable = (db as any)[table.replace(/_/g, '')];
+        const dexieTable = (db as any)[this.snakeToCamel(table)];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
           await dexieTable.bulkPut(entitiesData);
@@ -464,7 +464,7 @@ export class IncomingChangeService {
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
       if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
-        const tableName = table.replace(/_/g, ''); // Convert snake_case to camelCase for Dexie table names
+        const tableName = this.snakeToCamel(table); // Convert snake_case to camelCase for Dexie table names
         const dexieTable = (db as any)[tableName];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} ${table} in IndexedDB`);
@@ -597,16 +597,23 @@ export class IncomingChangeService {
   }
 
   /**
+   * Convert snake_case to camelCase
+   */
+  private snakeToCamel(str: string): string {
+    return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  }
+
+  /**
    * Generic handler for domain table changes
    * Works for any table that follows the standard CRUD pattern
    */
   private async applyDomainTableChange(change: TableChange): Promise<void> {
     const { db } = await import('@repo/dataforge/dexie-schema');
-    const tableName = change.table.replace(/_/g, ''); // Convert snake_case to camelCase for Dexie table names
+    const tableName = this.snakeToCamel(change.table); // Convert snake_case to camelCase for Dexie table names
     const dexieTable = (db as any)[tableName];
     
     if (!dexieTable) {
-      throw new Error(`Dexie table not found for: ${change.table}`);
+      throw new Error(`Dexie table not found for: ${change.table} (tried: ${tableName})`);
     }
     
     switch (change.operation) {
