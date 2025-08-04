@@ -17,7 +17,7 @@ import type {
 import { DEFAULT_VIEW_CONFIG, TIME_SCALE_CONFIG, ZOOM_UTILS } from '../../constants';
 import { ganttRendererActor } from '../../actors/gantt-renderer-actor';
 import { createGanttStoreLogic } from '../../stores/gantt-data-store';
-import { createGanttStoreLogic as createAtomicGanttStoreLogic, loadInitialGanttData } from '../../stores/gantt-data-store-atomic';
+import { createGanttStoreLogic as createAtomicGanttStoreLogic, loadInitialGanttData, setupGranularGanttSubscriptions } from '../../stores/gantt-data-store-atomic';
 import { timelineSlice } from './slices/timeline-slice';
 import { taskSlice } from './slices/task-slice';
 import { interactionSlice } from './slices/interaction-slice';
@@ -60,6 +60,7 @@ const createInitialContext = (): GanttMachineContext => ({
     focusedTaskId: null,
     selectionMode: 'single',
   },
+  selectedDependencyIds: new Set(),
   dragState: null,
   hoverState: null,
   editingTaskId: null,
@@ -168,11 +169,8 @@ export const ganttMachine = setup({
     // Apply task move (calculate new dates)
     applyTaskMove: ({ context, event }) => {
       if (event.type === 'TASK_DRAG_END' && context.dragState && context.renderer) {
-        // Reset visual state
-        context.renderer.send({
-          type: 'RESET_DRAG_STATE',
-          taskId: event.taskId
-        });
+        // Don't reset visual state immediately - let the new coordinates arrive first
+        // The live query update will trigger a re-render with correct coordinates
         
         // Calculate new dates based on deltaX
         if (event.deltaX !== undefined && context.dataStore) {
@@ -184,24 +182,104 @@ export const ganttMachine = setup({
             const dayWidth = coordinateMapping.timeline.dayWidth;
             const daysDelta = Math.round(event.deltaX / dayWidth);
             
+            // Check if there's any actual movement
+            if (daysDelta === 0) {
+              console.log('GanttMachine: No movement detected, skipping update', {
+                taskId: event.taskId,
+                deltaX: event.deltaX,
+                dayWidth: dayWidth,
+                daysDelta
+              });
+              return;
+            }
+            
             const task = tasks[event.taskId];
             if (task && task.plannedStartDate && task.plannedEndDate) {
-              const newStartDate = new Date(task.plannedStartDate);
-              newStartDate.setDate(newStartDate.getDate() + daysDelta);
+              console.log('GanttMachine: BEFORE move calculation', {
+                taskId: task.id,
+                originalStartDate: task.plannedStartDate,
+                originalEndDate: task.plannedEndDate,
+                deltaX: event.deltaX,
+                dayWidth: dayWidth,
+                daysDelta
+              });
               
-              const newEndDate = new Date(task.plannedEndDate);
-              newEndDate.setDate(newEndDate.getDate() + daysDelta);
+              // Create new dates with proper snapping to day boundaries
+              const originalStart = new Date(task.plannedStartDate);
+              const originalEnd = new Date(task.plannedEndDate);
               
-              // Update the task through the store
-              const updatedTask = {
-                ...task,
-                plannedStartDate: newStartDate,
-                plannedEndDate: newEndDate
-              };
+              // Snap to start of day for consistent calculations
+              const newStartDate = new Date(originalStart);
+              newStartDate.setDate(originalStart.getDate() + daysDelta);
+              // Keep the original time of day to avoid timezone issues
+              newStartDate.setHours(originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds(), originalStart.getMilliseconds());
               
-              context.dataStore.send({
-                type: 'TASK_UPDATED',
-                task: updatedTask
+              const newEndDate = new Date(originalEnd);
+              newEndDate.setDate(originalEnd.getDate() + daysDelta);
+              // Keep the original time of day to avoid timezone issues
+              newEndDate.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
+              
+              // Check if dates actually changed
+              const originalStartTime = new Date(task.plannedStartDate).getTime();
+              const originalEndTime = new Date(task.plannedEndDate).getTime();
+              const newStartTime = newStartDate.getTime();
+              const newEndTime = newEndDate.getTime();
+              
+              if (originalStartTime === newStartTime && originalEndTime === newEndTime) {
+                console.log('GanttMachine: No date changes detected, skipping update', {
+                  taskId: task.id,
+                  originalStartDate: task.plannedStartDate,
+                  originalEndDate: task.plannedEndDate,
+                  newStartDate: newStartDate.toISOString(),
+                  newEndDate: newEndDate.toISOString()
+                });
+                return;
+              }
+              
+              console.log('GanttMachine: AFTER move calculation', {
+                taskId: task.id,
+                newStartDate: newStartDate.toISOString(),
+                newEndDate: newEndDate.toISOString(),
+                daysDelta
+              });
+              
+              // Only update through domain service - live query will update store automatically
+              if (context.domainService?.updateTask) {
+                console.log('GanttMachine: Calling domain service updateTask', {
+                  taskId: task.id,
+                  updateData: {
+                    plannedStartDate: newStartDate,
+                    plannedEndDate: newEndDate
+                  }
+                });
+                
+                // Make the call async and handle the promise
+                context.domainService.updateTask(task.id, {
+                  plannedStartDate: newStartDate,
+                  plannedEndDate: newEndDate
+                }).then((updateResult) => {
+                  console.log('GanttMachine: Domain service updateTask SUCCESS', {
+                    taskId: task.id,
+                    result: updateResult,
+                    updatedStartDate: updateResult?.plannedStartDate,
+                    updatedEndDate: updateResult?.plannedEndDate
+                  });
+                }).catch((error) => {
+                  console.error('GanttMachine: Domain service updateTask ERROR', {
+                    taskId: task.id,
+                    error: error.message,
+                    stack: error.stack
+                  });
+                });
+              } else {
+                console.error('GanttMachine: No domain service available for updateTask');
+              }
+            } else {
+              console.error('GanttMachine: Invalid task data', {
+                taskId: event.taskId,
+                hasTask: !!task,
+                hasStartDate: task?.plannedStartDate,
+                hasEndDate: task?.plannedEndDate
               });
             }
           }
@@ -212,11 +290,8 @@ export const ganttMachine = setup({
     // Apply task resize (calculate new dates)
     applyTaskResize: ({ context, event }) => {
       if (event.type === 'TASK_RESIZE_END' && context.dragState && context.renderer) {
-        // Reset visual state
-        context.renderer.send({
-          type: 'RESET_DRAG_STATE',
-          taskId: event.taskId
-        });
+        // Don't reset visual state immediately - let the new coordinates arrive first
+        // The live query update will trigger a re-render with correct coordinates
         
         // Calculate new dates based on deltaX
         if (event.deltaX !== undefined && context.dataStore) {
@@ -230,22 +305,28 @@ export const ganttMachine = setup({
             
             const task = tasks[event.taskId];
             if (task && task.plannedStartDate && task.plannedEndDate) {
-              const updatedTask = { ...task };
-              
-              if (event.handle === 'start' || event.handle === 'left') {
-                const newStartDate = new Date(task.plannedStartDate);
-                newStartDate.setDate(newStartDate.getDate() + daysDelta);
-                updatedTask.plannedStartDate = newStartDate;
-              } else {
-                const newEndDate = new Date(task.plannedEndDate);
-                newEndDate.setDate(newEndDate.getDate() + daysDelta);
-                updatedTask.plannedEndDate = newEndDate;
+              // Only update through domain service - live query will update store automatically
+              if (context.domainService?.updateTask) {
+                const updates: any = {};
+                if (event.handle === 'start' || event.handle === 'left') {
+                  const newStartDate = new Date(task.plannedStartDate);
+                  newStartDate.setDate(newStartDate.getDate() + daysDelta);
+                  updates.plannedStartDate = newStartDate;
+                } else {
+                  const newEndDate = new Date(task.plannedEndDate);
+                  newEndDate.setDate(newEndDate.getDate() + daysDelta);
+                  updates.plannedEndDate = newEndDate;
+                }
+                
+                console.log('GanttMachine: Applying task resize via domain service', {
+                  taskId: task.id,
+                  handle: event.handle,
+                  deltaX: event.deltaX,
+                  daysDelta,
+                  updates
+                });
+                context.domainService.updateTask(task.id, updates);
               }
-              
-              context.dataStore.send({
-                type: 'TASK_UPDATED',
-                task: updatedTask
-              });
             }
           }
         }
@@ -377,59 +458,32 @@ export const ganttMachine = setup({
       }
     },
     
-    // Notify external handlers
-    notifyTaskUpdate: ({ context, event }) => {
-      // Update store with new task data
-      if (context.dataStore && event.type === 'TASK_DRAG_END') {
-        const task = context.tasks.get(event.taskId);
-        if (task) {
-          const updatedTask = {
-            ...task,
-            plannedStartDate: event.newStartDate,
-            plannedEndDate: event.newEndDate
-          };
-          
-          context.dataStore.send({
-            type: 'TASK_UPDATED',
-            task: updatedTask
+    // Handle keyboard shortcuts
+    handleKeyboardShortcut: ({ context, event }) => {
+      if (event.type !== 'KEYBOARD_SHORTCUT') return;
+      
+      // Handle Delete key
+      if (event.key === 'Delete') {
+        // Delete selected tasks
+        if (context.selection.selectedTaskIds.size > 0) {
+          context.selection.selectedTaskIds.forEach(taskId => {
+            if (context.domainService?.deleteTask) {
+              context.domainService.deleteTask(taskId);
+            }
           });
-          
-          // Also update domain service if provided
-          if (context.domainService?.updateTask) {
-            context.domainService.updateTask(task.id, {
-              plannedStartDate: event.newStartDate,
-              plannedEndDate: event.newEndDate
-            });
-          }
         }
-      } else if (context.dataStore && event.type === 'TASK_RESIZE_END') {
-        const task = context.tasks.get(event.taskId);
-        if (task) {
-          const updatedTask = {
-            ...task,
-            ...(event.handle === 'left' && event.newStartDate ? { plannedStartDate: event.newStartDate } : {}),
-            ...(event.handle === 'right' && event.newEndDate ? { plannedEndDate: event.newEndDate } : {})
-          };
-          
-          context.dataStore.send({
-            type: 'TASK_UPDATED',
-            task: updatedTask
+        
+        // Delete selected dependencies
+        if (context.selectedDependencyIds && context.selectedDependencyIds.size > 0) {
+          context.selectedDependencyIds.forEach(depId => {
+            if (context.domainService?.deleteDependency) {
+              context.domainService.deleteDependency(depId);
+            }
           });
-          
-          // Also update domain service if provided
-          if (context.domainService?.updateTask) {
-            const updates: any = {};
-            if (event.handle === 'left' && event.newStartDate) {
-              updates.plannedStartDate = event.newStartDate;
-            }
-            if (event.handle === 'right' && event.newEndDate) {
-              updates.plannedEndDate = event.newEndDate;
-            }
-            context.domainService.updateTask(task.id, updates);
-          }
         }
       }
     },
+    
   },
   guards: {
     // Validation guards
@@ -506,17 +560,8 @@ export const ganttMachine = setup({
                 // Store globally for debugging
                 (window as any).__vibegantt_store_actor = store;
                 
-                // Subscribe to store snapshots for updates
-                store.subscribe((snapshot) => {
-                  console.log('GanttMachine: Store snapshot update', {
-                    taskCount: Object.keys(snapshot.context.tasks).length,
-                    dependencyCount: Object.keys(snapshot.context.dependencies).length,
-                    expandedCount: snapshot.context.expandedTasks.size
-                  });
-                });
-                
                 // Load initial data into the store
-                loadInitialGanttData(context.projectId).then(({ tasks, dependencies, relationships, pagination }) => {
+                loadInitialGanttData(context.projectId, context.domainService).then(({ tasks, dependencies, relationships, pagination }) => {
                   console.log('GanttMachine: Loading initial data for store');
                   
                   // Send initial data to store
@@ -544,6 +589,14 @@ export const ganttMachine = setup({
                     taskCount: Object.keys(tasks).length,
                     depCount: Object.keys(dependencies).length
                   });
+                  
+                  // Set up live query subscriptions for reactive updates
+                  if (!pagination?.enabled) {
+                    console.log('GanttMachine: Setting up live query subscriptions');
+                    const cleanup = setupGranularGanttSubscriptions(store, context.projectId, context.domainService);
+                    // Store cleanup function for later cleanup
+                    (context as any).__subscriptionsCleanup = cleanup;
+                  }
                 }).catch(error => {
                   console.error('GanttMachine: Error loading initial data', error);
                   store.send({
@@ -622,8 +675,17 @@ export const ganttMachine = setup({
           if (context.dataStore) {
             console.log('GanttMachine: Setting up store subscription');
             
+            // Skip the first update since we already sent initial data
+            let isFirstUpdate = true;
+            
             // Subscribe to store changes
             const unsubscribe = context.dataStore.subscribe((snapshot) => {
+              if (isFirstUpdate) {
+                isFirstUpdate = false;
+                console.log('GanttMachine: Skipping first store update (already sent initial data)');
+                return;
+              }
+              
               const storeContext = snapshot.context;
               const tasks = Object.values(storeContext.tasks || {});
               const dependencies = Object.values(storeContext.dependencies || {});
@@ -667,6 +729,14 @@ export const ganttMachine = setup({
           if ((context as any).__storeUnsubscribe) {
             (context as any).__storeUnsubscribe();
             delete (context as any).__storeUnsubscribe;
+          }
+        },
+        // Clean up live query subscriptions
+        ({ context }) => {
+          if ((context as any).__subscriptionsCleanup) {
+            console.log('GanttMachine: Cleaning up live query subscriptions');
+            (context as any).__subscriptionsCleanup();
+            delete (context as any).__subscriptionsCleanup;
           }
         }
       ],
@@ -757,10 +827,112 @@ export const ganttMachine = setup({
                   ],
                 },
                 TASK_DRAG_END: {
-                  actions: ['notifyTaskUpdate'],
+                  // Handled by task slice
                 },
                 TASK_RESIZE_END: {
-                  actions: ['notifyTaskUpdate'],
+                  // Handled by task slice
+                },
+                DEPENDENCY_SELECT: {
+                  actions: [
+                    assign({
+                      selectedDependencyIds: ({ context, event }) => {
+                        console.log('GanttMachine: Handling DEPENDENCY_SELECT event', { dependencyId: event.dependencyId, multi: event.multi });
+                        const newSelection = new Set(context.selectedDependencyIds);
+                        
+                        if (event.multi) {
+                          // Toggle selection in multi-select mode
+                          if (newSelection.has(event.dependencyId)) {
+                            newSelection.delete(event.dependencyId);
+                          } else {
+                            newSelection.add(event.dependencyId);
+                          }
+                        } else {
+                          // Single selection mode
+                          newSelection.clear();
+                          newSelection.add(event.dependencyId);
+                        }
+                        
+                        console.log('GanttMachine: Updated dependency selection', { selectedCount: newSelection.size });
+                        
+                        return newSelection;
+                      },
+                    }),
+                    // Update renderer with new selection
+                    ({ context }) => {
+                      if (context.renderer) {
+                        // Re-render dependencies with updated selection
+                        const storeSnapshot = context.dataStore?.getSnapshot();
+                        if (storeSnapshot?.context?.coordinateMapping) {
+                          context.renderer.send({
+                            type: 'RENDER_COORDINATES',
+                            mapping: storeSnapshot.context.coordinateMapping,
+                            tasks: storeSnapshot.context.tasks,
+                            dependencies: storeSnapshot.context.dependencies,
+                            selectedDependencyIds: context.selectedDependencyIds
+                          });
+                        }
+                      }
+                    },
+                  ],
+                },
+                DEPENDENCY_DELETE: {
+                  actions: [
+                    ({ context, event }) => {
+                      if (context.domainService?.deleteDependency) {
+                        console.log('GanttMachine: Deleting dependency', event.dependencyId);
+                        context.domainService.deleteDependency(event.dependencyId);
+                      }
+                    },
+                  ],
+                },
+                DEPENDENCY_DRAG_START: {
+                  actions: [
+                    ({ context, event }) => {
+                      console.log('GanttMachine: Dependency drag started', {
+                        dependencyId: event.dependencyId,
+                        handleType: event.handleType,
+                        x: event.x,
+                        y: event.y
+                      });
+                      // Store drag state for potential cancellation or completion
+                    },
+                  ],
+                },
+                DEPENDENCY_REASSIGN: {
+                  actions: [
+                    ({ context, event }) => {
+                      console.log('GanttMachine: Reassigning dependency', {
+                        dependencyId: event.dependencyId,
+                        handleType: event.handleType,
+                        newTaskId: event.newTaskId,
+                        originalPredecessorId: event.originalPredecessorId,
+                        originalSuccessorId: event.originalSuccessorId
+                      });
+                      
+                      // Calculate the new dependency based on which handle was dragged
+                      const newPredecessorId = event.handleType === 'start' 
+                        ? event.newTaskId 
+                        : event.originalPredecessorId;
+                      const newSuccessorId = event.handleType === 'end' 
+                        ? event.newTaskId 
+                        : event.originalSuccessorId;
+                      
+                      // Use domain service to update the dependency
+                      if (context.domainService?.createDependency && context.domainService?.deleteDependency) {
+                        // Delete the old dependency
+                        context.domainService.deleteDependency(event.dependencyId);
+                        
+                        // Create a new dependency with the new connection
+                        context.domainService.createDependency({
+                          predecessorId: newPredecessorId,
+                          successorId: newSuccessorId,
+                          type: 'finish-to-start', // Default type, could be made configurable
+                          lagDays: 0,
+                          metadata: {}
+                        });
+                      }
+                    },
+                  ],
                 },
               },
             },

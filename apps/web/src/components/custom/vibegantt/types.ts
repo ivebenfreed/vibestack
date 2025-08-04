@@ -167,6 +167,7 @@ export interface GanttMachineContext {
   
   // Interaction State
   selection: SelectionState;
+  selectedDependencyIds?: Set<string>; // For tracking selected dependencies
   dragState: DragState | null;
   hoverState: HoverState | null;
   editingTaskId: string | null;
@@ -214,6 +215,9 @@ export type GanttEvent =
   | { type: 'DEPENDENCY_CREATE_START'; sourceTaskId: string }
   | { type: 'DEPENDENCY_CREATE_END'; targetTaskId: string }
   | { type: 'DEPENDENCY_DELETE'; dependencyId: string }
+  | { type: 'DEPENDENCY_SELECT'; dependencyId: string; multi?: boolean }
+  | { type: 'DEPENDENCY_DRAG_START'; dependencyId: string; handleType: 'start' | 'end'; x: number; y: number }
+  | { type: 'DEPENDENCY_REASSIGN'; dependencyId: string; handleType: 'start' | 'end'; newTaskId: string; originalPredecessorId: string; originalSuccessorId: string }
   | { type: 'VIEWPORT_RESIZE'; width: number; height: number }
   | { type: 'VIEW_CONFIG_UPDATE'; config: Partial<GanttViewConfig> }
   | { type: 'RENDER_FRAME'; commands?: RenderCommand[] }

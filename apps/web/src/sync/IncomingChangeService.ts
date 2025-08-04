@@ -9,6 +9,7 @@
 
 import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { TableChange } from '@repo/sync-types';
+import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '@repo/dataforge/client-entities';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -370,91 +371,46 @@ export class IncomingChangeService {
       // Perform bulk insert to Dexie - no need for transaction wrapper since hooks are disabled
       const { db } = await import('@repo/dataforge/dexie-schema');
       
-      switch (table) {
-          case 'tasks':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tasks into IndexedDB`);
-            await db.tasks.bulkPut(entitiesData);
-            break;
-          
-        case 'comments':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} comments into IndexedDB`);
-          await db.comments.bulkPut(entitiesData);
-          break;
-          
-        case 'projects':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} projects into IndexedDB`);
-          await db.projects.bulkPut(entitiesData);
-          break;
-          
-        case 'users':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} users into IndexedDB`);
-          await db.users.bulkPut(entitiesData);
-          break;
-          
-        case 'status_sets':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} status_sets into IndexedDB`);
-          await db.status_sets.bulkPut(entitiesData);
-          break;
-          
-        case 'status_definitions':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} status_definitions into IndexedDB`);
-          await db.status_definitions.bulkPut(entitiesData);
-          break;
-          
-        case 'tags':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tags into IndexedDB`);
-          await db.tags.bulkPut(entitiesData);
-          break;
-          
-        case 'tag_sets':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} tag_sets into IndexedDB`);
-          await db.tag_sets.bulkPut(entitiesData);
-          break;
-          
-        // Junction tables
-        case 'project_members':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} project_members into IndexedDB`);
-          await db.project_members.bulkPut(entitiesData);
-          break;
-          
-        case 'project_status_sets':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} project_status_sets into IndexedDB`);
-          await db.project_status_sets.bulkPut(entitiesData);
-          break;
-          
-        case 'project_tag_sets':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} project_tag_sets into IndexedDB`);
-          await db.project_tag_sets.bulkPut(entitiesData);
-          break;
-          
-        case 'task_tags':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} task_tags into IndexedDB`);
-          await db.task_tags.bulkPut(entitiesData);
-          break;
-          
-        case 'task_dependencies':
-          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} task_dependencies into IndexedDB`);
-          await db.task_dependencies.bulkPut(entitiesData);
-          break;
-          
-        default:
-          // Fallback to individual processing for unknown tables
-          console.warn(`[IncomingChangeService] No bulk handler for ${table}, falling back to individual processing`);
-          for (const change of changes) {
-            try {
-              const result = await this.applyChangeInTransaction(change, null);
-              results.push(result);
-            } catch (error) {
-              console.error(`[IncomingChangeService] Insert failed for ${table}:${change.data.id}:`, error);
-              results.push({
-                change,
-                success: false,
-                error: error instanceof Error ? error.message : String(error)
-              });
-            }
-          }
-          return results;
+      // Check if it's a domain table
+      const tableWithQuotes = `"${table}"`;
+      if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
+        const tableName = table.replace(/_/g, ''); // Convert snake_case to camelCase for Dexie table names
+        const dexieTable = (db as any)[tableName];
+        if (dexieTable) {
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
+          await dexieTable.bulkPut(entitiesData);
+        } else {
+          throw new Error(`Dexie table not found for: ${table}`);
         }
+      } 
+      // Check if it's a junction table
+      else if (CLIENT_JUNCTION_TABLE_MAPPING[table]) {
+        const dexieTable = (db as any)[table.replace(/_/g, '')];
+        if (dexieTable) {
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
+          await dexieTable.bulkPut(entitiesData);
+        } else {
+          throw new Error(`Dexie junction table not found for: ${table}`);
+        }
+      }
+      // Unknown table - fallback to individual processing
+      else {
+        console.warn(`[IncomingChangeService] No bulk handler for ${table}, falling back to individual processing`);
+        for (const change of changes) {
+          try {
+            const result = await this.applyChangeInTransaction(change, null);
+            results.push(result);
+          } catch (error) {
+            console.error(`[IncomingChangeService] Insert failed for ${table}:${change.data.id}:`, error);
+            results.push({
+              change,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+        return results;
+      }
         
       // Create success results for all bulk inserted entities
       changes.forEach((change, index) => {
@@ -505,42 +461,34 @@ export class IncomingChangeService {
       // Perform bulk update - no need for transaction wrapper since hooks are disabled
       const { db } = await import('@repo/dataforge/dexie-schema');
       
-      switch (table) {
-          case 'tasks':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tasks in IndexedDB`);
-            await db.tasks.bulkPut(entitiesData);
-            break;
-          case 'projects':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} projects in IndexedDB`);
-            await db.projects.bulkPut(entitiesData);
-            break;
-          case 'users':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} users in IndexedDB`);
-            await db.users.bulkPut(entitiesData);
-            break;
-          case 'comments':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} comments in IndexedDB`);
-            await db.comments.bulkPut(entitiesData);
-            break;
-          case 'status_sets':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} status_sets in IndexedDB`);
-            await db.status_sets.bulkPut(entitiesData);
-            break;
-          case 'status_definitions':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} status_definitions in IndexedDB`);
-            await db.status_definitions.bulkPut(entitiesData);
-            break;
-          case 'tags':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tags in IndexedDB`);
-            await db.tags.bulkPut(entitiesData);
-            break;
-          case 'tag_sets':
-            console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} tag_sets in IndexedDB`);
-            await db.tag_sets.bulkPut(entitiesData);
-            break;
-        default:
-          console.warn(`[IncomingChangeService] Unknown table ${table} for Dexie bulk update`);
+      // Check if it's a domain table
+      const tableWithQuotes = `"${table}"`;
+      if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
+        const tableName = table.replace(/_/g, ''); // Convert snake_case to camelCase for Dexie table names
+        const dexieTable = (db as any)[tableName];
+        if (dexieTable) {
+          console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} ${table} in IndexedDB`);
+          await dexieTable.bulkPut(entitiesData);
+        } else {
+          throw new Error(`Dexie table not found for: ${table}`);
         }
+      } else {
+        console.warn(`[IncomingChangeService] Unknown table ${table} for Dexie bulk update, falling back to individual processing`);
+        for (const change of changes) {
+          try {
+            const result = await this.applyChangeInTransaction(change, null);
+            results.push(result);
+          } catch (error) {
+            console.error(`[IncomingChangeService] Update failed for ${table}:${change.data.id}:`, error);
+            results.push({
+              change,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+        return results;
+      }
         
       // Create success results for all bulk updated entities
       changes.forEach((change) => {
@@ -594,43 +542,19 @@ export class IncomingChangeService {
 
       console.log(`[IncomingChangeService] Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
-      // Use incoming path functions for clean separation
-      switch (change.table) {
-        case 'tasks':
-          await this.applyTaskChange(change);
-          break;
-        case 'projects':
-          await this.applyProjectChange(change);
-          break;
-        case 'users':
-          await this.applyUserChange(change);
-          break;
-        case 'comments':
-          await this.applyCommentChange(change);
-          break;
-        case 'status_sets':
-          await this.applyStatusSetChange(change);
-          break;
-        case 'status_definitions':
-          await this.applyStatusDefinitionChange(change);
-          break;
-        case 'tags':
-          await this.applyTagChange(change);
-          break;
-        case 'tag_sets':
-          await this.applyTagSetChange(change);
-          break;
-        // Junction tables
-        case 'project_members':
-        case 'project_status_sets':
-        case 'project_tag_sets':
-        case 'task_tags':
-        case 'task_dependencies':
-          console.log(`[IncomingChangeService] 🔧 Processing junction table ${change.table} with data:`, change.data);
-          await this.applyJunctionTableChange(change);
-          break;
-        default:
-          throw new Error(`No incoming function support for table: ${change.table}`);
+      // Check if it's a domain table (without quotes)
+      const tableWithQuotes = `"${change.table}"`;
+      if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
+        await this.applyDomainTableChange(change);
+      } 
+      // Check if it's a junction table
+      else if (CLIENT_JUNCTION_TABLE_MAPPING[change.table]) {
+        console.log(`[IncomingChangeService] 🔧 Processing junction table ${change.table} with data:`, change.data);
+        await this.applyJunctionTableChange(change);
+      }
+      // Unknown table
+      else {
+        throw new Error(`No incoming function support for table: ${change.table}`);
       }
 
       console.log(`[IncomingChangeService] Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
@@ -670,6 +594,41 @@ export class IncomingChangeService {
       };
     }
     return incomingData;
+  }
+
+  /**
+   * Generic handler for domain table changes
+   * Works for any table that follows the standard CRUD pattern
+   */
+  private async applyDomainTableChange(change: TableChange): Promise<void> {
+    const { db } = await import('@repo/dataforge/dexie-schema');
+    const tableName = change.table.replace(/_/g, ''); // Convert snake_case to camelCase for Dexie table names
+    const dexieTable = (db as any)[tableName];
+    
+    if (!dexieTable) {
+      throw new Error(`Dexie table not found for: ${change.table}`);
+    }
+    
+    switch (change.operation) {
+      case 'insert':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting ${change.table} ${change.data.id} into IndexedDB`);
+        await dexieTable.put(change.data as any);
+        break;
+      
+      case 'update':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating ${change.table} ${change.data.id} in IndexedDB`);
+        const mergedData = await this.mergeUpdateData(dexieTable, change.data.id, change.data);
+        await dexieTable.put(mergedData);
+        break;
+      
+      case 'delete':
+        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting ${change.table} ${change.data.id} from IndexedDB`);
+        await dexieTable.delete(change.data.id);
+        break;
+      
+      default:
+        throw new Error(`Unknown operation for ${change.table}: ${change.operation}`);
+    }
   }
 
   /**
