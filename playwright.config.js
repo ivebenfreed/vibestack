@@ -1,5 +1,5 @@
 // playwright.config.js
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 import { execSync } from 'child_process';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -45,47 +45,47 @@ function getPorts(issueNumber) {
 
 const issueNumber = getIssueNumber();
 const ports = getPorts(issueNumber);
-const profilePath = path.resolve(process.cwd(), '.playwright', 'profiles', `profile-${issueNumber}`);
+const authFile = path.resolve(process.cwd(), '.playwright', 'auth', `auth-${issueNumber}.json`);
 
 console.log(`🎭 Playwright Config:`);
 console.log(`   Issue: ${issueNumber}`);
 console.log(`   Web Port: ${ports.webPort}`);
 console.log(`   Server Port: ${ports.serverPort}`);
-console.log(`   Profile: ${profilePath}`);
+console.log(`   Auth State: ${authFile}`);
 
 export default defineConfig({
   testDir: './tests/playwright',
-  fullyParallel: false, // Run tests serially to avoid port conflicts
+  fullyParallel: false, // Run tests serially to avoid conflicts
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 1,
+  workers: 1,
   reporter: 'html',
   
   use: {
-    baseURL: `http://localhost:5273`, // Using actual running port
+    baseURL: `http://localhost:${ports.webPort}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
 
   projects: [
+    // Setup project that handles authentication
+    { 
+      name: 'setup', 
+      testMatch: /.*auth\.setup\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+    },
+    // Main test project that uses the stored auth state
     {
       name: 'chromium',
       use: { 
-        ...require('@playwright/test').devices['Desktop Chrome'],
-        // Use persistent context for profile isolation
-        contextOptions: {
-          userDataDir: profilePath,
-        }
+        ...devices['Desktop Chrome'],
+        // Use the stored authentication state
+        storageState: authFile,
       },
+      dependencies: ['setup'],
     },
   ],
-
-  // Skip webServer check - servers should already be running
-  // webServer: {
-  //   command: `echo "Servers should already be running on ports ${ports.webPort}/${ports.serverPort}"`,
-  //   port: ports.webPort,
-  //   reuseExistingServer: true,
-  //   timeout: 5000,
-  // },
 });

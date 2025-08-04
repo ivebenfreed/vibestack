@@ -221,6 +221,13 @@ echo "📱 Your services will be available at:"
 echo "   • Web: http://localhost:$((5173 + ISSUE_NUMBER * 10))"
 echo "   • API: http://localhost:$((8787 + ISSUE_NUMBER * 10))"
 echo ""
+
+# Option to run setup tests
+if [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
+    echo "🧪 Setup tests will run after servers start..."
+    echo ""
+fi
+
 echo "📝 When ready for PR:"
 echo "   📦 Package names are automatically managed - no manual cleanup needed!"
 echo ""
@@ -245,6 +252,25 @@ echo ""
 if [ "${AUTOMATION_TEST:-false}" = "true" ]; then
     echo "🧪 Running in automation test mode - will timeout after 30 seconds"
     timeout 30s pnpm dev:local || true
+elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
+    # Start servers in background and run tests
+    echo "🚀 Starting servers in background for setup tests..."
+    ./scripts/tmux-bg.sh vibestack-dev "pnpm dev:local"
+    
+    # Wait for servers to be ready
+    echo "⏳ Waiting for servers to start..."
+    sleep 15
+    
+    # Run setup tests
+    echo ""
+    ./scripts/run-worktree-setup-tests.sh
+    
+    echo ""
+    echo "📝 Servers are running in background. To view logs:"
+    echo "   ./scripts/bg-logs.sh vibestack-dev"
+    echo ""
+    echo "To stop servers when done:"
+    echo "   ./scripts/bg-stop.sh vibestack-dev"
 else
     pnpm dev:local
 fi
