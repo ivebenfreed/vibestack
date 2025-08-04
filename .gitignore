@@ -14,6 +14,10 @@ node_modules
 !.env.*.d.ts
 !.env.*.example
 
+# Playwright auth state (contains sensitive session data)
+.playwright/auth/
+playwright/.auth/
+
 # Build outputs
 dist
 build
