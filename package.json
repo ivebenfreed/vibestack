@@ -1,5 +1,5 @@
 {
-  "name": "vibestack-issue-11",
+  "name": "vibestack-issue-18",
   "private": true,
   "scripts": {
     "build": "turbo run build",
