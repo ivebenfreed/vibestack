@@ -65,6 +65,28 @@ export class TaskBarRenderer {
     }
   }
   
+  // Disable/enable resize handles globally when dependency is selected
+  setResizeHandlesEnabled(enabled: boolean): void {
+    this.taskElements.forEach(element => {
+      const leftHandle = element.querySelector('.vibegantt-resize-handle-left') as HTMLElement;
+      const rightHandle = element.querySelector('.vibegantt-resize-handle-right') as HTMLElement;
+      
+      if (leftHandle && rightHandle) {
+        if (enabled) {
+          leftHandle.style.pointerEvents = 'auto';
+          leftHandle.style.cursor = 'ew-resize';
+          rightHandle.style.pointerEvents = 'auto';
+          rightHandle.style.cursor = 'ew-resize';
+        } else {
+          leftHandle.style.pointerEvents = 'none';
+          leftHandle.style.cursor = 'default';
+          rightHandle.style.pointerEvents = 'none';
+          rightHandle.style.cursor = 'default';
+        }
+      }
+    });
+  }
+  
   private createTaskElement(task: GanttTask, layout: TaskLayout, options: TaskRenderOptions): HTMLElement {
     const element = document.createElement('div');
     element.className = 'vibegantt-task';

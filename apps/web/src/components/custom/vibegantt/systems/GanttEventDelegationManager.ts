@@ -1,4 +1,4 @@
-import type { GanttEvent, GanttTask, TaskDependency } from '../types';
+import type { GanttEvent, TimeScale } from '../types';
 import { RENDER_CONFIG } from '../constants';
 
 type EventHandler = (event: MouseEvent | KeyboardEvent | WheelEvent) => void;
@@ -14,6 +14,14 @@ interface DragState {
   data?: any;
 }
 
+/**
+ * Event Delegation Manager with Proper Isolation
+ * 
+ * Following VibeGridDex pattern:
+ * - Pure event transformation without state manipulation
+ * - Type-safe event emission
+ * - Clean separation of concerns
+ */
 export class GanttEventDelegationManager {
   private container: HTMLElement;
   private sendEvent: GanttEventCallback;
@@ -25,10 +33,10 @@ export class GanttEventDelegationManager {
     currentY: 0
   };
   
-  // Event listeners
-  private listeners: Map<string, EventHandler> = new Map();
+  // Abort controller for cleanup
+  private abortController = new AbortController();
   
-  constructor(container: HTMLElement, sendEvent: GanttEventCallback) {
+  constructor(container: HTMLElement, sendEvent: GanttEventCallback, zoomLevel?: TimeScale, zoomFactor?: number) {
     this.container = container;
     this.sendEvent = sendEvent;
     
@@ -47,21 +55,23 @@ export class GanttEventDelegationManager {
   }
   
   private attachEventListeners(): void {
-    // Mouse events
-    this.container.addEventListener('mousedown', this.handleMouseDown);
-    this.container.addEventListener('mousemove', this.handleMouseMove);
-    this.container.addEventListener('mouseup', this.handleMouseUp);
-    this.container.addEventListener('click', this.handleClick);
-    this.container.addEventListener('dblclick', this.handleDoubleClick);
-    this.container.addEventListener('wheel', this.handleWheel, { passive: false });
-    this.container.addEventListener('contextmenu', this.handleContextMenu);
+    const signal = this.abortController.signal;
+    
+    // Mouse events with proper cleanup support
+    this.container.addEventListener('mousedown', this.handleMouseDown, { signal });
+    this.container.addEventListener('mousemove', this.handleMouseMove, { signal });
+    this.container.addEventListener('mouseup', this.handleMouseUp, { signal });
+    this.container.addEventListener('click', this.handleClick, { signal });
+    this.container.addEventListener('dblclick', this.handleDoubleClick, { signal });
+    this.container.addEventListener('wheel', this.handleWheel, { passive: false, signal });
+    this.container.addEventListener('contextmenu', this.handleContextMenu, { signal });
     
     // Keyboard events (on document for global shortcuts)
-    document.addEventListener('keydown', this.handleKeyDown);
+    document.addEventListener('keydown', this.handleKeyDown, { signal });
     
     // Global mouse events for drag operations
-    document.addEventListener('mousemove', this.handleGlobalMouseMove);
-    document.addEventListener('mouseup', this.handleGlobalMouseUp);
+    document.addEventListener('mousemove', this.handleGlobalMouseMove, { signal });
+    document.addEventListener('mouseup', this.handleGlobalMouseUp, { signal });
   }
   
   private handleMouseDown(event: MouseEvent): void {
@@ -152,14 +162,23 @@ export class GanttEventDelegationManager {
   
   private handleClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
+    console.log('GanttEventDelegationManager: Click event', {
+      target: target.tagName,
+      className: target.className,
+      closestTask: target.closest('.vibegantt-task')
+    });
     
     // Task selection
     const taskElement = target.closest('.vibegantt-task') as HTMLElement;
     if (taskElement) {
       const taskId = taskElement.dataset.taskId;
+      console.log('GanttEventDelegationManager: Task element clicked', {
+        taskId,
+        element: taskElement
+      });
       if (taskId) {
         this.sendEvent({
-          type: 'TASK_SELECT',
+          type: 'SELECT_TASK',
           taskId,
           multi: event.ctrlKey || event.metaKey
         });
@@ -181,24 +200,15 @@ export class GanttEventDelegationManager {
   }
   
   private handleWheel(event: WheelEvent): void {
-    // Zoom functionality with Ctrl/Cmd + scroll
+    // Only handle zoom functionality with Ctrl/Cmd + scroll
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       
-      const delta = event.deltaY > 0 ? -0.1 : 0.1;
-      const currentZoom = 1; // Get from context
-      const newZoom = Math.max(0.1, Math.min(10, currentZoom + delta));
-      
-      // Send zoom event
-      // this.sendEvent({ type: 'ZOOM', level: newZoom });
-    } else {
-      // Regular scroll
-      this.sendEvent({
-        type: 'SCROLL',
-        scrollX: this.container.scrollLeft,
-        scrollY: this.container.scrollTop
-      });
+      // For now, just prevent default - zoom handling needs to be implemented
+      // in the machine/store layer
+      console.log('Zoom requested:', event.deltaY > 0 ? 'out' : 'in');
     }
+    // Let native scroll handle panning
   }
   
   private handleKeyDown(event: KeyboardEvent): void {
@@ -258,20 +268,30 @@ export class GanttEventDelegationManager {
   }
   
   private updateTaskDrag(event: MouseEvent): void {
-    if (this.dragState.type !== 'task-move') return;
+    if (this.dragState.type !== 'task-move' || !this.dragState.data?.taskId) return;
+    
+    const deltaX = event.clientX - this.dragState.startX;
     
     this.sendEvent({
       type: 'TASK_DRAG_MOVE',
+      taskId: this.dragState.data.taskId,
       x: event.clientX,
-      y: event.clientY
+      y: event.clientY,
+      deltaX: deltaX
     });
   }
   
   private endTaskDrag(event: MouseEvent): void {
-    if (this.dragState.type !== 'task-move') return;
+    if (this.dragState.type !== 'task-move' || !this.dragState.data?.taskId) return;
     
+    const deltaX = event.clientX - this.dragState.startX;
+    
+    // Calculate new dates based on delta
+    // This will be handled by the machine with proper date calculations
     this.sendEvent({
-      type: 'TASK_DRAG_END'
+      type: 'TASK_DRAG_END',
+      taskId: this.dragState.data.taskId,
+      deltaX: deltaX
     });
   }
   
@@ -298,19 +318,29 @@ export class GanttEventDelegationManager {
   }
   
   private updateTaskResize(event: MouseEvent): void {
-    if (this.dragState.type !== 'task-resize') return;
+    if (this.dragState.type !== 'task-resize' || !this.dragState.data) return;
+    
+    const deltaX = event.clientX - this.dragState.startX;
     
     this.sendEvent({
       type: 'TASK_RESIZE_MOVE',
-      x: event.clientX
+      taskId: this.dragState.data.taskId,
+      handle: this.dragState.data.handle,
+      x: event.clientX,
+      deltaX: deltaX
     });
   }
   
   private endTaskResize(event: MouseEvent): void {
-    if (this.dragState.type !== 'task-resize') return;
+    if (this.dragState.type !== 'task-resize' || !this.dragState.data) return;
+    
+    const deltaX = event.clientX - this.dragState.startX;
     
     this.sendEvent({
-      type: 'TASK_RESIZE_END'
+      type: 'TASK_RESIZE_END',
+      taskId: this.dragState.data.taskId,
+      handle: this.dragState.data.handle,
+      deltaX: deltaX
     });
   }
   
@@ -364,21 +394,11 @@ export class GanttEventDelegationManager {
     }
   };
   
-  // Cleanup
+  /**
+   * Clean up all event listeners
+   */
   destroy(): void {
-    // Remove event listeners
-    this.container.removeEventListener('mousedown', this.handleMouseDown);
-    this.container.removeEventListener('mousemove', this.handleMouseMove);
-    this.container.removeEventListener('mouseup', this.handleMouseUp);
-    this.container.removeEventListener('click', this.handleClick);
-    this.container.removeEventListener('dblclick', this.handleDoubleClick);
-    this.container.removeEventListener('wheel', this.handleWheel);
-    this.container.removeEventListener('contextmenu', this.handleContextMenu);
-    
-    document.removeEventListener('keydown', this.handleKeyDown);
-    document.removeEventListener('mousemove', this.handleGlobalMouseMove);
-    document.removeEventListener('mouseup', this.handleGlobalMouseUp);
-    
-    this.listeners.clear();
+    // Abort all event listeners at once
+    this.abortController.abort();
   }
 }

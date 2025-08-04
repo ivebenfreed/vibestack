@@ -98,7 +98,7 @@ export const useRenderStateExtractor = () => {
       }
       
       // Use processed rows from store
-      let rows = context.rows || [];
+      const rows = context.rows || [];
       
       if (rows.length === 0) {
         console.log('getRenderState: No processed rows from store yet');
@@ -106,7 +106,7 @@ export const useRenderStateExtractor = () => {
       }
       
       // Use visible columns from context if available, otherwise use all columns
-      let columns = context.visibleColumns || providedColumns || context.columns || [];
+      const columns = context.visibleColumns || providedColumns || context.columns || [];
       
       console.log('getRenderState: Using processed rows from store', {
         rowCount: rows.length,

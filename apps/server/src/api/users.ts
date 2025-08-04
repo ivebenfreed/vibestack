@@ -63,7 +63,7 @@ users.post('/', async (c) => {
     console.error('Error creating user:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }
@@ -145,7 +145,7 @@ users.patch('/:id', async (c) => {
     console.error('Error updating user:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }

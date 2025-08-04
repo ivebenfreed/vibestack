@@ -149,8 +149,8 @@ function applySorting(rows: TableRow[], sortBy: SortConfig[]): TableRow[] {
     for (const sort of sortBy) {
       // Check for resolved relationship values first
       const resolvedFieldName = `__resolved_${sort.field}`;
-      let aValue = a.data[resolvedFieldName] !== undefined ? a.data[resolvedFieldName] : a.data[sort.field];
-      let bValue = b.data[resolvedFieldName] !== undefined ? b.data[resolvedFieldName] : b.data[sort.field];
+      const aValue = a.data[resolvedFieldName] !== undefined ? a.data[resolvedFieldName] : a.data[sort.field];
+      const bValue = b.data[resolvedFieldName] !== undefined ? b.data[resolvedFieldName] : b.data[sort.field];
       
       // Debug logging for relationship sorting
       if (sort.field === 'projectId' && Math.random() < 0.05) {

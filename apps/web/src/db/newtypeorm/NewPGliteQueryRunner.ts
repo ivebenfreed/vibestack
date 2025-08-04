@@ -152,7 +152,7 @@ export class NewPGliteQueryRunner extends BaseQueryRunner implements QueryRunner
             let result;
             let attempts = 0;
             const maxAttempts = 3;
-            let wasInTransaction = this.isTransactionActive;
+            const wasInTransaction = this.isTransactionActive;
             
             while (attempts < maxAttempts) {
                 try {

@@ -90,7 +90,7 @@ export function calculateDragPreview(
   
   // Mouse is outside the dragged column - now use midpoint logic
   // Check columns from left to right to find where the mouse is
-  let foundTarget = false;
+  const foundTarget = false;
   
   // Find the best target position by checking all columns
   let bestTargetIndex = currentIndex;

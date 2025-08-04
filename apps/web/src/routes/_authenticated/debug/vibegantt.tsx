@@ -3,205 +3,129 @@ import { useState, useMemo } from 'react';
 import { VibeGantt } from '@/components/custom/vibegantt/VibeGantt';
 import type { GanttTask, TaskDependency, GanttViewConfig } from '@/components/custom/vibegantt/types';
 import { addDays, addWeeks, startOfDay } from 'date-fns';
+import { taskService } from '@/domain/task-service';
+import { entityDependencyService } from '@/domain/entity-dependency-service';
+import type { EntityDependency } from '@repo/dataforge/client-entities';
 
 export const Route = createFileRoute('/_authenticated/debug/vibegantt')({
   component: VibeGanttDebug,
 });
 
 function VibeGanttDebug() {
-  // Generate sample tasks
-  const sampleTasks = useMemo<GanttTask[]>(() => {
-    const today = startOfDay(new Date());
-    
-    return [
-      // Phase 1: Foundation
-      {
-        id: '1',
-        name: 'Project Foundation',
-        plannedStartDate: today,
-        plannedEndDate: addWeeks(today, 2),
-        progress: 100,
-        priority: 'high',
-        color: '#3b82f6',
-      },
-      {
-        id: '1.1',
-        name: 'Setup Development Environment',
-        plannedStartDate: today,
-        plannedEndDate: addDays(today, 3),
-        progress: 100,
-        priority: 'high',
-        parentId: '1',
-      },
-      {
-        id: '1.2',
-        name: 'Create Project Structure',
-        plannedStartDate: addDays(today, 3),
-        plannedEndDate: addDays(today, 7),
-        progress: 100,
-        priority: 'high',
-        parentId: '1',
-      },
-      {
-        id: '1.3',
-        name: 'Configure Build Tools',
-        plannedStartDate: addDays(today, 7),
-        plannedEndDate: addDays(today, 14),
-        progress: 100,
-        priority: 'medium',
-        parentId: '1',
-      },
-      
-      // Phase 2: Core Features
-      {
-        id: '2',
-        name: 'Core Features Implementation',
-        plannedStartDate: addWeeks(today, 2),
-        plannedEndDate: addWeeks(today, 6),
-        progress: 75,
-        priority: 'critical',
-        color: '#ef4444',
-      },
-      {
-        id: '2.1',
-        name: 'User Authentication',
-        plannedStartDate: addWeeks(today, 2),
-        plannedEndDate: addWeeks(today, 3),
-        progress: 100,
-        priority: 'critical',
-        parentId: '2',
-      },
-      {
-        id: '2.2',
-        name: 'Database Schema Design',
-        plannedStartDate: addWeeks(today, 2),
-        plannedEndDate: addDays(addWeeks(today, 2), 4),
-        progress: 100,
-        priority: 'high',
-        parentId: '2',
-      },
-      {
-        id: '2.3',
-        name: 'API Development',
-        plannedStartDate: addWeeks(today, 3),
-        plannedEndDate: addWeeks(today, 5),
-        progress: 60,
-        priority: 'high',
-        parentId: '2',
-      },
-      {
-        id: '2.4',
-        name: 'Frontend Components',
-        plannedStartDate: addDays(addWeeks(today, 3), 3),
-        plannedEndDate: addWeeks(today, 6),
-        progress: 40,
-        priority: 'medium',
-        parentId: '2',
-      },
-      
-      // Phase 3: Advanced Features
-      {
-        id: '3',
-        name: 'Advanced Features',
-        plannedStartDate: addWeeks(today, 5),
-        plannedEndDate: addWeeks(today, 9),
-        progress: 20,
-        priority: 'medium',
-        color: '#f59e0b',
-      },
-      {
-        id: '3.1',
-        name: 'Real-time Sync',
-        plannedStartDate: addWeeks(today, 5),
-        plannedEndDate: addWeeks(today, 7),
-        progress: 30,
-        priority: 'high',
-        parentId: '3',
-      },
-      {
-        id: '3.2',
-        name: 'Analytics Dashboard',
-        plannedStartDate: addWeeks(today, 6),
-        plannedEndDate: addWeeks(today, 8),
-        progress: 10,
-        priority: 'medium',
-        parentId: '3',
-      },
-      {
-        id: '3.3',
-        name: 'Export/Import Features',
-        plannedStartDate: addWeeks(today, 7),
-        plannedEndDate: addWeeks(today, 9),
-        progress: 0,
-        priority: 'low',
-        parentId: '3',
-      },
-      
-      // Phase 4: Testing & Deployment
-      {
-        id: '4',
-        name: 'Testing & Deployment',
-        plannedStartDate: addWeeks(today, 8),
-        plannedEndDate: addWeeks(today, 12),
-        progress: 0,
-        priority: 'high',
-        color: '#10b981',
-      },
-      {
-        id: '4.1',
-        name: 'Unit Testing',
-        plannedStartDate: addWeeks(today, 8),
-        plannedEndDate: addWeeks(today, 9),
-        progress: 0,
-        priority: 'high',
-        parentId: '4',
-      },
-      {
-        id: '4.2',
-        name: 'Integration Testing',
-        plannedStartDate: addWeeks(today, 9),
-        plannedEndDate: addWeeks(today, 10),
-        progress: 0,
-        priority: 'high',
-        parentId: '4',
-      },
-      {
-        id: '4.3',
-        name: 'Performance Optimization',
-        plannedStartDate: addWeeks(today, 10),
-        plannedEndDate: addWeeks(today, 11),
-        progress: 0,
-        priority: 'medium',
-        parentId: '4',
-      },
-      {
-        id: '4.4',
-        name: 'Production Deployment',
-        plannedStartDate: addWeeks(today, 11),
-        plannedEndDate: addWeeks(today, 12),
-        progress: 0,
-        priority: 'critical',
-        parentId: '4',
-      },
-    ];
-  }, []);
+  console.log('🎯 VibeGanttDebug: Using original VibeGantt with atomic store');
+  // Tasks will be loaded from the database by VibeGantt
   
-  // Sample dependencies
-  const sampleDependencies = useMemo<TaskDependency[]>(() => [
-    { id: 'd1', sourceTaskId: '1.1', targetTaskId: '1.2', type: 'finish-to-start', lag: 0 },
-    { id: 'd2', sourceTaskId: '1.2', targetTaskId: '1.3', type: 'finish-to-start', lag: 0 },
-    { id: 'd3', sourceTaskId: '1', targetTaskId: '2', type: 'finish-to-start', lag: 0 },
-    { id: 'd4', sourceTaskId: '2.1', targetTaskId: '2.3', type: 'finish-to-start', lag: 0 },
-    { id: 'd5', sourceTaskId: '2.2', targetTaskId: '2.3', type: 'finish-to-start', lag: 0 },
-    { id: 'd6', sourceTaskId: '2.3', targetTaskId: '2.4', type: 'start-to-start', lag: 3 },
-    { id: 'd7', sourceTaskId: '2.3', targetTaskId: '3.1', type: 'finish-to-start', lag: -7 },
-    { id: 'd8', sourceTaskId: '3.1', targetTaskId: '3.2', type: 'start-to-start', lag: 7 },
-    { id: 'd9', sourceTaskId: '3.2', targetTaskId: '3.3', type: 'start-to-start', lag: 7 },
-    { id: 'd10', sourceTaskId: '2', targetTaskId: '4.1', type: 'finish-to-start', lag: 14 },
-    { id: 'd11', sourceTaskId: '4.1', targetTaskId: '4.2', type: 'finish-to-start', lag: 0 },
-    { id: 'd12', sourceTaskId: '4.2', targetTaskId: '4.3', type: 'finish-to-start', lag: 0 },
-    { id: 'd13', sourceTaskId: '4.3', targetTaskId: '4.4', type: 'finish-to-start', lag: 0 },
-  ], []);
+  // Project selection state - use the test project ID we created
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>('ddfb9da6-32cf-49cc-be72-14a919850dcd');
+  
+  // Domain service implementation for write operations
+  const domainService = {
+    updateTask: async (taskId: string, updates: Partial<GanttTask>) => {
+      console.log('Updating task via domain service:', taskId, updates);
+      try {
+        // Convert dates to ISO strings if they exist
+        const taskUpdates: any = {};
+        if (updates.plannedStartDate) {
+          taskUpdates.plannedStartDate = updates.plannedStartDate instanceof Date 
+            ? updates.plannedStartDate.toISOString() 
+            : updates.plannedStartDate;
+        }
+        if (updates.plannedEndDate) {
+          taskUpdates.plannedEndDate = updates.plannedEndDate instanceof Date 
+            ? updates.plannedEndDate.toISOString() 
+            : updates.plannedEndDate;
+        }
+        if (updates.actualStartDate) {
+          taskUpdates.actualStartDate = updates.actualStartDate instanceof Date 
+            ? updates.actualStartDate.toISOString() 
+            : updates.actualStartDate;
+        }
+        if (updates.actualEndDate) {
+          taskUpdates.actualEndDate = updates.actualEndDate instanceof Date 
+            ? updates.actualEndDate.toISOString() 
+            : updates.actualEndDate;
+        }
+        if (updates.progress !== undefined) {
+          taskUpdates.progress = updates.progress;
+        }
+        
+        const updatedTask = await taskService.updateUI(taskId, taskUpdates);
+        console.log('Task updated successfully:', updatedTask);
+        return updatedTask;
+      } catch (error) {
+        console.error('Error updating task:', error);
+        throw error;
+      }
+    },
+    
+    createTask: async (task: Partial<GanttTask>) => {
+      console.log('Creating task via domain service:', task);
+      try {
+        const createInput: any = {
+          title: task.title || 'New Task',
+          description: task.description || '',
+          projectId: task.projectId || selectedProjectId,
+          plannedStartDate: task.plannedStartDate instanceof Date 
+            ? task.plannedStartDate.toISOString() 
+            : task.plannedStartDate,
+          plannedEndDate: task.plannedEndDate instanceof Date 
+            ? task.plannedEndDate.toISOString() 
+            : task.plannedEndDate,
+          progress: task.progress || 0,
+        };
+        
+        const newTask = await taskService.createUI(createInput);
+        console.log('Task created successfully:', newTask);
+        return newTask;
+      } catch (error) {
+        console.error('Error creating task:', error);
+        throw error;
+      }
+    },
+    
+    deleteTask: async (taskId: string) => {
+      console.log('Deleting task via domain service:', taskId);
+      try {
+        const success = await taskService.deleteUI(taskId);
+        console.log('Task deleted successfully:', success);
+        return success;
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        throw error;
+      }
+    },
+    
+    createDependency: async (dependency: Partial<TaskDependency>) => {
+      console.log('Creating dependency via domain service:', dependency);
+      try {
+        // Use EntityDependency format directly
+        const newDep = await entityDependencyService.createTaskDependency(
+          dependency.predecessorId || '',
+          dependency.successorId || '',
+          dependency.type || 'finish-to-start',
+          dependency.lagDays,
+          dependency.metadata
+        );
+        console.log('Dependency created successfully:', newDep);
+        return newDep;
+      } catch (error) {
+        console.error('Error creating dependency:', error);
+        throw error;
+      }
+    },
+    
+    deleteDependency: async (dependencyId: string) => {
+      console.log('Deleting dependency via domain service:', dependencyId);
+      try {
+        const success = await entityDependencyService.deleteUI(dependencyId);
+        console.log('Dependency deleted successfully:', success);
+        return success;
+      } catch (error) {
+        console.error('Error deleting dependency:', error);
+        throw error;
+      }
+    },
+  };
   
   // View configuration state
   const [viewConfig, setViewConfig] = useState<Partial<GanttViewConfig>>({
@@ -336,29 +260,7 @@ function VibeGanttDebug() {
           </div>
         </div>
         
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 text-sm">
-          <div className="bg-gray-50 p-3 rounded">
-            <div className="font-medium text-gray-700">Total Tasks</div>
-            <div className="text-2xl font-bold">{sampleTasks.length}</div>
-          </div>
-          <div className="bg-gray-50 p-3 rounded">
-            <div className="font-medium text-gray-700">Dependencies</div>
-            <div className="text-2xl font-bold">{sampleDependencies.length}</div>
-          </div>
-          <div className="bg-gray-50 p-3 rounded">
-            <div className="font-medium text-gray-700">In Progress</div>
-            <div className="text-2xl font-bold">
-              {sampleTasks.filter(t => t.progress > 0 && t.progress < 100).length}
-            </div>
-          </div>
-          <div className="bg-gray-50 p-3 rounded">
-            <div className="font-medium text-gray-700">Completed</div>
-            <div className="text-2xl font-bold">
-              {sampleTasks.filter(t => t.progress === 100).length}
-            </div>
-          </div>
-        </div>
+        {/* Stats will be populated from the store */}
       </div>
       
       {/* Gantt Chart */}
@@ -366,8 +268,8 @@ function VibeGanttDebug() {
         <h2 className="text-lg font-semibold mb-4">Gantt Chart</h2>
         
         <VibeGantt
-          tasks={sampleTasks}
-          dependencies={sampleDependencies}
+          projectId={selectedProjectId} // Filter to test project with EntityDependency data
+          domainService={domainService}
           viewConfig={viewConfig}
           onTaskUpdate={handleTaskUpdate}
           onTaskCreate={handleTaskCreate}

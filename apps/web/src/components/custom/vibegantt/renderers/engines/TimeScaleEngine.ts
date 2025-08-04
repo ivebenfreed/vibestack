@@ -39,6 +39,10 @@ export class TimeScaleEngine {
     this.pixelsPerDay = this.calculatePixelsPerDay();
     this.minDate = new Date(2000, 0, 1);
     this.maxDate = new Date(2100, 0, 1);
+    console.log('TimeScaleEngine: Initialized with', {
+      zoomLevel,
+      pixelsPerDay: this.pixelsPerDay
+    });
   }
   
   // Calculate pixels per day based on zoom level
@@ -48,10 +52,30 @@ export class TimeScaleEngine {
     return (config.minPixelsPerUnit * msPerDay) / config.milliseconds;
   }
   
-  // Set zoom level
+  // Set zoom level (without recalculating pixels per day)
   setZoomLevel(zoomLevel: TimeScale): void {
     this.zoomLevel = zoomLevel;
-    this.pixelsPerDay = this.calculatePixelsPerDay();
+    // Don't recalculate pixelsPerDay here - it should be set explicitly via setPixelsPerDay
+  }
+  
+  // Set pixels per day directly (for intermediate zoom steps)
+  setPixelsPerDay(pixelsPerDay: number): void {
+    console.log('TimeScaleEngine: Setting pixels per day', {
+      oldValue: this.pixelsPerDay,
+      newValue: pixelsPerDay,
+      zoomLevel: this.zoomLevel
+    });
+    this.pixelsPerDay = pixelsPerDay;
+  }
+  
+  // Get current zoom level
+  getZoomLevel(): TimeScale {
+    return this.zoomLevel;
+  }
+  
+  // Get day width in pixels
+  getDayWidth(): number {
+    return this.pixelsPerDay;
   }
   
   // Set viewport width
@@ -254,6 +278,13 @@ export class TimeScaleEngine {
   
   private formatHeaderLabel(date: Date, scale: TimeScale): string {
     const config = TIME_SCALE_CONFIG[scale];
+    
+    // Special case: when month scale is used as header for day/week scales,
+    // show month names instead of the month scale's own headerFormat (which is years)
+    if (scale === 'month' && (this.zoomLevel === 'day' || this.zoomLevel === 'week')) {
+      return format(date, 'MMMM yyyy'); // "January 2024"
+    }
+    
     return format(date, config.headerFormat || config.format);
   }
   

@@ -339,6 +339,23 @@ export class ConflictResolver {
         }
         break;
 
+      case 'entity_dependencies':
+        if (change.operation !== 'delete') {
+          if (!data.entity_type) {
+            errors.push('Entity dependencies require an entity_type field');
+          }
+          if (!data.predecessor_id) {
+            errors.push('Entity dependencies require a predecessor_id field');
+          }
+          if (!data.successor_id) {
+            errors.push('Entity dependencies require a successor_id field');
+          }
+          if (data.predecessor_id === data.successor_id) {
+            errors.push('Entity dependencies cannot have the same predecessor and successor');
+          }
+        }
+        break;
+
       default:
         syncLogger.warn(`Unknown table for validation: ${change.table}`, {
           table: change.table,
@@ -530,6 +547,17 @@ export class ConflictResolver {
           case 'name':
           case 'email':
             return 'last_write_wins';
+          default:
+            return 'timestamp_wins';
+        }
+        
+      case 'entity_dependencies':
+        switch (fieldName) {
+          case 'type':
+            return 'last_write_wins'; // Dependency type changes should prefer newer
+          case 'lag_time':
+          case 'lag_days':
+            return 'timestamp_wins'; // Lag values can be overridden if no conflict
           default:
             return 'timestamp_wins';
         }

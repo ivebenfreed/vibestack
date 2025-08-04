@@ -106,6 +106,12 @@ export class LayoutEngine {
   }
   
   private getOrAssignRow(task: GanttTask): number {
+    // If task has an explicit rowIndex, use it
+    if (task.rowIndex !== undefined && task.rowIndex !== null) {
+      this.taskRows.set(task.id, task.rowIndex);
+      return task.rowIndex;
+    }
+    
     // Check if task already has a row assigned
     const existingRow = this.taskRows.get(task.id);
     if (existingRow !== undefined) {
