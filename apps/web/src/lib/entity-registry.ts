@@ -10,7 +10,7 @@ import { CLIENT_DOMAIN_TABLES } from '@repo/dataforge/client-entities';
 
 // Cache for entity metadata
 let _entityMetadata: Map<string, EntityMetadata> | null = null;
-let _domainFiles: Map<string, string> | null = null;
+const _domainFiles: Map<string, string> | null = null;
 
 export interface EntityMetadata {
   name: string;
@@ -118,6 +118,6 @@ export function getDomainFilePath(entityName: string): string {
  */
 export function hasDomainFile(entityName: string): boolean {
   // Known entities with domain files
-  const entitiesWithDomainFiles = ['Task', 'Project', 'User', 'Comment', 'StatusDefinition', 'StatusSet', 'Tag', 'TagSet'];
+  const entitiesWithDomainFiles = ['Task', 'TaskDependency', 'Project', 'User', 'Comment', 'StatusDefinition', 'StatusSet', 'Tag', 'TagSet'];
   return entitiesWithDomainFiles.includes(entityName);
 }

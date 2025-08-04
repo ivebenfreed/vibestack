@@ -42,7 +42,7 @@ async function fetchCompleteEntityData<T extends DbEntity>(
   item: T, 
   tableName: 'users' | 'tasks' | 'projects' | 'comments'
 ): Promise<any> {
-  let completeData: any = { ...item };
+  const completeData: any = { ...item };
   
   // Basic type guards for safety
   const has = (prop: string) => Object.prototype.hasOwnProperty.call(item, prop);

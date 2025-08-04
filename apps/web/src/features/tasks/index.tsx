@@ -21,6 +21,10 @@ const LazyTimelineView = React.lazy(() =>
   import('./timeline/TasksTimeline').then(module => ({ default: module.TasksTimeline }))
 )
 
+const LazyGanttView = React.lazy(() => 
+  import('./timeline/TasksGantt').then(module => ({ default: module.TasksGantt }))
+)
+
 // Loading component for tab content
 function TaskViewLoader({ view }: { view: string }) {
   return (
@@ -91,7 +95,7 @@ const Tasks: React.FC = () => {
       
       {/* Tabbed Interface with search param support */}
       <Tabs value={currentView} onValueChange={handleTabChange} className="flex flex-col flex-1">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="table" className="flex items-center gap-2">
             <Grid3X3 className="h-4 w-4" />
             Table View
@@ -103,6 +107,10 @@ const Tasks: React.FC = () => {
           <TabsTrigger value="timeline" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Timeline
+          </TabsTrigger>
+          <TabsTrigger value="gantt" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Gantt Chart
           </TabsTrigger>
         </TabsList>
         
@@ -122,6 +130,13 @@ const Tasks: React.FC = () => {
         <TabsContent value="timeline" className="flex-1">
           <Suspense fallback={<TaskViewLoader view="Timeline" />}>
             <LazyTimelineView />
+          </Suspense>
+        </TabsContent>
+        
+        {/* Gantt View */}
+        <TabsContent value="gantt" className="flex-1">
+          <Suspense fallback={<TaskViewLoader view="Gantt Chart" />}>
+            <LazyGanttView />
           </Suspense>
         </TabsContent>
       </Tabs>

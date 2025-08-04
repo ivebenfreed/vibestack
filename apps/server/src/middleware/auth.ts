@@ -44,4 +44,7 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
 
   // Proceed to the next middleware or route handler
   await next();
-}); 
+});
+
+// Alias for backward compatibility
+export const requireAuth = authMiddleware; 

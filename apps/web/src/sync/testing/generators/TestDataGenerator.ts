@@ -1185,7 +1185,7 @@ export class TestDataGenerator {
     const isUnique = schema?.constraints?.unique?.includes(field);
     
     // Process template replacements first
-    let baseValue = template
+    const baseValue = template
       .replace('{{index}}', String(index + 1))
       .replace('{{timestamp}}', String(Date.now()));
     

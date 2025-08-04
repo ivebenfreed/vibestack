@@ -1446,7 +1446,7 @@ export function setupGranularSubscriptions(
           // Only send update if there were actual changes
           if (hasChanges) {
             // Enhanced logging to show what changed
-            let changeDetails = {
+            const changeDetails = {
               added: [] as string[],
               updated: [] as string[],
               removed: [] as string[]

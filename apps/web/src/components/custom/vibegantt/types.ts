@@ -19,10 +19,13 @@ export interface GanttTask {
 
 export interface TaskDependency {
   id: string;
-  sourceTaskId: string;
-  targetTaskId: string;
+  entityType: 'Task';
+  predecessorId: string;
+  successorId: string;
   type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
-  lag: number; // Days
+  lagDays?: number; // Days
+  metadata?: Record<string, any>;
+  description?: string;
 }
 
 export interface TaskConstraint {
@@ -57,6 +60,7 @@ export interface DateRange {
 export interface GanttViewConfig {
   timeRange: DateRange;
   zoomLevel: TimeScale;
+  zoomFactor: number; // Multiplier for pixels per unit (0.5 to 2.0)
   showWeekends: boolean;
   showDependencies: boolean;
   showCriticalPath: boolean;
@@ -181,6 +185,15 @@ export interface GanttMachineContext {
   // UI State
   contextMenu: { x: number; y: number; taskId: string } | null;
   tooltip: { x: number; y: number; content: string } | null;
+  
+  // Actors
+  renderer?: any; // Renderer actor
+  dataStore?: any; // Data store actor
+  storeActor?: any; // Store actor passed from parent
+  
+  // Domain service
+  domainService?: any; // Domain service for write operations
+  projectId?: string | null; // Project ID for data store
 }
 
 // Events
@@ -188,25 +201,34 @@ export type GanttEvent =
   | { type: 'INITIALIZE'; tasks: GanttTask[]; dependencies: TaskDependency[] }
   | { type: 'TASKS_UPDATED'; tasks: GanttTask[] }
   | { type: 'DEPENDENCIES_UPDATED'; dependencies: TaskDependency[] }
-  | { type: 'ZOOM'; level: TimeScale }
+  | { type: 'ZOOM'; level: TimeScale; factor?: number }
   | { type: 'PAN'; deltaX: number; deltaY: number }
   | { type: 'SCROLL'; scrollX: number; scrollY: number }
-  | { type: 'TASK_SELECT'; taskId: string; multi: boolean }
+  | { type: 'TASK_SELECT'; taskId: string; multi?: boolean }
   | { type: 'TASK_DRAG_START'; taskId: string; x: number; y: number }
-  | { type: 'TASK_DRAG_MOVE'; x: number; y: number }
-  | { type: 'TASK_DRAG_END' }
+  | { type: 'TASK_DRAG_MOVE'; taskId?: string; x: number; y: number; deltaX?: number }
+  | { type: 'TASK_DRAG_END'; taskId: string; deltaX?: number; newStartDate?: Date; newEndDate?: Date }
   | { type: 'TASK_RESIZE_START'; taskId: string; handle: 'start' | 'end'; x: number }
-  | { type: 'TASK_RESIZE_MOVE'; x: number }
-  | { type: 'TASK_RESIZE_END' }
+  | { type: 'TASK_RESIZE_MOVE'; taskId?: string; handle?: 'start' | 'end'; x: number; deltaX?: number }
+  | { type: 'TASK_RESIZE_END'; taskId: string; handle: 'start' | 'end' | 'left' | 'right'; deltaX?: number; newStartDate?: Date; newEndDate?: Date }
   | { type: 'DEPENDENCY_CREATE_START'; sourceTaskId: string }
   | { type: 'DEPENDENCY_CREATE_END'; targetTaskId: string }
   | { type: 'DEPENDENCY_DELETE'; dependencyId: string }
   | { type: 'VIEWPORT_RESIZE'; width: number; height: number }
   | { type: 'VIEW_CONFIG_UPDATE'; config: Partial<GanttViewConfig> }
-  | { type: 'RENDER_FRAME' }
+  | { type: 'RENDER_FRAME'; commands?: RenderCommand[] }
+  | { type: 'RENDER_COMPLETE'; metrics?: any }
+  | { type: 'RENDER_ERROR'; error: Error }
+  | { type: 'UPDATE_CONTEXT'; context: Partial<GanttMachineContext> }
   | { type: 'KEYBOARD_SHORTCUT'; key: string; modifiers: string[] }
   | { type: 'INITIALIZE_RENDERER'; options: { container: HTMLElement; width: number; height: number } }
-  | { type: 'RENDERER_READY' };
+  | { type: 'RENDERER_READY' }
+  | { type: 'ESCAPE' }
+  | { type: 'TOGGLE_TASK_EXPANDED'; taskId: string }
+  | { type: 'SELECT_TASK'; taskId: string }
+  | { type: 'MULTI_SELECT_TASK'; taskId: string }
+  | { type: 'SET_ZOOM'; zoom: TimeScale }
+  | { type: 'SET_VISIBLE_DATE_RANGE'; range: { start: Date; end: Date } };
 
 // Component Props
 export interface VibeGanttProps {

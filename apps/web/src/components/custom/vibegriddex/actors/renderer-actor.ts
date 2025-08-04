@@ -113,7 +113,7 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
   let renderState: RenderState | null = null;
   let isInitializing = false;
   let isInitialized = false;
-  let lastRenderedVersion = -1; // Track last rendered version to prevent duplicates
+  const lastRenderedVersion = -1; // Track last rendered version to prevent duplicates
   let pendingRenderEvents: Array<{ type: string; state?: RenderState; coordinateMapping?: any }> = [];
   
   console.log('RendererActor: Created callback actor');

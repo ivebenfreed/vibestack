@@ -71,7 +71,7 @@ comments.post('/', async (c) => {
     console.error('Error creating comment:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }
@@ -159,7 +159,7 @@ comments.patch('/:id', async (c) => {
     console.error('Error updating comment:', err);
     if (err instanceof Error && err.message.includes('validation')) {
       return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
+        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
         400
       );
     }

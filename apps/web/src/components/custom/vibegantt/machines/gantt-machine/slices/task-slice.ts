@@ -79,7 +79,6 @@ export const taskSlice = {
               },
             }),
             'updateDragPreview',
-            'queueDragRender',
           ],
         },
         TASK_DRAG_END: {
@@ -132,7 +131,6 @@ export const taskSlice = {
               },
             }),
             'updateResizePreview',
-            'queueResizeRender',
           ],
         },
         TASK_RESIZE_END: {
