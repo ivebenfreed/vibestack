@@ -58,6 +58,32 @@ setup('authenticate', async ({ page }) => {
   
   console.log('🔐 Setting up authentication...');
   
+  // Set up console monitoring BEFORE any navigation
+  let syncCompleted = false;
+  let lsnSaved = false;
+  
+  page.on('console', msg => {
+    const text = msg.text();
+    
+    // Log sync-related messages for debugging
+    if (text.includes('LSN') || text.includes('srv_init') || text.includes('saveOwnState')) {
+      console.log('   [Browser]:', text);
+    }
+    
+    // Check for sync completion
+    if (text.includes('srv_init_complete') || 
+        text.includes('Initial sync completed')) {
+      syncCompleted = true;
+      console.log('   ✅ Sync completed signal received');
+    }
+    
+    // Check for LSN save after init complete
+    if (text.includes('state saved successfully') && text.includes('currentLSN') && !text.includes('0/0')) {
+      lsnSaved = true;
+      console.log('   ✅ LSN saved successfully');
+    }
+  });
+  
   // Navigate to the app
   await page.goto('/');
   console.log('🌐 Navigated to app');
@@ -133,17 +159,44 @@ setup('authenticate', async ({ page }) => {
     console.log('✅ Login successful!');
   }
   
-  // Wait for any initial sync to complete
+  // Wait for initial sync to complete - CRITICAL for sync state persistence
+  console.log('⏳ Waiting for initial sync to complete...');
+  
+  // Wait for sync overlay if visible
   const syncOverlay = page.locator('text="Syncing data"');
   if (await syncOverlay.isVisible().catch(() => false)) {
-    console.log('⏳ Waiting for initial sync...');
+    console.log('   Sync overlay visible, waiting for it to disappear...');
     await syncOverlay.waitFor({ state: 'detached', timeout: 60000 }).catch(() => {
-      console.log('⚠️  Sync timeout, continuing anyway');
+      console.log('   ⚠️  Sync overlay timeout');
     });
-    console.log('✅ Initial sync complete');
   }
   
-  // Wait a bit for the session to stabilize
+  // Wait for both sync completion AND LSN save
+  const waitForSyncAndSave = new Promise((resolve) => {
+    const checkInterval = setInterval(() => {
+      if (syncCompleted && lsnSaved) {
+        clearInterval(checkInterval);
+        resolve(true);
+      }
+    }, 100);
+    
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      resolve(false);
+    }, 30000);
+  });
+  
+  console.log('   ⏳ Waiting for sync completion and LSN save...');
+  const result = await waitForSyncAndSave;
+  
+  if (result) {
+    console.log('✅ Initial sync completed and LSN saved');
+  } else {
+    console.log(`⚠️  Timeout waiting for sync (completed: ${syncCompleted}, LSN saved: ${lsnSaved})`);
+  }
+  
+  // Wait a bit more to ensure localStorage is updated
   await page.waitForTimeout(2000);
   
   // Save storage state

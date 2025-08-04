@@ -10,7 +10,7 @@ import { performCatchupSync, createLiveSyncConfirmation } from './server-changes
 import type { MinimalContext } from '../types/hono';
 import type { WebSocketHandler } from './types';
 import { syncLogger } from '../middleware/logger';
-import { getLatestChangeHistoryLSN, compareLSN } from '../lib/sync-common';
+import { compareLSN } from '../lib/sync-common';
 
 const MODULE_NAME = 'SyncStrategyAnalyzer';
 
@@ -50,9 +50,8 @@ export class SyncStrategyAnalyzer {
     // Store the client's LSN
     await this.context.stateManager.updateClientLSN(clientId, clientLSN);
     
-    // Get the current server LSN from change_history, default to '0/0'
-    const context = this.context.getContext();
-    const serverLSN = (await getLatestChangeHistoryLSN(context)) || '0/0';
+    // Get the current server LSN from WAL position to match what's sent in srv_init_complete
+    const serverLSN = await this.context.stateManager.getServerLSN() || '0/0';
     
     // If client has no LSN (0/0), it needs initial sync
     if (clientLSN === '0/0') {
@@ -354,8 +353,7 @@ export class SyncStrategyAnalyzer {
   }> {
     try {
       const clientLSN = await this.context.stateManager.getLSN() || '0/0';
-      const context = this.context.getContext();
-      const serverLSN = (await getLatestChangeHistoryLSN(context)) || '0/0';
+      const serverLSN = await this.context.stateManager.getServerLSN() || '0/0';
       const syncState = await this.context.stateManager.getClientSyncState(this.context.clientId);
       
       // Determine current strategy based on state
