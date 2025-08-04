@@ -902,10 +902,6 @@ export const SyncMetadataSchema = new EntitySchema<SyncMetadata>({
     columns: {
         id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
         createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
-        'clientId': {
-            name: 'client_id', // Explicit DB Name
-            type: 'text', // Use helper
-        },
         'currentLsn': {
             name: 'current_lsn', // Explicit DB Name
             type: 'text', // Use helper

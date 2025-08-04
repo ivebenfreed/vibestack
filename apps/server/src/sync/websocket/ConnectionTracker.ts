@@ -130,7 +130,7 @@ export class ConnectionTracker {
 
     while (retries < maxRetries) {
       const webSockets = this.context.ctx.getWebSockets();
-      if (webSockets.length > 0 && webSockets[0].readyState === WS_READY_STATE.OPEN) {
+      if (webSockets.length > 0 && webSockets[0]?.readyState === WS_READY_STATE.OPEN) {
         syncLogger.debug('WebSocket connection established', {
           clientId: this.context.clientId,
           retries
@@ -209,7 +209,9 @@ export class ConnectionTracker {
       const typeMatch = waitId.match(/^wait_([^_]+)_/);
       if (typeMatch) {
         const type = typeMatch[1];
-        stats.waitingByType[type] = (stats.waitingByType[type] || 0) + 1;
+        if (type) {
+          stats.waitingByType[type] = (stats.waitingByType[type] || 0) + 1;
+        }
       }
     }
 

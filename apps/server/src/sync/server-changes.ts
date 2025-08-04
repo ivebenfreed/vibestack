@@ -255,7 +255,7 @@ export async function sendCatchupChanges(
       timestamp: Date.now(),
       clientId,
       changes: chunkChanges,
-      lastLSN: i === chunks - 1 ? lastLSN : chunkChanges[chunkChanges.length - 1].lsn!,
+      lastLSN: i === chunks - 1 ? lastLSN : (chunkChanges[chunkChanges.length - 1]?.lsn || lastLSN),
       sequence: { chunk: i + 1, total: chunks }
     };
 
@@ -429,11 +429,18 @@ export async function performCatchupSync(
         syncLogger.debug(`[TIMING] Phase 1: Querying via repository for batch #${phase1Iteration}`, { clientId, timestamp: queryStartTime });
         
         const repositories = createChangeHistoryRepository(context);
-        rawBatchChanges = await repositories.changeHistory.findChangesAfterLSN(
+        const historyEntries = await repositories.changeHistory.findChangesAfterLSN(
           currentLSN,
-          clientId,
           BATCH_SIZE
         );
+        
+        rawBatchChanges = historyEntries.map(entry => ({
+          table: entry.tableName,
+          operation: entry.operation as 'insert' | 'update' | 'delete',
+          data: entry.data,
+          lsn: entry.lsn,
+          updatedAt: entry.timestamp?.toISOString() || new Date().toISOString()
+        }));
         
         syncLogger.debug(`[TIMING] Phase 1: Repository query finished for batch #${phase1Iteration} (took ${Date.now() - queryStartTime}ms)`, { 
           clientId, 
@@ -500,7 +507,7 @@ export async function performCatchupSync(
         syncLogger.debug(`[TIMING] Phase 1: Calling sendCatchupChanges for batch #${phase1Iteration}`, { clientId, changeCount: processedBatchChanges.changes.length, timestamp: sendStartTime });
         const batchSuccess = await sendCatchupChanges(
           processedBatchChanges.changes,
-          processedBatchChanges.changes[processedBatchChanges.changes.length - 1].lsn || initialServerLSN, 
+          (processedBatchChanges.changes[processedBatchChanges.changes.length - 1]?.lsn || initialServerLSN), 
           clientId,
           messageHandler
         );
@@ -513,7 +520,7 @@ export async function performCatchupSync(
         }
         
         // Update LSN based on the LAST PROCESSED change sent
-        currentLSN = processedBatchChanges.changes[processedBatchChanges.changes.length - 1].lsn || currentLSN;
+        currentLSN = processedBatchChanges.changes[processedBatchChanges.changes.length - 1]?.lsn || currentLSN;
         totalChangeCount += processedBatchChanges.changes.length;
       } else {
         // If all changes were filtered/deduped, update LSN based on the last RAW change fetched
@@ -772,11 +779,11 @@ export async function sendLiveChanges(
     let currentLSN: string;
     
     // Extract the LSN from the last change in the ordered list if available
-    const changesHaveLSN = orderedChanges.length > 0 && orderedChanges[orderedChanges.length - 1].lsn;
+    const changesHaveLSN = orderedChanges.length > 0 && orderedChanges[orderedChanges.length - 1]?.lsn;
     
     if (changesHaveLSN) {
       // Prefer the LSN from the changes for live sync
-      currentLSN = String(orderedChanges[orderedChanges.length - 1].lsn);
+      currentLSN = String(orderedChanges[orderedChanges.length - 1]?.lsn || '0/0');
       syncLogger.debug('Using LSN from changes', { 
         clientId, 
         lsn: currentLSN 
@@ -833,7 +840,7 @@ export async function sendLiveChanges(
       // For intermediate chunks, use the LSN of the last change in this chunk
       const chunkLastLSN = i === chunks - 1 ? 
         currentLSN : 
-        (chunkChanges[chunkChanges.length - 1].lsn || currentLSN);
+        (chunkChanges[chunkChanges.length - 1]?.lsn || currentLSN);
       
       // If this is the last chunk, update the lastSentLSN
       if (i === chunks - 1) {
@@ -864,7 +871,7 @@ export async function sendLiveChanges(
             })),
             hasTableProperty: sampleChanges.every(c => c.table !== undefined),
             tableValues: sampleChanges.map(c => c.table).join(','),
-            changeKeys: Object.keys(sampleChanges[0]).join(',')
+            changeKeys: sampleChanges[0] ? Object.keys(sampleChanges[0]).join(',') : 'none'
           }, MODULE_TAG);
         }
         
@@ -1068,12 +1075,18 @@ export async function processLiveUpdateNotification(
     
     try {
       const repositories = createChangeHistoryRepository(context);
-      rawDeltaChanges = await repositories.changeHistory.findChangesBetweenLSN(
+      const historyEntries = await repositories.changeHistory.findChangesBetweenLSN(
         clientLSN,
-        serverLSN,
-        clientId,
-        1000 // Reasonable limit for a live update delta
+        serverLSN
       );
+      
+      rawDeltaChanges = historyEntries.map(entry => ({
+        table: entry.tableName,
+        operation: entry.operation as 'insert' | 'update' | 'delete',
+        data: entry.data,
+        lsn: entry.lsn,
+        updatedAt: entry.timestamp?.toISOString() || new Date().toISOString()
+      }));
       
       syncLogger.debug('Repository fetch completed', {
         clientId,
@@ -1147,7 +1160,7 @@ export async function processLiveUpdateNotification(
 
       if (processedChangeCount > 0) {
         // 3. Determine final LSN for this batch
-        finalLSN = processedChanges.changes[processedChanges.changes.length - 1].lsn || serverLSN;
+        finalLSN = processedChanges.changes[processedChanges.changes.length - 1]?.lsn || serverLSN;
 
         // 4. Send processed changes via sendLiveChanges
         // This may throw a WebSocketUnavailableError which we want to propagate to the caller
@@ -1195,7 +1208,7 @@ export async function processLiveUpdateNotification(
         }
       } else {
         // If all changes were filtered/deduped, client is up to date with the last RAW change fetched
-        finalLSN = rawDeltaChanges[rawDeltaChanges.length - 1].lsn || serverLSN;
+        finalLSN = rawDeltaChanges[rawDeltaChanges.length - 1]?.lsn || serverLSN;
       }
     }
 

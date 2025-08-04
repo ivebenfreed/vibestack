@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { UserRole } from "@repo/dataforge/server-entities";
 import { Kysely } from 'kysely';
 import { NeonHTTPDialect } from 'kysely-neon';
 import { initializeAuth } from '../lib/auth';
 import type { Env } from '../types/env';
-import { UserRole } from '@repo/dataforge/server-entities'; // Assuming server-entities is the correct path
 
 type BootstrapEnv = { Bindings: Env };
 const bootstrapRouter = new Hono<BootstrapEnv>();

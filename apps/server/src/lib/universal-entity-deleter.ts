@@ -3,12 +3,14 @@ import {
   getEntityRelationships, 
   getJunctionRelationships,
   CLIENT_DOMAIN_TABLE_HIERARCHY,
-  CLIENT_JUNCTION_TABLE_MAPPING,
-  type RelationshipConfig
+  CLIENT_JUNCTION_TABLE_MAPPING
 } from '@repo/dataforge/client-entities';
 import { NeonService } from './neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
+
+// TODO: Import RelationshipConfig when exported from dataforge
+type RelationshipConfig = any;
 
 export interface DeletionStrategy {
   /** Strategy for handling foreign key references */

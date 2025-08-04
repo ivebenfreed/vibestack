@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception'; // Import HTTPException
+import { HTTPException } from 'hono/http-exception';
 import {
   type ApiEnv,
   ServiceErrorType,
@@ -7,7 +7,7 @@ import {
   createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import { Comment } from "@repo/dataforge/server-entities";
+import { Comment } from '../domains/comments';
 import { CommentRepository } from '../domains/comments';
 
 // Input types for API
@@ -31,15 +31,18 @@ comments.get('/', async (c) => {
     let result: Comment[];
     
     // Use filters if provided
-    if (taskId || projectId || authorId) {
-      result = await commentRepo.findWithFilters({
-        taskId: taskId as string,
-        projectId: projectId as string,
-        authorId: authorId as string
-      });
+    if (taskId) {
+      result = await commentRepo.findByTaskId(taskId as string);
+    } else if (projectId) {
+      result = await commentRepo.findByProjectId(projectId as string);
     } else {
       // No filters, return all comments
       result = await commentRepo.findAll();
+    }
+    
+    // Filter by authorId if provided
+    if (authorId && result.length > 0) {
+      result = result.filter(comment => comment.authorId === authorId);
     }
     
     return c.json(createSuccessResponse(result));
@@ -59,22 +62,18 @@ comments.post('/', async (c) => {
     throw new HTTPException(401, { message: 'Unauthorized' });
   }
   try {
-    const body = await c.req.json();
     const neonService = new NeonService(c);
     const commentRepo = new CommentRepository(neonService);
     
-    // Use systemCreate for API operations to clear clientId
-    const result = await commentRepo.systemCreate(body);
+    const input = await c.req.json<CommentCreateInput>();
+    const created = await commentRepo.createComment({
+      ...input,
+      authorId: user.id
+    });
     
-    return c.json(createSuccessResponse(result), 201);
+    return c.json(createSuccessResponse(created), 201);
   } catch (err) {
     console.error('Error creating comment:', err);
-    if (err instanceof Error && err.message.includes('validation')) {
-      return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
-        400
-      );
-    }
     return c.json(
       createErrorResponse(ServiceErrorType.INTERNAL, String(err)),
       500
@@ -88,19 +87,17 @@ comments.get('/:id', async (c) => {
   if (!user) {
     throw new HTTPException(401, { message: 'Unauthorized' });
   }
+  
   try {
-    const id = c.req.param('id');
     const neonService = new NeonService(c);
     const commentRepo = new CommentRepository(neonService);
     
-    const comment = await commentRepo.findById(id);
+    const commentId = c.req.param('id');
+    const comment = await commentRepo.findById(commentId);
     
     if (!comment) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Comment with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Comment not found'),
         404
       );
     }
@@ -116,53 +113,48 @@ comments.get('/:id', async (c) => {
 });
 
 // Update comment
-comments.patch('/:id', async (c) => {
+comments.put('/:id', async (c) => {
   const user = c.get('user');
   if (!user) {
     throw new HTTPException(401, { message: 'Unauthorized' });
   }
+  
+  const commentId = c.req.param('id');
+  
   try {
-    const id = c.req.param('id');
-    const body = await c.req.json();
     const neonService = new NeonService(c);
     const commentRepo = new CommentRepository(neonService);
     
-    // Find the comment first to ensure it exists
-    const existingComment = await commentRepo.findById(id);
+    // First check if comment exists and user owns it
+    const existingComment = await commentRepo.findById(commentId);
+    
     if (!existingComment) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Comment with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Comment not found'),
         404
       );
     }
     
-    // Use systemUpdate for API operations to clear clientId
-    await commentRepo.systemUpdate(id, body);
-    
-    // Always fetch the updated comment to return the most recent state
-    const updatedComment = await commentRepo.findById(id);
-    if (!updatedComment) {
+    if (existingComment.authorId !== user.id) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Comment with id ${id} not found after update`
-        ),
+        createErrorResponse(ServiceErrorType.FORBIDDEN, 'Cannot edit comment you do not own'),
+        403
+      );
+    }
+    
+    const input = await c.req.json<CommentUpdateInput>();
+    const updated = await commentRepo.updateComment(commentId, input);
+    
+    if (!updated) {
+      return c.json(
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Comment not found after update'),
         404
       );
     }
     
-    return c.json(createSuccessResponse(updatedComment));
+    return c.json(createSuccessResponse(updated));
   } catch (err) {
     console.error('Error updating comment:', err);
-    if (err instanceof Error && err.message.includes('validation')) {
-      return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION_ERROR, err.message),
-        400
-      );
-    }
     return c.json(
       createErrorResponse(ServiceErrorType.INTERNAL, String(err)),
       500
@@ -176,37 +168,36 @@ comments.delete('/:id', async (c) => {
   if (!user) {
     throw new HTTPException(401, { message: 'Unauthorized' });
   }
+  
+  const commentId = c.req.param('id');
+  
   try {
-    const id = c.req.param('id');
     const neonService = new NeonService(c);
     const commentRepo = new CommentRepository(neonService);
     
-    // Find the comment first to ensure it exists
-    const existingComment = await commentRepo.findById(id);
+    // First check if comment exists and user owns it
+    const existingComment = await commentRepo.findById(commentId);
+    
     if (!existingComment) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Comment with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Comment not found'),
         404
       );
     }
     
-    // Delete the comment
-    const deleted = await commentRepo.delete(id);
-    
-    if (!deleted) {
+    if (existingComment.authorId !== user.id) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.INTERNAL,
-          `Comment with id ${id} could not be deleted`
-        ),
-        500
+        createErrorResponse(ServiceErrorType.FORBIDDEN, 'Cannot delete comment you do not own'),
+        403
       );
     }
     
-    return c.json(createSuccessResponse({ id }));
+    // Delete comment and all its replies
+    const deletedCount = await commentRepo.deleteWithReplies(commentId);
+    
+    return c.json(createSuccessResponse({
+      message: `Deleted ${deletedCount} comment(s) successfully`
+    }));
   } catch (err) {
     console.error('Error deleting comment:', err);
     return c.json(
@@ -216,4 +207,4 @@ comments.delete('/:id', async (c) => {
   }
 });
 
-export { comments }; 
+export default comments;

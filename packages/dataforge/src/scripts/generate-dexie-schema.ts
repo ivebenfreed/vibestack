@@ -65,7 +65,7 @@ async function saveVersionHistory(history: VersionHistory): Promise<void> {
  */
 function calculateSchemaHash(stores: Record<string, string>): string {
   const sortedStores = Object.keys(stores).sort().reduce((acc, key) => {
-    acc[key] = stores[key];
+    acc[key] = stores[key] || '';
     return acc;
   }, {} as Record<string, string>);
   
@@ -137,10 +137,10 @@ function extractAllEntityMetadata(): Map<string, EntityMetadata> {
   const entityMetadataMap = new Map<string, EntityMetadata>();
   
   // Get all client table names (domain + system + utility)
-  const domainTableNames = ClientEntities.CLIENT_DOMAIN_TABLES.map(table => table.replace(/"/g, ''));
-  const systemTableNames = ClientEntities.CLIENT_SYSTEM_TABLES.map(table => table.replace(/"/g, ''));
+  const domainTableNames = ClientEntities.CLIENT_DOMAIN_TABLES.map(table => String(table).replace(/"/g, ''));
+  const systemTableNames = ClientEntities.CLIENT_SYSTEM_TABLES.map(table => String(table).replace(/"/g, ''));
   const utilityTableNames = ClientEntities.CLIENT_UTILITY_TABLES ? 
-    ClientEntities.CLIENT_UTILITY_TABLES.map(table => table.replace(/"/g, '')) : [];
+    ClientEntities.CLIENT_UTILITY_TABLES.map(table => String(table).replace(/"/g, '')) : [];
   
   const allClientTableNames = [...domainTableNames, ...systemTableNames, ...utilityTableNames];
   console.log('[generate-dexie-schema] All client tables:', allClientTableNames);
@@ -151,11 +151,11 @@ function extractAllEntityMetadata(): Map<string, EntityMetadata> {
   
   for (const [key, value] of Object.entries(ClientEntities)) {
     if (key.endsWith('Schema') && value && typeof value === 'object' && 'options' in value) {
-      const entityName = key.replace('Schema', '');
+      const entityName = key?.replace('Schema', '');
       entitySchemas.push({ name: entityName, schema: value });
     } else if (typeof value === 'function' && value.prototype && !key.endsWith('Schema')) {
       const excludedFunctions = ['getEntityRelationships', 'hasRelationshipConfig', 'getJunctionRelationships'];
-      if (!excludedFunctions.includes(key) && value.name && value.name[0] === value.name[0].toUpperCase()) {
+      if (!excludedFunctions.includes(key) && value.name && value.name[0] === value.name[0]?.toUpperCase()) {
         entityClasses.push({ name: key, entityClass: value as Function });
       }
     }
@@ -182,7 +182,7 @@ function extractAllEntityMetadata(): Map<string, EntityMetadata> {
     
     // Extract indexes from schema and entity class
     const indexedFields = extractIndexedFields(schemaOptions, entityClass, metadata);
-    metadata.indexedFields = indexedFields;
+    (metadata as EntityMetadata).indexedFields = indexedFields;
     
     entityMetadataMap.set(entityName, metadata);
   }
@@ -352,8 +352,8 @@ function generateEntityIndexes(metadata: EntityMetadata): string[] {
   };
   
   // Add indexes from schema metadata (includes @Index() decorators)
-  if (metadata.indexedFields) {
-    for (const indexedField of metadata.indexedFields) {
+  if (metadata.indexedFields || []) {
+    for (const indexedField of metadata.indexedFields || []) {
       addIndex(indexedField);
     }
   }

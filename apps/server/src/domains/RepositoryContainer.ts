@@ -1,4 +1,16 @@
-import { NeonService } from '../lib/neon-orm/neon-service';
+// Repository container for dependency injection
+import { Task, Task as TaskClass } from '@repo/dataforge/server-entities';
+import { User, User as UserClass } from '@repo/dataforge/server-entities';
+import { Comment as _Comment, Comment as CommentClass } from '@repo/dataforge/server-entities';
+import { Project, Project as ProjectClass } from '@repo/dataforge/server-entities';
+import { ChangeHistory, ChangeHistory as ChangeHistoryClass } from '@repo/dataforge/server-entities';
+import { StatusSet, StatusSet as StatusSetClass } from '@repo/dataforge/server-entities';
+import { StatusDefinition, StatusDefinition as StatusDefinitionClass } from '@repo/dataforge/server-entities';
+import { TagSet, TagSet as TagSetClass } from '@repo/dataforge/server-entities';
+import { Tag, Tag as TagClass } from '@repo/dataforge/server-entities';
+import { EntityDependency, EntityDependency as EntityDependencyClass } from '@repo/dataforge/server-entities';
+import { EntityTarget } from 'typeorm';
+import { BaseServerRepository } from './BaseServerRepository';
 import { ProjectRepository } from './projects';
 import { TaskRepository } from './tasks';
 import { UserRepository } from './users';
@@ -9,9 +21,7 @@ import { StatusDefinitionRepository } from './status-definitions';
 import { TagSetRepository } from './tag-sets';
 import { TagRepository } from './tags';
 import { EntityDependencyRepository } from './entity-dependencies';
-import { BaseServerRepository } from './BaseServerRepository';
-import { EntityTarget } from 'typeorm';
-import { Project, Task, User, Comment, ChangeHistory, StatusSet, StatusDefinition, TagSet, Tag, EntityDependency } from '@repo/dataforge/server-entities';
+import { NeonService } from '../lib/neon-orm/neon-service';
 
 /**
  * Central repository container for managing all domain repositories
@@ -91,25 +101,25 @@ export class RepositoryContainer {
   getRepositoryForEntity<T extends { id: string; updated_at?: Date | string }>(
     entityClass: EntityTarget<T>
   ): BaseServerRepository<T> | undefined {
-    if (entityClass === Project) {
+    if (entityClass === ProjectClass) {
       return this.projects as unknown as BaseServerRepository<T>;
-    } else if (entityClass === Task) {
+    } else if (entityClass === TaskClass) {
       return this.tasks as unknown as BaseServerRepository<T>;
-    } else if (entityClass === User) {
+    } else if (entityClass === UserClass) {
       return this.users as unknown as BaseServerRepository<T>;
-    } else if (entityClass === Comment) {
+    } else if (entityClass === CommentClass) {
       return this.comments as unknown as BaseServerRepository<T>;
-    } else if (entityClass === ChangeHistory) {
+    } else if (entityClass === ChangeHistoryClass) {
       return this.changeHistory as unknown as BaseServerRepository<T>;
-    } else if (entityClass === StatusSet) {
+    } else if (entityClass === StatusSetClass) {
       return this.statusSets as unknown as BaseServerRepository<T>;
-    } else if (entityClass === StatusDefinition) {
+    } else if (entityClass === StatusDefinitionClass) {
       return this.statusDefinitions as unknown as BaseServerRepository<T>;
-    } else if (entityClass === TagSet) {
+    } else if (entityClass === TagSetClass) {
       return this.tagSets as unknown as BaseServerRepository<T>;
-    } else if (entityClass === Tag) {
+    } else if (entityClass === TagClass) {
       return this.tags as unknown as BaseServerRepository<T>;
-    } else if (entityClass === EntityDependency) {
+    } else if (entityClass === EntityDependencyClass) {
       return this.entityDependencies as unknown as BaseServerRepository<T>;
     }
     return undefined;

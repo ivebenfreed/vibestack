@@ -458,7 +458,7 @@ export class SyncStateManager implements StateManager {
   async getServerLSN(): Promise<string> {
     try {
       const result = await sql<{ lsn: string }>(this.context, 'SELECT pg_current_wal_lsn() as lsn');
-      return result[0].lsn;
+      return result[0]?.lsn || '';
     } catch (err) {
       syncLogger.error('Server LSN fetch failed', {
         error: err instanceof Error ? err.message : String(err)

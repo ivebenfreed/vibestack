@@ -606,8 +606,8 @@ export class IntegrityManager {
     try {
       // Parse LSN format: "A/B" where A and B are hex numbers
       const [majorHex, minorHex] = currentLSN.split('/');
-      let major = parseInt(majorHex, 16);
-      let minor = parseInt(minorHex, 16);
+      let major = parseInt(majorHex || '0', 16);
+      let minor = parseInt(minorHex || '0', 16);
 
       // Calculate rollback amount based on issue type
       let rollbackAmount: number;
@@ -774,7 +774,7 @@ export class IntegrityManager {
 
   private lsnToDecimal(lsn: string): number {
     const [major, minor] = lsn.split('/');
-    return parseInt(major, 16) * 0x1000000 + parseInt(minor, 16);
+    return parseInt(major || '0', 16) * 0x1000000 + parseInt(minor || '0', 16);
   }
 
 

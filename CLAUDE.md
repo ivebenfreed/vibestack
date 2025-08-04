@@ -40,6 +40,33 @@ We use a unified ESLint and TypeScript configuration for the entire monorepo:
 - **Type check**: `pnpm type-check` - Runs TypeScript compiler in build mode
 - **Full check**: `pnpm check` - Runs both type checking and linting
 
+#### Focused Type Checking Scripts
+
+For debugging and fixing type errors systematically, use the focused type check scripts:
+
+- **`./scripts/type-check-focused/type-check-all.sh`** - Runs focused checks on all packages with summary
+- **`./scripts/type-check-focused/type-check-server.sh`** - Server-only type check (faster than full monorepo check)
+- **`./scripts/type-check-focused/type-check-web.sh`** - Web app type check
+- **`./scripts/type-check-focused/type-check-dataforge.sh`** - DataForge package type check
+
+These scripts are particularly useful when:
+- Full `pnpm type-check` hangs or is slow
+- You need to debug specific package errors
+- Working on systematic error fixes
+- The monorepo type check times out
+
+**Example workflow for fixing type errors:**
+```bash
+# Check all packages with summary
+./scripts/type-check-focused/type-check-all.sh
+
+# Focus on specific package with errors
+./scripts/type-check-focused/type-check-server.sh
+
+# After fixes, verify with full check
+pnpm type-check
+```
+
 #### ESLint Rules
 - Catches real errors: unreachable code, duplicate cases, invalid types
 - Warns on code quality issues: console.log, debugger, var usage
@@ -58,6 +85,68 @@ We use a unified ESLint and TypeScript configuration for the entire monorepo:
 1. Run `pnpm check` to ensure no type or lint errors
 2. Fix any issues before pushing
 3. Generated files in `packages/dataforge/src/generated/` are ignored
+
+## Playwright Testing with Isolated Profiles
+
+### Automated Browser Testing per Worktree
+
+Each worktree gets its own isolated browser profile for Playwright testing. This ensures that:
+- Login sessions don't interfere between branches
+- Browser state is isolated per issue/feature
+- Screenshots and videos are saved per worktree
+
+#### Quick Start
+
+```bash
+# Run all Playwright tests with isolated profile
+./scripts/playwright-test.sh
+
+# Run specific test file
+./scripts/playwright-test.sh tests/playwright/vibegantt-screenshot.spec.js
+
+# Run in debug mode
+./scripts/playwright-test.sh --debug
+
+# Run headless
+./scripts/playwright-test.sh --headed=false
+```
+
+#### How It Works
+
+1. **Auto-Detection**: Script detects issue number from branch name (`issue-10` → Issue #10)
+2. **Port Calculation**: Calculates correct ports for the worktree (Issue #10 → Web: 5273, Server: 8887)
+3. **Profile Isolation**: Uses `.playwright/profiles/profile-{issue}` for browser data
+4. **Screenshot Storage**: Saves screenshots to `./screenshots/` directory
+
+#### Test Configuration
+
+The `playwright.config.js` automatically:
+- Detects the current branch/issue number
+- Calculates the correct ports for the worktree
+- Sets up isolated browser profiles
+- Configures screenshot and video recording
+
+#### Directory Structure
+
+```
+worktrees/issue-10/
+├── .playwright/
+│   └── profiles/
+│       └── profile-10/          # Isolated browser profile
+├── screenshots/                 # Test screenshots
+├── test-results/               # Test artifacts
+├── tests/
+│   └── playwright/
+│       └── *.spec.js           # Test files
+└── playwright.config.js       # Auto-configured for this worktree
+```
+
+#### Integration with Development Workflow
+
+1. Create new worktree: `git worktree add worktrees/issue-123 -b issue-123`
+2. Install dependencies: `cd worktrees/issue-123 && pnpm install`
+3. Start dev servers: `./scripts/dev-start.sh`
+4. Run tests: `./scripts/playwright-test.sh`
 
 ## Background Process Management
 

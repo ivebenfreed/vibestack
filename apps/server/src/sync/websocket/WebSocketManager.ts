@@ -94,7 +94,9 @@ export class WebSocketManager {
     this.context.setClientId(clientId);
 
     // Configure WebSocket with hibernation API
-    this.context.ctx.acceptWebSocket(server);
+    if (server) {
+      this.context.ctx.acceptWebSocket(server);
+    }
     
     // Return connection info for further processing by parent
     return new Response(null, {
@@ -295,7 +297,7 @@ export class WebSocketManager {
 
     while (retries < maxRetries) {
       const webSockets = this.context.ctx.getWebSockets();
-      if (webSockets.length > 0 && webSockets[0].readyState === WS_READY_STATE.OPEN) {
+      if (webSockets.length > 0 && webSockets[0]?.readyState === WS_READY_STATE.OPEN) {
         return;
       }
       await new Promise(resolve => setTimeout(resolve, retryDelay));

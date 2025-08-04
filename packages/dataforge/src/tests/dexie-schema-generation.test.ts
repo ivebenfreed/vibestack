@@ -24,7 +24,7 @@ describe('Dexie Schema Generation', () => {
   it('should include the correct version number', () => {
     const versionMatch = schemaContent.match(/Current Version:\s*(\d+)/);
     expect(versionMatch).toBeTruthy();
-    const version = parseInt(versionMatch![1]);
+    const version = parseInt(versionMatch![1] || '0');
     expect(version).toBeGreaterThan(0);
   });
 

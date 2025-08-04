@@ -1,12 +1,11 @@
-import { StatusSet } from "@repo/dataforge/server-entities";
+import { StatusSet, StatusSet as StatusSetClass } from "@repo/dataforge/server-entities";
 import { NeonService } from '../lib/neon-orm/neon-service';
 import { BaseServerRepository } from './BaseServerRepository';
 
 // Simplified type definitions
-type StatusSetInstance = StatusSet;
 
 // Input types for API
-export type StatusSetCreateInput = Partial<Omit<StatusSetInstance, 'id' | 'created_at' | 'updated_at'>>;
+export type StatusSetCreateInput = Partial<Omit<StatusSet, 'id' | 'created_at' | 'updated_at'>>;
 export type StatusSetUpdateInput = Partial<StatusSetCreateInput>;
 
 /**
@@ -15,7 +14,7 @@ export type StatusSetUpdateInput = Partial<StatusSetCreateInput>;
 export class StatusSetRepository extends BaseServerRepository<StatusSet> {
   
   constructor(neonService: NeonService) {
-    super(neonService, StatusSet);
+    super(neonService, StatusSetClass);
   }
 
   /**

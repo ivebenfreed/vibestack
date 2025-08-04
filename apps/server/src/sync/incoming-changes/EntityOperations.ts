@@ -101,7 +101,7 @@ export class EntityOperations {
           if (changes.length > 1) {
             return this.executeBatchInsert(table, changes);
           } else {
-            const result = await this.executeInsert(table, changes[0].data as RecordData);
+            const result = await this.executeInsert(table, changes[0]?.data as RecordData);
             return result ? [result] : [];
           }
         case 'update':
@@ -136,15 +136,15 @@ export class EntityOperations {
       
       try {
         const result = await Promise.race([
-          executor(table, changes[0].data as RecordData),
+          executor(table, changes[0]?.data as RecordData),
           timeoutPromise
         ]);
         return result ? [result] : [];
       } catch (error) {
         syncLogger.error(`Single operation timed out or failed: ${error instanceof Error ? error.message : String(error)}`, {
           table,
-          operation: changes[0].operation,
-          id: (changes[0].data as RecordData).id,
+          operation: changes[0]?.operation,
+          id: (changes[0]?.data as RecordData)?.id,
           timestamp: new Date().toISOString()
         }, MODULE_NAME);
         return [];
@@ -720,7 +720,7 @@ export class EntityOperations {
       }
 
       // Use the universal relationship remover
-      await this.removeUniversalRelationship(sourceRepo, sourceId, relationName, targetId);
+      await this.removeUniversalRelationship(sourceRepo, sourceId || '', relationName, targetId || '');
       
       // Return synthetic record for consistency
       return {
@@ -742,7 +742,7 @@ export class EntityOperations {
   private async executeBatchInsert(table: string, changes: TableChange[]): Promise<any[]> {
     if (changes.length === 0) return [];
     if (changes.length === 1) {
-      const result = await this.executeInsert(table, changes[0].data as RecordData);
+      const result = await this.executeInsert(table, changes[0]?.data as RecordData);
       return result ? [result] : [];
     }
     
@@ -931,7 +931,7 @@ export class EntityOperations {
           relationName: relUpdate.relationName,
           operation: relUpdate.operation,
           targetCount: relUpdate.targetIds.length,
-          junctionTable: relationshipConfig.junctionTable,
+          junctionTable: relationshipConfig?.junctionTable,
           skipValidation
         }, MODULE_NAME);
         
@@ -942,7 +942,7 @@ export class EntityOperations {
           relationName: relUpdate.relationName,
           operation: relUpdate.operation,
           targetCount: relUpdate.targetIds.length,
-          junctionTable: relationshipConfig.junctionTable,
+          junctionTable: relationshipConfig?.junctionTable,
           error: error instanceof Error ? error.message : String(error)
         }, MODULE_NAME);
         throw error;
