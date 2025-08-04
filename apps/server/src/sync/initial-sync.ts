@@ -222,7 +222,7 @@ async function getTableChunk<T extends QueryResultRow>(
       // Check if there are more records
       const hasMore = result.rows.length > chunkSize;
       const items = hasMore ? result.rows.slice(0, chunkSize) : result.rows;
-      const nextCursor = items.length > 0 ? items[items.length - 1].id : null;
+      const nextCursor = items.length > 0 ? items[items.length - 1]?.id : null;
 
       return {
         items,

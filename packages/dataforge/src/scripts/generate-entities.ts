@@ -643,16 +643,16 @@ function generateContextOutput(
                          console.warn(`WARN: Multiple join columns found for ${entityName}.${propertyName}. Only using the first one for EntitySchema generation.`);
                      }
                      const joinColMeta = joinColumnMetas[0];
-                     const joinColName = joinColMeta.name || namingStrategy.joinColumnName(propertyName, targetEntityName);
+                     const joinColName = joinColMeta?.name || namingStrategy.joinColumnName(propertyName, targetEntityName);
                      // Referenced column name defaults to the primary column of the target entity if not specified.
                      // We only include it in the schema if it WAS explicitly defined in the decorator.
                      let joinColumnDef = `{ name: '${joinColName}'`;
-                     if (joinColMeta.referencedColumnName) {
-                         joinColumnDef += `, referencedColumnName: '${joinColMeta.referencedColumnName}'`;
+                     if (joinColMeta?.referencedColumnName) {
+                         joinColumnDef += `, referencedColumnName: '${joinColMeta?.referencedColumnName}'`;
                      }
                      // *** ADDED CHECK FOR foreignKeyConstraintName ***
-                     if (joinColMeta.foreignKeyConstraintName) {
-                         joinColumnDef += `, foreignKeyConstraintName: '${joinColMeta.foreignKeyConstraintName}'`;
+                     if (joinColMeta?.foreignKeyConstraintName) {
+                         joinColumnDef += `, foreignKeyConstraintName: '${joinColMeta?.foreignKeyConstraintName}'`;
                      }
                      // ***********************************************
                      joinColumnDef += ` }`;
@@ -945,11 +945,11 @@ function extractJunctionTableInfo(entities: Function[], filter: MetadataFilter):
                 let targetColumnDb = `${targetEntityName.toLowerCase()}_id`;
                 
                 if (joinTableMeta.joinColumns && joinTableMeta.joinColumns.length > 0) {
-                    sourceColumnDb = joinTableMeta.joinColumns[0].name || `${entityName.toLowerCase()}_id`;
+                    sourceColumnDb = joinTableMeta.joinColumns[0]?.name || `${entityName.toLowerCase()}_id`;
                 }
                 
                 if (joinTableMeta.inverseJoinColumns && joinTableMeta.inverseJoinColumns.length > 0) {
-                    targetColumnDb = joinTableMeta.inverseJoinColumns[0].name || `${targetEntityName.toLowerCase()}_id`;
+                    targetColumnDb = joinTableMeta.inverseJoinColumns[0]?.name || `${targetEntityName.toLowerCase()}_id`;
                 }
                 
                 // Convert database column names to TypeScript property names (camelCase for Dexie schema)
@@ -1063,9 +1063,10 @@ function generateRelationshipConfigs(entities: Function[], filter: MetadataFilte
         output += `  '${entityName}': {\n`;
         
         // Add foreign key relationships
-        if (foreignKeyConfigs[entityName]?.length > 0) {
+        const entityForeignKeys = foreignKeyConfigs[entityName];
+        if (entityForeignKeys && entityForeignKeys.length > 0) {
             output += `    requiredReferences: [\n`;
-            foreignKeyConfigs[entityName].forEach((ref: any) => {
+            entityForeignKeys.forEach((ref: any) => {
                 output += `      {\n`;
                 output += `        field: '${ref.field}',\n`;
                 output += `        targetEntity: '${ref.targetEntity}',\n`;
@@ -1078,9 +1079,10 @@ function generateRelationshipConfigs(entities: Function[], filter: MetadataFilte
         }
         
         // Add self-referential relationships
-        if (selfReferenceConfigs[entityName]?.length > 0) {
+        const entitySelfRefs = selfReferenceConfigs[entityName];
+        if (entitySelfRefs && entitySelfRefs.length > 0) {
             output += `    selfReferences: [\n`;
-            selfReferenceConfigs[entityName].forEach((selfRef: any) => {
+            entitySelfRefs.forEach((selfRef: any) => {
                 output += `      {\n`;
                 output += `        field: '${selfRef.field}',\n`;
                 output += `        allowCycles: ${selfRef.allowCycles},\n`;
@@ -1091,9 +1093,10 @@ function generateRelationshipConfigs(entities: Function[], filter: MetadataFilte
         }
         
         // Add junction relationships
-        if (junctionConfigs[entityName]?.length > 0) {
+        const entityJunctions = junctionConfigs[entityName];
+        if (entityJunctions && entityJunctions.length > 0) {
             output += `    junctionRelationships: [\n`;
-            junctionConfigs[entityName].forEach((junction: any) => {
+            entityJunctions.forEach((junction: any) => {
                 output += `      {\n`;
                 output += `        junctionTable: '${junction.junctionTable}',\n`;
                 output += `        relationName: '${junction.relationName}',\n`;

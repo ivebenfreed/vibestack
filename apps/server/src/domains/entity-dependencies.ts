@@ -1,4 +1,4 @@
-import { EntityDependency, DependencyType } from '@repo/dataforge/server-entities';
+import { EntityDependency, EntityDependency as EntityDependencyClass, DependencyType } from '@repo/dataforge/server-entities';
 import { FindOptionsWhere, In } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import { BaseServerRepository } from './BaseServerRepository';
@@ -13,7 +13,7 @@ const MODULE_NAME = 'entity-dependencies-repository';
  */
 export class EntityDependencyRepository extends BaseServerRepository<EntityDependency> {
   constructor(neonService: NeonService) {
-    super(neonService, EntityDependency);
+    super(neonService, EntityDependencyClass);
   }
 
   /**
@@ -69,7 +69,7 @@ export class EntityDependencyRepository extends BaseServerRepository<EntityDepen
   async getTaskDependenciesForProject(projectId: string): Promise<EntityDependency[]> {
     try {
       // First, get all task IDs for the project
-      const queryBuilder = await this.neonService.createQueryBuilder(EntityDependency, 'ed');
+      const queryBuilder = await this.neonService.createQueryBuilder(EntityDependencyClass, 'ed');
       const dependencies = await queryBuilder
         .where('ed.entity_type = :entityType', { entityType: 'task' })
         .andWhere(qb => {

@@ -49,7 +49,7 @@ export class IncomingChangeProcessor {
       await this.setStatementTimeout();
       
       // Extract change IDs for acknowledgment
-      const changeIds = changes.map(change => (change.data as any).id);
+      const changeIds = changes.map(change => (change?.data as any).id);
       
       // Send received acknowledgment first
       try {
@@ -131,7 +131,7 @@ export class IncomingChangeProcessor {
       try {
         await this.sendChangesApplied(
           clientId,
-          changes.map(change => (change.data as any).id),
+          changes.map(change => (change?.data as any).id),
           false, // success = false
           error instanceof Error ? error : new Error(String(error)),
           {
@@ -177,7 +177,7 @@ export class IncomingChangeProcessor {
     
     // Track all changes by ID for conflict detection
     for (const change of changes) {
-      const data = change.data as any;
+      const data = change?.data as any;
       processingMap.set(data.id, false); // Initially mark all as unprocessed
     }
     
@@ -194,22 +194,22 @@ export class IncomingChangeProcessor {
         for (let i = 0; i < group.changes.length; i++) {
           const change = group.changes[i];
           const result = batchResults[i];
-          const changeId = (change.data as any).id;
+          const changeId = (change?.data as any).id;
           
           if (result && result.id) {
             processingMap.set(changeId, true); // Mark as processed
             results.push({ success: true, data: result });
           } else if (result === null) {
             // null result indicates CRDT conflict
-            conflictedChanges.push(change);
+            if (change) conflictedChanges.push(change);
             processingMap.set(changeId, true); // Mark as processed (but conflicted)
             results.push({ success: true, data: null, skipped: true });
             
             syncLogger.info(`CRDT conflict detected during save`, {
-              table: change.table,
-              operation: change.operation,
+              table: change?.table,
+              operation: change?.operation,
               entityId: changeId,
-              clientId: change.clientId
+              clientId: change?.clientId
             }, MODULE_NAME);
           }
         }
@@ -224,7 +224,7 @@ export class IncomingChangeProcessor {
         
         // Mark as failed but continue processing other groups
         for (const change of group.changes) {
-          const data = change.data as any;
+          const data = change?.data as any;
           if (!processingMap.get(data.id)) {
             results.push({ 
               success: false, 
@@ -265,7 +265,7 @@ export class IncomingChangeProcessor {
     
     // Group changes by table and operation
     for (const change of changes) {
-      const key = `${change.table}:${change.operation}`;
+      const key = `${change?.table}:${change?.operation}`;
       if (!groupMap.has(key)) {
         groupMap.set(key, []);
       }
@@ -275,7 +275,7 @@ export class IncomingChangeProcessor {
     // Convert to array of groups
     for (const [key, changes] of groupMap.entries()) {
       const [table, operation] = key.split(':');
-      groups.push({ table, operation, changes });
+      groups.push({ table: table || '', operation: operation || '', changes });
     }
     
     return groups;
@@ -299,16 +299,16 @@ export class IncomingChangeProcessor {
       clientId,
       messageId: message.messageId,
       changes: changes.map((change, index) => {
-        const data = change.data as any;
+        const data = change?.data as any;
         return {
           index: index + 1,
-          table: change.table,
-          operation: change.operation,
+          table: change?.table,
+          operation: change?.operation,
           entityId: data.id,
-          hasRelationshipUpdates: !!(change.relationshipUpdates && change.relationshipUpdates.length > 0),
-          relationshipUpdatesCount: change.relationshipUpdates?.length || 0,
-          hasEntityRelations: !!(change.entityRelations && change.entityRelations.length > 0),
-          updatedAt: change.updatedAt,
+          hasRelationshipUpdates: !!(change?.relationshipUpdates && change?.relationshipUpdates.length > 0),
+          relationshipUpdatesCount: change?.relationshipUpdates?.length || 0,
+          hasEntityRelations: !!(change?.entityRelations && change?.entityRelations.length > 0),
+          updatedAt: change?.updatedAt,
           dataKeys: Object.keys(data)
         };
       })
@@ -323,16 +323,21 @@ export class IncomingChangeProcessor {
     const summary: Record<string, Record<string, number>> = {};
     
     for (const change of changes) {
-      if (!summary[change.table]) {
-        summary[change.table] = {};
+      const tableName = change?.table;
+      const operation = change?.operation;
+      
+      if (!tableName || !operation) continue;
+      
+      if (!summary[tableName]) {
+        summary[tableName] = {};
       }
       
       // Determine the type of change more accurately
-      let changeType: string = change.operation;
+      let changeType: string = operation;
       
       // For updates, check if this is a pure relationship update
-      if (change.operation === 'update' && change.relationshipUpdates && change.relationshipUpdates.length > 0) {
-        const data = change.data as any;
+      if (operation === 'update' && change?.relationshipUpdates && change?.relationshipUpdates.length > 0) {
+        const data = change?.data as any;
         
         // Check if there are actual entity fields to update (beyond id, clientId, updatedAt)
         const entityFields = Object.keys(data).filter(key => 
@@ -348,10 +353,15 @@ export class IncomingChangeProcessor {
         }
       }
       
-      if (!summary[change.table][changeType]) {
-        summary[change.table][changeType] = 0;
+      if (changeType && summary[tableName]) {
+        const tableEntry = summary[tableName];
+        if (tableEntry) {
+          if (!tableEntry[changeType]) {
+            tableEntry[changeType] = 0;
+          }
+          tableEntry[changeType] = (tableEntry[changeType] || 0) + 1;
+        }
       }
-      summary[change.table][changeType]++;
     }
     
     return summary;

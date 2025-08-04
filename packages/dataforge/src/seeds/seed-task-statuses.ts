@@ -35,15 +35,9 @@ async function seedTaskStatuses() {
     // Create task status set
     const taskStatusSet = statusSetRepo.create({
       name: 'task_workflow',
-      label: 'Task Workflow',
       description: 'Default workflow for task management',
-      entityType: 'Task',
-      isDefault: true,
-      isActive: true,
-      metadata: {
-        version: '1.0',
-        createdBy: 'system-seed'
-      }
+      entityType: 'task',
+      isSystem: true
     });
     
     await statusSetRepo.save(taskStatusSet);
@@ -169,7 +163,7 @@ async function seedTaskStatuses() {
     // In a real application, you might want to restrict certain transitions
     
     console.log('\n🎉 Task status seed completed successfully!');
-    console.log(`   - Status Set: ${taskStatusSet.label} (${taskStatusSet.id})`);
+    console.log(`   - Status Set: ${taskStatusSet.name} (${taskStatusSet.id})`);
     console.log(`   - Statuses: ${statusDefinitions.length} created`);
     
   } catch (error) {

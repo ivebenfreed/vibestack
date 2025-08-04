@@ -336,7 +336,7 @@ export class SyncStrategyAnalyzer {
   private lsnToDecimal(lsn: string): number {
     const [major, minor] = lsn.split('/');
     // PostgreSQL LSN: major part * 16MB + minor part
-    return parseInt(major, 16) * 0x1000000 + parseInt(minor, 16);
+    return parseInt(major || '0', 16) * 0x1000000 + parseInt(minor || '0', 16);
   }
 
   /**

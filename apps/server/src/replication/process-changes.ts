@@ -1,4 +1,5 @@
 import type { TableChange, RelationshipUpdate } from '@repo/sync-types';
+import { ChangeHistory } from '@repo/dataforge/server-entities';
 import { replicationLogger } from '../middleware/logger';
 import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';
@@ -653,7 +654,18 @@ export async function storeChangesInHistory(
   try {
     // Try using repository first
     const repositories = createRepositoryContainer(context);
-    const success = await repositories.changeHistory.bulkInsertChanges(changes, storeBatchSize);
+    
+    // Convert TableChange[] to Partial<ChangeHistory>[]
+    const changeHistoryEntries: Partial<ChangeHistory>[] = changes.map(change => ({
+      lsn: change.lsn || '',
+      tableName: change.table,
+      operation: change.operation,
+      data: change.data,
+      timestamp: new Date()
+    }));
+    
+    const result = await repositories.changeHistory.bulkInsertChanges(changeHistoryEntries);
+    const success = result.length > 0;
     
     if (success) {
       return true;
@@ -783,7 +795,7 @@ export async function processChanges(
     return { success: true, storedChanges: false, lastLSN: '' };
   }
 
-  const lastLSN = changes[changes.length - 1].lsn;
+  const lastLSN = changes[changes.length - 1]?.lsn || '';
   const startTime = Date.now();
 
   try {

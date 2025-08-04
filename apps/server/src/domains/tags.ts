@@ -1,12 +1,11 @@
-import { Tag } from "@repo/dataforge/server-entities";
+import { Tag, Tag as TagClass } from "@repo/dataforge/server-entities";
 import { NeonService } from '../lib/neon-orm/neon-service';
 import { BaseServerRepository } from './BaseServerRepository';
 
 // Simplified type definitions
-type TagInstance = Tag;
 
 // Input types for API
-export type TagCreateInput = Partial<Omit<TagInstance, 'id' | 'created_at' | 'updated_at'>>;
+export type TagCreateInput = Partial<Omit<Tag, 'id' | 'created_at' | 'updated_at'>>;
 export type TagUpdateInput = Partial<TagCreateInput>;
 
 /**
@@ -15,7 +14,7 @@ export type TagUpdateInput = Partial<TagCreateInput>;
 export class TagRepository extends BaseServerRepository<Tag> {
   
   constructor(neonService: NeonService) {
-    super(neonService, Tag);
+    super(neonService, TagClass);
   }
 
   /**

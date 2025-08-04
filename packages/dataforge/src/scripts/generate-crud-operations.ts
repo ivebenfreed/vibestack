@@ -38,7 +38,7 @@ async function generateCrudOperations() {
         } else if (typeof value === 'function' && value.prototype && !key.endsWith('Schema')) {
             // Skip utility functions and only include entity classes
             const excludedFunctions = ['getEntityRelationships', 'hasRelationshipConfig', 'getJunctionRelationships'];
-            if (!excludedFunctions.includes(key) && value.name && value.name[0] === value.name[0].toUpperCase()) {
+            if (!excludedFunctions.includes(key) && value.name && value.name[0] === value.name[0]?.toUpperCase()) {
                 entityClasses.push({ name: key, entityClass: value as Function });
             }
         }

@@ -1,21 +1,20 @@
 import { Client } from '@neondatabase/serverless';
-import { Task, TaskStatus, TaskPriority } from "@repo/dataforge/server-entities";
+import { Task, Task as TaskClass, TaskStatus, TaskPriority } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
 import { FindOptionsWhere, DeepPartial } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import type { Context } from 'hono';
-import type { Env } from '../types/env';
-import type { AppBindings } from '../types/hono';
+import { Context } from 'hono';
+import { Env } from '../types/env';
+import { AppBindings } from '../types/hono';
 import { BaseServerRepository } from './BaseServerRepository';
 
 // Re-export enums for convenience
 export { TaskStatus, TaskPriority };
 
 // Simplified type definitions
-type TaskInstance = Task;
 
 // Input types for API
-export type TaskCreateInput = Partial<Omit<TaskInstance, 'id' | 'created_at' | 'updated_at'>>;
+export type TaskCreateInput = Partial<Omit<Task, 'id' | 'created_at' | 'updated_at'>>;
 export type TaskUpdateInput = Partial<TaskCreateInput>;
 
 /**
@@ -24,7 +23,7 @@ export type TaskUpdateInput = Partial<TaskCreateInput>;
 export class TaskRepository extends BaseServerRepository<Task> {
   
   constructor(neonService: NeonService) {
-    super(neonService, Task);
+    super(neonService, TaskClass);
   }
 
   /**
@@ -144,7 +143,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
    * Add dependency to task using TypeORM query builder
    */
   async addDependency(taskId: string, dependencyId: string): Promise<Task | null> {
-    const queryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
+    const queryBuilder = await this.neonService.createQueryBuilder(TaskClass, 'task');
     await queryBuilder
       .insert()
       .into('task_dependencies')
@@ -162,7 +161,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
    * Remove dependency from task using TypeORM query builder
    */
   async removeDependency(taskId: string, dependencyId: string): Promise<Task | null> {
-    const queryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
+    const queryBuilder = await this.neonService.createQueryBuilder(TaskClass, 'task');
     await queryBuilder
       .delete()
       .from('task_dependencies')
@@ -487,7 +486,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
   override async delete(id: string): Promise<boolean> {
     try {
       // First delete all dependencies
-      const dependencyQueryBuilder = await this.neonService.createQueryBuilder(Task, 'task');
+      const dependencyQueryBuilder = await this.neonService.createQueryBuilder(TaskClass, 'task');
       await dependencyQueryBuilder
         .delete()
         .from('task_dependencies')
@@ -525,79 +524,79 @@ const createServiceFromClient = (client: Client): NeonService => {
 // Legacy compatibility layer - maps the class-based repository to the old interface
 // This preserves backward compatibility with code still using the taskQueries object
 export const taskQueries = {
-  findAll: async (client: Client): Promise<TaskInstance[]> => {
+  findAll: async (client: Client): Promise<Task[]> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.findAll();
   },
 
-  findById: async (client: Client, id: string): Promise<TaskInstance | null> => {
+  findById: async (client: Client, id: string): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.findById(id);
   },
 
-  findByProjectId: async (client: Client, projectId: string): Promise<TaskInstance[]> => {
+  findByProjectId: async (client: Client, projectId: string): Promise<Task[]> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.findByProjectId(projectId);
   },
 
-  findByAssigneeId: async (client: Client, assigneeId: string): Promise<TaskInstance[]> => {
+  findByAssigneeId: async (client: Client, assigneeId: string): Promise<Task[]> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.findByAssigneeId(assigneeId);
   },
 
-  findByStatus: async (client: Client, status: typeof TaskStatus[keyof typeof TaskStatus]): Promise<TaskInstance[]> => {
+  findByStatus: async (client: Client, status: typeof TaskStatus[keyof typeof TaskStatus]): Promise<Task[]> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.findByStatus(status);
   },
 
-  create: async (client: Client, data: TaskCreateInput): Promise<TaskInstance> => {
+  create: async (client: Client, data: TaskCreateInput): Promise<Task> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.create(data);
   },
 
-  update: async (client: Client, id: string, data: TaskUpdateInput): Promise<TaskInstance | null> => {
+  update: async (client: Client, id: string, data: TaskUpdateInput): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.update(id, data);
   },
 
-  updateStatus: async (client: Client, id: string, status: typeof TaskStatus[keyof typeof TaskStatus]): Promise<TaskInstance | null> => {
+  updateStatus: async (client: Client, id: string, status: typeof TaskStatus[keyof typeof TaskStatus]): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.updateStatus(id, status);
   },
 
-  updateTimeRange: async (client: Client, id: string, timeRange: string): Promise<TaskInstance | null> => {
+  updateTimeRange: async (client: Client, id: string, timeRange: string): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.updateTimeRange(id, timeRange);
   },
 
-  addDependency: async (client: Client, taskId: string, dependencyId: string): Promise<TaskInstance | null> => {
+  addDependency: async (client: Client, taskId: string, dependencyId: string): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.addDependency(taskId, dependencyId);
   },
 
-  removeDependency: async (client: Client, taskId: string, dependencyId: string): Promise<TaskInstance | null> => {
+  removeDependency: async (client: Client, taskId: string, dependencyId: string): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.removeDependency(taskId, dependencyId);
   },
 
-  addTag: async (client: Client, id: string, tag: string): Promise<TaskInstance | null> => {
+  addTag: async (client: Client, id: string, tag: string): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.addTag(id, tag);
   },
 
-  removeTag: async (client: Client, id: string, tag: string): Promise<TaskInstance | null> => {
+  removeTag: async (client: Client, id: string, tag: string): Promise<Task | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new TaskRepository(neonService);
     return await repo.removeTag(id, tag);

@@ -21,7 +21,7 @@
     "lint": "eslint . --cache --cache-location=.eslintcache",
     "lint:fix": "eslint . --fix --cache --cache-location=.eslintcache",
     "lint:staged": "./scripts/lint-staged.sh",
-    "type-check": "tsc --build --verbose",
+    "type-check": "./scripts/type-check-focused/type-check-all.sh",
     "type-check:watch": "tsc --build --watch",
     "type-check:quick": "./scripts/quick-type-check.sh",
     "type-errors": "./scripts/show-type-errors.sh",
@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
+    "@playwright/test": "^1.54.2",
     "@repo/eslint-config": "workspace:*",
     "eslint": "^9.25.1",
     "eslint-plugin-import": "^2.29.1",

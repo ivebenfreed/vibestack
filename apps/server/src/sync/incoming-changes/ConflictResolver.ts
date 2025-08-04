@@ -226,6 +226,8 @@ export class ConflictResolver {
         // Multiple changes for the same entity - potential conflict
         for (let i = 0; i < entityChanges.length; i++) {
           const change = entityChanges[i];
+          if (!change) continue;
+          
           const conflictingChanges = entityChanges.filter((_, index) => index !== i);
           
           if (conflictingChanges.length > 0) {
@@ -604,3 +606,10 @@ export class ConflictResolver {
     return existingValue;
   }
 } 
+// Helper to ensure we always have a valid TableChange
+function ensureTableChange(change: TableChange | undefined): TableChange {
+  if (!change) {
+    throw new Error('Invalid change object');
+  }
+  return change;
+}

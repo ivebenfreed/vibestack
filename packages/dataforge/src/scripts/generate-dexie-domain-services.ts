@@ -23,7 +23,7 @@ interface RelationshipInfo {
 interface EntityInfo {
   name: string;
   tableName: string;
-  relationships: RelationshipInfo[];
+  relationships?: any[];
 }
 
 // ============================================================================
@@ -49,10 +49,10 @@ async function generateDexieDomainServices() {
   
   // Parse the table to entity mappings
   const tableToEntityMap: Record<string, string> = {};
-  const mappingLines = tableMapMatch[1].split(',').map(line => line.trim()).filter(line => line);
+  const mappingLines = tableMapMatch[1]?.split(',').map(line => line.trim()).filter(line => line) || [];
   mappingLines.forEach(line => {
     const match = line.match(/['"](.+?)['"]\s*:\s*['"](.+?)['"]/);
-    if (match) {
+    if (match && match[1] && match[2]) {
       tableToEntityMap[match[1]] = match[2];
     }
   });
@@ -62,7 +62,7 @@ async function generateDexieDomainServices() {
   let domainTables: string[] = [];
   
   if (domainTablesMatch) {
-    domainTables = domainTablesMatch[1]
+    domainTables = (domainTablesMatch[1] || '')
       .split(',')
       .map(t => t.trim().replace(/['"]/g, ''))
       .filter(t => t);
@@ -251,7 +251,7 @@ function tableNameToEntityName(tableName: string): string {
 // Code Generation
 // ============================================================================
 
-function generateEntityDomainService(entity: { name: string; tableName: string }): string {
+function generateEntityDomainService(entity: { name: string; tableName: string; relationships?: any[] }): string {
   const lowerName = entity.name.toLowerCase();
   
   return `/**
@@ -264,12 +264,19 @@ function generateEntityDomainService(entity: { name: string; tableName: string }
  */
 
 import { db } from '../dexie-schema.js';
+import type { ${entity.name} } from '../client-entities.js';
+
+// Type definitions for ${entity.name}
+export interface ${entity.name}UpdateInput {
+  // Basic fields that can be updated (excluding relationships and computed fields)
+  [key: string]: any;
+}
 
 export class ${entity.name}DexieService {
   /**
    * Create a new ${entity.name}
    */
-  async create(input: any): Promise<any> {
+  async create(input: Record<string, any>): Promise<${entity.name}> {
     const id = (globalThis as any).crypto.randomUUID();
     const now = new Date();
     
@@ -278,7 +285,7 @@ export class ${entity.name}DexieService {
       id,
       createdAt: now,
       updatedAt: now,
-    };
+    } as ${entity.name};
     
     await db.${entity.tableName}.add(${lowerName});
     return ${lowerName};
@@ -287,24 +294,26 @@ export class ${entity.name}DexieService {
   /**
    * Get ${entity.name} by ID
    */
-  async getById(id: string): Promise<any> {
+  async getById(id: string): Promise<${entity.name} | undefined> {
     return await db.${entity.tableName}.get(id);
   }
 
   /**
    * Get all ${entity.name}s
    */
-  async getAll(): Promise<any[]> {
+  async getAll(): Promise<${entity.name}[]> {
     return await db.${entity.tableName}.toArray();
   }
 
   /**
    * Update ${entity.name}
    */
-  async update(id: string, updates: any): Promise<any> {
+  async update(id: string, updates: Record<string, any>): Promise<${entity.name} | undefined> {
     const updatedAt = new Date();
     
-    await db.${entity.tableName}.update(id, { ...updates, updatedAt });
+    // Use type assertion to avoid circular reference issues
+    const updateData: any = { ...updates, updatedAt };
+    await (db.${entity.tableName} as any).update(id, updateData);
     
     return await this.getById(id);
   }
@@ -385,9 +394,9 @@ function generateRelationshipMethods(entity: EntityInfo): string {
   const methods: string[] = [];
   
   // Group relationships by type
-  const manyToManyRelations = entity.relationships.filter(r => r.type === 'many-to-many');
-  const oneToManyRelations = entity.relationships.filter(r => r.type === 'one-to-many');
-  const manyToOneRelations = entity.relationships.filter(r => r.type === 'many-to-one');
+  const manyToManyRelations = hasRelationships(entity) ? entity.relationships.filter(r => r.type === 'many-to-many') : [];
+  const oneToManyRelations = hasRelationships(entity) ? entity.relationships.filter(r => r.type === 'one-to-many') : [];
+  const manyToOneRelations = hasRelationships(entity) ? entity.relationships.filter(r => r.type === 'many-to-one') : [];
   
   // Generate many-to-many relationship methods
   for (const relation of manyToManyRelations) {
@@ -432,7 +441,8 @@ function generateRelationshipMethods(entity: EntityInfo): string {
         await db.${relation.junctionTable}.bulkAdd(
           targetIds.map(targetId => ({
             ${sourceIdField}: ${camelCase(entity.name)}Id,
-            ${targetIdField}: targetId,
+            ${targetIdField}: targetId,${relation.junctionTable === 'project_members' ? `
+            role: 'member',` : ''}
             createdAt: now,
             updatedAt: now
           }))
@@ -621,3 +631,7 @@ async function main() {
 }
 
 main().catch(console.error);
+// Type guard for entity metadata
+function hasRelationships(entity: any): entity is { relationships: RelationshipInfo[] } {
+  return entity && Array.isArray(entity.relationships);
+}
