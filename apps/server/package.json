@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsc --noEmit && wrangler deploy --outdir=dist",
+    "build": "../../scripts/type-check-focused/type-check-all.sh && wrangler deploy --outdir=dist",
     "dev": "wrangler dev --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
     "dev:local": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
     "dev:pr": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
