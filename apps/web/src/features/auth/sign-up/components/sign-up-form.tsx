@@ -275,6 +275,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
               <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input 
+                  type='email'
                   placeholder='name@example.com' 
                   disabled={!!invitationData}
                   {...field} 

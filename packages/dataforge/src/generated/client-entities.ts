@@ -628,11 +628,6 @@ export const LocalChangesSchema = new EntitySchema<LocalChanges>({
             type: 'text', // Use helper
             nullable: true
         },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
-        },
         'processedSync': {
             name: 'processed_sync', // Explicit DB Name
             type: 'integer', // Use helper

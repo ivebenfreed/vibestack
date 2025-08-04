@@ -413,18 +413,27 @@ function generateStoreDefinitions(
 ): Record<string, string> {
   const stores: Record<string, string> = {};
   
-  // Entity tables
+  // Entity tables - use camelCase table names
   for (const entity of entityMetadataMap.values()) {
     const indexes = generateEntityIndexes(entity);
-    stores[entity.tableName] = indexes.join(', ');
+    const camelCaseTableName = toCamelCase(entity.tableName);
+    stores[camelCaseTableName] = indexes.join(', ');
   }
   
-  // Junction tables
+  // Junction tables - use camelCase table names
   for (const junction of junctionTables) {
-    stores[junction.name] = junction.indexes.join(', ');
+    const camelCaseTableName = toCamelCase(junction.name);
+    stores[camelCaseTableName] = junction.indexes.join(', ');
   }
   
   return stores;
+}
+
+/**
+ * Convert snake_case to camelCase for Dexie table names
+ */
+function toCamelCase(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
 /**
@@ -437,18 +446,20 @@ function generateDexieSchemaFile(
 ): string {
   const entities = Array.from(entityMetadataMap.values());
   
-  // Generate store configurations
+  // Generate store configurations using camelCase table names
   const storeConfigs: string[] = [];
   
   // Entity tables
   for (const entity of entities) {
     const indexes = generateEntityIndexes(entity);
-    storeConfigs.push(`      ${entity.tableName}: '${indexes.join(', ')}'`);
+    const camelCaseTableName = toCamelCase(entity.tableName);
+    storeConfigs.push(`      ${camelCaseTableName}: '${indexes.join(', ')}'`);
   }
   
   // Junction tables
   for (const junction of junctionTables) {
-    storeConfigs.push(`      ${junction.name}: '${junction.indexes.join(', ')}'`);
+    const camelCaseTableName = toCamelCase(junction.name);
+    storeConfigs.push(`      ${camelCaseTableName}: '${junction.indexes.join(', ')}'`);
   }
   
   // Generate junction table interfaces
@@ -498,11 +509,11 @@ ${junctionInterfaces}
 ${history.versions.map(v => ` * - Version ${v.version}: ${v.generatedAt}`).join('\n')}
  */
 export class VibeStackDB extends Dexie {
-  // Entity tables - using TypeORM entity types
-${entities.map(e => `  ${e.tableName}!: Table<${e.name}>;`).join('\n')}
+  // Entity tables - using TypeORM entity types with camelCase names
+${entities.map(e => `  ${toCamelCase(e.tableName)}!: Table<${e.name}>;`).join('\n')}
   
   // Junction tables
-${junctionTables.map(j => `  ${j.name}!: Table<${toPascalCase(j.name)}>;`).join('\n')}
+${junctionTables.map(j => `  ${toCamelCase(j.name)}!: Table<${toPascalCase(j.name)}>;`).join('\n')}
   
   constructor() {
     super('vibestack-db');
@@ -514,36 +525,42 @@ ${versionBlocks}
 // Export singleton instance
 export const db = new VibeStackDB();
 
-// Helper type for entity names
-export type EntityTableName = ${entities.map(e => `'${e.tableName}'`).join(' | ')};
+// Helper type for entity names (camelCase for Dexie)
+export type EntityTableName = ${entities.map(e => `'${toCamelCase(e.tableName)}'`).join(' | ')};
 
-// Helper type for junction table names  
-export type JunctionTableName = ${junctionTables.map(j => `'${j.name}'`).join(' | ')};
+// Helper type for junction table names (camelCase for Dexie)
+export type JunctionTableName = ${junctionTables.map(j => `'${toCamelCase(j.name)}'`).join(' | ')};
 
 // Combined table names
 export type TableName = EntityTableName | JunctionTableName;
 
-// Export metadata for runtime use
+// Export metadata for runtime use (camelCase names for Dexie)
 export const ENTITY_TABLES = [
-${entities.map(e => `  '${e.tableName}'`).join(',\n')}
+${entities.map(e => `  '${toCamelCase(e.tableName)}'`).join(',\n')}
 ] as const;
 
-// Export domain tables separately for generators
+// Export domain tables separately for generators (camelCase names for Dexie)
 export const CLIENT_DOMAIN_TABLES = [
 ${entities.filter(e => {
   // System tables based on context
   const systemTables = ['client_migration_status', 'local_changes', 'sync_metadata'];
   return !systemTables.includes(e.tableName);
-}).map(e => `  '${e.tableName}'`).join(',\n')}
+}).map(e => `  '${toCamelCase(e.tableName)}'`).join(',\n')}
 ] as const;
 
 export const JUNCTION_TABLES = [
-${junctionTables.map(j => `  '${j.name}'`).join(',\n')}
+${junctionTables.map(j => `  '${toCamelCase(j.name)}'`).join(',\n')}
 ] as const;
 
-// Export type mapping for sync operations
+// Export type mapping for sync operations (Dexie table name -> Entity name)
 export const TABLE_TO_ENTITY_MAP = {
-${entities.map(e => `  '${e.tableName}': '${e.name}'`).join(',\n')}
+${entities.map(e => `  '${toCamelCase(e.tableName)}': '${e.name}'`).join(',\n')}
+} as const;
+
+// Export mapping from Dexie table names to database table names for sync
+export const DEXIE_TO_DB_TABLE_MAP = {
+${entities.map(e => `  '${toCamelCase(e.tableName)}': '${e.tableName}'`).join(',\n')},
+${junctionTables.map(j => `  '${toCamelCase(j.name)}': '${j.name}'`).join(',\n')}
 } as const;
 `;
 }
