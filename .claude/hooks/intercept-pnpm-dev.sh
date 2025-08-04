@@ -15,7 +15,7 @@ if [[ "$COMMAND" =~ ^pnpm[[:space:]]+(dev|dev:|build) ]]; then
     if [[ "$COMMAND" =~ ^pnpm[[:space:]]+build ]]; then
         REASON="Command blocked: All builds are HMR (Hot Module Replacement) and don't need manual build commands. The dev server handles building automatically."
     else
-        REASON="Command blocked: pnpm dev commands should be run in tmux. Use: ./scripts/tmux-bg.sh vibestack-dev 'pnpm dev'"
+        REASON="Command blocked: pnpm dev commands should be run in tmux. Use: ./scripts/dev-start.sh"
     fi
     
     # Output the proper blocking response for Claude
