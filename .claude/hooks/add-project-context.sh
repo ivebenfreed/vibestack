@@ -3,8 +3,16 @@
 # Read the JSON input
 INPUT=$(cat)
 
-# SessionStart event - no user message to extract
+# Extract the event name from the input
+EVENT_NAME=$(echo "$INPUT" | jq -r '.hookEventName // empty')
 
+# If this is a SessionStart event, just return the input unchanged
+if [[ "$EVENT_NAME" == "SessionStart" ]]; then
+    echo "$INPUT"
+    exit 0
+fi
+
+# For UserPromptSubmit events, continue with context addition
 # Check if we're in a worktree
 WORKTREE_PATH=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
 IS_WORKTREE=$(git rev-parse --is-inside-work-tree 2>/dev/null || echo "false")
@@ -76,8 +84,12 @@ $([ -n "$PR_NUMBER" ] && echo "- PR Database: vibestack_dev_issue_${PR_NUMBER}")
 - Full check: 'pnpm check'
 "
 
-# Create the output with the additional context
-OUTPUT=$(echo "$INPUT" | jq --arg context "$CONTEXT_REMINDER" '.hookSpecificOutput.additionalContext = $context')
-
-# Return the enhanced input
-echo "$OUTPUT"
+# Only add context for UserPromptSubmit events
+if [[ "$EVENT_NAME" == "UserPromptSubmit" ]]; then
+    # Create the output with the additional context
+    OUTPUT=$(echo "$INPUT" | jq --arg context "$CONTEXT_REMINDER" '.hookSpecificOutput.additionalContext = $context')
+    echo "$OUTPUT"
+else
+    # For any other event, return the input unchanged
+    echo "$INPUT"
+fi
