@@ -287,7 +287,7 @@ export class ${entity.name}DexieService {
       updatedAt: now,
     } as ${entity.name};
     
-    await db.${entity.tableName}.add(${lowerName});
+    await db.${toCamelCase(entity.tableName)}.add(${lowerName});
     return ${lowerName};
   }
 
@@ -295,14 +295,14 @@ export class ${entity.name}DexieService {
    * Get ${entity.name} by ID
    */
   async getById(id: string): Promise<${entity.name} | undefined> {
-    return await db.${entity.tableName}.get(id);
+    return await db.${toCamelCase(entity.tableName)}.get(id);
   }
 
   /**
    * Get all ${entity.name}s
    */
   async getAll(): Promise<${entity.name}[]> {
-    return await db.${entity.tableName}.toArray();
+    return await db.${toCamelCase(entity.tableName)}.toArray();
   }
 
   /**
@@ -313,7 +313,7 @@ export class ${entity.name}DexieService {
     
     // Use type assertion to avoid circular reference issues
     const updateData: any = { ...updates, updatedAt };
-    await (db.${entity.tableName} as any).update(id, updateData);
+    await (db.${toCamelCase(entity.tableName)} as any).update(id, updateData);
     
     return await this.getById(id);
   }
@@ -322,7 +322,7 @@ export class ${entity.name}DexieService {
    * Delete ${entity.name}
    */
   async delete(id: string): Promise<boolean> {
-    await db.${entity.tableName}.delete(id);
+    await db.${toCamelCase(entity.tableName)}.delete(id);
     return true;
   }
 ${generateSpecialMethods(entity)}${generateRelationshipMethods(entity)}
@@ -343,14 +343,14 @@ function generateSpecialMethods(entity: EntityInfo): string {
    * Get StatusDefinitions for a specific entity type
    */
   async getStatusDefinitionsForEntityType(entityType: string): Promise<any[]> {
-    const statusSets = await db.status_sets
+    const statusSets = await db.statusSets
       .where('entityType')
       .equals(entityType)
       .toArray();
     
     const statusSetIds = statusSets.map(ss => ss.id);
     
-    const statusDefinitions = await db.status_definitions
+    const statusDefinitions = await db.statusDefinitions
       .where('statusSetId')
       .anyOf(statusSetIds)
       .toArray();
@@ -366,7 +366,7 @@ function generateSpecialMethods(entity: EntityInfo): string {
    */
   async getTagsForProject(projectId: string): Promise<any[]> {
     // Get tag sets associated with the project
-    const projectTagSets = await db.project_tag_sets
+    const projectTagSets = await db.projectTagSets
       .where('projectId')
       .equals(projectId)
       .toArray();
@@ -411,13 +411,13 @@ function generateRelationshipMethods(entity: EntityInfo): string {
    * Get ${relation.propertyName} for this ${entity.name}
    */
   async get${methodBaseName}(${camelCase(entity.name)}Id: string): Promise<any[]> {
-    const junctions = await db.${relation.junctionTable}
+    const junctions = await db.${toCamelCase(relation.junctionTable)}
       .where('${sourceIdField}')
       .equals(${camelCase(entity.name)}Id)
       .toArray();
     
     const targetIds = junctions.map(j => j.${targetIdField});
-    const targets = await db.${targetTableName}.bulkGet(targetIds);
+    const targets = await db.${toCamelCase(targetTableName)}.bulkGet(targetIds);
     
     return targets.filter(t => t !== undefined);
   }`);
@@ -428,9 +428,9 @@ function generateRelationshipMethods(entity: EntityInfo): string {
    * Set ${relation.propertyName} for this ${entity.name}
    */
   async set${methodBaseName}(${camelCase(entity.name)}Id: string, targetIds: string[]): Promise<void> {
-    await db.transaction('rw', db.${relation.junctionTable}, async () => {
+    await db.transaction('rw', db.${toCamelCase(relation.junctionTable)}, async () => {
       // Remove existing relationships
-      await db.${relation.junctionTable}
+      await db.${toCamelCase(relation.junctionTable)}
         .where('${sourceIdField}')
         .equals(${camelCase(entity.name)}Id)
         .delete();
@@ -438,7 +438,7 @@ function generateRelationshipMethods(entity: EntityInfo): string {
       // Add new relationships
       if (targetIds.length > 0) {
         const now = new Date();
-        await db.${relation.junctionTable}.bulkAdd(
+        await db.${toCamelCase(relation.junctionTable)}.bulkAdd(
           targetIds.map(targetId => ({
             ${sourceIdField}: ${camelCase(entity.name)}Id,
             ${targetIdField}: targetId,${relation.junctionTable === 'project_members' ? `
@@ -462,12 +462,13 @@ function generateRelationshipMethods(entity: EntityInfo): string {
     const now = new Date();
     const newRelations = targetIds.map(targetId => ({
       ${sourceIdField}: ${camelCase(entity.name)}Id,
-      ${targetIdField}: targetId,
+      ${targetIdField}: targetId,${relation.junctionTable === 'project_members' ? `
+      role: 'member' as const,` : ''}
       createdAt: now,
       updatedAt: now
     }));
     
-    await db.${relation.junctionTable}.bulkAdd(newRelations);
+    await db.${toCamelCase(relation.junctionTable)}.bulkAdd(newRelations);
   }`);
     
     // Remove method
@@ -478,7 +479,7 @@ function generateRelationshipMethods(entity: EntityInfo): string {
   async remove${methodBaseName}(${camelCase(entity.name)}Id: string, targetIds: string[]): Promise<void> {
     if (targetIds.length === 0) return;
     
-    await db.${relation.junctionTable}
+    await db.${toCamelCase(relation.junctionTable)}
       .where('${sourceIdField}')
       .equals(${camelCase(entity.name)}Id)
       .and(item => targetIds.includes(item.${targetIdField}))
@@ -491,7 +492,7 @@ function generateRelationshipMethods(entity: EntityInfo): string {
    * Check if ${entity.name} has a specific ${relation.targetEntity}
    */
   async has${methodBaseName.slice(0, -1)}(${camelCase(entity.name)}Id: string, targetId: string): Promise<boolean> {
-    const count = await db.${relation.junctionTable}
+    const count = await db.${toCamelCase(relation.junctionTable)}
       .where('[${sourceIdField}+${targetIdField}]')
       .equals([${camelCase(entity.name)}Id, targetId])
       .count();
@@ -505,7 +506,7 @@ function generateRelationshipMethods(entity: EntityInfo): string {
    * Get count of ${relation.propertyName} for this ${entity.name}
    */
   async get${methodBaseName}Count(${camelCase(entity.name)}Id: string): Promise<number> {
-    return await db.${relation.junctionTable}
+    return await db.${toCamelCase(relation.junctionTable)}
       .where('${sourceIdField}')
       .equals(${camelCase(entity.name)}Id)
       .count();
@@ -515,7 +516,27 @@ function generateRelationshipMethods(entity: EntityInfo): string {
   // Generate many-to-one relationship methods (simple resolver)
   for (const relation of manyToOneRelations) {
     const methodName = relation.propertyName.charAt(0).toUpperCase() + relation.propertyName.slice(1);
-    const targetTableName = camelToSnakeCase(relation.targetEntity) + 's';
+    // Map entity names to their Dexie table names (camelCase)
+    const entityToTableMap: Record<string, string> = {
+      'User': 'users',
+      'Project': 'projects', 
+      'Task': 'tasks',
+      'Tag': 'tags',
+      'TagSet': 'tagSets',
+      'Tagset': 'tagSets', // Handle incorrect casing
+      'StatusSet': 'statusSets',
+      'Statusset': 'statusSets', // Handle incorrect casing
+      'StatusDefinition': 'statusDefinitions',
+      'Statusdefinition': 'statusDefinitions', // Handle incorrect casing
+      'Comment': 'comments',
+      'EntityDependency': 'entityDependencies'
+    };
+    let targetTableName = entityToTableMap[relation.targetEntity];
+    if (!targetTableName) {
+      // Fallback: convert to snake_case then to camelCase
+      targetTableName = toCamelCase(camelToSnakeCase(relation.targetEntity) + 's');
+    }
+    console.log(`DEBUG: Entity ${relation.targetEntity} -> Table ${targetTableName}`);
     const foreignKeyField = `${relation.propertyName}Id`;
     
     methods.push(`
@@ -530,7 +551,7 @@ function generateRelationshipMethods(entity: EntityInfo): string {
   // Generate one-to-many relationship methods
   for (const relation of oneToManyRelations) {
     const methodBaseName = relation.propertyName.charAt(0).toUpperCase() + relation.propertyName.slice(1);
-    const targetTableName = camelToSnakeCase(relation.targetEntity) + 's';
+    const targetTableName = toCamelCase(camelToSnakeCase(relation.targetEntity) + 's');
     const foreignKeyField = `${camelCase(entity.name)}Id`;
     
     methods.push(`
@@ -571,6 +592,13 @@ function camelToSnakeCase(str: string): string {
  */
 function camelCase(str: string): string {
   return str.charAt(0).toLowerCase() + str.slice(1);
+}
+
+/**
+ * Convert snake_case to camelCase for Dexie table names
+ */
+function toCamelCase(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
 function generateIndexFile(entities: EntityInfo[]): string {

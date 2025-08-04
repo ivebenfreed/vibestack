@@ -530,11 +530,6 @@ export const AccountSchema = new EntitySchema<Account>({
             name: 'password', // Explicit DB Name
             type: 'text', // Use helper
             nullable: true
-        },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
         }
     },
     relations: {
@@ -871,11 +866,6 @@ export const SessionSchema = new EntitySchema<Session>({
             name: 'user_agent', // Explicit DB Name
             type: 'text', // Use helper
             nullable: true
-        },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
         }
     },
     relations: {
@@ -1439,11 +1429,6 @@ export const VerificationSchema = new EntitySchema<Verification>({
         'expiresAt': {
             name: 'expires_at', // Explicit DB Name
             type: 'timestamptz', // Use helper
-        },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
         }
     },
     relations: {

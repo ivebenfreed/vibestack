@@ -393,7 +393,7 @@ function generateContextOutput(
             const propertyName = col.propertyName;
 
             // Skip manually added base columns
-            if (['id', 'createdAt'/*, 'clientId'*/].includes(propertyName) && (inheritsBaseDomain || inheritsBaseSystem)) {
+            if (['id', 'createdAt', 'updatedAt', 'clientId'].includes(propertyName) && (inheritsBaseDomain || inheritsBaseSystem)) {
                  return;
             }
 
