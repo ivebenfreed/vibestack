@@ -31,21 +31,55 @@ export async function waitForLSN(page, targetLSN, timeout = 30000) {
 }
 
 /**
- * Wait for a specific sync state
+ * Wait for sync to be initialized (has clientId and LSN)
  * @param {Page} page - Playwright page object
- * @param {string} state - State to wait for (e.g., 'live', 'catchup', 'initial')
+ * @param {number} timeout - Timeout in milliseconds (default: 30000)
+ * @returns {Promise<void>}
+ */
+export async function waitForSyncInitialized(page, timeout = 30000) {
+  await page.waitForFunction(
+    () => {
+      const syncState = JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+      return syncState.clientId && syncState.currentLSN;
+    },
+    {},
+    { timeout }
+  );
+}
+
+/**
+ * Wait for sync to reach live state (LSN advanced beyond 0/0)
+ * @param {Page} page - Playwright page object  
+ * @param {number} timeout - Timeout in milliseconds (default: 30000)
+ * @returns {Promise<void>}
+ */
+export async function waitForSyncLive(page, timeout = 30000) {
+  await page.waitForFunction(
+    () => {
+      const syncState = JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+      return syncState.currentLSN && syncState.currentLSN !== '0/0';
+    },
+    {},
+    { timeout }
+  );
+}
+
+/**
+ * DEPRECATED: Wait for a specific sync state (updated for actual sync structure)
+ * @param {Page} page - Playwright page object
+ * @param {string} state - State to wait for ('live', 'initialized')
  * @param {number} timeout - Timeout in milliseconds (default: 30000)
  * @returns {Promise<void>}
  */
 export async function waitForSyncState(page, state, timeout = 30000) {
-  await page.waitForFunction(
-    (expectedState) => {
-      const syncState = JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
-      return syncState.state === expectedState;
-    },
-    state,
-    { timeout }
-  );
+  if (state === 'live') {
+    // For backwards compatibility, treat 'live' as LSN advancement
+    return await waitForSyncLive(page, timeout);
+  } else if (state === 'initialized') {
+    return await waitForSyncInitialized(page, timeout);
+  } else {
+    throw new Error(`Unsupported sync state: ${state}. Use waitForSyncInitialized() or waitForSyncLive() instead.`);
+  }
 }
 
 /**
