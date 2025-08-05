@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
+    "@faker-js/faker": "^9.7.0",
     "@playwright/test": "^1.54.2",
     "@repo/eslint-config": "workspace:*",
     "eslint": "^9.25.1",

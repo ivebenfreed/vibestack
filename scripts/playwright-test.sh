@@ -83,6 +83,15 @@ fi
 echo -e "${BLUE}🚀 Running Playwright tests...${NC}"
 echo ""
 
+# Check for headless mode preference
+if [[ "${HEADLESS:-}" == "false" ]]; then
+    echo -e "${YELLOW}🖥️  Running in headed mode (browser visible)${NC}"
+elif [[ "${HEADLESS:-}" == "true" ]]; then
+    echo -e "${BLUE}🤖 Running in headless mode (no browser window)${NC}"
+else
+    echo -e "${BLUE}🤖 Running in headless mode by default (set HEADLESS=false to see browser)${NC}"
+fi
+
 # Pass all arguments to Playwright
 if [[ $# -eq 0 ]]; then
     # No arguments, run all tests (headless by default)
