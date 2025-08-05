@@ -2,12 +2,12 @@
 
 ## Current Worktree Configuration
 
-**This is Issue #29 worktree with the following ports:**
+**This is Issue #41 worktree with the following ports:**
 
-- Web application: `http://localhost:5463`
-- Server API: `http://localhost:9077`
-- Database: `postgres://postgres:postgres@localhost:5722/vibestack_dev_issue_29`
-- Proxy: Port 4744
+- Web application: `http://localhost:5583`
+- Server API: `http://localhost:9197`
+- Database: `postgres://postgres:postgres@localhost:5842/vibestack_dev_issue_41`
+- Proxy: Port 4864
 
 
 ## Current Configuration

@@ -1,0 +1,3293 @@
+{
+  "testName": "should capture zoom levels and timeline transitions",
+  "timestamp": "2025-08-05T22:45:34.499Z",
+  "allMessages": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting...",
+      "timestamp": "2025-08-05T22:45:09.561Z"
+    },
+    {
+      "type": "info",
+      "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+      "timestamp": "2025-08-05T22:45:09.618Z"
+    },
+    {
+      "type": "log",
+      "text": "[AUTH] Environment detection: {hostname: localhost, isLocalDev: true, origin: http://localhost:5583, importMetaEnv: Object, NODE_ENV: undefined}",
+      "timestamp": "2025-08-05T22:45:09.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[AUTH] Using same-origin API URL: http://localhost:5583",
+      "timestamp": "2025-08-05T22:45:09.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Loading persisted auth state",
+      "timestamp": "2025-08-05T22:45:09.702Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Creating new auth machine actor",
+      "timestamp": "2025-08-05T22:45:09.702Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Starting with persisted snapshot",
+      "timestamp": "2025-08-05T22:45:09.705Z"
+    },
+    {
+      "type": "log",
+      "text": "[checkAuthActor] Checking authentication...",
+      "timestamp": "2025-08-05T22:45:09.707Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] No valid persisted session, checking auth",
+      "timestamp": "2025-08-05T22:45:09.709Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Checking authentication status",
+      "timestamp": "2025-08-05T22:45:09.709Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachine] Creating new sync machine actor",
+      "timestamp": "2025-08-05T22:45:09.710Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Loaded own persisted state: {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/0}",
+      "timestamp": "2025-08-05T22:45:09.713Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Initializing with state: {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/0}",
+      "timestamp": "2025-08-05T22:45:09.713Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachine] Starting (state persistence handled internally)",
+      "timestamp": "2025-08-05T22:45:09.713Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:09.709Z [SyncMachineV3] ℹ️ 📊 Entered state: idle Shell mode - awaiting connection request",
+      "timestamp": "2025-08-05T22:45:09.713Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔔 Enabling change tracking in idle state",
+      "timestamp": "2025-08-05T22:45:09.714Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Change Tracking] Enabling change tracking",
+      "timestamp": "2025-08-05T22:45:09.714Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📊 Current state: {phase: null, lsn: 0/0, connected: false, error: null}",
+      "timestamp": "2025-08-05T22:45:09.714Z"
+    },
+    {
+      "type": "log",
+      "text": "[APP INIT] Creating new app init machine actor",
+      "timestamp": "2025-08-05T22:45:09.714Z"
+    },
+    {
+      "type": "log",
+      "text": "[XSTATE] Creating app init machine actor...",
+      "timestamp": "2025-08-05T22:45:09.714Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Waiting for initialization trigger",
+      "timestamp": "2025-08-05T22:45:09.714Z"
+    },
+    {
+      "type": "log",
+      "text": "🚀 [ROUTER] Creating new router instance with performance tracking...",
+      "timestamp": "2025-08-05T22:45:09.719Z"
+    },
+    {
+      "type": "log",
+      "text": "✅ [ROUTER] Router instance created {createTime: 11.83ms, preloadEnabled: true, preloadDelay: 150, pendingMs: 100, pendingMinMs: 150}",
+      "timestamp": "2025-08-05T22:45:09.732Z"
+    },
+    {
+      "type": "log",
+      "text": "🔍 [MAIN] Creating React root and rendering app",
+      "timestamp": "2025-08-05T22:45:09.733Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthAwareProviders] Auth state: {isAuthenticated: false, isCheckingAuth: true, isSigningOut: false, shouldMountDatabase: false}",
+      "timestamp": "2025-08-05T22:45:09.823Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] Waiting for auth resolution...",
+      "timestamp": "2025-08-05T22:45:09.849Z"
+    },
+    {
+      "type": "log",
+      "text": "[DEBUG] Debug page detected. Type window.debugIntegrityHelp() for available functions.",
+      "timestamp": "2025-08-05T22:45:09.857Z"
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected.",
+      "timestamp": "2025-08-05T22:45:09.874Z"
+    },
+    {
+      "type": "log",
+      "text": "[checkAuthActor] Session data: {hasUser: true, hasSession: true, userRole: super_admin, sessionExpiry: 2025-08-12T22:35:35.613Z, tokenPresent: true}",
+      "timestamp": "2025-08-05T22:45:11.840Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Dispatching auth state change: {authenticated: true, reason: check-success}",
+      "timestamp": "2025-08-05T22:45:11.844Z"
+    },
+    {
+      "type": "log",
+      "text": "[Root] Auth state changed: {authenticated: true, reason: check-success}",
+      "timestamp": "2025-08-05T22:45:11.845Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Persisted auth state to localStorage",
+      "timestamp": "2025-08-05T22:45:11.845Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] User authenticated",
+      "timestamp": "2025-08-05T22:45:11.846Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] Persisted auth state using XState 5 format: authenticated",
+      "timestamp": "2025-08-05T22:45:11.847Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] State changed: {authenticated: true, reason: authenticated}",
+      "timestamp": "2025-08-05T22:45:11.848Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthMachine] ✅ Authentication complete - starting app initialization",
+      "timestamp": "2025-08-05T22:45:11.848Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Waiting for database initialization",
+      "timestamp": "2025-08-05T22:45:11.848Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Waiting for database initialization...",
+      "timestamp": "2025-08-05T22:45:11.849Z"
+    },
+    {
+      "type": "log",
+      "text": "[Root] Auth state changed: {authenticated: true, reason: authenticated}",
+      "timestamp": "2025-08-05T22:45:11.850Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthAwareProviders] Auth state: {isAuthenticated: true, isCheckingAuth: false, isSigningOut: false, shouldMountDatabase: true}",
+      "timestamp": "2025-08-05T22:45:11.852Z"
+    },
+    {
+      "type": "log",
+      "text": "[UnifiedLoadingScreen] Render: {isSystemReady: false, shouldShow: true, isAuthenticated: true, isCheckingAuth: false, appInitStates: Object}",
+      "timestamp": "2025-08-05T22:45:11.864Z"
+    },
+    {
+      "type": "log",
+      "text": "Dexie Provider: Starting database initialization...",
+      "timestamp": "2025-08-05T22:45:11.875Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Init] Starting database initialization...",
+      "timestamp": "2025-08-05T22:45:11.875Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] Final auth state check: {matches: authenticated, user: true, authError: null, errorRetryCount: undefined, path: /debug/vibegantt}",
+      "timestamp": "2025-08-05T22:45:11.876Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] System check: {hasAppInitMachine: true, appInitState: database, isSystemReady: false}",
+      "timestamp": "2025-08-05T22:45:11.876Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] First access this session - waiting for system initialization...",
+      "timestamp": "2025-08-05T22:45:11.876Z"
+    },
+    {
+      "type": "log",
+      "text": "[Root] Auth state changed: {authenticated: true, reason: authenticated}",
+      "timestamp": "2025-08-05T22:45:11.886Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Init] Database opened successfully. Version: 12",
+      "timestamp": "2025-08-05T22:45:11.963Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Change Tracking] DISABLED - Using manual tracking in domain layer instead",
+      "timestamp": "2025-08-05T22:45:11.980Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Init] Change tracking hooks initialized",
+      "timestamp": "2025-08-05T22:45:11.980Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Init] Database ready in 107.71500000357628ms",
+      "timestamp": "2025-08-05T22:45:11.983Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Init] Current data: 0 tasks, 0 users",
+      "timestamp": "2025-08-05T22:45:11.983Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Database ready event received",
+      "timestamp": "2025-08-05T22:45:11.983Z"
+    },
+    {
+      "type": "log",
+      "text": "Dexie Provider: Initialization successful in 109.4699999988079ms. isReady: true",
+      "timestamp": "2025-08-05T22:45:11.984Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Starting sync machine",
+      "timestamp": "2025-08-05T22:45:11.984Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Starting global sync machine",
+      "timestamp": "2025-08-05T22:45:11.984Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔧 Initializing context...",
+      "timestamp": "2025-08-05T22:45:11.985Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📊 Current state: {phase: null, lsn: 0/0, connected: false, error: null}",
+      "timestamp": "2025-08-05T22:45:11.985Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.984Z [SyncMachineV3] ℹ️ 📊 Entered state: connecting Phase 1: Real service initialization and connection",
+      "timestamp": "2025-08-05T22:45:11.986Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔇 Disabling change tracking during sync connection",
+      "timestamp": "2025-08-05T22:45:11.986Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Change Tracking] Disabling change tracking",
+      "timestamp": "2025-08-05T22:45:11.986Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.985Z [SyncMachineV3] 🔍 📝 saveOwnState: starting save process {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/0}",
+      "timestamp": "2025-08-05T22:45:11.986Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.985Z [SyncMachineV3] 🔍 📝 saveOwnState: no change, skipping save ",
+      "timestamp": "2025-08-05T22:45:11.987Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔧 Initializing services...",
+      "timestamp": "2025-08-05T22:45:11.987Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.986Z [SyncMachineV3] ℹ️ ⚙️ Phase 3: Initializing services with ServiceCoordinator... {serverUrl: ws://localhost:5583/api/sync, clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/0}",
+      "timestamp": "2025-08-05T22:45:11.987Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.986Z [SyncMachineV3] ℹ️ ⚙️ ServiceCoordinator created for autonomous sync ",
+      "timestamp": "2025-08-05T22:45:11.987Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.986Z [SyncMachineV3] ℹ️ ⚙️ Initializing services with autonomous coordination {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/0, serverUrl: ws://localhost:5583/api/sync}",
+      "timestamp": "2025-08-05T22:45:11.987Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.987Z [SyncMachineV3] ℹ️ ⚙️ Skipping TypeORM DataSource - using Dexie-only mode ",
+      "timestamp": "2025-08-05T22:45:11.988Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.987Z [SyncMachineV3] ℹ️ ⚙️ Creating WebSocketService... ",
+      "timestamp": "2025-08-05T22:45:11.988Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.987Z [SyncMachineV3] ℹ️ ⚙️ Creating IncomingChangeService with Dexie implementation... ",
+      "timestamp": "2025-08-05T22:45:11.988Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Initialized with config: {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, enableOptimisticUpdates: false, batchSize: 50, conflictResolution: server-wins}",
+      "timestamp": "2025-08-05T22:45:11.988Z"
+    },
+    {
+      "type": "log",
+      "text": "[ServiceCoordinator] ✅ IncomingChangeService created (Dexie mode)",
+      "timestamp": "2025-08-05T22:45:11.988Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.988Z [SyncMachineV3] ℹ️ ⚙️ Creating DexieOutgoingChangeService for parallel sync... ",
+      "timestamp": "2025-08-05T22:45:11.989Z"
+    },
+    {
+      "type": "log",
+      "text": "[DexieOutgoingChangeService] Initialized with config: {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, batchSize: 100, maxRetries: 3, retryDelay: 1000} {instanceId: 1754433911988-5qhztw6, activeInstances: 1, warning: Single instance}",
+      "timestamp": "2025-08-05T22:45:11.989Z"
+    },
+    {
+      "type": "log",
+      "text": "[ServiceCoordinator] ✅ DexieOutgoingChangeService created successfully",
+      "timestamp": "2025-08-05T22:45:11.989Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.988Z [SyncMachineV3] ℹ️ ⚙️ Dexie-only mode: WebSocketService, IncomingChangeService and DexieOutgoingChangeService are active ",
+      "timestamp": "2025-08-05T22:45:11.989Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.988Z [SyncMachineV3] ℹ️ ⚙️ ServiceCoordinator initialized {webSocket: true, incoming: true, outgoing: false, dexieOutgoing: true, integrity: false}",
+      "timestamp": "2025-08-05T22:45:11.989Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] App init machine change: {state: sync, isReady: false, syncInfo: }",
+      "timestamp": "2025-08-05T22:45:11.990Z"
+    },
+    {
+      "type": "log",
+      "text": "[UnifiedLoadingScreen] Render: {isSystemReady: false, shouldShow: true, isAuthenticated: true, isCheckingAuth: false, appInitStates: Object}",
+      "timestamp": "2025-08-05T22:45:11.991Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.992Z [SyncMachineV3] ℹ️ ⚙️ ServiceCoordinator initialized {webSocket: true, incoming: true, outgoing: false, dexieOutgoing: true, integrity: false}",
+      "timestamp": "2025-08-05T22:45:11.993Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.993Z [SyncMachineV3] ℹ️ ⚙️ Phase 3 ServiceCoordinator initialized {autonomous: true, servicesCount: 5}",
+      "timestamp": "2025-08-05T22:45:11.995Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.993Z [SyncMachineV3] ℹ️ ⚙️ Setting up streamlined service callbacks... ",
+      "timestamp": "2025-08-05T22:45:11.997Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.994Z [SyncMachineV3] ℹ️ ⚙️ Setting up simplified service callbacks ",
+      "timestamp": "2025-08-05T22:45:11.998Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.994Z [SyncMachineV3] ℹ️ ⚙️ Callbacks initialized {webSocket: true, incoming: true, outgoing: true, dexieOutgoing: true, integrity: true}",
+      "timestamp": "2025-08-05T22:45:11.998Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.994Z [SyncMachineV3] ℹ️ ⚙️ ServiceCallbacks initialized {coordinator: true, autonomous: true, eventHandler: true}",
+      "timestamp": "2025-08-05T22:45:11.998Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔌 Connecting WebSocket...",
+      "timestamp": "2025-08-05T22:45:11.998Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.996Z [SyncMachineV3] ℹ️ 🔌 Starting WebSocket connection... {url: ws://localhost:5583/api/sync}",
+      "timestamp": "2025-08-05T22:45:11.999Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.997Z [SyncMachineV3] 🔍 🔌 WebSocket status: connecting ",
+      "timestamp": "2025-08-05T22:45:11.999Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:11.997Z [SyncMachineV3] ℹ️ 🔌 Attempting connection to ws://localhost:5583/api/sync?clientId=80153a56-0aa9-42b4-a8d6-47c07eaf8dae&lsn=0%2F0 ",
+      "timestamp": "2025-08-05T22:45:11.999Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.129Z [SyncMachineV3] ℹ️ 🔌 Connection established ",
+      "timestamp": "2025-08-05T22:45:13.131Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.130Z [SyncMachineV3] 🔍 🔌 WebSocket status: connected ",
+      "timestamp": "2025-08-05T22:45:13.132Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.130Z [SyncMachineV3] ℹ️ 🔌 Starting heartbeat with interval 30000ms ",
+      "timestamp": "2025-08-05T22:45:13.132Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.130Z [SyncMachineV3] ℹ️ 🔌 Setting up heartbeat timer with 30000ms interval ",
+      "timestamp": "2025-08-05T22:45:13.132Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.131Z [SyncMachineV3] ℹ️ 🔌 Heartbeat timer started with ID: 19 ",
+      "timestamp": "2025-08-05T22:45:13.132Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.131Z [SyncMachineV3] 🔍 📝 saveOwnState: starting save process {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/0}",
+      "timestamp": "2025-08-05T22:45:13.132Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.132Z [SyncMachineV3] 🔍 📝 saveOwnState: no change, skipping save ",
+      "timestamp": "2025-08-05T22:45:13.133Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ WebSocket connected - determining sync phase",
+      "timestamp": "2025-08-05T22:45:13.133Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:13.132Z [SyncMachineV3] ℹ️ 📊 Entered state: determining_sync_phase Waiting for server to determine sync phase",
+      "timestamp": "2025-08-05T22:45:13.133Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:14.131Z [SyncMachineV3] ℹ️ 🔌 Test timer fired - setInterval should work ",
+      "timestamp": "2025-08-05T22:45:14.133Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:15.651Z [SyncMachineV3] 🔍 📨 Received: srv_init_start ",
+      "timestamp": "2025-08-05T22:45:15.654Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:15.652Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:15.654Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_start",
+      "timestamp": "2025-08-05T22:45:15.656Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 🚀 Server started initial sync",
+      "timestamp": "2025-08-05T22:45:15.656Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 Server LSN at init start: 0/20F74A8 (client: 0/0) - will update on completion",
+      "timestamp": "2025-08-05T22:45:15.656Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:15.653Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:15.654Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🚀 Server determined: Initial sync required",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:15.654Z [SyncMachineV3] ℹ️ 📊 Entered state: initial_sync Running initial synchronization",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔇 Disabling change tracking during initial sync",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Change Tracking] Disabling change tracking",
+      "timestamp": "2025-08-05T22:45:15.658Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.436Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:16.438Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.436Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:16.438Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:16.439Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 46 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:16.439Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:16.439Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 46 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:16.440Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 46 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:16.441Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:16.442Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 46 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:16.443Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 46 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:16.443Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 46 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:16.444Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 46 bulk inserts for users",
+      "timestamp": "2025-08-05T22:45:16.444Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 46 bulk inserts for users",
+      "timestamp": "2025-08-05T22:45:16.445Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 46 users into IndexedDB",
+      "timestamp": "2025-08-05T22:45:16.449Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 46 users entities",
+      "timestamp": "2025-08-05T22:45:16.487Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.483Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 46, resultCount: 46}",
+      "timestamp": "2025-08-05T22:45:16.487Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.483Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(46)}",
+      "timestamp": "2025-08-05T22:45:16.487Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.484Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:16.487Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 46 incoming changes",
+      "timestamp": "2025-08-05T22:45:16.492Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.488Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:16.492Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 46 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:16.492Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:16.492Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 46 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:16.493Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.489Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:16.493Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 46 incoming changes",
+      "timestamp": "2025-08-05T22:45:16.493Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.490Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:16.500Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.493Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:16.501Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:16.493Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:16.501Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:16.501Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.511Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:17.514Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.512Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:17.515Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:17.515Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 1 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:17.515Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 1 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 1 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 1 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 1 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 1 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Applying insert to status_sets for record 5c3c11be-48db-4fb1-b7ca-b827bbc4e8d6",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Inserting status_sets 5c3c11be-48db-4fb1-b7ca-b827bbc4e8d6 into IndexedDB",
+      "timestamp": "2025-08-05T22:45:17.516Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Successfully applied insert to status_sets for record 5c3c11be-48db-4fb1-b7ca-b827bbc4e8d6",
+      "timestamp": "2025-08-05T22:45:17.518Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.516Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 1, resultCount: 1}",
+      "timestamp": "2025-08-05T22:45:17.518Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.516Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(1)}",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.517Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 1 incoming changes",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.517Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 1 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 1 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.517Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 1 incoming changes",
+      "timestamp": "2025-08-05T22:45:17.520Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.517Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:17.521Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.518Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:17.521Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:17.518Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:17.521Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:17.521Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.122Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:18.126Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.122Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:18.126Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:18.126Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 17 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.130Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:18.130Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 17 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.130Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 17 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.130Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 17 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 17 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 17 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 17 bulk inserts for entity_dependencies",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 17 bulk inserts for entity_dependencies",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 17 entity_dependencies into IndexedDB",
+      "timestamp": "2025-08-05T22:45:18.131Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 17 entity_dependencies entities",
+      "timestamp": "2025-08-05T22:45:18.135Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.128Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 17, resultCount: 17}",
+      "timestamp": "2025-08-05T22:45:18.135Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.128Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(17)}",
+      "timestamp": "2025-08-05T22:45:18.135Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.128Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:18.135Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 17 incoming changes",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.128Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 17 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 17 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.129Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 17 incoming changes",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.129Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:18.136Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.129Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:18.137Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.129Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:18.137Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:18.137Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.693Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:18.696Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.693Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:18.696Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:18.696Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 9 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.697Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:18.697Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 9 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 9 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 9 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 9 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 9 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 9 bulk inserts for tag_sets",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 9 bulk inserts for tag_sets",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 9 tag_sets into IndexedDB",
+      "timestamp": "2025-08-05T22:45:18.699Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 9 tag_sets entities",
+      "timestamp": "2025-08-05T22:45:18.700Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.698Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 9, resultCount: 9}",
+      "timestamp": "2025-08-05T22:45:18.700Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.698Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(9)}",
+      "timestamp": "2025-08-05T22:45:18.702Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.699Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 9 incoming changes",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.699Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 9 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 9 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.699Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 9 incoming changes",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.699Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:18.703Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.699Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:18.704Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:18.700Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:18.704Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:18.704Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.542Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:19.544Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.543Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:19.544Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:19.546Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 7 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:19.546Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:19.546Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 7 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:19.548Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 7 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:19.549Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:19.549Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 7 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:19.549Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 7 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:19.550Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 7 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:19.550Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 7 bulk inserts for status_definitions",
+      "timestamp": "2025-08-05T22:45:19.551Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 7 bulk inserts for status_definitions",
+      "timestamp": "2025-08-05T22:45:19.551Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 7 status_definitions into IndexedDB",
+      "timestamp": "2025-08-05T22:45:19.551Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 7 status_definitions entities",
+      "timestamp": "2025-08-05T22:45:19.552Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.550Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 7, resultCount: 7}",
+      "timestamp": "2025-08-05T22:45:19.553Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.551Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(7)}",
+      "timestamp": "2025-08-05T22:45:19.553Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.551Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:19.555Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 7 incoming changes",
+      "timestamp": "2025-08-05T22:45:19.556Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.552Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:19.556Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 7 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:19.559Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:19.559Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 7 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:19.559Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.553Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:19.560Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 7 incoming changes",
+      "timestamp": "2025-08-05T22:45:19.560Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.553Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:19.560Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.554Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:19.560Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:19.554Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:19.560Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:19.561Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.121Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:20.125Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.122Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:20.125Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:20.126Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 44 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.126Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:20.126Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 44 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.126Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 44 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 44 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 44 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 44 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 44 bulk inserts for projects",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 44 bulk inserts for projects",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 44 projects into IndexedDB",
+      "timestamp": "2025-08-05T22:45:20.127Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 44 projects entities",
+      "timestamp": "2025-08-05T22:45:20.141Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.138Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 44, resultCount: 44}",
+      "timestamp": "2025-08-05T22:45:20.141Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.138Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(44)}",
+      "timestamp": "2025-08-05T22:45:20.141Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.138Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 44 incoming changes",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.139Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 44 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 44 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.139Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 44 incoming changes",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.140Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:20.144Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.140Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:20.145Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.140Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:20.145Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:20.145Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.863Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:20.867Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.863Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:20.867Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:20.867Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 10 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.871Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:20.871Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 10 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.871Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 10 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.871Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:20.871Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 10 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.871Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 10 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:20.872Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 10 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:20.874Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 10 bulk inserts for tags",
+      "timestamp": "2025-08-05T22:45:20.874Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 10 bulk inserts for tags",
+      "timestamp": "2025-08-05T22:45:20.874Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 10 tags into IndexedDB",
+      "timestamp": "2025-08-05T22:45:20.874Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 10 tags entities",
+      "timestamp": "2025-08-05T22:45:20.876Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.871Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 10, resultCount: 10}",
+      "timestamp": "2025-08-05T22:45:20.876Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.871Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(10)}",
+      "timestamp": "2025-08-05T22:45:20.876Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.871Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 10 incoming changes",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.871Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 10 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 10 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.872Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 10 incoming changes",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.872Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.872Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:20.872Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:20.877Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:20.878Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.746Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:21.749Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.747Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:21.749Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:21.750Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 192 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:21.750Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:21.750Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 192 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:21.750Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 192 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:21.750Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:21.750Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 192 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:21.751Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 192 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:21.751Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 50 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:21.751Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 50 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.751Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 50 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.751Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 50 tasks into IndexedDB",
+      "timestamp": "2025-08-05T22:45:21.751Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 50 tasks entities",
+      "timestamp": "2025-08-05T22:45:21.762Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 50 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:21.763Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 50 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.763Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 50 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.763Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 50 tasks into IndexedDB",
+      "timestamp": "2025-08-05T22:45:21.763Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 50 tasks entities",
+      "timestamp": "2025-08-05T22:45:21.770Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 50 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:21.770Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 50 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.770Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 50 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.771Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 50 tasks into IndexedDB",
+      "timestamp": "2025-08-05T22:45:21.771Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 50 tasks entities",
+      "timestamp": "2025-08-05T22:45:21.778Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 42 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:21.778Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 42 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.779Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 42 bulk inserts for tasks",
+      "timestamp": "2025-08-05T22:45:21.779Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 42 tasks into IndexedDB",
+      "timestamp": "2025-08-05T22:45:21.779Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 42 tasks entities",
+      "timestamp": "2025-08-05T22:45:21.786Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.784Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 192, resultCount: 192}",
+      "timestamp": "2025-08-05T22:45:21.786Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.785Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(192)}",
+      "timestamp": "2025-08-05T22:45:21.787Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.785Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:21.787Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 192 incoming changes",
+      "timestamp": "2025-08-05T22:45:21.787Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.785Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:21.788Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 192 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:21.788Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 192 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.786Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 192 incoming changes",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.787Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.787Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:21.787Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:21.790Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.350Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:22.353Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.351Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:22.353Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:22.353Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 26 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:22.353Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:22.353Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 26 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:22.353Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 26 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:22.354Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:22.354Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 26 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:22.354Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 26 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:22.354Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Grouped 26 changes into 1 operation groups",
+      "timestamp": "2025-08-05T22:45:22.355Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 26 bulk inserts for comments",
+      "timestamp": "2025-08-05T22:45:22.355Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 26 bulk inserts for comments",
+      "timestamp": "2025-08-05T22:45:22.355Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] 🗄️ Dexie: Bulk inserting 26 comments into IndexedDB",
+      "timestamp": "2025-08-05T22:45:22.355Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] ✅ Bulk inserted 26 comments entities",
+      "timestamp": "2025-08-05T22:45:22.367Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.363Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 26, resultCount: 26}",
+      "timestamp": "2025-08-05T22:45:22.367Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.363Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(26)}",
+      "timestamp": "2025-08-05T22:45:22.367Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.363Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 26 incoming changes",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.364Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing complete: 26 successful, 0 conflicts resolved, 0 errors",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 26 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.364Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 26 incoming changes",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.364Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:22.372Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.365Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:22.373Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:22.365Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:22.373Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:22.373Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.030Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:23.034Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.031Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:23.034Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty changes array for srv_init_changes - will still send acknowledgment",
+      "timestamp": "2025-08-05T22:45:23.037Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.034Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 0, resultCount: 0}",
+      "timestamp": "2025-08-05T22:45:23.041Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.034Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(0)}",
+      "timestamp": "2025-08-05T22:45:23.041Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty processing complete - returning empty results",
+      "timestamp": "2025-08-05T22:45:23.041Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.034Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.035Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 0 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.035Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.036Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:23.042Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.036Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:23.043Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.036Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:23.043Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:23.043Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.660Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:23.661Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.660Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:23.662Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:23.662Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.662Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:23.662Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.662Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty changes array for srv_init_changes - will still send acknowledgment",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.661Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 0, resultCount: 0}",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.662Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(0)}",
+      "timestamp": "2025-08-05T22:45:23.663Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty processing complete - returning empty results",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.662Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.662Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 0 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.662Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.662Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.663Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:23.664Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:23.663Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:23.665Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:23.665Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.476Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:24.479Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.476Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:24.479Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:24.480Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty changes array for srv_init_changes - will still send acknowledgment",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.478Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 0, resultCount: 0}",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.478Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(0)}",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty processing complete - returning empty results",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.479Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.479Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 0 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.479Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:24.481Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.479Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:24.485Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.479Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:24.485Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:24.480Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:24.485Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:24.486Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.074Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:25.078Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.075Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:25.078Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:25.078Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.078Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:25.078Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty changes array for srv_init_changes - will still send acknowledgment",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.076Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 0, resultCount: 0}",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.076Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(0)}",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty processing complete - returning empty results",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.076Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:25.080Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.077Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:25.081Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:25.081Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 0 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:25.081Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.077Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:25.081Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:25.082Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.077Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:25.082Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.077Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:25.082Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.077Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:25.082Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:25.082Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.633Z [SyncMachineV3] 🔍 📨 Received: srv_init_changes ",
+      "timestamp": "2025-08-05T22:45:25.636Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.634Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:25.637Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_changes",
+      "timestamp": "2025-08-05T22:45:25.637Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📥 Sending INCOMING_CHANGES event for 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.639Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📋 srv_init_changes received with LSN none (will update on completion)",
+      "timestamp": "2025-08-05T22:45:25.639Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.639Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queuing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.639Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Starting queue processing: 1 items",
+      "timestamp": "2025-08-05T22:45:25.639Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.639Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Processing 0 incoming changes (srv_init_changes)",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty changes array for srv_init_changes - will still send acknowledgment",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.636Z [SyncMachineV3] 🔍 ⚙️ IncomingChanges callback: changesProcessed {changeCount: 0, resultCount: 0}",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.637Z [SyncMachineV3] 🔍 ⚙️ Callback event: INCOMING_CHANGES_PROCESSED {type: INCOMING_CHANGES_PROCESSED, results: Array(0)}",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Empty processing complete - returning empty results",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.638Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:25.640Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.638Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "[IncomingChangeService] Queue processing completed",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] Processing complete: 0 success, 0 errors",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.639Z [SyncMachineV3] 🔍 📝 logProcessedChanges: starting {eventType: INCOMING_CHANGES_PROCESSED, hasResults: true, hasCount: false, eventKeys: Array(2)}",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Processed 0 incoming changes",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.639Z [SyncMachineV3] 🔍 📝 logProcessedChanges: completed successfully {eventType: INCOMING_CHANGES_PROCESSED}",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.639Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_received, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:25.639Z [SyncMachineV3] 🔍 📨 Sent: clt_init_received ",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📤 Sent acknowledgment: clt_init_received",
+      "timestamp": "2025-08-05T22:45:25.641Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.485Z [SyncMachineV3] 🔍 📨 Received: srv_init_complete ",
+      "timestamp": "2025-08-05T22:45:26.487Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.485Z [SyncMachineV3] 🔍 ⚙️ Callback event: WS_MESSAGE {type: WS_MESSAGE, message: Object}",
+      "timestamp": "2025-08-05T22:45:26.487Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📨 Processing message type: srv_init_complete",
+      "timestamp": "2025-08-05T22:45:26.489Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] ✅ Initial sync completed",
+      "timestamp": "2025-08-05T22:45:26.490Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📊 CRITICAL LSN update at init complete: 0/0 → 0/20F74A8",
+      "timestamp": "2025-08-05T22:45:26.490Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.486Z [SyncMachineV3] 🔍 📨 Send called {hasWebSocket: true, readyState: 1, messageType: clt_init_processed, isOpen: true}",
+      "timestamp": "2025-08-05T22:45:26.490Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.486Z [SyncMachineV3] 🔍 📨 Sent: clt_init_processed ",
+      "timestamp": "2025-08-05T22:45:26.490Z"
+    },
+    {
+      "type": "log",
+      "text": "[MessageProcessor] 📤 Sent acknowledgment: clt_init_processed",
+      "timestamp": "2025-08-05T22:45:26.490Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔍 updateLSN action called with event type: LSN_UPDATE",
+      "timestamp": "2025-08-05T22:45:26.493Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔍 LSN_UPDATE event received with LSN: 0/20F74A8",
+      "timestamp": "2025-08-05T22:45:26.493Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📊 LSN update: 0/0 → 0/20F74A8 (source: init_complete)",
+      "timestamp": "2025-08-05T22:45:26.493Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔄 Updating WebSocketService connection params with new LSN: 0/20F74A8",
+      "timestamp": "2025-08-05T22:45:26.493Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Returning updated context with new LSN: 0/20F74A8",
+      "timestamp": "2025-08-05T22:45:26.493Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.487Z [SyncMachineV3] 🔍 📝 saveOwnState: starting save process {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/20F74A8}",
+      "timestamp": "2025-08-05T22:45:26.494Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.488Z [SyncMachineV3] 🔍 📝 saveOwnState: state saved successfully {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/20F74A8}",
+      "timestamp": "2025-08-05T22:45:26.494Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 📢 Notifying app init machine: SYNC_LIVE",
+      "timestamp": "2025-08-05T22:45:26.494Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] Received SYNC_LIVE from sync machine - skipping live changes (TypeORM disabled)",
+      "timestamp": "2025-08-05T22:45:26.494Z"
+    },
+    {
+      "type": "log",
+      "text": "[AppInitMachine] System fully ready",
+      "timestamp": "2025-08-05T22:45:26.494Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] App init machine change: {state: ready, isReady: true, syncInfo: }",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] ✅ App init machine reached ready state!",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.489Z [SyncMachineV3] 🔍 📝 saveOwnState: starting save process {clientId: 80153a56-0aa9-42b4-a8d6-47c07eaf8dae, currentLSN: 0/20F74A8}",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.489Z [SyncMachineV3] 🔍 📝 saveOwnState: no change, skipping save ",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] ✅ Initial sync completed - skipping baseline (IntegrityService disabled)",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "2025-08-05T22:45:26.489Z [SyncMachineV3] ℹ️ 📊 Entered state: live_sync Enhanced validation complete, system ready for real-time sync",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🔄 Re-enabling Dexie change tracking for live sync",
+      "timestamp": "2025-08-05T22:45:26.497Z"
+    },
+    {
+      "type": "log",
+      "text": "[Dexie Change Tracking] Enabling change tracking",
+      "timestamp": "2025-08-05T22:45:26.498Z"
+    },
+    {
+      "type": "log",
+      "text": "[SyncMachineV3] 🚀 Starting Dexie outgoing sync monitoring",
+      "timestamp": "2025-08-05T22:45:26.498Z"
+    },
+    {
+      "type": "log",
+      "text": "[DexieOutgoingChangeService] Starting direct processing",
+      "timestamp": "2025-08-05T22:45:26.498Z"
+    },
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] System verified for this session",
+      "timestamp": "2025-08-05T22:45:26.498Z"
+    },
+    {
+      "type": "log",
+      "text": "[DexieOutgoingChangeService] Processed 0 total changes",
+      "timestamp": "2025-08-05T22:45:26.530Z"
+    },
+    {
+      "type": "log",
+      "text": "[DebugRoute] Permission check state: {isAuthenticated: true, hasUser: true, userRole: super_admin, canAccess: true, timestamp: 1754433929920}",
+      "timestamp": "2025-08-05T22:45:29.923Z"
+    },
+    {
+      "type": "log",
+      "text": "🎯 VibeGanttDebug: Using original VibeGantt with atomic store",
+      "timestamp": "2025-08-05T22:45:29.931Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Starting renderer actor",
+      "timestamp": "2025-08-05T22:45:30.010Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Creating atomic data store with projectId: ddfb9da6-32cf-49cc-be72-14a919850dcd",
+      "timestamp": "2025-08-05T22:45:30.012Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Loading initial data from IndexedDB {projectId: ddfb9da6-32cf-49cc-be72-14a919850dcd, domainService: Object}",
+      "timestamp": "2025-08-05T22:45:30.016Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Created callback actor with input: undefined",
+      "timestamp": "2025-08-05T22:45:30.017Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Received event: INITIALIZE",
+      "timestamp": "2025-08-05T22:45:30.018Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Initializing with options: {container: div.vibegantt, width: 894, height: 600}",
+      "timestamp": "2025-08-05T22:45:30.020Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Creating renderer with merged options",
+      "timestamp": "2025-08-05T22:45:30.021Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Created with container {container: vibegantt , bounds: DOMRect}",
+      "timestamp": "2025-08-05T22:45:30.022Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Initializing",
+      "timestamp": "2025-08-05T22:45:30.022Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Container measured {width: 896, height: 62}",
+      "timestamp": "2025-08-05T22:45:30.028Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Initializing renderers",
+      "timestamp": "2025-08-05T22:45:30.029Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Renderers initialized",
+      "timestamp": "2025-08-05T22:45:30.031Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Event delegation setup complete",
+      "timestamp": "2025-08-05T22:45:30.031Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Initialization complete",
+      "timestamp": "2025-08-05T22:45:30.032Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Renderer ready",
+      "timestamp": "2025-08-05T22:45:30.033Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Data still loading, will send when ready",
+      "timestamp": "2025-08-05T22:45:30.034Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Setting up store subscription",
+      "timestamp": "2025-08-05T22:45:30.036Z"
+    },
+    {
+      "type": "log",
+      "text": "[PLAYWRIGHT_READY] VibeGantt debug page loaded",
+      "timestamp": "2025-08-05T22:45:30.038Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Querying dependencies for task IDs: [1049ece2-bbba-42c8-afa2-286dbcbd6b3e, 11921839-b6f6-4bc6-aee8-324b782eba7c, 1a633385-8bbd-4018-bb5a-03cfd0f15109, 3708dda0-052b-4ba5-bbc9-4f177656e4cc, 6634e003-2185-437d-801e-97ae814b546c] ...",
+      "timestamp": "2025-08-05T22:45:30.062Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Raw dependency query result: {totalFound: 17, firstFew: Array(3)}",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Initial data loaded {taskCount: 10, dependencyCount: 17, relationshipTables: Array(4), paginationEnabled: false, sampleTasks: Array(3)}",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Task details for project ddfb9da6-32cf-49cc-be72-14a919850dcd",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 1049ece2-bbba-42c8-afa2-286dbcbd6b3e - Project Planning (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 11921839-b6f6-4bc6-aee8-324b782eba7c - Bug Fixes (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 1a633385-8bbd-4018-bb5a-03cfd0f15109 - API Integration (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 3708dda0-052b-4ba5-bbc9-4f177656e4cc - Documentation (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 6634e003-2185-437d-801e-97ae814b546c - Design Phase (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 938d87bb-5b4f-4513-b3f3-a94accee4218 - Backend Development (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: 9de897c6-7e38-4373-a51b-4dcdb39bc395 - Frontend Development (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: ad37be29-a132-47f4-8985-56bab8fe752c - Deployment Preparation (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: cfd8b80b-dca9-4115-8c0d-32b9f08cf568 - Testing Phase (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Task: d4b43a1e-19a3-42cd-b436-c3674075ba10 - Production Release (project: ddfb9da6-32cf-49cc-be72-14a919850dcd)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Dependencies found: 17",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 03635bae-0bba-4049-864c-8693279286b0 - 3708dda0-052b-4ba5-bbc9-4f177656e4cc -> ad37be29-a132-47f4-8985-56bab8fe752c (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 4a9afea1-b37f-451f-9048-a4b709408d4d - cfd8b80b-dca9-4115-8c0d-32b9f08cf568 -> 11921839-b6f6-4bc6-aee8-324b782eba7c (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 4c800317-025f-42aa-ac14-be64c2cf9a67 - ad37be29-a132-47f4-8985-56bab8fe752c -> d4b43a1e-19a3-42cd-b436-c3674075ba10 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 532abfb5-d7ae-4809-aa64-c0900f10054e - ad37be29-a132-47f4-8985-56bab8fe752c -> d4b43a1e-19a3-42cd-b436-c3674075ba10 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 668e6a3f-b615-475c-971c-12bb36c023e4 - 1a633385-8bbd-4018-bb5a-03cfd0f15109 -> cfd8b80b-dca9-4115-8c0d-32b9f08cf568 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 677da720-d4f5-4c4e-922a-34a88860e0c2 - 11921839-b6f6-4bc6-aee8-324b782eba7c -> 3708dda0-052b-4ba5-bbc9-4f177656e4cc (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: 95bbc51c-3d2b-4df7-989f-bd7b89884611 - 9de897c6-7e38-4373-a51b-4dcdb39bc395 -> 1a633385-8bbd-4018-bb5a-03cfd0f15109 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: a55c1321-4171-467b-b1d3-d29aa28cb016 - 9de897c6-7e38-4373-a51b-4dcdb39bc395 -> 1a633385-8bbd-4018-bb5a-03cfd0f15109 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: a7e67ee1-c76d-4391-860a-f48724f35ea8 - 938d87bb-5b4f-4513-b3f3-a94accee4218 -> 9de897c6-7e38-4373-a51b-4dcdb39bc395 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: acb2c178-2a67-4fa4-a8f0-1633408c1ad3 - 1049ece2-bbba-42c8-afa2-286dbcbd6b3e -> 6634e003-2185-437d-801e-97ae814b546c (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: b51789a3-c49d-4447-a4bb-f1f1e501740e - cfd8b80b-dca9-4115-8c0d-32b9f08cf568 -> 11921839-b6f6-4bc6-aee8-324b782eba7c (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: b8aed627-d3c8-49cd-a2d6-75b2594a11a0 - 6634e003-2185-437d-801e-97ae814b546c -> 9de897c6-7e38-4373-a51b-4dcdb39bc395 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: dbf55e19-3dca-401a-881b-f773c469fd44 - 11921839-b6f6-4bc6-aee8-324b782eba7c -> 3708dda0-052b-4ba5-bbc9-4f177656e4cc (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: e1738306-2aed-40ef-96e5-825062d90f37 - 3708dda0-052b-4ba5-bbc9-4f177656e4cc -> ad37be29-a132-47f4-8985-56bab8fe752c (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: e40fdac7-bb96-4d15-b634-9acf2bb55474 - 6634e003-2185-437d-801e-97ae814b546c -> 938d87bb-5b4f-4513-b3f3-a94accee4218 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: e79b15d8-17b7-46bd-a653-954cfba485ef - 6634e003-2185-437d-801e-97ae814b546c -> 938d87bb-5b4f-4513-b3f3-a94accee4218 (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "  Dep: eb148999-fc16-4b88-9c96-339bb49d133b - 1049ece2-bbba-42c8-afa2-286dbcbd6b3e -> 6634e003-2185-437d-801e-97ae814b546c (type: finish-to-start)",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Loading initial data for store",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Setting tasks {taskCount: 10, hasRelationships: true}",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "📐 Calculating coordinate mapping {taskCount: 10, zoom: day, dateRange: Object, dateRangeDetails: Object}",
+      "timestamp": "2025-08-05T22:45:30.079Z"
+    },
+    {
+      "type": "log",
+      "text": "📐 Task 0: Project Planning {task: Object, parsed: Object}",
+      "timestamp": "2025-08-05T22:45:30.080Z"
+    },
+    {
+      "type": "log",
+      "text": "📐 Task 1: Design Phase {task: Object, parsed: Object}",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "📐 Task 2: Backend Development {task: Object, parsed: Object}",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Initial data loaded, sending to renderer",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Store data changed, updating renderer {taskCount: 10, depCount: 0}",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Sending updated coordinate mapping to renderer",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Received event: RENDER_COORDINATES",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Rendering with coordinates: {taskCount: 10, segmentCount: 104, version: 1754433930076}",
+      "timestamp": "2025-08-05T22:45:30.082Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Rendering from coordinates {taskCount: 10, segmentCount: 104, totalWidth: 5200}",
+      "timestamp": "2025-08-05T22:45:30.082Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Store data changed, updating renderer {taskCount: 10, depCount: 17}",
+      "timestamp": "2025-08-05T22:45:30.108Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Sending updated coordinate mapping to renderer",
+      "timestamp": "2025-08-05T22:45:30.108Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Received event: RENDER_COORDINATES",
+      "timestamp": "2025-08-05T22:45:30.109Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Rendering with coordinates: {taskCount: 10, segmentCount: 104, version: 1754433930076}",
+      "timestamp": "2025-08-05T22:45:30.110Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Rendering from coordinates {taskCount: 10, segmentCount: 104, totalWidth: 5200}",
+      "timestamp": "2025-08-05T22:45:30.110Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Initial data loaded {taskCount: 10, depCount: 17}",
+      "timestamp": "2025-08-05T22:45:30.111Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Setting up live query subscriptions",
+      "timestamp": "2025-08-05T22:45:30.112Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Setting up granular subscriptions {projectId: ddfb9da6-32cf-49cc-be72-14a919850dcd, domainService: Object}",
+      "timestamp": "2025-08-05T22:45:30.113Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Initial load complete, enabling live updates",
+      "timestamp": "2025-08-05T22:45:30.213Z"
+    }
+  ],
+  "zoomLogs": [
+    {
+      "type": "log",
+      "text": "[AuthenticatedRoute] Final auth state check: {matches: authenticated, user: true, authError: null, errorRetryCount: undefined, path: /debug/vibegantt}",
+      "timestamp": "2025-08-05T22:45:11.876Z"
+    },
+    {
+      "type": "log",
+      "text": "🎯 VibeGanttDebug: Using original VibeGantt with atomic store",
+      "timestamp": "2025-08-05T22:45:29.931Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Starting renderer actor",
+      "timestamp": "2025-08-05T22:45:30.010Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Creating atomic data store with projectId: ddfb9da6-32cf-49cc-be72-14a919850dcd",
+      "timestamp": "2025-08-05T22:45:30.012Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Loading initial data from IndexedDB {projectId: ddfb9da6-32cf-49cc-be72-14a919850dcd, domainService: Object}",
+      "timestamp": "2025-08-05T22:45:30.016Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Created callback actor with input: undefined",
+      "timestamp": "2025-08-05T22:45:30.017Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Received event: INITIALIZE",
+      "timestamp": "2025-08-05T22:45:30.018Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Initializing with options: {container: div.vibegantt, width: 894, height: 600}",
+      "timestamp": "2025-08-05T22:45:30.020Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Creating renderer with merged options",
+      "timestamp": "2025-08-05T22:45:30.021Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Created with container {container: vibegantt , bounds: DOMRect}",
+      "timestamp": "2025-08-05T22:45:30.022Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Initializing",
+      "timestamp": "2025-08-05T22:45:30.022Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Container measured {width: 896, height: 62}",
+      "timestamp": "2025-08-05T22:45:30.028Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Initializing renderers",
+      "timestamp": "2025-08-05T22:45:30.029Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Renderers initialized",
+      "timestamp": "2025-08-05T22:45:30.031Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Event delegation setup complete",
+      "timestamp": "2025-08-05T22:45:30.031Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Initialization complete",
+      "timestamp": "2025-08-05T22:45:30.032Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Renderer ready",
+      "timestamp": "2025-08-05T22:45:30.033Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Data still loading, will send when ready",
+      "timestamp": "2025-08-05T22:45:30.034Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Setting up store subscription",
+      "timestamp": "2025-08-05T22:45:30.036Z"
+    },
+    {
+      "type": "log",
+      "text": "[PLAYWRIGHT_READY] VibeGantt debug page loaded",
+      "timestamp": "2025-08-05T22:45:30.038Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Querying dependencies for task IDs: [1049ece2-bbba-42c8-afa2-286dbcbd6b3e, 11921839-b6f6-4bc6-aee8-324b782eba7c, 1a633385-8bbd-4018-bb5a-03cfd0f15109, 3708dda0-052b-4ba5-bbc9-4f177656e4cc, 6634e003-2185-437d-801e-97ae814b546c] ...",
+      "timestamp": "2025-08-05T22:45:30.062Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Raw dependency query result: {totalFound: 17, firstFew: Array(3)}",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Initial data loaded {taskCount: 10, dependencyCount: 17, relationshipTables: Array(4), paginationEnabled: false, sampleTasks: Array(3)}",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Task details for project ddfb9da6-32cf-49cc-be72-14a919850dcd",
+      "timestamp": "2025-08-05T22:45:30.071Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Dependencies found: 17",
+      "timestamp": "2025-08-05T22:45:30.077Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Loading initial data for store",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Setting tasks {taskCount: 10, hasRelationships: true}",
+      "timestamp": "2025-08-05T22:45:30.078Z"
+    },
+    {
+      "type": "log",
+      "text": "📐 Calculating coordinate mapping {taskCount: 10, zoom: day, dateRange: Object, dateRangeDetails: Object}",
+      "timestamp": "2025-08-05T22:45:30.079Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Initial data loaded, sending to renderer",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Store data changed, updating renderer {taskCount: 10, depCount: 0}",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Sending updated coordinate mapping to renderer",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Received event: RENDER_COORDINATES",
+      "timestamp": "2025-08-05T22:45:30.081Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Rendering with coordinates: {taskCount: 10, segmentCount: 104, version: 1754433930076}",
+      "timestamp": "2025-08-05T22:45:30.082Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Rendering from coordinates {taskCount: 10, segmentCount: 104, totalWidth: 5200}",
+      "timestamp": "2025-08-05T22:45:30.082Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Store data changed, updating renderer {taskCount: 10, depCount: 17}",
+      "timestamp": "2025-08-05T22:45:30.108Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Sending updated coordinate mapping to renderer",
+      "timestamp": "2025-08-05T22:45:30.108Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Received event: RENDER_COORDINATES",
+      "timestamp": "2025-08-05T22:45:30.109Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRendererActor: Rendering with coordinates: {taskCount: 10, segmentCount: 104, version: 1754433930076}",
+      "timestamp": "2025-08-05T22:45:30.110Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttRenderer: Rendering from coordinates {taskCount: 10, segmentCount: 104, totalWidth: 5200}",
+      "timestamp": "2025-08-05T22:45:30.110Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Initial data loaded {taskCount: 10, depCount: 17}",
+      "timestamp": "2025-08-05T22:45:30.111Z"
+    },
+    {
+      "type": "log",
+      "text": "GanttMachine: Setting up live query subscriptions",
+      "timestamp": "2025-08-05T22:45:30.112Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Setting up granular subscriptions {projectId: ddfb9da6-32cf-49cc-be72-14a919850dcd, domainService: Object}",
+      "timestamp": "2025-08-05T22:45:30.113Z"
+    },
+    {
+      "type": "log",
+      "text": "📊 GanttStore: Initial load complete, enabling live updates",
+      "timestamp": "2025-08-05T22:45:30.213Z"
+    }
+  ]
+}
