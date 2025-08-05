@@ -764,18 +764,18 @@ export class IncomingChangeService {
     switch (change.operation) {
       case 'insert':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_set ${change.data.id} into IndexedDB`);
-        await db.status_sets.put(change.data as any);
+        await db.statusSets.put(change.data as any);
         break;
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
-        const mergedStatusSet = await this.mergeUpdateData(db.status_sets, change.data.id, change.data);
-        await db.status_sets.put(mergedStatusSet);
+        const mergedStatusSet = await this.mergeUpdateData(db.statusSets, change.data.id, change.data);
+        await db.statusSets.put(mergedStatusSet);
         break;
       
       case 'delete':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_set ${change.data.id} from IndexedDB`);
-        await db.status_sets.delete(change.data.id);
+        await db.statusSets.delete(change.data.id);
         break;
       
       default:
@@ -793,18 +793,18 @@ export class IncomingChangeService {
     switch (change.operation) {
       case 'insert':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_definition ${change.data.id} into IndexedDB`);
-        await db.status_definitions.put(change.data as any);
+        await db.statusDefinitions.put(change.data as any);
         break;
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
-        const mergedStatusDef = await this.mergeUpdateData(db.status_definitions, change.data.id, change.data);
-        await db.status_definitions.put(mergedStatusDef);
+        const mergedStatusDef = await this.mergeUpdateData(db.statusDefinitions, change.data.id, change.data);
+        await db.statusDefinitions.put(mergedStatusDef);
         break;
       
       case 'delete':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_definition ${change.data.id} from IndexedDB`);
-        await db.status_definitions.delete(change.data.id);
+        await db.statusDefinitions.delete(change.data.id);
         break;
       
       default:
@@ -944,18 +944,18 @@ export class IncomingChangeService {
     switch (change.operation) {
       case 'insert':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag_set ${change.data.id} into IndexedDB`);
-        await db.tag_sets.put(change.data as any);
+        await db.tagSets.put(change.data as any);
         break;
       
       case 'update':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
-        const mergedTagSet = await this.mergeUpdateData(db.tag_sets, change.data.id, change.data);
-        await db.tag_sets.put(mergedTagSet);
+        const mergedTagSet = await this.mergeUpdateData(db.tagSets, change.data.id, change.data);
+        await db.tagSets.put(mergedTagSet);
         break;
       
       case 'delete':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag_set ${change.data.id} from IndexedDB`);
-        await db.tag_sets.delete(change.data.id);
+        await db.tagSets.delete(change.data.id);
         break;
       
       default:
@@ -1007,15 +1007,15 @@ export class IncomingChangeService {
         // Junction tables typically use composite keys, so we need to handle deletion differently
         const junctionData = change.data as any;
         if (table === 'project_members' && junctionData.projectId && junctionData.userId) {
-          await db.project_members.where('[projectId+userId]').equals([junctionData.projectId, junctionData.userId]).delete();
+          await db.projectMembers.where('[projectId+userId]').equals([junctionData.projectId, junctionData.userId]).delete();
         } else if (table === 'task_tags' && junctionData.taskId && junctionData.tagId) {
-          await db.task_tags.where('[taskId+tagId]').equals([junctionData.taskId, junctionData.tagId]).delete();
+          await db.taskTags.where('[taskId+tagId]').equals([junctionData.taskId, junctionData.tagId]).delete();
         } else if (table === 'project_status_sets' && junctionData.projectId && junctionData.statusSetId) {
-          await db.project_status_sets.where('[projectId+statusSetId]').equals([junctionData.projectId, junctionData.statusSetId]).delete();
+          await db.projectStatusSets.where('[projectId+statusSetId]').equals([junctionData.projectId, junctionData.statusSetId]).delete();
         } else if (table === 'project_tag_sets' && junctionData.projectId && junctionData.tagSetId) {
-          await db.project_tag_sets.where('[projectId+tagSetId]').equals([junctionData.projectId, junctionData.tagSetId]).delete();
+          await db.projectTagSets.where('[projectId+tagSetId]').equals([junctionData.projectId, junctionData.tagSetId]).delete();
         } else if (table === 'task_dependencies' && junctionData.dependentTaskId && junctionData.dependencyTaskId) {
-          await db.task_dependencies.where('[dependentTaskId+dependencyTaskId]').equals([junctionData.dependentTaskId, junctionData.dependencyTaskId]).delete();
+          await db.taskDependencies.where('[dependentTaskId+dependencyTaskId]').equals([junctionData.dependentTaskId, junctionData.dependencyTaskId]).delete();
         } else {
           console.warn(`[IncomingChangeService] Unable to delete from junction table ${table} - missing key fields`);
         }

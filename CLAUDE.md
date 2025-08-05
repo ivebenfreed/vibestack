@@ -18,7 +18,7 @@
 - **User**: ben@getelevra.com (authenticated with valid session)
 - **Expiry**: 2025-08-12 (tokens are valid)
 
-**DO NOT re-run auth setup** - use existing state for all tests.
+**DO NOT re-run auth setup** - use existing state for all tests. staging
 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -115,6 +115,15 @@ Each worktree gets its own isolated browser profile for Playwright testing. This
 - Login sessions don't interfere between branches
 - Browser state is isolated per issue/feature
 - Screenshots and videos are saved per worktree
+
+#### Test Organization
+
+Tests are organized into folders:
+- `tests/playwright/core/` - Core tests that run for all issues (auth setup, templates, helpers)
+- `tests/playwright/issue-{number}/` - Issue-specific tests for the current worktree
+
+When creating tests for a specific issue/feature, place them in the appropriate issue folder.
+Core tests should only contain reusable utilities and basic smoke tests.
 
 #### Quick Start
 
@@ -214,6 +223,30 @@ worktrees/issue-10/
 3. Start dev servers: `./scripts/dev-start.sh`
 4. Run tests: `./scripts/playwright-test.sh`
 
+#### Database Access in Tests
+
+Tests can access the Dexie database and domain services directly:
+
+```javascript
+// Import database and domain services
+const { db, domainServices } = await import('/src/domain/index.js');
+
+// Use domain services
+const task = await domainServices.task.createUI({ title: 'Test' });
+
+// Direct database access
+const count = await db.tasks.count();
+const task = await db.tasks.get(taskId);
+```
+
+#### Test Reporter Configuration
+
+By default, tests use:
+- List reporter for terminal output
+- HTML report generation (without auto-opening)
+
+To view HTML reports after tests: `npx playwright show-report`
+
 ## Background Process Management
 
 ### tmux-based Background Processes
@@ -299,4 +332,25 @@ Where `{N}` is the issue number (e.g., `vibestack-dev-issue-24` for Issue #24)
 - Memorize the nuanced communication patterns in the VibeStack architecture
 - Pay special attention to WebSocket message structures and sync protocols
 
-[... rest of the existing file content remains unchanged ...]
+## Worktree-Specific Rules
+
+### Playwright Test Organization
+
+When working in a worktree for a specific issue:
+- **ALWAYS** create new test files in `tests/playwright/issue-{number}/` folder
+- **NEVER** modify tests in `tests/playwright/core/` unless fixing a bug
+- **PREFER** using existing test helpers from `core/db-test-helpers.js`
+- **USE** `core/test-template.spec.js` as a starting point for new tests
+
+Example for Issue #25:
+```bash
+# Good - issue-specific test
+tests/playwright/issue-25/feature-validation.spec.js
+
+# Bad - adding to core without good reason
+tests/playwright/core/my-feature-test.spec.js
+```
+
+The Playwright config automatically detects the issue number and only runs:
+- All tests in `core/`
+- Tests specific to the current issue folder

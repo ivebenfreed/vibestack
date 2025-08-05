@@ -24,7 +24,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
   entityName = 'TagSet';
   
   protected getTable() {
-    return db.tag_sets;
+    return db.tagSets;
   }
   
   // ============================================================================
@@ -134,7 +134,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
       tagSetId
     };
     
-    await db.project_tag_sets.add(junction);
+    await db.projectTagSets.add(junction);
     await trackOutgoingChange('project_tag_sets', 'insert', junction);
     
     console.log('[TagSetService] Associated tag set with project', {
@@ -148,7 +148,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
    * Disassociate a tag set from a project
    */
   async disassociateFromProject(tagSetId: string, projectId: string): Promise<void> {
-    await db.project_tag_sets
+    await db.projectTagSets
       .where('[projectId+tagSetId]')
       .equals([projectId, tagSetId])
       .delete();
@@ -178,7 +178,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
    * Get all projects using a tag set
    */
   async getProjectsUsingTagSet(tagSetId: string): Promise<string[]> {
-    const junctions = await db.project_tag_sets
+    const junctions = await db.projectTagSets
       .where('tagSetId')
       .equals(tagSetId)
       .toArray();
@@ -191,7 +191,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
    */
   async getTagSetByName(name: string): Promise<TagSet | null> {
     // Since 'name' is not indexed, we need to use toArray and filter
-    const tagSets = await db.tag_sets.toArray();
+    const tagSets = await db.tagSets.toArray();
     const tagSet = tagSets.find(ts => ts.name === name);
     
     return tagSet || null;
@@ -202,7 +202,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
   // ============================================================================
   
   async createIncoming(tagSet: TagSet): Promise<TagSet> {
-    await db.tag_sets.put(tagSet);
+    await db.tagSets.put(tagSet);
     console.log('[TagSetService] Created tag set from incoming sync', {
       id: tagSet.id,
       name: tagSet.name
@@ -222,7 +222,7 @@ export class TagSetDomainService extends BaseDomainService<TagSet, CreateTagSetI
       updatedAt: updates.updatedAt || new Date().toISOString()
     };
     
-    await db.tag_sets.put(updated);
+    await db.tagSets.put(updated);
     console.log('[TagSetService] Updated tag set from incoming sync', {
       id: updated.id,
       updates
