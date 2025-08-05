@@ -85,8 +85,8 @@ echo ""
 
 # Pass all arguments to Playwright
 if [[ $# -eq 0 ]]; then
-    # No arguments, run all tests
-    npx playwright test --headed
+    # No arguments, run all tests (headless by default)
+    npx playwright test
 else
     # Pass through all arguments
     npx playwright test "$@"
@@ -106,7 +106,7 @@ echo ""
 echo -e "${BLUE}📋 Helpful commands:${NC}"
 echo "   View HTML report:    npx playwright show-report"
 echo "   Run specific test:   ./scripts/playwright-test.sh tests/playwright/vibegantt-screenshot.spec.js"
-echo "   Run headless:        ./scripts/playwright-test.sh --headed=false"
+echo "   Run with browser UI: ./scripts/playwright-test.sh --headed"
 echo "   Debug mode:          ./scripts/playwright-test.sh --debug"
 echo "   Screenshots saved:   ./screenshots/"
 echo ""

@@ -32,7 +32,7 @@ export const test = base.extend({
     
     // Launch persistent context
     const context = await chromium.launchPersistentContext(userDataDir, {
-      headless: false,
+      headless: process.env.HEADED ? false : true, // Default to headless unless HEADED=1
       viewport: { width: 1280, height: 720 },
       permissions: ['clipboard-read', 'clipboard-write'],
       acceptDownloads: true,
