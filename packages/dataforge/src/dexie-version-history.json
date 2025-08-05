@@ -254,7 +254,7 @@
     },
     {
       "version": 12,
-      "generatedAt": "2025-08-05T01:37:34.071Z",
+      "generatedAt": "2025-08-04T23:50:11.289Z",
       "schemaHash": "0b02fa2891062db5",
       "stores": {
         "clientMigrationStatus": "id",

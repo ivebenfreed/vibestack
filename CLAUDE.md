@@ -2,12 +2,23 @@
 
 ## Current Worktree Configuration
 
-**This is PR #11 worktree with the following ports:**
+**This is Issue #20 worktree with the following ports:**
 
-- Web application: `http://localhost:5403`
-- Server API: `http://localhost:9017`
-- Database: `postgres://postgres:postgres@localhost:5662/vibestack_dev_issue_23`
-- Proxy: Port 4684
+- Web application: `http://localhost:5373`
+- Server API: `http://localhost:8987`
+- Database: `postgres://postgres:postgres@localhost:5632/vibestack_dev_issue_20`
+- Proxy: Port 4654
+
+### Playwright Test Environment
+
+**✅ READY TO USE** - This worktree has pre-configured Playwright authentication:
+
+- **Auth file**: `.playwright/auth/auth-20.json` (1110 bytes)
+- **Current LSN**: `0/1E04FA0` (sync state persisted)
+- **User**: ben@getelevra.com (authenticated with valid session)
+- **Expiry**: 2025-08-12 (tokens are valid)
+
+**DO NOT re-run auth setup** - use existing state for all tests. staging
 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -17,15 +28,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **IMPORTANT**: Claude Code is configured to automatically redirect all long-running development commands to tmux background sessions. This happens transparently via PreToolUse hooks.
 
 ### Commands Automatically Redirected to tmux:
-- `pnpm dev` → Runs in `vibestack-dev` tmux session
-- `pnpm dev:local` → Runs in `vibestack-dev` tmux session
-- `pnpm dev:server` → Runs in `vibestack-dev` tmux session
-- `pnpm dev:web` → Runs in `vibestack-dev` tmux session
-- `pnpm build --watch` → Runs in `vibestack-build` tmux session
-- `pnpm test --watch` → Runs in `vibestack-test` tmux session
-- `npm run dev` → Runs in `vibestack-dev` tmux session
-- `yarn dev` → Runs in `vibestack-dev` tmux session
-- `wrangler dev` → Runs in `vibestack-dev` tmux session
+- `pnpm dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm dev:local` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm dev:server` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm dev:web` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm build --watch` → Runs in `vibestack-build-issue-{N}` tmux session (worktree-specific)
+- `pnpm test --watch` → Runs in `vibestack-test-issue-{N}` tmux session (worktree-specific)
+- `npm run dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `yarn dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `wrangler dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
 
 ### How It Works:
 1. PreToolUse hook intercepts all Bash commands
@@ -105,14 +116,29 @@ Each worktree gets its own isolated browser profile for Playwright testing. This
 - Browser state is isolated per issue/feature
 - Screenshots and videos are saved per worktree
 
+#### Test Organization
+
+Tests are organized into folders:
+- `tests/playwright/core/` - Core tests that run for all issues (auth setup, templates, helpers)
+- `tests/playwright/issue-{number}/` - Issue-specific tests for the current worktree
+
+When creating tests for a specific issue/feature, place them in the appropriate issue folder.
+Core tests should only contain reusable utilities and basic smoke tests.
+
 #### Quick Start
 
+**IMPORTANT**: This worktree was created with `--test-setup` flag, which means:
+- ✅ Authentication state is already saved to `.playwright/auth/auth-20.json`
+- ✅ Browser profile is pre-configured with login and sync state  
+- ✅ LSN is properly persisted from initial sync
+- ✅ **DO NOT re-run auth setup** - use existing state
+
 ```bash
-# Run all Playwright tests with isolated profile
+# Run all Playwright tests with existing isolated profile
 ./scripts/playwright-test.sh
 
-# Run specific test file
-./scripts/playwright-test.sh tests/playwright/vibegantt-screenshot.spec.js
+# Run specific test file  
+./scripts/playwright-test.sh tests/playwright/vibegantt-debug-route.spec.js
 
 # Run in debug mode
 ./scripts/playwright-test.sh --debug
@@ -120,6 +146,45 @@ Each worktree gets its own isolated browser profile for Playwright testing. This
 # Run headless
 ./scripts/playwright-test.sh --headed=false
 ```
+
+#### Pre-configured Auth State
+
+The auth file `.playwright/auth/auth-20.json` contains:
+- Valid session cookies for user: ben@getelevra.com
+- Sync state with current LSN: `0/1E04FA0`
+- Authentication tokens with expiry: 2025-08-12
+
+**When writing new tests**: Tests automatically use this auth state via `playwright.config.js` - no additional setup needed.
+
+#### Writing New Tests
+
+**IMPORTANT**: Use the test template as a starting point for all new tests:
+
+```bash
+# Copy the template for a new test
+cp tests/playwright/test-template.spec.js tests/playwright/your-new-test.spec.js
+```
+
+The template (`test-template.spec.js`) includes:
+- ✅ Automatic use of existing auth state
+- ✅ Graceful fallback if auth expires
+- ✅ Proper wait for React app initialization
+- ✅ Sync state verification helpers
+- ✅ Screenshot capture for debugging
+
+Example minimal test that visits root and checks sync state:
+```javascript
+test('check sync state', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForTimeout(5000);
+  
+  const syncState = await page.evaluate(() => {
+    return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+  });
+  
+  console.log('Current LSN:', syncState.currentLSN);
+  expect(syncState.currentLSN).not.toBe('0/0');
+});
 
 #### How It Works
 
@@ -157,6 +222,30 @@ worktrees/issue-10/
 2. Install dependencies: `cd worktrees/issue-123 && pnpm install`
 3. Start dev servers: `./scripts/dev-start.sh`
 4. Run tests: `./scripts/playwright-test.sh`
+
+#### Database Access in Tests
+
+Tests can access the Dexie database and domain services directly:
+
+```javascript
+// Import database and domain services
+const { db, domainServices } = await import('/src/domain/index.js');
+
+// Use domain services
+const task = await domainServices.task.createUI({ title: 'Test' });
+
+// Direct database access
+const count = await db.tasks.count();
+const task = await db.tasks.get(taskId);
+```
+
+#### Test Reporter Configuration
+
+By default, tests use:
+- List reporter for terminal output
+- HTML report generation (without auto-opening)
+
+To view HTML reports after tests: `npx playwright show-report`
 
 ## Background Process Management
 
@@ -196,10 +285,14 @@ We use tmux to manage long-running background processes without blocking Claude 
 
 #### Standard Session Names
 
-- `vibestack-dev` - Main development servers (`pnpm dev:local`)
-- `vibestack-build` - Build processes
-- `vibestack-test` - Test runners
-- `vibestack-migrate` - Database migrations
+**All session names are worktree-specific:**
+
+- `vibestack-dev-issue-{N}` - Main development servers (`pnpm dev:local`)
+- `vibestack-build-issue-{N}` - Build processes
+- `vibestack-test-issue-{N}` - Test runners
+- `vibestack-migrate-issue-{N}` - Database migrations
+
+Where `{N}` is the issue number (e.g., `vibestack-dev-issue-24` for Issue #24)
 
 #### Usage Patterns
 
@@ -211,17 +304,17 @@ We use tmux to manage long-running background processes without blocking Claude 
 
 2. **Checking if servers are running:**
    ```bash
-   ./scripts/bg-status.sh vibestack-dev
+   ./scripts/bg-status.sh vibestack-dev-issue-24  # For Issue #24
    ```
 
 3. **Viewing server logs while working:**
    ```bash
-   ./scripts/dev-logs.sh 50  # View last 50 lines
+   ./scripts/dev-logs.sh 50  # View last 50 lines (auto-detects issue number)
    ```
 
 4. **Stopping servers when done:**
    ```bash
-   ./scripts/bg-stop.sh vibestack-dev
+   ./scripts/bg-stop.sh vibestack-dev-issue-24  # For Issue #24
    ```
 
 #### Benefits
@@ -239,4 +332,25 @@ We use tmux to manage long-running background processes without blocking Claude 
 - Memorize the nuanced communication patterns in the VibeStack architecture
 - Pay special attention to WebSocket message structures and sync protocols
 
-[... rest of the existing file content remains unchanged ...]
+## Worktree-Specific Rules
+
+### Playwright Test Organization
+
+When working in a worktree for a specific issue:
+- **ALWAYS** create new test files in `tests/playwright/issue-{number}/` folder
+- **NEVER** modify tests in `tests/playwright/core/` unless fixing a bug
+- **PREFER** using existing test helpers from `core/db-test-helpers.js`
+- **USE** `core/test-template.spec.js` as a starting point for new tests
+
+Example for Issue #25:
+```bash
+# Good - issue-specific test
+tests/playwright/issue-25/feature-validation.spec.js
+
+# Bad - adding to core without good reason
+tests/playwright/core/my-feature-test.spec.js
+```
+
+The Playwright config automatically detects the issue number and only runs:
+- All tests in `core/`
+- Tests specific to the current issue folder

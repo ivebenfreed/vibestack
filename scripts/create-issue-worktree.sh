@@ -130,8 +130,14 @@ pnpm install
 echo ""
 echo "2.1️⃣ Ensuring Claude configuration is synced..."
 # Explicitly sync Claude config in case postinstall didn't work
+# Pass test setup flag if this is a test setup run
+TEST_SETUP_FLAG=""
+if [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
+    TEST_SETUP_FLAG="--test-setup"
+fi
+
 if [ -f "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" ]; then
-    "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD"
+    "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD" "$TEST_SETUP_FLAG"
     echo "   ✅ Claude configuration synced with database info"
 else
     echo "   ⚠️ Could not sync Claude config - sync script not found"
@@ -255,7 +261,7 @@ if [ "${AUTOMATION_TEST:-false}" = "true" ]; then
 elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     # Start servers in background and run tests
     echo "🚀 Starting servers in background for setup tests..."
-    ./scripts/tmux-bg.sh vibestack-dev "pnpm dev:local"
+    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev:local"
     
     # Wait for servers to be ready
     echo "⏳ Waiting for servers to start..."
@@ -265,12 +271,18 @@ elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     echo ""
     ./scripts/run-worktree-setup-tests.sh
     
+    # Update CLAUDE.md with actual auth state after tests complete
+    if [ -f "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" ]; then
+        echo "📝 Updating CLAUDE.md with auth state..."
+        "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD" --update-auth-state "$ISSUE_NUMBER"
+    fi
+    
     echo ""
     echo "📝 Servers are running in background. To view logs:"
-    echo "   ./scripts/bg-logs.sh vibestack-dev"
+    echo "   ./scripts/bg-logs.sh vibestack-dev-issue-${ISSUE_NUMBER}"
     echo ""
     echo "To stop servers when done:"
-    echo "   ./scripts/bg-stop.sh vibestack-dev"
+    echo "   ./scripts/bg-stop.sh vibestack-dev-issue-${ISSUE_NUMBER}"
 else
     pnpm dev:local
 fi
