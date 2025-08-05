@@ -4,6 +4,7 @@ import { Grid3X3, Kanban, Calendar } from 'lucide-react'
 import { useTheme } from '@/context/theme-context'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import TasksTableView from './TasksTableView'
+import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
 
 // Separate component for table view to isolate hooks
 const TaskTableView: React.FC<{ theme: string }> = ({ theme }) => {
@@ -48,6 +49,9 @@ function TaskViewLoader({ view }: { view: string }) {
  */
 const Tasks: React.FC = () => {
   performance.mark('tasks-component-start')
+  
+  // Signal to Playwright that the tasks page is ready
+  usePlaywrightReady('[PLAYWRIGHT_READY] Tasks page loaded')
   console.log('[Performance] Tasks component render started')
   // Get theme and resolve 'system' to actual theme - React Compiler will optimize this
   const { theme } = useTheme()

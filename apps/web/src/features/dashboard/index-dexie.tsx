@@ -12,6 +12,7 @@ import { ContentContainer } from '@/components/layout/content-container'
 import { TopNav } from '@/components/layout/top-nav'
 import { RecentTasksEnhanced } from './components/recent-tasks-enhanced-dexie'
 import { db } from '@repo/dataforge/dexie-schema'
+import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
 
 const topNav = [
   {
@@ -52,6 +53,10 @@ export default function Dashboard() {
     tags: 0,
     tagSets: 0
   });
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  // Signal when dashboard is ready for Playwright
+  usePlaywrightReady(dataLoaded ? '[PLAYWRIGHT_READY] Dashboard data loaded' : undefined);
 
   // Load counts from Dexie
   useEffect(() => {
@@ -98,8 +103,11 @@ export default function Dashboard() {
           tags: tagCount,
           tagSets: tagSetCount
         });
+        
+        setDataLoaded(true);
       } catch (error) {
         console.error('[Dashboard] Error loading counts from Dexie:', error);
+        setDataLoaded(true); // Still mark as loaded even on error
       }
     }
 
