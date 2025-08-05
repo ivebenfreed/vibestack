@@ -83,10 +83,19 @@ fi
 echo -e "${BLUE}🚀 Running Playwright tests...${NC}"
 echo ""
 
+# Check for headless mode preference
+if [[ "${HEADLESS:-}" == "false" ]]; then
+    echo -e "${YELLOW}🖥️  Running in headed mode (browser visible)${NC}"
+elif [[ "${HEADLESS:-}" == "true" ]]; then
+    echo -e "${BLUE}🤖 Running in headless mode (no browser window)${NC}"
+else
+    echo -e "${BLUE}🤖 Running in headless mode by default (set HEADLESS=false to see browser)${NC}"
+fi
+
 # Pass all arguments to Playwright
 if [[ $# -eq 0 ]]; then
     # No arguments, run all tests
-    npx playwright test --headed
+    npx playwright test
 else
     # Pass through all arguments
     npx playwright test "$@"
@@ -106,7 +115,8 @@ echo ""
 echo -e "${BLUE}📋 Helpful commands:${NC}"
 echo "   View HTML report:    npx playwright show-report"
 echo "   Run specific test:   ./scripts/playwright-test.sh tests/playwright/vibegantt-screenshot.spec.js"
-echo "   Run headless:        ./scripts/playwright-test.sh --headed=false"
+echo "   Run with browser:    HEADLESS=false ./scripts/playwright-test.sh"
+echo "   Force headless:      HEADLESS=true ./scripts/playwright-test.sh"
 echo "   Debug mode:          ./scripts/playwright-test.sh --debug"
 echo "   Screenshots saved:   ./screenshots/"
 echo ""

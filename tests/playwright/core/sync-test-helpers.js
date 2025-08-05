@@ -124,19 +124,22 @@ export async function waitForSyncState(page, state, timeout = 30000) {
  */
 export async function forceSyncCatchup(page) {
   await page.evaluate(async () => {
-    const { domainServices } = await import('/src/domain/index.js');
+    const { db } = await import('/src/domain/index.js');
     // Trigger sync by creating a dummy operation
     const timestamp = Date.now();
-    await domainServices.task.createUI({
+    const taskId = `_SYNC_TRIGGER_${timestamp}`;
+    
+    // Add and immediately remove a dummy task to trigger sync
+    await db.tasks.add({
+      id: taskId,
       title: `_SYNC_TRIGGER_${timestamp}`,
-      status: 'pending'
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
+    
     // Immediately delete to avoid test pollution
-    const tasks = await domainServices.task.getAll();
-    const triggerTask = tasks.find(t => t.title === `_SYNC_TRIGGER_${timestamp}`);
-    if (triggerTask) {
-      await domainServices.task.deleteUI(triggerTask.id);
-    }
+    await db.tasks.delete(taskId);
   });
 }
 
