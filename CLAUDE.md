@@ -105,145 +105,109 @@ pnpm type-check
 2. Fix any issues before pushing
 3. Generated files in `packages/dataforge/src/generated/` are ignored
 
-## Playwright Testing with Isolated Profiles
+## Playwright Testing with Persistent Browser Profiles
 
-### Automated Browser Testing per Worktree
+### Browser Profile Persistence
 
-Each worktree gets its own isolated browser profile for Playwright testing. This ensures that:
-- Login sessions don't interfere between branches
-- Browser state is isolated per issue/feature
-- Screenshots and videos are saved per worktree
-
-#### Test Organization
-
-Tests are organized into folders:
-- `tests/playwright/core/` - Core tests that run for all issues (auth setup, templates, helpers)
-- `tests/playwright/issue-{number}/` - Issue-specific tests for the current worktree
-
-When creating tests for a specific issue/feature, place them in the appropriate issue folder.
-Core tests should only contain reusable utilities and basic smoke tests.
+Each worktree uses a **persistent browser profile** that maintains login state across test runs:
+- Login once per worktree, stay logged in forever
+- Full browser state persistence (cookies, localStorage, IndexedDB)
+- Realistic testing environment like a real user
+- Profile stored in `.playwright/profiles/profile-{issue}/`
 
 #### Quick Start
 
-**IMPORTANT**: This worktree was created with `--test-setup` flag, which means:
-- ✅ Authentication state is already saved to `.playwright/auth/auth-20.json`
-- ✅ Browser profile is pre-configured with login and sync state  
-- ✅ LSN is properly persisted from initial sync
-- ✅ **DO NOT re-run auth setup** - use existing state
-
 ```bash
-# Run all Playwright tests with existing isolated profile
+# Profile is automatically created during worktree setup with --test-setup flag
+# No manual setup needed!
+
+# Run all tests (will use saved profile)
 ./scripts/playwright-test.sh
 
-# Run specific test file  
-./scripts/playwright-test.sh tests/playwright/vibegantt-debug-route.spec.js
+# Run specific test  
+./scripts/playwright-test.sh tests/playwright/core/test-vibegantt-ready.spec.js
 
 # Run in debug mode
 ./scripts/playwright-test.sh --debug
 
-# Run headless
-./scripts/playwright-test.sh --headed=false
+# Manual profile creation (only if needed)
+npx playwright test tests/playwright/core/persistent-login.spec.js
 ```
 
-#### Pre-configured Auth State
+#### Using Persistent Context
 
-The auth file `.playwright/auth/auth-20.json` contains:
-- Valid session cookies for user: ben@getelevra.com
-- Sync state with current LSN: `0/1E04FA0`
-- Authentication tokens with expiry: 2025-08-12
+All tests use the persistent context fixture by default:
 
-**When writing new tests**: Tests automatically use this auth state via `playwright.config.js` - no additional setup needed.
+```javascript
+import { test, expect } from '../fixtures/persistent-context.js';
 
-#### Writing New Tests
+test('my test', async ({ page }) => {
+  await page.goto('/'); // Already logged in!
+  // Your test code here
+});
+```
 
-**IMPORTANT**: Use the test template as a starting point for all new tests:
+#### Isolated Tests (When Needed)
+
+For tests that need a clean browser state:
+
+```javascript
+// Use standard Playwright test for isolated context
+import { test, expect } from '@playwright/test';
+
+test('isolated test', async ({ page }) => {
+  // Fresh browser context - must handle login
+  await page.goto('/sign-in');
+});
+```
+
+#### Multiple User Testing
+
+For testing with different user accounts, create custom fixtures:
+
+```javascript
+// See tests/playwright/TESTING-GUIDE.md for examples
+```
+
+#### Route Ready Detection
+
+Use `usePlaywrightReady` hook in components for better test synchronization:
+
+```javascript
+// In your React component
+import { usePlaywrightReady } from '@/hooks/use-playwright-ready';
+
+function MyComponent() {
+  usePlaywrightReady('[PLAYWRIGHT_READY] My component loaded');
+  // ...
+}
+```
+
+Tests can wait for readiness:
+```javascript
+await page.waitForFunction(() => 
+  document.body.getAttribute('data-playwright-ready') === 'true'
+);
+```
+
+#### Test Organization
+
+- `tests/playwright/core/` - Core tests and utilities
+- `tests/playwright/issue-{number}/` - Issue-specific tests
+- `tests/playwright/fixtures/` - Custom test fixtures
+- `tests/playwright/TESTING-GUIDE.md` - Detailed testing guide
+
+#### Profile Management
 
 ```bash
-# Copy the template for a new test
-cp tests/playwright/test-template.spec.js tests/playwright/your-new-test.spec.js
+# View profile directory
+ls -la .playwright/profiles/profile-main/
+
+# Reset profile (if needed)
+rm -rf .playwright/profiles/profile-main/
+
+# Profiles are automatically created per worktree
 ```
-
-The template (`test-template.spec.js`) includes:
-- ✅ Automatic use of existing auth state
-- ✅ Graceful fallback if auth expires
-- ✅ Proper wait for React app initialization
-- ✅ Sync state verification helpers
-- ✅ Screenshot capture for debugging
-
-Example minimal test that visits root and checks sync state:
-```javascript
-test('check sync state', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForTimeout(5000);
-  
-  const syncState = await page.evaluate(() => {
-    return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
-  });
-  
-  console.log('Current LSN:', syncState.currentLSN);
-  expect(syncState.currentLSN).not.toBe('0/0');
-});
-
-#### How It Works
-
-1. **Auto-Detection**: Script detects issue number from branch name (`issue-10` → Issue #10)
-2. **Port Calculation**: Calculates correct ports for the worktree (Issue #10 → Web: 5273, Server: 8887)
-3. **Profile Isolation**: Uses `.playwright/profiles/profile-{issue}` for browser data
-4. **Screenshot Storage**: Saves screenshots to `./screenshots/` directory
-
-#### Test Configuration
-
-The `playwright.config.js` automatically:
-- Detects the current branch/issue number
-- Calculates the correct ports for the worktree
-- Sets up isolated browser profiles
-- Configures screenshot and video recording
-
-#### Directory Structure
-
-```
-worktrees/issue-10/
-├── .playwright/
-│   └── profiles/
-│       └── profile-10/          # Isolated browser profile
-├── screenshots/                 # Test screenshots
-├── test-results/               # Test artifacts
-├── tests/
-│   └── playwright/
-│       └── *.spec.js           # Test files
-└── playwright.config.js       # Auto-configured for this worktree
-```
-
-#### Integration with Development Workflow
-
-1. Create new worktree: `git worktree add worktrees/issue-123 -b issue-123`
-2. Install dependencies: `cd worktrees/issue-123 && pnpm install`
-3. Start dev servers: `./scripts/dev-start.sh`
-4. Run tests: `./scripts/playwright-test.sh`
-
-#### Database Access in Tests
-
-Tests can access the Dexie database and domain services directly:
-
-```javascript
-// Import database and domain services
-const { db, domainServices } = await import('/src/domain/index.js');
-
-// Use domain services
-const task = await domainServices.task.createUI({ title: 'Test' });
-
-// Direct database access
-const count = await db.tasks.count();
-const task = await db.tasks.get(taskId);
-```
-
-#### Test Reporter Configuration
-
-By default, tests use:
-- List reporter for terminal output
-- HTML report generation (without auto-opening)
-
-To view HTML reports after tests: `npx playwright show-report`
 
 ## Background Process Management
 

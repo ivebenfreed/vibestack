@@ -57,16 +57,31 @@ fi
 # Run the setup tests
 echo -e "\n${YELLOW}🚀 Running setup tests...${NC}"
 
-# Use the playwright test script if it exists
-if [[ -f "./scripts/playwright-test.sh" ]]; then
-    ./scripts/playwright-test.sh tests/playwright/worktree-setup.spec.js
+# First, run the persistent login test to create the browser profile
+echo -e "\n${YELLOW}🔐 Setting up persistent browser profile...${NC}"
+if npx playwright test tests/playwright/core/persistent-login.spec.js; then
+    echo -e "${GREEN}   ✅ Browser profile created successfully${NC}"
 else
-    # Fallback to direct npx command
-    npx playwright test tests/playwright/worktree-setup.spec.js
+    echo -e "${RED}   ❌ Failed to create browser profile${NC}"
+    exit 1
+fi
+
+# Then run any additional setup tests if they exist
+if [[ -f "tests/playwright/worktree-setup.spec.js" ]]; then
+    echo -e "\n${YELLOW}🧪 Running additional setup tests...${NC}"
+    if [[ -f "./scripts/playwright-test.sh" ]]; then
+        ./scripts/playwright-test.sh tests/playwright/worktree-setup.spec.js
+    else
+        npx playwright test tests/playwright/worktree-setup.spec.js
+    fi
+    SETUP_TEST_RESULT=$?
+else
+    # No additional setup tests, just mark as success
+    SETUP_TEST_RESULT=0
 fi
 
 # Check test results
-if [ $? -eq 0 ]; then
+if [ $SETUP_TEST_RESULT -eq 0 ]; then
     echo -e "\n${GREEN}✅ Worktree setup tests passed!${NC}"
     echo -e "${GREEN}   Your worktree is ready for development.${NC}"
     
