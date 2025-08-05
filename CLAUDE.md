@@ -2,12 +2,23 @@
 
 ## Current Worktree Configuration
 
-**This is PR #11 worktree with the following ports:**
+**This is Issue #20 worktree with the following ports:**
 
-- Web application: `http://localhost:5353`
-- Server API: `http://localhost:8967`
-- Database: `postgres://postgres:postgres@localhost:5612/vibestack_dev_issue_18`
-- Proxy: Port 4634
+- Web application: `http://localhost:5373`
+- Server API: `http://localhost:8987`
+- Database: `postgres://postgres:postgres@localhost:5632/vibestack_dev_issue_20`
+- Proxy: Port 4654
+
+### Playwright Test Environment
+
+**✅ READY TO USE** - This worktree has pre-configured Playwright authentication:
+
+- **Auth file**: `.playwright/auth/auth-20.json` (1110 bytes)
+- **Current LSN**: `0/1E04FA0` (sync state persisted)
+- **User**: ben@getelevra.com (authenticated with valid session)
+- **Expiry**: 2025-08-12 (tokens are valid)
+
+**DO NOT re-run auth setup** - use existing state for all tests.
 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -107,12 +118,18 @@ Each worktree gets its own isolated browser profile for Playwright testing. This
 
 #### Quick Start
 
+**IMPORTANT**: This worktree was created with `--test-setup` flag, which means:
+- ✅ Authentication state is already saved to `.playwright/auth/auth-20.json`
+- ✅ Browser profile is pre-configured with login and sync state  
+- ✅ LSN is properly persisted from initial sync
+- ✅ **DO NOT re-run auth setup** - use existing state
+
 ```bash
-# Run all Playwright tests with isolated profile
+# Run all Playwright tests with existing isolated profile
 ./scripts/playwright-test.sh
 
-# Run specific test file
-./scripts/playwright-test.sh tests/playwright/vibegantt-screenshot.spec.js
+# Run specific test file  
+./scripts/playwright-test.sh tests/playwright/vibegantt-debug-route.spec.js
 
 # Run in debug mode
 ./scripts/playwright-test.sh --debug
@@ -120,6 +137,15 @@ Each worktree gets its own isolated browser profile for Playwright testing. This
 # Run headless
 ./scripts/playwright-test.sh --headed=false
 ```
+
+#### Pre-configured Auth State
+
+The auth file `.playwright/auth/auth-20.json` contains:
+- Valid session cookies for user: ben@getelevra.com
+- Sync state with current LSN: `0/1E04FA0`
+- Authentication tokens with expiry: 2025-08-12
+
+**When writing new tests**: Tests automatically use this auth state via `playwright.config.js` - no additional setup needed.
 
 #### How It Works
 

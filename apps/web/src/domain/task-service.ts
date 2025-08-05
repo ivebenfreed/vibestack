@@ -366,6 +366,64 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   async resolveAssignee(assigneeId: string) {
     return taskDexieService.resolveAssignee_id(assigneeId);
   }
+  
+  // ============================================================================
+  // Task Dependency Management (via EntityDependency service)
+  // ============================================================================
+  
+  /**
+   * Get all dependencies for a set of tasks
+   */
+  async getTaskDependencies(taskIds?: string[]): Promise<any[]> {
+    const { entityDependencyService } = await import('./entity-dependency-service');
+    return entityDependencyService.getTaskDependencies(taskIds);
+  }
+  
+  /**
+   * Get dependencies where these tasks are predecessors
+   */
+  async getDependenciesForTasks(taskIds: string[]): Promise<any[]> {
+    const { entityDependencyService } = await import('./entity-dependency-service');
+    return entityDependencyService.getDependenciesForEntities('Task', taskIds);
+  }
+  
+  /**
+   * Get dependencies for a single task
+   */
+  async getDependenciesForTask(taskId: string): Promise<any[]> {
+    const { entityDependencyService } = await import('./entity-dependency-service');
+    return entityDependencyService.getDependenciesForEntity('Task', taskId);
+  }
+  
+  /**
+   * Get dependents for a single task (tasks that depend on this task)
+   */
+  async getDependentsForTask(taskId: string): Promise<any[]> {
+    const { entityDependencyService } = await import('./entity-dependency-service');
+    return entityDependencyService.getDependentsForEntity('Task', taskId);
+  }
+  
+  /**
+   * Create a task dependency
+   */
+  async createTaskDependency(
+    predecessorTaskId: string, 
+    successorTaskId: string, 
+    type?: any,
+    lagDays?: number,
+    metadata?: Record<string, any>
+  ): Promise<any> {
+    const { entityDependencyService } = await import('./entity-dependency-service');
+    return entityDependencyService.createTaskDependency(predecessorTaskId, successorTaskId, type, lagDays, metadata);
+  }
+  
+  /**
+   * Check if a dependency exists between two tasks
+   */
+  async taskDependencyExists(predecessorTaskId: string, successorTaskId: string): Promise<boolean> {
+    const { entityDependencyService } = await import('./entity-dependency-service');
+    return entityDependencyService.dependencyExists('Task', predecessorTaskId, successorTaskId);
+  }
 }
 
 // ============================================================================
