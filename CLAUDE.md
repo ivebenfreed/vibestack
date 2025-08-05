@@ -121,13 +121,16 @@ Each worktree uses a **persistent browser profile** that maintains login state a
 # Profile is automatically created during worktree setup with --test-setup flag
 # No manual setup needed!
 
-# Run all tests (will use saved profile)
+# Run all tests (headless by default, uses saved profile)
 ./scripts/playwright-test.sh
 
 # Run specific test  
 ./scripts/playwright-test.sh tests/playwright/core/test-vibegantt-ready.spec.js
 
-# Run in debug mode
+# Run with browser UI visible
+./scripts/playwright-test.sh --headed
+
+# Run in debug mode (automatically shows browser)
 ./scripts/playwright-test.sh --debug
 
 # Manual profile creation (only if needed)
@@ -136,7 +139,7 @@ npx playwright test tests/playwright/core/persistent-login.spec.js
 
 #### Using Persistent Context
 
-All tests use the persistent context fixture by default:
+All tests should use the persistent context fixture by default:
 
 ```javascript
 import { test, expect } from '../fixtures/persistent-context.js';
@@ -146,6 +149,8 @@ test('my test', async ({ page }) => {
   // Your test code here
 });
 ```
+
+**Note**: The test template at `tests/playwright/core/test-template.spec.js` is pre-configured to use the persistent context fixture.
 
 #### Isolated Tests (When Needed)
 

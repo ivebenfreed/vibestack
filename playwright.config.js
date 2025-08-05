@@ -84,7 +84,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         // Note: userDataDir doesn't work here for persistent context
         // We'll use a custom fixture instead
-        headless: true,
+        headless: true, // Default to headless, can override with --headed
       },
     },
   ],
