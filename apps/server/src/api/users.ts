@@ -4,36 +4,36 @@ import {
   type ApiEnv,
   ServiceErrorType,
   createSuccessResponse,
-  createErrorResponse,
+  createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import { User, UserRole } from "@repo/dataforge/server-entities";
 import { UserRepository } from '../domains/users';
-
-// Re-export enums for convenience
-export { UserRole };
+import { UserRole } from '@repo/dataforge/server-entities';
+import type { User } from '@repo/dataforge/server-entities';
 
 // Input types for API
-export type UserCreateInput = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>;
-export type UserUpdateInput = Partial<UserCreateInput>;
+export type UserCreateInput = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'tasks' | 'ownedProjects' | 'memberProjects'>>;
+export type UserUpdateInput = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'tasks' | 'ownedProjects' | 'memberProjects'>>;
 
 // Create users router
 const users = new Hono<ApiEnv>();
 
 // List users
 users.get('/', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
   try {
     const neonService = new NeonService(c);
     const userRepo = new UserRepository(neonService);
     const { role } = c.req.query();
     
     let result: User[];
-    if (role && Object.values(UserRole).includes(role as UserRole)) {
-      // Use repository for role filtering
+    
+    if (role && role !== 'all') {
       result = await userRepo.findByRole(role as UserRole);
     } else {
-      // Use repository for all users
       result = await userRepo.findAll();
     }
     
@@ -49,24 +49,20 @@ users.get('/', async (c) => {
 
 // Create user
 users.post('/', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
   try {
-    const body = await c.req.json();
     const neonService = new NeonService(c);
     const userRepo = new UserRepository(neonService);
     
-    // The repository will handle validation and defaults
-    const result = await userRepo.create(body);
+    const input = await c.req.json<UserCreateInput>();
+    const created = await userRepo.create(input);
     
-    return c.json(createSuccessResponse(result), 201);
+    return c.json(createSuccessResponse(created), 201);
   } catch (err) {
     console.error('Error creating user:', err);
-    if (err instanceof Error && err.message.includes('validation')) {
-      return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
-        400
-      );
-    }
     return c.json(
       createErrorResponse(ServiceErrorType.INTERNAL, String(err)),
       500
@@ -76,25 +72,26 @@ users.post('/', async (c) => {
 
 // Get user by ID
 users.get('/:id', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+  
   try {
-    const id = c.req.param('id');
     const neonService = new NeonService(c);
     const userRepo = new UserRepository(neonService);
     
-    const user = await userRepo.findById(id);
+    const userId = c.req.param('id');
+    const targetUser = await userRepo.findById(userId);
     
-    if (!user) {
+    if (!targetUser) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `User with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'User not found'),
         404
       );
     }
     
-    return c.json(createSuccessResponse(user));
+    return c.json(createSuccessResponse(targetUser));
   } catch (err) {
     console.error('Error getting user:', err);
     return c.json(
@@ -105,50 +102,49 @@ users.get('/:id', async (c) => {
 });
 
 // Update user
-users.patch('/:id', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+users.put('/:id', async (c) => {
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+  
+  const userId = c.req.param('id');
+  
   try {
-    const id = c.req.param('id');
-    const body = await c.req.json();
     const neonService = new NeonService(c);
     const userRepo = new UserRepository(neonService);
     
-    // Find the user first to ensure it exists
-    const existingUser = await userRepo.findById(id);
+    // First check if user exists
+    const existingUser = await userRepo.findById(userId);
+    
     if (!existingUser) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `User with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'User not found'),
         404
       );
     }
     
-    // Update the user
-    await userRepo.update(id, body);
-    
-    // Always fetch the updated user to return the most recent state
-    const updatedUser = await userRepo.findById(id);
-    if (!updatedUser) {
+    // Only allow users to update themselves or admins to update others
+    if (userId !== user.id && user.role !== 'super_admin') {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `User with id ${id} not found after update`
-        ),
+        createErrorResponse(ServiceErrorType.FORBIDDEN, 'Access denied'),
+        403
+      );
+    }
+    
+    const input = await c.req.json<UserUpdateInput>();
+    const updated = await userRepo.update(userId, input);
+    
+    if (!updated) {
+      return c.json(
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'User not found after update'),
         404
       );
     }
     
-    return c.json(createSuccessResponse(updatedUser));
+    return c.json(createSuccessResponse(updated));
   } catch (err) {
     console.error('Error updating user:', err);
-    if (err instanceof Error && err.message.includes('validation')) {
-      return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
-        400
-      );
-    }
     return c.json(
       createErrorResponse(ServiceErrorType.INTERNAL, String(err)),
       500
@@ -158,38 +154,40 @@ users.patch('/:id', async (c) => {
 
 // Delete user
 users.delete('/:id', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+  
+  const userId = c.req.param('id');
+  
   try {
-    const id = c.req.param('id');
     const neonService = new NeonService(c);
     const userRepo = new UserRepository(neonService);
     
-    // Find the user first to ensure it exists
-    const existingUser = await userRepo.findById(id);
+    // First check if user exists
+    const existingUser = await userRepo.findById(userId);
+    
     if (!existingUser) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `User with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'User not found'),
         404
       );
     }
     
-    // Delete the user
-    const deleted = await userRepo.delete(id);
-    
-    if (!deleted) {
+    // Only super admins can delete users
+    if (user.role !== 'super_admin') {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.INTERNAL,
-          `User with id ${id} could not be deleted`
-        ),
-        500
+        createErrorResponse(ServiceErrorType.FORBIDDEN, 'Only super admins can delete users'),
+        403
       );
     }
     
-    return c.json(createSuccessResponse({ id }));
+    await userRepo.delete(userId);
+    
+    return c.json(createSuccessResponse({
+      message: 'User deleted successfully'
+    }));
   } catch (err) {
     console.error('Error deleting user:', err);
     return c.json(
@@ -199,4 +197,4 @@ users.delete('/:id', async (c) => {
   }
 });
 
-export { users }; 
+export default users;

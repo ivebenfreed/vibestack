@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
-import { usePGliteContext } from '@/db/pglite-provider';
+import { domainServices } from '@/domain';
 
 interface ProjectContextType {
   selectedProject: Project | null;
@@ -36,20 +36,11 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
   const [isUpdateDrawerOpen, setIsUpdateDrawerOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Use service directly from context - this already includes proper sync handling
-  const { services } = usePGliteContext();
-  const projectService = services?.projects;
-
-  // Create a new project
+  // Create a new project using domain services
   const createProject = useCallback(async (projectData: { name: string; description?: string; status?: ProjectStatus }) => {
     console.log('Creating project with data:', projectData);
     
-    if (!projectService) {
-      throw new Error('Project service not available');
-    }
-    
-    console.log('Using project service to create project');
-    const created = await projectService.createProject({
+    const created = await domainServices.project.createUI({
       name: projectData.name,
       description: projectData.description || '',
       status: projectData.status || ProjectStatus.ACTIVE
@@ -63,18 +54,13 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
     console.log('Dispatched project-created event');
     
     return created;
-  }, [projectService]);
+  }, []);
 
-  // Update an existing project
+  // Update an existing project using domain services
   const updateProject = useCallback(async (id: string, changes: Partial<Project>) => {
     console.log('Updating project with id:', id, 'and changes:', changes);
     
-    if (!projectService) {
-      throw new Error('Project service not available');
-    }
-    
-    console.log('Using project service to update project');
-    const updated = await projectService.updateProject(id, changes);
+    const updated = await domainServices.project.updateUI(id, changes);
     
     // Dispatch a custom event to notify that a project was updated
     const event = new CustomEvent('project-updated', { 
@@ -84,18 +70,13 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
     console.log('Dispatched project-updated event');
     
     return updated;
-  }, [projectService]);
+  }, []);
 
-  // Delete a project
+  // Delete a project using domain services
   const deleteProject = useCallback(async (id: string) => {
     console.log('Deleting project with id:', id);
     
-    if (!projectService) {
-      throw new Error('Project service not available');
-    }
-    
-    console.log('Using project service to delete project');
-    const success = await projectService.deleteProject(id);
+    const success = await domainServices.project.deleteUI(id);
     
     if (success) {
       // Dispatch a custom event to notify that a project was deleted
@@ -107,7 +88,7 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
     }
     
     return success;
-  }, [projectService]);
+  }, []);
 
   const value = {
     selectedProject,

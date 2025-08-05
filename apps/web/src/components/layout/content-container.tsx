@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { useLayoutStore } from '@/stores/layoutStore'
 
 export interface ContentContainerProps extends React.ComponentProps<'div'> {
   /** Whether to include automatic padding (default: true) */
@@ -33,6 +32,8 @@ export function ContentContainer({
       className={cn(
         'flex flex-col w-full',
         includePadding && 'p-4',
+        // Support full-height for pages that need it (like data grids)
+        className?.includes('full-height') && 'h-full',
         // 🎯 REMOVED: No explicit transitions - let SidebarInset handle this naturally
         className
       )}
@@ -40,7 +41,7 @@ export function ContentContainer({
       {...props}
     >
       {debug && (
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-3 py-2 rounded mb-4 text-sm">
+        <div className="bg-muted border border-border text-muted-foreground px-3 py-2 rounded mb-4 text-sm">
           <strong>Debug Info:</strong> Using natural SidebarInset responsive behavior
         </div>
       )}

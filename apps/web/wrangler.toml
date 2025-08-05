@@ -3,9 +3,13 @@ compatibility_date = "2025-04-03"
 compatibility_flags = ["nodejs_compat"]
 main = "./worker/index.ts"
 
+# Enable observability logging for all environments
+[observability.logs]
+enabled = true
+
 # Assets configuration for serving static files
 [assets]
-directory = "./dist"
+directory = "./dist/client"
 not_found_handling = "single-page-application"
 
 # Environment variables for development

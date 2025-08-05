@@ -226,6 +226,8 @@ export class ConflictResolver {
         // Multiple changes for the same entity - potential conflict
         for (let i = 0; i < entityChanges.length; i++) {
           const change = entityChanges[i];
+          if (!change) continue;
+          
           const conflictingChanges = entityChanges.filter((_, index) => index !== i);
           
           if (conflictingChanges.length > 0) {
@@ -335,6 +337,23 @@ export class ConflictResolver {
           }
           if (!data.author_id) {
             errors.push('Comments require an author_id field');
+          }
+        }
+        break;
+
+      case 'entity_dependencies':
+        if (change.operation !== 'delete') {
+          if (!data.entity_type) {
+            errors.push('Entity dependencies require an entity_type field');
+          }
+          if (!data.predecessor_id) {
+            errors.push('Entity dependencies require a predecessor_id field');
+          }
+          if (!data.successor_id) {
+            errors.push('Entity dependencies require a successor_id field');
+          }
+          if (data.predecessor_id === data.successor_id) {
+            errors.push('Entity dependencies cannot have the same predecessor and successor');
           }
         }
         break;
@@ -534,6 +553,17 @@ export class ConflictResolver {
             return 'timestamp_wins';
         }
         
+      case 'entity_dependencies':
+        switch (fieldName) {
+          case 'type':
+            return 'last_write_wins'; // Dependency type changes should prefer newer
+          case 'lag_time':
+          case 'lag_days':
+            return 'timestamp_wins'; // Lag values can be overridden if no conflict
+          default:
+            return 'timestamp_wins';
+        }
+        
       default:
         return 'timestamp_wins';
     }
@@ -576,3 +606,10 @@ export class ConflictResolver {
     return existingValue;
   }
 } 
+// Helper to ensure we always have a valid TableChange
+function ensureTableChange(change: TableChange | undefined): TableChange {
+  if (!change) {
+    throw new Error('Invalid change object');
+  }
+  return change;
+}

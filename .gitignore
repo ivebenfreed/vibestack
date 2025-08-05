@@ -8,8 +8,15 @@ node_modules
 .env.*
 !.env.example
 !.env.*.ts
+
+# Worktree management files
+.worktree-package-backup.json
 !.env.*.d.ts
 !.env.*.example
+
+# Playwright auth state (contains sensitive session data)
+.playwright/auth/
+playwright/.auth/
 
 # Build outputs
 dist
@@ -38,6 +45,7 @@ coverage
 
 # TypeScript
 *.tsbuildinfo
+tsconfig.tsbuildinfo
 next-env.d.ts
 
 # Database
@@ -60,8 +68,14 @@ logs
 # Documentation
 docs/
 
+# Reference implementations and external projects
+ref/
+
 local-neon/
 # CLI package specific
 packages/cli/.env
 packages/cli/dist
 packages/cli/node_modules
+
+# Git worktrees
+worktrees/

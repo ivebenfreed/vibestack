@@ -1,0 +1,56 @@
+import { assign } from 'xstate';
+import type { GanttMachineContext, GanttEvent } from '../../../types';
+import { RENDER_CONFIG } from '../../../constants';
+
+export const viewportSlice = {
+  initial: 'active',
+  states: {
+    active: {
+      on: {
+        VIEWPORT_RESIZE: {
+          actions: [
+            assign({
+              viewport: ({ context, event }: {
+                context: GanttMachineContext;
+                event: Extract<GanttEvent, { type: 'VIEWPORT_RESIZE' }>;
+              }) => ({
+                ...context.viewport,
+                width: event.width,
+                height: event.height,
+              }),
+            }),
+            // Forward viewport width to store
+            ({ context, event }) => {
+              if (context.dataStore) {
+                context.dataStore.send({
+                  type: 'SET_VIEWPORT_WIDTH',
+                  width: event.width
+                });
+              }
+            },
+            'recalculateVisibleRange',
+            'updateVisibleTasks',
+            'queueFullRender',
+          ],
+        },
+        SCROLL: {
+          actions: [
+            assign({
+              viewport: ({ context, event }: {
+                context: GanttMachineContext;
+                event: Extract<GanttEvent, { type: 'SCROLL' }>;
+              }) => ({
+                ...context.viewport,
+                scrollX: event.scrollX,
+                scrollY: event.scrollY,
+              }),
+            }),
+            'updateVisibleDateRange',
+            'updateVisibleTasks',
+            'queueViewportRender',
+          ],
+        },
+      },
+    },
+  },
+};

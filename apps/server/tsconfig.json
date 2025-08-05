@@ -1,48 +1,39 @@
 {
-	"compilerOptions": {
-		/* Visit https://aka.ms/tsconfig.json to read more about this file */
-
-		/* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
-		"target": "es2021",
-		/* Specify a set of bundled library declaration files that describe the target runtime environment. */
-		"lib": ["es2021"],
-		/* Specify what JSX code is generated. */
-		"jsx": "react-jsx",
-
-		/* Specify what module code is generated. */
-		"module": "es2022",
-		/* Specify how TypeScript looks up a file from a given module specifier. */
-		"moduleResolution": "bundler",
-		/* Specify type package names to be included without being referenced in a source file. */
-		"types": [],
-		/* Enable importing .json files */
-		"resolveJsonModule": true,
-
-		/* Allow JavaScript files to be a part of your program. Use the `checkJS` option to get errors from these files. */
-		"allowJs": true,
-		/* Enable error reporting in type-checked JavaScript files. */
-		"checkJs": false,
-
-		/* Enable all strict type-checking options. */
-		"strict": true,
-
-		/* Skip type checking all .d.ts files. */
-		"skipLibCheck": true,
-
-		/* Enable decorator metadata */
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
-
-		/* Specify the output directory for emitted files. */
-		"outDir": "./dist",
-		"baseUrl": ".",
-		"paths": {
-			"@repo/sync-types": ["../../packages/sync-types/src"],
-			"@repo/dataforge/*": ["../../packages/dataforge/src/*"]
-		},
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true
-	},
-	"include": ["src/**/*", "worker-configuration.d.ts"],
-	"exclude": ["node_modules", "dist"]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2021",
+    "lib": ["ES2021"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    
+    // Server-specific settings
+    "jsx": "react-jsx",
+    "composite": true,
+    "outDir": "./dist",
+    "rootDir": "../..", // Allow imports from workspace root
+    
+    // Path mappings
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@repo/sync-types": ["../../packages/sync-types/src"]
+    },
+    
+    // Relax some strictness for Workers environment
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    
+    // Allow JS files for type inference
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": [
+    "src/**/*", 
+    "worker-configuration.d.ts",
+    "../../packages/dataforge/src/**/*",
+    "../../packages/dataforge/dist/**/*",
+    "../../packages/sync-types/src/**/*"
+  ],
+  "exclude": ["node_modules", "dist", ".wrangler", "**/*.test.ts", "**/*.backup*", "**/*.original*", "**/*.bak"]
 }

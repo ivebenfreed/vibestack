@@ -9,60 +9,72 @@ export const Route = createFileRoute('/_authenticated/debug/')({
 function DebugIndexPage() {
   const debugPages = [
     {
-      title: '🚀 Sync Machine V2',
-      description: 'NEW: Enhanced debug panel for the pure services sync architecture. Test sync-machine-v2 with WebSocketService, IncomingChangeService, and OutgoingChangeService.',
+      title: '🚀 Sync System',
+      description: 'Enhanced debug panel for sync architecture. Debug sync-machine-v2, monitor WebSocket connections, and inspect service states.',
       path: '/debug/sync',
-      color: 'border-green-200 hover:border-green-300 bg-green-50',
-      badge: 'NEW ARCHITECTURE'
+      color: 'border-green-500/20 hover:border-green-500/30 bg-green-500/5 dark:border-green-400/20 dark:hover:border-green-400/30 dark:bg-green-400/5',
+      badge: 'SYNC DEBUG'
     },
     {
-      title: 'Integrity Management',
-      description: 'Test integrity validation, resets, and sync recovery',
-      path: '/debug/integrity',
-      color: 'border-red-200 hover:border-red-300'
+      title: '🧪 Sync Test',
+      description: 'Comprehensive sync functionality testing framework. CRUD operations, offline sync, batch operations, and relationship testing.',
+      path: '/debug/sync-test',
+      color: 'border-emerald-500/20 hover:border-emerald-500/30 bg-emerald-500/5 dark:border-emerald-400/20 dark:hover:border-emerald-400/30 dark:bg-emerald-400/5',
+      badge: 'SYNC TEST'
     },
     {
       title: 'Database Tests',
       description: 'Database connection and operation testing',
       path: '/debug/database',
-      color: 'border-blue-200 hover:border-blue-300'
+      color: 'border-blue-500/20 hover:border-blue-500/30 bg-blue-500/5 dark:border-blue-400/20 dark:hover:border-blue-400/30 dark:bg-blue-400/5'
     },
     {
-      title: 'Legacy Sync Testing',
-      description: 'Legacy manual sync testing and debugging (old SyncManager)',
-      path: '/debug/sync-test',
-      color: 'border-gray-200 hover:border-gray-300 opacity-75',
-      badge: 'LEGACY'
-    },
-
-    {
-      title: 'Live Query Tests',
-      description: 'Test live query functionality',
-      path: '/debug/live-query',
-      color: 'border-purple-200 hover:border-purple-300'
+      title: 'Integrity Management',
+      description: 'Test integrity validation, resets, and sync recovery',
+      path: '/debug/integrity',
+      color: 'border-red-500/20 hover:border-red-500/30 bg-red-500/5 dark:border-red-400/20 dark:hover:border-red-400/30 dark:bg-red-400/5'
     },
     {
-      title: 'Performance Tests',
-      description: 'Performance and load testing tools',
-      path: '/debug/performance',
-      color: 'border-orange-200 hover:border-orange-300'
+      title: '🔧 State Machine Test',
+      description: 'Test XState machine for grid cell optimistic updates. Eliminates editor flash issues with predictable state transitions.',
+      path: '/debug/state-machine-test',
+      color: 'border-purple-500/20 hover:border-purple-500/30 bg-purple-500/5 dark:border-purple-400/20 dark:hover:border-purple-400/30 dark:bg-purple-400/5',
+      badge: 'STATE MACHINE'
     },
-
     {
-      title: '🔥 VibeGrid Native (Clean Break)',
-      description: 'NEWEST: Pure TanStack Table implementation with native meta property configuration. Zero XState complexity, instant performance, ~150 lines vs 950+ old lines.',
-      path: '/debug/vibegrid-native',
-      color: 'border-emerald-200 hover:border-emerald-300 bg-emerald-50',
-      badge: 'CLEAN BREAK'
+      title: '🎛️ Grid Machine Test',
+      description: 'Test comprehensive XState grid machine with cell actors, optimistic updates, sorting, filtering, selection, and local persistence.',
+      path: '/debug/grid-machine-test',
+      color: 'border-orange-500/20 hover:border-orange-500/30 bg-orange-500/5 dark:border-orange-400/20 dark:hover:border-orange-400/30 dark:bg-orange-400/5',
+      badge: 'GRID MACHINE'
     },
-
-    
     {
-      title: '🧩 VibeGridFinal Tasks (Modular)',
-      description: 'MODULAR: Demonstrates the new modularized VibeGridFinal architecture. Clean separation of concerns with preserved 42.54ms performance and 100% feature parity.',
-      path: '/debug/vibegridfinal-tasks',
-      color: 'border-indigo-200 hover:border-indigo-300 bg-indigo-50',
-      badge: 'MODULAR ARCHITECTURE'
+      title: '🔍 Status Test',
+      description: 'Test StatusDefinition queries and task status updates to debug foreign key constraint issues in the relationship system.',
+      path: '/debug/status-test',
+      color: 'border-yellow-500/20 hover:border-yellow-500/30 bg-yellow-500/5 dark:border-yellow-400/20 dark:hover:border-yellow-400/30 dark:bg-yellow-400/5',
+      badge: 'STATUS DEBUG'
+    },
+    {
+      title: '🔥 VibeGridDex Test',
+      description: 'Test VibeGridDex component with Dexie live queries. Compare performance vs VibeGridX atomic stores and test real-time reactivity.',
+      path: '/debug/vibegriddex-test',
+      color: 'border-amber-500/20 hover:border-amber-500/30 bg-amber-500/5 dark:border-amber-400/20 dark:hover:border-amber-400/30 dark:bg-amber-400/5',
+      badge: 'VIBEGRIDDEX'
+    },
+    {
+      title: '📊 VibeGantt Debug',
+      description: 'Test VibeGantt timeline component for project scheduling. Interactive Gantt charts with task dependencies, resource allocation, and real-time updates.',
+      path: '/debug/vibegantt',
+      color: 'border-rose-500/20 hover:border-rose-500/30 bg-rose-500/5 dark:border-rose-400/20 dark:hover:border-rose-400/30 dark:bg-rose-400/5',
+      badge: 'VIBEGANTT'
+    },
+    {
+      title: '🔗 Junction Tables',
+      description: 'Debug many-to-many relationships and junction tables. Test project members, task tags, and relationship sync operations.',
+      path: '/debug/junction-tables',
+      color: 'border-indigo-500/20 hover:border-indigo-500/30 bg-indigo-500/5 dark:border-indigo-400/20 dark:hover:border-indigo-400/30 dark:bg-indigo-400/5',
+      badge: 'RELATIONSHIPS'
     }
   ]
 
@@ -73,11 +85,11 @@ function DebugIndexPage() {
         <p className="text-muted-foreground">
           Development and testing utilities for debugging the application
         </p>
-        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h3 className="font-semibold text-green-900">🎉 Sync Architecture Refactor Complete!</h3>
-          <p className="text-green-800 text-sm mt-1">
-            The sync system has been migrated to a new pure services architecture. 
-            Check out the <strong>Sync Machine V2</strong> debug panel below for comprehensive testing.
+        <div className="mt-4 p-4 bg-green-500/5 border border-green-500/20 rounded-lg dark:bg-green-400/5 dark:border-green-400/20">
+          <h3 className="font-semibold text-green-900 dark:text-green-100">🧹 Debug Environment Cleaned!</h3>
+          <p className="text-green-800 dark:text-green-200 text-sm mt-1">
+            Essential debug tools only. All legacy patterns removed, focusing on current architecture: 
+            <strong>XState Atoms + VibeGridDex + 3-Layer Architecture</strong>.
           </p>
         </div>
       </div>
@@ -87,15 +99,21 @@ function DebugIndexPage() {
           <Card key={page.path} className={`transition-colors ${page.color} relative`}>
             {page.badge && (
               <div className={`absolute top-2 right-2 px-2 py-1 text-xs font-medium rounded-full ${
-                page.badge === 'CLEAN BREAK' 
-                  ? 'bg-emerald-100 text-emerald-800' 
-                  : page.badge === 'NEW ARCHITECTURE' 
-                  ? 'bg-green-100 text-green-800' 
-                  : page.badge === 'LEGACY ARCHITECTURE'
-                  ? 'bg-orange-100 text-orange-800'
-                  : page.badge === 'MODULAR ARCHITECTURE'
-                  ? 'bg-indigo-100 text-indigo-800'
-                  : 'bg-gray-100 text-gray-600'
+                page.badge === 'SYNC DEBUG' 
+                  ? 'bg-green-500/10 text-green-700 dark:bg-green-400/10 dark:text-green-300 border border-green-500/20' 
+                  : page.badge === 'SYNC TEST'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 border border-emerald-500/20'
+                  : page.badge === 'GRID MACHINE'
+                  ? 'bg-orange-500/10 text-orange-700 dark:bg-orange-400/10 dark:text-orange-300 border border-orange-500/20'
+                  : page.badge === 'STATUS DEBUG'
+                  ? 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-400/10 dark:text-yellow-300 border border-yellow-500/20'
+                  : page.badge === 'VIBEGRIDDEX'
+                  ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300 border border-amber-500/20'
+                  : page.badge === 'VIBEGANTT'
+                  ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300 border border-rose-500/20'
+                  : page.badge === 'RELATIONSHIPS'
+                  ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
+                  : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
               </div>
@@ -109,9 +127,13 @@ function DebugIndexPage() {
               </p>
               <Link to={page.path}>
                 <Button variant="outline" className="w-full">
-                  {page.badge === 'CLEAN BREAK' ? '🔥 Open Native Implementation' 
-                   : page.badge === 'NEW ARCHITECTURE' ? '🚀 Open New Debug Panel' 
-                   : page.badge === 'MODULAR ARCHITECTURE' ? '🧩 Open Modular Implementation'
+                  {page.badge === 'SYNC DEBUG' ? '🚀 Open Sync Panel' 
+                   : page.badge === 'SYNC TEST' ? '🧪 Open Test Framework'
+                   : page.badge === 'GRID MACHINE' ? '🎛️ Open Grid Machine'
+                   : page.badge === 'STATUS DEBUG' ? '🔍 Open Status Test'
+                   : page.badge === 'VIBEGRIDDEX' ? '🔥 Open VibeGridDex Test'
+                   : page.badge === 'VIBEGANTT' ? '📊 Open VibeGantt Debug'
+                   : page.badge === 'RELATIONSHIPS' ? '🔗 Open Junction Tables'
                    : 'Open Tool'}
                 </Button>
               </Link>
@@ -120,17 +142,16 @@ function DebugIndexPage() {
         ))}
       </div>
       
-      <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 className="font-semibold text-blue-900 mb-2">🧪 Testing the New Architecture</h3>
-        <p className="text-blue-800 text-sm mb-3">
-          The new Sync Machine V2 provides comprehensive testing capabilities for the refactored sync system:
+      <div className="mt-8 p-6 bg-blue-500/5 border border-blue-500/20 rounded-lg dark:bg-blue-400/5 dark:border-blue-400/20">
+        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🧪 Current Architecture Testing</h3>
+        <p className="text-blue-800 dark:text-blue-200 text-sm mb-3">
+          Essential debug tools for the production architecture:
         </p>
-        <ul className="text-blue-800 text-sm space-y-1">
-          <li>• <strong>Real-time state monitoring</strong> - Watch sync phases, progress, and machine states</li>
-          <li>• <strong>Connection testing</strong> - Simulate offline/online scenarios</li>
-          <li>• <strong>Service inspection</strong> - Test pure services (WebSocket, IncomingChange, OutgoingChange)</li>
-          <li>• <strong>Event flow visualization</strong> - See how callbacks replace the old 88-event system</li>
-          <li>• <strong>Phase transition testing</strong> - Test initial, catchup, and live sync phases</li>
+        <ul className="text-blue-800 dark:text-blue-200 text-sm space-y-1">
+          <li>• <strong>Sync System</strong> - WebSocket sync, state transitions, and service testing</li>
+          <li>• <strong>Database Operations</strong> - Connection testing and query performance</li>
+          <li>• <strong>Data Integrity</strong> - Validation, recovery, and consistency checks</li>
+          <li>• <strong>VibeGridDex</strong> - Production table with real-time Dexie integration and declarative API</li>
         </ul>
       </div>
     </div>

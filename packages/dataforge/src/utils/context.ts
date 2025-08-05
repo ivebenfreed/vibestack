@@ -9,6 +9,7 @@ export const METADATA_KEYS = {
   SERVER_ENTITY: 'context:server-entity',
   CLIENT_ENTITY: 'context:client-entity',
   TABLE_CATEGORY: 'context:table-category',
+  DEXIE_INDEX: 'context:dexie-index',
 };
 
 /**
@@ -154,4 +155,38 @@ export function shouldIncludeInServer(entityClass: Function): boolean {
 export function shouldIncludeInClient(entityClass: Function): boolean {
   // Include if not specifically marked as server-only entity
   return !isServerEntity(entityClass);
+}
+
+/**
+ * Marks a property as requiring a Dexie index for efficient querying
+ */
+export function DexieIndex(): PropertyDecorator {
+  return function(target: Object, propertyKey: string | symbol): void {
+    Reflect.defineMetadata(METADATA_KEYS.DEXIE_INDEX, true, target, propertyKey);
+  };
+}
+
+/**
+ * Checks if a property is marked for Dexie indexing
+ */
+export function hasDexieIndex(target: Object, propertyKey: string | symbol): boolean {
+  return Reflect.getMetadata(METADATA_KEYS.DEXIE_INDEX, target, propertyKey) === true;
+}
+
+/**
+ * Gets all properties marked for Dexie indexing on an entity
+ */
+export function getDexieIndexedProperties(entityClass: Function): string[] {
+  const indexedProps: string[] = [];
+  
+  // Get all properties from the class and its prototype chain
+  const propertyKeys = getAllPropertyKeys(entityClass);
+  
+  for (const propertyKey of propertyKeys) {
+    if (hasDexieIndex(entityClass.prototype, propertyKey)) {
+      indexedProps.push(propertyKey);
+    }
+  }
+  
+  return indexedProps;
 } 

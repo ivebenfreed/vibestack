@@ -1,8 +1,10 @@
 import type { TableChange, RelationshipUpdate } from '@repo/sync-types';
+import type { ChangeHistory } from '@repo/dataforge/server-entities';
 import { replicationLogger } from '../middleware/logger';
 import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';
 import { parsePostgreSQLValue } from '../lib/postgresql-type-parser';
+import type { WebSocketHandler } from '../sync/types';
 
 // Helper type for WAL change records
 type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
@@ -192,14 +194,20 @@ async function transformJunctionTableChange(
   if (!junctionInfo) return null;
   
   try {
+    // Convert camelCase column names to snake_case for WAL extraction
+    const sourceColumnSnake = camelToSnake(junctionInfo.sourceColumn);
+    const targetColumnSnake = camelToSnake(junctionInfo.targetColumn);
+    
     // Extract entity IDs from junction table operation
-    const sourceId = extractColumnValue(change, junctionInfo.sourceColumn);
-    const targetId = extractColumnValue(change, junctionInfo.targetColumn);
+    const sourceId = extractColumnValue(change, sourceColumnSnake);
+    const targetId = extractColumnValue(change, targetColumnSnake);
     
     if (!sourceId) {
       replicationLogger.warn('Could not extract source ID from junction table change', {
         table: change.table,
-        sourceColumn: junctionInfo.sourceColumn
+        sourceColumn: junctionInfo.sourceColumn,
+        sourceColumnSnake: sourceColumnSnake,
+        availableColumns: change.columnnames || []
       }, MODULE_NAME);
       return null;
     }
@@ -368,14 +376,15 @@ export async function transformWALChanges(
           continue;
         }
 
+        
         // Track for summary stats
         if (!changesByTable[change.table]) {
           changesByTable[change.table] = {};
         }
-        if (!changesByTable[change.table][change.kind]) {
-          changesByTable[change.table][change.kind] = 0;
+        if (!changesByTable[change.table]![change.kind]) {
+          changesByTable[change.table]![change.kind] = 0;
         }
-        changesByTable[change.table][change.kind]++;
+        changesByTable[change.table]![change.kind]!++;
 
         // ✨ NEW: Check if this is a junction table operation
         if (isJunctionTable(change.table)) {
@@ -401,11 +410,39 @@ export async function transformWALChanges(
           const colCount = Math.min(change.columnnames.length, change.columnvalues.length);
           
           for (let i = 0; i < colCount; i++) {
-            const columnName = change.columnnames[i];
+            const columnName = change.columnnames[i]!;
             let columnValue = change.columnvalues[i];
             
+            // Debug logging for client_id before parsing
+            if (columnName === 'client_id') {
+              replicationLogger.debug('WAL client_id before parsing', {
+                table: change.table,
+                columnName,
+                rawValue: columnValue,
+                rawType: typeof columnValue,
+                rawStringified: JSON.stringify(columnValue),
+                isNull: columnValue === null,
+                isUndefined: columnValue === undefined,
+                isEmpty: columnValue === ''
+              }, MODULE_NAME);
+            }
+            
             // Parse PostgreSQL-specific data types using comprehensive type detection
-            columnValue = parsePostgreSQLValue(columnName, columnValue, change.table);
+            columnValue = parsePostgreSQLValue(columnName, columnValue || '', change.table);
+            
+            // Debug logging for client_id after parsing
+            if (columnName === 'client_id') {
+              replicationLogger.debug('WAL client_id after parsing', {
+                table: change.table,
+                columnName,
+                parsedValue: columnValue,
+                parsedType: typeof columnValue,
+                parsedStringified: JSON.stringify(columnValue),
+                isNull: columnValue === null,
+                isUndefined: columnValue === undefined,
+                isEmpty: columnValue === ''
+              }, MODULE_NAME);
+            }
             
             snakeCaseData[columnName] = columnValue;
           }
@@ -418,11 +455,11 @@ export async function transformWALChanges(
           const keyCount = Math.min(change.oldkeys.keynames.length, change.oldkeys.keyvalues.length);
           
           for (let i = 0; i < keyCount; i++) {
-            const keyName = change.oldkeys.keynames[i];
+            const keyName = change.oldkeys.keynames[i]!;
             let keyValue = change.oldkeys.keyvalues[i];
             
             // Parse PostgreSQL-specific data types for oldkeys as well
-            keyValue = parsePostgreSQLValue(keyName, keyValue, change.table);
+            keyValue = parsePostgreSQLValue(keyName, keyValue || '', change.table);
             
             snakeCaseData[keyName] = keyValue;
           }
@@ -436,12 +473,35 @@ export async function transformWALChanges(
           (snakeCaseData.updated_at as string) || 
           new Date().toISOString();
 
+        // Extract clientId for top-level TableChange field (for anti-echo filtering) 
+        // Important: Only set clientId if it has a real value (not null, undefined, or empty string)
+        let topLevelClientId: string | undefined = undefined;
+        if (camelCaseData.clientId && typeof camelCaseData.clientId === 'string' && camelCaseData.clientId.trim() !== '') {
+          topLevelClientId = camelCaseData.clientId as string;
+        }
+        
+        // Debug logging for clientId detection - always log
+        replicationLogger.debug('WAL data extraction complete', {
+          table: change.table,
+          operation: change.kind,
+          hasClientIdInCamelCase: !!camelCaseData.clientId,
+          clientIdValue: camelCaseData.clientId,
+          clientIdType: typeof camelCaseData.clientId,
+          hasClientIdInSnakeCase: !!snakeCaseData.client_id,
+          snakeClientIdValue: snakeCaseData.client_id,
+          snakeClientIdType: typeof snakeCaseData.client_id,
+          topLevelClientIdWillBe: topLevelClientId,
+          columnNames: change.columnnames || [],
+          dataKeys: Object.keys(camelCaseData)
+        }, MODULE_NAME);
+
         // Add to result array with proper TableChange format (camelCase)
         tableChanges.push({
           table: change.table,
           operation: change.kind,
           data: camelCaseData,
           lsn: wal.lsn,
+          clientId: topLevelClientId,  // Set top-level clientId for anti-echo filtering
           updatedAt: timestamp  // Use camelCase as per TableChange interface
         });
       } catch (error) {
@@ -458,7 +518,7 @@ export async function transformWALChanges(
   for (const [entityKey, relUpdates] of relationshipUpdates.entries()) {
     const [table, entityId] = entityKey.split(':');
     tableChanges.push({
-      table,
+      table: table!,
       operation: 'update',
       data: { id: entityId },
       relationshipUpdates: relUpdates,
@@ -512,6 +572,11 @@ function addFilterReason(reasons: Record<string, number>, reason: string) {
 // Helper function to convert snake_case to camelCase
 function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// Helper function to convert camelCase to snake_case
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 }
 
 // Helper function to convert snake_case object keys to camelCase
@@ -589,7 +654,18 @@ export async function storeChangesInHistory(
   try {
     // Try using repository first
     const repositories = createRepositoryContainer(context);
-    const success = await repositories.changeHistory.bulkInsertChanges(changes, storeBatchSize);
+    
+    // Convert TableChange[] to Partial<ChangeHistory>[]
+    const changeHistoryEntries: Partial<ChangeHistory>[] = changes.map(change => ({
+      lsn: change.lsn || '',
+      tableName: change.table,
+      operation: change.operation,
+      data: change.data,
+      timestamp: new Date()
+    }));
+    
+    const result = await repositories.changeHistory.bulkInsertChanges(changeHistoryEntries);
+    const success = result.length > 0;
     
     if (success) {
       return true;
@@ -719,15 +795,14 @@ export async function processChanges(
     return { success: true, storedChanges: false, lastLSN: '' };
   }
 
-  const lastLSN = changes[changes.length - 1].lsn;
+  const lastLSN = changes[changes.length - 1]?.lsn || '';
   const startTime = Date.now();
 
   try {
-    // Step 1: Transform
-    // Reduced to a single debug log
+    // Step 1: Transform WAL changes (includes clientId filtering for dual-path sync)
     replicationLogger.debug(`Processing ${changes.length} WAL entries`, {}, MODULE_NAME);
     const { tableChanges, filteredReasons } = await transformWALChanges(changes, context);
-    const filteredCount = changes.length - tableChanges.length;
+    const filteredCount = Object.values(filteredReasons).reduce((sum, count) => sum + count, 0);
     
     // Only log filtering info if there are actual changes or non-expected filters
     const hasImportantFilters = Object.keys(filteredReasons).some(r => 
@@ -753,209 +828,144 @@ export async function processChanges(
       };
     }
 
-    // Step 2: Store raw changes in history 
-    const storedSuccessfully = await storeChangesInHistory(context, tableChanges, storeBatchSize);
-    
-    if (!storedSuccessfully) {
-      replicationLogger.warn('Failed to store changes', {
-        lastLSN
-      }, MODULE_NAME);
-      
-      // Even if storage failed, update LSN to prevent reprocessing this batch
-      await stateManager.setLSN(lastLSN);
-      return { 
-        success: true, // Still success from polling perspective, but storage failed
-        storedChanges: false, 
-        changeCount: tableChanges.length,
-        filteredCount,
-        lastLSN
-      };
-    }
-
-    // Step 3: Update LSN
-    try {
-      await stateManager.setLSN(lastLSN);
-    } catch (lsnError) {
-      replicationLogger.error('LSN update failed', { lsn: lastLSN }, MODULE_NAME);
-    }
-    
-    // Step 4: Notify clients about new changes
+    // Step 2: Push system changes to clients using handlePushedLiveChanges
+    // Since client-originated changes are filtered out, only system changes remain
     try {
       const clientIds = await getAllClientIds(env);
       
-      // Skip logging if no clients to notify
       if (clientIds.length === 0) {
-        return { 
-          success: true, 
-          storedChanges: storedSuccessfully,
-          changeCount: tableChanges.length,
-          filteredCount,
-          lastLSN
-        };
-      }
-      
-      // Capture the changes we're about to send for verification purposes
-      const changeRecordIds = tableChanges.map(change => {
-        const id = change.data?.id ? String(change.data.id).substring(0, 8) + '...' : 'unknown';
-        return `${change.table}:${change.operation}:${id}`;
-      });
-      
-      // Single log at start of notification with client count and change count only
-      replicationLogger.info('Notifying clients in parallel', {
-        count: clientIds.length,
-        changeCount: tableChanges.length
-      }, MODULE_NAME);
-      // Add debug log for change sample
-      replicationLogger.debug('Notifying clients change sample', {
-        changeRecordSample: changeRecordIds.length > 5 
-          ? changeRecordIds.slice(0, 5).join(', ') + ` (and ${changeRecordIds.length - 5} more)`
-          : changeRecordIds.join(', ')
-      }, MODULE_NAME);
-      
-      // Process all clients in parallel
-      const results = await Promise.all(
-        clientIds.map(async (clientId) => {
-          try {
-            const clientDoId = env.SYNC.idFromName(`client:${clientId}`);
-            const clientDo = env.SYNC.get(clientDoId);
-            
-            // Set a diagnostic header so we can correlate client processing logs
-            const processingId = `proc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-            
-            const response = await clientDo.fetch(
-              `https://internal/new-changes?clientId=${encodeURIComponent(clientId)}`,
-              {
-                method: "POST",
-                headers: { 
-                  "Content-Type": "application/json",
-                  "X-Processing-Id": processingId
-                },
-                body: JSON.stringify({ 
-                  lsn: lastLSN,
-                  changeCount: tableChanges.length,
-                })
-              }
-            );
-            
-            // Attempt to parse response body for more details
-            let responseDetails = {};
-            try {
-              const responseBody = await response.text();
-              if (responseBody) {
-                responseDetails = JSON.parse(responseBody);
-              }
-            } catch (parseError) {
-              // Ignore parse errors
-            }
-            
-            // Consider 410 Gone (WebSocket unavailable/client cleaned up) as a special case
-            // We need to mark these as failures, but track when cleanup was successful
-            const isCleanedUp = response.status === 410;
-            const cleanedUp = isCleanedUp && (responseDetails as any)?.cleaned === true;
-            
-            return { 
-              clientId, 
-              processingId,
-              // Only status 200 is a success, everything else is a failure
-              success: response.status === 200,
-              error: response.status !== 200 ? `Status ${response.status}${isCleanedUp ? ' (No active WebSocket)' : ''}` : undefined,
-              details: responseDetails,
-              cleanedUp
-            };
-          } catch (error) {
-            return { 
-              clientId, 
-              success: false, 
-              error: error instanceof Error ? error.message : String(error)
-            };
-          }
-        })
-      );
-      
-      // Process results
-      const successCount = results.filter(r => r.success).length;
-      const failureCount = results.length - successCount;
-      const failedClients = results.filter(r => !r.success).map(r => r.clientId);
-      
-      // Count cleaned up clients as a special case
-      const cleanedClientCount = results.filter(r => r.cleanedUp).length;
-      
-      // Log any failures individually
-      results.filter(r => !r.success).forEach(result => {
-        // Use different log level for cleaned-up clients vs other failures
-        if (result.cleanedUp) {
-          replicationLogger.info('Client cleaned up during notification', {
-            clientId: result.clientId,
-            status: result.error
+        replicationLogger.debug('No clients to notify, skipping notification step', {
+          changeCount: tableChanges.length
+        }, MODULE_NAME);
+      } else if (tableChanges.length > 0) {
+        // Filter out client-originated changes - only notify system changes
+        const systemChanges = tableChanges.filter(change => {
+          // Check both top-level clientId and clientId within data
+          const hasClientId = !!(change.clientId || change.data?.clientId);
+          
+          // Debug logging for filter - always log for debugging
+          replicationLogger.debug('System change filter check', {
+            table: change.table,
+            topLevelClientId: change.clientId,
+            topLevelClientIdType: typeof change.clientId,
+            dataClientId: change.data?.clientId,
+            dataClientIdType: typeof change.data?.clientId,
+            hasClientId,
+            willBeSystemChange: !hasClientId,
+            changeDataKeys: Object.keys(change.data || {})
+          }, MODULE_NAME);
+          
+          return !hasClientId; // Only include changes without clientId (system-originated)
+        });
+        
+        if (systemChanges.length === 0) {
+          replicationLogger.debug('All changes are client-originated, skipping notifications (handled by primary path)', {
+            totalChanges: tableChanges.length,
+            clientChanges: tableChanges.length - systemChanges.length
           }, MODULE_NAME);
         } else {
-          replicationLogger.warn('Client notify failed', {
-            clientId: result.clientId,
-            error: result.error
+          const { handlePushedLiveChanges } = await import('../sync/live-push');
+          
+          replicationLogger.info('Pushing system changes to all clients', {
+            totalChanges: tableChanges.length,
+            systemChanges: systemChanges.length,
+            clientChanges: tableChanges.length - systemChanges.length,
+            clientCount: clientIds.length,
+            tables: [...new Set(systemChanges.map(c => c.table))]
+          }, MODULE_NAME);
+        
+        // Process all clients in parallel
+        const results = await Promise.all(
+          clientIds.map(async (clientId) => {
+            try {
+              const clientDoId = env.SYNC.idFromName(`client:${clientId}`);
+              const clientDo = env.SYNC.get(clientDoId);
+              
+              // Create a simple message handler that sends to SyncDO
+              const messageHandler = {
+                send: async (message: any) => {
+                  const response = await clientDo.fetch(
+                    `https://internal/new-changes?clientId=${encodeURIComponent(clientId)}`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        lsn: lastLSN,
+                        changeCount: systemChanges.length,
+                        changes: systemChanges
+                      })
+                    }
+                  );
+                  if (response.status !== 200) {
+                    throw new Error(`Failed to send: ${response.status}`);
+                  }
+                },
+                // Stub methods to satisfy WebSocketHandler interface
+                onMessage: () => {},
+                removeHandler: () => {},
+                clearHandlers: () => {},
+                isConnected: () => true,
+                waitForMessage: () => Promise.resolve({} as any)
+              } as WebSocketHandler;
+              
+              // Use handlePushedLiveChanges which will filter and send appropriately
+              const result = await handlePushedLiveChanges(
+                systemChanges,
+                lastLSN,
+                clientId,
+                messageHandler
+              );
+              
+              return {
+                clientId,
+                success: result.success,
+                changeCount: result.changeCount
+              };
+            } catch (error) {
+              replicationLogger.error('Failed to push system changes to client', {
+                clientId,
+                error: error instanceof Error ? error.message : String(error)
+              }, MODULE_NAME);
+              return {
+                clientId,
+                success: false,
+                error: error instanceof Error ? error.message : String(error)
+              };
+            }
+          })
+        );
+        
+        const successCount = results.filter(r => r.success).length;
+        const failureCount = results.filter(r => !r.success).length;
+        
+          replicationLogger.info('System change notifications completed', {
+            total: clientIds.length,
+            successful: successCount,
+            failed: failureCount,
+            systemChanges: systemChanges.length,
+            processingTime: Date.now() - startTime
           }, MODULE_NAME);
         }
-      });
-      
-      // Extract details about changes processed
-      const changeStats = results
-        .filter(r => r.success && r.details && (r.details as any).processingStats)
-        .map(r => ({
-          clientId: r.clientId,
-          stats: (r.details as any).processingStats
-        }));
-      
-      // If we have processing stats, log them
-      if (changeStats.length > 0) {
-        // For each client, log the change counts
-        changeStats.forEach(stat => {
-          const processingStats = stat.stats || {};
-          
-          // Log detailed deduplication information if available
-          if (processingStats.deduplication) {
-            const dedup = processingStats.deduplication;
-            const transformations = dedup.transformations || [];
-            
-            // Log a summary of transformations
-            if (transformations.length > 0) {
-              const transformationsByType: Record<string, number> = {};
-              transformations.forEach((t: any) => {
-                const key = `${t.from}->${t.to}`;
-                transformationsByType[key] = (transformationsByType[key] || 0) + 1;
-              });
-              
-              replicationLogger.info('Change transformations for client', {
-                clientId: stat.clientId,
-                transformations: Object.entries(transformationsByType)
-                  .map(([type, count]) => `${type}:${count}`)
-                  .join(', ')
-              }, MODULE_NAME);
-            }
-            
-            // Log information about any missing entities
-            if (dedup.missingIds?.length > 0) {
-              replicationLogger.warn('Changes with missing IDs detected', {
-                clientId: stat.clientId,
-                count: dedup.missingIds.length,
-                tables: dedup.missingIds.map((c: any) => c.table).join(', ')
-              }, MODULE_NAME);
-            }
-          }
-        });
       }
-      
-      // Summary log
-      replicationLogger.info('Client notifications completed', {
-        success: successCount,
-        failed: failureCount,
-        cleanedUp: cleanedClientCount,
-        failedClients: failedClients.length > 0 ? failedClients : undefined,
-        processingTime: Date.now() - startTime
+    } catch (notificationError) {
+      replicationLogger.error('System change notification failed', {
+        error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+        changeCount: tableChanges.length
       }, MODULE_NAME);
-    } catch (notifyError) {
-      replicationLogger.error('Client notification process failed', {
-        error: notifyError instanceof Error ? notifyError.message : String(notifyError)
+      // Continue to store in database even if notifications fail
+    }
+
+    // Step 3: Store changes in database
+    const storedSuccessfully = await storeChangesInHistory(context, tableChanges, storeBatchSize || DEFAULT_STORE_BATCH_SIZE);
+    
+    if (!storedSuccessfully) {
+      replicationLogger.warn('Failed to store changes in history', {
+        lastLSN
       }, MODULE_NAME);
     }
+
+    // Step 4: Update LSN
+    await stateManager.setLSN(lastLSN);
     
     return { 
       success: true, 
@@ -990,4 +1000,4 @@ export async function processChanges(
       lastLSN
     };
   }
-} 
+}

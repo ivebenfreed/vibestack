@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { IconArrowRightDashed } from '@tabler/icons-react'
+import { useAuth } from '@/state-machines'
 import {
   CommandDialog,
   CommandEmpty,
@@ -8,13 +8,37 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from '@/components/ui/command'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { globalSidebarData } from '@/components/layout/data/sidebar-data'
+import { 
+  Home, 
+  FolderKanban, 
+  CheckSquare, 
+  Settings, 
+  Bug,
+  MessageSquare,
+  Package,
+  HelpCircle,
+} from 'lucide-react'
+
+const navigationItems = [
+  { id: 'dashboard', label: 'Dashboard', href: '/', icon: Home },
+  { id: 'projects', label: 'Projects', href: '/projects', icon: FolderKanban },
+  { id: 'tasks', label: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { id: 'tasks-kanban', label: 'Tasks Kanban', href: '/tasks?view=kanban', icon: CheckSquare },
+  { id: 'tasks-timeline', label: 'Tasks Timeline', href: '/tasks?view=timeline', icon: CheckSquare },
+  { id: 'apps', label: 'Apps', href: '/apps', icon: Package },
+  { id: 'chats', label: 'Chats', href: '/chats', icon: MessageSquare },
+  { id: 'help-center', label: 'Help Center', href: '/help-center', icon: HelpCircle },
+  { id: 'settings', label: 'Settings', href: '/settings', icon: Settings },
+  { id: 'debug', label: 'Debug', href: '/debug', icon: Bug },
+  { id: 'debug-sync', label: 'Debug - Sync', href: '/debug/sync', icon: Bug },
+  { id: 'debug-database', label: 'Debug - Database', href: '/debug/database', icon: Bug },
+]
 
 export function CommandMenu() {
   const navigate = useNavigate()
+  const { isAdmin, isSuperAdmin } = useAuth()
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -34,51 +58,37 @@ export function CommandMenu() {
     command()
   }
 
+  // Filter navigation items based on user permissions
+  const filteredNavigationItems = navigationItems.filter(item => {
+    if (item.id.startsWith('debug')) {
+      // Only show debug items to admins and super admins
+      return isAdmin || isSuperAdmin
+    }
+    return true
+  })
+
   return (
     <CommandDialog modal open={open} onOpenChange={setOpen}>
       <CommandInput placeholder='Type a command or search...' />
       <CommandList>
         <ScrollArea type='hover' className='h-72 pr-1'>
           <CommandEmpty>No results found.</CommandEmpty>
-          {globalSidebarData.map((section) => (
-            <CommandGroup key={section.id} heading={section.title}>
-              {section.navGroups.map((group) =>
-                group.items.map((navItem, i) => {
-                  if (navItem.url)
-                    return (
-                      <CommandItem
-                        key={`${navItem.url}-${i}`}
-                        value={navItem.title}
-                        onSelect={() => {
-                          runCommand(() => navigate({ to: navItem.url }))
-                        }}
-                      >
-                        <div className='mr-2 flex h-4 w-4 items-center justify-center'>
-                          <IconArrowRightDashed className='text-muted-foreground/80 size-2' />
-                        </div>
-                        {navItem.title}
-                      </CommandItem>
-                    )
-
-                  return navItem.items?.map((subItem, i) => (
-                    <CommandItem
-                      key={`${subItem.url}-${i}`}
-                      value={subItem.title}
-                      onSelect={() => {
-                        runCommand(() => navigate({ to: subItem.url }))
-                      }}
-                    >
-                      <div className='mr-2 flex h-4 w-4 items-center justify-center'>
-                        <IconArrowRightDashed className='text-muted-foreground/80 size-2' />
-                      </div>
-                      {subItem.title}
-                    </CommandItem>
-                  ))
-                })
-              )}
-            </CommandGroup>
-          ))}
-          <CommandSeparator />
+          <CommandGroup heading="Navigation">
+            {filteredNavigationItems.map((item) => (
+              <CommandItem
+                key={item.id}
+                value={item.label}
+                onSelect={() => {
+                  runCommand(() => navigate({ to: item.href }))
+                }}
+              >
+                <div className='mr-2 flex h-4 w-4 items-center justify-center'>
+                  <item.icon className='h-4 w-4' />
+                </div>
+                {item.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
         </ScrollArea>
       </CommandList>
     </CommandDialog>

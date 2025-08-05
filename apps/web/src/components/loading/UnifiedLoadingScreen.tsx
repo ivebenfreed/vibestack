@@ -1,5 +1,5 @@
 import React from 'react';
-import { useOrchestrator, useSystemReadiness } from '@/state-machines/orchestrator-hooks';
+import { useAuth, useSystem, useAppInit } from '@/state-machines';
 import { Loader2, Database, Shield, Wifi, RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface UnifiedLoadingScreenProps {
@@ -7,248 +7,140 @@ interface UnifiedLoadingScreenProps {
 }
 
 export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
-  const orchestrator = useOrchestrator();
-  const { canLoadRoutes, isSystemReady, readinessChecks, isLoading } = useSystemReadiness();
-  const systemShouldShow = !canLoadRoutes || isLoading;
+  const { isAuthenticated, isCheckingAuth, isSigningIn } = useAuth();
+  const { isSystemReady } = useSystem();
+  const { 
+    isCheckingRequirements, 
+    isInitializingDatabase, 
+    isStartingSync, 
+    isStartingLiveChanges, 
+    isReady 
+  } = useAppInit();
+  
+  // Simple reactive loading - no timeouts or complex state management
+  const shouldShow = !isSystemReady;
 
-  // Add 200ms delay before hiding the screen for smooth transition
-  const [shouldShow, setShouldShow] = React.useState(systemShouldShow);
-  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  // Debug logging in development - log every render
+  if (import.meta.env.MODE === 'development') {
+    console.log('[UnifiedLoadingScreen] Render:', {
+      isSystemReady,
+      shouldShow,
+      isAuthenticated,
+      isCheckingAuth,
+      appInitStates: {
+        isCheckingRequirements,
+        isInitializingDatabase,
+        isStartingSync,
+        isStartingLiveChanges,
+        isReady
+      },
+      timestamp: Date.now()
+    });
+  }
 
-  React.useEffect(() => {
-    if (systemShouldShow) {
-      // System needs loading screen - show immediately
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      setShouldShow(true);
-    } else {
-      // System is ready - delay hiding by 200ms for smooth transition
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        setShouldShow(false);
-        timeoutRef.current = null;
-      }, 400);
-    }
-
-    // Cleanup timeout on unmount
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [systemShouldShow]);
-
-  // Debug logging in development - only log when state actually changes
-  const prevStateRef = React.useRef<string>('');
-  React.useEffect(() => {
-    if (import.meta.env.MODE === 'development') {
-      const currentState = JSON.stringify({
-        currentPhase: orchestrator.currentPhase,
-        canLoadRoutes,
-        isSystemReady,
-        isLoading,
-        shouldShow
-      });
-      
-      // Only log if state actually changed
-      if (currentState !== prevStateRef.current) {
-        console.log('[UnifiedLoadingScreen] State changed:', {
-          currentPhase: orchestrator.currentPhase,
-          canLoadRoutes,
-          isSystemReady,
-          isLoading,
-          shouldShow,
-          contextReady: orchestrator.context.isSystemReady,
-          isDatabaseReady: orchestrator.context.isDatabaseInitialized,
-          isSyncLive: orchestrator.context.isSyncLive,
-          liveChangesActive: orchestrator.context.liveChangesActive,
-        });
-        prevStateRef.current = currentState;
-      }
-    }
-  }, [orchestrator.currentPhase, canLoadRoutes, isSystemReady, isLoading, shouldShow]);
-
-  // Determine the current phase based on orchestrator state machine
+  // Simple loading state - no complex phase detection
   const getLoadingState = () => {
-    const { context, currentPhase } = orchestrator;
-    
-    // Handle specific orchestrator states
-    switch (currentPhase) {
-      case 'initializing.auth':
-        return {
-          phase: 'auth',
-          icon: Shield,
-          title: 'Checking Authentication',
-          message: 'Verifying your session...',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-blue-100 dark:bg-blue-900/20',
-            icon: 'text-blue-600 dark:text-blue-400',
-            progress: 'bg-blue-600'
-          }
-        };
-
-      case 'initializing.database':
-        return {
-          phase: 'database',
-          icon: Database,
-          title: 'Initializing Database',
-          message: 'Setting up local database and running migrations...',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-blue-100 dark:bg-blue-900/20',
-            icon: 'text-blue-600 dark:text-blue-400',
-            progress: 'bg-blue-600'
-          }
-        };
-
-      case 'initializing.sync':
-        return {
-          phase: 'sync',
-          icon: RefreshCw,
-          title: 'Starting Synchronization',
-          message: context.isOnline 
-            ? 'Connecting to sync server and downloading data...'
-            : 'Waiting for internet connection...',
-          progress: context.syncState.progress || undefined,
-          colorClasses: {
-            bg: 'bg-green-100 dark:bg-green-900/20',
-            icon: 'text-green-600 dark:text-green-400',
-            progress: 'bg-green-600'
-          }
-        };
-
-      case 'initializing.validating_integrity':
-        return {
-          phase: 'integrity-validation',
-          icon: CheckCircle,
-          title: 'Validating Data Integrity',
-          message: 'Ensuring your local data is consistent with the server...',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-purple-100 dark:bg-purple-900/20',
-            icon: 'text-purple-600 dark:text-purple-400',
-            progress: 'bg-purple-600'
-          }
-        };
-
-      case 'initializing.starting_live_changes':
-        return {
-          phase: 'live-changes',
-          icon: Wifi,
-          title: 'Enabling Live Updates',
-          message: 'Setting up real-time data synchronization...',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-green-100 dark:bg-green-900/20',
-            icon: 'text-green-600 dark:text-green-400',
-            progress: 'bg-green-600'
-          }
-        };
-
-      case 'resetting':
-        return {
-          phase: 'resetting',
-          icon: AlertTriangle,
-          title: 'Resetting System',
-          message: 'Data integrity issues detected. Performing system reset...',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-red-100 dark:bg-red-900/20',
-            icon: 'text-red-600 dark:text-red-400',
-            progress: 'bg-red-600'
-          }
-        };
-
-      case 'signing_out':
-        return {
-          phase: 'signing-out',
-          icon: Shield,
-          title: 'Signing Out',
-          message: 'Clearing your session and disconnecting...',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-gray-100 dark:bg-gray-900/20',
-            icon: 'text-gray-600 dark:text-gray-400',
-            progress: 'bg-gray-600'
-          }
-        };
-
-      case 'ready':
-        // System is ready but routes not loaded yet
-        if (!canLoadRoutes) {
-          return {
-            phase: 'route-loading',
-            icon: Loader2,
-            title: routeName ? `Loading ${routeName}` : 'Loading Application',
-            message: 'Preparing your workspace...',
-            progress: undefined,
-            colorClasses: {
-              bg: 'bg-purple-100 dark:bg-purple-900/20',
-              icon: 'text-purple-600 dark:text-purple-400',
-              progress: 'bg-purple-600'
-            }
-          };
-        }
-        break;
-
-      case 'initializing.error':
-        return {
-          phase: 'error',
-          icon: AlertTriangle,
-          title: 'Initialization Error',
-          message: context.databaseError || context.authError || 'An error occurred during initialization',
-          progress: undefined,
-          colorClasses: {
-            bg: 'bg-red-100 dark:bg-red-900/20',
-            icon: 'text-red-600 dark:text-red-400',
-            progress: 'bg-red-600'
-          }
-        };
-    }
-
-    // Fallback: Use context-based detection for edge cases
-    if (context.databaseError) {
+    if (isCheckingAuth) {
       return {
-        phase: 'error',
-        icon: AlertTriangle,
-        title: 'Database Error',
-        message: context.databaseError,
-        progress: undefined,
+        phase: 'auth',
+        icon: Shield,
+        title: 'Checking Authentication',
+        message: 'Verifying your session...',
         colorClasses: {
-          bg: 'bg-red-100 dark:bg-red-900/20',
-          icon: 'text-red-600 dark:text-red-400',
-          progress: 'bg-red-600'
+          bg: 'bg-blue-50 dark:bg-blue-950',
+          icon: 'text-blue-600 dark:text-blue-400',
         }
       };
     }
 
-    // Final fallback loading state
+    if (isSigningIn) {
+      return {
+        phase: 'signing-in',
+        icon: Shield,
+        title: 'Signing In',
+        message: 'Authenticating your credentials...',
+        colorClasses: {
+          bg: 'bg-blue-50 dark:bg-blue-950',
+          icon: 'text-blue-600 dark:text-blue-400',
+        }
+      };
+    }
+
+    // App initialization states
+    if (isCheckingRequirements) {
+      return {
+        phase: 'starting',
+        icon: Loader2,
+        title: 'Starting...',
+        message: 'Preparing application...',
+        colorClasses: {
+          bg: 'bg-gray-50 dark:bg-gray-950',
+          icon: 'text-gray-600 dark:text-gray-400',
+        }
+      };
+    }
+
+    if (isInitializingDatabase) {
+      return {
+        phase: 'database',
+        icon: Database,
+        title: 'Setting up database...',
+        message: 'Initializing local storage...',
+        colorClasses: {
+          bg: 'bg-green-50 dark:bg-green-950',
+          icon: 'text-green-600 dark:text-green-400',
+        }
+      };
+    }
+
+    if (isStartingSync) {
+      return {
+        phase: 'sync',
+        icon: Wifi,
+        title: 'Syncing data...',
+        message: 'Connecting and syncing...',
+        colorClasses: {
+          bg: 'bg-purple-50 dark:bg-purple-950',
+          icon: 'text-purple-600 dark:text-purple-400',
+        }
+      };
+    }
+
+    if (isStartingLiveChanges) {
+      return {
+        phase: 'live-changes',
+        icon: RefreshCw,
+        title: 'Preparing live updates...',
+        message: 'Setting up real-time sync...',
+        colorClasses: {
+          bg: 'bg-orange-50 dark:bg-orange-950',
+          icon: 'text-orange-600 dark:text-orange-400',
+        }
+      };
+    }
+
+    // Default loading state for everything else
     return {
       phase: 'loading',
       icon: Loader2,
-      title: 'Loading',
-      message: `Preparing application... (phase: ${currentPhase})`,
-      progress: undefined,
+      title: 'Loading Application',
+      message: 'Setting up your workspace...',
       colorClasses: {
-        bg: 'bg-gray-100 dark:bg-gray-900/20',
+        bg: 'bg-gray-50 dark:bg-gray-950',
         icon: 'text-gray-600 dark:text-gray-400',
-        progress: 'bg-gray-600'
       }
     };
   };
 
   const loadingState = getLoadingState();
 
+  // Don't render anything if system is ready
+  if (!shouldShow) {
+    return null;
+  }
+
   return (
-    <div 
-      className={`fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity duration-200 ${
-        shouldShow ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-      }`}
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
     >
       <div className="bg-card border rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
         <div className="flex flex-col items-center space-y-6">
@@ -280,7 +172,7 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
           )}
 
           {/* Connection status indicator */}
-          {!orchestrator.context.isOnline && (
+          {!navigator.onLine && (
             <div className="flex items-center space-x-2 text-xs text-muted-foreground">
               <div className="w-2 h-2 bg-red-500 rounded-full"></div>
               <span>Offline - Waiting for connection</span>
@@ -293,31 +185,15 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
               <summary className="cursor-pointer">Debug Info</summary>
               <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">
                 {JSON.stringify({
-                  currentPhase: orchestrator.currentPhase,
                   phase: loadingState.phase,
-                  context: {
-                    isOnline: orchestrator.context.isOnline,
-                    isDatabaseInitialized: orchestrator.context.isDatabaseInitialized,
-                    hasUser: !!orchestrator.context.user,
-                    isSyncLive: orchestrator.context.isSyncLive,
-                    liveChangesActive: orchestrator.context.liveChangesActive,
-                    isSystemReady: orchestrator.context.isSystemReady,
+                  auth: {
+                    isAuthenticated,
+                    isCheckingAuth,
+                    isSigningIn,
                   },
-                  syncState: {
-                    phase: orchestrator.context.syncState.phase,
-                    machineState: orchestrator.context.syncState.machineState,
-                    progress: orchestrator.context.syncState.progress,
-                    currentLSN: orchestrator.context.syncState.currentLSN,
-                  },
-                  flags: {
-                    canLoadRoutes,
+                  system: {
                     isSystemReady,
-                    isLoading,
-                  },
-                  errors: {
-                    databaseError: orchestrator.context.databaseError,
-                    authError: orchestrator.context.authError,
-                    syncError: orchestrator.context.syncState.error,
+                    shouldShow,
                   }
                 }, null, 2)}
               </pre>

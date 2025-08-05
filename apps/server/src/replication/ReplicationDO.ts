@@ -95,7 +95,7 @@ export class ReplicationDO implements DurableObject {
     error?: string
   }> {
     try {
-      replicationLogger.info('Initializing replication system', {}, MODULE_NAME);
+      replicationLogger.debug('Initializing replication system', {}, MODULE_NAME);
       
       // Check if slot exists or create it
       const c = this.getContext();
@@ -110,7 +110,7 @@ export class ReplicationDO implements DurableObject {
       const firstWALPoll = await this.pollingManager.startPollingWithFirstPollResults();
       
               // Log successful initialization with first WAL poll results
-        replicationLogger.info('Initialization completed with first WAL poll', {
+        replicationLogger.debug('Initialization completed with first WAL poll', {
           changesFound: firstWALPoll.changesFound,
           changeCount: firstWALPoll.changeCount || 0,
           walEntries: firstWALPoll.walEntries || 0,
@@ -124,15 +124,41 @@ export class ReplicationDO implements DurableObject {
         firstWALPoll
       };
     } catch (err) {
+      // Properly serialize error objects
       const errorMessage = err instanceof Error ? err.message : String(err);
-      replicationLogger.error('Failed to initialize replication', { 
-        error: errorMessage 
-      }, MODULE_NAME);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      const errorName = err instanceof Error ? err.constructor.name : typeof err;
+      
+      const errorDetails = {
+        error: errorMessage,
+        errorType: errorName,
+        stack: errorStack,
+        config: {
+          slot: this.config.slot,
+          publication: this.config.publication,
+          pollingInterval: this.config.pollingInterval
+        },
+        environment: {
+          databaseUrl: this.env.DATABASE_URL || 'undefined',
+          environment: this.env.ENVIRONMENT || 'undefined'
+        },
+        // Add raw error for debugging if it has additional properties
+        rawError: err && typeof err === 'object' ? Object.getOwnPropertyNames(err).reduce((acc, key) => {
+          try {
+            acc[key] = (err as any)[key];
+          } catch (e) {
+            acc[key] = '[Unserializable]';
+          }
+          return acc;
+        }, {} as any) : String(err)
+      };
+      
+      replicationLogger.error('Failed to initialize replication', errorDetails, MODULE_NAME);
       
       return {
         success: false,
         slotStatus: null,
-        error: errorMessage
+        error: err instanceof Error ? err.message : String(err)
       };
     }
   }
@@ -171,6 +197,8 @@ export class ReplicationDO implements DurableObject {
           return this.handleClients();
         case '/lsn':
           return this.handleLSN();
+        case '/reset-lsn':
+          return this.handleResetLSN();
       }
     }
 
@@ -195,11 +223,11 @@ export class ReplicationDO implements DurableObject {
   private async initializeReplication(): Promise<{success: boolean, error?: string, slotStatus?: any}> {
     try {
       // Check if slot exists or create it if needed
-      replicationLogger.info('Starting replication slot check', {}, MODULE_NAME);
+      replicationLogger.debug('Starting replication slot check', {}, MODULE_NAME);
       const c = this.getContext();
       const slotStatus = await this.stateManager.checkSlotStatus(c);
       
-      replicationLogger.info('Replication slot check completed', {
+      replicationLogger.debug('Replication slot check completed', {
         slotExists: slotStatus.exists
       }, MODULE_NAME);
 
@@ -224,7 +252,7 @@ export class ReplicationDO implements DurableObject {
    */
   private async handleInit(): Promise<Response> {
     try {
-      replicationLogger.info('API: Replication init called - always initializing', {}, MODULE_NAME);
+      replicationLogger.debug('API: Replication init called - always initializing', {}, MODULE_NAME);
       
       try {
         // Always initialize and start polling - this is idempotent and ensures wake-up
@@ -466,6 +494,56 @@ export class ReplicationDO implements DurableObject {
         success: false,
         error: errorMessage,
         lsn: '0/0' // Default fallback
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  /**
+   * Reset stored LSN to slot's confirmed_flush_lsn - HTTP endpoint handler
+   */
+  private async handleResetLSN(): Promise<Response> {
+    try {
+      const c = this.getContext();
+      const slotStatus = await this.stateManager.checkSlotStatus(c);
+      
+      if (!slotStatus.exists || !slotStatus.lsn) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Replication slot does not exist or has no LSN'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const oldLSN = await this.stateManager.getLSN();
+      await this.stateManager.setLSN(slotStatus.lsn);
+      
+      replicationLogger.info('LSN reset completed', {
+        oldLSN,
+        newLSN: slotStatus.lsn,
+        slot: this.config.slot
+      }, MODULE_NAME);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        oldLSN,
+        newLSN: slotStatus.lsn,
+        slot: this.config.slot
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      replicationLogger.error('LSN reset error', { error: errorMessage }, MODULE_NAME);
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: errorMessage
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }

@@ -8,12 +8,84 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { useLocation } from '@tanstack/react-router'
 import { GLOBAL_SIDEBAR_WIDTH } from './global-sidebar'
+import { Button } from '@/components/ui/button'
+import { RotateCcw } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export const HEADER_HEIGHT = 64 // pixels
 
 interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   fixed?: boolean
   ref?: React.Ref<HTMLElement>
+}
+
+// PWA-aware refresh button component
+const RefreshButton = () => {
+  const [isRefreshing, setIsRefreshing] = React.useState(false)
+  
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    
+    try {
+      // Handle PWA service worker and cache clearing
+      if ('serviceWorker' in navigator) {
+        // Get all service worker registrations
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        
+        for (const registration of registrations) {
+          // Skip waiting to activate new service worker immediately
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+          }
+          
+          // Force update to get latest service worker
+          await registration.update()
+        }
+      }
+      
+      // Clear all caches to ensure fresh content
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        )
+      }
+      
+      // Give a moment for cache clearing, then hard reload
+      setTimeout(() => {
+        // Force reload bypassing cache
+        window.location.reload()
+      }, 300)
+      
+    } catch (error) {
+      console.error('Error during PWA refresh:', error)
+      // Fallback to simple reload if PWA refresh fails
+      setTimeout(() => {
+        window.location.reload()
+      }, 200)
+    }
+  }
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="h-8 w-8"
+          >
+            <RotateCcw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Refresh App</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
 }
 
 export const Header = ({
@@ -71,7 +143,11 @@ export const Header = ({
     >
       {showSidebarTrigger && (
         <>
-          <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
+          <SidebarTrigger 
+            variant='outline' 
+            className='scale-125 sm:scale-100' 
+            data-testid="sidebar-toggle"
+          />
           <Separator orientation='vertical' className='h-6' />
         </>
       )}
@@ -79,8 +155,9 @@ export const Header = ({
       <div className='ml-auto flex items-center space-x-4'>
         <Search />
         <SyncStatusIcon />
+        <RefreshButton />
         <ThemeSwitch />
-        <ProfileDropdown />
+        <ProfileDropdown data-testid="user-menu" />
       </div>
     </header>
   )

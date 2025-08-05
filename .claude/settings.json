@@ -1,0 +1,60 @@
+{
+  "permissions": {
+    "allow": ["*"]
+  },
+  "slashCommands": {
+    "/status": {
+      "description": "Check status of all development servers and background processes",
+      "command": ".claude/commands/status.sh"
+    },
+    "/start": {
+      "description": "Start development servers in background",
+      "command": ".claude/commands/start-dev.sh"
+    },
+    "/stop": {
+      "description": "Stop all development servers",
+      "command": ".claude/commands/stop-all.sh"
+    },
+    "/pr": {
+      "description": "Show current PR/issue information",
+      "command": ".claude/commands/pr-info.sh"
+    },
+    "/context": {
+      "description": "Show the session start context that's automatically added",
+      "command": ".claude/commands/show-context.sh"
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/intercept-pnpm-dev.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/add-project-context.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/add-project-context.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

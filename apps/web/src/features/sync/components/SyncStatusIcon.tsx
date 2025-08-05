@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
+import { useSync } from '@/state-machines';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -15,20 +15,23 @@ interface SyncStatusIconProps {
 }
 
 const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className }) => {
-  const { isOnline } = useOrchestrator();
-  const syncMachineState = useSyncMachine();
-  
-  // Destructure from the sync machine state
   const {
+    clientId,
+    currentLSN,
     syncPhase,
-    syncProgress,
+    isConnected,
+    error,
     isInitialSync,
     isCatchupSync,
     isLiveSync,
     isError,
-    currentLSN,
+    isConnecting,
+    isIdle,
     statusText
-  } = syncMachineState;
+  } = useSync();
+  
+  // Derived state
+  const isOnline = isConnected;
 
   // Remove excessive logging that was causing performance issues during scroll
   // console.log('[SyncStatusIcon] State:', {
@@ -60,11 +63,18 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
 
   const getTooltipText = (): string => {
     const baseStatus = !isOnline ? 'Status: Disconnected' :
-                      isError ? 'Status: Error' :
+                      isError ? `Status: Error${error ? `: ${error}` : ''}` :
                       statusText ? `Status: ${statusText}` :
                       'Status: Connecting...';
     
-    return `${baseStatus}\nLSN: ${currentLSN || '0/0'}`;
+    return baseStatus;
+  };
+
+  const getClientIdDisplay = () => {
+    if (!clientId) return 'unknown';
+    const firstPart = clientId.substring(0, 18);
+    const secondPart = clientId.substring(18);
+    return { firstPart, secondPart };
   };
 
   const getAriaLabel = (): string => {
@@ -97,7 +107,23 @@ const SyncStatusIcon: React.FC<SyncStatusIconProps> = React.memo(({ className })
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{getTooltipText()}</p>
+          <div className="text-sm">
+            <div>{getTooltipText()}</div>
+            <div className="mt-1">
+              <div>Client ID:</div>
+              <div className="font-mono text-xs">
+                {clientId ? (
+                  <>
+                    <div>{clientId.substring(0, 18)}</div>
+                    <div>{clientId.substring(18)}</div>
+                  </>
+                ) : (
+                  'unknown'
+                )}
+              </div>
+            </div>
+            {currentLSN && <div className="mt-1">LSN: {currentLSN}</div>}
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

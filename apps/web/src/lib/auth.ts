@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react"; // Use React client
+import { adminClient, emailOTPClient } from "better-auth/client/plugins";
 
 // Define the base URL for the Better Auth server
 // Using same-origin architecture - everything from same domain
@@ -27,6 +28,10 @@ export const authClient = createAuthClient({
     'Content-Type': 'application/json',
   },
   mode: 'cors',
+  plugins: [
+    adminClient(),
+    emailOTPClient()
+  ],
   fetchOptions: {
     // Add timeout for requests
     timeout: 10000, // 10 seconds
@@ -40,12 +45,21 @@ export const authClient = createAuthClient({
       maxDelay: import.meta.env.DEV ? 5000 : 60000, // Longer max delay in production
       shouldRetry: (response: Response | null) => {
         // Always retry on network failures (response is null)
-        if (response === null) return true;
+        if (response === null) {
+          console.log('[AUTH] Network failure detected, will retry');
+          return true;
+        }
         
         // Retry on 5xx server errors
-        if (response.status >= 500) return true;
+        if (response.status >= 500) {
+          console.log(`[AUTH] Server error ${response.status} detected, will retry`);
+          return true;
+        }
         
         // Don't retry on 4xx client errors (auth failures, validation errors, etc.)
+        if (response.status >= 400 && response.status < 500) {
+          console.log(`[AUTH] Client error ${response.status} detected, will not retry`);
+        }
         return false;
       }
     },

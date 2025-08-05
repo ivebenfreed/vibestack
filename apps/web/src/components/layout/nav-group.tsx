@@ -36,7 +36,7 @@ export function NavGroup({ title, items }: NavGroup) {
   const href = useLocation({ select: (location) => location.href })
   
   return (
-    <SidebarGroup>
+    <SidebarGroup data-testid={`nav-group-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <SidebarGroupLabel>{title}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
@@ -74,7 +74,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
   // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
   
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem data-testid={`nav-item-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
       <SidebarMenuButton
         asChild
         isActive={checkIsActive(href, item)}
@@ -84,6 +84,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
           to={item.url} 
           onClick={() => setOpenMobile(false)}
           preload={false}
+          data-testid={`nav-link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
         >
           {item.icon && <item.icon />}
           <span>{item.title}</span>
@@ -115,7 +116,7 @@ const SidebarMenuCollapsible = ({
             {item.icon && <item.icon />}
             <span>{item.title}</span>
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
-            <ChevronRight className='ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
+            <ChevronRight className='ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent className='CollapsibleContent'>
@@ -177,7 +178,7 @@ const SidebarMenuCollapsedDropdown = ({
             {item.icon && <item.icon />}
             <span>{item.title}</span>
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
-            <ChevronRight className='ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
+            <ChevronRight className='ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent side='right' align='start' sideOffset={4}>

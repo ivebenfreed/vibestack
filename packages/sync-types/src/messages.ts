@@ -31,6 +31,7 @@ export type CltMessageType =
   | 'clt_init_processed'   // Client signals initial sync data was processed
   | 'clt_catchup_received' // Client acknowledges receipt of catchup sync chunk
   | 'clt_integrity_validation' // Client requests integrity validation
+  | 'clt_integrity_baseline_validation' // Client requests baseline integrity validation
   | 'clt_integrity_reset_ack'; // Client acknowledges integrity reset
 
 // Base message interface for all messages
@@ -53,6 +54,7 @@ export interface ServerChangesMessage extends ServerMessage {
     chunk: number;
     total: number;
   };
+  isConflictResolution?: boolean; // Indicates CRDT conflict resolution - no anti-echo filtering
 }
 
 export interface ServerCatchupChangesMessage extends ServerChangesMessage {
@@ -76,6 +78,7 @@ export interface ServerInitChangesMessage extends ServerMessage {
 export interface ServerInitStartMessage extends ServerMessage {
   type: 'srv_init_start';
   serverLSN: string;  // Server's current LSN at start of initial sync
+  resuming?: boolean; // Indicates if this is resuming an interrupted sync
 }
 
 export interface ServerInitCompleteMessage extends ServerMessage {
@@ -155,6 +158,8 @@ export interface ServerIntegrityValidationResponseMessage extends ServerMessage 
   recommendedAction: 'none' | 'catchup' | 'reset';
   serverFingerprints: Record<string, any>;
   validationTimestamp: number;
+  rollbackToLSN?: string; // LSN to roll back to before starting catchup
+  rollbackReason?: string; // Explanation for the rollback recommendation
 }
 
 /**

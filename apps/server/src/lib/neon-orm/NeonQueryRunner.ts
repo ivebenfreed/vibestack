@@ -17,7 +17,7 @@ class SafeBroadcaster extends Broadcaster {
         super(queryRunner)
         this.safeQueryRunner = queryRunner
     }
-    broadcastLoadEvent(result: BroadcasterResult, metadata: any, entities: any[]): void {
+    override broadcastLoadEvent(result: BroadcasterResult, metadata: any, entities: any[]): void {
         try {
             // Skip entirely in Cloudflare environment to avoid I/O issues
             if (typeof (globalThis as any).navigator !== 'undefined' && (globalThis as any).navigator.userAgent?.includes('Cloudflare-Workers')) {

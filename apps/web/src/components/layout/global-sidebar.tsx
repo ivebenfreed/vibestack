@@ -3,7 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { globalSidebarData } from '@/components/layout/data/sidebar-data'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { useLayoutStoreV2 } from '@/stores/layoutStoreV2'
+import { useAuth } from '@/state-machines'
 
 // Global sidebar width constant
 export const GLOBAL_SIDEBAR_WIDTH = 64
@@ -38,7 +39,7 @@ function NavItem({ sectionId, icon: Icon, label, isActive, isMobile }: NavItemPr
       <Link
         to={route}
         className={cn(
-          'flex flex-col items-center justify-center p-2 rounded-md text-xs',
+          'flex flex-col items-center justify-center p-2 rounded-md text-xs min-h-[3rem]',
           'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
           isActive 
             ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
@@ -46,7 +47,7 @@ function NavItem({ sectionId, icon: Icon, label, isActive, isMobile }: NavItemPr
         )}
         preload={false}
       >
-        <Icon className="h-5 w-5 mb-1" />
+        <Icon className="h-4 w-4 mb-1" />
         <span className="text-xs">{label}</span>
       </Link>
     )
@@ -58,7 +59,8 @@ function NavItem({ sectionId, icon: Icon, label, isActive, isMobile }: NavItemPr
         <Link
           to={route}
           className={cn(
-            'flex items-center justify-center w-10 h-10 rounded-md',
+            'flex items-center justify-center w-8 h-8 rounded-md',
+            'transition-colors duration-200',
             'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
             isActive 
               ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
@@ -89,18 +91,37 @@ function VLogo() {
 }
 
 export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
-  const activeSection = useLayoutStore.activeSection()
+  const activeSection = useLayoutStoreV2.activeSection()
+  const { isAuthenticated, user } = useAuth()
+  
+  // Filter sidebar sections based on authentication and permissions
+  const visibleSections = React.useMemo(() => {
+    return globalSidebarData.filter(section => {
+      // Show home and projects to all authenticated users
+      if (section.id === 'home' || section.id === 'projects' || section.id === 'settings') {
+        return isAuthenticated
+      }
+      
+      // Show debug only to authenticated users with debug permissions
+      if (section.id === 'debug') {
+        const canAccessDebug = user?.role === 'admin' || user?.role === 'super_admin'
+        return isAuthenticated && canAccessDebug
+      }
+      
+      // Default: show to authenticated users
+      return isAuthenticated
+    })
+  }, [isAuthenticated, user?.role])
 
   return (
     <>
       {/* Desktop Global Sidebar */}
       <div
         className={cn(
-          // Hide on mobile, show on desktop
-          'fixed left-0 top-0 z-[100] hidden md:flex h-full flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border',
+          // Hide on mobile, show on desktop - participates in CSS Grid
+          'global-sidebar-desktop hidden md:flex h-full flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border',
           className
         )}
-        style={{ width: 'var(--global-sidebar-width)' }}
         {...props}
       >
         <div className="flex h-14 items-center justify-center border-b border-sidebar-border">
@@ -113,10 +134,10 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
             <VLogo />
           </Link>
         </div>
-        <div className="flex flex-1 flex-col items-center gap-1 p-2">
+        <div className="flex flex-1 flex-col items-center gap-2 p-2">
           {/* ⚡ PERFORMANCE: Increased delay to 800ms to prevent premature tooltip calculations */}
           <TooltipProvider delayDuration={800} skipDelayDuration={200}>
-            {globalSidebarData.map((section) => (
+            {visibleSections.map((section) => (
               <NavItem 
                 key={section.id}
                 sectionId={section.id}
@@ -136,7 +157,7 @@ export function GlobalSidebar({ className, ...props }: GlobalSidebarProps) {
         style={{ height: `${MOBILE_BOTTOM_NAV_HEIGHT}px` }}
       >
         <div className="flex items-center justify-around h-full px-1">
-          {globalSidebarData.map((section) => (
+          {visibleSections.map((section) => (
             <MobileNavItem 
               key={section.id}
               sectionId={section.id}

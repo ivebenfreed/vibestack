@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "globalEnv": ["PR_NUMBER", "SERVER_PORT", "WEB_PORT", "DB_PORT", "PROXY_PORT"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -8,29 +9,75 @@
     },
     "dev": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "ensure-docker:local": {
+      "cache": false,
+      "outputs": []
+    },
+    "dev:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "dev:debug": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:debug:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "dev:info": {
       "persistent": true,
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:info:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build", "ensure-docker:local"]
+    },
+    "dev:pr": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:pr:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build", "ensure-docker:local"]
+    },
+    "dev:no-logs": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "dev:no-logs:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["^build", "ensure-docker:local"]
     },
     "_start_servers_for_pwa_test": {
       "persistent": true,
       "cache": false
     },
+    "_start_servers_for_pwa_test:local": {
+      "persistent": true,
+      "cache": false,
+      "dependsOn": ["ensure-docker:local"]
+    },
     "lint": {
+      "outputs": []
+    },
+    "typecheck": {
       "outputs": []
     },
     "type-check": {
       "dependsOn": ["^check-types"]
-    },
-    "quality": {
-      "dependsOn": ["build"],
-      "outputs": []
     }
   }
 }

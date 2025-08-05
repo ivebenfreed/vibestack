@@ -13,6 +13,8 @@ import {
 import { User } from './User.js';
 import { Task } from './Task.js';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
+import { StatusSet } from './StatusSet.js';
+import { TagSet } from './TagSet.js';
 // No need for ServerOnly/ClientOnly decorators as this is a shared entity
 import { EnumTypeName } from '../utils/decorators.js';
 
@@ -76,4 +78,32 @@ export class Project extends BaseDomainEntity {
   
   @OneToMany(() => Task, (task) => task.project)
   tasks!: Promise<import('./Task.js').Task[]>;
+  
+  @ManyToMany(() => StatusSet, (statusSet) => statusSet.projects)
+  @JoinTable({
+    name: 'project_status_sets',
+    joinColumn: {
+      name: 'project_id',
+      referencedColumnName: 'id'
+    },
+    inverseJoinColumn: {
+      name: 'status_set_id',
+      referencedColumnName: 'id'
+    }
+  })
+  statusSets!: Promise<import('./StatusSet.js').StatusSet[]>;
+  
+  @ManyToMany(() => TagSet, (tagSet) => tagSet.projects)
+  @JoinTable({
+    name: 'project_tag_sets',
+    joinColumn: {
+      name: 'project_id',
+      referencedColumnName: 'id'
+    },
+    inverseJoinColumn: {
+      name: 'tag_set_id',
+      referencedColumnName: 'id'
+    }
+  })
+  tagSets!: Promise<import('./TagSet.js').TagSet[]>;
 } 

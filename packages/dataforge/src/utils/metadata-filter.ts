@@ -1,15 +1,34 @@
 import { getMetadataArgsStorage } from 'typeorm';
-import pkg from 'glob';
-const { glob } = pkg;
+import fs from 'fs/promises';
 import path from 'path';
-import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { isServerOnly, isClientOnly, isServerEntity, isClientEntity, METADATA_KEYS } from './context.js';
-
-const globPromise = promisify(glob);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PACKAGE_ROOT = path.resolve(__dirname, '../..');
+
+// Dynamic package root detection - find the directory containing package.json
+function findPackageRoot(startDir: string): string {
+    let currentDir = startDir;
+    while (currentDir !== path.dirname(currentDir)) {
+        const packageJsonPath = path.join(currentDir, 'package.json');
+        try {
+            const fs = require('fs');
+            if (fs.existsSync(packageJsonPath)) {
+                const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                if (packageJson.name === '@repo/dataforge') {
+                    return currentDir;
+                }
+            }
+        } catch (e) {
+            // Continue searching
+        }
+        currentDir = path.dirname(currentDir);
+    }
+    // Fallback to the original logic if package.json not found
+    return path.resolve(__dirname, '../..');
+}
+
+const PACKAGE_ROOT = findPackageRoot(__dirname);
 
 export class MetadataFilter {
     private readonly metadataStorage = getMetadataArgsStorage();
@@ -18,12 +37,24 @@ export class MetadataFilter {
      * Discover all entity files in the entities directory
      */
     async discoverEntities(): Promise<Function[]> {
-        const entityFiles = await globPromise(path.join(PACKAGE_ROOT, 'src/entities/**/*.{ts,js}'), {
-            ignore: ['**/*.test.ts', '**/*.spec.ts'],
-            absolute: true
-        });
+        console.log('PACKAGE_ROOT determined as:', PACKAGE_ROOT);
+        const entitiesDir = path.join(PACKAGE_ROOT, 'src/entities');
+        console.log('Searching entities in directory:', entitiesDir);
+        
+        console.log('About to read directory...');
+        const files = await fs.readdir(entitiesDir);
+        console.log('Directory read completed!');
+        
+        // Filter for TypeScript files, excluding test files and type definitions
+        const entityFiles = files
+            .filter(file => file.endsWith('.ts') && 
+                           !file.endsWith('.test.ts') && 
+                           !file.endsWith('.spec.ts') && 
+                           !file.endsWith('.d.ts') &&
+                           file !== 'index.ts')
+            .map(file => path.join(entitiesDir, file));
 
-        console.log('Found entity files:', entityFiles);
+        console.log(`Found ${entityFiles.length} entity files`);
         const entities: Function[] = [];
 
         for (const file of entityFiles) {

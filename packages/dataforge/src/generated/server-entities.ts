@@ -1,25 +1,51 @@
 // Generated server entities - DO NOT EDIT
 
 import { EntitySchema } from 'typeorm';
-import { BaseDomainEntity } from '../entities/BaseDomainEntity.js';
-import { BaseSystemEntity } from '../entities/BaseSystemEntity.js';
 
-// Enum Imports (dynamically generated)
-import { MigrationState, MigrationType } from '../entities/ClientMigration.js';
-import { ProjectStatus } from '../entities/Project.js';
-import { TaskPriority, TaskStatus } from '../entities/Task.js';
-import { UserRole } from '../entities/User.js';
+// Enum Definitions (embedded)
+export enum DependencyType {
+  FINISH_TO_START = 'finish-to-start',
+  START_TO_START = 'start-to-start',
+  FINISH_TO_FINISH = 'finish-to-finish',
+  START_TO_FINISH = 'start-to-finish',
+}
 
+export enum ProjectStatus {
+  ACTIVE = 'active',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  ON_HOLD = 'on_hold',
+}
 
-// Enum Exports
-export { MigrationState, MigrationType } from '../entities/ClientMigration.js';
-export { ProjectStatus } from '../entities/Project.js';
-export { TaskPriority, TaskStatus } from '../entities/Task.js';
-export { UserRole } from '../entities/User.js';
+export enum TaskStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+}
+
+export enum TaskPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
+export enum UserRole {
+  ADMIN = 'admin',
+  MEMBER = 'member',
+  VIEWER = 'viewer',
+  SUPER_ADMIN = 'super_admin',
+}
+
 
 
 // Generated Classes (for type checking and validation)
-export class Account extends BaseSystemEntity {
+export class Account {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   userId!: string;
 
   accountId!: string;
@@ -40,13 +66,17 @@ export class Account extends BaseSystemEntity {
 
   password?: string;
 
-  updatedAt!: Date;
-
-  user!: User;
+  user!: Promise<User>;
 
 }
 
-export class ChangeHistory extends BaseSystemEntity {
+export class ChangeHistory {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   lsn!: string;
 
   tableName!: string;
@@ -59,16 +89,16 @@ export class ChangeHistory extends BaseSystemEntity {
 
 }
 
-export class ClientMigration extends BaseSystemEntity {
+export class ClientMigration {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   migrationName!: string;
 
   schemaVersion!: string;
-
-  dependencies!: string[];
-
-  migrationType!: MigrationType;
-
-  state!: MigrationState;
 
   upQueries!: string[];
 
@@ -80,7 +110,15 @@ export class ClientMigration extends BaseSystemEntity {
 
 }
 
-export class Comment extends BaseDomainEntity {
+export class Comment {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   content!: string;
 
   authorId?: string;
@@ -91,24 +129,65 @@ export class Comment extends BaseDomainEntity {
 
   projectId?: string;
 
-  author?: User;
+  author?: Promise<User>;
 
-  parent?: Comment;
+  parent?: Promise<Comment>;
 
-  task?: Task;
+  task?: Promise<Task>;
 
-  project?: Project;
+  project?: Promise<Project>;
 
 }
 
-export class JWKS extends BaseSystemEntity {
+export class EntityDependency {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
+  entityType!: string;
+
+  predecessorId!: string;
+
+  successorId!: string;
+
+  type!: DependencyType;
+
+  lagTime?: any;
+
+  lagDays?: number;
+
+  metadata?: any;
+
+  description?: string;
+
+}
+
+export class JWKS {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   publicKey!: string;
 
   privateKey!: string;
 
 }
 
-export class Project extends BaseDomainEntity {
+export class Project {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   name!: string;
 
   description?: string;
@@ -117,15 +196,25 @@ export class Project extends BaseDomainEntity {
 
   ownerId?: string;
 
-  owner?: User;
+  owner?: Promise<User>;
 
-  members!: User[];
+  members!: Promise<User[]>;
 
-  tasks!: Task[];
+  tasks!: Promise<Task[]>;
+
+  statusSets!: Promise<StatusSet[]>;
+
+  tagSets!: Promise<TagSet[]>;
 
 }
 
-export class Session extends BaseSystemEntity {
+export class Session {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   userId!: string;
 
   token!: string;
@@ -136,18 +225,176 @@ export class Session extends BaseSystemEntity {
 
   userAgent?: string;
 
-  updatedAt!: Date;
-
-  user!: User;
+  user!: Promise<User>;
 
 }
 
-export class Task extends BaseDomainEntity {
+export class StatusDefinition {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
+  statusSetId!: string;
+
+  name!: string;
+
+  label!: string;
+
+  color!: string;
+
+  icon?: string;
+
+  variant?: string;
+
+  sortOrder!: number;
+
+  isDefault!: boolean;
+
+  isFinal!: boolean;
+
+  isActive!: boolean;
+
+  allowedTransitions?: string[];
+
+  autoTransitionDays?: number;
+
+  metadata!: any;
+
+  statusSet!: Promise<StatusSet>;
+
+  tasks!: Promise<Task[]>;
+
+}
+
+export class StatusSet {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
+  name!: string;
+
+  entityType!: string;
+
+  description?: string;
+
+  isSystem!: boolean;
+
+  isActive!: boolean;
+
+  defaultColor?: string;
+
+  displayOrder!: number;
+
+  metadata!: any;
+
+  statuses!: Promise<StatusDefinition[]>;
+
+  projects!: Promise<Project[]>;
+
+}
+
+export class Tag {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
+  tagSetId!: string;
+
+  name!: string;
+
+  slug!: string;
+
+  color!: string;
+
+  icon?: string;
+
+  variant!: string;
+
+  sortOrder!: number;
+
+  parentId?: string;
+
+  isActive!: boolean;
+
+  usageCount!: number;
+
+  lastUsedAt?: Date;
+
+  metadata!: any;
+
+  tagSet!: Promise<TagSet>;
+
+  parent?: Promise<Tag>;
+
+  children!: Promise<Tag[]>;
+
+  tasks!: Promise<Task[]>;
+
+}
+
+export class TagSet {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
+  name!: string;
+
+  description?: string;
+
+  category?: string;
+
+  isSystem!: boolean;
+
+  isActive!: boolean;
+
+  defaultColor!: string;
+
+  displayOrder!: number;
+
+  isExclusive!: boolean;
+
+  maxTags?: number;
+
+  metadata!: any;
+
+  tags!: Promise<Tag[]>;
+
+  projects!: Promise<Project[]>;
+
+}
+
+export class Task {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   title!: string;
 
   description?: string;
 
-  status!: TaskStatus;
+  legacyStatus?: TaskStatus;
+
+  statusId?: string;
 
   priority!: TaskPriority;
 
@@ -161,23 +408,35 @@ export class Task extends BaseDomainEntity {
 
   estimatedDuration?: any;
 
-  tags!: string[];
+  legacyTags?: string[];
 
   projectId?: string;
 
   assigneeId?: string;
 
-  project?: Project;
+  status!: Promise<StatusDefinition>;
 
-  assignee?: User;
+  tags!: Promise<Tag[]>;
 
-  dependencies!: Task[];
+  project?: Promise<Project>;
 
-  tasksDependentOnThis!: Task[];
+  assignee?: Promise<User>;
+
+  dependencies!: Promise<Task[]>;
+
+  tasksDependentOnThis!: Promise<Task[]>;
 
 }
 
-export class User extends BaseDomainEntity {
+export class User {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
+  clientId?: string;
+
   name!: string;
 
   email!: string;
@@ -188,26 +447,30 @@ export class User extends BaseDomainEntity {
 
   role!: UserRole;
 
-  tasks!: Task[];
+  tasks!: Promise<Task[]>;
 
-  ownedProjects!: Project[];
+  ownedProjects!: Promise<Project[]>;
 
-  memberProjects!: Project[];
+  memberProjects!: Promise<Project[]>;
 
-  sessions!: Session[];
+  sessions!: Promise<Session[]>;
 
-  accounts!: Account[];
+  accounts!: Promise<Account[]>;
 
 }
 
-export class Verification extends BaseSystemEntity {
+export class Verification {
+  id!: string;
+
+  createdAt!: Date;
+
+  updatedAt!: Date;
+
   identifier!: string;
 
   value!: string;
 
   expiresAt!: Date;
-
-  updatedAt!: Date;
 
 }
 
@@ -267,11 +530,6 @@ export const AccountSchema = new EntitySchema<Account>({
             name: 'password', // Explicit DB Name
             type: 'text', // Use helper
             nullable: true
-        },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
         }
     },
     relations: {
@@ -334,23 +592,6 @@ export const ClientMigrationSchema = new EntitySchema<ClientMigration>({
         'schemaVersion': {
             name: 'schema_version', // Explicit DB Name
             type: 'text', // Use helper
-        },
-        'dependencies': {
-            name: 'dependencies', // Explicit DB Name
-            type: 'text', // Use helper
-            default: [],
-            array: true
-        },
-        'migrationType': {
-            name: 'migration_type', // Explicit DB Name
-            type: 'enum', // Use helper
-            enum: MigrationType, // Use name from decorator
-        },
-        'state': {
-            name: 'state', // Explicit DB Name
-            type: 'enum', // Use helper
-            default: "pending",
-            enum: MigrationState, // Use name from decorator
         },
         'upQueries': {
             name: 'up_queries', // Explicit DB Name
@@ -439,6 +680,63 @@ export const CommentSchema = new EntitySchema<Comment>({
     },
 });
 
+// Schema for EntityDependency
+export const EntityDependencySchema = new EntitySchema<EntityDependency>({
+    target: EntityDependency, // Link to generated class
+    name: 'EntityDependency', 
+    tableName: 'entity_dependencies',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        updatedAt: { name: 'updated_at', type: 'timestamptz', updateDate: true },
+        clientId: { name: 'client_id', type: 'uuid', nullable: true },
+        'entityType': {
+            name: 'entity_type', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 50
+        },
+        'predecessorId': {
+            name: 'predecessor_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+        },
+        'successorId': {
+            name: 'successor_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+        },
+        'type': {
+            name: 'dependency_type', // Explicit DB Name
+            type: 'enum', // Use helper
+            default: "finish-to-start",
+            enum: DependencyType, // Use name from decorator
+        },
+        'lagTime': {
+            name: 'lag_time', // Explicit DB Name
+            type: 'interval', // Use helper
+            nullable: true,
+            comment: 'Positive values delay successor, negative values allow overlap'
+        },
+        'lagDays': {
+            name: 'lag_days', // Explicit DB Name
+            type: 'integer', // Use helper
+            nullable: true,
+            comment: 'Lag time in days. Positive = delay, negative = lead time'
+        },
+        'metadata': {
+            name: 'metadata', // Explicit DB Name
+            type: 'jsonb', // Use helper
+            nullable: true,
+            comment: 'Optional entity-specific metadata'
+        },
+        'description': {
+            name: 'description', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
+        }
+    },
+    relations: {
+    },
+});
+
 // Schema for JWKS
 export const JWKSSchema = new EntitySchema<JWKS>({
     target: JWKS, // Link to generated class
@@ -514,6 +812,26 @@ export const ProjectSchema = new EntitySchema<Project>({
             target: 'Task', // Target Entity Name (String)
             type: 'one-to-many',
             inverseSide: 'project'
+        },
+        'statusSets': {
+            target: 'StatusSet', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'projects',
+            joinTable: {
+                name: 'project_status_sets',
+                joinColumns: [{ name: 'project_id', referencedColumnName: 'id' }],
+                inverseJoinColumns: [{ name: 'status_set_id', referencedColumnName: 'id' }],
+            }
+        },
+        'tagSets': {
+            target: 'TagSet', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'projects',
+            joinTable: {
+                name: 'project_tag_sets',
+                joinColumns: [{ name: 'project_id', referencedColumnName: 'id' }],
+                inverseJoinColumns: [{ name: 'tag_set_id', referencedColumnName: 'id' }],
+            }
         }
     },
 });
@@ -548,11 +866,6 @@ export const SessionSchema = new EntitySchema<Session>({
             name: 'user_agent', // Explicit DB Name
             type: 'text', // Use helper
             nullable: true
-        },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
         }
     },
     relations: {
@@ -560,6 +873,341 @@ export const SessionSchema = new EntitySchema<Session>({
             target: 'User', // Target Entity Name (String)
             type: 'many-to-one',
             joinColumn: { name: 'user_id' }
+        }
+    },
+});
+
+// Schema for StatusDefinition
+export const StatusDefinitionSchema = new EntitySchema<StatusDefinition>({
+    target: StatusDefinition, // Link to generated class
+    name: 'StatusDefinition', 
+    tableName: 'status_definitions',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        updatedAt: { name: 'updated_at', type: 'timestamptz', updateDate: true },
+        clientId: { name: 'client_id', type: 'uuid', nullable: true },
+        'statusSetId': {
+            name: 'status_set_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+        },
+        'name': {
+            name: 'name', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 50
+        },
+        'label': {
+            name: 'label', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 100
+        },
+        'color': {
+            name: 'color', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 7
+        },
+        'icon': {
+            name: 'icon', // Explicit DB Name
+            type: 'varchar', // Use helper
+            nullable: true,
+            length: 50
+        },
+        'variant': {
+            name: 'variant', // Explicit DB Name
+            type: 'varchar', // Use helper
+            nullable: true,
+            length: 20
+        },
+        'sortOrder': {
+            name: 'sort_order', // Explicit DB Name
+            type: 'int', // Use helper
+        },
+        'isDefault': {
+            name: 'is_default', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: false
+        },
+        'isFinal': {
+            name: 'is_final', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: false
+        },
+        'isActive': {
+            name: 'is_active', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: true
+        },
+        'allowedTransitions': {
+            name: 'allowed_transitions', // Explicit DB Name
+            type: 'uuid', // Use helper
+            nullable: true,
+            array: true
+        },
+        'autoTransitionDays': {
+            name: 'auto_transition_days', // Explicit DB Name
+            type: 'int', // Use helper
+            nullable: true
+        },
+        'metadata': {
+            name: 'metadata', // Explicit DB Name
+            type: 'jsonb', // Use helper
+            default: {}
+        }
+    },
+    relations: {
+        'statusSet': {
+            target: 'StatusSet', // Target Entity Name (String)
+            type: 'many-to-one',
+            inverseSide: 'statuses',
+            joinColumn: { name: 'status_set_id' }
+        },
+        'tasks': {
+            target: 'Task', // Target Entity Name (String)
+            type: 'one-to-many',
+            inverseSide: 'status'
+        }
+    },
+});
+
+// Schema for StatusSet
+export const StatusSetSchema = new EntitySchema<StatusSet>({
+    target: StatusSet, // Link to generated class
+    name: 'StatusSet', 
+    tableName: 'status_sets',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        updatedAt: { name: 'updated_at', type: 'timestamptz', updateDate: true },
+        clientId: { name: 'client_id', type: 'uuid', nullable: true },
+        'name': {
+            name: 'name', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 100
+        },
+        'entityType': {
+            name: 'entityType', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 50
+        },
+        'description': {
+            name: 'description', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
+        },
+        'isSystem': {
+            name: 'isSystem', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: false
+        },
+        'isActive': {
+            name: 'isActive', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: true
+        },
+        'defaultColor': {
+            name: 'default_color', // Explicit DB Name
+            type: 'varchar', // Use helper
+            nullable: true,
+            length: 7
+        },
+        'displayOrder': {
+            name: 'display_order', // Explicit DB Name
+            type: 'int', // Use helper
+            default: 0
+        },
+        'metadata': {
+            name: 'metadata', // Explicit DB Name
+            type: 'jsonb', // Use helper
+            default: {}
+        }
+    },
+    relations: {
+        'statuses': {
+            target: 'StatusDefinition', // Target Entity Name (String)
+            type: 'one-to-many',
+            inverseSide: 'statusSet'
+        },
+        'projects': {
+            target: 'Project', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'statusSets'
+        }
+    },
+});
+
+// Schema for Tag
+export const TagSchema = new EntitySchema<Tag>({
+    target: Tag, // Link to generated class
+    name: 'Tag', 
+    tableName: 'tags',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        updatedAt: { name: 'updated_at', type: 'timestamptz', updateDate: true },
+        clientId: { name: 'client_id', type: 'uuid', nullable: true },
+        'tagSetId': {
+            name: 'tag_set_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+        },
+        'name': {
+            name: 'name', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 50
+        },
+        'slug': {
+            name: 'slug', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 50,
+            unique: true
+        },
+        'color': {
+            name: 'color', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 7
+        },
+        'icon': {
+            name: 'icon', // Explicit DB Name
+            type: 'varchar', // Use helper
+            nullable: true,
+            length: 50
+        },
+        'variant': {
+            name: 'variant', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 20,
+            default: "solid"
+        },
+        'sortOrder': {
+            name: 'sort_order', // Explicit DB Name
+            type: 'int', // Use helper
+            default: 0
+        },
+        'parentId': {
+            name: 'parent_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+            nullable: true
+        },
+        'isActive': {
+            name: 'is_active', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: true
+        },
+        'usageCount': {
+            name: 'usage_count', // Explicit DB Name
+            type: 'int', // Use helper
+            default: 0
+        },
+        'lastUsedAt': {
+            name: 'last_used_at', // Explicit DB Name
+            type: 'timestamptz', // Use helper
+            nullable: true
+        },
+        'metadata': {
+            name: 'metadata', // Explicit DB Name
+            type: 'jsonb', // Use helper
+            default: {}
+        }
+    },
+    relations: {
+        'tagSet': {
+            target: 'TagSet', // Target Entity Name (String)
+            type: 'many-to-one',
+            inverseSide: 'tags',
+            joinColumn: { name: 'tag_set_id' }
+        },
+        'parent': {
+            target: 'Tag', // Target Entity Name (String)
+            type: 'many-to-one',
+            inverseSide: 'children',
+            joinColumn: { name: 'parent_id' },
+            nullable: true
+        },
+        'children': {
+            target: 'Tag', // Target Entity Name (String)
+            type: 'one-to-many',
+            inverseSide: 'parent'
+        },
+        'tasks': {
+            target: 'Task', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'tags'
+        }
+    },
+});
+
+// Schema for TagSet
+export const TagSetSchema = new EntitySchema<TagSet>({
+    target: TagSet, // Link to generated class
+    name: 'TagSet', 
+    tableName: 'tag_sets',
+    columns: {
+        id: { name: 'id', type: 'uuid', primary: true, generated: 'uuid' },
+        createdAt: { name: 'created_at', type: 'timestamptz', createDate: true },
+        updatedAt: { name: 'updated_at', type: 'timestamptz', updateDate: true },
+        clientId: { name: 'client_id', type: 'uuid', nullable: true },
+        'name': {
+            name: 'name', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 100
+        },
+        'description': {
+            name: 'description', // Explicit DB Name
+            type: 'text', // Use helper
+            nullable: true
+        },
+        'category': {
+            name: 'category', // Explicit DB Name
+            type: 'varchar', // Use helper
+            nullable: true,
+            length: 50
+        },
+        'isSystem': {
+            name: 'is_system', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: false
+        },
+        'isActive': {
+            name: 'is_active', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: true
+        },
+        'defaultColor': {
+            name: 'default_color', // Explicit DB Name
+            type: 'varchar', // Use helper
+            length: 7,
+            default: "#94a3b8"
+        },
+        'displayOrder': {
+            name: 'display_order', // Explicit DB Name
+            type: 'int', // Use helper
+            default: 0
+        },
+        'isExclusive': {
+            name: 'is_exclusive', // Explicit DB Name
+            type: 'boolean', // Use helper
+            default: false
+        },
+        'maxTags': {
+            name: 'max_tags', // Explicit DB Name
+            type: 'int', // Use helper
+            nullable: true
+        },
+        'metadata': {
+            name: 'metadata', // Explicit DB Name
+            type: 'jsonb', // Use helper
+            default: {}
+        }
+    },
+    relations: {
+        'tags': {
+            target: 'Tag', // Target Entity Name (String)
+            type: 'one-to-many',
+            inverseSide: 'tagSet'
+        },
+        'projects': {
+            target: 'Project', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'tagSets'
         }
     },
 });
@@ -584,11 +1232,17 @@ export const TaskSchema = new EntitySchema<Task>({
             type: 'text', // Use helper
             nullable: true
         },
-        'status': {
-            name: 'status', // Explicit DB Name
+        'legacyStatus': {
+            name: 'legacy_status', // Explicit DB Name
             type: 'enum', // Use helper
+            nullable: true,
             default: "open",
             enum: TaskStatus, // Use name from decorator
+        },
+        'statusId': {
+            name: 'status_id', // Explicit DB Name
+            type: 'uuid', // Use helper
+            nullable: true
         },
         'priority': {
             name: 'priority', // Explicit DB Name
@@ -621,9 +1275,10 @@ export const TaskSchema = new EntitySchema<Task>({
             type: 'interval', // Use helper
             nullable: true
         },
-        'tags': {
-            name: 'tags', // Explicit DB Name
+        'legacyTags': {
+            name: 'legacy_tags', // Explicit DB Name
             type: 'text', // Use helper
+            nullable: true,
             default: [],
             array: true
         },
@@ -639,6 +1294,22 @@ export const TaskSchema = new EntitySchema<Task>({
         }
     },
     relations: {
+        'status': {
+            target: 'StatusDefinition', // Target Entity Name (String)
+            type: 'many-to-one',
+            inverseSide: 'tasks',
+            joinColumn: { name: 'status_id' }
+        },
+        'tags': {
+            target: 'Tag', // Target Entity Name (String)
+            type: 'many-to-many',
+            inverseSide: 'tasks',
+            joinTable: {
+                name: 'task_tags',
+                joinColumns: [{ name: 'task_id', referencedColumnName: 'id' }],
+                inverseJoinColumns: [{ name: 'tag_id', referencedColumnName: 'id' }],
+            }
+        },
         'project': {
             target: 'Project', // Target Entity Name (String)
             type: 'many-to-one',
@@ -758,11 +1429,6 @@ export const VerificationSchema = new EntitySchema<Verification>({
         'expiresAt': {
             name: 'expires_at', // Explicit DB Name
             type: 'timestamptz', // Use helper
-        },
-        'updatedAt': {
-            name: 'updated_at', // Explicit DB Name
-            type: 'timestamptz', // Use helper
-            updateDate: true
         }
     },
     relations: {
@@ -777,9 +1443,14 @@ export const serverEntities = [
   ChangeHistorySchema,
   ClientMigrationSchema,
   CommentSchema,
+  EntityDependencySchema,
   JWKSSchema,
   ProjectSchema,
   SessionSchema,
+  StatusDefinitionSchema,
+  StatusSetSchema,
+  TagSchema,
+  TagSetSchema,
   TaskSchema,
   UserSchema,
   VerificationSchema,
@@ -788,7 +1459,12 @@ export const serverEntities = [
 // domain tables for server context
 export const SERVER_DOMAIN_TABLES = [
   '"comments"',
+  '"entity_dependencies"',
   '"projects"',
+  '"status_definitions"',
+  '"status_sets"',
+  '"tags"',
+  '"tag_sets"',
   '"tasks"',
   '"users"',
 ];
@@ -801,9 +1477,14 @@ export const SERVER_DOMAIN_TABLES = [
  */
 export const SERVER_DOMAIN_TABLE_HIERARCHY = {
   '"users"': 0,
+  '"status_sets"': 0,
+  '"status_definitions"': 1,
   '"projects"': 1,
   '"tasks"': 2,
   '"comments"': 3,
+  '"entity_dependencies"': 0,
+  '"tag_sets"': 0,
+  '"tags"': 1,
 } as const;
 
 // system tables for server context
@@ -823,17 +1504,28 @@ export const SERVER_UTILITY_TABLES = [
 // Junction tables for server context
 export const SERVER_JUNCTION_TABLES = [
   '"project_members"',
+  '"project_status_sets"',
+  '"project_tag_sets"',
   '"task_dependencies"',
+  '"task_tags"',
 ];
 
 // Combined entity and junction tables for replication tracking
 export const SERVER_TRACKED_TABLES = [
   '"comments"',
+  '"entity_dependencies"',
   '"projects"',
+  '"status_definitions"',
+  '"status_sets"',
+  '"tags"',
+  '"tag_sets"',
   '"tasks"',
   '"users"',
   '"project_members"',
+  '"project_status_sets"',
+  '"project_tag_sets"',
   '"task_dependencies"',
+  '"task_tags"',
 ];
 
 // Junction table mapping for relationship transformation
@@ -841,17 +1533,41 @@ export const SERVER_JUNCTION_TABLE_MAPPING = {
   "project_members": {
     sourceEntity: 'Project',
     sourceTable: '"projects"',
-    sourceColumn: 'project_id',
+    sourceColumn: 'projectId',
     targetEntity: 'User',
-    targetColumn: 'user_id',
+    targetColumn: 'userId',
     relationName: 'members'
+  },
+  "project_status_sets": {
+    sourceEntity: 'Project',
+    sourceTable: '"projects"',
+    sourceColumn: 'projectId',
+    targetEntity: 'StatusSet',
+    targetColumn: 'statusSetId',
+    relationName: 'statusSets'
+  },
+  "project_tag_sets": {
+    sourceEntity: 'Project',
+    sourceTable: '"projects"',
+    sourceColumn: 'projectId',
+    targetEntity: 'TagSet',
+    targetColumn: 'tagSetId',
+    relationName: 'tagSets'
+  },
+  "task_tags": {
+    sourceEntity: 'Task',
+    sourceTable: '"tasks"',
+    sourceColumn: 'taskId',
+    targetEntity: 'Tag',
+    targetColumn: 'tagId',
+    relationName: 'tags'
   },
   "task_dependencies": {
     sourceEntity: 'Task',
     sourceTable: '"tasks"',
-    sourceColumn: 'dependent_task_id',
+    sourceColumn: 'dependentTaskId',
     targetEntity: 'Task',
-    targetColumn: 'dependency_task_id',
+    targetColumn: 'dependencyTaskId',
     relationName: 'dependencies'
   },
 } as const;
@@ -919,6 +1635,9 @@ export const SERVER_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
     ],
     customValidators: [],
   },
+  'entitydependencys': {
+    customValidators: [],
+  },
   'projects': {
     requiredReferences: [
       {
@@ -931,9 +1650,23 @@ export const SERVER_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
       {
         junctionTable: 'project_members',
         relationName: 'members',
-        sourceColumn: 'project_id',
-        targetColumn: 'user_id',
+        sourceColumn: 'projectId',
+        targetColumn: 'userId',
         targetEntity: 'users',
+      },
+      {
+        junctionTable: 'project_status_sets',
+        relationName: 'statusSets',
+        sourceColumn: 'projectId',
+        targetColumn: 'statusSetId',
+        targetEntity: 'statussets',
+      },
+      {
+        junctionTable: 'project_tag_sets',
+        relationName: 'tagSets',
+        sourceColumn: 'projectId',
+        targetColumn: 'tagSetId',
+        targetEntity: 'tagsets',
       },
     ],
     customValidators: [],
@@ -947,8 +1680,43 @@ export const SERVER_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
     ],
     customValidators: [],
   },
+  'statusdefinitions': {
+    requiredReferences: [
+      {
+        field: 'statusSetId',
+        targetEntity: 'statussets',
+      },
+    ],
+    customValidators: [],
+  },
+  'statussets': {
+    customValidators: [],
+  },
+  'tags': {
+    requiredReferences: [
+      {
+        field: 'tagSetId',
+        targetEntity: 'tagsets',
+      },
+    ],
+    selfReferences: [
+      {
+        field: 'parentId',
+        allowCycles: false,
+        maxDepth: 5,
+      },
+    ],
+    customValidators: [],
+  },
+  'tagsets': {
+    customValidators: [],
+  },
   'tasks': {
     requiredReferences: [
+      {
+        field: 'statusId',
+        targetEntity: 'statusdefinitions',
+      },
       {
         field: 'projectId',
         targetEntity: 'projects',
@@ -962,10 +1730,17 @@ export const SERVER_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
     ],
     junctionRelationships: [
       {
+        junctionTable: 'task_tags',
+        relationName: 'tags',
+        sourceColumn: 'taskId',
+        targetColumn: 'tagId',
+        targetEntity: 'tags',
+      },
+      {
         junctionTable: 'task_dependencies',
         relationName: 'dependencies',
-        sourceColumn: 'dependent_task_id',
-        targetColumn: 'dependency_task_id',
+        sourceColumn: 'dependentTaskId',
+        targetColumn: 'dependencyTaskId',
         targetEntity: 'tasks',
       },
     ],

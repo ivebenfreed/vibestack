@@ -22,6 +22,7 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
   }
 
   // ========== STANDARD CRUD OPERATIONS ==========
+  // These methods are used by the sync system and preserve clientId
 
   /**
    * Find all entities of this type
@@ -130,6 +131,68 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
   async delete(id: string): Promise<boolean> {
     const result = await this.neonService.delete(this.entityClass, { id } as FindOptionsWhere<T>);
     return (result.affected !== null && result.affected !== undefined && result.affected > 0);
+  }
+
+  // ========== SYSTEM-SPECIFIC OPERATIONS ==========
+  // These methods are used by the API layer and always clear clientId
+
+  /**
+   * System update - explicitly sets clientId to null
+   * Used by API endpoints, cron jobs, and admin operations
+   */
+  async systemUpdate(id: string, data: DeepPartial<T>): Promise<T | null> {
+    // Ensure clientId is explicitly set to null for system updates
+    const systemData = { ...data, clientId: null } as DeepPartial<T>;
+    return await this.update(id, systemData);
+  }
+
+  /**
+   * System create - explicitly sets clientId to null
+   * Used by API endpoints, cron jobs, and admin operations
+   */
+  async systemCreate(data: DeepPartial<T>): Promise<T> {
+    // Ensure clientId is explicitly set to null for system creates
+    const systemData = { ...data, clientId: null } as DeepPartial<T>;
+    return await this.create(systemData);
+  }
+
+  /**
+   * System bulk update - clears clientId for all updates
+   * Used by API endpoints for batch operations
+   */
+  async bulkSystemUpdate(updates: Array<{id: string, data: DeepPartial<T>}>): Promise<T[]> {
+    const results: T[] = [];
+    
+    for (const { id, data } of updates) {
+      const updated = await this.systemUpdate(id, data);
+      if (updated) {
+        results.push(updated);
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * System bulk upsert - clears clientId for all entities
+   * Used by API endpoints for batch insert/update operations
+   */
+  async systemBulkUpsert(entities: DeepPartial<T>[]): Promise<T[]> {
+    // Clear clientId from all entities
+    const systemEntities = entities.map(entity => ({
+      ...entity,
+      clientId: null
+    })) as DeepPartial<T>[];
+    
+    return await this.bulkUpsert(systemEntities);
+  }
+
+  /**
+   * System delete - same as regular delete but included for consistency
+   * Delete operations don't need special handling for clientId
+   */
+  async systemDelete(id: string): Promise<boolean> {
+    return await this.delete(id);
   }
 
   // ========== BULK OPERATIONS FOR SYNC PERFORMANCE ==========
@@ -427,6 +490,6 @@ export abstract class BaseServerRepository<T extends { id: string; updated_at?: 
     
     // Fallback to lowercase class name
     const match = className.match(/class\s+(\w+)/);
-    return match ? match[1].toLowerCase() + 's' : 'unknown';
+    return match?.[1] ? match[1].toLowerCase() + 's' : 'unknown';
   }
 } 

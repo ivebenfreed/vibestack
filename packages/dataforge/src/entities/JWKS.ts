@@ -28,5 +28,5 @@ export class JWKS extends BaseSystemEntity {
   privateKey!: string;
 
   @CreateDateColumn({ type: 'timestamptz' })
-  createdAt!: Date;
+  override createdAt!: Date;
 } 

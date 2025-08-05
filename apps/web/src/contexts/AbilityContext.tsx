@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 // Adjust import paths as necessary
 import { AppAbility, defineAbilityFor } from '../lib/ability';
-import { useAuth } from '../state-machines/orchestrator-hooks';
+import { useAuth } from '@/state-machines';
 
 const defaultAbility = defineAbilityFor(null);
 export const AbilityContext = createContext<AppAbility>(defaultAbility);

@@ -36,7 +36,7 @@ interface TableChange {
 }
 
 type SrvMessageType = 'srv_send_changes' | 'srv_catchup_changes' | 'srv_live_changes' | 'srv_init_start' | 'srv_init_changes' | 'srv_init_complete' | 'srv_heartbeat' | 'srv_error' | 'srv_state_change' | 'srv_lsn_update' | 'srv_changes_received' | 'srv_changes_applied' | 'srv_sync_completed' | 'srv_catchup_completed' | 'srv_live_start' | 'srv_sync_stats' | 'srv_integrity_reset' | 'srv_integrity_validation_response';
-type CltMessageType = 'clt_sync_request' | 'clt_send_changes' | 'clt_heartbeat' | 'clt_error' | 'clt_changes_received' | 'clt_changes_applied' | 'clt_init_received' | 'clt_init_processed' | 'clt_catchup_received' | 'clt_integrity_validation' | 'clt_integrity_reset_ack';
+type CltMessageType = 'clt_sync_request' | 'clt_send_changes' | 'clt_heartbeat' | 'clt_error' | 'clt_changes_received' | 'clt_changes_applied' | 'clt_init_received' | 'clt_init_processed' | 'clt_catchup_received' | 'clt_integrity_validation' | 'clt_integrity_baseline_validation' | 'clt_integrity_reset_ack';
 interface BaseMessage {
     messageId: string;
     timestamp: number;
@@ -53,6 +53,7 @@ interface ServerChangesMessage extends ServerMessage {
         chunk: number;
         total: number;
     };
+    isConflictResolution?: boolean;
 }
 interface ServerInitChangesMessage extends ServerMessage {
     type: 'srv_init_changes';
@@ -66,6 +67,7 @@ interface ServerInitChangesMessage extends ServerMessage {
 interface ServerInitStartMessage extends ServerMessage {
     type: 'srv_init_start';
     serverLSN: string;
+    resuming?: boolean;
 }
 interface ServerInitCompleteMessage extends ServerMessage {
     type: 'srv_init_complete';
@@ -136,6 +138,8 @@ interface ServerIntegrityValidationResponseMessage extends ServerMessage {
     recommendedAction: 'none' | 'catchup' | 'reset';
     serverFingerprints: Record<string, any>;
     validationTimestamp: number;
+    rollbackToLSN?: string;
+    rollbackReason?: string;
 }
 /**
  * Message sent when a client connects and is already up-to-date,

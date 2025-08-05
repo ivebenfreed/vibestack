@@ -1,13 +1,43 @@
 import React from 'react'
 import { useSelector } from '@xstate/store/react'
-import { projectsAtom } from '@/domain/project'
+import { projectsAtom } from '@/domain-xstate/project'
 import { Dot } from 'lucide-react'
 import { Link, useLocation } from '@tanstack/react-router'
-import { useSidebar } from '@/components/ui/sidebar'
-import {
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-} from '@/components/ui/sidebar'
+import { useDualSidebar } from '@/components/layout/dual-sidebar/DualSidebarProvider'
+// Using custom sidebar components that work with DualSidebarProvider
+function SidebarMenuSubItem({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="group/menu-sub-item relative">
+      {children}
+    </li>
+  )
+}
+
+function SidebarMenuSubButton({ 
+  children, 
+  isActive = false, 
+  asChild = false 
+}: { 
+  children: React.ReactNode
+  isActive?: boolean
+  asChild?: boolean
+}) {
+  const buttonClasses = 'sidebar-menu-sub-button w-full'
+  
+  if (asChild) {
+    return (
+      <div className={buttonClasses} data-active={isActive}>
+        {children}
+      </div>
+    )
+  }
+  
+  return (
+    <button className={buttonClasses} data-active={isActive}>
+      {children}
+    </button>
+  )
+}
 
 interface SidebarProjectItemProps {
   projectId: string
@@ -18,7 +48,7 @@ interface SidebarProjectItemProps {
  * Uses individual project selector for surgical updates (like table rows)
  */
 export const SidebarProjectItem = React.memo<SidebarProjectItemProps>(({ projectId }) => {
-  const { setOpenMobile } = useSidebar()
+  const { setMobileSheetOpen } = useDualSidebar()
   const href = useLocation({ select: (location) => location.href })
   
   // 🎯 SURGICAL: Read from individual project via useSelector - only re-renders when THIS project changes
@@ -43,11 +73,12 @@ export const SidebarProjectItem = React.memo<SidebarProjectItemProps>(({ project
       >
         <Link 
           to={`/projects/${project.id}`} 
-          onClick={() => setOpenMobile(false)}
+          onClick={() => setMobileSheetOpen(false)}
           preload={false} // ⚡ PERFORMANCE: Disable preloading to prevent click handler violations
+          className="flex items-center gap-2 w-full min-h-[2rem]"
         >
-          <Dot />
-          <span>{project.name}</span>
+          <Dot className="h-4 w-4 shrink-0" />
+          <span className="truncate">{project.name}</span>
         </Link>
       </SidebarMenuSubButton>
     </SidebarMenuSubItem>

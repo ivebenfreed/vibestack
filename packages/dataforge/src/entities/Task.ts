@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, ManyToMany, JoinTable, JoinColumn, Check } from 'typeorm';
+import { Entity, Column, ManyToOne, ManyToMany, OneToMany, JoinTable, JoinColumn, Check } from 'typeorm';
 import { 
   IsString, 
   MinLength, 
@@ -9,13 +9,16 @@ import {
   Min, 
   IsArray, 
   IsUUID,
-  MaxLength
+  MaxLength,
+  IsBoolean
 } from 'class-validator';
 // Import User and Project for use in decorators
 // The Relation wrapper will handle circular dependencies
 import { User } from './User.js';
 import { Project } from './Project.js';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
+import { StatusDefinition } from './StatusDefinition.js';
+import { Tag } from './Tag.js';
 // No need for ServerOnly/ClientOnly decorators as this is a shared entity
 import { EnumTypeName } from '../utils/decorators.js'; // Import the new decorator
 
@@ -54,10 +57,22 @@ export class Task extends BaseDomainEntity {
   @MaxLength(5000, { message: "Description cannot exceed 5000 characters" })
   description?: string;
   
-  @Column({ type: "enum", enum: TaskStatus, default: TaskStatus.OPEN })
+  // Legacy status field - will be removed after migration
+  @Column({ type: "enum", enum: TaskStatus, default: TaskStatus.OPEN, nullable: true, name: 'legacy_status' })
+  @IsOptional()
   @IsEnum(TaskStatus)
   @EnumTypeName({ name: 'TaskStatus', sourcePath: './Task' })
-  status!: TaskStatus;
+  legacyStatus?: TaskStatus;
+  
+  // New status relationship
+  @Column({ type: 'uuid', nullable: true, name: 'status_id' })
+  @IsOptional()
+  @IsUUID()
+  statusId?: string;
+  
+  @ManyToOne(() => StatusDefinition, status => status.tasks)
+  @JoinColumn({ name: 'status_id' })
+  status?: StatusDefinition;
   
   @Column({ type: "enum", enum: TaskPriority, default: TaskPriority.MEDIUM })
   @IsEnum(TaskPriority)
@@ -87,10 +102,21 @@ export class Task extends BaseDomainEntity {
   @IsOptional()
   estimatedDuration?: string;
   
-  @Column("text", { array: true, default: [] })
+  // Legacy tags field - will be removed after migration
+  @Column("text", { array: true, default: [], nullable: true, name: 'legacy_tags' })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  tags!: string[];
+  legacyTags?: string[];
+  
+  // New tags relationship
+  @ManyToMany(() => Tag, tag => tag.tasks)
+  @JoinTable({
+    name: 'task_tags',
+    joinColumn: { name: 'task_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' }
+  })
+  tags!: Tag[];
   
   @Column({ type: "uuid", name: "project_id", nullable: true })
   @IsOptional()
@@ -111,7 +137,7 @@ export class Task extends BaseDomainEntity {
   @JoinColumn({ name: "assignee_id" })
   assignee?: Promise<import('./User.js').User>;
   
-  @ManyToMany(() => Task, task => task.tasksDependentOnThis) // Updated to point to the new inverse property
+  @ManyToMany(() => Task, task => task.tasksDependentOnThis)
   @JoinTable({
     name: 'task_dependencies',
     joinColumn: { name: 'dependent_task_id', referencedColumnName: 'id' },

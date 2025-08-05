@@ -11,8 +11,7 @@ import {
   SERVER_JUNCTION_TABLE_MAPPING,
   getEntityRelationships,
   hasRelationshipConfig,
-  getJunctionRelationships,
-  type RelationshipConfig
+  getJunctionRelationships
 } from '@repo/dataforge/server-entities';
 
 const MODULE_NAME = 'entity-operations';
@@ -101,7 +100,7 @@ export class EntityOperations {
           if (changes.length > 1) {
             return this.executeBatchInsert(table, changes);
           } else {
-            const result = await this.executeInsert(table, changes[0].data as RecordData);
+            const result = await this.executeInsert(table, changes[0]?.data as RecordData);
             return result ? [result] : [];
           }
         case 'update':
@@ -136,15 +135,15 @@ export class EntityOperations {
       
       try {
         const result = await Promise.race([
-          executor(table, changes[0].data as RecordData),
+          executor(table, changes[0]?.data as RecordData),
           timeoutPromise
         ]);
         return result ? [result] : [];
       } catch (error) {
         syncLogger.error(`Single operation timed out or failed: ${error instanceof Error ? error.message : String(error)}`, {
           table,
-          operation: changes[0].operation,
-          id: (changes[0].data as RecordData).id,
+          operation: changes[0]?.operation,
+          id: (changes[0]?.data as RecordData)?.id,
           timestamp: new Date().toISOString()
         }, MODULE_NAME);
         return [];
@@ -228,7 +227,7 @@ export class EntityOperations {
         throw new ValidationError(`No repository found for table: ${table}`);
       }
 
-      // Clean the data - remove metadata and relationship fields
+      // Clean the data - remove metadata and relationship fields but preserve clientId
       const { 
         metadata, 
         entityRelations, 
@@ -237,6 +236,11 @@ export class EntityOperations {
         relationship_updates,
         ...insertData 
       } = data as any;
+      
+      // Ensure clientId is preserved for anti-echo filtering
+      if (data.clientId && !insertData.clientId) {
+        insertData.clientId = data.clientId;
+      }
       
       // Data is already in camelCase from client - just ensure date fields are Date objects
       const transformedData = this.ensureDateObjects(insertData);
@@ -331,8 +335,19 @@ export class EntityOperations {
         ...updateData 
       } = data as any;
       
+      // Ensure clientId is preserved for anti-echo filtering
+      if (data.clientId && !updateData.clientId) {
+        updateData.clientId = data.clientId;
+      }
+      
       // Clean snake_case duplicates first, then ensure date objects
-      const cleanedData = this.ensureDateObjects(updateData);
+      const processedData = this.ensureDateObjects(updateData);
+      
+      // Separate relationship fields from regular entity fields
+      const relationshipFields = ['tags', 'dependencies', 'tasksDependentOnThis', 'members', 'statusSets', 'tagSets'];
+      const { entityFieldsData, relationshipFieldsData } = this.separateRelationshipFields(processedData, relationshipFields);
+      
+      const cleanedData = entityFieldsData;
 
       syncLogger.debug('Data processing for update operation', {
         table,
@@ -428,6 +443,16 @@ export class EntityOperations {
         }
       }
 
+      // Log what data is being sent to the repository
+      syncLogger.info(`About to call repository.update with data`, {
+        table,
+        id,
+        dataKeys: Object.keys(cleanedData),
+        hasClientId: !!cleanedData.clientId,
+        clientIdValue: cleanedData.clientId,
+        updatedAtValue: cleanedData.updatedAt
+      }, MODULE_NAME);
+
       // Try direct update first (preferred for explicit update operations)
       const result = await repository.update(id, cleanedData);
       
@@ -438,8 +463,23 @@ export class EntityOperations {
         resultType: typeof result
       }, MODULE_NAME);
       
+      // Log successful direct update
+      if (result) {
+        syncLogger.info(`Update operation succeeded: ${table}:${id}`, {
+          table,
+          id,
+          operation: 'update',
+          success: true
+        }, MODULE_NAME);
+        
+        // Handle relationship field updates if present
+        await this.processRelationshipFieldUpdates(table, id, relationshipFieldsData);
+        
+        return result;
+      }
+      
       // Enhanced: If entity doesn't exist, fall back to upsert for better CRDT handling
-      if (!result) {
+      else {
         syncLogger.warn(`Update operation failed - entity not found: ${table}:${id}. Attempting upsert fallback.`, {
           table,
           id,
@@ -482,6 +522,9 @@ export class EntityOperations {
               id,
               resultType: typeof upsertResult
             }, MODULE_NAME);
+            
+            // Handle relationship field updates if present
+            await this.processRelationshipFieldUpdates(table, id, relationshipFieldsData);
             
             return upsertResult;
           } else {
@@ -676,7 +719,7 @@ export class EntityOperations {
       }
 
       // Use the universal relationship remover
-      await this.removeUniversalRelationship(sourceRepo, sourceId, relationName, targetId);
+      await this.removeUniversalRelationship(sourceRepo, sourceId || '', relationName, targetId || '');
       
       // Return synthetic record for consistency
       return {
@@ -698,7 +741,7 @@ export class EntityOperations {
   private async executeBatchInsert(table: string, changes: TableChange[]): Promise<any[]> {
     if (changes.length === 0) return [];
     if (changes.length === 1) {
-      const result = await this.executeInsert(table, changes[0].data as RecordData);
+      const result = await this.executeInsert(table, changes[0]?.data as RecordData);
       return result ? [result] : [];
     }
     
@@ -887,7 +930,7 @@ export class EntityOperations {
           relationName: relUpdate.relationName,
           operation: relUpdate.operation,
           targetCount: relUpdate.targetIds.length,
-          junctionTable: relationshipConfig.junctionTable,
+          junctionTable: relationshipConfig?.junctionTable,
           skipValidation
         }, MODULE_NAME);
         
@@ -898,7 +941,7 @@ export class EntityOperations {
           relationName: relUpdate.relationName,
           operation: relUpdate.operation,
           targetCount: relUpdate.targetIds.length,
-          junctionTable: relationshipConfig.junctionTable,
+          junctionTable: relationshipConfig?.junctionTable,
           error: error instanceof Error ? error.message : String(error)
         }, MODULE_NAME);
         throw error;
@@ -1110,6 +1153,85 @@ export class EntityOperations {
         
         throw new Error(`Repository method not found for removing relationship '${relationName}'`);
       }
+    }
+  }
+
+  /**
+   * Separate relationship fields from regular entity fields
+   * This prevents TypeORM from trying to update many-to-many relationships directly
+   */
+  private separateRelationshipFields(
+    data: Record<string, any>, 
+    relationshipFieldNames: string[]
+  ): { entityFieldsData: Record<string, any>; relationshipFieldsData: Record<string, any> } {
+    const entityFieldsData: Record<string, any> = {};
+    const relationshipFieldsData: Record<string, any> = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (relationshipFieldNames.includes(key)) {
+        relationshipFieldsData[key] = value;
+        syncLogger.debug(`Separated relationship field from entity update`, {
+          field: key,
+          hasValue: value !== undefined && value !== null,
+          valueType: Array.isArray(value) ? 'array' : typeof value,
+          arrayLength: Array.isArray(value) ? value.length : undefined
+        }, MODULE_NAME);
+      } else {
+        entityFieldsData[key] = value;
+      }
+    }
+    
+    return { entityFieldsData, relationshipFieldsData };
+  }
+
+  /**
+   * Process relationship field updates by converting them to relationship update format
+   * and using the universal relationship handling system
+   */
+  private async processRelationshipFieldUpdates(
+    table: string, 
+    entityId: string, 
+    relationshipFieldsData: Record<string, any>
+  ): Promise<void> {
+    const relationshipUpdates = Object.entries(relationshipFieldsData)
+      .filter(([key, value]) => value !== undefined && value !== null)
+      .map(([relationName, relationshipData]) => {
+        // Convert relationship field data to relationship update format
+        let targetIds: string[];
+        
+        if (Array.isArray(relationshipData)) {
+          // Handle array of objects or IDs
+          targetIds = relationshipData.map(item => 
+            typeof item === 'string' ? item : item.id
+          ).filter(id => id); // Remove any undefined/null IDs
+        } else {
+          // Handle single relationship (shouldn't happen for many-to-many, but be safe)
+          targetIds = [];
+          syncLogger.warn(`Unexpected non-array relationship data for many-to-many field`, {
+            table,
+            entityId,
+            relationName,
+            dataType: typeof relationshipData
+          }, MODULE_NAME);
+        }
+        
+        return {
+          relationName,
+          operation: 'set' as const, // Always use 'set' operation for field updates
+          targetIds
+        };
+      });
+    
+    if (relationshipUpdates.length > 0) {
+      syncLogger.debug(`Processing relationship field updates`, {
+        table,
+        entityId,
+        updateCount: relationshipUpdates.length,
+        relations: relationshipUpdates.map(ru => `${ru.relationName}:${ru.targetIds.length}`)
+      }, MODULE_NAME);
+      
+      // Use existing relationship update processing with validation skipped
+      await this.processEntityRelationshipUpdates(table, entityId, relationshipUpdates, true);
     }
   }
 

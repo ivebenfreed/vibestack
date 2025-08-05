@@ -1,7 +1,6 @@
 import React from 'react';
-import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
+import { useSync } from '@/state-machines';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSyncVisualizationState } from '../hooks/useSyncVisualizationState';
 import { SyncVisualizationCore } from './SyncVisualizationCore';
 
 interface SyncVisualizerProps {
@@ -9,24 +8,27 @@ interface SyncVisualizerProps {
 }
 
 export function SyncVisualizer({ className }: SyncVisualizerProps) {
-  const { isOnline } = useOrchestrator();
-  const syncMachineState = useSyncMachine();
-  
-  // Destructure from the sync machine state
-  const { 
-    syncPhase, 
-    syncProgress,
-    syncPhaseProgress,
-    isLiveSync,
+  const {
+    clientId,
     currentLSN,
+    syncPhase,
+    isConnected,
+    error,
     isInitialSync,
     isCatchupSync,
-    machineState,
+    isLiveSync,
+    isError,
     isConnecting,
+    isIdle,
+    machineState,
+    syncPhaseProgress,
     statusText
-  } = syncMachineState;
+  } = useSync();
   
-  const { errorInfo } = useSyncVisualizationState();
+  // Map sync machine data to component state
+  const isOnline = isConnected;
+  const syncProgress = 0; // TODO: Extract from syncPhaseProgress if needed
+  const errorInfo = error;
 
   // Format sync status display
   const getSyncStatusDisplay = () => {

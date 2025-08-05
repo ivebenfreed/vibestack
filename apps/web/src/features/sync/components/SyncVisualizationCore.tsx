@@ -1,18 +1,36 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useSyncVisualizationState } from '../hooks/useSyncVisualizationState';
+import { useSync } from '@/state-machines';
 
 interface SyncVisualizationCoreProps {
   className?: string; // Allow className for the container
 }
 
 export function SyncVisualizationCore({ className }: SyncVisualizationCoreProps) {
-  // Get state from the custom hook
-  const { 
-    currentConnectionState, 
-    outgoingStatus, 
-    incomingStatus 
-  } = useSyncVisualizationState();
+  // Get state from sync machine
+  const {
+    isConnected,
+    error,
+    isInitialSync,
+    isCatchupSync,
+    isLiveSync,
+    isError,
+    isConnecting,
+    isIdle
+  } = useSync();
+  
+  // Map sync machine state to visualization states
+  const currentConnectionState = isError ? 'error' :
+    isIdle ? 'disconnected' :
+    isConnecting ? 'connecting' :
+    isInitialSync ? 'initial' :
+    isCatchupSync ? 'catchup' :
+    isLiveSync ? 'live' :
+    'connecting';
+    
+  // TODO: Could be enhanced with actual message flow tracking
+  const outgoingStatus = 'idle';
+  const incomingStatus = 'idle';
 
   // Enhanced connection line animations with more visual interest
   const connectionVariants = {

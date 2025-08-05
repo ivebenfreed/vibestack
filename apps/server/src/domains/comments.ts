@@ -1,191 +1,136 @@
-import { Client } from '@neondatabase/serverless';
-import { Comment } from "@repo/dataforge/server-entities";
-import { validate } from "class-validator";
-import { FindOptionsWhere, DeepPartial } from 'typeorm';
-import { NeonService } from '../lib/neon-orm/neon-service';
-import { BaseServerRepository } from './BaseServerRepository';
-import type { Context } from 'hono';
-import type { Env } from '../types/env';
+// Comment repository and domain functions
+import { Comment as _Comment } from "@repo/dataforge/server-entities";
+import type { Comment as _CommentType } from "@repo/dataforge/server-entities";
+import { BaseServerRepository } from "./BaseServerRepository.js";
+import { NeonService } from '../lib/neon-orm/neon-service.js';
 
-// Simplified type definitions
-type CommentInstance = Comment;
-
-// Input types for API
-export type CommentCreateInput = Partial<Omit<CommentInstance, 'id' | 'created_at' | 'updated_at'>>;
-export type CommentUpdateInput = Partial<CommentCreateInput>;
+// Re-export the Comment type
+export { _Comment as Comment };
 
 /**
- * CommentRepository class that extends BaseServerRepository
- * Provides both base repository functionality and comment-specific methods
+ * Comment repository with server-specific query methods.
+ * Handles comment operations including task and project associations.
  */
-export class CommentRepository extends BaseServerRepository<Comment> {
-  
+export class CommentRepository extends BaseServerRepository<_CommentType> {
   constructor(neonService: NeonService) {
-    super(neonService, Comment);
+    super(neonService, _Comment as any);
   }
 
   /**
-   * Find comments by task ID
+   * Find all comments for a specific task.
+   * @param taskId - The ID of the task to find comments for
+   * @returns Array of comments associated with the task
    */
-  async findByTaskId(taskId: string): Promise<Comment[]> {
-    return await this.neonService.find(Comment, { taskId } as FindOptionsWhere<Comment>);
+  async findByTaskId(taskId: string): Promise<_CommentType[]> {
+    const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
+    return await queryBuilder
+      .where('comment.taskId = :taskId', { taskId })
+      .orderBy('comment.createdAt', 'DESC')
+      .getMany();
   }
 
   /**
-   * Find comments by project ID
+   * Find all comments for a specific project.
+   * @param projectId - The ID of the project to find comments for
+   * @returns Array of comments associated with the project
    */
-  async findByProjectId(projectId: string): Promise<Comment[]> {
-    return await this.neonService.find(Comment, { projectId } as FindOptionsWhere<Comment>);
+  async findByProjectId(projectId: string): Promise<_CommentType[]> {
+    const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
+    return await queryBuilder
+      .where('comment.projectId = :projectId', { projectId })
+      .orderBy('comment.createdAt', 'DESC')
+      .getMany();
   }
 
   /**
-   * Find comments by author ID
+   * Find replies to a specific comment.
+   * @param parentId - The ID of the parent comment
+   * @returns Array of reply comments
    */
-  async findByAuthorId(authorId: string): Promise<Comment[]> {
-    return await this.neonService.find(Comment, { authorId } as FindOptionsWhere<Comment>);
+  async findReplies(parentId: string): Promise<_CommentType[]> {
+    const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
+    const replies = await queryBuilder
+      .where('comment.parentId = :parentId', { parentId })
+      .orderBy('comment.createdAt', 'ASC')
+      .getMany();
+
+    // Recursively find replies to replies
+    const allReplies: _CommentType[] = [];
+    for (const reply of replies) {
+      allReplies.push(reply);
+      const subReplies = await this.findReplies(reply.id);
+      allReplies.push(...subReplies);
+    }
+
+    return allReplies;
   }
 
   /**
-   * Find comments with multiple filters
+   * Delete a comment and all its replies.
+   * @param commentId - The ID of the comment to delete
+   * @returns Number of comments deleted
    */
-  async findWithFilters(filters: { taskId?: string; projectId?: string; authorId?: string }): Promise<Comment[]> {
-    const queryBuilder = await this.neonService.createQueryBuilder(Comment, 'comment');
+  async deleteWithReplies(commentId: string): Promise<number> {
+    const replies = await this.findReplies(commentId);
+    const idsToDelete = [commentId, ...replies.map(r => r.id)];
     
-    if (filters.taskId) {
-      queryBuilder.where('comment.taskId = :taskId', { taskId: filters.taskId });
+    // Use NeonService to delete multiple entities
+    let deleted = 0;
+    for (const id of idsToDelete) {
+      const result = await this.neonService.delete(this.entityClass, { id });
+      if (result) deleted++;
+    }
+    return deleted;
+  }
+
+  /**
+   * Create a new comment.
+   * @param commentData - The comment data
+   * @returns The created comment
+   */
+  async createComment(commentData: Partial<_CommentType>): Promise<_CommentType> {
+    return await this.create(commentData);
+  }
+
+  /**
+   * Update an existing comment.
+   * @param commentId - The ID of the comment to update
+   * @param updates - The updates to apply
+   * @returns The updated comment
+   */
+  async updateComment(commentId: string, updates: Partial<_CommentType>): Promise<_CommentType | null> {
+    await this.update(commentId, updates);
+    return await this.findById(commentId);
+  }
+
+  /**
+   * Find a comment with its author information.
+   * @param commentId - The ID of the comment
+   * @returns The comment with author relation loaded
+   */
+  async findWithAuthor(commentId: string): Promise<_CommentType | null> {
+    const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
+    return await queryBuilder
+      .leftJoinAndSelect('comment.author', 'author')
+      .where('comment.id = :commentId', { commentId })
+      .getOne();
+  }
+
+  /**
+   * Count comments for a specific entity.
+   * @param entityType - Type of entity ('task' or 'project')
+   * @param entityId - The ID of the entity
+   * @returns The count of comments
+   */
+  async countByEntity(entityType: 'task' | 'project', entityId: string): Promise<number> {
+    const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
+    
+    if (entityType === 'task') {
+      queryBuilder.where('comment.taskId = :entityId', { entityId });
+    } else {
+      queryBuilder.where('comment.projectId = :entityId', { entityId });
     }
     
-    if (filters.projectId) {
-      const condition = filters.taskId ? 'comment.projectId = :projectId' : 'comment.projectId = :projectId';
-      queryBuilder.andWhere(condition, { projectId: filters.projectId });
-    }
-    
-    if (filters.authorId) {
-      const condition = (filters.taskId || filters.projectId) ? 'comment.authorId = :authorId' : 'comment.authorId = :authorId';
-      queryBuilder.andWhere(condition, { authorId: filters.authorId });
-    }
-    
-    queryBuilder.orderBy('comment.createdAt', 'DESC');
-    return await queryBuilder.getMany();
-  }
-
-  /**
-   * Create a new comment with validation
-   */
-  async createComment(data: CommentCreateInput): Promise<Comment> {
-    // Validate that either taskId or projectId is provided
-    if (!data.taskId && !data.projectId) {
-      throw new Error('Validation failed: Either taskId or projectId must be provided');
-    }
-    
-    // Create a new comment entity
-    const comment = new Comment();
-    Object.assign(comment, data);
-    
-    // Validate the comment
-    const errors = await validate(comment, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Insert and return the comment
-    return await this.neonService.insert(Comment, data as DeepPartial<Comment>);
-  }
-
-  /**
-   * Update a comment with validation
-   */
-  async updateComment(id: string, data: CommentUpdateInput): Promise<Comment | null> {
-    // Create comment for validation
-    const comment = new Comment();
-    Object.assign(comment, { id, ...data });
-    
-    // Validate comment
-    const errors = await validate(comment, { skipMissingProperties: true });
-    if (errors.length > 0) {
-      throw new Error(`Validation failed: ${JSON.stringify(errors)}`);
-    }
-    
-    // Update the comment using TypeORM
-    await this.neonService.update(Comment, { id } as FindOptionsWhere<Comment>, data as DeepPartial<Comment>);
-    
-    // Return the updated comment
-    return await this.findById(id);
-  }
-
-  /**
-   * Delete comment
-   */
-  async deleteComment(id: string): Promise<boolean> {
-    const result = await this.neonService.delete(Comment, { id } as FindOptionsWhere<Comment>);
-    return (result.affected !== null && result.affected !== undefined && result.affected > 0);
+    return await queryBuilder.getCount();
   }
 }
-
-// Helper to create a NeonService instance from a Neon client
-const createServiceFromClient = (client: Client): NeonService => {
-  // Create a minimal mock of Hono context with the client
-  // First cast to unknown to avoid strict type checking errors
-  const context = {
-    req: { neon: client },
-    env: { DATABASE_URL: "neon-client://internal" },
-    // Add minimal implementations of required methods/properties
-    finalized: false,
-    error: null,
-    get executionCtx() { return null; },
-    get event() { return null; }
-  } as unknown as any;
-  
-  return new NeonService(context);
-};
-
-// Legacy compatibility layer (not used yet but included for consistency)
-export const commentQueries = {
-  findAll: async (client: Client): Promise<CommentInstance[]> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.findAll();
-  },
-
-  findById: async (client: Client, id: string): Promise<CommentInstance | null> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.findById(id);
-  },
-
-  findByTaskId: async (client: Client, taskId: string): Promise<CommentInstance[]> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.findByTaskId(taskId);
-  },
-
-  findByProjectId: async (client: Client, projectId: string): Promise<CommentInstance[]> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.findByProjectId(projectId);
-  },
-
-  findByAuthorId: async (client: Client, authorId: string): Promise<CommentInstance[]> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.findByAuthorId(authorId);
-  },
-
-  create: async (client: Client, data: CommentCreateInput): Promise<CommentInstance> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.createComment(data);
-  },
-
-  update: async (client: Client, id: string, data: CommentUpdateInput): Promise<CommentInstance | null> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.updateComment(id, data);
-  },
-
-  delete: async (client: Client, id: string): Promise<boolean> => {
-    const neonService = createServiceFromClient(client);
-    const repo = new CommentRepository(neonService);
-    return await repo.deleteComment(id);
-  }
-}; 

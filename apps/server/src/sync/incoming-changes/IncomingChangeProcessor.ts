@@ -28,7 +28,8 @@ export class IncomingChangeProcessor {
     private client: Client,
     private messageHandler: WebSocketHandler,
     private env: { DATABASE_URL: string; NODE_ENV?: string },
-    private config: SyncConfig = DEFAULT_SYNC_CONFIG
+    private config: SyncConfig = DEFAULT_SYNC_CONFIG,
+    private broadcastConflicts?: (changes: TableChange[], originClientId: string) => Promise<void>
   ) {
     this.conflictResolver = new ConflictResolver(config);
     this.entityOperations = new EntityOperations(client, env, this.conflictResolver);
@@ -48,7 +49,7 @@ export class IncomingChangeProcessor {
       await this.setStatementTimeout();
       
       // Extract change IDs for acknowledgment
-      const changeIds = changes.map(change => (change.data as any).id);
+      const changeIds = changes.map(change => (change?.data as any).id);
       
       // Send received acknowledgment first
       try {
@@ -64,19 +65,24 @@ export class IncomingChangeProcessor {
       // Deduplicate changes
       const optimizedChangesResult = deduplicateChanges(changes);
       
-      // Process changes
-      const results = await this.processAllChanges(optimizedChangesResult.changes);
+      // Process changes and detect conflicts
+      const { results, conflictedChanges } = await this.processAllChanges(optimizedChangesResult.changes);
       
-      // Summarize results
+      // Summarize results and extract error context
       const summary = this.summarizeResults(results);
+      const affectedTables = [...new Set(optimizedChangesResult.changes.map(c => c.table))];
       
-      // Send applied acknowledgment
+      // Send applied acknowledgment with error context
       try {
         await this.sendChangesApplied(
           clientId, 
           changeIds,
           summary.allSuccessful,
-          summary.lastError
+          summary.lastError,
+          summary.lastError ? {
+            affectedTables,
+            failedChangeCount: optimizedChangesResult.changes.length - summary.appliedCount
+          } : undefined
         );
       } catch (appliedError) {
         syncLogger.error(`Failed to send applied acknowledgment for client ${clientId}`, {
@@ -85,20 +91,63 @@ export class IncomingChangeProcessor {
         }, MODULE_NAME);
       }
       
+      // Trigger rebroadcast for conflicts with isConflictResolution flag
+      if (conflictedChanges.length > 0 && this.broadcastConflicts) {
+        try {
+          await this.broadcastConflicts(conflictedChanges, clientId);
+          syncLogger.info(`Rebroadcast triggered for ${conflictedChanges.length} CRDT conflicts`, {
+            clientId,
+            conflictCount: conflictedChanges.length,
+            conflictTables: [...new Set(conflictedChanges.map(c => c.table))]
+          }, MODULE_NAME);
+        } catch (broadcastError) {
+          syncLogger.error(`Failed to rebroadcast CRDT conflicts for client ${clientId}`, {
+            clientId,
+            conflictCount: conflictedChanges.length,
+            error: broadcastError instanceof Error ? broadcastError.message : String(broadcastError)
+          }, MODULE_NAME);
+        }
+      }
+      
       // Log completion summary
       syncLogger.info(`Completed processing ${optimizedChangesResult.changes.length} changes for client ${clientId}`, {
         clientId,
         appliedCount: summary.appliedCount,
         skippedCount: summary.skippedCount,
+        conflictCount: conflictedChanges.length,
         success: summary.allSuccessful
       }, MODULE_NAME);
     } catch (error) {
       syncLogger.error(`Processing failed for client ${clientId}`, {
         clientId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       }, MODULE_NAME);
       
-      // Send error response
+      // Extract affected tables from the changes
+      const affectedTables = [...new Set(changes.map(c => c.table))];
+      
+      // Send proper error acknowledgment via srv_changes_applied
+      try {
+        await this.sendChangesApplied(
+          clientId,
+          changes.map(change => (change?.data as any).id),
+          false, // success = false
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            affectedTables,
+            failedChangeCount: changes.length
+          }
+        );
+      } catch (ackError) {
+        syncLogger.error(`Failed to send error acknowledgment to client ${clientId}`, {
+          clientId,
+          originalError: error instanceof Error ? error.message : String(error),
+          ackError: ackError instanceof Error ? ackError.message : String(ackError)
+        }, MODULE_NAME);
+      }
+      
+      // Also send srv_error for backwards compatibility
       try {
         await this.sendError(clientId, error instanceof Error ? error : new Error(String(error)));
       } catch (errorSendError) {
@@ -114,16 +163,21 @@ export class IncomingChangeProcessor {
   
   /**
    * Process all changes using the EntityOperations module
+   * Returns both results and changes that encountered CRDT conflicts
    */
-  private async processAllChanges(changes: TableChange[]): Promise<ExecutionResult[]> {
+  private async processAllChanges(changes: TableChange[]): Promise<{
+    results: ExecutionResult[];
+    conflictedChanges: TableChange[];
+  }> {
     // Group changes by table and operation
     const groups = this.groupChangesByTableAndOperation(changes);
     const results: ExecutionResult[] = [];
+    const conflictedChanges: TableChange[] = [];
     const processingMap = new Map<string, boolean>(); // Track which changes were processed
     
     // Track all changes by ID for conflict detection
     for (const change of changes) {
-      const data = change.data as any;
+      const data = change?.data as any;
       processingMap.set(data.id, false); // Initially mark all as unprocessed
     }
     
@@ -136,11 +190,27 @@ export class IncomingChangeProcessor {
           group.changes
         );
         
-        // Mark successful changes
-        for (const result of batchResults) {
+        // Mark successful changes and detect conflicts
+        for (let i = 0; i < group.changes.length; i++) {
+          const change = group.changes[i];
+          const result = batchResults[i];
+          const changeId = (change?.data as any).id;
+          
           if (result && result.id) {
-            processingMap.set(result.id, true); // Mark as processed
+            processingMap.set(changeId, true); // Mark as processed
             results.push({ success: true, data: result });
+          } else if (result === null) {
+            // null result indicates CRDT conflict
+            if (change) conflictedChanges.push(change);
+            processingMap.set(changeId, true); // Mark as processed (but conflicted)
+            results.push({ success: true, data: null, skipped: true });
+            
+            syncLogger.info(`CRDT conflict detected during save`, {
+              table: change?.table,
+              operation: change?.operation,
+              entityId: changeId,
+              clientId: change?.clientId
+            }, MODULE_NAME);
           }
         }
       } catch (error) {
@@ -154,7 +224,7 @@ export class IncomingChangeProcessor {
         
         // Mark as failed but continue processing other groups
         for (const change of group.changes) {
-          const data = change.data as any;
+          const data = change?.data as any;
           if (!processingMap.get(data.id)) {
             results.push({ 
               success: false, 
@@ -174,7 +244,7 @@ export class IncomingChangeProcessor {
       }
     }
     
-    return results;
+    return { results, conflictedChanges };
   }
   
   /**
@@ -195,7 +265,7 @@ export class IncomingChangeProcessor {
     
     // Group changes by table and operation
     for (const change of changes) {
-      const key = `${change.table}:${change.operation}`;
+      const key = `${change?.table}:${change?.operation}`;
       if (!groupMap.has(key)) {
         groupMap.set(key, []);
       }
@@ -205,7 +275,7 @@ export class IncomingChangeProcessor {
     // Convert to array of groups
     for (const [key, changes] of groupMap.entries()) {
       const [table, operation] = key.split(':');
-      groups.push({ table, operation, changes });
+      groups.push({ table: table || '', operation: operation || '', changes });
     }
     
     return groups;
@@ -229,16 +299,16 @@ export class IncomingChangeProcessor {
       clientId,
       messageId: message.messageId,
       changes: changes.map((change, index) => {
-        const data = change.data as any;
+        const data = change?.data as any;
         return {
           index: index + 1,
-          table: change.table,
-          operation: change.operation,
+          table: change?.table,
+          operation: change?.operation,
           entityId: data.id,
-          hasRelationshipUpdates: !!(change.relationshipUpdates && change.relationshipUpdates.length > 0),
-          relationshipUpdatesCount: change.relationshipUpdates?.length || 0,
-          hasEntityRelations: !!(change.entityRelations && change.entityRelations.length > 0),
-          updatedAt: change.updatedAt,
+          hasRelationshipUpdates: !!(change?.relationshipUpdates && change?.relationshipUpdates.length > 0),
+          relationshipUpdatesCount: change?.relationshipUpdates?.length || 0,
+          hasEntityRelations: !!(change?.entityRelations && change?.entityRelations.length > 0),
+          updatedAt: change?.updatedAt,
           dataKeys: Object.keys(data)
         };
       })
@@ -253,16 +323,21 @@ export class IncomingChangeProcessor {
     const summary: Record<string, Record<string, number>> = {};
     
     for (const change of changes) {
-      if (!summary[change.table]) {
-        summary[change.table] = {};
+      const tableName = change?.table;
+      const operation = change?.operation;
+      
+      if (!tableName || !operation) continue;
+      
+      if (!summary[tableName]) {
+        summary[tableName] = {};
       }
       
       // Determine the type of change more accurately
-      let changeType: string = change.operation;
+      let changeType: string = operation;
       
       // For updates, check if this is a pure relationship update
-      if (change.operation === 'update' && change.relationshipUpdates && change.relationshipUpdates.length > 0) {
-        const data = change.data as any;
+      if (operation === 'update' && change?.relationshipUpdates && change?.relationshipUpdates.length > 0) {
+        const data = change?.data as any;
         
         // Check if there are actual entity fields to update (beyond id, clientId, updatedAt)
         const entityFields = Object.keys(data).filter(key => 
@@ -278,10 +353,15 @@ export class IncomingChangeProcessor {
         }
       }
       
-      if (!summary[change.table][changeType]) {
-        summary[change.table][changeType] = 0;
+      if (changeType && summary[tableName]) {
+        const tableEntry = summary[tableName];
+        if (tableEntry) {
+          if (!tableEntry[changeType]) {
+            tableEntry[changeType] = 0;
+          }
+          tableEntry[changeType] = (tableEntry[changeType] || 0) + 1;
+        }
       }
-      summary[change.table][changeType]++;
     }
     
     return summary;
@@ -349,8 +429,28 @@ export class IncomingChangeProcessor {
     clientId: string,
     changeIds: string[],
     success: boolean,
-    error?: Error
+    error?: Error,
+    errorContext?: {
+      affectedTables?: string[];
+      failedChangeCount?: number;
+      errorType?: 'database' | 'validation' | 'conflict' | 'unknown';
+    }
   ): Promise<void> {
+    // Create structured error information
+    let errorInfo: string | undefined;
+    if (error) {
+      const errorData = {
+        message: error.message,
+        type: errorContext?.errorType || this.classifyError(error),
+        details: {
+          affectedTables: errorContext?.affectedTables || [],
+          failedChangeCount: errorContext?.failedChangeCount || changeIds.length,
+          stack: this.env.NODE_ENV === 'development' ? error.stack : undefined
+        }
+      };
+      errorInfo = JSON.stringify(errorData);
+    }
+
     const message: ServerAppliedMessage = {
       type: 'srv_changes_applied',
       messageId: `srv_${Date.now()}`,
@@ -358,7 +458,7 @@ export class IncomingChangeProcessor {
       clientId,
       appliedChanges: changeIds,
       success,
-      error: error?.message
+      error: errorInfo
     };
 
     try {
@@ -396,6 +496,25 @@ export class IncomingChangeProcessor {
     }
   }
   
+  /**
+   * Classify error type based on error message/type
+   */
+  private classifyError(error: Error): 'database' | 'validation' | 'conflict' | 'unknown' {
+    const message = error.message.toLowerCase();
+    
+    if (error instanceof DatabaseError || message.includes('database') || message.includes('constraint')) {
+      return 'database';
+    }
+    if (error instanceof ValidationError || message.includes('validation') || message.includes('invalid')) {
+      return 'validation';
+    }
+    if (error instanceof CRDTConflictError || message.includes('conflict') || message.includes('crdt')) {
+      return 'conflict';
+    }
+    
+    return 'unknown';
+  }
+
   /**
    * Set statement timeout
    */

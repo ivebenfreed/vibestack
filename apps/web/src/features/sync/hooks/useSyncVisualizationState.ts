@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOrchestrator, useSyncMachine } from '@/state-machines/orchestrator-hooks';
+import { useAppInit, useSystem } from '@/state-machines';
 import { SyncManager, SyncState } from '@/sync/SyncManager';
 
 export type FlowStatus = 'idle' | 'sending' | 'receiving' | 'acknowledged' | 'processed' | 'error' | 'timeout';
@@ -24,8 +24,23 @@ export interface SyncVisualizationState {
 }
 
 export function useSyncVisualizationState(): SyncVisualizationState {
-  const { isOnline } = useOrchestrator();
-  const sync = useSyncMachine();
+  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  const { isSystemReady } = useSystem();
+  
+  // Map v2 data to legacy sync machine structure
+  const isOnline = connectionStatus === 'connected';
+  const sync = {
+    currentLSN: null, // Not available in v2
+    error: syncError,
+    isError: !!syncError,
+    isConnecting: connectionStatus === 'connecting',
+    isInitialSync: connectionStatus === 'connecting' && !isSyncReady,
+    isCatchupSync: false, // Not available in v2
+    isLiveSync: isSyncReady && liveChangesStatus === 'connected',
+    isIdle: connectionStatus === 'disconnected',
+    syncPhase: isSyncReady ? 'live' : 'connecting',
+    machineState: connectionStatus
+  };
   
   const [currentLsn, setCurrentLsn] = useState<string>('0/0');
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
@@ -198,10 +213,10 @@ export function useSyncVisualizationState(): SyncVisualizationState {
   return {
     isOnline,
     
-    // Use sync machine data
+    // Use mapped sync data
     syncPhase: sync.syncPhase || 'idle',
     isSyncLive: sync.isLiveSync,
-    currentLSN: sync.currentLSN,
+    currentLSN: sync.currentLSN || '0/0',
     isInitialSync: sync.isInitialSync,
     isCatchupSync: sync.isCatchupSync,
     isLiveSync: sync.isLiveSync,

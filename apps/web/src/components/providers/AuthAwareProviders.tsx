@@ -1,31 +1,40 @@
 import React from 'react'
-import { useAuth } from '@/hooks/useSimpleAuth'
-import { VibestackPGliteProvider } from '../../db/pglite-provider'
+// import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
+import { VibestackDexieProvider } from '../../db/dexie-provider'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
-import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
-// 🔥 UPDATED: No longer need to create actor here - it's provided at root level
-import { useOrchestrator } from '@/state-machines/orchestrator-hooks'
+// 🔥 UPDATED: Use V2 orchestrator hooks
+import { useAuth } from '@/state-machines'
 
 // Auth-aware wrapper component for database and sync services
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth() // Use new simple hook (one clean dependency)
+  const { isAuthenticated, isCheckingAuth, isSigningOut } = useAuth()
   
-  if (isAuthenticated) {
+  // 🔥 SIMPLIFIED: Just check auth state - no triple checking with orchestrator
+  // When auth completes, it directly triggers init via event
+  console.log('[AuthAwareProviders] Auth state:', { 
+    isAuthenticated, 
+    isCheckingAuth,
+    isSigningOut,
+    shouldMountDatabase: isAuthenticated && !isCheckingAuth && !isSigningOut
+  });
+  
+  // Simple rule: mount database when authenticated and not checking or signing out
+  if (isAuthenticated && !isCheckingAuth && !isSigningOut) {
     return (
-      <VibestackPGliteProvider>
+      <VibestackDexieProvider>
         <AbilityProvider>
           <AppLayout>{children}</AppLayout>
         </AbilityProvider>
-      </VibestackPGliteProvider>
+      </VibestackDexieProvider>
     )
   }
   
-  // Unauthenticated: Simpler layout without database/sync providers
+  // Unauthenticated, auth check in progress, or signing out: Don't render children during sign-out
   return (
     <AbilityProvider>
       <PublicLayout>
-        {children}
+        {isSigningOut ? null : children}
       </PublicLayout>
     </AbilityProvider>
   )
@@ -36,7 +45,6 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen">
       <NavigationProgress />
-      <UnifiedLoadingScreen />
       <div className="flex flex-1 relative">
         <div className="flex-1">
           {children}

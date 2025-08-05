@@ -1,32 +1,26 @@
-import { useAuth } from '@/state-machines/orchestrator-hooks';
+import { useAuth } from '@/state-machines';
 
 /**
- * Custom hook for handling the sign-out process through the orchestrator.
- * The orchestrator coordinates all sign-out steps including:
- * 1. Sync teardown
- * 2. Authentication provider sign-out
- * 3. State machine coordination
- * 4. Navigation is handled by route guards/auth providers
+ * Simple sign-out hook that leverages the auth machine.
+ * The route guard will handle navigation when auth state changes.
  */
 export function useSignOut() {
-  const { signOut: orchestratorSignOut, isSigningOut } = useAuth();
+  const { signOut, isSigningOut } = useAuth();
 
-  const signOut = async () => {
+  const handleSignOut = async () => {
     try {
-      console.log('[AUTH] Beginning orchestrator-coordinated sign-out...');
-      
-      // Use orchestrator sign-out - it will coordinate everything
-      orchestratorSignOut();
-      
+      // Simply trigger sign out in auth machine
+      signOut();
+      // Route guard will detect auth change and redirect
       return true;
     } catch (error) {
-      console.error('[AUTH] Error during sign-out process:', error);
+      console.error('[useSignOut] Sign-out failed:', error);
       return false;
     }
   };
 
   return { 
-    signOut,
-    isSigningOut 
+    signOut: handleSignOut,
+    isSigningOut
   };
 } 

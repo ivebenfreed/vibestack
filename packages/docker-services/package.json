@@ -1,0 +1,7 @@
+{
+  "name": "@repo/docker-services",
+  "private": true,
+  "scripts": {
+    "ensure:local": "node ../../scripts/ensure-docker-services.js"
+  }
+}

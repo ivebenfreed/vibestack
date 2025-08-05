@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
+import { IconBrandGoogle } from '@tabler/icons-react'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -18,8 +18,9 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { useAuth } from '@/state-machines/orchestrator-hooks'
+import { useAuth } from '@/state-machines'
 import { Route } from '../../sign-in'
+import { authClient } from '@/lib/auth'
 
 type UserAuthFormProps = HTMLAttributes<HTMLFormElement>
 
@@ -82,7 +83,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       console.log("[AUTH] Attempting sign-in with orchestrator:", data.email);
       
       // Use ONLY the orchestrator sign-in - remove dual system
-      signIn(data.email, data.password);
+      signIn({ email: data.email, password: data.password });
       
       // Don't manually navigate - let the useEffect handle it when isAuthenticated becomes true
       // The orchestrator will update isAuthenticated state when sign-in is successful
@@ -92,6 +93,30 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       const errorMessage = error?.message || "A network error occurred. Please try again.";
       toast.error(errorMessage);
       setIsLoading(false);
+    }
+  }
+
+  // Handle Google OAuth sign-in
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Redirect to Google OAuth
+      const result = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: `${window.location.origin}/api/auth/callback/google`
+      })
+      
+      if (result.error) {
+        throw new Error(result.error.message)
+      }
+      
+      // The redirect will happen automatically via Better Auth
+      
+    } catch (error: any) {
+      console.error('[AUTH] Google Sign In Error:', error)
+      toast.error(error?.message || 'Failed to sign in with Google')
+      setIsLoading(false)
     }
   }
 
@@ -109,7 +134,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder='name@example.com' {...field} />
+                <Input type='email' placeholder='name@example.com' name='email' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -122,7 +147,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             <FormItem className='relative'>
               <FormLabel>Password</FormLabel>
               <FormControl>
-                <PasswordInput placeholder='********' {...field} />
+                <PasswordInput placeholder='********' name='password' {...field} />
               </FormControl>
               <FormMessage />
               <Link
@@ -134,7 +159,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             </FormItem>
           )}
         />
-        <Button className='mt-2' disabled={isLoading || isSigningIn}>
+        <Button type='submit' className='mt-2' disabled={isLoading || isSigningIn}>
           {(isLoading || isSigningIn) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Login
         </Button>
@@ -150,14 +175,16 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
           </div>
         </div>
 
-        <div className='grid grid-cols-2 gap-2'>
-          <Button variant='outline' type='button' disabled={isLoading}>
-            <IconBrandGithub className='h-4 w-4' /> GitHub
-          </Button>
-          <Button variant='outline' type='button' disabled={isLoading}>
-            <IconBrandFacebook className='h-4 w-4' /> Facebook
-          </Button>
-        </div>
+        <Button 
+          variant='outline' 
+          type='button' 
+          disabled={isLoading}
+          onClick={handleGoogleSignIn}
+          className='w-full'
+        >
+          <IconBrandGoogle className='h-4 w-4 mr-2' /> 
+          Continue with Google
+        </Button>
       </form>
     </Form>
   )

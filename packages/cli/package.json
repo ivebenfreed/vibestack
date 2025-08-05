@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "cli": "tsx src/cli.ts",
+    "cli:dev": "NODE_ENV=development tsx src/cli.ts",
+    "cli:staging": "NODE_ENV=staging tsx src/cli.ts",
+    "cli:prod": "NODE_ENV=production tsx src/cli.ts",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },

@@ -1,5 +1,6 @@
 import ContentSection from '../components/content-section'
 import { AccountForm } from './account-form'
+import { EmailVerificationStatus } from '@/features/auth/components/EmailVerificationStatus'
 
 export default function SettingsAccount() {
   return (
@@ -8,7 +9,10 @@ export default function SettingsAccount() {
       desc='Update your account settings. Set your preferred language and
           timezone.'
     >
-      <AccountForm />
+      <div className="space-y-6">
+        <EmailVerificationStatus />
+        <AccountForm />
+      </div>
     </ContentSection>
   )
 }

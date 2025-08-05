@@ -5,8 +5,7 @@ import { fetchDomainTableData, checkDatabaseHealth } from '../lib/db';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import * as Entities from '@repo/dataforge/server-entities'; // Import entities
 import { EntityTarget } from 'typeorm'; // Import EntityTarget type
-import { Client } from 'pg';
-import { addConnectTimeout } from '../lib/db';
+import { getDBClient } from '../lib/db';
 
 // --- Entity Mapping ---
 // Map request table names (lowercase) to actual Entity classes
@@ -285,14 +284,12 @@ db.delete('/:tableName/delete', async (c) => {
 db.get('/debug/raw-user/:id', async (c) => {
   if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
   const userId = c.req.param('id');
-  const dbUrl = c.env.DATABASE_URL;
   if (!userId) return c.json({ success: false, error: 'User ID required in path' }, 400);
-  if (!dbUrl) return c.json({ success: false, error: 'DATABASE_URL not configured' }, 500);
 
   const requestId = c.req.header('cf-request-id') || `local-debug-${Date.now()}`;
   console.log(`[${requestId}] Route /debug/raw-user: START, ID: ${userId}`);
 
-  const client = new Client(addConnectTimeout(dbUrl));
+  const client = getDBClient(c);
   let result;
   try {
     console.log(`[${requestId}] Route /debug/raw-user: Connecting client...`);
@@ -325,9 +322,6 @@ db.get('/debug/raw-user/:id', async (c) => {
     }, 500);
   } finally {
       console.log(`[${requestId}] Route /debug/raw-user: FINALLY block.`);
-      // Ensure client ends even if return happens before finally (shouldn't with async/await)
-      // Added explicit end in try/catch blocks, but belt-and-suspenders
-      // await client.end(); // Potential double-end, rely on try/catch for now.
   }
 });
 // --- End Temporary Debug Route --- 

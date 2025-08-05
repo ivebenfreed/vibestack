@@ -151,6 +151,11 @@ export function generateProjectsSection(projects: Project[] = []): GlobalSidebar
             url: '/tasks',
             icon: IconChecklist,
           },
+          {
+            title: 'Tasks Kanban',
+            url: '/tasks/kanban',
+            icon: IconChecklist,
+          },
         ],
       },
     ],
@@ -175,6 +180,11 @@ export const globalSidebarData: GlobalSidebarSection[] = [
           {
             title: 'Tasks',
             url: '/tasks',
+            icon: IconChecklist,
+          },
+          {
+            title: 'Tasks Kanban',
+            url: '/tasks/kanban',
             icon: IconChecklist,
           },
           {
@@ -299,12 +309,6 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             url: '/debug/sync',
             icon: IconBug,
           },
-
-          {
-            title: 'Sync Testing',
-            url: '/debug/sync-test',
-            icon: IconBug,
-          },
           {
             title: 'Live Query',
             url: '/debug/live-query',
@@ -338,8 +342,8 @@ export const globalSidebarData: GlobalSidebarSection[] = [
           },
 
           {
-            title: 'VibeGridFinal Tasks',
-            url: '/debug/vibegridfinal-tasks',
+            title: 'Kanban Debug',
+            url: '/debug/kanban',
             icon: IconChecklist,
           },
         ],
@@ -387,9 +391,9 @@ export const sidebarData: SidebarData = {
   },
   teams: [
     {
-      name: 'Shadcn Admin',
+      name: 'VibeStack',
       logo: Command,
-      plan: 'Vite + ShadcnUI',
+      plan: 'Local First Platform',
     },
     {
       name: 'Acme Inc',

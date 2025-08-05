@@ -1,6 +1,6 @@
 import { Entity, Column, Index } from 'typeorm';
 import { IsString, IsJSON, IsNumber } from 'class-validator';
-import { ClientOnly } from '../utils/context.js';
+import { ClientOnly, DexieIndex } from '../utils/context.js';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 
 /**
@@ -28,10 +28,27 @@ export class LocalChanges extends BaseSystemEntity {
   @IsString()
   lsn!: string;
 
+  @Column({ type: 'text', nullable: true })
+  @IsString()
+  clientSequence?: string; // Client-side sequence for ordering
+
   @Column({ type: 'timestamptz', name: 'updated_at' })
   updatedAt!: Date;
 
   @Column({ type: 'integer', default: 0, name: 'processed_sync' })
+  @Index()
+  @DexieIndex()
   @IsNumber()
   processedSync!: number;
+
+  @Column({ type: 'integer', default: 0, name: 'send_attempts' })
+  @IsNumber()
+  sendAttempts!: number;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_send_attempt' })
+  lastSendAttempt?: Date;
+
+  @Column({ type: 'text', nullable: true, name: 'last_error' })
+  @IsString()
+  lastError?: string;
 } 

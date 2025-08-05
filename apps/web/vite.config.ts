@@ -1,10 +1,24 @@
 import path from 'path'
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
+import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
+import fs from 'fs'
+
+// Try to load dynamic server configuration if it exists
+let dynamicServerConfig = {};
+try {
+  const configPath = path.resolve(__dirname, './vite.server.config.js');
+  if (fs.existsSync(configPath)) {
+    const { dynamicServerConfig: config } = await import(configPath);
+    dynamicServerConfig = config;
+    console.log('Using dynamic server configuration');
+  }
+} catch (e) {
+  // Ignore - use defaults
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,9 +32,9 @@ export default defineConfig({
         registerType: 'autoUpdate', // Automatically update the service worker when new content is available
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'], // Cache these static assets
         manifest: { // Basic PWA manifest generation
-          name: 'ShadAdmin',
-          short_name: 'ShadAdmin',
-          description: 'Admin Dashboard',
+          name: 'VibeStack',
+          short_name: 'VibeStack',
+          description: 'Local First, Sync Enabled Business Tool Platform',
           theme_color: '#ffffff',
           icons: [
             {
@@ -36,7 +50,45 @@ export default defineConfig({
           ]
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'] // Cache JS, CSS, HTML, and image assets
+          globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // Cache JS, CSS, HTML, and image assets
+          // Fix for direct route navigation - allow all navigation routes
+          navigateFallback: 'index.html',
+          navigateFallbackAllowlist: [/^\/(?!(api|assets|_|\.)).*/], // Allow app routes, exclude API and assets
+          // Fix redirect handling for direct URL navigation
+          navigateFallbackDenylist: [/^\/api\//, /^\/assets\//, /^\/_/, /\.[^\/]+$/], // Exclude API routes and static files
+          // Improved runtime caching for navigation
+          runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                networkTimeoutSeconds: 3,
+                cacheName: 'navigation-cache',
+                cacheableResponse: {
+                  statuses: [0, 200]
+                },
+                fetchOptions: {
+                  redirect: 'follow',
+                  credentials: 'include'
+                }
+              }
+            },
+            {
+              urlPattern: /^https:\/\/dev\.codevibesmatter\.com\/(?!api).*/,
+              handler: 'NetworkFirst',
+              options: {
+                networkTimeoutSeconds: 3,
+                cacheName: 'runtime-navigation',
+                cacheableResponse: {
+                  statuses: [0, 200]
+                },
+                fetchOptions: {
+                  redirect: 'follow',
+                  credentials: 'include'
+                }
+              }
+            }
+          ]
         }
       })
     ] : []),
@@ -46,7 +98,13 @@ export default defineConfig({
       target: 'react',
       autoCodeSplitting: true,
     }),
-    react(),
+    react({
+      babel: {
+        plugins: [
+          ['babel-plugin-react-compiler', {}],
+        ],
+      },
+    }),
     tailwindcss(),
   ],
   optimizeDeps: {
@@ -97,10 +155,15 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
     },
-    proxy: {
-      // Proxy requests starting with /api to your backend server
+    // Merge default config with dynamic config
+    ...(dynamicServerConfig.port ? { port: dynamicServerConfig.port } : {}),
+    // IMPORTANT: Fail if port is in use instead of auto-incrementing
+    // This ensures stable ports for Playwright testing and integrations
+    strictPort: true,
+    proxy: dynamicServerConfig.proxy || {
+      // Default proxy configuration
       '/api': {
-        target: 'http://127.0.0.1:8787', // Target is HTTP, matching frontend protocol
+        target: `http://127.0.0.1:${process.env.SERVER_PORT || '8787'}`, // Use dynamic server port
         secure: false, // Allow self-signed certificates from the backend (wrangler dev)
         changeOrigin: true, // Needed when switching between HTTP and HTTPS
         // Don't rewrite the path - server expects /api prefix

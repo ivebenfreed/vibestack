@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
-import { usePGliteContext } from '@/db/pglite-provider'
+import { domainServices } from '@/domain'
 
 type TasksDialogType = 'create' | 'update' | 'delete' | 'import'
 
@@ -42,11 +42,7 @@ export default function TasksProvider({ children }: Props) {
   const [open, setOpen] = useDialogState<TasksDialogType>(null)
   const [currentRow, setCurrentRow] = useState<Task | null>(null)
   
-  // Get task service directly from context
-  const { services } = usePGliteContext();
-  const taskService = services?.tasks;
-  
-  // Create a new task
+  // Create a new task using domain services
   const createTask = useCallback(async (taskData: {
     title: string;
     projectId?: string;
@@ -59,43 +55,27 @@ export default function TasksProvider({ children }: Props) {
     estimatedDuration?: number;
     tags?: string[];
   }) => {
-    if (!taskService) {
-      throw new Error('Task service not available');
-    }
-    
     console.log('[TasksContext] Creating task with data:', taskData);
-    return await taskService.createTask(taskData);
-  }, [taskService]);
+    return await domainServices.task.createUI(taskData);
+  }, []);
 
-  // Update an existing task
+  // Update an existing task using domain services
   const updateTask = useCallback(async (id: string, changes: Partial<Task>) => {
-    if (!taskService) {
-      throw new Error('Task service not available');
-    }
-    
     console.log('[TasksContext] Updating task with id:', id, 'and changes:', changes);
-    return await taskService.updateTask(id, changes);
-  }, [taskService]);
+    return await domainServices.task.updateUI(id, changes);
+  }, []);
 
-  // Delete a task
+  // Delete a task using domain services
   const deleteTask = useCallback(async (id: string) => {
-    if (!taskService) {
-      throw new Error('Task service not available');
-    }
-    
     console.log('[TasksContext] Deleting task with id:', id);
-    return await taskService.deleteTask(id);
-  }, [taskService]);
+    return await domainServices.task.deleteUI(id);
+  }, []);
 
-  // Update a task's status
+  // Update a task's status using domain services
   const updateTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
-    if (!taskService) {
-      throw new Error('Task service not available');
-    }
-    
     console.log('[TasksContext] Updating task status with id:', id, 'and status:', status);
-    return await taskService.updateTaskStatus(id, status);
-  }, [taskService]);
+    return await domainServices.task.updateUI(id, { status });
+  }, []);
 
   return (
     <TasksContext.Provider 

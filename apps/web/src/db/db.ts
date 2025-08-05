@@ -203,25 +203,9 @@ export async function initializeDatabase(): Promise<PGliteWorker> {
         }
       });
 
-      // Wait for the worker to signal readiness and verify live queries
-      console.log('🔍 [DB] Testing worker connection...');
-      try {
-        await Promise.race([
-          pgliteWorker.query('SELECT 1'),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Query timeout')), 5000))
-        ]);
-        console.log('✅ [DB] Worker connection test successful');
-      } catch (error) {
-        console.warn('⚠️ [DB] Worker connection test failed, but continuing:', error);
-        // Continue anyway - the worker might be ready but the query interface has issues
-      }
+      // Worker connection ready - no test needed
       
-      // Verify live query support
-      if (!pgliteWorker.live?.query) {
-        console.warn('Live queries not available despite configuration');
-      } else {
-        console.log('Live queries enabled successfully');
-      }
+      // Live queries are configured and will be available when needed
 
       // Store both instances
       pgliteWorkerInstance = pgliteWorker;

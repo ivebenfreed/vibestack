@@ -1,5 +1,5 @@
 {
-  "name": "server",
+  "name": "server-issue-27",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,17 +12,26 @@
     }
   },
   "scripts": {
-    "build": "tsc --noEmit && wrangler deploy --outdir=dist",
-    "dev": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229",
-    "_start_servers_for_pwa_test": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229",
-    "dev:debug": "wrangler dev --var LOG_LEVEL:debug --inspector-port=9229",
-    "dev:info": "wrangler dev --var LOG_LEVEL:info --inspector-port=9229",
+    "build": "../../scripts/type-check-focused/type-check-all.sh && wrangler deploy --outdir=dist",
+    "dev": "wrangler dev --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:local": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:pr": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:pr:local": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:no-logs": "wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1",
+    "dev:no-logs:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
+    "_start_servers_for_pwa_test": "wrangler dev --var LOG_LEVEL:info",
+    "_start_servers_for_pwa_test:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info",
+    "dev:debug": "wrangler dev --var LOG_LEVEL:debug --ip 127.0.0.1",
+    "dev:debug:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:debug --ip 127.0.0.1",
+    "dev:info": "wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1",
+    "dev:info:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
     "deploy": "wrangler deploy",
     "lint": "eslint",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ensure-docker:local": "node ../../scripts/ensure-docker-services.js"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.1.11",
@@ -34,7 +43,7 @@
     "hono": "^4.7.7",
     "kysely": "^0.27.0",
     "kysely-neon": "^1.0.0",
-    "pg": "^8.15.6",
+    "resend": "^4.0.0",
     "typeorm": "^0.3.22",
     "valibot": "^1.0.0",
     "zod": "^3.22.4"
@@ -45,6 +54,6 @@
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
     "vitest": "^1.2.2",
-    "wrangler": "^4.14.0"
+    "wrangler": "^4.25.0"
   }
 }

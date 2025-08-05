@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DataTableSkeleton } from '@/components/ui/table-skeleton'
+import { DataTableSkeleton } from '@/components/ui/table'
 import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -8,8 +8,9 @@ import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { usePGliteContext } from '@/db/pglite-provider'
 import { useSelector } from '@xstate/store/react'
-import { tasksAtom } from '@/domain/task'
+import { tasksAtom } from '@/domain-xstate/task'
 import { shallowEqual } from '@xstate/store'
+import { useStableEntityArrayFiltered } from '@/hooks/useStableEntityArray'
 import { Badge } from '@/components/ui/badge'
 
 interface ProjectTasksSectionProps {
@@ -17,15 +18,11 @@ interface ProjectTasksSectionProps {
   projectName?: string
 }
 
-// 🎯 XSTATE PATTERN: Simple hook to get tasks by project using XState selector
+// 🎯 XSTATE PATTERN: Simple hook to get tasks by project using stable filtered array
 function useTasksByProject(projectId: string) {
-  const projectTasks = useSelector(
+  const projectTasks = useStableEntityArrayFiltered(
     tasksAtom,
-    (tasksRecord: Record<string, Task>) => {
-      const allTasks = Object.values(tasksRecord)
-      return allTasks.filter((task: Task) => task.projectId === projectId)
-    },
-    shallowEqual
+    (task: Task) => task.projectId === projectId
   )
   
   return {

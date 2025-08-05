@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { Skeleton } from './skeleton'
 
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
@@ -96,6 +97,44 @@ function TableCaption({
   )
 }
 
+function DataTableSkeleton({
+  rows = 5,
+  columns = 4,
+  className,
+  ...props
+}: {
+  rows?: number
+  columns?: number
+  className?: string
+}) {
+  return (
+    <div className={cn('w-full', className)} {...props}>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {Array.from({ length: columns }).map((_, index) => (
+              <TableHead key={index}>
+                <Skeleton className="h-4 w-full" />
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: rows }).map((_, rowIndex) => (
+            <TableRow key={rowIndex}>
+              {Array.from({ length: columns }).map((_, colIndex) => (
+                <TableCell key={colIndex}>
+                  <Skeleton className="h-4 w-full" />
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
 export {
   Table,
   TableHeader,
@@ -105,4 +144,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  DataTableSkeleton,
 }

@@ -45,9 +45,21 @@ export class StateManager {
    * Check status of replication slot and create if needed
    */
   public async checkSlotStatus(c: MinimalContext): Promise<{ exists: boolean; lsn?: string }> {
+    let client;
     try {
-      const client = getDBClient(c);
+      replicationLogger.debug('Creating database client for slot check', {
+        slot: this.config.slot,
+        publication: this.config.publication
+      }, MODULE_NAME);
+      
+      client = getDBClient(c);
+      
+      replicationLogger.debug('Attempting to connect to database', {
+        databaseUrl: 'env' in c && c.env ? (c.env as any).DATABASE_URL : 'no env'
+      }, MODULE_NAME);
+      
       await client.connect();
+      
       try {
         // Get current WAL position
         const walResult = await client.query('SELECT pg_current_wal_lsn();');
@@ -130,10 +142,89 @@ export class StateManager {
         await client.end();
       }
     } catch (err) {
-      replicationLogger.error('Slot check failed', {
-        error: err instanceof Error ? err.message : String(err),
-        slot: this.config.slot
-      }, MODULE_NAME);
+      // Aggressive error debugging - try multiple approaches
+      let errorMessage = 'Unknown error';
+      let errorStack = undefined;
+      let errorName = 'unknown';
+      let debugInfo = {};
+      
+      try {
+        // Try different ways to extract error information
+        errorMessage = err instanceof Error ? err.message : String(err);
+        errorStack = err instanceof Error ? err.stack : undefined;
+        errorName = err instanceof Error ? err.constructor.name : typeof err;
+        
+        // Try to extract all properties using multiple methods
+        if (err && typeof err === 'object') {
+          // Method 1: getOwnPropertyNames
+          const ownProps = Object.getOwnPropertyNames(err);
+          debugInfo = { ...debugInfo, ownPropertyNames: ownProps };
+          
+          // Method 2: for...in loop
+          const forInProps: any = {};
+          for (const key in err) {
+            try {
+              forInProps[key] = (err as any)[key];
+            } catch (e) {
+              forInProps[key] = '[Unserializable]';
+            }
+          }
+          debugInfo = { ...debugInfo, forInProps };
+          
+          // Method 3: Try to stringify the error directly
+          try {
+            debugInfo = { ...debugInfo, jsonStringify: JSON.stringify(err) };
+          } catch (e) {
+            debugInfo = { ...debugInfo, jsonStringify: '[Not JSON serializable]' };
+          }
+          
+          // Method 4: toString method
+          try {
+            debugInfo = { ...debugInfo, toString: err.toString() };
+          } catch (e) {
+            debugInfo = { ...debugInfo, toString: '[toString failed]' };
+          }
+          
+          // Method 5: valueOf method
+          try {
+            debugInfo = { ...debugInfo, valueOf: (err as any).valueOf() };
+          } catch (e) {
+            debugInfo = { ...debugInfo, valueOf: '[valueOf failed]' };
+          }
+        }
+      } catch (debugError) {
+        debugInfo = { debugError: String(debugError) };
+      }
+      
+      const errorDetails = {
+        error: errorMessage,
+        errorType: errorName,
+        slot: this.config.slot,
+        publication: this.config.publication,
+        stack: errorStack,
+        debugInfo,
+        // Also include the original error reference info
+        errorConstructor: err && err.constructor ? err.constructor.name : 'no constructor',
+        errorPrototype: err && Object.getPrototypeOf(err) ? Object.getPrototypeOf(err).constructor.name : 'no prototype'
+      };
+      
+      replicationLogger.error('Slot check failed', errorDetails, MODULE_NAME);
+      
+      // If it's a connection error, log additional context
+      if (err instanceof Error) {
+        if (err.message.includes('connect') || err.message.includes('timeout')) {
+          replicationLogger.error('Database connection failed - check DATABASE_URL and proxy', {
+            possibleCauses: [
+              'DATABASE_URL environment variable not set correctly',
+              'Neon HTTP proxy not running or misconfigured',
+              'PostgreSQL database not accessible',
+              'Network connectivity issues'
+            ],
+            databaseUrl: 'env' in c && c.env ? (c.env as any).DATABASE_URL || 'undefined' : 'context missing env'
+          }, MODULE_NAME);
+        }
+      }
+      
       throw err;
     }
   }

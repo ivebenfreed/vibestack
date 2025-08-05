@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
 import { useSelector } from '@xstate/store/react'
-import { tasksAtom } from '@/domain/task'
+import { tasksAtom } from '@/domain-xstate/task'
 import { shallowEqual } from '@xstate/store'
+import { useStableEntityArraySorted } from '@/hooks/useStableEntityArray'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from '@/components/ui/badge'
 import { List } from 'lucide-react'
@@ -11,19 +12,8 @@ import { List } from 'lucide-react'
  * Reads directly from XState atoms for excellent performance
  */
 export function RecentTasksEnhanced() {
-  // 🎯 XSTATE REACTIVITY: Read directly from XState atom with useSelector
-  const allTasks = useSelector(
-    tasksAtom,
-    (tasksRecord) => {
-      const tasks = Object.values(tasksRecord);
-      return tasks.sort((a, b) => {
-        const aTime = new Date(a.updatedAt || a.createdAt).getTime();
-        const bTime = new Date(b.updatedAt || b.createdAt).getTime();
-        return bTime - aTime; // Latest first
-      });
-    },
-    shallowEqual
-  )
+  // 🎯 XSTATE REACTIVITY: Stable sorted array that only changes when data changes
+  const allTasks = useStableEntityArraySorted(tasksAtom, 'updatedAt', 'desc')
   
   // Calculate recent tasks from XState data
   const recentTasks = useMemo(() => {

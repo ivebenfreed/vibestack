@@ -30,16 +30,20 @@ const apiApp = new Hono<AppBindings>().basePath('/api');
 
 // Add Hono's CORS middleware FIRST
 apiApp.use('*', cors({
-  origin: (origin) => {
-    // Dynamically allow the specific frontend origin
-    // or potentially others in the future
+  origin: (origin, c) => {
+    // Get dynamic web port from environment
+    const webPort = c.env.WEB_PORT || '5173';
+    console.log(`[CORS DEBUG] WEB_PORT from env: ${c.env.WEB_PORT}, using: ${webPort}, checking origin: ${origin}`);
+    
+    // Build allowed origins dynamically
     const allowedOrigins = [
-      'https://127.0.0.1:5173', 
-      'http://127.0.0.1:5173', 
-      'http://localhost:5173',
+      `https://127.0.0.1:${webPort}`, 
+      `http://127.0.0.1:${webPort}`, 
+      `http://localhost:${webPort}`,
       'https://dev.codevibesmatter.com',
       'https://app.codevibesmatter.com'
     ];
+    
     if (!origin) {
       // For requests without origin, we return null to avoid setting the header
       return null;
@@ -66,6 +70,40 @@ apiApp.use('*', createStructuredLogger());
 // Mount the bootstrap router BEFORE authMiddleware
 // This ensures it's not protected by standard authentication
 apiApp.route('/bootstrap', bootstrapRouter);
+
+// Add public health endpoints BEFORE authMiddleware
+apiApp.get('/health', (c) => c.text('Server OK'));
+apiApp.get('/db/health', async (c) => {
+  try {
+    const url = c.env.DATABASE_URL;
+    if (!url) {
+      return c.json({
+        success: false,
+        data: { healthy: false, error: 'DATABASE_URL not set' }
+      }, 503);
+    }
+    
+    const isLocal = url.includes('localtest.me');
+    
+    return c.json({
+      success: true,
+      data: {
+        healthy: true,
+        mode: isLocal ? 'local' : 'remote',
+        proxy: isLocal ? 'http://db.localtest.me:4444/sql' : 'neon-serverless',
+        message: `Database configured in ${isLocal ? 'local' : 'remote'} mode`
+      }
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      data: {
+        healthy: false,
+        error: error instanceof Error ? error.message : 'Configuration error'
+      }
+    }, 503);
+  }
+});
 
 // Apply the authentication middleware to check session status on all requests
 // for routes mounted AFTER this middleware.
@@ -121,10 +159,12 @@ const worker = {
     if (url.pathname === '/api/sync') {
       // --- BEGIN CORS CHECK for /api/sync ---
       const origin = request.headers.get('Origin');
+      const webPort = env.WEB_PORT || '5173';
+      console.log(`[${requestId}] [Sync CORS DEBUG] WEB_PORT from env: ${env.WEB_PORT}, using: ${webPort}, origin: ${origin}`);
       const allowedOrigins = [
-        'https://127.0.0.1:5173', 
-        'http://127.0.0.1:5173', 
-        'http://localhost:5173',
+        `https://127.0.0.1:${webPort}`, 
+        `http://127.0.0.1:${webPort}`, 
+        `http://localhost:${webPort}`,
         'https://dev.codevibesmatter.com',
         'https://app.codevibesmatter.com'
       ]; // Match the API allowed origins
@@ -147,6 +187,8 @@ const worker = {
       // --- END CORS CHECK ---
 
       // --- BEGIN AUTH CHECK for /api/sync ---
+      let authenticatedUser: any = null; // Declare outside try block
+      
       try {
         const auth = initializeAuth(env); // Initialize auth using env
         
@@ -186,8 +228,11 @@ const worker = {
         }
         
         // Session is valid, proceed with WebSocket logic
-        // Optionally: log user ID or other details from sessionData.user
-        console.log(`[${requestId}] [Sync Auth] User ${(sessionData.user as { id?: any })?.id ?? 'ID_UNKNOWN'} authenticated for sync.`);
+        const user = sessionData.user as any;
+        console.log(`[${requestId}] [Sync Auth] User ${user?.id ?? 'ID_UNKNOWN'} authenticated for sync.`);
+        
+        // Store user info for later use after clientId extraction
+        authenticatedUser = user;
       } catch (error) {
         console.error(`[${requestId}] [Sync Auth] Error during session check:`, error);
         return new Response('Internal Server Error during authentication.', { status: 500 });
@@ -204,6 +249,27 @@ const worker = {
       const clientId = url.searchParams.get('clientId');
       if (!clientId) {
         return new Response('Client ID is required', { status: 400 });
+      }
+      
+      // Store user context in KV for SyncDO to retrieve (now that we have clientId)
+      const userContext = {
+        userId: authenticatedUser?.id,
+        userRole: authenticatedUser?.role,
+        userEmail: authenticatedUser?.email,
+        userName: authenticatedUser?.name,
+        timestamp: Date.now()
+      };
+      
+      try {
+        await env.CLIENT_REGISTRY.put(
+          `auth:${clientId}`,
+          JSON.stringify(userContext),
+          { expirationTtl: 300 } // 5 minutes TTL
+        );
+        console.log(`[${requestId}] [Sync Auth] Stored user context for client ${clientId}`);
+      } catch (authStoreError) {
+        console.error(`[${requestId}] [Sync Auth] Failed to store user context:`, authStoreError);
+        // Continue anyway - this is not critical for WebSocket functionality
       }
       
       // Create unique SyncDO instance for this client
@@ -275,58 +341,27 @@ const worker = {
 
   /**
    * Scheduled handler that runs on cron triggers
-   * Used to keep the Replication Durable Object from hibernating
+   * Removed replication heartbeat - ReplicationDO is now activated on-demand by client activity
    * 
    * @param event - The scheduled event
    * @param env - Environment variables and bindings
    * @param ctx - Execution context
    */
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<Response> {
-    serverLogger.info('Running scheduled task to keep replication DO active', {
+    serverLogger.info('Scheduled task triggered', {
       cron: event.cron,
       scheduledTime: new Date(event.scheduledTime).toISOString()
     });
 
-    try {
-      // Get a reference to the replication DO
-      const doId = env.REPLICATION.idFromName("replication");
-      const replicationDO = env.REPLICATION.get(doId);
-      
-      // Call the init endpoint to ensure polling is active
-      const doResponse = await replicationDO.fetch("https://dummy-url/api/replication/init");
-      
-      // Define response type
-      interface ReplicationInitResponse {
-        success: boolean;
-        alreadyInitialized?: boolean;
-        pollingStarted?: boolean;
-      }
-      
-      // Parse the response
-      const result = await doResponse.json() as ReplicationInitResponse;
-      
-      serverLogger.info('Replication heartbeat completed', {
-        success: result.success,
-        alreadyInitialized: result.alreadyInitialized || false,
-        pollingStarted: result.pollingStarted || false
-      });
-
-      // Return the JSON response from the DO
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' },
-        status: doResponse.status // Propagate status from DO
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      serverLogger.error('Failed to send heartbeat to replication DO', {
-        error: errorMessage
-      });
-      // Return an error response
-      return new Response(JSON.stringify({ success: false, error: errorMessage }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    // ReplicationDO is now activated on-demand when clients send data
+    // This allows it to hibernate naturally when no client activity occurs
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'Scheduled handler active - ReplicationDO uses on-demand activation' 
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200
+    });
   }
 };
 

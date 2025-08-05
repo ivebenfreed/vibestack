@@ -1,4 +1,4 @@
-import { Client, QueryResultRow } from '@neondatabase/serverless';
+import { Client, QueryResultRow, neonConfig } from '@neondatabase/serverless';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
 import type { AppContext, MinimalContext } from '../types/hono';
@@ -18,16 +18,53 @@ export function addConnectTimeout(url: string): string {
 // Initialize database client
 export const getDBClient = (c: AppContext | MinimalContext | { env: { DATABASE_URL: string } }) => {
   try {
-    const url = 'env' in c && typeof c.env === 'object' && c.env !== null ? c.env.DATABASE_URL : undefined;
+    const url = 'env' in c && typeof c.env === 'object' && c.env !== null 
+      ? c.env.DATABASE_URL
+      : undefined;
+      
     if (!url) {
       throw new Error('DATABASE_URL environment variable is not set');
     }
     
+    // Check if this is a local development URL
+    const isLocal = url.includes('localtest.me');
+    
+    // Configure for local HTTP proxy if needed
+    if (isLocal) {
+      
+      // Configure for single SQL queries (HTTP)
+      neonConfig.fetchEndpoint = (host) => {
+        const [protocol, port] = host === 'db.localtest.me' ? ['http', 4444] : ['https', 443];
+        return `${protocol}://${host}:${port}/sql`;
+      };
+      neonConfig.fetchFunction = fetch;
+      
+      // Configure for Pool connections (WebSocket) - needed for replication
+      const connectionStringUrl = new URL(url);
+      neonConfig.useSecureWebSocket = connectionStringUrl.hostname !== 'db.localtest.me';
+      neonConfig.wsProxy = connectionStringUrl.hostname === 'db.localtest.me' 
+        ? (host) => `${host}:4444/v1` 
+        : undefined;
+      
+      // In Cloudflare Workers, WebSocket is available globally
+      neonConfig.webSocketConstructor = WebSocket;
+    }
+    
     const urlWithTimeout = addConnectTimeout(url);
-    return new Client({
+    
+    const clientConfig: any = {
       connectionString: urlWithTimeout,
-      ssl: true
-    });
+      ssl: !isLocal // No SSL for local connections
+    };
+    
+    // For local development, force HTTP-only mode
+    if (isLocal) {
+      clientConfig.forceHttp = true;
+      clientConfig.webSocketConstructor = null;
+    }
+    
+    const client = new Client(clientConfig);
+    return client;
   } catch (error) {
     console.error('Error creating database client:', error);
     throw error;

@@ -1,7 +1,9 @@
 import { Separator } from '@/components/ui/separator'
 import { ContentContainer } from '@/components/layout/content-container'
 import SidebarNav from './components/sidebar-nav'
-import { User, Settings as SettingsIcon, Palette, Bell, Monitor } from 'lucide-react'
+import { User, Settings as SettingsIcon, Palette, Bell, Monitor, Shield } from 'lucide-react'
+import { useAuth } from '@/state-machines'
+import { Outlet } from '@tanstack/react-router'
 
 const sidebarNavItems = [
   {
@@ -32,6 +34,18 @@ const sidebarNavItems = [
 ]
 
 export default function Settings() {
+  const { user, isAdmin } = useAuth();
+
+  // Add admin items if user is admin
+  const allSidebarNavItems = [
+    ...sidebarNavItems,
+    ...(isAdmin ? [{
+      title: 'User Management',
+      href: '/settings/admin/users',
+      icon: <Shield className="w-4 h-4" />,
+    }] : [])
+  ];
+
   return (
     <ContentContainer>
       <div className='space-y-6'>
@@ -42,16 +56,12 @@ export default function Settings() {
           </p>
         </div>
         <Separator />
-        <div className='flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0'>
-          <aside className='-mx-4 lg:w-1/5'>
-            <SidebarNav items={sidebarNavItems} />
+        <div className='grid gap-6 lg:grid-cols-[200px_1fr]'>
+          <aside>
+            <SidebarNav items={allSidebarNavItems} />
           </aside>
-          <div className='flex-1 lg:max-w-2xl'>
-            <div className='space-y-6'>
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">Settings forms coming soon...</p>
-              </div>
-            </div>
+          <div className='min-w-0 max-w-2xl'>
+            <Outlet />
           </div>
         </div>
       </div>

@@ -58,7 +58,7 @@ export class PollingManager {
       }
       
       this.pollCounter = 0;
-      replicationLogger.info('Starting polling process', {}, MODULE_NAME);
+      replicationLogger.debug('Starting polling process', {}, MODULE_NAME);
       
       this.startContinuousPolling();
       this.hasCompletedFirstPoll = true; // Set flag after polling actually starts
@@ -90,7 +90,7 @@ export class PollingManager {
       }
       
       this.pollCounter = 0;
-      replicationLogger.info('Starting polling process with first poll results', {}, MODULE_NAME);
+      replicationLogger.debug('Starting polling process with first poll results', {}, MODULE_NAME);
       
       // Perform the first poll immediately and capture results
       const firstPollResults = await this.performFirstPollAndGetResults();
@@ -126,7 +126,7 @@ export class PollingManager {
   }> {
     // Use the same polling lock as continuous polling to prevent conflicts
     if (this.isPolling) {
-      replicationLogger.debug('First poll skipped - polling already in progress', {}, MODULE_NAME);
+      replicationLogger.info('First poll skipped - polling already in progress', {}, MODULE_NAME);
       return {
         success: true,
         changesFound: false,
@@ -139,9 +139,20 @@ export class PollingManager {
     this.isPolling = true;
     
     try {
+      const currentLSN = await this.stateManager.getLSN();
+      replicationLogger.info('First poll starting with LSN details', {
+        currentStoredLSN: currentLSN,
+        slot: this.config.slot,
+        batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
+      }, MODULE_NAME);
+      
       const changes = await this.pollForChanges();
       
       if (!changes || changes.length === 0) {
+        replicationLogger.info('First poll completed - no changes found', {
+          currentStoredLSN: currentLSN,
+          slot: this.config.slot
+        }, MODULE_NAME);
         return {
           success: true,
           changesFound: false,
@@ -187,7 +198,7 @@ export class PollingManager {
       this.pollingInterval = null;
       this.pollCounter = 0;
       this.hasCompletedFirstPoll = false;
-      replicationLogger.info('Polling stopped', {}, MODULE_NAME);
+      replicationLogger.debug('Polling stopped', {}, MODULE_NAME);
     }
   }
 
@@ -236,12 +247,12 @@ export class PollingManager {
       if (changes && changes.length > 0) {
         try {
           // Extract basic info about the WAL entries
-          const firstLSN = changes[0].lsn;
-          const lastLSN = changes[changes.length - 1].lsn;
+          const firstLSN = changes[0]?.lsn;
+          const lastLSN = changes[changes.length - 1]?.lsn;
           
           // Remove redundant parsing - this is already done in processChanges
           // Let processChanges handle the actual parsing and counting
-          replicationLogger.info('WAL changes found', {
+          replicationLogger.debug('WAL changes found', {
             walEntries: changes.length,
             lsnRange: {
               first: firstLSN,
@@ -283,10 +294,18 @@ export class PollingManager {
   }
 
   private async pollForChanges(): Promise<WALData[] | null> {
-    const client = getDBClient(this.c);
+    let client;
     
     try {
       const currentLSN = await this.stateManager.getLSN();
+      
+      replicationLogger.debug('Polling for changes', {
+        currentLSN,
+        slot: this.config.slot,
+        batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
+      }, MODULE_NAME);
+      
+      client = getDBClient(this.c);
       await client.connect();
       
       const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
@@ -315,29 +334,61 @@ export class PollingManager {
       return newChanges.length > 0 ? newChanges : null;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      const errorName = err instanceof Error ? err.constructor.name : typeof err;
+      
+      const errorDetails = {
+        error: errorMsg,
+        errorType: errorName,
+        slot: this.config.slot,
+        currentLSN: await this.stateManager.getLSN().catch(() => 'unknown'),
+        stack: errorStack,
+        // Add raw error for debugging if it has additional properties
+        rawError: err && typeof err === 'object' ? Object.getOwnPropertyNames(err).reduce((acc, key) => {
+          try {
+            acc[key] = (err as any)[key];
+          } catch (e) {
+            acc[key] = '[Unserializable]';
+          }
+          return acc;
+        }, {} as any) : String(err)
+      };
       
       if (errorMsg.includes('replication slot') && errorMsg.includes('is active for PID')) {
-        replicationLogger.warn('Replication slot in use by another process during poll', {
-          error: errorMsg,
-          slot: this.config.slot
-        }, MODULE_NAME);
-        
+        replicationLogger.warn('Replication slot in use by another process during poll', errorDetails, MODULE_NAME);
         return null;
-      } else {
-        replicationLogger.error('Polling error', {
-          error: errorMsg
+      } else if (errorMsg.includes('connect') || errorMsg.includes('timeout')) {
+        replicationLogger.error('Database connection failed during polling', {
+          ...errorDetails,
+          possibleCauses: [
+            'DATABASE_URL misconfigured',
+            'Neon HTTP proxy not responding',
+            'PostgreSQL database not running',
+            'Network connectivity issues'
+          ],
+          databaseUrl: 'env' in this.c && this.c.env ? (this.c.env as any).DATABASE_URL || 'undefined' : 'context missing env'
         }, MODULE_NAME);
-        
+        throw err;
+      } else if (errorMsg.includes('does not exist')) {
+        replicationLogger.error('Replication slot does not exist', {
+          ...errorDetails,
+          suggestion: 'Try calling the /api/replication/init endpoint to create the slot'
+        }, MODULE_NAME);
+        throw err;
+      } else {
+        replicationLogger.error('Polling error', errorDetails, MODULE_NAME);
         throw err;
       }
     } finally {
-      try {
-        await client.end();
-      } catch (closeError) {
-        replicationLogger.error('Error closing database connection after polling', {
-          error: closeError instanceof Error ? closeError.message : String(closeError),
-          slot: this.config.slot
-        }, MODULE_NAME);
+      if (client) {
+        try {
+          await client.end();
+        } catch (closeError) {
+          replicationLogger.error('Error closing database connection after polling', {
+            error: closeError instanceof Error ? closeError.message : String(closeError),
+            slot: this.config.slot
+          }, MODULE_NAME);
+        }
       }
     }
   }

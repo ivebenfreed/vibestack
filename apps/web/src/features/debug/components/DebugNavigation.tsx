@@ -4,22 +4,14 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function DebugNavigation() {
   const debugRoutes = [
-    { path: '/debug/database', label: 'Database' },
     { path: '/debug/sync', label: 'Sync' },
-    
-    { path: '/debug/sync-test', label: 'Sync Testing' },
-    { path: '/debug/live-query', label: 'Live Query' },
-    { path: '/debug/performance', label: 'Live Query Performance' },
-    { path: '/debug/multi-query', label: 'Multi-Query Test' },
-    
-    { path: '/debug/data-table-v2', label: 'Data Table V2' },
-    
-    
-    { path: '/debug/vibegrid-native', label: 'VibeGrid Native' },
-    
-    { path: '/debug/vibegridfinal-tasks', label: 'VibeGridFinal Tasks' },
-    { path: '/debug/typeorm-test', label: 'TypeORM Test' },
-    { path: '/debug/tasks-new-pattern', label: 'Tasks New Pattern' },
+    { path: '/debug/database', label: 'Database' },
+    { path: '/debug/integrity', label: 'Integrity' },
+    { path: '/debug/state-machine-test', label: 'State Machine Test' },
+    { path: '/debug/query-test', label: 'Query Test' },
+    { path: '/debug/reactflow-positioning', label: 'React Flow Positioning' },
+    { path: '/debug/vibegantt', label: 'VibeGantt' },
+    { path: '/debug/gantt-test-data', label: 'Gantt Test Data' },
   ];
   
   return (

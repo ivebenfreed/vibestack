@@ -7,29 +7,37 @@ import {
   createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import { Task, TaskStatus, TaskPriority } from "@repo/dataforge/server-entities";
-import { TaskRepository, TaskCreateInput, TaskUpdateInput } from '../domains/tasks';
+import { TaskRepository } from '../domains/tasks';
+import { TaskStatus } from '@repo/dataforge/server-entities';
+import type { Task } from '@repo/dataforge/server-entities';
 
-// Re-export enums for convenience
-export { TaskStatus, TaskPriority };
+// Input types for API
+export type TaskCreateInput = Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'tags' | 'dependencies' | 'dependents'>>;
+export type TaskUpdateInput = Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'tags' | 'dependencies' | 'dependents'>>;
 
 // Create tasks router
 const tasks = new Hono<ApiEnv>();
 
 // List tasks
 tasks.get('/', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
   try {
     const neonService = new NeonService(c);
     const taskRepo = new TaskRepository(neonService);
-    const { status } = c.req.query();
+    const { status, projectId, assigneeId } = c.req.query();
     
     let result: Task[];
-    if (status && Object.values(TaskStatus).includes(status as TaskStatus)) {
-      // Use repository for status filtering
+    
+    if (status && status !== 'all') {
       result = await taskRepo.findByStatus(status as TaskStatus);
+    } else if (projectId) {
+      result = await taskRepo.findByProjectId(projectId as string);
+    } else if (assigneeId) {
+      result = await taskRepo.findByAssigneeId(assigneeId as string);
     } else {
-      // Use repository for all tasks
       result = await taskRepo.findAll();
     }
     
@@ -45,24 +53,20 @@ tasks.get('/', async (c) => {
 
 // Create task
 tasks.post('/', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
   try {
-    const body = await c.req.json();
     const neonService = new NeonService(c);
     const taskRepo = new TaskRepository(neonService);
     
-    // The repository will handle validation and defaults
-    const result = await taskRepo.create(body);
+    const input = await c.req.json<TaskCreateInput>();
+    const created = await taskRepo.create(input);
     
-    return c.json(createSuccessResponse(result), 201);
+    return c.json(createSuccessResponse(created), 201);
   } catch (err) {
     console.error('Error creating task:', err);
-    if (err instanceof Error && err.message.includes('validation')) {
-      return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
-        400
-      );
-    }
     return c.json(
       createErrorResponse(ServiceErrorType.INTERNAL, String(err)),
       500
@@ -72,20 +76,21 @@ tasks.post('/', async (c) => {
 
 // Get task by ID
 tasks.get('/:id', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+  
   try {
-    const id = c.req.param('id');
     const neonService = new NeonService(c);
     const taskRepo = new TaskRepository(neonService);
     
-    const task = await taskRepo.findById(id);
+    const taskId = c.req.param('id');
+    const task = await taskRepo.findById(taskId);
     
     if (!task) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Task with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Task not found'),
         404
       );
     }
@@ -101,60 +106,41 @@ tasks.get('/:id', async (c) => {
 });
 
 // Update task
-tasks.patch('/:id', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+tasks.put('/:id', async (c) => {
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+  
+  const taskId = c.req.param('id');
+  
   try {
-    const id = c.req.param('id');
-    const body = await c.req.json();
     const neonService = new NeonService(c);
     const taskRepo = new TaskRepository(neonService);
     
-    // Find the task first to ensure it exists
-    const existingTask = await taskRepo.findById(id);
+    // First check if task exists
+    const existingTask = await taskRepo.findById(taskId);
+    
     if (!existingTask) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Task with id ${id} not found`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Task not found'),
         404
       );
     }
     
-    // Handle status updates separately to manage completedAt
-    if (body.status && body.status !== existingTask.status) {
-      await taskRepo.updateStatus(id, body.status);
-      // Remove status from body to avoid duplicate updates
-      delete body.status;
-    }
+    const input = await c.req.json<TaskUpdateInput>();
+    const updated = await taskRepo.update(taskId, input);
     
-    // Update the remaining fields if any
-    let updatedTask;
-    if (Object.keys(body).length > 0) {
-      updatedTask = await taskRepo.update(id, body);
-    }
-    
-    // Always fetch the latest task data to return the most recent state
-    updatedTask = await taskRepo.findById(id);
-    if (!updatedTask) {
+    if (!updated) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Task with id ${id} not found after update`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Task not found after update'),
         404
       );
     }
     
-    return c.json(createSuccessResponse(updatedTask));
+    return c.json(createSuccessResponse(updated));
   } catch (err) {
     console.error('Error updating task:', err);
-    if (err instanceof Error && err.message.includes('validation')) {
-      return c.json(
-        createErrorResponse(ServiceErrorType.VALIDATION, err.message),
-        400
-      );
-    }
     return c.json(
       createErrorResponse(ServiceErrorType.INTERNAL, String(err)),
       500
@@ -164,26 +150,32 @@ tasks.patch('/:id', async (c) => {
 
 // Delete task
 tasks.delete('/:id', async (c) => {
-  if (!c.get('user')) throw new HTTPException(401, { message: 'Unauthorized' });
+  const user = c.get('user');
+  if (!user) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+  
+  const taskId = c.req.param('id');
+  
   try {
-    const id = c.req.param('id');
     const neonService = new NeonService(c);
     const taskRepo = new TaskRepository(neonService);
     
-    // TaskRepository.delete already checks if the task exists
-    const deleted = await taskRepo.delete(id);
+    // First check if task exists
+    const existingTask = await taskRepo.findById(taskId);
     
-    if (!deleted) {
+    if (!existingTask) {
       return c.json(
-        createErrorResponse(
-          ServiceErrorType.NOT_FOUND,
-          `Task with id ${id} not found or could not be deleted`
-        ),
+        createErrorResponse(ServiceErrorType.NOT_FOUND, 'Task not found'),
         404
       );
     }
     
-    return c.json(createSuccessResponse({ id }));
+    await taskRepo.delete(taskId);
+    
+    return c.json(createSuccessResponse({
+      message: 'Task deleted successfully'
+    }));
   } catch (err) {
     console.error('Error deleting task:', err);
     return c.json(
@@ -193,4 +185,4 @@ tasks.delete('/:id', async (c) => {
   }
 });
 
-export { tasks }; 
+export default tasks;

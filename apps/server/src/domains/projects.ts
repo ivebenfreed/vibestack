@@ -1,21 +1,22 @@
 import { Client } from '@neondatabase/serverless';
-import { Project, ProjectStatus } from "@repo/dataforge/server-entities";
+import { Project as ProjectClass, ProjectStatus } from "@repo/dataforge/server-entities";
+import type { Project } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
 import { FindOptionsWhere, DeepPartial, In } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import type { Context } from 'hono';
-import type { Env } from '../types/env';
-import { User } from "@repo/dataforge/server-entities";
+import { Context } from 'hono';
+import { Env } from '../types/env';
+import { User as UserClass } from "@repo/dataforge/server-entities";
+import type { User } from "@repo/dataforge/server-entities";
 import { BaseServerRepository } from './BaseServerRepository';
 
 // Re-export enums for convenience
 export { ProjectStatus };
 
 // Simplified type definitions
-type ProjectInstance = Project;
 
 // Input types for API
-export type ProjectCreateInput = Partial<Omit<ProjectInstance, 'id' | 'created_at' | 'updated_at'>>;
+export type ProjectCreateInput = Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>;
 export type ProjectUpdateInput = Partial<ProjectCreateInput>;
 
 /**
@@ -24,27 +25,27 @@ export type ProjectUpdateInput = Partial<ProjectCreateInput>;
 export class ProjectRepository extends BaseServerRepository<Project> {
   
   constructor(neonService: NeonService) {
-    super(neonService, Project);
+    super(neonService, ProjectClass);
   }
 
   /**
    * Find projects by owner ID
    */
   async findByOwnerId(ownerId: string): Promise<Project[]> {
-    return await this.neonService.find(Project, { ownerId } as FindOptionsWhere<Project>);
+    return await this.neonService.find(ProjectClass, { ownerId } as FindOptionsWhere<Project>);
   }
 
   /**
    * Find projects by status
    */
   async findByStatus(status: ProjectStatus): Promise<Project[]> {
-    return await this.neonService.find(Project, { status } as FindOptionsWhere<Project>);
+    return await this.neonService.find(ProjectClass, { status } as FindOptionsWhere<Project>);
   }
 
   /**
    * Create a new project with defaults
    */
-  async create(data: ProjectCreateInput): Promise<Project> {
+  override async create(data: ProjectCreateInput): Promise<Project> {
     // Set default values if not provided
     const projectData = {
       ...data,
@@ -59,7 +60,7 @@ export class ProjectRepository extends BaseServerRepository<Project> {
    * Get project members using TypeORM relations via query builder
    */
   async getMembers(projectId: string): Promise<User[]> {
-    const queryBuilder = await this.neonService.createQueryBuilder(User, 'u');
+    const queryBuilder = await this.neonService.createQueryBuilder(UserClass, 'u');
     return await queryBuilder
       .innerJoin('project_members', 'pm', 'u.id = pm.user_id')
       .where('pm.project_id = :projectId', { projectId })
@@ -81,7 +82,7 @@ export class ProjectRepository extends BaseServerRepository<Project> {
 
     // Validate that all new users exist (always needed for data integrity)
     if (newUserIds.length > 0) {
-      const existingUsers = await this.neonService.find(User, {
+      const existingUsers = await this.neonService.find(UserClass, {
         id: In(newUserIds)
       } as FindOptionsWhere<User>);
       
@@ -157,13 +158,13 @@ export class ProjectRepository extends BaseServerRepository<Project> {
     }
 
     // Check if user exists
-    const user = await this.neonService.findOne(User, { id: userId } as FindOptionsWhere<User>);
+    const user = await this.neonService.findOne(UserClass, { id: userId } as FindOptionsWhere<User>);
     if (!user) {
       throw new Error(`User with ID ${userId} not found`);
     }
 
     // Add member using TypeORM query builder with ON CONFLICT handling
-    const insertBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+    const insertBuilder = await this.neonService.createQueryBuilder(UserClass, 'pm');
     await insertBuilder
       .insert()
       .into('project_members')
@@ -185,7 +186,7 @@ export class ProjectRepository extends BaseServerRepository<Project> {
     }
 
     // Remove member using TypeORM query builder
-    const deleteBuilder = await this.neonService.createQueryBuilder(User, 'pm');
+    const deleteBuilder = await this.neonService.createQueryBuilder(UserClass, 'pm');
     await deleteBuilder
       .delete()
       .from('project_members')
@@ -193,6 +194,17 @@ export class ProjectRepository extends BaseServerRepository<Project> {
       .execute();
 
     return await this.getMembers(projectId);
+  }
+
+  /**
+   * Check if a user is a member of a project
+   * @param projectId - The ID of the project
+   * @param userId - The ID of the user
+   * @returns Whether the user is a member
+   */
+  async isUserProjectMember(projectId: string, userId: string): Promise<boolean> {
+    const members = await this.getMembers(projectId);
+    return members.some((member: User) => member.id === userId);
   }
 }
 
@@ -217,31 +229,31 @@ const createServiceFromClient = (client: Client): NeonService => {
 
 // Legacy compatibility layer - maps the class-based repository to the old interface
 export const projectQueries = {
-  findAll: async (client: Client): Promise<ProjectInstance[]> => {
+  findAll: async (client: Client): Promise<Project[]> => {
     const neonService = createServiceFromClient(client);
     const repo = new ProjectRepository(neonService);
     return await repo.findAll();
   },
 
-  findById: async (client: Client, id: string): Promise<ProjectInstance | null> => {
+  findById: async (client: Client, id: string): Promise<Project | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new ProjectRepository(neonService);
     return await repo.findById(id);
   },
 
-  findByOwnerId: async (client: Client, ownerId: string): Promise<ProjectInstance[]> => {
+  findByOwnerId: async (client: Client, ownerId: string): Promise<Project[]> => {
     const neonService = createServiceFromClient(client);
     const repo = new ProjectRepository(neonService);
     return await repo.findByOwnerId(ownerId);
   },
 
-  create: async (client: Client, data: ProjectCreateInput): Promise<ProjectInstance> => {
+  create: async (client: Client, data: ProjectCreateInput): Promise<Project> => {
     const neonService = createServiceFromClient(client);
     const repo = new ProjectRepository(neonService);
     return await repo.create(data);
   },
 
-  update: async (client: Client, id: string, data: ProjectUpdateInput): Promise<ProjectInstance | null> => {
+  update: async (client: Client, id: string, data: ProjectUpdateInput): Promise<Project | null> => {
     const neonService = createServiceFromClient(client);
     const repo = new ProjectRepository(neonService);
     return await repo.update(id, data);
@@ -252,4 +264,4 @@ export const projectQueries = {
     const repo = new ProjectRepository(neonService);
     return await repo.delete(id);
   }
-}; 
+};

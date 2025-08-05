@@ -42,6 +42,8 @@ export interface IntegrityValidationResult {
   recommendedAction: 'none' | 'catchup' | 'reset';
   serverFingerprints: Record<string, TableFingerprint>;
   validationTimestamp: number;
+  rollbackToLSN?: string; // LSN to roll back to before starting catchup
+  rollbackReason?: string; // Explanation for the rollback recommendation
 }
 
 export interface IntegrityIssue {
@@ -136,22 +138,26 @@ export class IntegrityManager {
     // Compare fingerprints and identify issues
     const issues = await this.compareFingerprints(request.tableFingerprints, serverFingerprints);
     
-    // Determine recommended action
-    const recommendedAction = this.determineAction(issues);
+    // Determine recommended action with rollback LSN
+    const actionResult = this.determineActionAndRollback(issues, request.currentLSN);
     
     const result: IntegrityValidationResult = {
       isValid: issues.length === 0,
       issues,
-      recommendedAction,
+      recommendedAction: actionResult.action,
       serverFingerprints,
-      validationTimestamp: Date.now()
+      validationTimestamp: Date.now(),
+      rollbackToLSN: actionResult.rollbackToLSN,
+      rollbackReason: actionResult.rollbackReason
     };
 
     syncLogger.info('Client integrity validation completed', {
       clientId: request.clientId,
       isValid: result.isValid,
       issueCount: issues.length,
-      recommendedAction: result.recommendedAction
+      recommendedAction: result.recommendedAction,
+      rollbackToLSN: result.rollbackToLSN,
+      rollbackReason: result.rollbackReason
     }, MODULE_NAME);
 
     return result;
@@ -189,15 +195,26 @@ export class IntegrityManager {
       request.baselineTimestamp
     );
     
-    // Determine recommended action for baseline validation
-    const recommendedAction = this.determineBaselineAction(issues, request.recordCount);
+    // Determine recommended action with rollback LSN for baseline validation
+    const baselineAction = this.determineBaselineAction(issues, request.recordCount);
+    let rollbackToLSN: string | undefined;
+    let rollbackReason: string | undefined;
+    
+    // If catchup is recommended, calculate rollback LSN
+    if (baselineAction === 'catchup') {
+      const rollbackInfo = this.calculateRollbackLSN(issues, request.currentLSN);
+      rollbackToLSN = rollbackInfo.lsn;
+      rollbackReason = rollbackInfo.reason;
+    }
     
     const result: IntegrityValidationResult = {
       isValid: issues.length === 0,
       issues,
-      recommendedAction,
+      recommendedAction: baselineAction,
       serverFingerprints,
-      validationTimestamp: Date.now()
+      validationTimestamp: Date.now(),
+      rollbackToLSN,
+      rollbackReason
     };
 
     syncLogger.info('Baseline validation completed', {
@@ -490,11 +507,18 @@ export class IntegrityManager {
   }
 
   /**
-   * Determine recommended action based on issues found
+   * Determine recommended action and rollback LSN based on issues found
    */
-  private determineAction(issues: IntegrityIssue[]): 'none' | 'catchup' | 'reset' {
+  private determineActionAndRollback(
+    issues: IntegrityIssue[], 
+    clientLSN: string
+  ): { 
+    action: 'none' | 'catchup' | 'reset'; 
+    rollbackToLSN?: string; 
+    rollbackReason?: string 
+  } {
     if (issues.length === 0) {
-      return 'none';
+      return { action: 'none' };
     }
 
     const criticalCount = issues.filter(i => i.severity === 'critical').length;
@@ -504,15 +528,135 @@ export class IntegrityManager {
     if (criticalCount >= this.RESET_THRESHOLDS.criticalIssues ||
         highCount >= this.RESET_THRESHOLDS.highSeverityIssues ||
         mediumCount >= this.RESET_THRESHOLDS.mediumSeverityIssues) {
-      return 'reset';
+      return { action: 'reset' };
     }
 
-    // For minor issues, catchup might be sufficient
+    // For minor issues, catchup with rollback might be sufficient
     if (highCount > 0 || mediumCount > 0) {
-      return 'catchup';
+      const rollbackInfo = this.calculateRollbackLSN(issues, clientLSN);
+      return { 
+        action: 'catchup', 
+        rollbackToLSN: rollbackInfo.lsn,
+        rollbackReason: rollbackInfo.reason
+      };
     }
 
-    return 'none';
+    return { action: 'none' };
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   */
+  private determineAction(issues: IntegrityIssue[]): 'none' | 'catchup' | 'reset' {
+    const result = this.determineActionAndRollback(issues, '0/0');
+    return result.action;
+  }
+
+  /**
+   * Calculate optimal rollback LSN based on integrity issues
+   */
+  private calculateRollbackLSN(issues: IntegrityIssue[], clientLSN: string): { 
+    lsn: string; 
+    reason: string 
+  } {
+    // Analyze issue types to determine rollback strategy
+    const hasLSNRegression = issues.some(i => i.type === 'lsn_regression');
+    const hasDataCorruption = issues.some(i => i.type === 'data_corruption');
+    const hasMissingRecords = issues.some(i => i.type === 'missing_records');
+    
+    // If we have LSN regression, we can try to rollback to a safer position
+    if (hasLSNRegression) {
+      const rollbackLSN = this.calculateSaferLSN(clientLSN, 'lsn_regression');
+      return {
+        lsn: rollbackLSN,
+        reason: `LSN regression detected - rolling back from ${clientLSN} to ${rollbackLSN} for safe catchup`
+      };
+    }
+
+    // For data corruption, rollback to avoid corrupted changes
+    if (hasDataCorruption) {
+      const rollbackLSN = this.calculateSaferLSN(clientLSN, 'data_corruption');
+      return {
+        lsn: rollbackLSN,
+        reason: `Data corruption detected - rolling back from ${clientLSN} to ${rollbackLSN} to exclude corrupted data`
+      };
+    }
+
+    // For missing records, rollback to ensure we get all changes
+    if (hasMissingRecords) {
+      const rollbackLSN = this.calculateSaferLSN(clientLSN, 'missing_records');
+      return {
+        lsn: rollbackLSN,
+        reason: `Missing records detected - rolling back from ${clientLSN} to ${rollbackLSN} to ensure complete sync`
+      };
+    }
+
+    // Default: conservative rollback for other issues
+    const rollbackLSN = this.calculateSaferLSN(clientLSN, 'general');
+    return {
+      lsn: rollbackLSN,
+      reason: `Integrity issues detected - rolling back from ${clientLSN} to ${rollbackLSN} for safe recovery`
+    };
+  }
+
+  /**
+   * Calculate a safer LSN by rolling back from current position
+   */
+  private calculateSaferLSN(currentLSN: string, issueType: string): string {
+    try {
+      // Parse LSN format: "A/B" where A and B are hex numbers
+      const [majorHex, minorHex] = currentLSN.split('/');
+      let major = parseInt(majorHex || '0', 16);
+      let minor = parseInt(minorHex || '0', 16);
+
+      // Calculate rollback amount based on issue type
+      let rollbackAmount: number;
+      switch (issueType) {
+        case 'lsn_regression':
+          // Aggressive rollback for LSN regression
+          rollbackAmount = 100 * 1024 * 1024; // 100MB
+          break;
+        case 'data_corruption':
+          // Significant rollback for data corruption
+          rollbackAmount = 50 * 1024 * 1024; // 50MB
+          break;
+        case 'missing_records':
+          // Moderate rollback for missing records
+          rollbackAmount = 20 * 1024 * 1024; // 20MB
+          break;
+        default:
+          // Conservative rollback for general issues
+          rollbackAmount = 10 * 1024 * 1024; // 10MB
+      }
+
+      // Convert to decimal for arithmetic
+      const currentDecimal = major * 0x1000000 + minor;
+      const rollbackDecimal = Math.max(0, currentDecimal - rollbackAmount);
+
+      // Convert back to LSN format
+      const newMajor = Math.floor(rollbackDecimal / 0x1000000);
+      const newMinor = rollbackDecimal % 0x1000000;
+
+      const rollbackLSN = `${newMajor.toString(16).toUpperCase()}/${newMinor.toString(16).toUpperCase()}`;
+      
+      syncLogger.info('Calculated rollback LSN', {
+        currentLSN,
+        rollbackLSN,
+        issueType,
+        rollbackAmount: `${rollbackAmount / (1024 * 1024)}MB`
+      }, MODULE_NAME);
+
+      return rollbackLSN;
+    } catch (error) {
+      syncLogger.error('Failed to calculate rollback LSN, using 0/0', {
+        currentLSN,
+        issueType,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
+      // Fallback to beginning if calculation fails
+      return '0/0';
+    }
   }
 
   /**
@@ -630,7 +774,7 @@ export class IntegrityManager {
 
   private lsnToDecimal(lsn: string): number {
     const [major, minor] = lsn.split('/');
-    return parseInt(major, 16) * 0x1000000 + parseInt(minor, 16);
+    return parseInt(major || '0', 16) * 0x1000000 + parseInt(minor || '0', 16);
   }
 
 

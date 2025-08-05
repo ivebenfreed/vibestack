@@ -29,17 +29,12 @@ const DebugSidebarContent = React.memo(function DebugSidebarContent() {
     {
       title: "Data Tables",
       items: [
-        { title: "Data Table V2", url: "/debug/data-table-v2", icon: Table },
-
         { title: "VibeGrid Native", url: "/debug/vibegrid-native", icon: Grid3X3 },
-
-        { title: "VibeGridFinal Tasks", url: "/debug/vibegridfinal-tasks", icon: Grid3X3 },
       ]
     },
     {
       title: "Testing",
       items: [
-        { title: "Sync Testing", url: "/debug/sync-test", icon: TestTube },
         { title: "Multi-Query", url: "/debug/multi-query", icon: Database },
         { title: "TypeORM Test", url: "/debug/typeorm-test", icon: Database },
       ]

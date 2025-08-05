@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import { UserRole } from "@repo/dataforge/server-entities";
 import { Kysely } from 'kysely';
 import { NeonHTTPDialect } from 'kysely-neon';
 import { initializeAuth } from '../lib/auth';
 import type { Env } from '../types/env';
-import { UserRole } from '@repo/dataforge/server-entities'; // Assuming server-entities is the correct path
 
 type BootstrapEnv = { Bindings: Env };
 const bootstrapRouter = new Hono<BootstrapEnv>();
@@ -31,7 +31,7 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     const existingSuperAdmin = await db
       .selectFrom('users')
       .selectAll()
-      .where('role', '=', UserRole.SUPER_ADMIN) // Use the enum value
+      .where('role', '=', 'super_admin') // Use the enum value directly
       .limit(1)
       .executeTakeFirst();
     if (existingSuperAdmin) {

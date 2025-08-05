@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LogOut, User } from 'lucide-react'
-import { useAuth } from '@/hooks/useSimpleAuth'
+import { useAuth } from '@/state-machines'
 import { useSignOut } from '@/hooks/use-sign-out'
 
 export function ProfileDropdown() {

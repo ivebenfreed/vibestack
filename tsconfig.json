@@ -1,20 +1,18 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2020",
     "module": "CommonJS",
-    "lib": ["ES2020", "DOM"],
-    "declaration": true,
-    "sourceMap": true,
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "baseUrl": ".",
-    "paths": {
-      "@dataforge/*": ["packages/dataforge/src/*"]
-    }
-  }
-} 
+    "moduleResolution": "node"
+  },
+  "references": [
+    { "path": "./apps/server" },
+    { "path": "./apps/web" },
+    { "path": "./packages/dataforge" },
+    { "path": "./packages/sync-test" },
+    { "path": "./packages/config/eslint-config" },
+    { "path": "./packages/config/tailwind-config" },
+    { "path": "./packages/config/typescript-config" }
+  ],
+  "files": [],
+  "include": []
+}

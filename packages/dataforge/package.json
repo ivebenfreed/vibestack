@@ -5,16 +5,32 @@
   "type": "module",
   "exports": {
     "./client-entities": {
-      "types": "./dist/client-entities.d.ts",
+      "types": "./dist/generated/client-entities.d.ts",
       "import": "./dist/client-entities.js"
     },
     "./server-entities": {
-      "types": "./dist/server-entities.d.ts",
+      "types": "./dist/generated/server-entities.d.ts",
       "import": "./dist/server-entities.js"
     },
-    "./column-configurations": {
-      "types": "./dist/column-configurations.d.ts",
-      "import": "./dist/column-configurations.js"
+    "./*-operations": {
+      "types": "./dist/generated/*-operations.d.ts",
+      "import": "./dist/*-operations.js"
+    },
+    "./crud-operations": {
+      "types": "./dist/generated/crud-operations.d.ts",
+      "import": "./dist/crud-operations.js"
+    },
+    "./dexie-schema": {
+      "types": "./dist/generated/dexie-schema.d.ts",
+      "import": "./dist/dexie-schema.js"
+    },
+    "./dexie-domain": {
+      "types": "./dist/generated/dexie-domain/index.d.ts",
+      "import": "./dist/dexie-domain/index.js"
+    },
+    "./dexie-domain/*": {
+      "types": "./dist/generated/dexie-domain/*.d.ts",
+      "import": "./dist/dexie-domain/*.js"
     },
     "./entities/*": {
       "types": "./dist/entities/*.d.ts",
@@ -36,44 +52,68 @@
     "dist"
   ],
   "scripts": {
-    "generate-entities": "node --loader ts-node/esm src/scripts/generate-entities.ts",
-    "generate-column-configs": "node --loader ts-node/esm src/scripts/generate-column-configs.ts",
-    "generate": "pnpm run generate-entities && pnpm run generate-column-configs",
-    "compile": "tsup",
-    "migration:generate:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
-    "migration:generate:client": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/client.ts migration:generate",
-    "migration:run:server": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:run",
-    "migration:run:client": "node --loader ts-node/esm ./node_modules/typeorm/cli.js -d src/datasources/client.ts migration:run",
-    "migration:upload-client": "node --loader ts-node/esm src/scripts/upload-client-migrations.ts",
-    "migration:clear": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts",
-    "migration:clear:all": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts --all",
-    "migration:clear:server": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts --server",
-    "migration:clear:published": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts --published",
-    "migration:clear:lite-local": "node --loader ts-node/esm src/scripts/clear-migration-tables.ts --lite-local",
+    "generate-entities": "tsx src/scripts/generate-entities.ts",
+    "generate-crud-operations": "tsx src/scripts/generate-crud-operations.ts",
+    "generate-client-schema": "tsx src/scripts/generate-dexie-schema.ts",
+    "generate-client-services": "tsx src/scripts/generate-dexie-domain-services.ts",
+    "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-client-schema && pnpm run generate-client-services",
+    "compile": "tsup && tsc --project tsconfig.dts.json",
+    "build": "pnpm run forge:build",
+    "migration:generate:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
+    "migration:run:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:run",
+    "migration:run:server:dev": "NODE_ENV=development tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:run",
+    "migration:run:server:staging": "NODE_ENV=preview tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:run",
+    "migration:run:server:prod": "NODE_ENV=production tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:run",
+    "migration:generate:server:dev": "NODE_ENV=development tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
+    "migration:generate:server:staging": "NODE_ENV=preview tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
+    "migration:generate:server:prod": "NODE_ENV=production tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",
+    "migration:revert:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:revert",
+    "migration:revert:server:dev": "NODE_ENV=development tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:revert",
+    "migration:revert:server:staging": "NODE_ENV=preview tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:revert",
+    "migration:revert:server:prod": "NODE_ENV=production tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:revert",
+    "migration:show:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:show",
+    "migration:show:server:dev": "NODE_ENV=development tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:show",
+    "migration:show:server:staging": "NODE_ENV=preview tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:show",
+    "migration:show:server:prod": "NODE_ENV=production tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:show",
+    "migration:run:local": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server-local.ts migration:run",
+    "migration:generate:local": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server-local.ts migration:generate",
+    "migration:show:local": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server-local.ts migration:show",
+    "migration:revert:local": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server-local.ts migration:revert",
+    "migration:clear": "tsx src/scripts/clear-migration-tables.ts",
+    "migration:clear:all": "tsx src/scripts/clear-migration-tables.ts --all",
+    "migration:clear:server": "tsx src/scripts/clear-migration-tables.ts --server",
+    "migration:clear:published": "tsx src/scripts/clear-migration-tables.ts --published",
     "forge:build": "pnpm run generate && pnpm run compile",
-    "forge:migrate": "node --loader ts-node/esm src/scripts/manage-migrations.ts",
-    "forge:trigger:apply": "node --loader ts-node/esm src/scripts/manage-trigger-migration.ts",
+    "forge:client": "pnpm run generate-client-schema",
+    "forge:migrate": "tsx src/scripts/manage-migrations.ts",
+    "forge:migrate:preview": "NODE_ENV=preview tsx src/scripts/manage-migrations.ts",
+    "forge:migrate:production": "NODE_ENV=production tsx src/scripts/manage-migrations.ts",
+    "forge:trigger:apply": "tsx src/scripts/manage-trigger-migration.ts",
     "deploy": "pnpm run forge:build && pnpm run forge:migrate generate && pnpm run forge:migrate run",
+    "entity:update": "tsx src/scripts/entity-update.ts",
+    "entity:update:full": "tsx src/scripts/entity-update.ts --full",
     "test": "vitest",
-    "seed": "node --loader ts-node/esm src/scripts/seed.ts",
-    "debug:changes": "node --loader ts-node/esm src/scripts/debug-changes.ts"
+    "seed:task-statuses": "tsx src/seeds/seed-task-statuses.ts",
+    "seed:tags": "tsx src/seeds/seed-tags.ts",
+    "seed:all": "pnpm run seed:task-statuses && pnpm run seed:tags",
+    "ensure-docker:local": "node ../../scripts/ensure-docker-services.js"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.3.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dexie": "^4.0.11",
     "dotenv": "^16.5.0",
     "pg": "^8.15.6",
     "reflect-metadata": "^0.1.14",
-    "typeorm": "^0.3.22",
-    "typeorm-pglite": "^0.3.2"
+    "typeorm": "^0.3.22"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.7.0",
     "@microsoft/api-extractor": "^7.52.5",
+    "@swc/core-linux-x64-gnu": "^1.13.3",
     "@types/node": "^18.19.87",
-    "ts-node": "^10.9.2",
-    "tsup": "^8.4.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "vitest": "^1.6.1"
   },

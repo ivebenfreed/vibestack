@@ -11,7 +11,7 @@ export interface ExecutionContext {
   props: any;
 }
 
-export type DeploymentEnv = 'development' | 'staging' | 'production';
+export type DeploymentEnv = 'development' | 'staging' | 'production' | 'local';
 export type LogLevel = 'error' | 'debug' | 'info' | 'warn';
 
 /**
@@ -34,6 +34,9 @@ export interface Env {
   // Auth variables
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  RESEND_API_KEY: string;
   
   // Durable Object bindings (from wrangler.toml)
   SYNC: DurableObjectNamespace; 
