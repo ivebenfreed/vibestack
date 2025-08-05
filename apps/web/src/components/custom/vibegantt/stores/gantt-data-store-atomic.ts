@@ -3,6 +3,7 @@ import { db } from '@repo/dataforge/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '../types';
+import { taskService } from '@/domain/task-service';
 
 // ====================================
 // MEMORY LIMITS
@@ -706,9 +707,7 @@ export async function loadInitialGanttData(projectId?: string) {
     projectIds.length > 0 ? db.projects.where('id').anyOf(projectIds).toArray() : [],
     statusIds.length > 0 ? db.status_definitions.where('id').anyOf(statusIds).toArray() : [],
     tagIds.length > 0 ? db.tags.where('id').anyOf(tagIds).toArray() : [],
-    db.entity_dependencies.where('entityType').equals('Task')
-      .and(dep => taskIds.includes(dep.predecessorId) || taskIds.includes(dep.successorId))
-      .toArray()
+    taskService.getDependenciesForTasks(taskIds)
   ]);
   
   // Log dependency query results
@@ -909,10 +908,7 @@ export function setupGranularGanttSubscriptions(
   
   // Subscribe to dependency changes
   const depSub = liveQuery(async () => {
-    let dependencies = await db.entity_dependencies
-      .where('entityType')
-      .equals('Task')
-      .toArray();
+    let dependencies = await taskService.getTaskDependencies();
     
     if (projectId) {
       const projectTasks = await db.tasks.where('projectId').equals(projectId).toArray();
