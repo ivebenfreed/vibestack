@@ -1,0 +1,3 @@
+2025/08/05-07:14:24.863 27943b Reusing MANIFEST /home/benfreed/vibestack/.playwright/profiles/profile-main/Default/IndexedDB/http_localhost_5173.indexeddb.leveldb/MANIFEST-000001
+2025/08/05-07:14:24.863 27943b Recovering log #3
+2025/08/05-07:14:24.865 27943b Reusing old log /home/benfreed/vibestack/.playwright/profiles/profile-main/Default/IndexedDB/http_localhost_5173.indexeddb.leveldb/000003.log 

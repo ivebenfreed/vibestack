@@ -45,25 +45,13 @@ function getPorts(issueNumber) {
 
 const issueNumber = getIssueNumber();
 const ports = getPorts(issueNumber);
-const authFile = path.resolve(process.cwd(), '.playwright', 'auth', `auth-${issueNumber}.json`);
+const userDataDir = path.resolve(process.cwd(), '.playwright', 'profiles', `profile-${issueNumber}`);
 
-// Check if auth file exists and is recent (less than 24 hours old)
-const fs = require('fs');
-let authExists = false;
-try {
-  const stats = fs.statSync(authFile);
-  const age = Date.now() - stats.mtime.getTime();
-  authExists = age < 24 * 60 * 60 * 1000; // 24 hours
-} catch (error) {
-  authExists = false;
-}
-
-console.log(`🎭 Playwright Config:`);
+console.log(`🎭 Playwright Config (Persistent Context):`);
 console.log(`   Issue: ${issueNumber}`);
 console.log(`   Web Port: ${ports.webPort}`);
 console.log(`   Server Port: ${ports.serverPort}`);
-console.log(`   Auth State: ${authFile}`);
-console.log(`   Auth Exists: ${authExists ? '✅ Using existing auth' : '❌ Will create new auth'}`);
+console.log(`   Profile Dir: ${userDataDir}`);
 
 export default defineConfig({
   testDir: './tests/playwright',
@@ -90,24 +78,14 @@ export default defineConfig({
   },
 
   projects: [
-    // Setup project that handles authentication (only runs if auth doesn't exist)
-    { 
-      name: 'setup', 
-      testMatch: /.*auth\.setup\.js/,
-      use: {
-        ...devices['Desktop Chrome'],
-      },
-    },
-    // Main test project that uses the stored auth state
     {
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Use the stored authentication state if it exists
-        ...(authExists ? { storageState: authFile } : {}),
+        // Note: userDataDir doesn't work here for persistent context
+        // We'll use a custom fixture instead
+        headless: false,
       },
-      // Only depend on setup if auth doesn't exist
-      ...(authExists ? {} : { dependencies: ['setup'] }),
     },
   ],
 });
