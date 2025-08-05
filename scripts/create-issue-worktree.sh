@@ -284,5 +284,14 @@ elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     echo "To stop servers when done:"
     echo "   ./scripts/bg-stop.sh vibestack-dev-issue-${ISSUE_NUMBER}"
 else
-    pnpm dev:local
+    # Start servers in background using tmux
+    echo "🚀 Starting servers in background..."
+    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev:local"
+    
+    echo ""
+    echo "📝 Servers are starting in background. To view logs:"
+    echo "   ./scripts/bg-logs.sh vibestack-dev-issue-${ISSUE_NUMBER}"
+    echo ""
+    echo "To stop servers when done:"
+    echo "   ./scripts/bg-stop.sh vibestack-dev-issue-${ISSUE_NUMBER}"
 fi

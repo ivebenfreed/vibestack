@@ -6,6 +6,7 @@ import { addDays, addWeeks, startOfDay } from 'date-fns';
 import { taskService } from '@/domain/task-service';
 import { entityDependencyService } from '@/domain/entity-dependency-service';
 import type { EntityDependency } from '@repo/dataforge/client-entities';
+import { usePlaywrightReady } from '@/hooks/use-playwright-ready';
 
 export const Route = createFileRoute('/_authenticated/debug/vibegantt')({
   component: VibeGanttDebug,
@@ -13,6 +14,10 @@ export const Route = createFileRoute('/_authenticated/debug/vibegantt')({
 
 function VibeGanttDebug() {
   console.log('🎯 VibeGanttDebug: Using original VibeGantt with atomic store');
+  
+  // Signal to Playwright that the VibeGantt debug page is ready
+  usePlaywrightReady('[PLAYWRIGHT_READY] VibeGantt debug page loaded');
+  
   // Tasks will be loaded from the database by VibeGantt
   
   // Project selection state - use the test project ID we created
