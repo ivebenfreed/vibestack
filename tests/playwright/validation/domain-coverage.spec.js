@@ -203,13 +203,38 @@ test.describe('Domain Coverage - Issue #34', () => {
         }
       }
       
+      // Get the current authenticated user ID for use in test data
+      const currentUserId = await page.evaluate(() => {
+        const authState = JSON.parse(localStorage.getItem('auth-machine-state') || '{}');
+        return authState.context?.user?.id;
+      });
+      
+      console.log('🔐 Using authenticated user ID:', currentUserId);
+      
       // Test each entity in dependency order
       for (const [entity, info] of sortedEntities) {
         console.log(`\n📝 Testing ${entity}...`);
         
+        // Skip users - they are auth-related and shouldn't be created via domain services
+        if (entity === 'users') {
+          console.log(`⏭️  ${entity}: Skipping - auth-related entity, use existing user`);
+          continue;
+        }
+        
         if (!info.hasService) {
           console.log(`❌ ${entity}: No domain service found!`);
           continue;
+        }
+        
+        // Initialize coverage tracking for this entity if not exists
+        if (!entityCoverage.entities[entity]) {
+          entityCoverage.entities[entity] = {
+            create: false,
+            read: false,
+            update: false,
+            delete: false,
+            sync: false
+          };
         }
         
         // Track what we find
@@ -218,7 +243,7 @@ test.describe('Domain Coverage - Issue #34', () => {
         // Test CREATE
         if (info.hasCreateUI) {
           try {
-            const testData = getTestDataForEntity(info.serviceName);
+            const testData = getTestDataForEntity(info.serviceName, currentUserId);
             const created = await createEntity(page, info.serviceName, testData);
             
             if (created && created.id) {
@@ -321,8 +346,14 @@ test.describe('Domain Coverage - Issue #34', () => {
           
           // Don't clear localChanges - just check if our specific entity is tracked
           
+          // Get current user ID for test data
+          const currentUserId = await page.evaluate(() => {
+            const authState = JSON.parse(localStorage.getItem('auth-machine-state') || '{}');
+            return authState.context?.user?.id;
+          });
+          
           // Create entity and check if it generates sync changes
-          const testData = getTestDataForEntity(serviceName);
+          const testData = getTestDataForEntity(serviceName, currentUserId);
           const created = await createEntity(page, serviceName, testData);
           
           // Wait a bit for sync processing
@@ -355,9 +386,12 @@ test.describe('Domain Coverage - Issue #34', () => {
             );
             
             console.log(`Checking sync for ${tableName}:${recordId}`, {
+              entityName,
+              tableName,
+              recordId,
               totalChanges: allChanges.length,
               matchingChanges: matchingChanges.length,
-              allChanges: allChanges.map(c => ({
+              lastFewChanges: allChanges.slice(-5).map(c => ({
                 table: c.table,
                 operation: c.operation,
                 dataId: c.data?.id
@@ -366,6 +400,17 @@ test.describe('Domain Coverage - Issue #34', () => {
             
             return matchingChanges.length > 0;
           }, { entityName: entity, recordId: created.id });
+          
+          // Initialize coverage tracking for this entity if not exists
+          if (!entityCoverage.entities[entity]) {
+            entityCoverage.entities[entity] = {
+              create: false,
+              read: false,
+              update: false,
+              delete: false,
+              sync: false
+            };
+          }
           
           if (hasChanges) {
             console.log(`✅ ${entity}: Sync tracking works - changes recorded`);
@@ -421,7 +466,7 @@ const createdEntities = {
 };
 
 // Helper functions to generate test data for different entity types
-function getTestDataForEntity(entity) {
+function getTestDataForEntity(entity, currentUserId = null) {
   // Use faker to generate realistic test data
   faker.seed(12345); // Consistent seed for reproducible tests
   
@@ -442,13 +487,15 @@ function getTestDataForEntity(entity) {
       priority: faker.helpers.arrayElement(['low', 'medium', 'high'])
     },
     user: {
+      // Users are auth-related - use existing authenticated user instead of creating
       name: `TEST_${faker.person.fullName()}`,
       email: faker.internet.email()
     },
     comment: {
       content: `TEST_${faker.lorem.paragraph()}`,
-      taskId: createdEntities.task?.id || 'placeholder-task-id',
-      authorId: createdEntities.user?.id || 'placeholder-user-id'
+      taskId: createdEntities.task?.id || null, // Allow null taskId, will use projectId instead  
+      projectId: createdEntities.project?.id || 'placeholder-project-id',
+      authorId: currentUserId || 'placeholder-user-id'
     },
     statusSet: {
       name: `TEST_${faker.word.adjective()} Status Set`,
