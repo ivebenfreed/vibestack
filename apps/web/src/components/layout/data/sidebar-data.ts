@@ -309,12 +309,6 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             url: '/debug/sync',
             icon: IconBug,
           },
-
-          {
-            title: 'Sync Testing',
-            url: '/debug/sync-test',
-            icon: IconBug,
-          },
           {
             title: 'Live Query',
             url: '/debug/live-query',
