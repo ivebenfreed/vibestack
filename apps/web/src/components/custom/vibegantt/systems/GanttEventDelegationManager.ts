@@ -204,9 +204,17 @@ export class GanttEventDelegationManager {
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       
-      // For now, just prevent default - zoom handling needs to be implemented
-      // in the machine/store layer
-      console.log('Zoom requested:', event.deltaY > 0 ? 'out' : 'in');
+      // Calculate zoom direction based on wheel delta
+      const zoomIn = event.deltaY < 0;
+      
+      // Send ZOOM_REQUEST event to the machine
+      // The machine will handle determining the new zoom level
+      this.sendEvent({
+        type: 'ZOOM_REQUEST',
+        direction: zoomIn ? 'in' : 'out'
+      });
+      
+      console.log('Zoom requested:', zoomIn ? 'in' : 'out');
     }
     // Let native scroll handle panning
   }
