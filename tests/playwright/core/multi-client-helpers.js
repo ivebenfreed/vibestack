@@ -63,10 +63,14 @@ export async function createSyncedClient(browser, profileSuffix) {
   if (!isLoggedIn) {
     console.log(`🔐 Logging in new client profile...`);
     
+    if (!process.env.VIBE_DEV_PASSWORD) {
+      throw new Error('VIBE_DEV_PASSWORD environment variable is required for multi-client login');
+    }
+    
     // Wait for login form and fill it
     await page.waitForSelector('input[type="email"]', { timeout: 10000 });
     await page.fill('input[type="email"]', 'ben@getelevra.com');
-    await page.fill('input[type="password"]', 'password123');
+    await page.fill('input[type="password"]', process.env.VIBE_DEV_PASSWORD);
     await page.click('button[type="submit"]');
     
     // Wait for login to complete
