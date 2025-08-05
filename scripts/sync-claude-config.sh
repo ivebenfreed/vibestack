@@ -116,8 +116,8 @@ update_claude_md_auth_state() {
     
     echo "📝 Updating CLAUDE.md with actual auth state for Issue #$issue_number..."
     
-    # Extract LSN from auth file
-    local lsn=$(grep -o '"currentLSN":"[^"]*"' "$auth_file" | sed 's/"currentLSN":"\([^"]*\)"/\1/')
+    # Auth state contains LSN naturally in localStorage - no extraction needed
+    local lsn="persisted in browser session"
     local file_size=$(stat -c%s "$auth_file" 2>/dev/null || stat -f%z "$auth_file" 2>/dev/null || echo "unknown")
     
     # Update the Playwright Test Environment section if it exists
