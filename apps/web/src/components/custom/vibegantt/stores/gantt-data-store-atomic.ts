@@ -6,6 +6,7 @@ import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '..
 import { taskService } from '@/domain/task-service';
 import { entityDependencyService } from '@/domain/entity-dependency-service';
 import { calculateCoordinateMapping, type CoordinateMapping } from '../utils/coordinate-mapper';
+import { ZOOM_UTILS } from '../constants';
 
 // ====================================
 // MEMORY LIMITS
@@ -57,7 +58,8 @@ export const createGanttStoreLogic = (projectId?: string) => {
         start: new Date(),
         end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
       },
-      zoom: persistedState?.zoom || 'day' as 'hour' | 'day' | 'week' | 'month',
+      zoomLevel: persistedState?.zoomLevel || 'day' as 'hour' | 'day' | 'week' | 'month',
+      zoomFactor: persistedState?.zoomFactor || 1.0,
       showWeekends: persistedState?.showWeekends ?? true,
       showDependencies: persistedState?.showDependencies ?? true,
       
@@ -119,7 +121,8 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoom: context.zoom,
+            zoomLevel: context.zoomLevel,
+            zoomFactor: context.zoomFactor,
           });
         },
         loading: false,
@@ -183,7 +186,8 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoom: context.zoom,
+            zoomLevel: context.zoomLevel,
+            zoomFactor: context.zoomFactor,
           });
         },
         lastUpdatedAt: Date.now()
@@ -367,7 +371,8 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree: context.taskTree,
             expandedTasks: expanded,
             visibleDateRange: context.visibleDateRange,
-            zoom: context.zoom,
+            zoomLevel: context.zoomLevel,
+            zoomFactor: context.zoomFactor,
           });
         }
       },
@@ -391,17 +396,19 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree: context.taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: event.range,
-            zoom: context.zoom,
+            zoomLevel: context.zoomLevel,
+            zoomFactor: context.zoomFactor,
           });
         }
       },
       
       setZoom: {
-        zoom: (context, event: { zoom: 'hour' | 'day' | 'week' | 'month' }) => {
+        zoomLevel: (context, event: { zoom: 'hour' | 'day' | 'week' | 'month' }) => {
           // Persist zoom level
           saveDisplayState(context.projectId || 'global', {
             ...context,
-            zoom: event.zoom
+            zoomLevel: event.zoom,
+            zoomFactor: context.zoomFactor
           });
           return event.zoom;
         },
@@ -411,7 +418,63 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree: context.taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoom: event.zoom,
+            zoomLevel: event.zoom,
+            zoomFactor: context.zoomFactor,
+          });
+        }
+      },
+      
+      ZOOM_REQUEST: {
+        zoomLevel: (context, event: { direction: 'in' | 'out' }) => {
+          // Calculate next zoom based on current state
+          const nextZoom = ZOOM_UTILS.calculateNextZoom(
+            context.zoomLevel,
+            context.zoomFactor,
+            event.direction
+          );
+          
+          // Persist zoom level
+          saveDisplayState(context.projectId || 'global', {
+            ...context,
+            zoomLevel: nextZoom.level,
+            zoomFactor: nextZoom.factor
+          });
+          
+          return nextZoom.level;
+        },
+        zoomFactor: (context, event: { direction: 'in' | 'out' }) => {
+          // Calculate next zoom based on current state
+          const nextZoom = ZOOM_UTILS.calculateNextZoom(
+            context.zoomLevel,
+            context.zoomFactor,
+            event.direction
+          );
+          
+          return nextZoom.factor;
+        },
+        coordinateMapping: (context, event) => {
+          // Calculate next zoom based on current state
+          const nextZoom = ZOOM_UTILS.calculateNextZoom(
+            context.zoomLevel,
+            context.zoomFactor,
+            event.direction
+          );
+          
+          // Recalculate with new zoom level and factor
+          console.log('📊 GanttStore: Updating zoom', { 
+            direction: event.direction,
+            currentLevel: context.zoomLevel,
+            currentFactor: context.zoomFactor,
+            nextLevel: nextZoom.level,
+            nextFactor: nextZoom.factor 
+          });
+          
+          return calculateCoordinateMapping({
+            taskTree: context.taskTree,
+            expandedTasks: context.expandedTasks,
+            visibleDateRange: context.visibleDateRange,
+            zoomLevel: nextZoom.level,
+            zoomFactor: nextZoom.factor,
           });
         }
       },

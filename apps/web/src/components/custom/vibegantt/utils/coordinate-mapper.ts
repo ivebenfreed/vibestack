@@ -35,7 +35,8 @@ interface CalculateCoordinatesParams {
   taskTree: any[];
   expandedTasks: Set<string>;
   visibleDateRange: { start: Date; end: Date };
-  zoom: TimeScale;
+  zoomLevel: TimeScale;
+  zoomFactor?: number;
   rowHeight?: number;
   dayWidth?: number;
 }
@@ -48,9 +49,10 @@ export function calculateCoordinateMapping({
   taskTree,
   expandedTasks,
   visibleDateRange,
-  zoom,
+  zoomLevel,
+  zoomFactor = 1.0,
   rowHeight = 40,
-  dayWidth = 50,
+  dayWidth: customDayWidth,
 }: CalculateCoordinatesParams): CoordinateMapping {
   // Ensure dates are valid Date objects (handle both Date objects and ISO strings)
   const parseDate = (date: any): Date => {
@@ -68,7 +70,8 @@ export function calculateCoordinateMapping({
     
   console.log('📐 Calculating coordinate mapping', {
     taskCount: taskTree.length,
-    zoom,
+    zoomLevel,
+    zoomFactor,
     dateRange: visibleDateRange,
     dateRangeDetails: {
       start: validStart,
@@ -86,15 +89,16 @@ export function calculateCoordinateMapping({
   startDate.setDate(startDate.getDate() - 7);
   endDate.setDate(endDate.getDate() + 7);
   
-  // Calculate day width based on zoom
-  const zoomConfig = TIME_SCALE_CONFIG[zoom];
-  const adjustedDayWidth = dayWidth * (zoomConfig?.dayWidth || 1);
+  // Calculate day width based on zoom level and factor
+  const zoomConfig = TIME_SCALE_CONFIG[zoomLevel];
+  const baseDayWidth = customDayWidth || zoomConfig.minPixelsPerUnit;
+  const adjustedDayWidth = baseDayWidth * zoomFactor;
   
   // Calculate timeline segments
   const timelineSegments = calculateTimelineSegments(
     startDate,
     endDate,
-    zoom,
+    zoomLevel,
     adjustedDayWidth
   );
   

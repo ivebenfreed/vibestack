@@ -10,25 +10,13 @@ export const timelineSlice = {
         // Handle zoom requests from event delegation
         ZOOM_REQUEST: {
           actions: [
-            // Forward zoom event to store with calculated level/factor
+            // Forward zoom direction to store
             ({ context, event }) => {
               if (context.dataStore) {
-                // Get current zoom from store
-                const storeSnapshot = context.dataStore.getSnapshot();
-                const { zoomLevel, zoomFactor } = storeSnapshot.context;
-                
-                // Calculate next zoom using ZOOM_UTILS
-                const nextZoom = ZOOM_UTILS.calculateNextZoom(
-                  zoomLevel,
-                  zoomFactor,
-                  event.direction
-                );
-                
-                // Send UPDATE_ZOOM to store
+                // Simply forward the zoom request to store
                 context.dataStore.send({
-                  type: 'UPDATE_ZOOM',
-                  level: nextZoom.level,
-                  factor: nextZoom.factor
+                  type: 'ZOOM_REQUEST',
+                  direction: event.direction
                 });
               }
             }
