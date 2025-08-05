@@ -1,6 +1,6 @@
 // tests/playwright/test-template.spec.js
-// Template for new Playwright tests - uses existing auth state gracefully
-import { test, expect } from '@playwright/test';
+// Template for new Playwright tests - uses persistent browser context
+import { test, expect } from '../fixtures/persistent-context.js';
 
 test.describe('Test Template', () => {
   test.setTimeout(60000);
@@ -12,46 +12,15 @@ test.describe('Test Template', () => {
     await page.goto('/');
     console.log('🌐 Navigated to app');
     
-    // Check if we need to handle auth (graceful fallback)
-    const needsAuth = await page.evaluate(() => {
-      const path = window.location.pathname;
-      const hasLoginForm = document.querySelector('input[type="email"], input[name="email"]');
-      return (path.includes('/login') || 
-              path.includes('/sign-in') ||
-              path.includes('/handler')) || hasLoginForm;
-    });
+    // With persistent context, we should already be logged in
+    // Just wait for app initialization
+    await page.waitForFunction(() => {
+      // Check if React app is ready
+      return document.querySelector('#root') && 
+             !document.querySelector('[data-loading="true"]');
+    }, { timeout: 30000 });
     
-    if (needsAuth) {
-      console.log('🔐 Auth state expired, logging in...');
-      
-      // Load credentials from environment
-      const email = process.env.VIBE_DEV_EMAIL || 'ben@getelevra.com';
-      const password = process.env.VIBE_DEV_PASSWORD;
-      
-      if (!password) {
-        console.log('⚠️ No password found in environment, skipping auth');
-        test.skip();
-        return;
-      }
-      
-      // Fill login form
-      await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 10000 });
-      await page.locator('input[type="email"], input[name="email"]').first().fill(email);
-      await page.locator('input[type="password"], input[name="password"]').first().fill(password);
-      await page.locator('button:has-text("Login")').first().click();
-      
-      // Wait for redirect
-      await page.waitForFunction(() => {
-        const path = window.location.pathname;
-        return !path.includes('/login') && 
-               !path.includes('/sign-in') &&
-               !path.includes('/handler');
-      }, { timeout: 30000 });
-      
-      console.log('✅ Login successful');
-    } else {
-      console.log('✅ Already authenticated via stored state');
-    }
+    console.log('✅ App initialized with persistent context');
     
     // Wait for any sync overlay to disappear
     const syncOverlay = page.locator('text="Syncing data"');
