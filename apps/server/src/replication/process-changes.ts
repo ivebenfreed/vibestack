@@ -1,5 +1,5 @@
 import type { TableChange, RelationshipUpdate } from '@repo/sync-types';
-import { ChangeHistory } from '@repo/dataforge/server-entities';
+import type { ChangeHistory } from '@repo/dataforge/server-entities';
 import { replicationLogger } from '../middleware/logger';
 import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';

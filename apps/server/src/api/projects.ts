@@ -7,8 +7,9 @@ import {
   createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import type { Project, ProjectStatus } from '@repo/dataforge/server-entities';
 import { ProjectRepository } from '../domains/projects';
+import { ProjectStatus } from '@repo/dataforge/server-entities';
+import type { Project } from '@repo/dataforge/server-entities';
 
 // Input types for API
 export type ProjectCreateInput = Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'members' | 'tasks'>>;

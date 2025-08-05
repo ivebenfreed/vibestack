@@ -17,13 +17,16 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@repo/sync-types": ["../../packages/sync-types/src"],
-      "@repo/dataforge/*": ["../../packages/dataforge/src/*"]
+      "@repo/sync-types": ["../../packages/sync-types/src"]
     },
     
     // Relax some strictness for Workers environment
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    
+    // Allow JS files for type inference
+    "allowJs": true,
+    "checkJs": false
   },
   "include": [
     "src/**/*", 

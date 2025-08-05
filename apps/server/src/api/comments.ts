@@ -7,8 +7,19 @@ import {
   createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import { Comment } from '../domains/comments';
 import { CommentRepository } from '../domains/comments';
+
+// Local interface for Comment to work around module resolution issues
+interface Comment {
+  id: string;
+  content: string;
+  authorId?: string;
+  parentId?: string;
+  taskId?: string;
+  projectId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 // Input types for API
 export type CommentCreateInput = Partial<Omit<Comment, 'id' | 'createdAt' | 'updatedAt'>>;

@@ -503,7 +503,7 @@ ${storeEntries}
 import { Dexie, Table } from 'dexie';
 import type { 
   ${entityImports}
-} from '../client-entities.js';
+} from './client-entities.js';
 
 // Junction table types
 ${junctionInterfaces}

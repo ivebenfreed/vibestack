@@ -66,7 +66,7 @@ export class Account {
 
   password?: string;
 
-  user!: User;
+  user!: Promise<User>;
 
 }
 
@@ -129,13 +129,13 @@ export class Comment {
 
   projectId?: string;
 
-  author?: User;
+  author?: Promise<User>;
 
   parent?: Promise<Comment>;
 
-  task?: Task;
+  task?: Promise<Task>;
 
-  project?: Project;
+  project?: Promise<Project>;
 
 }
 
@@ -196,15 +196,15 @@ export class Project {
 
   ownerId?: string;
 
-  owner?: User;
+  owner?: Promise<User>;
 
-  members!: User[];
+  members!: Promise<User[]>;
 
-  tasks!: Task[];
+  tasks!: Promise<Task[]>;
 
-  statusSets!: StatusSet[];
+  statusSets!: Promise<StatusSet[]>;
 
-  tagSets!: TagSet[];
+  tagSets!: Promise<TagSet[]>;
 
 }
 
@@ -225,7 +225,7 @@ export class Session {
 
   userAgent?: string;
 
-  user!: User;
+  user!: Promise<User>;
 
 }
 
@@ -264,9 +264,9 @@ export class StatusDefinition {
 
   metadata!: any;
 
-  statusSet!: StatusSet;
+  statusSet!: Promise<StatusSet>;
 
-  tasks!: Task[];
+  tasks!: Promise<Task[]>;
 
 }
 
@@ -295,9 +295,9 @@ export class StatusSet {
 
   metadata!: any;
 
-  statuses!: StatusDefinition[];
+  statuses!: Promise<StatusDefinition[]>;
 
-  projects!: Project[];
+  projects!: Promise<Project[]>;
 
 }
 
@@ -334,13 +334,13 @@ export class Tag {
 
   metadata!: any;
 
-  tagSet!: TagSet;
+  tagSet!: Promise<TagSet>;
 
   parent?: Promise<Tag>;
 
   children!: Promise<Tag[]>;
 
-  tasks!: Task[];
+  tasks!: Promise<Task[]>;
 
 }
 
@@ -373,9 +373,9 @@ export class TagSet {
 
   metadata!: any;
 
-  tags!: Tag[];
+  tags!: Promise<Tag[]>;
 
-  projects!: Project[];
+  projects!: Promise<Project[]>;
 
 }
 
@@ -414,13 +414,13 @@ export class Task {
 
   assigneeId?: string;
 
-  status!: StatusDefinition;
+  status!: Promise<StatusDefinition>;
 
-  tags!: Tag[];
+  tags!: Promise<Tag[]>;
 
-  project?: Project;
+  project?: Promise<Project>;
 
-  assignee?: User;
+  assignee?: Promise<User>;
 
   dependencies!: Promise<Task[]>;
 
@@ -447,15 +447,15 @@ export class User {
 
   role!: UserRole;
 
-  tasks!: Task[];
+  tasks!: Promise<Task[]>;
 
-  ownedProjects!: Project[];
+  ownedProjects!: Promise<Project[]>;
 
-  memberProjects!: Project[];
+  memberProjects!: Promise<Project[]>;
 
-  sessions!: Session[];
+  sessions!: Promise<Session[]>;
 
-  accounts!: Account[];
+  accounts!: Promise<Account[]>;
 
 }
 

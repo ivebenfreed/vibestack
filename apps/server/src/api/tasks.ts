@@ -7,8 +7,9 @@ import {
   createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import type { Task, TaskStatus } from '@repo/dataforge/server-entities';
 import { TaskRepository } from '../domains/tasks';
+import { TaskStatus } from '@repo/dataforge/server-entities';
+import type { Task } from '@repo/dataforge/server-entities';
 
 // Input types for API
 export type TaskCreateInput = Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'tags' | 'dependencies' | 'dependents'>>;
