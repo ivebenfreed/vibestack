@@ -71,7 +71,7 @@ export function useLiveTasksWithRelations(projectId?: string) {
       const [users, projects, statuses] = await Promise.all([
         db.users.bulkGet(Array.from(userIds)),
         db.projects.bulkGet(Array.from(projectIds)),
-        db.status_definitions.bulkGet(Array.from(statusIds))
+        db.statusDefinitions.bulkGet(Array.from(statusIds))
       ]);
 
       // Create lookup maps
@@ -91,7 +91,7 @@ export function useLiveTasksWithRelations(projectId?: string) {
 
       // Load tags for all tasks
       const taskIds = tasks.map(t => t.id);
-      const taskTags = await db.task_tags
+      const taskTags = await db.taskTags
         .where('taskId')
         .anyOf(taskIds)
         .toArray();
@@ -264,7 +264,7 @@ export function useLiveTags() {
 export function useLiveTagSets() {
   return useLiveQuery(
     async () => {
-      return await db.tag_sets.toArray();
+      return await db.tagSets.toArray();
     }
   );
 }
@@ -275,7 +275,7 @@ export function useLiveTagSets() {
 export function useLiveStatusDefinitions() {
   return useLiveQuery(
     async () => {
-      return await db.status_definitions.toArray();
+      return await db.statusDefinitions.toArray();
     }
   );
 }
@@ -286,7 +286,7 @@ export function useLiveStatusDefinitions() {
 export function useLiveStatusSets() {
   return useLiveQuery(
     async () => {
-      return await db.status_sets.toArray();
+      return await db.statusSets.toArray();
     }
   );
 }
@@ -299,7 +299,7 @@ export function useLiveTaskTags(taskId: string | undefined) {
     async () => {
       if (!taskId) return [];
       
-      const taskTags = await db.task_tags
+      const taskTags = await db.taskTags
         .where('taskId')
         .equals(taskId)
         .toArray();

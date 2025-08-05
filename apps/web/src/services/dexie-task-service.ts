@@ -51,7 +51,7 @@ export const dexieTaskService = {
     const [assignee, project, status, tags, dependencies] = await Promise.all([
       task.assigneeId ? db.users.get(task.assigneeId) : undefined,
       task.projectId ? db.projects.get(task.projectId) : undefined,
-      task.statusId ? db.status_definitions.get(task.statusId) : undefined,
+      task.statusId ? db.statusDefinitions.get(task.statusId) : undefined,
       this.loadTags(id),
       this.loadDependencies(id)
     ]);
@@ -81,15 +81,15 @@ export const dexieTaskService = {
     tagIds?: string[],
     dependencyIds?: string[]
   ): Promise<void> {
-    await db.transaction('rw', db.tasks, db.task_tags, db.task_dependencies, async () => {
+    await db.transaction('rw', db.tasks, db.taskTags, db.taskDependencies, async () => {
       // Save the main entity
       await db.tasks.put(task);
 
       // Update tags if provided
       if (tagIds !== undefined) {
-        await db.task_tags.where('taskId').equals(task.id).delete();
+        await db.taskTags.where('taskId').equals(task.id).delete();
         if (tagIds.length > 0) {
-          await db.task_tags.bulkAdd(
+          await db.taskTags.bulkAdd(
             tagIds.map(tagId => ({ taskId: task.id, tagId }))
           );
         }
@@ -97,9 +97,9 @@ export const dexieTaskService = {
 
       // Update dependencies if provided
       if (dependencyIds !== undefined) {
-        await db.task_dependencies.where('dependentTaskId').equals(task.id).delete();
+        await db.taskDependencies.where('dependentTaskId').equals(task.id).delete();
         if (dependencyIds.length > 0) {
-          await db.task_dependencies.bulkAdd(
+          await db.taskDependencies.bulkAdd(
             dependencyIds.map(depId => ({
               dependentTaskId: task.id,
               dependencyTaskId: depId
@@ -114,14 +114,14 @@ export const dexieTaskService = {
    * Delete a task
    */
   async delete(id: string): Promise<void> {
-    await db.transaction('rw', db.tasks, db.task_tags, db.task_dependencies, async () => {
+    await db.transaction('rw', db.tasks, db.taskTags, db.taskDependencies, async () => {
       // Delete the task
       await db.tasks.delete(id);
       
       // Clean up relationships
-      await db.task_tags.where('taskId').equals(id).delete();
-      await db.task_dependencies.where('dependentTaskId').equals(id).delete();
-      await db.task_dependencies.where('dependencyTaskId').equals(id).delete();
+      await db.taskTags.where('taskId').equals(id).delete();
+      await db.taskDependencies.where('dependentTaskId').equals(id).delete();
+      await db.taskDependencies.where('dependencyTaskId').equals(id).delete();
     });
   },
 
@@ -129,7 +129,7 @@ export const dexieTaskService = {
    * Load tags for a task
    */
   async loadTags(taskId: string): Promise<Tag[]> {
-    const junctions = await db.task_tags.where('taskId').equals(taskId).toArray();
+    const junctions = await db.taskTags.where('taskId').equals(taskId).toArray();
     const tagIds = junctions.map(j => j.tagId);
     const tags = await db.tags.bulkGet(tagIds);
     return tags.filter((tag): tag is Tag => tag !== undefined);
@@ -139,7 +139,7 @@ export const dexieTaskService = {
    * Load dependencies for a task
    */
   async loadDependencies(taskId: string): Promise<Task[]> {
-    const junctions = await db.task_dependencies
+    const junctions = await db.taskDependencies
       .where('dependentTaskId')
       .equals(taskId)
       .toArray();
@@ -180,9 +180,9 @@ export const dexieTaskService = {
       switch (update.operation) {
         case 'set':
           // Replace all tags
-          await db.task_tags.where('taskId').equals(taskId).delete();
+          await db.taskTags.where('taskId').equals(taskId).delete();
           if (update.targetIds.length > 0) {
-            await db.task_tags.bulkAdd(
+            await db.taskTags.bulkAdd(
               update.targetIds.map(tagId => ({ taskId, tagId }))
             );
           }
@@ -190,7 +190,7 @@ export const dexieTaskService = {
 
         case 'add':
           // Add new tags
-          await db.task_tags.bulkAdd(
+          await db.taskTags.bulkAdd(
             update.targetIds.map(tagId => ({ taskId, tagId }))
           );
           break;
@@ -198,7 +198,7 @@ export const dexieTaskService = {
         case 'remove':
           // Remove specific tags
           for (const tagId of update.targetIds) {
-            await db.task_tags
+            await db.taskTags
               .where('[taskId+tagId]')
               .equals([taskId, tagId])
               .delete();
@@ -209,9 +209,9 @@ export const dexieTaskService = {
       // Similar logic for dependencies
       switch (update.operation) {
         case 'set':
-          await db.task_dependencies.where('dependentTaskId').equals(taskId).delete();
+          await db.taskDependencies.where('dependentTaskId').equals(taskId).delete();
           if (update.targetIds.length > 0) {
-            await db.task_dependencies.bulkAdd(
+            await db.taskDependencies.bulkAdd(
               update.targetIds.map(depId => ({
                 dependentTaskId: taskId,
                 dependencyTaskId: depId
@@ -221,7 +221,7 @@ export const dexieTaskService = {
           break;
 
         case 'add':
-          await db.task_dependencies.bulkAdd(
+          await db.taskDependencies.bulkAdd(
             update.targetIds.map(depId => ({
               dependentTaskId: taskId,
               dependencyTaskId: depId
@@ -231,7 +231,7 @@ export const dexieTaskService = {
 
         case 'remove':
           for (const depId of update.targetIds) {
-            await db.task_dependencies
+            await db.taskDependencies
               .where('[dependentTaskId+dependencyTaskId]')
               .equals([taskId, depId])
               .delete();
