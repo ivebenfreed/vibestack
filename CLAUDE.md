@@ -1,24 +1,12 @@
 # CLAUDE.md
 
-## Current Worktree Configuration
+## Current Configuration
 
-**This is Issue #20 worktree with the following ports:**
+**This is the main staging branch with the following default ports:**
 
-- Web application: `http://localhost:5373`
-- Server API: `http://localhost:8987`
-- Database: `postgres://postgres:postgres@localhost:5632/vibestack_dev_issue_20`
-- Proxy: Port 4654
-
-### Playwright Test Environment
-
-**✅ READY TO USE** - This worktree has pre-configured Playwright authentication:
-
-- **Auth file**: `.playwright/auth/auth-20.json` (1110 bytes)
-- **Current LSN**: `0/1E04FA0` (sync state persisted)
-- **User**: ben@getelevra.com (authenticated with valid session)
-- **Expiry**: 2025-08-12 (tokens are valid)
-
-**DO NOT re-run auth setup** - use existing state for all tests. staging
+- Web application: `http://localhost:5173`
+- Server API: `http://localhost:8787`
+- Database: `postgres://postgres:postgres@localhost:5432/vibestack_dev` staging
 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

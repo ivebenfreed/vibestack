@@ -2,6 +2,7 @@ import { Entity, Column, Index } from 'typeorm';
 import { IsUUID, IsEnum, IsOptional, IsInt, IsString, MaxLength, IsObject } from 'class-validator';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { EnumTypeName } from '../utils/decorators.js';
+import { TableCategory } from '../utils/context.js';
 
 // Four standard dependency types (from project management)
 export enum DependencyType {
@@ -26,6 +27,7 @@ export enum DependencyType {
  * - Workflows: Deploy stage cannot start until Test stage completes
  */
 @Entity('entity_dependencies')
+@TableCategory('domain')
 @Index(['entityType', 'predecessorId'])
 @Index(['entityType', 'successorId'])
 @Index(['entityType', 'createdAt'])
