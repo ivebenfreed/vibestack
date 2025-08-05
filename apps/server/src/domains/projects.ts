@@ -1,11 +1,13 @@
 import { Client } from '@neondatabase/serverless';
-import { Project, Project as ProjectClass, ProjectStatus } from "@repo/dataforge/server-entities";
+import { Project as ProjectClass, ProjectStatus } from "@repo/dataforge/server-entities";
+import type { Project } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
 import { FindOptionsWhere, DeepPartial, In } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import { Context } from 'hono';
 import { Env } from '../types/env';
-import { User, User as UserClass } from "@repo/dataforge/server-entities";
+import { User as UserClass } from "@repo/dataforge/server-entities";
+import type { User } from "@repo/dataforge/server-entities";
 import { BaseServerRepository } from './BaseServerRepository';
 
 // Re-export enums for convenience
@@ -30,14 +32,14 @@ export class ProjectRepository extends BaseServerRepository<Project> {
    * Find projects by owner ID
    */
   async findByOwnerId(ownerId: string): Promise<Project[]> {
-    return await this.neonService.find(Project, { ownerId } as FindOptionsWhere<Project>);
+    return await this.neonService.find(ProjectClass, { ownerId } as FindOptionsWhere<Project>);
   }
 
   /**
    * Find projects by status
    */
   async findByStatus(status: ProjectStatus): Promise<Project[]> {
-    return await this.neonService.find(Project, { status } as FindOptionsWhere<Project>);
+    return await this.neonService.find(ProjectClass, { status } as FindOptionsWhere<Project>);
   }
 
   /**
@@ -80,7 +82,7 @@ export class ProjectRepository extends BaseServerRepository<Project> {
 
     // Validate that all new users exist (always needed for data integrity)
     if (newUserIds.length > 0) {
-      const existingUsers = await this.neonService.find(User, {
+      const existingUsers = await this.neonService.find(UserClass, {
         id: In(newUserIds)
       } as FindOptionsWhere<User>);
       
@@ -156,7 +158,7 @@ export class ProjectRepository extends BaseServerRepository<Project> {
     }
 
     // Check if user exists
-    const user = await this.neonService.findOne(User, { id: userId } as FindOptionsWhere<User>);
+    const user = await this.neonService.findOne(UserClass, { id: userId } as FindOptionsWhere<User>);
     if (!user) {
       throw new Error(`User with ID ${userId} not found`);
     }

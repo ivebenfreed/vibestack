@@ -1,5 +1,6 @@
 // Comment repository and domain functions
 import { Comment as _Comment } from "@repo/dataforge/server-entities";
+import type { Comment as _CommentType } from "@repo/dataforge/server-entities";
 import { BaseServerRepository } from "./BaseServerRepository.js";
 import { NeonService } from '../lib/neon-orm/neon-service.js';
 
@@ -10,7 +11,7 @@ export { _Comment as Comment };
  * Comment repository with server-specific query methods.
  * Handles comment operations including task and project associations.
  */
-export class CommentRepository extends BaseServerRepository<_Comment> {
+export class CommentRepository extends BaseServerRepository<_CommentType> {
   constructor(neonService: NeonService) {
     super(neonService, _Comment as any);
   }
@@ -20,7 +21,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
    * @param taskId - The ID of the task to find comments for
    * @returns Array of comments associated with the task
    */
-  async findByTaskId(taskId: string): Promise<_Comment[]> {
+  async findByTaskId(taskId: string): Promise<_CommentType[]> {
     const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
     return await queryBuilder
       .where('comment.taskId = :taskId', { taskId })
@@ -33,7 +34,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
    * @param projectId - The ID of the project to find comments for
    * @returns Array of comments associated with the project
    */
-  async findByProjectId(projectId: string): Promise<_Comment[]> {
+  async findByProjectId(projectId: string): Promise<_CommentType[]> {
     const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
     return await queryBuilder
       .where('comment.projectId = :projectId', { projectId })
@@ -46,7 +47,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
    * @param parentId - The ID of the parent comment
    * @returns Array of reply comments
    */
-  async findReplies(parentId: string): Promise<_Comment[]> {
+  async findReplies(parentId: string): Promise<_CommentType[]> {
     const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
     const replies = await queryBuilder
       .where('comment.parentId = :parentId', { parentId })
@@ -54,7 +55,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
       .getMany();
 
     // Recursively find replies to replies
-    const allReplies: _Comment[] = [];
+    const allReplies: _CommentType[] = [];
     for (const reply of replies) {
       allReplies.push(reply);
       const subReplies = await this.findReplies(reply.id);
@@ -87,7 +88,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
    * @param commentData - The comment data
    * @returns The created comment
    */
-  async createComment(commentData: Partial<_Comment>): Promise<_Comment> {
+  async createComment(commentData: Partial<_CommentType>): Promise<_CommentType> {
     return await this.create(commentData);
   }
 
@@ -97,7 +98,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
    * @param updates - The updates to apply
    * @returns The updated comment
    */
-  async updateComment(commentId: string, updates: Partial<_Comment>): Promise<_Comment | null> {
+  async updateComment(commentId: string, updates: Partial<_CommentType>): Promise<_CommentType | null> {
     await this.update(commentId, updates);
     return await this.findById(commentId);
   }
@@ -107,7 +108,7 @@ export class CommentRepository extends BaseServerRepository<_Comment> {
    * @param commentId - The ID of the comment
    * @returns The comment with author relation loaded
    */
-  async findWithAuthor(commentId: string): Promise<_Comment | null> {
+  async findWithAuthor(commentId: string): Promise<_CommentType | null> {
     const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'comment');
     return await queryBuilder
       .leftJoinAndSelect('comment.author', 'author')

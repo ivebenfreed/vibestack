@@ -347,11 +347,9 @@ function generateContextOutput(
                 relationTsType += '[]';
             }
             
-            // Check for self-referencing relationships and wrap in Promise<>
-            const isSelfReferencing = targetTypeName === entityName;
-            if (isSelfReferencing) {
-                relationTsType = `Promise<${relationTsType}>`;
-            }
+            // Wrap ALL relationships in Promise<> to avoid circular references
+            // This matches TypeORM's approach and enables proper .d.ts generation
+            relationTsType = `Promise<${relationTsType}>`;
             
             const nullable = originalRelationMeta.options?.nullable ? '?' : '!';
             // NO relation decorators here

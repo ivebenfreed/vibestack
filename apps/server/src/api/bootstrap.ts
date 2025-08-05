@@ -31,7 +31,7 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     const existingSuperAdmin = await db
       .selectFrom('users')
       .selectAll()
-      .where('role', '=', UserRole.SUPER_ADMIN) // Use the enum value
+      .where('role', '=', 'super_admin') // Use the enum value directly
       .limit(1)
       .executeTakeFirst();
     if (existingSuperAdmin) {

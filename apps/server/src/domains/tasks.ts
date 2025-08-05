@@ -1,5 +1,6 @@
 import { Client } from '@neondatabase/serverless';
-import { Task, Task as TaskClass, TaskStatus, TaskPriority } from "@repo/dataforge/server-entities";
+import { Task as TaskClass, TaskStatus, TaskPriority } from "@repo/dataforge/server-entities";
+import type { Task } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
 import { FindOptionsWhere, DeepPartial } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
@@ -30,35 +31,35 @@ export class TaskRepository extends BaseServerRepository<Task> {
    * Find all tasks
    */
   override async findAll(): Promise<Task[]> {
-    return await this.neonService.find(Task);
+    return await this.neonService.find(TaskClass);
   }
 
   /**
    * Find task by ID
    */
   override async findById(id: string): Promise<Task | null> {
-    return await this.neonService.findOne(Task, { id } as FindOptionsWhere<Task>);
+    return await this.neonService.findOne(TaskClass, { id } as FindOptionsWhere<Task>);
   }
 
   /**
    * Find tasks by project ID
    */
   async findByProjectId(projectId: string): Promise<Task[]> {
-    return await this.neonService.find(Task, { projectId } as FindOptionsWhere<Task>);
+    return await this.neonService.find(TaskClass, { projectId } as FindOptionsWhere<Task>);
   }
 
   /**
    * Find tasks by assignee ID
    */
   async findByAssigneeId(assigneeId: string): Promise<Task[]> {
-    return await this.neonService.find(Task, { assigneeId } as FindOptionsWhere<Task>);
+    return await this.neonService.find(TaskClass, { assigneeId } as FindOptionsWhere<Task>);
   }
 
   /**
    * Find tasks by status
    */
   async findByStatus(status: TaskStatus): Promise<Task[]> {
-    return await this.neonService.find(Task, { legacyStatus: status } as FindOptionsWhere<Task>);
+    return await this.neonService.find(TaskClass, { legacyStatus: status } as FindOptionsWhere<Task>);
   }
 
   /**
@@ -81,7 +82,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
    */
   override async update(id: string, data: TaskUpdateInput): Promise<Task | null> {
     // Create task for validation
-    const task = new Task();
+    const task = new TaskClass();
     Object.assign(task, { id, ...data });
     
     // Validate task
@@ -91,7 +92,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
     }
     
     // Update the task using TypeORM
-    await this.neonService.update(Task, { id } as FindOptionsWhere<Task>, data as DeepPartial<Task>);
+    await this.neonService.update(TaskClass, { id } as FindOptionsWhere<Task>, data as DeepPartial<Task>);
     
     // Return the updated task
     return await this.findById(id);
@@ -192,7 +193,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
         
         // Update using the standard update method
         await this.neonService.update(
-          Task,
+          TaskClass,
           { id } as FindOptionsWhere<Task>,
           { legacyTags: tags } as DeepPartial<Task>
         );
@@ -222,7 +223,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
       
       // Update using the standard update method
       await this.neonService.update(
-        Task,
+        TaskClass,
         { id } as FindOptionsWhere<Task>,
         { legacyTags: updatedTags } as DeepPartial<Task>
       );
@@ -494,7 +495,7 @@ export class TaskRepository extends BaseServerRepository<Task> {
         .execute();
       
       // Then delete the task
-      const result = await this.neonService.delete(Task, { id } as FindOptionsWhere<Task>);
+      const result = await this.neonService.delete(TaskClass, { id } as FindOptionsWhere<Task>);
       
       return (result.affected !== null && result.affected !== undefined && result.affected > 0);
     } catch (error) {

@@ -1,5 +1,6 @@
 import { Client } from '@neondatabase/serverless';
-import { User, User as UserClass, UserRole } from "@repo/dataforge/server-entities";
+import { User as UserClass, UserRole } from "@repo/dataforge/server-entities";
+import type { User } from "@repo/dataforge/server-entities";
 import { validate } from "class-validator";
 import { FindOptionsWhere, DeepPartial } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
@@ -31,14 +32,14 @@ export class UserRepository extends BaseServerRepository<User> {
    * Find user by email
    */
   async findByEmail(email: string): Promise<User | null> {
-    return await this.neonService.findOne(User, { email } as FindOptionsWhere<User>);
+    return await this.neonService.findOne(UserClass, { email } as FindOptionsWhere<User>);
   }
 
   /**
    * Find users by role
    */
   async findByRole(role: UserRole): Promise<User[]> {
-    return await this.neonService.find(User, { role } as FindOptionsWhere<User>);
+    return await this.neonService.find(UserClass, { role } as FindOptionsWhere<User>);
   }
 
   /**
