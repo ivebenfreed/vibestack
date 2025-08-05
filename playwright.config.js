@@ -67,11 +67,20 @@ console.log(`   Auth Exists: ${authExists ? '✅ Using existing auth' : '❌ Wil
 
 export default defineConfig({
   testDir: './tests/playwright',
+  testMatch: [
+    'core/**/*.spec.js',
+    'core/**/*.setup.js',
+    `issue-${issueNumber}/**/*.spec.js`,
+    `issue-${issueNumber}/**/*.setup.js`
+  ],
   fullyParallel: false, // Run tests serially to avoid conflicts
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: 'html',
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }]
+  ],
   
   use: {
     baseURL: `http://localhost:${ports.webPort}`,
