@@ -31,8 +31,11 @@ export const test = base.extend({
     console.log(`🔧 Using persistent profile: ${userDataDir}`);
     
     // Launch persistent context
+    // Check for headless mode from environment or default to true
+    const headless = process.env.HEADLESS !== 'false';
+    
     const context = await chromium.launchPersistentContext(userDataDir, {
-      headless: false,
+      headless,
       viewport: { width: 1280, height: 720 },
       permissions: ['clipboard-read', 'clipboard-write'],
       acceptDownloads: true,

@@ -80,14 +80,29 @@ idle → connecting → (initial_sync | catchup_sync) → pre_live_validation �
 1. **Test observable state changes** - Monitor localStorage sync-machine-state
 2. **Test change tracking effects** - Verify localChanges table behavior
 3. **Use domain services for operations** - Don't bypass change tracking
-4. **Mock WebSocket for controlled scenarios** - Avoid network dependencies
+4. **Use debug functions for controlled scenarios** - Leverage `debugResetLSN` for LSN manipulation
 5. **Focus on client-side behavior** - Server integration is separate concern
 
-### Test Categories:
-1. **State Persistence Tests** - Verify sync state survives page refresh
-2. **Change Tracking Tests** - Verify CRUD operations are tracked correctly
-3. **Phase Transition Tests** - Monitor syncPhase changes (if observable)
-4. **Error Recovery Tests** - Test disconnect/reconnect scenarios
+### Test Categories Implemented:
+1. **State Persistence Tests** ✅ - Verify sync state survives page refresh
+2. **Change Tracking Tests** ✅ - Verify CRUD operations are tracked correctly
+3. **LSN Progression Tests** ✅ - Use debug functions to test LSN updates
+4. **Sync Reset Tests** ✅ - Test complete sync reset to LSN 0/0
+5. **Catchup Sync Tests** ✅ - Test reconnection with rolled-back LSN
+6. **Integrity Status Tests** ✅ - Verify debug status functions work
+
+### Catchup Sync Test Implementation:
+The catchup sync test simulates the scenario where a client's LSN falls behind the server:
+1. **Rolls back client LSN** to `0/1000000` (older than current)
+2. **Triggers sync disconnect/reconnect** via sync machine events
+3. **Monitors catchup attempt** - in test environment, no server LSN updates occur
+4. **Validates test infrastructure** - confirms debug functions work correctly
+
+**Expected Behavior in Test Environment:**
+- LSN rollback succeeds (localStorage updated)
+- Reconnection attempt processed (events sent to sync machine)
+- No actual catchup occurs (no server to provide newer LSN)
+- Test validates the client-side catchup infrastructure is working
 
 ## 🚫 Assumptions That Were Wrong:
 1. ❌ LSN advances after every local operation

@@ -319,12 +319,14 @@ test.describe('Domain Coverage - Issue #34', () => {
             return tableToService[tableName] || tableName;
           }, { tableName: entity });
           
+          // Don't clear localChanges - just check if our specific entity is tracked
+          
           // Create entity and check if it generates sync changes
           const testData = getTestDataForEntity(serviceName);
           const created = await createEntity(page, serviceName, testData);
           
           // Wait a bit for sync processing
-          await page.waitForTimeout(1000);
+          await page.waitForTimeout(500);
           
           // Check if localChanges has the operation
           const hasChanges = await page.evaluate(async ({ entityName, recordId }) => {
@@ -344,13 +346,25 @@ test.describe('Domain Coverage - Issue #34', () => {
             
             const tableName = entityToTable[entityName] || entityName;
             
-            // Check localChanges table
-            const changes = await db.localChanges
-              .where('[table+recordId]')
-              .equals([tableName, recordId])
-              .count();
+            // Check localChanges table - use simple query since no compound index exists
+            const allChanges = await db.localChanges.toArray();
+            const matchingChanges = allChanges.filter(change => 
+              change.table === tableName && 
+              change.data && 
+              change.data.id === recordId
+            );
             
-            return changes > 0;
+            console.log(`Checking sync for ${tableName}:${recordId}`, {
+              totalChanges: allChanges.length,
+              matchingChanges: matchingChanges.length,
+              allChanges: allChanges.map(c => ({
+                table: c.table,
+                operation: c.operation,
+                dataId: c.data?.id
+              }))
+            });
+            
+            return matchingChanges.length > 0;
           }, { entityName: entity, recordId: created.id });
           
           if (hasChanges) {
@@ -512,7 +526,7 @@ function getUpdateDataForEntity(entity) {
     },
     statusDefinition: {
       name: `UPDATED_${faker.word.adjective()}`,
-      color: faker.internet.color()
+      color: faker.color.rgb()
     },
     tagSet: {
       name: `UPDATED_${faker.word.noun()} Tags`,
@@ -520,7 +534,7 @@ function getUpdateDataForEntity(entity) {
     },
     tag: {
       name: `UPDATED_${faker.word.noun()}`,
-      color: faker.internet.color()
+      color: faker.color.rgb()
     },
     projectMember: { 
       role: faker.helpers.arrayElement(['member', 'admin', 'viewer'])
