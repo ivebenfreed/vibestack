@@ -261,7 +261,7 @@ if [ "${AUTOMATION_TEST:-false}" = "true" ]; then
 elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     # Start servers in background and run tests
     echo "🚀 Starting servers in background for setup tests..."
-    ./scripts/tmux-bg.sh vibestack-dev "pnpm dev:local"
+    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev:local"
     
     # Wait for servers to be ready
     echo "⏳ Waiting for servers to start..."
@@ -279,10 +279,10 @@ elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     
     echo ""
     echo "📝 Servers are running in background. To view logs:"
-    echo "   ./scripts/bg-logs.sh vibestack-dev"
+    echo "   ./scripts/bg-logs.sh vibestack-dev-issue-${ISSUE_NUMBER}"
     echo ""
     echo "To stop servers when done:"
-    echo "   ./scripts/bg-stop.sh vibestack-dev"
+    echo "   ./scripts/bg-stop.sh vibestack-dev-issue-${ISSUE_NUMBER}"
 else
     pnpm dev:local
 fi

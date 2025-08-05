@@ -28,15 +28,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **IMPORTANT**: Claude Code is configured to automatically redirect all long-running development commands to tmux background sessions. This happens transparently via PreToolUse hooks.
 
 ### Commands Automatically Redirected to tmux:
-- `pnpm dev` → Runs in `vibestack-dev` tmux session
-- `pnpm dev:local` → Runs in `vibestack-dev` tmux session
-- `pnpm dev:server` → Runs in `vibestack-dev` tmux session
-- `pnpm dev:web` → Runs in `vibestack-dev` tmux session
-- `pnpm build --watch` → Runs in `vibestack-build` tmux session
-- `pnpm test --watch` → Runs in `vibestack-test` tmux session
-- `npm run dev` → Runs in `vibestack-dev` tmux session
-- `yarn dev` → Runs in `vibestack-dev` tmux session
-- `wrangler dev` → Runs in `vibestack-dev` tmux session
+- `pnpm dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm dev:local` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm dev:server` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm dev:web` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `pnpm build --watch` → Runs in `vibestack-build-issue-{N}` tmux session (worktree-specific)
+- `pnpm test --watch` → Runs in `vibestack-test-issue-{N}` tmux session (worktree-specific)
+- `npm run dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `yarn dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `wrangler dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
 
 ### How It Works:
 1. PreToolUse hook intercepts all Bash commands
@@ -147,6 +147,36 @@ The auth file `.playwright/auth/auth-20.json` contains:
 
 **When writing new tests**: Tests automatically use this auth state via `playwright.config.js` - no additional setup needed.
 
+#### Writing New Tests
+
+**IMPORTANT**: Use the test template as a starting point for all new tests:
+
+```bash
+# Copy the template for a new test
+cp tests/playwright/test-template.spec.js tests/playwright/your-new-test.spec.js
+```
+
+The template (`test-template.spec.js`) includes:
+- ✅ Automatic use of existing auth state
+- ✅ Graceful fallback if auth expires
+- ✅ Proper wait for React app initialization
+- ✅ Sync state verification helpers
+- ✅ Screenshot capture for debugging
+
+Example minimal test that visits root and checks sync state:
+```javascript
+test('check sync state', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForTimeout(5000);
+  
+  const syncState = await page.evaluate(() => {
+    return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+  });
+  
+  console.log('Current LSN:', syncState.currentLSN);
+  expect(syncState.currentLSN).not.toBe('0/0');
+});
+
 #### How It Works
 
 1. **Auto-Detection**: Script detects issue number from branch name (`issue-10` → Issue #10)
@@ -222,10 +252,14 @@ We use tmux to manage long-running background processes without blocking Claude 
 
 #### Standard Session Names
 
-- `vibestack-dev` - Main development servers (`pnpm dev:local`)
-- `vibestack-build` - Build processes
-- `vibestack-test` - Test runners
-- `vibestack-migrate` - Database migrations
+**All session names are worktree-specific:**
+
+- `vibestack-dev-issue-{N}` - Main development servers (`pnpm dev:local`)
+- `vibestack-build-issue-{N}` - Build processes
+- `vibestack-test-issue-{N}` - Test runners
+- `vibestack-migrate-issue-{N}` - Database migrations
+
+Where `{N}` is the issue number (e.g., `vibestack-dev-issue-24` for Issue #24)
 
 #### Usage Patterns
 
@@ -237,17 +271,17 @@ We use tmux to manage long-running background processes without blocking Claude 
 
 2. **Checking if servers are running:**
    ```bash
-   ./scripts/bg-status.sh vibestack-dev
+   ./scripts/bg-status.sh vibestack-dev-issue-24  # For Issue #24
    ```
 
 3. **Viewing server logs while working:**
    ```bash
-   ./scripts/dev-logs.sh 50  # View last 50 lines
+   ./scripts/dev-logs.sh 50  # View last 50 lines (auto-detects issue number)
    ```
 
 4. **Stopping servers when done:**
    ```bash
-   ./scripts/bg-stop.sh vibestack-dev
+   ./scripts/bg-stop.sh vibestack-dev-issue-24  # For Issue #24
    ```
 
 #### Benefits
