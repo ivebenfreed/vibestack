@@ -1,5 +1,5 @@
 import type { GanttTask, TaskDependency, TimeScale } from '../types';
-import { TIME_SCALE_CONFIG } from '../constants';
+import { TIME_SCALE_CONFIG, ZOOM_UTILS } from '../constants';
 
 // Coordinate mapping for pre-calculated positions
 export interface CoordinateMapping {
@@ -22,6 +22,7 @@ export interface CoordinateMapping {
     }>;
     totalWidth: number;
     dayWidth: number;
+    hideSecondRow?: boolean;
   };
   viewport: {
     startDate: Date;
@@ -35,8 +36,9 @@ interface CalculateCoordinatesParams {
   taskTree: any[];
   expandedTasks: Set<string>;
   visibleDateRange: { start: Date; end: Date };
-  zoomLevel: TimeScale;
-  zoomFactor?: number;
+  zoomLevel?: TimeScale; // Optional, for backwards compatibility
+  zoomFactor?: number; // Optional, for backwards compatibility
+  zoom?: number; // New continuous zoom parameter
   rowHeight?: number;
   dayWidth?: number;
 }
@@ -51,6 +53,7 @@ export function calculateCoordinateMapping({
   visibleDateRange,
   zoomLevel,
   zoomFactor = 1.0,
+  zoom,
   rowHeight = 40,
   dayWidth: customDayWidth,
 }: CalculateCoordinatesParams): CoordinateMapping {
@@ -68,10 +71,24 @@ export function calculateCoordinateMapping({
   const validStart = parseDate(visibleDateRange.start);
   const validEnd = parseDate(visibleDateRange.end);
     
+  // Determine zoom parameters
+  let effectiveZoom: number;
+  let displayScale: TimeScale;
+  
+  if (zoom !== undefined) {
+    // Use new continuous zoom
+    effectiveZoom = zoom;
+    displayScale = ZOOM_UTILS.getTimescaleForZoom(zoom);
+  } else {
+    // Fallback to old zoomLevel + zoomFactor
+    displayScale = zoomLevel;
+    effectiveZoom = 1.0; // Default
+  }
+  
   console.log('📐 Calculating coordinate mapping', {
     taskCount: taskTree.length,
-    zoomLevel,
-    zoomFactor,
+    zoom: effectiveZoom,
+    displayScale,
     dateRange: visibleDateRange,
     dateRangeDetails: {
       start: validStart,
@@ -85,20 +102,20 @@ export function calculateCoordinateMapping({
   const startDate = new Date(validStart);
   const endDate = new Date(validEnd);
   
-  // Add padding days
-  startDate.setDate(startDate.getDate() - 7);
-  endDate.setDate(endDate.getDate() + 7);
+  // Add padding - fixed 5 days as requested
+  const paddingDays = 5;
   
-  // Calculate day width based on zoom level and factor
-  const zoomConfig = TIME_SCALE_CONFIG[zoomLevel];
-  const baseDayWidth = customDayWidth || zoomConfig.minPixelsPerUnit;
-  const adjustedDayWidth = baseDayWidth * zoomFactor;
+  startDate.setDate(startDate.getDate() - paddingDays);
+  endDate.setDate(endDate.getDate() + paddingDays);
   
-  // Calculate timeline segments
-  const timelineSegments = calculateTimelineSegments(
+  // Calculate day width based on zoom
+  const adjustedDayWidth = customDayWidth || ZOOM_UTILS.getPixelsPerDayForZoom(effectiveZoom);
+  
+  // Calculate timeline segments with continuous scaling
+  const timelineSegments = calculateContinuousTimelineSegments(
     startDate,
     endDate,
-    zoomLevel,
+    effectiveZoom,
     adjustedDayWidth
   );
   
@@ -182,6 +199,7 @@ export function calculateCoordinateMapping({
       segments: timelineSegments,
       totalWidth,
       dayWidth: adjustedDayWidth,
+      hideSecondRow: timelineSegments.hideSecondRow,
     },
     viewport: {
       startDate,
@@ -193,84 +211,116 @@ export function calculateCoordinateMapping({
 }
 
 /**
- * Calculate timeline segments based on zoom level
+ * Calculate continuous timeline segments based on zoom level
+ * No discrete switching - purely based on zoom scale
  */
-function calculateTimelineSegments(
+function calculateContinuousTimelineSegments(
   startDate: Date,
   endDate: Date,
-  zoom: TimeScale,
+  zoom: number,
   dayWidth: number
-): CoordinateMapping['timeline']['segments'] {
+): CoordinateMapping['timeline']['segments'] & { hideSecondRow?: boolean } {
   const segments: CoordinateMapping['timeline']['segments'] = [];
   const currentDate = new Date(startDate);
   let xPosition = 0;
+  
+  // Calculate pixels per day to determine appropriate segment spacing
+  const pixelsPerDay = dayWidth;
+  
+  // Determine segment configuration based on pixel density
+  let segmentIncrement: number;
+  let segmentWidth: number;
+  let segmentUnit: 'day' | 'week' | 'month' | 'quarter' | 'year';
+  
+  if (pixelsPerDay >= 15) {
+    // Very zoomed in - show individual days
+    segmentIncrement = 1;
+    segmentWidth = dayWidth;
+    segmentUnit = 'day';
+  } else if (pixelsPerDay >= 5) {
+    // Medium zoom - show weeks (raised threshold for earlier transition)
+    segmentIncrement = 7;
+    segmentWidth = dayWidth * 7;
+    segmentUnit = 'week';
+  } else if (pixelsPerDay >= 1.5) {
+    // Zoomed out - show months (raised threshold)
+    segmentIncrement = 30;
+    segmentWidth = dayWidth * 30;
+    segmentUnit = 'month';
+  } else if (pixelsPerDay >= 0.4) {
+    // More zoomed out - show quarters (raised threshold)
+    segmentIncrement = 90;
+    segmentWidth = dayWidth * 90;
+    segmentUnit = 'quarter';
+  } else {
+    // Very zoomed out - show years
+    segmentIncrement = 365;
+    segmentWidth = dayWidth * 365;
+    segmentUnit = 'year';
+  }
+  
+  // Only show labels if segments are wide enough to be readable
+  const minLabelWidth = 15; // Lower threshold to show day labels during transition
+  const showLabels = segmentWidth >= minLabelWidth;
+  
+  // Hide second timeline row when zoomed out enough (months, quarters and years)
+  const hideSecondRow = segmentUnit === 'month' || segmentUnit === 'quarter' || segmentUnit === 'year';
   
   while (currentDate <= endDate) {
     const segment = {
       date: new Date(currentDate),
       xPosition,
-      width: dayWidth,
-      label: '',
-      isMonth: false,
-      isWeek: false,
+      width: segmentWidth,
+      label: showLabels ? formatDateLabel(currentDate, segmentUnit) : '',
+      isMonth: segmentUnit === 'month',
+      isWeek: segmentUnit === 'week',
     };
     
-    // Format label based on zoom level
-    switch (zoom) {
-      case 'hour':
-        segment.label = currentDate.toLocaleTimeString('en-US', { hour: 'numeric' });
-        segment.width = dayWidth / 24;
-        break;
-      case 'day':
-        segment.label = currentDate.getDate().toString();
-        break;
-      case 'week':
-        segment.label = `W${getWeekNumber(currentDate)}`;
-        segment.isWeek = true;
-        segment.width = dayWidth * 7;
-        break;
-      case 'month':
-        segment.label = currentDate.toLocaleDateString('en-US', { month: 'short' });
-        segment.isMonth = true;
-        segment.width = dayWidth * getDaysInMonth(currentDate);
-        break;
-      case 'quarter':
-        segment.label = `Q${Math.floor(currentDate.getMonth() / 3) + 1}`;
-        segment.width = dayWidth * 90; // Approximate
-        break;
-      case 'year':
-        segment.label = currentDate.getFullYear().toString();
-        segment.width = dayWidth * 365;
-        break;
-    }
-    
     segments.push(segment);
-    xPosition += segment.width;
+    xPosition += segmentWidth;
     
-    // Increment date based on zoom
-    switch (zoom) {
-      case 'hour':
-        currentDate.setHours(currentDate.getHours() + 1);
-        break;
-      case 'day':
-        currentDate.setDate(currentDate.getDate() + 1);
-        break;
-      case 'week':
-        currentDate.setDate(currentDate.getDate() + 7);
-        break;
-      case 'month':
-        currentDate.setMonth(currentDate.getMonth() + 1);
-        break;
-      case 'quarter':
-        currentDate.setMonth(currentDate.getMonth() + 3);
-        break;
-      case 'year':
-        currentDate.setFullYear(currentDate.getFullYear() + 1);
-        break;
+    // Increment date by the segment increment with proper date handling
+    if (segmentUnit === 'month') {
+      // Move to start of next month to avoid duplicates
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      currentDate.setDate(1); // Ensure we're at the start of the month
+    } else if (segmentUnit === 'quarter') {
+      // Move to start of next quarter
+      currentDate.setMonth(currentDate.getMonth() + 3);
+      currentDate.setDate(1);
+    } else if (segmentUnit === 'year') {
+      // Move to start of next year
+      currentDate.setFullYear(currentDate.getFullYear() + 1);
+      currentDate.setMonth(0);
+      currentDate.setDate(1);
+    } else {
+      // Days or weeks - just add the increment
+      currentDate.setDate(currentDate.getDate() + segmentIncrement);
     }
   }
   
-  return segments;
+  // Return segments with metadata about whether to hide second row
+  return Object.assign(segments, { hideSecondRow });
+}
+
+/**
+ * Format date label based on the display unit
+ */
+function formatDateLabel(date: Date, unit: 'day' | 'week' | 'month' | 'quarter' | 'year'): string {
+  switch (unit) {
+    case 'day':
+      return date.getDate().toString();
+    case 'week':
+      return `W${getWeekNumber(date)}`;
+    case 'month':
+      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    case 'quarter':
+      return `Q${Math.floor(date.getMonth() / 3) + 1} ${date.getFullYear()}`;
+    case 'year':
+      return date.getFullYear().toString();
+    default:
+      return date.getDate().toString();
+  }
 }
 
 /**

@@ -79,6 +79,9 @@ const createInitialContext = (): GanttMachineContext => ({
   // UI State
   contextMenu: null,
   tooltip: null,
+  
+  // Zoom State
+  isZooming: false,
 });
 
 // Main machine definition
@@ -349,8 +352,7 @@ export const ganttMachine = setup({
     // Queue timeline render after zoom changes
     queueTimelineRender: ({ context }) => {
       console.log('GanttMachine: Queueing timeline render after zoom', {
-        zoomLevel: context.viewConfig.zoomLevel,
-        zoomFactor: context.viewConfig.zoomFactor,
+        zoom: context.viewConfig.zoom,
         dayWidth: context.timelineLayout.dayWidth
       });
       
@@ -659,6 +661,20 @@ export const ganttMachine = setup({
                       tasks: storeContext.tasks,
                       dependencies: storeContext.dependencies
                     });
+                    
+                    // Also send scroll position update if available
+                    if (storeContext.scrollX !== undefined && storeContext.scrollX !== context.viewport.scrollX) {
+                      console.log('GanttMachine: Sending initial scroll position to renderer', {
+                        scrollX: storeContext.scrollX
+                      });
+                      context.renderer.send({
+                        type: 'UPDATE_SCROLL_POSITION',
+                        scrollX: storeContext.scrollX
+                      });
+                      
+                      // Update context to track the scroll position
+                      context.viewport.scrollX = storeContext.scrollX;
+                    }
                   } else {
                     console.warn('GanttMachine: No coordinate mapping available yet');
                   }
@@ -725,6 +741,21 @@ export const ganttMachine = setup({
                     tasks: storeContext.tasks,
                     dependencies: storeContext.dependencies
                   });
+                  
+                  // Also send scroll position update if it changed
+                  if (storeContext.scrollX !== undefined && storeContext.scrollX !== context.viewport.scrollX) {
+                    console.log('GanttMachine: Sending scroll position update to renderer', {
+                      oldScrollX: context.viewport.scrollX,
+                      newScrollX: storeContext.scrollX
+                    });
+                    context.renderer.send({
+                      type: 'UPDATE_SCROLL_POSITION',
+                      scrollX: storeContext.scrollX
+                    });
+                    
+                    // Update context to track the new scroll position
+                    context.viewport.scrollX = storeContext.scrollX;
+                  }
                 } else {
                   console.warn('GanttMachine: No coordinate mapping in store update');
                 }
@@ -883,6 +914,21 @@ export const ganttMachine = setup({
                             dependencies: storeSnapshot.context.dependencies,
                             selectedDependencyIds: context.selectedDependencyIds
                           });
+                          
+                          // Also send scroll position update if available
+                          const storeContext = storeSnapshot.context;
+                          if (storeContext.scrollX !== undefined && storeContext.scrollX !== context.viewport.scrollX) {
+                            console.log('GanttMachine: Sending scroll position update during dependency select', {
+                              scrollX: storeContext.scrollX
+                            });
+                            context.renderer.send({
+                              type: 'UPDATE_SCROLL_POSITION',
+                              scrollX: storeContext.scrollX
+                            });
+                            
+                            // Update context to track the scroll position
+                            context.viewport.scrollX = storeContext.scrollX;
+                          }
                         }
                       }
                     },

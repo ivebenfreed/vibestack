@@ -36,6 +36,11 @@ export class GanttEventDelegationManager {
   // Abort controller for cleanup
   private abortController = new AbortController();
   
+  // Zoom debouncing and throttling
+  private zoomDebounceTimer: number | null = null;
+  private pendingZoomEvent: { direction: 'in' | 'out'; mouseX: number; scrollX: number } | null = null;
+  private isProcessingZoom: boolean = false;
+  
   constructor(container: HTMLElement, sendEvent: GanttEventCallback, zoomLevel?: TimeScale, zoomFactor?: number) {
     this.container = container;
     this.sendEvent = sendEvent;
@@ -207,14 +212,63 @@ export class GanttEventDelegationManager {
       // Calculate zoom direction based on wheel delta
       const zoomIn = event.deltaY < 0;
       
-      // Send ZOOM_REQUEST event to the machine
-      // The machine will handle determining the new zoom level
-      this.sendEvent({
-        type: 'ZOOM_REQUEST',
-        direction: zoomIn ? 'in' : 'out'
-      });
+      // Get mouse position relative to the container
+      const rect = this.container.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
       
-      console.log('Zoom requested:', zoomIn ? 'in' : 'out');
+      // Get current scroll position from the actual scrollable element
+      const taskScrollWrapper = this.container.querySelector('.vibegantt-tasks-wrapper') as HTMLElement;
+      const scrollX = taskScrollWrapper?.scrollLeft || 0;
+      
+      // Skip if already processing a zoom
+      if (this.isProcessingZoom) {
+        return;
+      }
+      
+      // Cancel any pending zoom
+      if (this.zoomDebounceTimer) {
+        clearTimeout(this.zoomDebounceTimer);
+      }
+      
+      // Store pending zoom event
+      this.pendingZoomEvent = {
+        direction: zoomIn ? 'in' : 'out',
+        mouseX: mouseX,
+        scrollX: scrollX
+      };
+      
+      // Reduced debounce to 25ms for better responsiveness
+      this.zoomDebounceTimer = window.setTimeout(() => {
+        if (this.pendingZoomEvent && !this.isProcessingZoom) {
+          // Mark as processing
+          this.isProcessingZoom = true;
+          
+          // Read fresh scroll position right before processing
+          const freshScrollX = taskScrollWrapper?.scrollLeft || 0;
+          
+          // Send ZOOM_REQUEST event to the machine with fresh data
+          this.sendEvent({
+            type: 'ZOOM_REQUEST',
+            direction: this.pendingZoomEvent.direction,
+            mouseX: this.pendingZoomEvent.mouseX,
+            currentScrollX: freshScrollX
+          });
+          
+          console.log('🔍 Zoom requested (debounced):', {
+            direction: this.pendingZoomEvent.direction,
+            mouseX: this.pendingZoomEvent.mouseX,
+            scrollX: freshScrollX,
+            containerWidth: rect.width
+          });
+          
+          this.pendingZoomEvent = null;
+          
+          // Reset processing flag after a short delay to allow completion
+          setTimeout(() => {
+            this.isProcessingZoom = false;
+          }, 100);
+        }
+      }, 25);
     }
     // Let native scroll handle panning
   }
@@ -361,8 +415,8 @@ export class GanttEventDelegationManager {
       currentX: event.clientX,
       currentY: event.clientY,
       data: {
-        startScrollX: this.container.scrollLeft,
-        startScrollY: this.container.scrollTop
+        startScrollX: this.container.querySelector('.vibegantt-tasks-wrapper')?.scrollLeft || 0,
+        startScrollY: this.container.querySelector('.vibegantt-tasks-wrapper')?.scrollTop || 0
       }
     };
     
@@ -406,6 +460,15 @@ export class GanttEventDelegationManager {
    * Clean up all event listeners
    */
   destroy(): void {
+    // Cancel any pending zoom
+    if (this.zoomDebounceTimer) {
+      clearTimeout(this.zoomDebounceTimer);
+    }
+    
+    // Reset zoom processing state
+    this.isProcessingZoom = false;
+    this.pendingZoomEvent = null;
+    
     // Abort all event listeners at once
     this.abortController.abort();
   }

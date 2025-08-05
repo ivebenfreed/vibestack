@@ -6,7 +6,7 @@ import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '..
 import { taskService } from '@/domain/task-service';
 import { entityDependencyService } from '@/domain/entity-dependency-service';
 import { calculateCoordinateMapping, type CoordinateMapping } from '../utils/coordinate-mapper';
-import { ZOOM_UTILS } from '../constants';
+import { ZOOM_UTILS, ZOOM_SCALE } from '../constants';
 
 // ====================================
 // MEMORY LIMITS
@@ -56,12 +56,13 @@ export const createGanttStoreLogic = (projectId?: string) => {
       selectedTasks: new Set() as Set<string>,
       visibleDateRange: persistedState?.visibleDateRange || {
         start: new Date(),
-        end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+        end: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
       },
-      zoomLevel: persistedState?.zoomLevel || 'day' as 'hour' | 'day' | 'week' | 'month',
-      zoomFactor: persistedState?.zoomFactor || 1.0,
+      zoom: persistedState?.zoom || ZOOM_SCALE.DEFAULT, // Continuous zoom scale
       showWeekends: persistedState?.showWeekends ?? true,
       showDependencies: persistedState?.showDependencies ?? true,
+      scrollX: 0, // Viewport scroll position
+      viewportWidth: 0, // Viewport width for centering calculations
       
       // Metadata
       loading: true,
@@ -121,8 +122,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoomLevel: context.zoomLevel,
-            zoomFactor: context.zoomFactor,
+            zoom: context.zoom,
           });
         },
         loading: false,
@@ -186,8 +186,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoomLevel: context.zoomLevel,
-            zoomFactor: context.zoomFactor,
+            zoom: context.zoom,
           });
         },
         lastUpdatedAt: Date.now()
@@ -371,8 +370,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree: context.taskTree,
             expandedTasks: expanded,
             visibleDateRange: context.visibleDateRange,
-            zoomLevel: context.zoomLevel,
-            zoomFactor: context.zoomFactor,
+            zoom: context.zoom,
           });
         }
       },
@@ -396,19 +394,17 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree: context.taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: event.range,
-            zoomLevel: context.zoomLevel,
-            zoomFactor: context.zoomFactor,
+            zoom: context.zoom,
           });
         }
       },
       
       setZoom: {
-        zoomLevel: (context, event: { zoom: 'hour' | 'day' | 'week' | 'month' }) => {
+        zoom: (context, event: { zoom: number }) => {
           // Persist zoom level
           saveDisplayState(context.projectId || 'global', {
             ...context,
-            zoomLevel: event.zoom,
-            zoomFactor: context.zoomFactor
+            zoom: event.zoom
           });
           return event.zoom;
         },
@@ -418,65 +414,112 @@ export const createGanttStoreLogic = (projectId?: string) => {
             taskTree: context.taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoomLevel: event.zoom,
-            zoomFactor: context.zoomFactor,
+            zoom: event.zoom,
           });
         }
       },
       
       ZOOM_REQUEST: {
-        zoomLevel: (context, event: { direction: 'in' | 'out' }) => {
-          // Calculate next zoom based on current state
-          const nextZoom = ZOOM_UTILS.calculateNextZoom(
-            context.zoomLevel,
-            context.zoomFactor,
-            event.direction
-          );
+        zoom: (context, event: { direction: 'in' | 'out' }) => {
+          // Calculate next zoom value on continuous scale
+          const newZoom = ZOOM_UTILS.calculateNextZoom(context.zoom, event.direction);
           
-          // Persist zoom level
+          // Persist zoom
           saveDisplayState(context.projectId || 'global', {
             ...context,
-            zoomLevel: nextZoom.level,
-            zoomFactor: nextZoom.factor
+            zoom: newZoom
           });
           
-          return nextZoom.level;
-        },
-        zoomFactor: (context, event: { direction: 'in' | 'out' }) => {
-          // Calculate next zoom based on current state
-          const nextZoom = ZOOM_UTILS.calculateNextZoom(
-            context.zoomLevel,
-            context.zoomFactor,
-            event.direction
-          );
-          
-          return nextZoom.factor;
+          return newZoom;
         },
         coordinateMapping: (context, event) => {
-          // Calculate next zoom based on current state
-          const nextZoom = ZOOM_UTILS.calculateNextZoom(
-            context.zoomLevel,
-            context.zoomFactor,
-            event.direction
-          );
+          // Calculate next zoom value
+          const newZoom = ZOOM_UTILS.calculateNextZoom(context.zoom, event.direction);
           
-          // Recalculate with new zoom level and factor
-          console.log('📊 GanttStore: Updating zoom', { 
+          console.log('📊 GanttStore: Updating zoom with continuous scaling', { 
             direction: event.direction,
-            currentLevel: context.zoomLevel,
-            currentFactor: context.zoomFactor,
-            nextLevel: nextZoom.level,
-            nextFactor: nextZoom.factor 
+            currentZoom: context.zoom,
+            newZoom: newZoom,
+            pixelsPerDay: ZOOM_UTILS.getPixelsPerDayForZoom(newZoom)
           });
           
           return calculateCoordinateMapping({
             taskTree: context.taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
-            zoomLevel: nextZoom.level,
-            zoomFactor: nextZoom.factor,
+            zoom: newZoom,
           });
+        },
+        scrollX: (context, event) => {
+          // Use fresh scroll position from event
+          const currentScrollX = event.currentScrollX !== undefined ? event.currentScrollX : context.scrollX;
+          const oldDayWidth = context.coordinateMapping?.timeline.dayWidth || 30;
+          const mouseX = event.mouseX;
+          
+          // Get timeline dimensions
+          const viewportWidth = context.viewportWidth || 0;
+          
+          if (!context.coordinateMapping?.viewport?.startDate) {
+            return currentScrollX; // Can't calculate without timeline data
+          }
+          
+          // Use center of viewport if no mouse position
+          const anchorX = mouseX !== undefined ? mouseX : viewportWidth / 2;
+          
+          // Calculate the visible date range
+          const startDate = context.coordinateMapping.viewport.startDate;
+          const endDate = context.coordinateMapping.viewport.endDate;
+          const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Convert to integer calculations (multiply by 1000 for precision)
+          const currentScrollXInt = Math.round(currentScrollX * 1000);
+          const anchorXInt = Math.round(anchorX * 1000);
+          const oldDayWidthInt = Math.round(oldDayWidth * 1000);
+          
+          // Calculate which day the anchor point is on (in integer space)
+          const anchorPositionInt = currentScrollXInt + anchorXInt;
+          const daysFromStartInt = Math.round((anchorPositionInt * 1000) / oldDayWidthInt);
+          
+          // Calculate new dimensions after zoom
+          const newZoom = ZOOM_UTILS.calculateNextZoom(context.zoom, event.direction);
+          const newDayWidth = ZOOM_UTILS.getPixelsPerDayForZoom(newZoom);
+          const newDayWidthInt = Math.round(newDayWidth * 1000);
+          const newTotalWidth = totalDays * newDayWidth;
+          
+          // Calculate where that same day should be in the new zoom (integer space)
+          const newAnchorPositionInt = (daysFromStartInt * newDayWidthInt) / 1000;
+          const targetScrollXInt = newAnchorPositionInt - anchorXInt;
+          
+          // Convert back to float
+          const targetScrollX = targetScrollXInt / 1000;
+          
+          // Calculate the maximum valid scroll position
+          const maxScrollX = Math.max(0, newTotalWidth - viewportWidth);
+          
+          // Clamp to valid range [0, maxScrollX]
+          const newScrollX = Math.max(0, Math.min(targetScrollX, maxScrollX));
+          
+          console.log('📊 GanttStore: Zoom anchor calculation (integer-based)', {
+            anchorX,
+            daysFromStartInt: daysFromStartInt / 1000,
+            totalDays,
+            oldDayWidth,
+            newDayWidth,
+            currentScrollX,
+            freshScrollX: event.currentScrollX,
+            targetScrollX,
+            maxScrollX,
+            newScrollX,
+            fits: newTotalWidth <= viewportWidth
+          });
+          
+          return newScrollX;
         }
+      },
+      
+      ZOOM_COMPLETE: {
+        // This event is sent after zoom is complete to signal the machine
+        // No state changes needed, just allows machine to reset isZooming flag
       },
       
       setShowWeekends: {
@@ -510,6 +553,14 @@ export const createGanttStoreLogic = (projectId?: string) => {
       
       setPagination: {
         pagination: (context, event: { pagination: typeof context.pagination }) => event.pagination
+      },
+      
+      UPDATE_SCROLL: {
+        scrollX: (context, event: { x: number; y: number }) => event.x
+      },
+      
+      SET_VIEWPORT_WIDTH: {
+        viewportWidth: (context, event: { width: number }) => event.width
       }
     }
   });

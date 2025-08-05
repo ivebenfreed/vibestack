@@ -302,10 +302,7 @@ export class GanttRenderer {
    * Clear all rendered content
    */
   private clearAllContent(): void {
-    // Clear timeline
-    if (this.timelineContainer) {
-      this.timelineContainer.innerHTML = '';
-    }
+    // Don't clear timeline here - it will be updated in renderTimelineSegments
     
     // Clear tasks (preserve SVG)
     const taskElements = this.taskContainer.querySelectorAll('.vibegantt-task');
@@ -317,115 +314,171 @@ export class GanttRenderer {
     }
   }
   
+  // Track last rendered timeline type to minimize re-renders
+  private lastTimelineType: 'single' | 'double' | null = null;
+  private timelineInner: HTMLElement | null = null;
+
   /**
    * Render timeline segments from coordinates
    */
   private renderTimelineSegments(segments: CoordinateMapping['timeline']['segments']): void {
-    // Create timeline inner container
-    const timelineInner = document.createElement('div');
-    timelineInner.style.cssText = `
-      position: relative;
-      height: 100%;
-      display: flex;
-      align-items: stretch;
-    `;
+    // Check if we're showing months only (hideSecondRow flag)
+    const hideSecondRow = (segments as any).hideSecondRow || false;
+    const isMonthView = segments.length > 0 && segments[0].isMonth;
+    const currentTimelineType = (hideSecondRow || isMonthView) ? 'single' : 'double';
     
-    // Render month headers
-    const monthRow = document.createElement('div');
-    monthRow.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 30px;
-      width: 100%;
-      display: flex;
-      border-bottom: 1px solid #e5e7eb;
-    `;
-    
-    // Render day segments
-    const dayRow = document.createElement('div');
-    dayRow.style.cssText = `
-      position: absolute;
-      top: 30px;
-      left: 0;
-      height: 30px;
-      width: 100%;
-      display: flex;
-    `;
-    
-    let currentMonth = -1;
-    let monthStartX = 0;
-    
-    for (const segment of segments) {
-      const month = segment.date.getMonth();
+    // Only rebuild timeline structure if type changed
+    if (this.lastTimelineType !== currentTimelineType || !this.timelineInner) {
+      this.timelineContainer.innerHTML = '';
       
-      // Add month header when month changes
-      if (month !== currentMonth) {
-        if (currentMonth !== -1) {
-          // Create month label for previous month
-          const monthLabel = document.createElement('div');
-          monthLabel.style.cssText = `
-            position: absolute;
-            left: ${monthStartX}px;
-            width: ${segment.xPosition - monthStartX}px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-            color: #374151;
-            border-right: 1px solid #e5e7eb;
-          `;
-          monthLabel.textContent = new Date(segment.date.getFullYear(), currentMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-          monthRow.appendChild(monthLabel);
-        }
-        currentMonth = month;
-        monthStartX = segment.xPosition;
+      // Create timeline inner container
+      this.timelineInner = document.createElement('div');
+      this.timelineInner.style.cssText = `
+        position: relative;
+        height: 100%;
+        display: flex;
+        align-items: stretch;
+      `;
+      
+      this.timelineContainer.appendChild(this.timelineInner);
+      this.lastTimelineType = currentTimelineType;
+    }
+    
+    // Clear existing segments but keep structure
+    this.timelineInner.innerHTML = '';
+    
+    if (hideSecondRow || isMonthView) {
+      // Single row for months/quarters/years - full height
+      const singleRow = document.createElement('div');
+      singleRow.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 60px;
+        width: 100%;
+        display: flex;
+      `;
+      
+      // Render month segments directly
+      for (const segment of segments) {
+        const segmentEl = document.createElement('div');
+        segmentEl.style.cssText = `
+          position: absolute;
+          left: ${segment.xPosition}px;
+          width: ${segment.width}px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 600;
+          color: #374151;
+          border-right: 1px solid #e5e7eb;
+          background: #f9fafb;
+        `;
+        segmentEl.textContent = segment.label;
+        singleRow.appendChild(segmentEl);
       }
       
-      // Create day segment
-      const daySegment = document.createElement('div');
-      daySegment.style.cssText = `
+      this.timelineInner.appendChild(singleRow);
+    } else {
+      // Two rows for days/weeks
+      // Render month headers
+      const monthRow = document.createElement('div');
+      monthRow.style.cssText = `
         position: absolute;
-        left: ${segment.xPosition}px;
-        width: ${segment.width}px;
+        top: 0;
+        left: 0;
         height: 30px;
+        width: 100%;
         display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        color: #6b7280;
-        border-right: 1px solid #e5e7eb;
-        ${segment.date.getDay() === 0 || segment.date.getDay() === 6 ? 'background: #f9fafb;' : ''}
+        border-bottom: 1px solid #e5e7eb;
       `;
-      daySegment.textContent = segment.label;
-      dayRow.appendChild(daySegment);
-    }
-    
-    // Add final month label
-    if (segments.length > 0) {
-      const lastSegment = segments[segments.length - 1];
-      const monthLabel = document.createElement('div');
-      monthLabel.style.cssText = `
+      
+      // Render day segments
+      const dayRow = document.createElement('div');
+      dayRow.style.cssText = `
         position: absolute;
-        left: ${monthStartX}px;
-        width: ${lastSegment.xPosition + lastSegment.width - monthStartX}px;
+        top: 30px;
+        left: 0;
         height: 30px;
+        width: 100%;
         display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 600;
-        color: #374151;
       `;
-      monthLabel.textContent = lastSegment.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      monthRow.appendChild(monthLabel);
+      
+      let currentMonth = -1;
+      let monthStartX = 0;
+      
+      for (const segment of segments) {
+        const month = segment.date.getMonth();
+        
+        // Add month header when month changes
+        if (month !== currentMonth) {
+          if (currentMonth !== -1) {
+            // Create month label for previous month
+            const monthLabel = document.createElement('div');
+            monthLabel.style.cssText = `
+              position: absolute;
+              left: ${monthStartX}px;
+              width: ${segment.xPosition - monthStartX}px;
+              height: 30px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 12px;
+              font-weight: 600;
+              color: #374151;
+              border-right: 1px solid #e5e7eb;
+            `;
+            monthLabel.textContent = new Date(segment.date.getFullYear(), currentMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            monthRow.appendChild(monthLabel);
+          }
+          currentMonth = month;
+          monthStartX = segment.xPosition;
+        }
+        
+        // Create day segment
+        const daySegment = document.createElement('div');
+        daySegment.style.cssText = `
+          position: absolute;
+          left: ${segment.xPosition}px;
+          width: ${segment.width}px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          color: #6b7280;
+          border-right: 1px solid #e5e7eb;
+          ${segment.date.getDay() === 0 || segment.date.getDay() === 6 ? 'background: #f9fafb;' : ''}
+        `;
+        daySegment.textContent = segment.label;
+        dayRow.appendChild(daySegment);
+      }
+      
+      // Add final month label
+      if (segments.length > 0) {
+        const lastSegment = segments[segments.length - 1];
+        const monthLabel = document.createElement('div');
+        monthLabel.style.cssText = `
+          position: absolute;
+          left: ${monthStartX}px;
+          width: ${lastSegment.xPosition + lastSegment.width - monthStartX}px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+        `;
+        monthLabel.textContent = lastSegment.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        monthRow.appendChild(monthLabel);
+      }
+      
+      this.timelineInner.appendChild(monthRow);
+      this.timelineInner.appendChild(dayRow);
     }
-    
-    timelineInner.appendChild(monthRow);
-    timelineInner.appendChild(dayRow);
-    this.timelineContainer.appendChild(timelineInner);
   }
   
   /**
@@ -833,6 +886,29 @@ export class GanttRenderer {
   }
   
   /**
+   * Update scroll position (for zoom anchoring)
+   */
+  updateScrollPosition(scrollX: number, scrollY?: number): void {
+    if (this.taskScrollWrapper) {
+      console.log('🎯 GanttRenderer: Applying scroll position', { scrollX, scrollY });
+      
+      // Use requestAnimationFrame to sync with browser paint cycle
+      requestAnimationFrame(() => {
+        if (this.taskScrollWrapper) {
+          this.taskScrollWrapper.scrollLeft = Math.max(0, scrollX);
+          if (scrollY !== undefined) {
+            this.taskScrollWrapper.scrollTop = Math.max(0, scrollY);
+          }
+          
+          // Force synchronous layout to ensure scroll is applied
+          // This prevents the next zoom event from reading stale values
+          const _ = this.taskScrollWrapper.scrollLeft;
+        }
+      });
+    }
+  }
+  
+  /**
    * Clean up and destroy
    */
   destroy(): void {
@@ -845,6 +921,10 @@ export class GanttRenderer {
     
     // Clear all content
     this.clearAllContent();
+    
+    // Reset timeline cache
+    this.lastTimelineType = null;
+    this.timelineInner = null;
     
     // Clear container
     this.container.innerHTML = '';

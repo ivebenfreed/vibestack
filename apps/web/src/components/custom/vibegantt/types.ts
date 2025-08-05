@@ -55,7 +55,7 @@ export interface ResourceAllocation {
 }
 
 // View Configuration
-export type TimeScale = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
+export type TimeScale = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export interface DateRange {
   start: Date;
@@ -64,8 +64,7 @@ export interface DateRange {
 
 export interface GanttViewConfig {
   timeRange: DateRange;
-  zoomLevel: TimeScale;
-  zoomFactor: number; // Multiplier for pixels per unit (0.5 to 2.0)
+  zoom: number; // Continuous zoom scale
   showWeekends: boolean;
   showDependencies: boolean;
   showCriticalPath: boolean;
@@ -208,7 +207,7 @@ export type GanttEvent =
   | { type: 'TASKS_UPDATED'; tasks: GanttTask[] }
   | { type: 'DEPENDENCIES_UPDATED'; dependencies: TaskDependency[] }
   | { type: 'ZOOM'; level: TimeScale; factor?: number }
-  | { type: 'ZOOM_REQUEST'; direction: 'in' | 'out' }
+  | { type: 'ZOOM_REQUEST'; direction: 'in' | 'out'; mouseX?: number; currentScrollX?: number }
   | { type: 'PAN'; deltaX: number; deltaY: number }
   | { type: 'SCROLL'; scrollX: number; scrollY: number }
   | { type: 'TASK_SELECT'; taskId: string; multi?: boolean }

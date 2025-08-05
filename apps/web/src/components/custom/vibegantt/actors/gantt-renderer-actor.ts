@@ -26,6 +26,7 @@ export type RendererActorEvent =
   | { type: 'RENDER_COORDINATES'; mapping: CoordinateMapping; tasks: any; dependencies: any }
   | { type: 'UPDATE_VIEWPORT'; width: number; height: number }
   | { type: 'UPDATE_SELECTION'; selectedTaskIds: Set<string> }
+  | { type: 'UPDATE_SCROLL_POSITION'; scrollX: number; scrollY?: number }
   | { type: 'HANDLE_DRAG_MOVE'; taskId: string; deltaX: number }
   | { type: 'HANDLE_RESIZE_MOVE'; taskId: string; handle: 'left' | 'right'; deltaX: number }
   | { type: 'RESET_DRAG_STATE'; taskId: string }
@@ -214,6 +215,20 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           renderer.updateSelection(event.selectedTaskIds);
           break;
           
+        case 'UPDATE_SCROLL_POSITION':
+          if (!renderer) {
+            console.warn('GanttRendererActor: Cannot update scroll position - renderer not initialized');
+            return;
+          }
+          
+          console.log('GanttRendererActor: Updating scroll position:', {
+            scrollX: event.scrollX,
+            scrollY: event.scrollY
+          });
+          
+          renderer.updateScrollPosition(event.scrollX, event.scrollY);
+          break;
+          
         case 'HANDLE_DRAG_MOVE':
           if (!renderer) {
             console.warn('GanttRendererActor: Cannot handle drag - renderer not initialized');
@@ -284,7 +299,7 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
  */
 export function isRendererActorEvent(event: any): event is RendererActorEvent {
   return event && typeof event.type === 'string' && 
-    ['INITIALIZE', 'RENDER_COORDINATES', 'UPDATE_VIEWPORT', 'UPDATE_SELECTION', 'DESTROY'].includes(event.type);
+    ['INITIALIZE', 'RENDER_COORDINATES', 'UPDATE_VIEWPORT', 'UPDATE_SELECTION', 'UPDATE_SCROLL_POSITION', 'DESTROY'].includes(event.type);
 }
 
 /**

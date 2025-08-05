@@ -2,14 +2,6 @@ import type { TimeScale } from './types';
 
 // Time scale configurations
 export const TIME_SCALE_CONFIG = {
-  hour: {
-    label: 'Hour',
-    milliseconds: 60 * 60 * 1000,
-    minPixelsPerUnit: 50,
-    maxPixelsPerUnit: 200,
-    format: 'HH:mm',
-    headerFormat: 'MMM dd, yyyy',
-  },
   day: {
     label: 'Day',
     milliseconds: 24 * 60 * 60 * 1000,
@@ -53,83 +45,88 @@ export const TIME_SCALE_CONFIG = {
 } as const;
 
 // Zoom levels in order from most detailed to least detailed
-export const ZOOM_LEVELS: TimeScale[] = ['hour', 'day', 'week', 'month', 'quarter', 'year'];
+export const ZOOM_LEVELS: TimeScale[] = ['day', 'week', 'month', 'quarter', 'year'];
 
-// Zoom factor constraints
-export const ZOOM_FACTOR_CONSTRAINTS = {
-  MIN: 0.25,  // Minimum zoom factor (25% of base pixels per unit)
-  MAX: 4.0,   // Maximum zoom factor (400% of base pixels per unit)
-  STEP: 0.1,  // Step size for zoom factor changes
-  TRANSITION_THRESHOLD: 0.5, // When to transition to next/prev time scale
+// Zoom scale - continuous scale where higher values = more zoomed in
+export const ZOOM_SCALE = {
+  MIN: 0.1,   // Minimum zoom (year view)
+  MAX: 5.0,   // Maximum zoom (day view zoomed in)
+  DEFAULT: 1.0, // Default zoom (week/month view)
+  STEP: 0.2,  // Larger steps for more noticeable zooming (20% change)
 } as const;
 
 // Zoom utility functions
 export const ZOOM_UTILS = {
-  getNextZoomLevel(current: TimeScale, direction: 'in' | 'out'): TimeScale {
-    const currentIndex = ZOOM_LEVELS.indexOf(current);
-    if (currentIndex === -1) return 'day'; // fallback
+  // Get timeline display configuration based on zoom level
+  // This determines what labels to show but doesn't switch discrete scales
+  getTimelineDisplayForZoom(zoom: number): { 
+    primaryUnit: 'day' | 'week' | 'month' | 'quarter' | 'year',
+    pixelsPerPrimaryUnit: number,
+    showSecondaryLabels: boolean 
+  } {
+    const pixelsPerDay = this.getPixelsPerDayForZoom(zoom);
     
-    if (direction === 'in') {
-      // Zoom in = more detailed (lower index)
-      return ZOOM_LEVELS[Math.max(0, currentIndex - 1)];
+    // Always use day as the base unit but adjust what we show
+    if (pixelsPerDay >= 80) {
+      // Very zoomed in - show individual days
+      return {
+        primaryUnit: 'day',
+        pixelsPerPrimaryUnit: pixelsPerDay,
+        showSecondaryLabels: true
+      };
+    } else if (pixelsPerDay >= 15) {
+      // Medium zoom - show weeks but with smooth scaling
+      return {
+        primaryUnit: 'week',
+        pixelsPerPrimaryUnit: pixelsPerDay * 7,
+        showSecondaryLabels: false
+      };
+    } else if (pixelsPerDay >= 3) {
+      // Zoomed out - show months
+      return {
+        primaryUnit: 'month',
+        pixelsPerPrimaryUnit: pixelsPerDay * 30,
+        showSecondaryLabels: false
+      };
     } else {
-      // Zoom out = less detailed (higher index)
-      return ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, currentIndex + 1)];
+      // Very zoomed out - show years
+      return {
+        primaryUnit: 'year',
+        pixelsPerPrimaryUnit: pixelsPerDay * 365,
+        showSecondaryLabels: false
+      };
     }
   },
   
-  canZoom(current: TimeScale, direction: 'in' | 'out'): boolean {
-    const currentIndex = ZOOM_LEVELS.indexOf(current);
-    if (currentIndex === -1) return true;
-    
-    if (direction === 'in') {
-      return currentIndex > 0; // Can zoom in if not at most detailed level
-    } else {
-      return currentIndex < ZOOM_LEVELS.length - 1; // Can zoom out if not at least detailed level
-    }
+  // Legacy method for backwards compatibility - always return 'day'
+  getTimescaleForZoom(zoom: number): TimeScale {
+    // Always return 'day' since we want continuous scaling
+    return 'day';
   },
   
-  // Calculate next zoom state with intermediate steps
-  calculateNextZoom(
-    currentLevel: TimeScale, 
-    currentFactor: number, 
-    direction: 'in' | 'out'
-  ): { level: TimeScale; factor: number } {
-    const { MIN, MAX, STEP, TRANSITION_THRESHOLD } = ZOOM_FACTOR_CONSTRAINTS;
+  // Calculate next zoom value using percentage-based scaling
+  calculateNextZoom(currentZoom: number, direction: 'in' | 'out'): number {
+    const { MIN, MAX } = ZOOM_SCALE;
+    // Use 30% zoom change for more noticeable steps
+    const zoomFactor = direction === 'in' ? 1.3 : 0.769231;
+    const newZoom = currentZoom * zoomFactor;
     
-    // Calculate new factor
-    let newFactor = currentFactor + (direction === 'in' ? STEP : -STEP);
-    let newLevel = currentLevel;
+    // Round to 2 decimal places to avoid floating point issues
+    const rounded = Math.round(newZoom * 100) / 100;
+    return Math.max(MIN, Math.min(MAX, rounded));
+  },
+  
+  // Get pixels per day for a given zoom level
+  getPixelsPerDayForZoom(zoom: number): number {
+    // Use exponential scaling for better zoom feel
+    // At zoom 1.0, we want about 30 pixels per day
+    // At zoom 0.1, we want about 3 pixels per day  
+    // At zoom 5.0, we want about 150 pixels per day
+    const pixelsPerDay = 30 * Math.pow(zoom, 1.2);
     
-    // Use a lower threshold for zoom-in transitions to ensure they happen before MAX
-    const ZOOM_IN_THRESHOLD = 3.5; // Transition when factor reaches 3.5 instead of 4.0
-    
-    // Check if we need to transition to a different time scale
-    if (direction === 'in' && newFactor >= ZOOM_IN_THRESHOLD) {
-      // Transition to more detailed time scale (zoom in further)
-      if (this.canZoom(currentLevel, 'in')) {
-        newLevel = this.getNextZoomLevel(currentLevel, 'in');
-        newFactor = 1.0; // Start at neutral factor when transitioning to more detailed scale
-      } else {
-        newFactor = Math.min(MAX, newFactor); // Cap at max if can't transition
-      }
-    } else if (direction === 'out' && newFactor <= TRANSITION_THRESHOLD) {
-      // Transition to less detailed time scale (zoom out further) when getting close to minimum
-      if (this.canZoom(currentLevel, 'out')) {
-        newLevel = this.getNextZoomLevel(currentLevel, 'out');
-        newFactor = 1.0; // Start at neutral factor when transitioning to less detailed scale  
-      } else {
-        // Can't zoom out further, clamp to minimum
-        newFactor = Math.max(MIN, newFactor);
-      }
-    }
-    
-    // Clamp factor to valid range (but allow transition logic above to override)
-    if (newLevel === currentLevel) {
-      newFactor = Math.max(MIN, Math.min(MAX, newFactor));
-    }
-    
-    return { level: newLevel, factor: newFactor };
+    // Ensure minimum width for readability
+    const minPixelsPerDay = 2;
+    return Math.max(minPixelsPerDay, pixelsPerDay);
   },
   
   // Get actual pixels per unit considering zoom factor
@@ -155,8 +152,7 @@ export const DEFAULT_VIEW_CONFIG = {
     start: new Date(),
     end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
   },
-  zoomLevel: 'day' as const,
-  zoomFactor: 1.0, // Default zoom factor (no scaling)
+  zoom: ZOOM_SCALE.DEFAULT, // Default zoom
   showWeekends: true,
   showDependencies: true,
   showCriticalPath: false,

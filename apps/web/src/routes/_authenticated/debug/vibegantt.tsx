@@ -129,7 +129,7 @@ function VibeGanttDebug() {
   
   // View configuration state
   const [viewConfig, setViewConfig] = useState<Partial<GanttViewConfig>>({
-    zoomLevel: 'week',
+    zoom: 1.0, // Use continuous zoom instead of discrete zoomLevel
     showWeekends: true,
     showDependencies: true,
     showCriticalPath: false,
@@ -180,18 +180,20 @@ function VibeGanttDebug() {
           {/* Zoom Level */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Zoom Level
+              Zoom Level (Continuous)
             </label>
             <select
-              value={viewConfig.zoomLevel}
-              onChange={(e) => setViewConfig({ ...viewConfig, zoomLevel: e.target.value as any })}
+              value={viewConfig.zoom}
+              onChange={(e) => setViewConfig({ ...viewConfig, zoom: parseFloat(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             >
-              <option value="day">Day</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-              <option value="quarter">Quarter</option>
-              <option value="year">Year</option>
+              <option value="5.0">Very Close (5.0) - Individual Days</option>
+              <option value="3.0">Close (3.0) - Days</option>
+              <option value="1.5">Medium (1.5) - Weeks</option>
+              <option value="1.0">Default (1.0) - Weeks/Months</option>
+              <option value="0.5">Far (0.5) - Months</option>
+              <option value="0.25">Very Far (0.25) - Quarters</option>
+              <option value="0.1">Extreme (0.1) - Years</option>
             </select>
           </div>
           

@@ -19,6 +19,15 @@ export const viewportSlice = {
                 height: event.height,
               }),
             }),
+            // Forward viewport width to store
+            ({ context, event }) => {
+              if (context.dataStore) {
+                context.dataStore.send({
+                  type: 'SET_VIEWPORT_WIDTH',
+                  width: event.width
+                });
+              }
+            },
             'recalculateVisibleRange',
             'updateVisibleTasks',
             'queueFullRender',

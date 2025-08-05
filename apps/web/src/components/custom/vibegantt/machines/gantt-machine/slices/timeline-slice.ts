@@ -9,18 +9,32 @@ export const timelineSlice = {
       on: {
         // Handle zoom requests from event delegation
         ZOOM_REQUEST: {
+          guard: ({ context }) => !context.isZooming, // Prevent concurrent zooms
           actions: [
-            // Forward zoom direction to store
+            // Mark zoom as in progress
+            assign({ isZooming: true }),
+            // Forward zoom direction and mouse position to store
             ({ context, event }) => {
               if (context.dataStore) {
-                // Simply forward the zoom request to store
+                // Forward the zoom request with mouse position to store
                 context.dataStore.send({
                   type: 'ZOOM_REQUEST',
-                  direction: event.direction
+                  direction: event.direction,
+                  mouseX: event.mouseX,
+                  currentScrollX: event.currentScrollX
                 });
               }
+            },
+            // Reset zoom state after a delay to allow DOM updates
+            ({ context, self }) => {
+              setTimeout(() => {
+                self.send({ type: 'ZOOM_COMPLETE' });
+              }, 100);
             }
           ],
+        },
+        ZOOM_COMPLETE: {
+          actions: assign({ isZooming: false })
         },
         PAN: {
           target: 'panning',
