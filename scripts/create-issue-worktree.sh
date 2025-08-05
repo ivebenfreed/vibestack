@@ -130,8 +130,14 @@ pnpm install
 echo ""
 echo "2.1️⃣ Ensuring Claude configuration is synced..."
 # Explicitly sync Claude config in case postinstall didn't work
+# Pass test setup flag if this is a test setup run
+TEST_SETUP_FLAG=""
+if [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
+    TEST_SETUP_FLAG="--test-setup"
+fi
+
 if [ -f "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" ]; then
-    "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD"
+    "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD" "$TEST_SETUP_FLAG"
     echo "   ✅ Claude configuration synced with database info"
 else
     echo "   ⚠️ Could not sync Claude config - sync script not found"
@@ -264,6 +270,12 @@ elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     # Run setup tests
     echo ""
     ./scripts/run-worktree-setup-tests.sh
+    
+    # Update CLAUDE.md with actual auth state after tests complete
+    if [ -f "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" ]; then
+        echo "📝 Updating CLAUDE.md with auth state..."
+        "${MAIN_REPO_ROOT}/scripts/sync-claude-config.sh" "$PWD" --update-auth-state "$ISSUE_NUMBER"
+    fi
     
     echo ""
     echo "📝 Servers are running in background. To view logs:"
