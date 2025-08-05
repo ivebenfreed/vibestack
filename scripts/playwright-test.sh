@@ -94,7 +94,7 @@ fi
 
 # Pass all arguments to Playwright
 if [[ $# -eq 0 ]]; then
-    # No arguments, run all tests
+    # No arguments, run all tests (headless by default)
     npx playwright test
 else
     # Pass through all arguments
@@ -115,8 +115,7 @@ echo ""
 echo -e "${BLUE}📋 Helpful commands:${NC}"
 echo "   View HTML report:    npx playwright show-report"
 echo "   Run specific test:   ./scripts/playwright-test.sh tests/playwright/vibegantt-screenshot.spec.js"
-echo "   Run with browser:    HEADLESS=false ./scripts/playwright-test.sh"
-echo "   Force headless:      HEADLESS=true ./scripts/playwright-test.sh"
+echo "   Run with browser UI: ./scripts/playwright-test.sh --headed"
 echo "   Debug mode:          ./scripts/playwright-test.sh --debug"
 echo "   Screenshots saved:   ./screenshots/"
 echo ""
