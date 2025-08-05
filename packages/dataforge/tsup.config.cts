@@ -1,36 +1,76 @@
 // @ts-check
 const { defineConfig } = require('tsup');
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Dynamically discover entry points from src/generated/
+ */
+function getEntryPoints() {
+  const entries = {};
+  
+  // Core generated files (always include these)
+  const coreFiles = [
+    'client-entities',
+    'server-entities', 
+    'dexie-schema'
+  ];
+  
+  for (const file of coreFiles) {
+    const srcPath = `src/generated/${file}.ts`;
+    if (fs.existsSync(srcPath)) {
+      entries[file] = srcPath;
+    }
+  }
+  
+  // Utils files
+  const utilsDir = 'src/utils';
+  if (fs.existsSync(utilsDir)) {
+    const utilsFiles = fs.readdirSync(utilsDir).filter(f => f.endsWith('.ts'));
+    for (const file of utilsFiles) {
+      const name = file.replace('.ts', '');
+      entries[`utils/${name}`] = `${utilsDir}/${file}`;
+    }
+  }
+  
+  // Dynamically discover all *-operations.ts files
+  const generatedDir = 'src/generated';
+  if (fs.existsSync(generatedDir)) {
+    const generatedFiles = fs.readdirSync(generatedDir);
+    
+    // Operation files
+    const operationFiles = generatedFiles.filter(f => f.endsWith('-operations.ts'));
+    for (const file of operationFiles) {
+      const name = file.replace('.ts', '');
+      entries[name] = `${generatedDir}/${file}`;
+    }
+    
+    // Dexie domain directory
+    const dexieDomainDir = path.join(generatedDir, 'dexie-domain');
+    if (fs.existsSync(dexieDomainDir)) {
+      // Index file
+      const indexFile = path.join(dexieDomainDir, 'index.ts');
+      if (fs.existsSync(indexFile)) {
+        entries['dexie-domain/index'] = 'src/generated/dexie-domain/index.ts';
+      }
+      
+      // Service files
+      const serviceFiles = fs.readdirSync(dexieDomainDir).filter(f => f.endsWith('-dexie-service.ts'));
+      for (const file of serviceFiles) {
+        const name = file.replace('.ts', '');
+        entries[`dexie-domain/${name}`] = `${dexieDomainDir}/${file}`;
+      }
+    }
+  }
+  
+  return entries;
+}
 
 /** @type {import('tsup').Options} */
 const config = {
-  entry: {
-    // Map generated files to root of dist
-    'client-entities': 'src/generated/client-entities.ts',
-    'server-entities': 'src/generated/server-entities.ts',
-    'crud-operations': 'src/generated/crud-operations.ts',
-    'dexie-schema': 'src/generated/dexie-schema.ts',
-    'dexie-domain/index': 'src/generated/dexie-domain/index.ts',
-    // Dexie domain services
-    'dexie-domain/comment-dexie-service': 'src/generated/dexie-domain/comment-dexie-service.ts',
-    'dexie-domain/entitydependency-dexie-service': 'src/generated/dexie-domain/entitydependency-dexie-service.ts',
-    'dexie-domain/project-dexie-service': 'src/generated/dexie-domain/project-dexie-service.ts',
-    'dexie-domain/statusdefinition-dexie-service': 'src/generated/dexie-domain/statusdefinition-dexie-service.ts',
-    'dexie-domain/statusset-dexie-service': 'src/generated/dexie-domain/statusset-dexie-service.ts',
-    'dexie-domain/tag-dexie-service': 'src/generated/dexie-domain/tag-dexie-service.ts',
-    'dexie-domain/tagset-dexie-service': 'src/generated/dexie-domain/tagset-dexie-service.ts',
-    'dexie-domain/task-dexie-service': 'src/generated/dexie-domain/task-dexie-service.ts',
-    'dexie-domain/user-dexie-service': 'src/generated/dexie-domain/user-dexie-service.ts',
-    // Utils files
-    'utils/context': 'src/utils/context.ts',
-    'utils/decorators': 'src/utils/decorators.ts',
-    'utils/metadata-extraction': 'src/utils/metadata-extraction.ts',
-    'utils/metadata-filter': 'src/utils/metadata-filter.ts',
-    'utils/table-category': 'src/utils/table-category.ts',
-    'utils/table-registry': 'src/utils/table-registry.ts',
-    'utils/validation': 'src/utils/validation.ts'
-  },
+  entry: getEntryPoints(),
   format: ['esm'],
-  dts: false, // Skip type generation due to circular references
+  dts: false, // Use separate tsc for DTS generation
   clean: true,
   platform: 'node',
   target: 'es2020',
@@ -53,4 +93,4 @@ const config = {
   external: ['fsevents']
 };
 
-module.exports = defineConfig(config); 
+module.exports = defineConfig(config);

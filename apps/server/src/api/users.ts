@@ -7,8 +7,9 @@ import {
   createErrorResponse
 } from '../types/api';
 import { NeonService } from '../lib/neon-orm/neon-service';
-import type { User, UserRole } from '@repo/dataforge/server-entities';
 import { UserRepository } from '../domains/users';
+import { UserRole } from '@repo/dataforge/server-entities';
+import type { User } from '@repo/dataforge/server-entities';
 
 // Input types for API
 export type UserCreateInput = Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'tasks' | 'ownedProjects' | 'memberProjects'>>;

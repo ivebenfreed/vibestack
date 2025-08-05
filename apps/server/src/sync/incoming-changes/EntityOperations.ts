@@ -11,8 +11,7 @@ import {
   SERVER_JUNCTION_TABLE_MAPPING,
   getEntityRelationships,
   hasRelationshipConfig,
-  getJunctionRelationships,
-  type RelationshipConfig
+  getJunctionRelationships
 } from '@repo/dataforge/server-entities';
 
 const MODULE_NAME = 'entity-operations';
