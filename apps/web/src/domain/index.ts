@@ -188,11 +188,11 @@ export const devUtils = {
       db.tasks.clear(),
       db.projects.clear(),
       db.users.clear(),
-      db.task_tags.clear(),
-      db.project_members.clear(),
-      db.project_status_sets.clear(),
-      db.project_tag_sets.clear(),
-      db.task_dependencies.clear(),
+      db.taskTags.clear(),
+      db.projectMembers.clear(),
+      db.projectStatusSets.clear(),
+      db.projectTagSets.clear(),
+      db.taskDependencies.clear(),
     ]);
     console.log('All Dexie data cleared');
   },
@@ -270,8 +270,8 @@ export const devUtils = {
       { name: 'tasks', count: await db.tasks.count() },
       { name: 'projects', count: await db.projects.count() },
       { name: 'users', count: await db.users.count() },
-      { name: 'task_tags', count: await db.task_tags.count() },
-      { name: 'project_members', count: await db.project_members.count() },
+      { name: 'task_tags', count: await db.taskTags.count() },
+      { name: 'project_members', count: await db.projectMembers.count() },
     ]);
 
     return {

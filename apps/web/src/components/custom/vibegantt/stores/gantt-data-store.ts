@@ -472,7 +472,7 @@ export async function loadGanttData(
     
     // Load dependencies
     const depsObservable = liveQuery(async () => {
-      let dependencies = await db.task_dependencies.toArray();
+      let dependencies = await db.taskDependencies.toArray();
       
       if (projectId) {
         const projectTasks = await db.tasks.where('projectId').equals(projectId).toArray();

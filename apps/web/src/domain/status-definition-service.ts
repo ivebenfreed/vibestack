@@ -25,7 +25,7 @@ export class StatusDefinitionDomainService extends BaseDomainService<StatusDefin
   entityName = 'StatusDefinition';
   
   protected getTable() {
-    return db.status_definitions;
+    return db.statusDefinitions;
   }
   
   // ============================================================================
@@ -155,7 +155,7 @@ export class StatusDefinitionDomainService extends BaseDomainService<StatusDefin
   // ============================================================================
   
   async createIncoming(statusDefinition: StatusDefinition): Promise<StatusDefinition> {
-    await db.status_definitions.put(statusDefinition);
+    await db.statusDefinitions.put(statusDefinition);
     console.log('[StatusDefinitionService] Created status definition from incoming sync', {
       id: statusDefinition.id,
       name: statusDefinition.name
@@ -175,7 +175,7 @@ export class StatusDefinitionDomainService extends BaseDomainService<StatusDefin
       updatedAt: updates.updatedAt || new Date().toISOString()
     };
     
-    await db.status_definitions.put(updated);
+    await db.statusDefinitions.put(updated);
     console.log('[StatusDefinitionService] Updated status definition from incoming sync', {
       id: updated.id,
       updates

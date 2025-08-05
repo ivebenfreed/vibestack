@@ -24,6 +24,8 @@ export class GanttRenderer {
   private timelineContainer!: HTMLElement;
   private taskContainer!: HTMLElement;
   private dependencyContainer!: SVGElement;
+  private timelineScrollWrapper!: HTMLElement;
+  private taskScrollWrapper!: HTMLElement;
   private containerWidth: number = 0;
   private containerHeight: number = 0;
   private taskListWidth: number = 300; // Fixed width for task list
@@ -123,25 +125,40 @@ export class GanttRenderer {
       overflow: hidden;
     `;
     
-    // Create timeline container
-    this.timelineContainer = document.createElement('div');
-    this.timelineContainer.className = 'vibegantt-timeline';
-    this.timelineContainer.style.cssText = `
+    // Create timeline scroll wrapper
+    const timelineScrollWrapper = document.createElement('div');
+    timelineScrollWrapper.style.cssText = `
       height: 60px;
-      background: #f9fafb;
-      border-bottom: 1px solid #e5e7eb;
       overflow-x: hidden;
       overflow-y: hidden;
       position: relative;
     `;
     
-    // Create task container with proper scrolling
-    this.taskContainer = document.createElement('div');
-    this.taskContainer.className = 'vibegantt-tasks';
-    this.taskContainer.style.cssText = `
+    // Create timeline container
+    this.timelineContainer = document.createElement('div');
+    this.timelineContainer.className = 'vibegantt-timeline';
+    this.timelineContainer.style.cssText = `
+      height: 100%;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+      position: relative;
+    `;
+    
+    // Create task scroll wrapper
+    const taskScrollWrapper = document.createElement('div');
+    taskScrollWrapper.className = 'vibegantt-tasks-wrapper';
+    taskScrollWrapper.style.cssText = `
       flex: 1;
       overflow: auto;
       position: relative;
+    `;
+    
+    // Create task container
+    this.taskContainer = document.createElement('div');
+    this.taskContainer.className = 'vibegantt-tasks';
+    this.taskContainer.style.cssText = `
+      position: relative;
+      min-width: 100%;
     `;
     
     // Create dependency SVG container
@@ -156,12 +173,24 @@ export class GanttRenderer {
     `;
     
     // Assemble structure
-    chartContainer.appendChild(this.timelineContainer);
-    chartContainer.appendChild(this.taskContainer);
+    timelineScrollWrapper.appendChild(this.timelineContainer);
+    chartContainer.appendChild(timelineScrollWrapper);
+    
+    taskScrollWrapper.appendChild(this.taskContainer);
     this.taskContainer.appendChild(this.dependencyContainer);
+    chartContainer.appendChild(taskScrollWrapper);
     
     this.container.appendChild(this.taskListContainer);
     this.container.appendChild(chartContainer);
+    
+    // Store references to scroll wrappers
+    this.timelineScrollWrapper = timelineScrollWrapper;
+    this.taskScrollWrapper = taskScrollWrapper;
+    
+    // Sync horizontal scrolling between timeline and tasks
+    taskScrollWrapper.addEventListener('scroll', () => {
+      timelineScrollWrapper.scrollLeft = taskScrollWrapper.scrollLeft;
+    });
     
     // Sync scrolling between task list and chart
     this.setupScrollSync();
@@ -202,17 +231,14 @@ export class GanttRenderer {
     const taskListBody = this.taskListContainer.querySelector('.vibegantt-task-list-body') as HTMLElement;
     
     // Sync vertical scrolling between task list and chart
-    this.taskContainer.addEventListener('scroll', (e) => {
+    this.taskScrollWrapper.addEventListener('scroll', (e) => {
       const target = e.target as HTMLElement;
       taskListBody.scrollTop = target.scrollTop;
-      
-      // Also sync horizontal scroll with timeline
-      this.timelineContainer.scrollLeft = target.scrollLeft;
     });
     
     taskListBody.addEventListener('scroll', (e) => {
       const target = e.target as HTMLElement;
-      this.taskContainer.scrollTop = target.scrollTop;
+      this.taskScrollWrapper.scrollTop = target.scrollTop;
     });
   }
   
@@ -240,7 +266,7 @@ export class GanttRenderer {
     
     this.timelineContainer.style.width = `${totalWidth}px`;
     this.taskContainer.style.width = `${totalWidth}px`;
-    this.taskContainer.style.height = `${totalHeight}px`;
+    this.taskContainer.style.minHeight = `${totalHeight}px`;
     
     // Update SVG dimensions
     this.dependencyContainer.setAttribute('width', totalWidth.toString());
@@ -448,7 +474,7 @@ export class GanttRenderer {
     // Add task name
     const nameEl = document.createElement('span');
     nameEl.style.position = 'relative';
-    nameEl.textContent = task.name;
+    nameEl.textContent = task.title || task.name || 'Untitled Task';
     taskEl.appendChild(nameEl);
     
     // Add resize handles
@@ -573,7 +599,7 @@ export class GanttRenderer {
       text-overflow: ellipsis;
       white-space: nowrap;
     `;
-    taskName.textContent = task.name || 'Untitled Task';
+    taskName.textContent = task.title || task.name || 'Untitled Task';
     
     // Progress indicator
     if (task.progress !== undefined) {

@@ -37,7 +37,7 @@ export class EntityDependencyDomainService extends BaseDomainService<EntityDepen
   entityName = 'EntityDependency';
   
   protected getTable() {
-    return db.entity_dependencies;
+    return db.entityDependencies; // Use camelCase for Dexie v11+
   }
   
   // ============================================================================

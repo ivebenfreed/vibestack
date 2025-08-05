@@ -620,12 +620,18 @@ export const ganttMachine = setup({
           actions: [
             // Send initial data to renderer from store
             ({ context }) => {
-              console.log('GanttMachine: Renderer ready, sending initial data');
+              console.log('GanttMachine: Renderer ready');
               
               if (context.dataStore) {
                 // Get current store snapshot
                 const storeSnapshot = context.dataStore.getSnapshot();
                 const storeContext = storeSnapshot.context;
+                
+                // Check if data is still loading
+                if (storeContext.loading) {
+                  console.log('GanttMachine: Data still loading, will send when ready');
+                  return; // Don't send empty data, wait for store update
+                }
                 
                 // Extract tasks and dependencies from atomic store
                 const tasks = Object.values(storeContext.tasks || {});
@@ -675,15 +681,22 @@ export const ganttMachine = setup({
           if (context.dataStore) {
             console.log('GanttMachine: Setting up store subscription');
             
-            // Skip the first update since we already sent initial data
-            let isFirstUpdate = true;
+            // Track if we've sent initial data
+            let hasSentInitialData = false;
             
             // Subscribe to store changes
             const unsubscribe = context.dataStore.subscribe((snapshot) => {
-              if (isFirstUpdate) {
-                isFirstUpdate = false;
-                console.log('GanttMachine: Skipping first store update (already sent initial data)');
-                return;
+              // Check if this is the initial data load completing
+              if (!hasSentInitialData && !snapshot.context.loading && Object.keys(snapshot.context.tasks).length > 0) {
+                hasSentInitialData = true;
+                console.log('GanttMachine: Initial data loaded, sending to renderer');
+              } else if (hasSentInitialData) {
+                // Skip if we haven't changed since initial load
+                const taskCount = Object.keys(snapshot.context.tasks).length;
+                const depCount = Object.keys(snapshot.context.dependencies).length;
+                if (taskCount === 0 && depCount === 0) {
+                  return; // Skip empty updates
+                }
               }
               
               const storeContext = snapshot.context;
