@@ -1,4 +1,5 @@
-import { ChangeHistory } from '@repo/dataforge/server-entities';
+import { ChangeHistory as ChangeHistoryClass } from '@repo/dataforge/server-entities';
+import type { ChangeHistory } from '@repo/dataforge/server-entities';
 import { BaseServerRepository } from './BaseServerRepository.js';
 import { NeonService } from '../lib/neon-orm/neon-service.js';
 
@@ -8,7 +9,7 @@ import { NeonService } from '../lib/neon-orm/neon-service.js';
  */
 export class ChangeHistoryRepository extends BaseServerRepository<ChangeHistory> {
   constructor(neonService: NeonService) {
-    super(neonService, ChangeHistory as any);
+    super(neonService, ChangeHistoryClass as any);
   }
 
   /**
@@ -105,7 +106,7 @@ export class ChangeHistoryRepository extends BaseServerRepository<ChangeHistory>
     const queryBuilder = await this.neonService.createQueryBuilder(this.entityClass, 'changeHistory');
     const result = await queryBuilder
       .insert()
-      .into(ChangeHistory)
+      .into(ChangeHistoryClass)
       .values(changes)
       .execute();
     

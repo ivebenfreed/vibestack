@@ -1,4 +1,5 @@
-import { EntityDependency, EntityDependency as EntityDependencyClass, DependencyType } from '@repo/dataforge/server-entities';
+import { EntityDependency as EntityDependencyClass, DependencyType } from '@repo/dataforge/server-entities';
+import type { EntityDependency } from '@repo/dataforge/server-entities';
 import { FindOptionsWhere, In } from 'typeorm';
 import { NeonService } from '../lib/neon-orm/neon-service';
 import { BaseServerRepository } from './BaseServerRepository';
@@ -21,7 +22,7 @@ export class EntityDependencyRepository extends BaseServerRepository<EntityDepen
    */
   async getDependenciesForEntity(entityType: string, entityId: string): Promise<EntityDependency[]> {
     try {
-      const dependencies = await this.neonService.find(EntityDependency, { 
+      const dependencies = await this.neonService.find(EntityDependencyClass, { 
         entityType,
         predecessorId: entityId 
       } as FindOptionsWhere<EntityDependency>);
@@ -44,7 +45,7 @@ export class EntityDependencyRepository extends BaseServerRepository<EntityDepen
    */
   async getDependentsForEntity(entityType: string, entityId: string): Promise<EntityDependency[]> {
     try {
-      const dependents = await this.neonService.find(EntityDependency, { 
+      const dependents = await this.neonService.find(EntityDependencyClass, { 
         entityType,
         successorId: entityId 
       } as FindOptionsWhere<EntityDependency>);
@@ -111,7 +112,7 @@ export class EntityDependencyRepository extends BaseServerRepository<EntityDepen
       }
 
       // Check for direct cycle (A -> B, B -> A)
-      const reverseExists = await this.neonService.findOne(EntityDependency, {
+      const reverseExists = await this.neonService.findOne(EntityDependencyClass, {
         entityType,
         predecessorId: successorId,
         successorId: predecessorId
@@ -148,7 +149,7 @@ export class EntityDependencyRepository extends BaseServerRepository<EntityDepen
     }
 
     // Check if dependency already exists
-    const existing = await this.neonService.findOne(EntityDependency, {
+    const existing = await this.neonService.findOne(EntityDependencyClass, {
       entityType,
       predecessorId,
       successorId

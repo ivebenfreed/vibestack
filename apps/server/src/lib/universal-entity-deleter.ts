@@ -188,7 +188,7 @@ export class UniversalEntityDeleter {
 
     for (const [entityName, config] of Object.entries(CLIENT_RELATIONSHIP_CONFIGS)) {
       // Check required references (direct foreign keys)
-      if (config.requiredReferences) {
+      if (config && 'requiredReferences' in config && config.requiredReferences) {
         for (const ref of config.requiredReferences) {
           if (this.getTargetEntityName(ref.targetEntity) === targetEntityName) {
             referencingEntities.push(entityName);
@@ -198,7 +198,7 @@ export class UniversalEntityDeleter {
       }
 
       // Check junction relationships where target entity is referenced
-      if (config.junctionRelationships) {
+      if (config && 'junctionRelationships' in config && config.junctionRelationships) {
         for (const junction of config.junctionRelationships) {
           if (junction.targetEntity === targetEntityName) {
             referencingEntities.push(entityName);
@@ -214,7 +214,7 @@ export class UniversalEntityDeleter {
     // This handles the reverse case: when deleting a user, we need to clean up
     // project_members entries where user_id = target_user_id
     for (const [entityName, config] of Object.entries(CLIENT_RELATIONSHIP_CONFIGS)) {
-      if (config.junctionRelationships) {
+      if (config && 'junctionRelationships' in config && config.junctionRelationships) {
         for (const junction of config.junctionRelationships) {
           // If this junction table connects TO the target entity via sourceColumn,
           // we need to clean it up when deleting the target entity
