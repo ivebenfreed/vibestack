@@ -1,40 +1,88 @@
 // Multi-client test helpers for Playwright tests
 
-import { waitForLSN, waitForSyncState, getCurrentLSN } from './sync-test-helpers.js';
+import { waitForLSN, waitForSyncState, waitForSyncInitialized, getCurrentLSN } from './sync-test-helpers.js';
+import path from 'path';
+import { execSync } from 'child_process';
+
+// Get issue number for profile directory
+function getIssueNumber() {
+  if (process.env.PR_NUMBER) {
+    return process.env.PR_NUMBER;
+  }
+  
+  try {
+    const branchName = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+    const match = branchName.match(/(?:issue-|feature-|pr-)(\d+)/);
+    if (match) {
+      return match[1];
+    }
+  } catch (error) {
+    // Silent fail
+  }
+  
+  return 'main';
+}
 
 /**
- * Create a single synced client with authentication
- * @param {Browser} browser - Playwright browser object
- * @param {string} authState - Optional path to auth state file
+ * Create a single synced client with separate persistent context
+ * @param {Browser} browser - Playwright browser object  
+ * @param {string} profileSuffix - Required suffix for profile directory (must be unique)
  * @returns {Promise<object>} Client object with context and page
  */
-export async function createSyncedClient(browser, authState = '.playwright/auth/auth-29.json') {
-  // Create new browser context with auth state
-  const context = await browser.newContext({
-    storageState: authState
+export async function createSyncedClient(browser, profileSuffix) {
+  if (!profileSuffix) {
+    throw new Error('profileSuffix is required for multi-client testing to ensure separate profiles');
+  }
+  
+  // Use separate profile for each client
+  const issueNumber = getIssueNumber();
+  const userDataDir = path.resolve(process.cwd(), '.playwright', 'profiles', `profile-${issueNumber}${profileSuffix}`);
+  
+  console.log(`🔧 Creating client with profile: ${userDataDir}`);
+  
+  // Create persistent context with separate profile
+  const context = await browser.browserType().launchPersistentContext(userDataDir, {
+    headless: false,
+    viewport: { width: 1280, height: 720 },
+    permissions: ['clipboard-read', 'clipboard-write'],
+    acceptDownloads: true,
   });
   
-  // Create new page
-  const page = await context.newPage();
+  // Get the first page (persistent context might already have one)
+  const page = context.pages()[0] || await context.newPage();
   
   // Navigate to app
   await page.goto('/');
   
-  // Wait for app to initialize
+  // Check if we need to login (new profile)
+  await page.waitForTimeout(2000);
+  const isLoggedIn = await page.evaluate(() => {
+    return !!localStorage.getItem('sync-machine-state');
+  });
+  
+  if (!isLoggedIn) {
+    console.log(`🔐 Logging in new client profile...`);
+    
+    // Wait for login form and fill it
+    await page.waitForSelector('input[type="email"]', { timeout: 10000 });
+    await page.fill('input[type="email"]', 'ben@getelevra.com');
+    await page.fill('input[type="password"]', 'password123');
+    await page.click('button[type="submit"]');
+    
+    // Wait for login to complete
+    await page.waitForURL('/', { timeout: 15000 });
+    await page.waitForTimeout(3000);
+  }
+  
+  // Wait for sync to initialize  
   await page.waitForTimeout(5000);
   
-  // Check if sync is available before waiting
+  // Wait for sync to initialize first
   try {
-    const syncState = await page.evaluate(() => {
-      return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
-    });
-    
-    if (syncState && syncState.state && syncState.state !== 'not_initialized') {
-      // Wait for initial sync only if sync is initialized
-      await waitForSyncState(page, 'live', 30000);
-    }
+    await waitForSyncInitialized(page, 15000);
+    console.log(`✅ Client sync initialized`);
   } catch (error) {
-    console.log(`⚠️  Client sync not ready yet, continuing without sync wait`);
+    console.log(`⚠️  Client sync not initialized yet: ${error.message}`);
   }
   
   return {
@@ -53,7 +101,6 @@ export async function createSyncedClient(browser, authState = '.playwright/auth/
  */
 export async function createSyncedClients(browser, count, options = {}) {
   const {
-    authState = '.playwright/auth/auth-29.json',
     staggerDelay = 1000, // Delay between client creation to avoid overwhelming server
     waitForSync = true
   } = options;
@@ -66,7 +113,7 @@ export async function createSyncedClients(browser, count, options = {}) {
       await new Promise(resolve => setTimeout(resolve, staggerDelay));
     }
     
-    const client = await createSyncedClient(browser, authState);
+    const client = await createSyncedClient(browser, `-client-${i}`);
     client.index = i;
     client.name = `Client_${i}`;
     clients.push(client);

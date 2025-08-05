@@ -1,5 +1,5 @@
 // Test to verify all core infrastructure helpers work correctly
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/persistent-context.js';
 import { 
   createEntity, 
   updateEntity, 

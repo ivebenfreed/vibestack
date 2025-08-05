@@ -1,5 +1,5 @@
 // Basic system test to verify functionality after updates
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/persistent-context.js';
 import { createEntity, getEntity } from './db-test-helpers.js';
 
 test.describe('Basic System Test', () => {
