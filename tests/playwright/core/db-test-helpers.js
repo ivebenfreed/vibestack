@@ -1,6 +1,169 @@
 // Database test helpers for Playwright tests
 
 /**
+ * Create an entity using domain services
+ * @param {Page} page - Playwright page object
+ * @param {string} entityType - Type of entity (e.g., 'task', 'project', 'user')
+ * @param {object} data - Entity data
+ * @returns {Promise<object>} Created entity
+ */
+export async function createEntity(page, entityType, data) {
+  return await page.evaluate(async ({ entityType, data }) => {
+    const { domainServices } = await import('/src/domain/index.js');
+    const service = domainServices[entityType];
+    if (!service) {
+      throw new Error(`No domain service found for entity type: ${entityType}`);
+    }
+    return await service.createUI(data);
+  }, { entityType, data });
+}
+
+/**
+ * Update an entity using domain services
+ * @param {Page} page - Playwright page object
+ * @param {string} entityType - Type of entity
+ * @param {string} id - Entity ID
+ * @param {object} updates - Update data
+ * @returns {Promise<object>} Updated entity
+ */
+export async function updateEntity(page, entityType, id, updates) {
+  return await page.evaluate(async ({ entityType, id, updates }) => {
+    const { domainServices } = await import('/src/domain/index.js');
+    const service = domainServices[entityType];
+    if (!service) {
+      throw new Error(`No domain service found for entity type: ${entityType}`);
+    }
+    return await service.updateUI(id, updates);
+  }, { entityType, id, updates });
+}
+
+/**
+ * Delete an entity using domain services
+ * @param {Page} page - Playwright page object
+ * @param {string} entityType - Type of entity
+ * @param {string} id - Entity ID
+ * @returns {Promise<void>}
+ */
+export async function deleteEntity(page, entityType, id) {
+  return await page.evaluate(async ({ entityType, id }) => {
+    const { domainServices } = await import('/src/domain/index.js');
+    const service = domainServices[entityType];
+    if (!service) {
+      throw new Error(`No domain service found for entity type: ${entityType}`);
+    }
+    return await service.deleteUI(id);
+  }, { entityType, id });
+}
+
+/**
+ * Get a single entity by ID
+ * @param {Page} page - Playwright page object
+ * @param {string} entityType - Type of entity
+ * @param {string} id - Entity ID
+ * @returns {Promise<object|null>} Entity or null if not found
+ */
+export async function getEntity(page, entityType, id) {
+  return await page.evaluate(async ({ entityType, id }) => {
+    const { db } = await import('/src/domain/index.js');
+    // Map entity type to table name (add 's' for plural)
+    const tableName = entityType + 's';
+    const table = db[tableName];
+    if (!table) {
+      throw new Error(`No table found for entity type: ${entityType}`);
+    }
+    return await table.get(id) || null;
+  }, { entityType, id });
+}
+
+/**
+ * Get all entities of a type with optional filters
+ * @param {Page} page - Playwright page object
+ * @param {string} entityType - Type of entity
+ * @param {object} filters - Optional filters
+ * @returns {Promise<array>} Array of entities
+ */
+export async function getAllEntities(page, entityType, filters = {}) {
+  return await page.evaluate(async ({ entityType, filters }) => {
+    const { db } = await import('/src/domain/index.js');
+    // Map entity type to table name (add 's' for plural)
+    const tableName = entityType + 's';
+    const table = db[tableName];
+    if (!table) {
+      throw new Error(`No table found for entity type: ${entityType}`);
+    }
+    
+    const allEntities = await table.toArray();
+    
+    // Apply filters
+    return allEntities.filter(entity => {
+      for (const [key, value] of Object.entries(filters)) {
+        if (entity[key] !== value) return false;
+      }
+      return true;
+    });
+  }, { entityType, filters });
+}
+
+/**
+ * Create multiple entities in bulk
+ * @param {Page} page - Playwright page object
+ * @param {string} entityType - Type of entity
+ * @param {array} dataArray - Array of entity data
+ * @returns {Promise<array>} Array of created entities
+ */
+export async function createBulkEntities(page, entityType, dataArray) {
+  return await page.evaluate(async ({ entityType, dataArray }) => {
+    const { domainServices } = await import('/src/domain/index.js');
+    const service = domainServices[entityType];
+    if (!service) {
+      throw new Error(`No domain service found for entity type: ${entityType}`);
+    }
+    
+    const results = [];
+    for (const data of dataArray) {
+      const entity = await service.createUI(data);
+      results.push(entity);
+    }
+    return results;
+  }, { entityType, dataArray });
+}
+
+/**
+ * Get entity count from database
+ * @param {Page} page - Playwright page object
+ * @param {string} tableName - Table name (e.g., 'tasks', 'projects')
+ * @returns {Promise<number>} Count
+ */
+export async function getEntityCount(page, tableName) {
+  return await page.evaluate(async (tableName) => {
+    const { db } = await import('/src/domain/index.js');
+    const table = db[tableName];
+    if (!table) {
+      throw new Error(`Table ${tableName} not found`);
+    }
+    return await table.count();
+  }, tableName);
+}
+
+/**
+ * Get entity directly from database (bypassing domain services)
+ * @param {Page} page - Playwright page object
+ * @param {string} tableName - Table name
+ * @param {string} id - Entity ID
+ * @returns {Promise<object|undefined>} Entity or undefined
+ */
+export async function getEntityFromDB(page, tableName, id) {
+  return await page.evaluate(async ({ tableName, id }) => {
+    const { db } = await import('/src/domain/index.js');
+    const table = db[tableName];
+    if (!table) {
+      throw new Error(`Table ${tableName} not found`);
+    }
+    return await table.get(id);
+  }, { tableName, id });
+}
+
+/**
  * Set up database test utilities on the page
  */
 export async function setupDbHelpers(page) {
@@ -10,17 +173,31 @@ export async function setupDbHelpers(page) {
       async clearTestData() {
         const { db } = await import('/src/domain/index.js');
         
-        // Delete all test data (items with TEST_ prefix)
-        await db.transaction('rw', 
-          db.tasks, db.projects, db.users, db.comments, db.tags,
-          async () => {
-            await db.tasks.where('title').startsWith('TEST_').delete();
-            await db.projects.where('name').startsWith('TEST_').delete();
-            await db.users.where('name').startsWith('TEST_').delete();
-            await db.comments.where('content').startsWith('TEST_').delete();
-            await db.tags.where('name').startsWith('TEST_').delete();
+        try {
+          // Delete all test data (items with TEST_ prefix)
+          // Check which tables exist and clear them
+          const tablesToClear = [];
+          
+          if (db.tasks) {
+            tablesToClear.push(db.tasks.where('title').startsWith('TEST_').delete());
           }
-        );
+          if (db.projects) {
+            tablesToClear.push(db.projects.where('name').startsWith('TEST_').delete());
+          }
+          if (db.users) {
+            tablesToClear.push(db.users.where('name').startsWith('TEST_').delete());
+          }
+          if (db.comments) {
+            tablesToClear.push(db.comments.where('content').startsWith('TEST_').delete());
+          }
+          if (db.tags) {
+            tablesToClear.push(db.tags.where('name').startsWith('TEST_').delete());
+          }
+          
+          await Promise.all(tablesToClear);
+        } catch (error) {
+          console.error('Error clearing test data:', error);
+        }
       },
       
       // Get counts for all tables
@@ -226,6 +403,50 @@ export async function monitorChanges(page, callback) {
   });
   
   return changes;
+}
+
+/**
+ * Validate entity relationships
+ * @param {Page} page - Playwright page object
+ * @param {object} entity - Entity to validate
+ * @param {object} relationships - Expected relationships { relationName: { entityType, id } }
+ * @returns {Promise<object>} Validation results
+ */
+export async function validateEntityRelationships(page, entity, relationships) {
+  return await page.evaluate(async ({ entity, relationships }) => {
+    const { domainServices, db } = await import('/src/domain/index.js');
+    const results = {};
+    
+    for (const [relationName, expected] of Object.entries(relationships)) {
+      results[relationName] = {
+        expected: expected,
+        found: false,
+        valid: false
+      };
+      
+      // Handle different relationship patterns
+      if (relationName.endsWith('Id')) {
+        // Direct foreign key reference (e.g., projectId, ownerId)
+        results[relationName].found = entity[relationName];
+        results[relationName].valid = entity[relationName] === expected.id;
+      } else if (relationName.endsWith('Ids')) {
+        // Array of IDs (e.g., tagIds)
+        const ids = entity[relationName] || [];
+        results[relationName].found = ids;
+        results[relationName].valid = ids.includes(expected.id);
+      } else {
+        // Try to fetch related entity
+        const relatedTable = db[expected.entityType + 's'];
+        if (relatedTable) {
+          const relatedEntity = await relatedTable.get(expected.id);
+          results[relationName].found = relatedEntity;
+          results[relationName].valid = !!relatedEntity;
+        }
+      }
+    }
+    
+    return results;
+  }, { entity, relationships });
 }
 
 /**

@@ -3,6 +3,12 @@
  * 
  * Handles all WebSocket message routing and processing to reduce sync machine size.
  * Maintains clean separation between state machine orchestration and message handling.
+ * 
+ * IMPORTANT LSN BEHAVIOR:
+ * - Always uses `serverLSN` (current PostgreSQL WAL position) for LSN updates
+ * - NOT `lastLSN` from changes history which only reflects data modifications
+ * - This ensures client LSN matches actual server WAL position, preventing false "behind" detection
+ * - LSN updates only occur at sync phase completion (not during sync) for proper error recovery
  */
 
 import { syncLogger } from './SyncLogger';
@@ -126,27 +132,31 @@ export class MessageProcessor {
       changes, 
       messageType,
       sequence: message.sequence,
-      lastLSN: message.lastLSN // Pass through the LSN for acknowledgments
+      serverLSN: message.serverLSN // Pass through the server LSN for acknowledgments
     });
     
-    // Update LSN from lastLSN in change messages (for catchup and live changes)
-    if ((messageType === 'srv_catchup_changes' || messageType === 'srv_live_changes')) {
+    // Only update LSN immediately for live changes (real-time sync)
+    // Initial and catchup sync LSN updates happen at completion events
+    if (messageType === 'srv_live_changes') {
       console.log(`[MessageProcessor] 🔍 LSN check for ${messageType}:`, {
-        hasLastLSN: !!message.lastLSN,
-        lastLSN: message.lastLSN,
+        hasServerLSN: !!message.serverLSN,
+        serverLSN: message.serverLSN,
         currentLSN: context.currentLSN,
-        different: message.lastLSN !== context.currentLSN,
+        different: message.serverLSN !== context.currentLSN,
         messageKeys: Object.keys(message)
       });
       
-      if (message.lastLSN && message.lastLSN !== context.currentLSN) {
-        console.log(`[MessageProcessor] 📊 LSN update from ${messageType}: ${context.currentLSN} → ${message.lastLSN}`);
-        sendEvent({ type: 'LSN_UPDATE', lsn: message.lastLSN, source: messageType });
-      } else if (!message.lastLSN) {
-        console.warn(`[MessageProcessor] ⚠️ ${messageType} message missing lastLSN field!`);
+      if (message.serverLSN && message.serverLSN !== context.currentLSN) {
+        console.log(`[MessageProcessor] 📊 LSN update from ${messageType}: ${context.currentLSN} → ${message.serverLSN}`);
+        sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: messageType });
+      } else if (!message.serverLSN) {
+        console.warn(`[MessageProcessor] ⚠️ ${messageType} message missing serverLSN field!`);
       } else {
-        console.log(`[MessageProcessor] ✅ LSN already current for ${messageType}: ${message.lastLSN}`);
+        console.log(`[MessageProcessor] ✅ LSN already current for ${messageType}: ${message.serverLSN}`);
       }
+    } else if (messageType === 'srv_catchup_changes' || messageType === 'srv_init_changes') {
+      // Log LSN info but don't update until completion
+      console.log(`[MessageProcessor] 📋 ${messageType} received with LSN ${message.serverLSN || 'none'} (will update on completion)`);
     }
     
     // CRITICAL: Send immediate chunk acknowledgment for catchup changes
@@ -349,10 +359,9 @@ export class MessageProcessor {
     if (messageType === 'srv_init_start') {
       console.log('[MessageProcessor] 🚀 Server started initial sync');
       
-      // Update LSN from server at start of initial sync
-      if (message.serverLSN && message.serverLSN !== context.currentLSN) {
-        console.log(`[MessageProcessor] 📊 LSN update at init start: ${context.currentLSN} → ${message.serverLSN}`);
-        sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: 'init_start' });
+      // Log server LSN but don't update until completion
+      if (message.serverLSN) {
+        console.log(`[MessageProcessor] 📋 Server LSN at init start: ${message.serverLSN} (client: ${context.currentLSN}) - will update on completion`);
       }
       
       // Send acknowledgment
@@ -521,8 +530,8 @@ export class MessageProcessor {
         return {
           ...baseAck,
           type: 'clt_changes_received',
-          lsn: message.lastLSN || context.currentLSN, // Use the updated LSN from the message
-          lastProcessedLSN: message.lastLSN
+          lsn: message.serverLSN || context.currentLSN, // Use the server LSN from the message
+          serverLSN: message.serverLSN
         };
         
       default:
