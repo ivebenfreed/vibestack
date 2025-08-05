@@ -18,6 +18,9 @@ importers:
       '@eslint/js':
         specifier: ^9.25.1
         version: 9.25.1
+      '@faker-js/faker':
+        specifier: ^9.7.0
+        version: 9.7.0
       '@playwright/test':
         specifier: ^1.54.2
         version: 1.54.2
