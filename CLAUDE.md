@@ -4,10 +4,10 @@
 
 **This is PR #11 worktree with the following ports:**
 
-- Web application: `http://localhost:5353`
-- Server API: `http://localhost:8967`
-- Database: `postgres://postgres:postgres@localhost:5612/vibestack_dev_issue_18`
-- Proxy: Port 4634
+- Web application: `http://localhost:5403`
+- Server API: `http://localhost:9017`
+- Database: `postgres://postgres:postgres@localhost:5662/vibestack_dev_issue_23`
+- Proxy: Port 4684
 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

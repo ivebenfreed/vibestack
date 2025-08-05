@@ -73,7 +73,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
   // Subscribe to task dependencies
   const subscribeToDependencies = () => {
     const observable = liveQuery(async () => {
-      let dependencies = await db.task_dependencies.toArray();
+      let dependencies = await db.taskDependencies.toArray();
       
       // Filter by project if provided (need to join with tasks)
       if (input?.projectId) {
@@ -173,7 +173,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
         break;
         
       case 'CREATE_DEPENDENCY':
-        db.task_dependencies.add({
+        db.taskDependencies.add({
           dependentTaskId: event.dependency.targetTaskId,
           dependencyTaskId: event.dependency.sourceTaskId,
         });
@@ -182,7 +182,7 @@ export const dataSubscriptionActor = fromCallback<any, DataSubscriptionInput>(({
       case 'DELETE_DEPENDENCY':
         // Parse the generated ID back to component parts
         const [dependentId, dependencyId] = event.dependencyId.split('-');
-        db.task_dependencies
+        db.taskDependencies
           .where('[dependentTaskId+dependencyTaskId]')
           .equals([dependentId, dependencyId])
           .delete();

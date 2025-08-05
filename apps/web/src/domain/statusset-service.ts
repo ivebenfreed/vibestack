@@ -25,7 +25,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
   entityName = 'StatusSet';
   
   protected getTable() {
-    return db.status_sets;
+    return db.statusSets;
   }
   
   // ============================================================================
@@ -51,7 +51,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
       projects: []
     } as StatusSet;
     
-    await db.status_sets.add(statusSet);
+    await db.statusSets.add(statusSet);
     await trackOutgoingChange('status_sets', 'insert', statusSet);
     
     console.log('[StatusSetService] Created status set', {
@@ -69,7 +69,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
   
   async deleteUI(id: string): Promise<boolean> {
     // Clean up related status definitions first
-    const statusDefinitions = await db.status_definitions
+    const statusDefinitions = await db.statusDefinitions
       .where('statusSetId')
       .equals(id)
       .toArray();
@@ -86,7 +86,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
   // ============================================================================
   
   async createIncoming(statusSet: StatusSet): Promise<StatusSet> {
-    await db.status_sets.put(statusSet);
+    await db.statusSets.put(statusSet);
     console.log('[StatusSetService] Created status set from incoming sync', {
       id: statusSet.id,
       name: statusSet.name
@@ -95,7 +95,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
   }
   
   async updateIncoming(id: string, updates: Partial<StatusSet>): Promise<StatusSet> {
-    const existing = await db.status_sets.get(id);
+    const existing = await db.statusSets.get(id);
     if (!existing) {
       throw new Error(`StatusSet ${id} not found`);
     }
@@ -106,7 +106,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
       updatedAt: updates.updatedAt || new Date().toISOString()
     };
     
-    await db.status_sets.put(updated);
+    await db.statusSets.put(updated);
     console.log('[StatusSetService] Updated status set from incoming sync', {
       id: updated.id,
       updates
@@ -116,12 +116,12 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
   }
   
   async deleteIncoming(id: string): Promise<boolean> {
-    const existing = await db.status_sets.get(id);
+    const existing = await db.statusSets.get(id);
     if (!existing) {
       return false;
     }
     
-    await db.status_sets.delete(id);
+    await db.statusSets.delete(id);
     console.log('[StatusSetService] Deleted status set from incoming sync', { id });
     
     return true;
@@ -135,7 +135,7 @@ export class StatusSetDomainService extends BaseDomainService<StatusSet, CreateS
    * Get status sets by entity type
    */
   async getByEntityType(entityType: string): Promise<StatusSet[]> {
-    return db.status_sets
+    return db.statusSets
       .where('entityType')
       .equals(entityType)
       .and(statusSet => statusSet.isActive)

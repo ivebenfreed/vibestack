@@ -245,6 +245,11 @@ function extractIndexedFields(schemaOptions: any, entityClass?: Function, metada
       if (entityClass.name === 'LocalChanges') {
         indexedFields.push('processedSync');
       }
+      
+      // Temporary hardcoded fix for EntityDependency entityType index
+      if (entityClass.name === 'EntityDependency') {
+        indexedFields.push('entityType');
+      }
     } catch (error) {
       console.warn(`[generate-dexie-schema] Failed to extract Dexie indexes from class metadata:`, error);
     }

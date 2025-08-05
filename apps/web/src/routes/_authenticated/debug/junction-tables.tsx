@@ -37,8 +37,8 @@ function JunctionTablesDebug() {
         taskDexieService.getAll(),
         userDexieService.getAll(),
         tagDexieService.getAll(),
-        db.status_sets.toArray(),
-        db.tag_sets.toArray(),
+        db.statusSets.toArray(),
+        db.tagSets.toArray(),
       ]);
       
       setProjects(projectsData);
@@ -57,18 +57,18 @@ function JunctionTablesDebug() {
     setLoading(true);
     try {
       const junctionTables = [
-        { name: 'Project Members', table: db.project_members },
-        { name: 'Project Status Sets', table: db.project_status_sets },
-        { name: 'Project Tag Sets', table: db.project_tag_sets },
-        { name: 'Task Tags', table: db.task_tags },
-        { name: 'Task Dependencies', table: db.task_dependencies },
+        { name: 'Project Members', table: db.projectMembers },
+        { name: 'Project Status Sets', table: db.projectStatusSets },
+        { name: 'Project Tag Sets', table: db.projectTagSets },
+        { name: 'Task Tags', table: db.taskTags },
+        { name: 'Task Dependencies', table: db.taskDependencies },
       ];
 
       const stats = [];
       
       // Project Members
       try {
-        const pmRecords = await db.project_members.toArray();
+        const pmRecords = await db.projectMembers.toArray();
         console.log('project_members raw:', pmRecords);
         stats.push({ tableName: 'Project Members', count: pmRecords.length, samples: pmRecords.slice(0, 5) });
       } catch (error) {
@@ -78,7 +78,7 @@ function JunctionTablesDebug() {
 
       // Project Status Sets  
       try {
-        const pssRecords = await db.project_status_sets.toArray();
+        const pssRecords = await db.projectStatusSets.toArray();
         console.log('project_status_sets raw:', pssRecords);
         stats.push({ tableName: 'Project Status Sets', count: pssRecords.length, samples: pssRecords.slice(0, 5) });
       } catch (error) {
@@ -88,7 +88,7 @@ function JunctionTablesDebug() {
 
       // Project Tag Sets
       try {
-        const ptsRecords = await db.project_tag_sets.toArray();
+        const ptsRecords = await db.projectTagSets.toArray();
         console.log('project_tag_sets raw:', ptsRecords);
         stats.push({ tableName: 'Project Tag Sets', count: ptsRecords.length, samples: ptsRecords.slice(0, 5) });
       } catch (error) {
@@ -98,7 +98,7 @@ function JunctionTablesDebug() {
 
       // Task Tags
       try {
-        const ttRecords = await db.task_tags.toArray();
+        const ttRecords = await db.taskTags.toArray();
         console.log('task_tags raw:', ttRecords);
         stats.push({ tableName: 'Task Tags', count: ttRecords.length, samples: ttRecords.slice(0, 5) });
       } catch (error) {
@@ -108,7 +108,7 @@ function JunctionTablesDebug() {
 
       // Task Dependencies
       try {
-        const tdRecords = await db.task_dependencies.toArray();
+        const tdRecords = await db.taskDependencies.toArray();
         console.log('task_dependencies raw:', tdRecords);
         stats.push({ tableName: 'Task Dependencies', count: tdRecords.length, samples: tdRecords.slice(0, 5) });
       } catch (error) {
@@ -435,11 +435,11 @@ function JunctionTablesDebug() {
                 console.log('=== RAW JUNCTION TABLE DEBUG ===');
                 
                 // Check each junction table directly
-                const pmData = await db.project_members.toArray();
-                const pssData = await db.project_status_sets.toArray();
-                const ptsData = await db.project_tag_sets.toArray();
-                const ttData = await db.task_tags.toArray();
-                const tdData = await db.task_dependencies.toArray();
+                const pmData = await db.projectMembers.toArray();
+                const pssData = await db.projectStatusSets.toArray();
+                const ptsData = await db.projectTagSets.toArray();
+                const ttData = await db.taskTags.toArray();
+                const tdData = await db.taskDependencies.toArray();
                 
                 console.log('project_members:', pmData.length, pmData);
                 console.log('project_status_sets:', pssData.length, pssData);

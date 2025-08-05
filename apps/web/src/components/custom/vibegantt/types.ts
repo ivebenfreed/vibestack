@@ -1,20 +1,25 @@
 // Core Gantt Types
 export interface GanttTask {
   id: string;
-  name: string;
-  plannedStartDate: Date;
-  plannedEndDate: Date;
+  title: string; // Changed from 'name' to match Task entity
+  startDate?: Date | string; // Optional, matches Task entity
+  dueDate?: Date | string; // Changed from plannedEndDate to match Task entity
   actualStartDate?: Date;
   actualEndDate?: Date;
-  progress: number; // 0-100
+  progress?: number; // 0-100, made optional
   assigneeId?: string;
   parentId?: string; // For task hierarchy
   color?: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  priority?: 'low' | 'medium' | 'high' | 'critical'; // Made optional
   constraints?: TaskConstraint[];
   customFields?: Record<string, any>;
   rowIndex?: number; // For positioning
   level?: number; // For hierarchy indentation
+  
+  // Additional fields from Task entity
+  status?: string;
+  description?: string;
+  projectId?: string;
 }
 
 export interface TaskDependency {

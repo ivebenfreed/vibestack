@@ -108,33 +108,33 @@ export function calculateCoordinateMapping({
       // Add task to visible list
       visibleTasks.push(task);
       
-      // Calculate task coordinates
-      const taskStart = new Date(task.plannedStartDate);
-      const taskEnd = new Date(task.plannedEndDate);
+      // Calculate task coordinates using the correct field names
+      const taskStart = task.startDate ? new Date(task.startDate) : null;
+      const taskEnd = task.dueDate ? new Date(task.dueDate) : null;
       
       // Log first few tasks to debug date issue
       if (rowIndex.current < 3) {
         console.log(`📐 Task ${rowIndex.current}: ${task.title}`, {
           task: {
             id: task.id,
-            plannedStartDate: task.plannedStartDate,
-            plannedEndDate: task.plannedEndDate,
-            hasStartDate: !!task.plannedStartDate,
-            hasEndDate: !!task.plannedEndDate
+            startDate: task.startDate,
+            dueDate: task.dueDate,
+            hasStartDate: !!task.startDate,
+            hasDueDate: !!task.dueDate
           },
           parsed: {
-            startValid: !isNaN(taskStart.getTime()),
-            endValid: !isNaN(taskEnd.getTime())
+            startValid: taskStart && !isNaN(taskStart.getTime()),
+            endValid: taskEnd && !isNaN(taskEnd.getTime())
           }
         });
       }
       
-      // Skip tasks with invalid dates
-      if (isNaN(taskStart.getTime()) || isNaN(taskEnd.getTime())) {
-        console.warn(`⚠️ Skipping task with invalid dates: ${task.id}`, {
+      // Skip tasks without dates or with invalid dates
+      if (!taskStart || !taskEnd || isNaN(taskStart.getTime()) || isNaN(taskEnd.getTime())) {
+        console.warn(`⚠️ Skipping task without valid dates: ${task.id}`, {
           title: task.title,
-          plannedStartDate: task.plannedStartDate,
-          plannedEndDate: task.plannedEndDate
+          startDate: task.startDate,
+          dueDate: task.dueDate
         });
         rowIndex.current++;
         return;

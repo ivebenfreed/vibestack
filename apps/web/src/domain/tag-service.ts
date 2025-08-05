@@ -187,7 +187,7 @@ export class TagDomainService extends BaseDomainService<Tag, CreateTagInput, Upd
    */
   async getTagsForEntityType(entityType: string, includeEmpty: boolean = true): Promise<Tag[]> {
     // Get all tag sets
-    const tagSets = await db.tag_sets.toArray();
+    const tagSets = await db.tagSets.toArray();
     
     console.log(`TagService: All tag sets in database:`, tagSets.map(ts => ({ 
       id: ts.id, 

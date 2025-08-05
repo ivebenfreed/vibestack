@@ -3,6 +3,9 @@ import { db } from '@repo/dataforge/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import type { GanttTask, TaskDependency, Resource, ResourceAllocation } from '../types';
+import { taskService } from '@/domain/task-service';
+import { entityDependencyService } from '@/domain/entity-dependency-service';
+import { calculateCoordinateMapping, type CoordinateMapping } from '../utils/coordinate-mapper';
 
 // ====================================
 // MEMORY LIMITS
@@ -45,6 +48,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
       taskMap: new Map() as Map<string, any>, // Quick lookup
       dependencyMap: new Map() as Map<string, { predecessors: string[]; successors: string[] }>,
       criticalPath: new Set() as Set<string>,
+      coordinateMapping: null as CoordinateMapping | null, // Pre-calculated positions
       
       // View state
       expandedTasks: new Set(persistedState?.expandedTasks || ['root']) as Set<string>,
@@ -106,6 +110,18 @@ export const createGanttStoreLogic = (projectId?: string) => {
           // Calculate critical path
           return calculateCriticalPath(event.tasks, context.dependencies);
         },
+        coordinateMapping: (context, event) => {
+          // Calculate coordinate mapping for rendering
+          const tasks = Object.values(event.tasks);
+          const taskTree = buildTaskTree(tasks);
+          
+          return calculateCoordinateMapping({
+            taskTree,
+            expandedTasks: context.expandedTasks,
+            visibleDateRange: context.visibleDateRange,
+            zoom: context.zoom,
+          });
+        },
         loading: false,
         error: null,
         lastUpdatedAt: Date.now()
@@ -154,6 +170,21 @@ export const createGanttStoreLogic = (projectId?: string) => {
             );
           }
           return context.criticalPath;
+        },
+        coordinateMapping: (context, event) => {
+          // Recalculate coordinate mapping with updated task
+          const tasks = Object.values({
+            ...context.tasks,
+            [event.task.id]: resolveTaskRelationships(event.task, context.relationships)
+          });
+          const taskTree = buildTaskTree(tasks);
+          
+          return calculateCoordinateMapping({
+            taskTree,
+            expandedTasks: context.expandedTasks,
+            visibleDateRange: context.visibleDateRange,
+            zoom: context.zoom,
+          });
         },
         lastUpdatedAt: Date.now()
       },
@@ -322,6 +353,22 @@ export const createGanttStoreLogic = (projectId?: string) => {
           });
           
           return expanded;
+        },
+        coordinateMapping: (context, event) => {
+          // Recalculate with updated expanded state
+          const expanded = new Set(context.expandedTasks);
+          if (expanded.has(event.taskId)) {
+            expanded.delete(event.taskId);
+          } else {
+            expanded.add(event.taskId);
+          }
+          
+          return calculateCoordinateMapping({
+            taskTree: context.taskTree,
+            expandedTasks: expanded,
+            visibleDateRange: context.visibleDateRange,
+            zoom: context.zoom,
+          });
         }
       },
       
@@ -337,6 +384,15 @@ export const createGanttStoreLogic = (projectId?: string) => {
             visibleDateRange: event.range
           });
           return event.range;
+        },
+        coordinateMapping: (context, event) => {
+          // Recalculate with new date range
+          return calculateCoordinateMapping({
+            taskTree: context.taskTree,
+            expandedTasks: context.expandedTasks,
+            visibleDateRange: event.range,
+            zoom: context.zoom,
+          });
         }
       },
       
@@ -348,6 +404,15 @@ export const createGanttStoreLogic = (projectId?: string) => {
             zoom: event.zoom
           });
           return event.zoom;
+        },
+        coordinateMapping: (context, event) => {
+          // Recalculate with new zoom level
+          return calculateCoordinateMapping({
+            taskTree: context.taskTree,
+            expandedTasks: context.expandedTasks,
+            visibleDateRange: context.visibleDateRange,
+            zoom: event.zoom,
+          });
         }
       },
       
@@ -640,76 +705,83 @@ function resolveTaskRelationships(task: any, relationships: any): any {
 // INITIAL DATA LOADER
 // ====================================
 
-export async function loadInitialGanttData(projectId?: string) {
-  console.log('📊 GanttStore: Loading initial data from IndexedDB', { projectId });
+export async function loadInitialGanttData(projectId?: string, domainService?: any) {
+  console.log('📊 GanttStore: Loading initial data from IndexedDB', { projectId, domainService });
   
-  // Build query for tasks
-  let taskQuery = db.tasks.toCollection();
-  if (projectId) {
-    taskQuery = db.tasks.where('projectId').equals(projectId);
-  }
-  
-  // Check if we need pagination
-  const totalCount = await taskQuery.count();
-  const needsPagination = totalCount > MEMORY_LIMITS.MAX_TASKS;
-  
-  let tasks: any[];
-  let paginationInfo = null;
-  
-  if (needsPagination) {
-    // Load first page only
-    const pageSize = MEMORY_LIMITS.DEFAULT_PAGE_SIZE;
-    tasks = await taskQuery.limit(pageSize).toArray();
-    
-    paginationInfo = {
-      enabled: true,
-      currentPage: 0,
-      pageSize,
-      totalTasks: totalCount,
-      totalPages: Math.ceil(totalCount / pageSize)
-    };
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📊 GanttStore: Pagination enabled', paginationInfo);
+  try {
+    // Build query for tasks
+    let taskQuery = db.tasks.toCollection();
+    if (projectId) {
+      taskQuery = db.tasks.where('projectId').equals(projectId);
     }
-  } else {
-    // Load all tasks
-    tasks = await taskQuery.toArray();
-  }
+    
+    // Check if we need pagination
+    const totalCount = await taskQuery.count();
+    const needsPagination = totalCount > MEMORY_LIMITS.MAX_TASKS;
+    
+    let tasks: any[];
+    let paginationInfo = null;
   
-  // Get unique IDs for relationships
-  const assigneeIds = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
-  const projectIds = [...new Set(tasks.map(t => t.projectId).filter(Boolean))];
-  const statusIds = [...new Set(tasks.map(t => t.statusId).filter(Boolean))];
-  const parentIds = [...new Set(tasks.map(t => t.parentId).filter(Boolean))];
-  
-  // Extract tag IDs from junction table
-  const taskIds = tasks.map(t => t.id);
-  const taskTags = await db.task_tags.where('taskId').anyOf(taskIds).toArray();
-  const tagIds = [...new Set(taskTags.map(tt => tt.tagId))];
-  
-  // Process junction data
-  const tagsByTask: Record<string, string[]> = {};
-  taskTags.forEach(tt => {
-    if (!tagsByTask[tt.taskId]) {
-      tagsByTask[tt.taskId] = [];
+    if (needsPagination) {
+      // Load first page only
+      const pageSize = MEMORY_LIMITS.DEFAULT_PAGE_SIZE;
+      tasks = await taskQuery.limit(pageSize).toArray();
+      
+      paginationInfo = {
+        enabled: true,
+        currentPage: 0,
+        pageSize,
+        totalTasks: totalCount,
+        totalPages: Math.ceil(totalCount / pageSize)
+      };
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📊 GanttStore: Pagination enabled', paginationInfo);
+      }
+    } else {
+      // Load all tasks
+      tasks = await taskQuery.toArray();
     }
-    tagsByTask[tt.taskId].push(tt.tagId);
-  });
   
-  // Log before querying dependencies
-  console.log('📊 GanttStore: Querying dependencies for task IDs:', taskIds.slice(0, 5), '...');
+    // Get unique IDs for relationships
+    const assigneeIds = [...new Set(tasks.map(t => t.assigneeId).filter(Boolean))];
+    const projectIds = [...new Set(tasks.map(t => t.projectId).filter(Boolean))];
+    const statusIds = [...new Set(tasks.map(t => t.statusId).filter(Boolean))];
+    const parentIds = [...new Set(tasks.map(t => t.parentId).filter(Boolean))];
   
-  // Load all relationships in parallel
-  const [users, projects, statusDefs, tags, dependencies] = await Promise.all([
-    assigneeIds.length > 0 ? db.users.where('id').anyOf(assigneeIds).toArray() : [],
-    projectIds.length > 0 ? db.projects.where('id').anyOf(projectIds).toArray() : [],
-    statusIds.length > 0 ? db.status_definitions.where('id').anyOf(statusIds).toArray() : [],
-    tagIds.length > 0 ? db.tags.where('id').anyOf(tagIds).toArray() : [],
-    db.entity_dependencies.where('entityType').equals('Task')
-      .and(dep => taskIds.includes(dep.predecessorId) || taskIds.includes(dep.successorId))
-      .toArray()
-  ]);
+    // Extract tag IDs from junction table
+    const taskIds = tasks.map(t => t.id);
+    const taskTags = await db.taskTags.where('taskId').anyOf(taskIds).toArray();
+    const tagIds = [...new Set(taskTags.map(tt => tt.tagId))];
+    
+    // Process junction data
+    const tagsByTask: Record<string, string[]> = {};
+    taskTags.forEach(tt => {
+      if (!tagsByTask[tt.taskId]) {
+        tagsByTask[tt.taskId] = [];
+      }
+      tagsByTask[tt.taskId].push(tt.tagId);
+    });
+  
+    // Log before querying dependencies
+    console.log('📊 GanttStore: Querying dependencies for task IDs:', taskIds.slice(0, 5), '...');
+    
+    // Load all relationships in parallel with error handling
+    let users = [], projects = [], statusDefs = [], tags = [], dependencies = [];
+  
+  try {
+    [users, projects, statusDefs, tags, dependencies] = await Promise.all([
+      assigneeIds.length > 0 ? db.users.where('id').anyOf(assigneeIds).toArray() : [],
+      projectIds.length > 0 ? db.projects.where('id').anyOf(projectIds).toArray() : [],
+      statusIds.length > 0 ? db.statusDefinitions.where('id').anyOf(statusIds).toArray() : [],
+      tagIds.length > 0 ? db.tags.where('id').anyOf(tagIds).toArray() : [],
+      taskIds.length > 0 ? entityDependencyService.getTaskDependencies(taskIds) : []
+    ]);
+  } catch (error) {
+    console.error('📊 GanttStore: Error loading relationships from database:', error);
+    // Continue with empty arrays - better than crashing
+    console.log('📊 GanttStore: Continuing with empty relationship data');
+  }
   
   // Log dependency query results
   console.log('📊 GanttStore: Raw dependency query result:', {
@@ -782,6 +854,22 @@ export async function loadInitialGanttData(projectId?: string) {
     relationships,
     pagination: paginationInfo
   };
+  
+  } catch (error) {
+    console.error('📊 GanttStore: Critical error loading initial data:', error);
+    // Return minimal valid data structure to prevent crashes
+    return {
+      tasks: {},
+      dependencies: {},
+      relationships: {
+        users: {},
+        projects: {},
+        statusDefinitions: {},
+        tags: {}
+      },
+      pagination: null
+    };
+  }
 }
 
 // ====================================
@@ -790,7 +878,8 @@ export async function loadInitialGanttData(projectId?: string) {
 
 export function setupGranularGanttSubscriptions(
   storeActor: any,
-  projectId?: string
+  projectId?: string,
+  domainService?: any
 ): () => void {
   const subscriptions: Subscription[] = [];
   let initialLoadComplete = false;
@@ -802,7 +891,7 @@ export function setupGranularGanttSubscriptions(
     return () => {};
   }
   
-  console.log('📊 GanttStore: Setting up granular subscriptions', { projectId });
+  console.log('📊 GanttStore: Setting up granular subscriptions', { projectId, domainService });
   
   // Track previous state for change detection
   let previousTasks: Record<string, any> = {};
@@ -834,7 +923,7 @@ export function setupGranularGanttSubscriptions(
     
     // Get tags from junction table
     const taskIds = tasks.map(t => t.id);
-    const taskTags = await db.task_tags.where('taskId').anyOf(taskIds).toArray();
+    const taskTags = await db.taskTags.where('taskId').anyOf(taskIds).toArray();
     
     // Process junction data
     const tagsByTask: Record<string, string[]> = {};
@@ -909,7 +998,7 @@ export function setupGranularGanttSubscriptions(
   
   // Subscribe to dependency changes
   const depSub = liveQuery(async () => {
-    let dependencies = await db.entity_dependencies
+    let dependencies = await db.entityDependencies // Use camelCase for Dexie v11+
       .where('entityType')
       .equals('Task')
       .toArray();

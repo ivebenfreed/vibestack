@@ -26,7 +26,7 @@ export class TaskDependencyDomainService extends BaseDomainService<TaskDependenc
   entityName = 'TaskDependency';
   
   protected getTable() {
-    return db.task_dependencies_scheduling;
+    return db.taskDependenciesScheduling;
   }
   
   // ============================================================================

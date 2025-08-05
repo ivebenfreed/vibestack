@@ -310,7 +310,7 @@ export class ProjectDomainService extends BaseDomainService<Project, CreateProje
       clientId: nanoid(),
     };
     
-    await db.project_members.add(member);
+    await db.projectMembers.add(member);
     await trackOutgoingChange('project_members', 'insert', member);
     
     console.log('[ProjectService] Added project member', {
@@ -324,13 +324,13 @@ export class ProjectDomainService extends BaseDomainService<Project, CreateProje
    * Remove a project member
    */
   async removeProjectMemberUI(projectId: string, userId: string): Promise<void> {
-    const member = await db.project_members
+    const member = await db.projectMembers
       .where('[projectId+userId]')
       .equals([projectId, userId])
       .first();
     
     if (member) {
-      await db.project_members.delete(member.id);
+      await db.projectMembers.delete(member.id);
       await trackOutgoingChange('project_members', 'delete', member);
       
       console.log('[ProjectService] Removed project member', {
