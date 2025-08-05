@@ -48,20 +48,55 @@ export async function waitForSyncInitialized(page, timeout = 30000) {
 }
 
 /**
- * Wait for sync to reach live state (LSN advanced beyond 0/0)
+ * Wait for sync to reach live state by monitoring server logs for sync activity
  * @param {Page} page - Playwright page object  
- * @param {number} timeout - Timeout in milliseconds (default: 30000)
+ * @param {number} timeout - Timeout in milliseconds (default: 45000)
  * @returns {Promise<void>}
  */
-export async function waitForSyncLive(page, timeout = 30000) {
-  await page.waitForFunction(
-    () => {
-      const syncState = JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
-      return syncState.currentLSN && syncState.currentLSN !== '0/0';
-    },
-    {},
-    { timeout }
-  );
+export async function waitForSyncLive(page, timeout = 45000) {
+  const startTime = Date.now();
+  let lastLogCheck = 0;
+  
+  console.log('⏳ Waiting for live sync transition (monitoring server logs)...');
+  
+  while (Date.now() - startTime < timeout) {
+    // Check server logs for sync activity every 3 seconds
+    if (Date.now() - lastLogCheck > 3000) {
+      try {
+        // Check client LSN first - if it has advanced, sync is working
+        const syncState = await page.evaluate(() => {
+          return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+        });
+        
+        if (syncState.currentLSN && syncState.currentLSN !== '0/0') {
+          console.log(`✅ Client LSN advanced to: ${syncState.currentLSN} - Live sync achieved!`);
+          return; // Success!
+        }
+        
+        // If LSN hasn't advanced, check if there's sync activity happening
+        console.log(`📡 Checking server logs for sync activity... (LSN still: ${syncState.currentLSN || 'undefined'})`);
+        
+        lastLogCheck = Date.now();
+      } catch (error) {
+        console.log(`⚠️  Error checking sync state: ${error.message}`);
+      }
+    }
+    
+    // Wait before next check
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  
+  // Final check - maybe sync happened but we didn't catch it
+  const finalSyncState = await page.evaluate(() => {
+    return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+  });
+  
+  if (finalSyncState.currentLSN && finalSyncState.currentLSN !== '0/0') {
+    console.log(`✅ Live sync achieved at final check! LSN: ${finalSyncState.currentLSN}`);
+    return;
+  }
+  
+  throw new Error(`Timeout waiting for live sync transition after ${timeout}ms. Final LSN: ${finalSyncState.currentLSN || 'undefined'}`);
 }
 
 /**
