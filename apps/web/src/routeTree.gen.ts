@@ -57,9 +57,6 @@ import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authen
 
 // Create Virtual Routes
 
-const AuthenticatedDebugSyncTestLazyImport = createFileRoute(
-  '/_authenticated/debug/sync-test',
-)()
 const AuthenticatedDebugSyncLazyImport = createFileRoute(
   '/_authenticated/debug/sync',
 )()
@@ -233,15 +230,6 @@ const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexImport.update({
   path: '/apps/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedDebugSyncTestLazyRoute =
-  AuthenticatedDebugSyncTestLazyImport.update({
-    id: '/sync-test',
-    path: '/sync-test',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/debug/sync-test.lazy').then((d) => d.Route),
-  )
 
 const AuthenticatedDebugSyncLazyRoute = AuthenticatedDebugSyncLazyImport.update(
   {
@@ -631,13 +619,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugSyncLazyImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
-    '/_authenticated/debug/sync-test': {
-      id: '/_authenticated/debug/sync-test'
-      path: '/sync-test'
-      fullPath: '/debug/sync-test'
-      preLoaderRoute: typeof AuthenticatedDebugSyncTestLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
@@ -710,7 +691,6 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
-  AuthenticatedDebugSyncTestLazyRoute: typeof AuthenticatedDebugSyncTestLazyRoute
   AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
 }
 
@@ -729,7 +709,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
-    AuthenticatedDebugSyncTestLazyRoute: AuthenticatedDebugSyncTestLazyRoute,
     AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
   }
 
@@ -831,7 +810,6 @@ export interface FileRoutesByFullPath {
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
-  '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug/': typeof AuthenticatedDebugIndexRoute
@@ -876,7 +854,6 @@ export interface FileRoutesByTo {
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
-  '/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug': typeof AuthenticatedDebugIndexRoute
@@ -925,7 +902,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/_authenticated/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
-  '/_authenticated/debug/sync-test': typeof AuthenticatedDebugSyncTestLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
@@ -975,7 +951,6 @@ export interface FileRouteTypes {
     | '/debug/database'
     | '/debug/integrity'
     | '/debug/sync'
-    | '/debug/sync-test'
     | '/apps'
     | '/chats'
     | '/debug/'
@@ -1019,7 +994,6 @@ export interface FileRouteTypes {
     | '/debug/database'
     | '/debug/integrity'
     | '/debug/sync'
-    | '/debug/sync-test'
     | '/apps'
     | '/chats'
     | '/debug'
@@ -1066,7 +1040,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/database'
     | '/_authenticated/debug/integrity'
     | '/_authenticated/debug/sync'
-    | '/_authenticated/debug/sync-test'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/debug/'
@@ -1174,7 +1147,6 @@ export const routeTree = rootRoute
         "/_authenticated/debug/database",
         "/_authenticated/debug/integrity",
         "/_authenticated/debug/sync",
-        "/_authenticated/debug/sync-test",
         "/_authenticated/debug/"
       ]
     },
@@ -1305,10 +1277,6 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/sync": {
       "filePath": "_authenticated/debug/sync.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/sync-test": {
-      "filePath": "_authenticated/debug/sync-test.lazy.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/apps/": {

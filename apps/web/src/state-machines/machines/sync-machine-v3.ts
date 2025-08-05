@@ -176,10 +176,13 @@ export const syncMachineV3 = setup({
           currentLSN: context.currentLSN
         };
         
-        // Only save if state has actually changed
-        if (lastSavedState && 
-            lastSavedState.clientId === stateToSave.clientId && 
-            lastSavedState.currentLSN === stateToSave.currentLSN) {
+        // Check if state has actually changed to avoid redundant saves
+        // BUG FIX: Use fresh comparison that accounts for in-flight LSN updates
+        const hasChanged = !lastSavedState || 
+                          lastSavedState.clientId !== stateToSave.clientId || 
+                          lastSavedState.currentLSN !== stateToSave.currentLSN;
+        
+        if (!hasChanged) {
           syncLogger.debug('machine', 'saveOwnState: no change, skipping save');
           return;
         }
@@ -205,7 +208,11 @@ export const syncMachineV3 = setup({
     
     // Update LSN and save state
     updateLSN: assign(({ event, context }) => {
+      console.log(`[SyncMachineV3] 🔍 updateLSN action called with event type: ${event.type}`);
+      
       if (event.type === 'LSN_UPDATE') {
+        console.log(`[SyncMachineV3] 🔍 LSN_UPDATE event received with LSN: ${event.lsn}`);
+        
         // Validate LSN format before updating
         try {
           // Import validation from syncActors
@@ -234,6 +241,7 @@ export const syncMachineV3 = setup({
             console.warn(`[SyncMachineV3] ⚠️ Cannot update WebSocketService - missing service or clientId`);
           }
           
+          console.log(`[SyncMachineV3] ✅ Returning updated context with new LSN: ${event.lsn}`);
           return {
             currentLSN: event.lsn
           };
@@ -641,6 +649,11 @@ export const syncMachineV3 = setup({
           actions: 'processWebSocketMessage'
         },
         
+        // Handle LSN updates during sync phase determination - CRITICAL for catchup sync
+        LSN_UPDATE: {
+          actions: ['updateLSN', 'saveOwnState']
+        },
+        
         // Server determines what sync phase is needed
         START_INITIAL_SYNC: {
           target: 'initial_sync',
@@ -705,6 +718,11 @@ export const syncMachineV3 = setup({
           actions: 'processWebSocketMessage'
         },
         
+        // Handle LSN updates during initial sync
+        LSN_UPDATE: {
+          actions: ['updateLSN', 'saveOwnState']
+        },
+        
         // Process incoming changes (from V2)
         INCOMING_CHANGES: {
           actions: 'processIncomingChanges'
@@ -765,6 +783,11 @@ export const syncMachineV3 = setup({
         // Handle WebSocket messages
         WS_MESSAGE: {
           actions: 'processWebSocketMessage'
+        },
+        
+        // Handle LSN updates during catchup sync  
+        LSN_UPDATE: {
+          actions: ['updateLSN', 'saveOwnState']
         },
         
         // Process incoming changes (from V2)

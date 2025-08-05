@@ -549,7 +549,6 @@ function DebugNavigation({ isCollapsed, onNavigate }: {
       setExpanded: setSystemExpanded,
       items: [
         { label: 'Sync System', href: '/debug/sync' },
-        { label: 'Sync Test', href: '/debug/sync-test' },
         { label: 'Database', href: '/debug/database' },
         { label: 'Integrity', href: '/debug/integrity' },
         { label: 'Kanban Debug', href: '/debug/kanban' },
