@@ -108,8 +108,8 @@ Each worktree uses a **persistent browser profile** that maintains login state a
 #### Quick Start
 
 ```bash
-# First time: Run login test to set up profile
-npx playwright test tests/playwright/core/persistent-login.spec.js
+# Profile is automatically created during worktree setup with --test-setup flag
+# No manual setup needed!
 
 # Run all tests (will use saved profile)
 ./scripts/playwright-test.sh
@@ -119,6 +119,9 @@ npx playwright test tests/playwright/core/persistent-login.spec.js
 
 # Run in debug mode
 ./scripts/playwright-test.sh --debug
+
+# Manual profile creation (only if needed)
+npx playwright test tests/playwright/core/persistent-login.spec.js
 ```
 
 #### Using Persistent Context

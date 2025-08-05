@@ -31,13 +31,23 @@ This directory contains end-to-end tests using Playwright.
 
 This project uses **persistent browser profiles** for Playwright tests. Each worktree maintains its own browser profile that persists login state across test runs.
 
-### First Time Setup (per worktree)
+### Automatic Setup
+The browser profile is **automatically created** when you create a worktree with the `--test-setup` flag:
+
 ```bash
-# Run the login test once to create the persistent profile
+./scripts/create-issue-worktree.sh 123 --test-setup
+```
+
+This runs the persistent login test and creates the profile during setup.
+
+### Manual Setup (if needed)
+If you need to recreate the profile or didn't use `--test-setup`:
+
+```bash
 npx playwright test tests/playwright/core/persistent-login.spec.js
 ```
 
-After this initial setup, all tests will use the saved authentication automatically.
+After setup, all tests will use the saved authentication automatically.
 
 ## Running Tests
 
