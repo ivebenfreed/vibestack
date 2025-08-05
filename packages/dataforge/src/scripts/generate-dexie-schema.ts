@@ -247,6 +247,7 @@ function extractIndexedFields(schemaOptions: any, entityClass?: Function, metada
       }
       
       // Temporary hardcoded fix for EntityDependency entityType index
+      // The @Index(['entityType', 'predecessorId']) decorators are not being detected
       if (entityClass.name === 'EntityDependency') {
         indexedFields.push('entityType');
       }

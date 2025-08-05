@@ -47,19 +47,40 @@ const issueNumber = getIssueNumber();
 const ports = getPorts(issueNumber);
 const authFile = path.resolve(process.cwd(), '.playwright', 'auth', `auth-${issueNumber}.json`);
 
+// Check if auth file exists and is recent (less than 24 hours old)
+const fs = require('fs');
+let authExists = false;
+try {
+  const stats = fs.statSync(authFile);
+  const age = Date.now() - stats.mtime.getTime();
+  authExists = age < 24 * 60 * 60 * 1000; // 24 hours
+} catch (error) {
+  authExists = false;
+}
+
 console.log(`🎭 Playwright Config:`);
 console.log(`   Issue: ${issueNumber}`);
 console.log(`   Web Port: ${ports.webPort}`);
 console.log(`   Server Port: ${ports.serverPort}`);
 console.log(`   Auth State: ${authFile}`);
+console.log(`   Auth Exists: ${authExists ? '✅ Using existing auth' : '❌ Will create new auth'}`);
 
 export default defineConfig({
   testDir: './tests/playwright',
+  testMatch: [
+    'core/**/*.spec.js',
+    'core/**/*.setup.js',
+    `issue-${issueNumber}/**/*.spec.js`,
+    `issue-${issueNumber}/**/*.setup.js`
+  ],
   fullyParallel: false, // Run tests serially to avoid conflicts
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
-  reporter: [['list']],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }]
+  ],
   
   use: {
     baseURL: `http://localhost:${ports.webPort}`,
@@ -69,7 +90,7 @@ export default defineConfig({
   },
 
   projects: [
-    // Setup project that handles authentication
+    // Setup project that handles authentication (only runs if auth doesn't exist)
     { 
       name: 'setup', 
       testMatch: /.*auth\.setup\.js/,
@@ -82,10 +103,11 @@ export default defineConfig({
       name: 'chromium',
       use: { 
         ...devices['Desktop Chrome'],
-        // Use the stored authentication state
-        storageState: authFile,
+        // Use the stored authentication state if it exists
+        ...(authExists ? { storageState: authFile } : {}),
       },
-      dependencies: ['setup'],
+      // Only depend on setup if auth doesn't exist
+      ...(authExists ? {} : { dependencies: ['setup'] }),
     },
   ],
 });
