@@ -33,6 +33,7 @@ export class GanttRenderer {
   // State
   private currentCoordinates: CoordinateMapping | null = null;
   private selectedTaskIds = new Set<string>();
+  private selectedDependencyId: string | null = null;
   
   constructor(container: HTMLElement, eventHandler: (event: any) => void) {
     this.container = container;
@@ -707,6 +708,9 @@ export class GanttRenderer {
         e.stopPropagation();
         console.log('Dependency clicked:', dep.id);
         
+        // Store selection state
+        this.selectedDependencyId = dep.id;
+        
         // Remove previous selection
         this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
           el.classList.remove('selected');
@@ -725,10 +729,11 @@ export class GanttRenderer {
         // Show delete button
         this.showDependencyControls(depGroup, dep.id, midX, (sourceY + targetY) / 2);
         
-        // Send selection event
+        // Send selection event - but don't trigger re-render
         this.eventHandler({
           type: 'DEPENDENCY_SELECT',
-          dependencyId: dep.id
+          dependencyId: dep.id,
+          skipRender: true  // Add flag to prevent re-render
         });
       });
       
@@ -740,6 +745,17 @@ export class GanttRenderer {
       depGroup.appendChild(hitArea);
       depGroup.appendChild(startHandle);
       depGroup.appendChild(endHandle);
+      
+      // Apply selected state if this dependency is selected
+      if (this.selectedDependencyId === dep.id) {
+        depGroup.classList.add('selected');
+        path.setAttribute('stroke', '#3b82f6');
+        path.setAttribute('stroke-width', '3');
+        // Show controls after a short delay to ensure DOM is ready
+        setTimeout(() => {
+          this.showDependencyControls(depGroup, dep.id, midX, (sourceY + targetY) / 2);
+        }, 10);
+      }
       
       this.dependencyContainer.appendChild(depGroup);
     }
@@ -908,6 +924,11 @@ export class GanttRenderer {
         const { entityDependencyService } = await import('/src/domain/entity-dependency-service.ts');
         await entityDependencyService.deleteUI(dependencyId);
         
+        // Clear selected state if deleting selected dependency
+        if (this.selectedDependencyId === dependencyId) {
+          this.selectedDependencyId = null;
+        }
+        
         // Remove from DOM
         depGroup.remove();
         controls.remove();
@@ -946,6 +967,8 @@ export class GanttRenderer {
             pathEl.setAttribute('stroke', '#6b7280');
             pathEl.setAttribute('stroke-width', '2');
           }
+          // Clear selected dependency state
+          this.selectedDependencyId = null;
           document.removeEventListener('click', hideControls);
         }
       };
@@ -971,6 +994,65 @@ export class GanttRenderer {
         }
       }
     });
+  }
+  
+  /**
+   * Update dependency selection
+   */
+  updateDependencySelection(dependencyId: string | null): void {
+    // Store the selection
+    this.selectedDependencyId = dependencyId;
+    
+    // Update visual state if dependency exists in current DOM
+    if (dependencyId) {
+      const depGroup = this.dependencyContainer.querySelector(`[data-dependency-id="${dependencyId}"]`)?.parentElement as SVGElement;
+      if (depGroup) {
+        // Clear other selections
+        this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
+          el.classList.remove('selected');
+          const pathEl = el.querySelector('.vibegantt-dependency');
+          if (pathEl) {
+            pathEl.setAttribute('stroke', '#6b7280');
+            pathEl.setAttribute('stroke-width', '2');
+          }
+        });
+        
+        // Select this dependency
+        depGroup.classList.add('selected');
+        const path = depGroup.querySelector('.vibegantt-dependency');
+        if (path) {
+          path.setAttribute('stroke', '#3b82f6');
+          path.setAttribute('stroke-width', '3');
+        }
+        
+        // Show controls
+        const sourceCoord = this.currentCoordinates?.tasks.find(t => 
+          t.taskId === depGroup.dataset.predecessorId
+        );
+        const targetCoord = this.currentCoordinates?.tasks.find(t => 
+          t.taskId === depGroup.dataset.successorId
+        );
+        
+        if (sourceCoord && targetCoord) {
+          const midX = (sourceCoord.xPosition + sourceCoord.width + targetCoord.xPosition) / 2;
+          const midY = (sourceCoord.yPosition + targetCoord.yPosition + sourceCoord.height) / 2;
+          this.showDependencyControls(depGroup, dependencyId, midX, midY);
+        }
+      }
+    } else {
+      // Clear all dependency selections
+      this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
+        el.classList.remove('selected');
+        const pathEl = el.querySelector('.vibegantt-dependency');
+        if (pathEl) {
+          pathEl.setAttribute('stroke', '#6b7280');
+          pathEl.setAttribute('stroke-width', '2');
+        }
+      });
+      
+      // Remove any controls
+      this.dependencyContainer.querySelectorAll('.dependency-controls').forEach(el => el.remove());
+    }
   }
   
   /**

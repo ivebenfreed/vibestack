@@ -870,20 +870,12 @@ export const ganttMachine = setup({
                         return newSelection;
                       },
                     }),
-                    // Update renderer with new selection
-                    ({ context }) => {
-                      if (context.renderer) {
-                        // Re-render dependencies with updated selection
-                        const storeSnapshot = context.dataStore?.getSnapshot();
-                        if (storeSnapshot?.context?.coordinateMapping) {
-                          context.renderer.send({
-                            type: 'RENDER_COORDINATES',
-                            mapping: storeSnapshot.context.coordinateMapping,
-                            tasks: storeSnapshot.context.tasks,
-                            dependencies: storeSnapshot.context.dependencies,
-                            selectedDependencyIds: context.selectedDependencyIds
-                          });
-                        }
+                    // Don't re-render - the renderer already handles the visual update
+                    ({ context, event }) => {
+                      // Only send the selection update, not a full re-render
+                      if (context.renderer && !event.skipRender) {
+                        // The renderer will maintain the visual state internally
+                        console.log('GanttMachine: Dependency selection handled by renderer');
                       }
                     },
                   ],
