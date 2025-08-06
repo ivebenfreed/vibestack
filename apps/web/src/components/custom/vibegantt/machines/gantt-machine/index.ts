@@ -194,19 +194,19 @@ export const ganttMachine = setup({
             }
             
             const task = tasks[event.taskId];
-            if (task && task.plannedStartDate && task.plannedEndDate) {
+            if (task && task.startDate && task.dueDate) {
               console.log('GanttMachine: BEFORE move calculation', {
                 taskId: task.id,
-                originalStartDate: task.plannedStartDate,
-                originalEndDate: task.plannedEndDate,
+                originalStartDate: task.startDate,
+                originalDueDate: task.dueDate,
                 deltaX: event.deltaX,
                 dayWidth: dayWidth,
                 daysDelta
               });
               
               // Create new dates with proper snapping to day boundaries
-              const originalStart = new Date(task.plannedStartDate);
-              const originalEnd = new Date(task.plannedEndDate);
+              const originalStart = new Date(task.startDate);
+              const originalEnd = new Date(task.dueDate);
               
               // Snap to start of day for consistent calculations
               const newStartDate = new Date(originalStart);
@@ -214,24 +214,24 @@ export const ganttMachine = setup({
               // Keep the original time of day to avoid timezone issues
               newStartDate.setHours(originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds(), originalStart.getMilliseconds());
               
-              const newEndDate = new Date(originalEnd);
-              newEndDate.setDate(originalEnd.getDate() + daysDelta);
+              const newDueDate = new Date(originalEnd);
+              newDueDate.setDate(originalEnd.getDate() + daysDelta);
               // Keep the original time of day to avoid timezone issues
-              newEndDate.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
+              newDueDate.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
               
               // Check if dates actually changed
-              const originalStartTime = new Date(task.plannedStartDate).getTime();
-              const originalEndTime = new Date(task.plannedEndDate).getTime();
+              const originalStartTime = new Date(task.startDate).getTime();
+              const originalEndTime = new Date(task.dueDate).getTime();
               const newStartTime = newStartDate.getTime();
-              const newEndTime = newEndDate.getTime();
+              const newEndTime = newDueDate.getTime();
               
               if (originalStartTime === newStartTime && originalEndTime === newEndTime) {
                 console.log('GanttMachine: No date changes detected, skipping update', {
                   taskId: task.id,
-                  originalStartDate: task.plannedStartDate,
-                  originalEndDate: task.plannedEndDate,
+                  originalStartDate: task.startDate,
+                  originalDueDate: task.dueDate,
                   newStartDate: newStartDate.toISOString(),
-                  newEndDate: newEndDate.toISOString()
+                  newDueDate: newDueDate.toISOString()
                 });
                 return;
               }
@@ -239,7 +239,7 @@ export const ganttMachine = setup({
               console.log('GanttMachine: AFTER move calculation', {
                 taskId: task.id,
                 newStartDate: newStartDate.toISOString(),
-                newEndDate: newEndDate.toISOString(),
+                newDueDate: newDueDate.toISOString(),
                 daysDelta
               });
               
@@ -248,21 +248,21 @@ export const ganttMachine = setup({
                 console.log('GanttMachine: Calling domain service updateTask', {
                   taskId: task.id,
                   updateData: {
-                    plannedStartDate: newStartDate,
-                    plannedEndDate: newEndDate
+                    startDate: newStartDate,
+                    dueDate: newDueDate
                   }
                 });
                 
                 // Make the call async and handle the promise
                 context.domainService.updateTask(task.id, {
-                  plannedStartDate: newStartDate,
-                  plannedEndDate: newEndDate
+                  startDate: newStartDate,
+                  dueDate: newDueDate
                 }).then((updateResult) => {
                   console.log('GanttMachine: Domain service updateTask SUCCESS', {
                     taskId: task.id,
                     result: updateResult,
-                    updatedStartDate: updateResult?.plannedStartDate,
-                    updatedEndDate: updateResult?.plannedEndDate
+                    updatedStartDate: updateResult?.startDate,
+                    updatedDueDate: updateResult?.dueDate
                   });
                 }).catch((error) => {
                   console.error('GanttMachine: Domain service updateTask ERROR', {
@@ -278,8 +278,8 @@ export const ganttMachine = setup({
               console.error('GanttMachine: Invalid task data', {
                 taskId: event.taskId,
                 hasTask: !!task,
-                hasStartDate: task?.plannedStartDate,
-                hasEndDate: task?.plannedEndDate
+                hasStartDate: task?.startDate,
+                hasDueDate: task?.dueDate
               });
             }
           }
@@ -304,18 +304,18 @@ export const ganttMachine = setup({
             const daysDelta = Math.round(event.deltaX / dayWidth);
             
             const task = tasks[event.taskId];
-            if (task && task.plannedStartDate && task.plannedEndDate) {
+            if (task && task.startDate && task.dueDate) {
               // Only update through domain service - live query will update store automatically
               if (context.domainService?.updateTask) {
                 const updates: any = {};
                 if (event.handle === 'start' || event.handle === 'left') {
-                  const newStartDate = new Date(task.plannedStartDate);
+                  const newStartDate = new Date(task.startDate);
                   newStartDate.setDate(newStartDate.getDate() + daysDelta);
-                  updates.plannedStartDate = newStartDate;
+                  updates.startDate = newStartDate;
                 } else {
-                  const newEndDate = new Date(task.plannedEndDate);
-                  newEndDate.setDate(newEndDate.getDate() + daysDelta);
-                  updates.plannedEndDate = newEndDate;
+                  const newDueDate = new Date(task.dueDate);
+                  newDueDate.setDate(newDueDate.getDate() + daysDelta);
+                  updates.dueDate = newDueDate;
                 }
                 
                 console.log('GanttMachine: Applying task resize via domain service', {

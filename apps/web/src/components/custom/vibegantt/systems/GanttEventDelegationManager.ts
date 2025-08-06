@@ -248,6 +248,12 @@ export class GanttEventDelegationManager {
   
   // Task drag handlers
   private startTaskDrag(taskId: string, event: MouseEvent): void {
+    console.log('GanttEventDelegationManager: startTaskDrag', {
+      taskId,
+      startX: event.clientX,
+      startY: event.clientY
+    });
+    
     this.dragState = {
       type: 'task-move',
       startX: event.clientX,
@@ -272,6 +278,12 @@ export class GanttEventDelegationManager {
     
     const deltaX = event.clientX - this.dragState.startX;
     
+    console.log('GanttEventDelegationManager: updateTaskDrag', {
+      currentX: event.clientX,
+      startX: this.dragState.startX,
+      deltaX: deltaX
+    });
+    
     this.sendEvent({
       type: 'TASK_DRAG_MOVE',
       taskId: this.dragState.data.taskId,
@@ -285,6 +297,13 @@ export class GanttEventDelegationManager {
     if (this.dragState.type !== 'task-move' || !this.dragState.data?.taskId) return;
     
     const deltaX = event.clientX - this.dragState.startX;
+    
+    console.log('GanttEventDelegationManager: endTaskDrag', {
+      endX: event.clientX,
+      startX: this.dragState.startX,
+      deltaX: deltaX,
+      taskId: this.dragState.data.taskId
+    });
     
     // Calculate new dates based on delta
     // This will be handled by the machine with proper date calculations
