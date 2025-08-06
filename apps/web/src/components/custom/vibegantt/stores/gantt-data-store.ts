@@ -68,6 +68,7 @@ export type GanttStoreEvent =
   | { type: 'TOGGLE_TASK_EXPANDED'; taskId: string }
   | { type: 'SET_SELECTED_TASKS'; taskIds: string[] }
   | { type: 'SET_VISIBLE_DATE_RANGE'; range: { start: Date; end: Date } }
+  | { type: 'UPDATE_VIEW_CONFIG'; viewConfig: any; timelineLayout?: any }
   | { type: 'COMPUTE_CRITICAL_PATH' };
 
 // ====================================
@@ -393,6 +394,20 @@ export const createGanttStoreLogic = (projectId?: string) => {
           ...context,
           error: event.error,
           loading: false
+        };
+      },
+      
+      UPDATE_VIEW_CONFIG: (context, event) => {
+        console.log('📊 GanttStore: View config updated for coordinate recalculation', {
+          dayWidth: event.timelineLayout?.dayWidth,
+          zoomFactor: event.viewConfig?.zoomFactor
+        });
+        
+        // Trigger coordinate recalculation by updating lastUpdatedAt
+        // This will cause dependent computations to re-run
+        return {
+          ...context,
+          lastUpdatedAt: Date.now()
         };
       }
     }

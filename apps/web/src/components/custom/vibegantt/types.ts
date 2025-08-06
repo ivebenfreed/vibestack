@@ -196,6 +196,7 @@ export type GanttEvent =
   | { type: 'TASKS_UPDATED'; tasks: GanttTask[] }
   | { type: 'DEPENDENCIES_UPDATED'; dependencies: TaskDependency[] }
   | { type: 'ZOOM'; level: TimeScale; factor?: number }
+  | { type: 'ZOOM_REQUEST'; direction: 'in' | 'out'; anchorX?: number; anchorDate?: Date }
   | { type: 'PAN'; deltaX: number; deltaY: number }
   | { type: 'SCROLL'; scrollX: number; scrollY: number }
   | { type: 'TASK_SELECT'; taskId: string; multi?: boolean }

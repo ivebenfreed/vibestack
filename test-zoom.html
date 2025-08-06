@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Zoom Test</title>
+</head>
+<body>
+    <h1>Test Zoom Functionality</h1>
+    <p>Testing Ctrl+Scroll zoom on VibeGantt</p>
+    <ul>
+        <li>Open http://localhost:5593/debug/vibegantt</li>
+        <li>Hold Ctrl (or Cmd on Mac) and scroll with mouse wheel</li>
+        <li>Check browser console for "Zoom requested:" messages</li>
+        <li>Check for "Zoom: day -> week" type messages</li>
+    </ul>
+    
+    <h2>Expected Behavior:</h2>
+    <ul>
+        <li>Ctrl+Scroll UP should zoom IN (more detail, hour -> day -> week)</li>
+        <li>Ctrl+Scroll DOWN should zoom OUT (less detail, day -> week -> month)</li>
+        <li>The timeline should update to show different time scales</li>
+    </ul>
+    
+    <h2>Current Implementation Status:</h2>
+    <ul>
+        <li>✓ GanttEventDelegationManager.handleWheel() sends ZOOM_REQUEST events</li>
+        <li>✓ timeline-slice handles ZOOM_REQUEST and forwards to store</li>
+        <li>✓ Store has setZoom action that updates zoom level</li>
+        <li>✓ ZOOM_UTILS provides zoom level transitions</li>
+    </ul>
+</body>
+</html>

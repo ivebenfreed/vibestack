@@ -245,26 +245,33 @@ export class GanttEventDelegationManager {
   }
   
   private handleWheel(event: WheelEvent): void {
+    console.log('🖱️ Wheel event detected:', {
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      deltaY: event.deltaY
+    });
+    
     // Only handle zoom functionality with Ctrl/Cmd + scroll
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       
       // Send zoom request to the machine
       const direction = event.deltaY > 0 ? 'out' : 'in';
-      console.log('Zoom requested:', direction);
+      console.log('🔍 Zoom requested:', direction);
       
-      // Get mouse position relative to the container for zoom anchoring
+      // Get mouse position relative to the timeline for anchoring
       const rect = this.container.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
+      const mouseX = event.clientX - rect.left;
       
+      console.log('📤 Sending ZOOM_REQUEST event to machine...');
       this.sendEvent({
         type: 'ZOOM_REQUEST',
         direction,
-        anchorX: x,
-        anchorY: y,
-        deltaY: event.deltaY
+        anchorX: mouseX
       });
+      console.log('✅ ZOOM_REQUEST event sent');
+    } else {
+      console.log('⏭️ Wheel without Ctrl/Cmd - letting native scroll handle');
     }
     // Let native scroll handle panning
   }

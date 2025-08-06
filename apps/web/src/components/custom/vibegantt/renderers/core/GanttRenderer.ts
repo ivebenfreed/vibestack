@@ -17,6 +17,7 @@ import { GanttEventDelegationManager } from '../../systems/GanttEventDelegationM
 export class GanttRenderer {
   private container: HTMLElement;
   private eventHandler: (event: any) => void;
+  private machineEventHandler?: (event: any) => void; // Direct machine event handler
   private eventManager: GanttEventDelegationManager | null = null;
   
   // DOM containers
@@ -32,12 +33,16 @@ export class GanttRenderer {
   
   // State
   private currentCoordinates: CoordinateMapping | null = null;
+  private currentTasks: Record<string, GanttTask> = {};
+  private currentDependencies: Record<string, TaskDependency> = {};
   private selectedTaskIds = new Set<string>();
   private selectedDependencyId: string | null = null;
+  private pendingDayWidth: number | null = null;
   
-  constructor(container: HTMLElement, eventHandler: (event: any) => void) {
+  constructor(container: HTMLElement, eventHandler: (event: any) => void, machineEventHandler?: (event: any) => void) {
     this.container = container;
     this.eventHandler = eventHandler;
+    this.machineEventHandler = machineEventHandler;
     
     console.log('GanttRenderer: Created with container', { 
       container: this.container.className,
@@ -189,8 +194,18 @@ export class GanttRenderer {
     this.taskScrollWrapper = taskScrollWrapper;
     
     // Sync horizontal scrolling between timeline and tasks
-    taskScrollWrapper.addEventListener('scroll', () => {
-      timelineScrollWrapper.scrollLeft = taskScrollWrapper.scrollLeft;
+    taskScrollWrapper.addEventListener('scroll', (e) => {
+      const target = e.target as HTMLElement;
+      timelineScrollWrapper.scrollLeft = target.scrollLeft;
+      
+      // Send scroll event to machine to update viewport state
+      if (this.machineEventHandler) {
+        this.machineEventHandler({
+          type: 'SCROLL',
+          scrollX: target.scrollLeft,
+          scrollY: target.scrollTop,
+        });
+      }
     });
     
     // Sync scrolling between task list and chart
@@ -218,28 +233,47 @@ export class GanttRenderer {
   }
   
   private setupEventDelegation(): void {
+    // Create a hybrid event handler that routes events appropriately
+    const hybridEventHandler = (event: any) => {
+      console.log('GanttRenderer: Routing event:', event.type);
+      
+      // Route zoom events directly to machine, other events through renderer
+      if (event.type === 'ZOOM_REQUEST' && this.machineEventHandler) {
+        console.log('GanttRenderer: Routing ZOOM_REQUEST directly to machine');
+        this.machineEventHandler(event);
+      } else {
+        console.log('GanttRenderer: Routing event through renderer forwarding');
+        this.eventHandler(event);
+      }
+    };
+    
     this.eventManager = new GanttEventDelegationManager(
       this.container,
-      this.eventHandler,
+      hybridEventHandler,
       'day', // Initial zoom level
       1.0    // Initial zoom factor
     );
     
-    console.log('GanttRenderer: Event delegation setup complete');
+    console.log('GanttRenderer: Event delegation setup complete with hybrid routing');
   }
   
   private setupScrollSync(): void {
     const taskListBody = this.taskListContainer.querySelector('.vibegantt-task-list-body') as HTMLElement;
     
-    // Sync vertical scrolling between task list and chart
-    this.taskScrollWrapper.addEventListener('scroll', (e) => {
-      const target = e.target as HTMLElement;
-      taskListBody.scrollTop = target.scrollTop;
-    });
-    
+    // Sync vertical scrolling between task list and chart  
+    // Note: horizontal scroll and machine events are handled in the main scroll listener above
     taskListBody.addEventListener('scroll', (e) => {
       const target = e.target as HTMLElement;
       this.taskScrollWrapper.scrollTop = target.scrollTop;
+      
+      // Send scroll event to machine to update viewport state  
+      if (this.machineEventHandler) {
+        this.machineEventHandler({
+          type: 'SCROLL',
+          scrollX: this.taskScrollWrapper.scrollLeft,
+          scrollY: target.scrollTop,
+        });
+      }
     });
   }
   
@@ -260,6 +294,21 @@ export class GanttRenderer {
     
     const { coordinateMapping, tasks, dependencies } = params;
     this.currentCoordinates = coordinateMapping;
+    this.currentTasks = tasks;
+    this.currentDependencies = dependencies;
+    
+    // Apply any pending dayWidth update
+    if (this.pendingDayWidth !== null) {
+      console.log('GanttRenderer: Applying pending dayWidth update:', this.pendingDayWidth);
+      const pendingWidth = this.pendingDayWidth;
+      this.pendingDayWidth = null; // Clear the pending update
+      
+      // Apply the dayWidth update now that we have coordinates
+      setTimeout(() => {
+        this.updateTimelineLayout(pendingWidth);
+      }, 0);
+      return; // Don't render with old coordinates
+    }
     
     // Set container dimensions based on coordinate mapping
     const totalWidth = coordinateMapping.timeline.totalWidth;
@@ -322,18 +371,24 @@ export class GanttRenderer {
    * Render timeline segments from coordinates
    */
   private renderTimelineSegments(segments: CoordinateMapping['timeline']['segments']): void {
+    // Clear existing timeline
+    this.timelineContainer.innerHTML = '';
+    
     // Create timeline inner container
     const timelineInner = document.createElement('div');
     timelineInner.style.cssText = `
       position: relative;
       height: 100%;
-      display: flex;
-      align-items: stretch;
+      width: ${segments[segments.length - 1]?.xPosition + segments[segments.length - 1]?.width || 0}px;
     `;
     
-    // Render month headers
-    const monthRow = document.createElement('div');
-    monthRow.style.cssText = `
+    // Determine the display mode based on segment labels (set by coordinate mapper based on zoom)
+    const hasMonthLabels = segments.some(s => s.isMonth);
+    const hasWeekLabels = segments.some(s => s.isWeek);
+    
+    // Create header row (shows months/years)
+    const headerRow = document.createElement('div');
+    headerRow.style.cssText = `
       position: absolute;
       top: 0;
       left: 0;
@@ -343,9 +398,9 @@ export class GanttRenderer {
       border-bottom: 1px solid #e5e7eb;
     `;
     
-    // Render day segments
-    const dayRow = document.createElement('div');
-    dayRow.style.cssText = `
+    // Create main row (shows days/weeks/months based on zoom)
+    const mainRow = document.createElement('div');
+    mainRow.style.cssText = `
       position: absolute;
       top: 30px;
       left: 0;
@@ -354,64 +409,82 @@ export class GanttRenderer {
       display: flex;
     `;
     
-    let currentMonth = -1;
-    let monthStartX = 0;
+    // Track current period for header grouping
+    let currentHeaderPeriod = '';
+    let headerStartX = 0;
+    const headerLabels: Array<{ start: number; end: number; label: string }> = [];
     
-    for (const segment of segments) {
-      const month = segment.date.getMonth();
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
       
-      // Add month header when month changes
-      if (month !== currentMonth) {
-        if (currentMonth !== -1) {
-          // Create month label for previous month
-          const monthLabel = document.createElement('div');
-          monthLabel.style.cssText = `
-            position: absolute;
-            left: ${monthStartX}px;
-            width: ${segment.xPosition - monthStartX}px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-            color: #374151;
-            border-right: 1px solid #e5e7eb;
-          `;
-          monthLabel.textContent = new Date(segment.date.getFullYear(), currentMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-          monthRow.appendChild(monthLabel);
-        }
-        currentMonth = month;
-        monthStartX = segment.xPosition;
+      // Determine header period based on display mode
+      let headerPeriod = '';
+      if (hasMonthLabels) {
+        // When showing months, group by year
+        headerPeriod = segment.date.getFullYear().toString();
+      } else if (hasWeekLabels) {
+        // When showing weeks, group by month  
+        headerPeriod = segment.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      } else {
+        // When showing days, group by month
+        headerPeriod = segment.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
       }
       
-      // Create day segment
-      const daySegment = document.createElement('div');
-      daySegment.style.cssText = `
-        position: absolute;
-        left: ${segment.xPosition}px;
-        width: ${segment.width}px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        color: #6b7280;
-        border-right: 1px solid #e5e7eb;
-        ${segment.date.getDay() === 0 || segment.date.getDay() === 6 ? 'background: #f9fafb;' : ''}
-      `;
-      daySegment.textContent = segment.label;
-      dayRow.appendChild(daySegment);
+      // Track header changes
+      if (headerPeriod !== currentHeaderPeriod) {
+        if (currentHeaderPeriod !== '') {
+          // Save previous header region
+          headerLabels.push({
+            start: headerStartX,
+            end: segment.xPosition,
+            label: currentHeaderPeriod
+          });
+        }
+        currentHeaderPeriod = headerPeriod;
+        headerStartX = segment.xPosition;
+      }
+      
+      // Create main segment (only if it has a label)
+      if (segment.label) {
+        const mainSegment = document.createElement('div');
+        mainSegment.className = 'vibegantt-timeline-segment vibegantt-timeline-label';
+        mainSegment.style.cssText = `
+          position: absolute;
+          left: ${segment.xPosition}px;
+          width: ${segment.width}px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: ${hasMonthLabels ? '12px' : '11px'};
+          color: ${segment.isMonth || segment.isWeek ? '#374151' : '#6b7280'};
+          font-weight: ${segment.isMonth || segment.isWeek ? '500' : '400'};
+          border-right: 1px solid #e5e7eb;
+          ${(!hasMonthLabels && !hasWeekLabels && (segment.date.getDay() === 0 || segment.date.getDay() === 6)) ? 'background: #f9fafb;' : ''}
+        `;
+        mainSegment.textContent = segment.label;
+        mainRow.appendChild(mainSegment);
+      }
     }
     
-    // Add final month label
-    if (segments.length > 0) {
+    // Add final header label
+    if (segments.length > 0 && currentHeaderPeriod !== '') {
       const lastSegment = segments[segments.length - 1];
-      const monthLabel = document.createElement('div');
-      monthLabel.style.cssText = `
+      headerLabels.push({
+        start: headerStartX,
+        end: lastSegment.xPosition + lastSegment.width,
+        label: currentHeaderPeriod
+      });
+    }
+    
+    // Render header labels
+    headerLabels.forEach(header => {
+      const headerLabel = document.createElement('div');
+      headerLabel.className = 'vibegantt-timeline-header-label';
+      headerLabel.style.cssText = `
         position: absolute;
-        left: ${monthStartX}px;
-        width: ${lastSegment.xPosition + lastSegment.width - monthStartX}px;
+        left: ${header.start}px;
+        width: ${header.end - header.start}px;
         height: 30px;
         display: flex;
         align-items: center;
@@ -419,13 +492,14 @@ export class GanttRenderer {
         font-size: 12px;
         font-weight: 600;
         color: #374151;
+        border-right: 1px solid #e5e7eb;
       `;
-      monthLabel.textContent = lastSegment.date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      monthRow.appendChild(monthLabel);
-    }
+      headerLabel.textContent = header.label;
+      headerRow.appendChild(headerLabel);
+    });
     
-    timelineInner.appendChild(monthRow);
-    timelineInner.appendChild(dayRow);
+    timelineInner.appendChild(headerRow);
+    timelineInner.appendChild(mainRow);
     this.timelineContainer.appendChild(timelineInner);
   }
   
@@ -978,6 +1052,37 @@ export class GanttRenderer {
   }
   
   /**
+   * Update scroll position
+   */
+  updateScroll(scrollX: number, scrollY: number): void {
+    // Update the timeline scroll wrapper
+    if (this.timelineScrollWrapper) {
+      this.timelineScrollWrapper.scrollLeft = scrollX;
+    }
+    
+    // Update the task scroll wrapper
+    if (this.taskScrollWrapper) {
+      this.taskScrollWrapper.scrollLeft = scrollX;
+      this.taskScrollWrapper.scrollTop = scrollY;
+    }
+  }
+
+  /**
+   * Apply proper time scale zoom with date-based anchoring
+   */
+  applyTimeScaleZoom(dayWidth: number, anchorX: number, anchorDate?: Date): void {
+    console.log(`Time scale zoom: dayWidth=${dayWidth}px, anchorX=${anchorX}`, anchorDate ? `, anchorDate=${anchorDate.toISOString()}` : '');
+    
+    // This method is now handled by coordinate recalculation in the store
+    // No CSS transforms needed - content will be re-rendered with new scale
+    console.log('Time scale zoom will be handled by coordinate recalculation and re-render');
+    
+    // TODO: Implement date-based viewport anchoring
+    // Calculate which date should remain under the mouse cursor
+    // and adjust scroll position after re-render
+  }
+  
+  /**
    * Update dependency selection
    */
   updateDependencySelection(dependencyId: string | null): void {
@@ -1170,6 +1275,77 @@ export class GanttRenderer {
     }
   }
   
+  /**
+   * Update timeline layout with new day width (for zoom operations)
+   * Uses coordinate recalculation for consistency but optimized for performance
+   */
+  updateTimelineLayout(dayWidth: number): void {
+    console.log(`GanttRenderer: Updating timeline layout with dayWidth=${dayWidth}px`);
+    
+    if (!this.currentCoordinates || !this.currentCoordinates.timeline || !this.currentCoordinates.tasks) {
+      console.warn('GanttRenderer: Cannot update timeline layout - no coordinate data available yet');
+      this.handleCoordinateUnavailable(dayWidth);
+      return;
+    }
+    
+    // Calculate new coordinates based on dayWidth ratio
+    const oldDayWidth = this.currentCoordinates.timeline.dayWidth;
+    const scaleRatio = dayWidth / oldDayWidth;
+    
+    // Update timeline segments with new width calculations  
+    const segments = this.currentCoordinates.timeline.segments.map(segment => ({
+      ...segment,
+      xPosition: segment.xPosition * scaleRatio,
+      width: segment.width * scaleRatio
+    }));
+    
+    // Update tasks with new width calculations
+    const tasks = this.currentCoordinates.tasks.map(task => ({
+      ...task,
+      xPosition: task.xPosition * scaleRatio,
+      width: task.width * scaleRatio
+    }));
+    
+    // Create updated coordinate mapping with proper timeline layout
+    const updatedMapping = {
+      ...this.currentCoordinates,
+      timeline: {
+        ...this.currentCoordinates.timeline,
+        dayWidth: dayWidth,
+        segments,
+        totalWidth: this.currentCoordinates.timeline.totalWidth * scaleRatio
+      },
+      tasks,
+      version: Date.now() // Force refresh
+    };
+    
+    // Update internal coordinates first
+    this.currentCoordinates = updatedMapping;
+    
+    console.log(`GanttRenderer: Coordinate-based timeline update: ${oldDayWidth}px/day → ${dayWidth}px/day (${scaleRatio.toFixed(3)}x)`);
+    
+    // Re-render everything with new coordinates for consistency
+    this.renderFromCoordinates({
+      coordinateMapping: updatedMapping,
+      tasks: this.currentTasks,
+      dependencies: this.currentDependencies
+    });
+  }
+  
+  // Removed problematic CSS transform methods that caused dependency line disconnections
+  
+  /**
+   * Handle coordinate updates that require full re-rendering
+   */
+  private handleCoordinateUnavailable(dayWidth: number): void {
+    console.warn('GanttRenderer: Cannot update timeline layout - no coordinate data available yet');
+    console.warn('GanttRenderer: Available properties:', Object.keys(this.currentCoordinates || {}));
+      
+    // Store the dayWidth for when coordinates become available
+    this.pendingDayWidth = dayWidth;
+    console.log('GanttRenderer: Stored pending dayWidth for when coordinates become available:', dayWidth);
+  }
+
   /**
    * Clean up and destroy
    */

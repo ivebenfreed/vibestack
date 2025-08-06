@@ -48,7 +48,7 @@ const createInitialContext = (): GanttMachineContext => ({
   timelineLayout: {
     totalWidth: 0,
     totalHeight: 0,
-    dayWidth: TIME_SCALE_CONFIG.day.minPixelsPerUnit, // Use default from constants
+    dayWidth: 50, // Default 50px per day - single source of truth
     headerHeight: 60,
     visibleStartX: 0,
     visibleEndX: 0,
@@ -551,8 +551,12 @@ export const ganttMachine = setup({
               dataStore: ({ spawn, context }) => {
                 console.log('GanttMachine: Creating atomic data store with projectId:', context.projectId);
                 
-                // Create the atomic store logic with domainService
-                const storeLogic = createAtomicGanttStoreLogic(context.projectId, context.domainService);
+                // Create the atomic store logic with domainService and initial dayWidth
+                const storeLogic = createAtomicGanttStoreLogic(
+                  context.projectId, 
+                  context.domainService,
+                  context.timelineLayout.dayWidth // Pass initial dayWidth from machine
+                );
                 
                 // Spawn the store actor
                 const store = spawn(storeLogic, { id: 'dataStore' });
@@ -904,6 +908,107 @@ export const ganttMachine = setup({
                     },
                   ],
                 },
+                // Handle zoom events forwarded from renderer actor
+                ZOOM_REQUEST: {
+                  actions: [
+                    // Calculate viewport anchoring and new day width
+                    ({ context, event }) => {
+                      console.log('GanttMachine: Received ZOOM_REQUEST from renderer actor', event);
+                      
+                      const currentDayWidth = context.timelineLayout.dayWidth;
+                      const currentScrollX = context.viewport.scrollX;
+                      const anchorX = event.anchorX || 0;
+                      
+                      // Calculate new day width first
+                      const ZOOM_STEP = 10; // pixels per day
+                      let newDayWidth = event.direction === 'in' 
+                        ? currentDayWidth + ZOOM_STEP 
+                        : currentDayWidth - ZOOM_STEP;
+                      
+                      // Reasonable limits for day width (5px to 500px per day)
+                      newDayWidth = Math.max(5, Math.min(500, newDayWidth));
+                      
+                      // Simplified viewport anchoring: maintain same content position
+                      // The key insight: after zoom, we want the same visual content at the anchor point
+                      // This is simply a ratio calculation: new_scroll = old_scroll * (new_width / old_width)
+                      
+                      const scrollRatio = newDayWidth / currentDayWidth;
+                      const newScrollX = currentScrollX * scrollRatio;
+                      
+                      console.log('GanttMachine: Simplified viewport anchoring', {
+                        currentScrollX,
+                        currentDayWidth,
+                        newDayWidth,
+                        scrollRatio,
+                        newScrollX
+                      });
+                      
+                      console.log(`GanttMachine: Time Scale Zoom: ${currentDayWidth}px/day -> ${newDayWidth}px/day`);
+                      console.log(`GanttMachine: Scroll adjustment: ${currentScrollX} -> ${newScrollX} (maintaining anchor)`);
+                      
+                      // Store calculated values for use in assign actions
+                      (event as any)._calculatedDayWidth = newDayWidth;
+                      (event as any)._newScrollX = Math.max(0, newScrollX);
+                    },
+                    // Update timeline layout with new day width and viewport scroll for anchoring
+                    assign({
+                      timelineLayout: ({ context, event }) => {
+                        const newDayWidth = (event as any)._calculatedDayWidth;
+                        return {
+                          ...context.timelineLayout,
+                          dayWidth: newDayWidth
+                        };
+                      },
+                      viewport: ({ context, event }) => {
+                        const newScrollX = (event as any)._newScrollX;
+                        return {
+                          ...context.viewport,
+                          scrollX: newScrollX
+                        };
+                      },
+                      viewConfig: ({ context, event }) => {
+                        const newDayWidth = (event as any)._calculatedDayWidth;
+                        // Update zoom factor for consistency (derived from day width)
+                        const zoomFactor = newDayWidth / TIME_SCALE_CONFIG.day.minPixelsPerUnit;
+                        return {
+                          ...context.viewConfig,
+                          zoomFactor: zoomFactor
+                        };
+                      }
+                    }),
+                    // Trigger coordinate recalculation in store (which will update renderer via subscription)
+                    ({ context, event }) => {
+                      console.log('GanttMachine: Triggering coordinate recalculation with new time scale');
+                      
+                      const newDayWidth = (event as any)._calculatedDayWidth;
+                      const newScrollX = (event as any)._newScrollX;
+                      
+                      // Send dayWidth update to store for coordinate recalculation
+                      if (context.dataStore) {
+                        console.log('GanttMachine: Sending dayWidth to store for timeline label recalculation', {
+                          dayWidth: newDayWidth
+                        });
+                        context.dataStore.send({
+                          type: 'setDayWidth',
+                          dayWidth: newDayWidth
+                        });
+                      }
+                      
+                      // Send scroll position update directly to renderer
+                      if (context.renderer) {
+                        console.log('GanttMachine: Updating renderer scroll position', {
+                          scrollX: newScrollX,
+                          scrollY: context.viewport.scrollY
+                        });
+                        context.renderer.send({
+                          type: 'UPDATE_SCROLL',
+                          scrollX: newScrollX,
+                          scrollY: context.viewport.scrollY
+                        });
+                      }
+                    }
+                  ]
+                },
                 DEPENDENCY_DRAG_START: {
                   actions: [
                     ({ context, event }) => {
@@ -980,6 +1085,85 @@ export const ganttMachine = setup({
           ...event.config,
         }),
       }),
+    },
+    
+    // Scroll events - update viewport state directly
+    SCROLL: {
+      actions: [
+        assign({
+          viewport: ({ context, event }) => ({
+            ...context.viewport,
+            scrollX: event.scrollX,
+            scrollY: event.scrollY,
+          }),
+        }),
+        // Forward to renderer for visual updates
+        ({ context, event }) => {
+          if (context.renderer) {
+            context.renderer.send({
+              type: 'UPDATE_SCROLL',
+              scrollX: event.scrollX,
+              scrollY: event.scrollY,
+            });
+          }
+        }
+      ],
+    },
+    
+    // Zoom events - handle directly with current scroll position
+    ZOOM_REQUEST: {
+      actions: [
+        ({ context, event }) => {
+          console.log('GanttMachine: Handling ZOOM_REQUEST directly', {
+            direction: event.direction,
+            anchorX: event.anchorX,
+            currentScrollX: context.viewport.scrollX,
+            currentScrollY: context.viewport.scrollY
+          });
+          
+          const currentDayWidth = context.timelineLayout.dayWidth;
+          const currentScrollX = context.viewport.scrollX;
+          const anchorX = event.anchorX || 0;
+          
+          // Calculate new day width
+          const ZOOM_STEP = 10;
+          let newDayWidth = event.direction === 'in' 
+            ? currentDayWidth + ZOOM_STEP 
+            : currentDayWidth - ZOOM_STEP;
+          
+          newDayWidth = Math.max(5, Math.min(500, newDayWidth));
+          
+          console.log('GanttMachine: Zoom calculation', {
+            currentDayWidth,
+            newDayWidth,
+            currentScrollX,
+            anchorX
+          });
+          
+          // Calculate viewport anchoring
+          const scrollRatio = newDayWidth / currentDayWidth;
+          const newScrollX = currentScrollX * scrollRatio;
+          
+          console.log('GanttMachine: Anchoring calculation', {
+            scrollRatio,
+            newScrollX
+          });
+          
+          // Update timeline layout
+          context.timelineLayout.dayWidth = newDayWidth;
+          
+          // Update viewport scroll position
+          context.viewport.scrollX = newScrollX;
+          
+          // Note: The coordinate recalculation and renderer updates are handled
+          // in the nested ZOOM_REQUEST action within the main state machine
+          
+          console.log('GanttMachine: Zoom complete, new state:', {
+            dayWidth: context.timelineLayout.dayWidth,
+            scrollX: context.viewport.scrollX
+          });
+        }
+      ],
     },
     
     // Forward events from renderer
