@@ -206,14 +206,14 @@ function VibeGanttDebug() {
               />
               <span className="text-sm">Show Weekends</span>
             </label>
-            <label className="flex items-center opacity-50" title="Dependencies temporarily disabled - need proper domain functions">
+            <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={false}
-                disabled
+                checked={viewConfig.showDependencies}
+                onChange={(e) => setViewConfig({ ...viewConfig, showDependencies: e.target.checked })}
                 className="mr-2"
               />
-              <span className="text-sm">Show Dependencies (Disabled)</span>
+              <span className="text-sm">Show Dependencies</span>
             </label>
           </div>
           

@@ -508,15 +508,12 @@ export class GanttEventDelegationManager {
           newTaskId
         });
         
-        // Need to get the original predecessor and successor IDs
-        // This would typically come from the dependency data
+        // Send reassign event with all necessary data
         this.sendEvent({
           type: 'DEPENDENCY_REASSIGN',
           dependencyId: this.dragState.data.dependencyId,
-          handleType: this.dragState.data.handleType,
-          newTaskId,
-          originalPredecessorId: '', // Would need to track this
-          originalSuccessorId: '' // Would need to track this
+          handleType: this.dragState.data.handleType === 'start' ? 'predecessor' : 'successor',
+          newTaskId
         });
       }
     }

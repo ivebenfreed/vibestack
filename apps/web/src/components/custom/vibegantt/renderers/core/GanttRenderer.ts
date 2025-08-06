@@ -293,9 +293,8 @@ export class GanttRenderer {
       }
     }
     
-    // Render dependencies - TEMPORARILY DISABLED per Issue #12
-    // Dependencies don't work properly - need proper domain functions for CRUD with 4 types (FS, SS, FF, SF)
-    // this.renderDependenciesFromCoordinates(coordinateMapping, dependencies);
+    // Render dependencies
+    this.renderDependenciesFromCoordinates(coordinateMapping, dependencies);
     
   }
   
@@ -629,37 +628,40 @@ export class GanttRenderer {
     coordinateMapping: CoordinateMapping,
     dependencies: Record<string, TaskDependency>
   ): void {
-    // Create arrow marker definition
-    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-    marker.setAttribute('id', 'dependency-arrow');
-    marker.setAttribute('markerWidth', '10');
-    marker.setAttribute('markerHeight', '10');
-    marker.setAttribute('refX', '9');
-    marker.setAttribute('refY', '3');
-    marker.setAttribute('orient', 'auto');
-    marker.setAttribute('markerUnits', 'strokeWidth');
-    
-    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    arrow.setAttribute('d', 'M0,0 L0,6 L9,3 z');
-    arrow.setAttribute('fill', '#6b7280');
-    
-    marker.appendChild(arrow);
-    defs.appendChild(marker);
-    this.dependencyContainer.appendChild(defs);
-    
-    // Render each dependency
+    // Render each dependency without arrow markers
     for (const dep of Object.values(dependencies)) {
       const sourceCoord = coordinateMapping.tasks.find(t => t.taskId === dep.predecessorId);
       const targetCoord = coordinateMapping.tasks.find(t => t.taskId === dep.successorId);
       
       if (!sourceCoord || !targetCoord) continue;
       
-      // Calculate connection points
-      const sourceX = sourceCoord.xPosition + sourceCoord.width;
-      const sourceY = sourceCoord.yPosition + sourceCoord.height / 2;
-      const targetX = targetCoord.xPosition;
-      const targetY = targetCoord.yPosition + targetCoord.height / 2;
+      // Calculate connection points based on dependency type
+      let sourceX: number, sourceY: number, targetX: number, targetY: number;
+      
+      // Default to finish-to-start positioning
+      sourceX = sourceCoord.xPosition + sourceCoord.width;
+      sourceY = sourceCoord.yPosition + sourceCoord.height / 2;
+      targetX = targetCoord.xPosition;
+      targetY = targetCoord.yPosition + targetCoord.height / 2;
+      
+      // Adjust based on dependency type if available
+      if (dep.type === 'start-to-start') {
+        sourceX = sourceCoord.xPosition;
+        targetX = targetCoord.xPosition;
+      } else if (dep.type === 'finish-to-finish') {
+        sourceX = sourceCoord.xPosition + sourceCoord.width;
+        targetX = targetCoord.xPosition + targetCoord.width;
+      } else if (dep.type === 'start-to-finish') {
+        sourceX = sourceCoord.xPosition;
+        targetX = targetCoord.xPosition + targetCoord.width;
+      }
+      
+      // Create group for dependency (line + interaction elements)
+      const depGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      depGroup.setAttribute('class', 'vibegantt-dependency-group');
+      depGroup.setAttribute('data-dependency-id', dep.id);
+      depGroup.setAttribute('data-predecessor-id', dep.predecessorId);
+      depGroup.setAttribute('data-successor-id', dep.successorId);
       
       // Create path
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -667,17 +669,288 @@ export class GanttRenderer {
       path.setAttribute('data-dependency-id', dep.id);
       
       // Simple L-shaped path
-      const midX = sourceX + 10;
+      const midX = sourceX + (targetX - sourceX) / 2;
       const d = `M ${sourceX} ${sourceY} L ${midX} ${sourceY} L ${midX} ${targetY} L ${targetX} ${targetY}`;
       
       path.setAttribute('d', d);
       path.setAttribute('fill', 'none');
       path.setAttribute('stroke', '#6b7280');
       path.setAttribute('stroke-width', '2');
-      path.setAttribute('marker-end', 'url(#dependency-arrow)');
+      path.setAttribute('pointer-events', 'visibleStroke');
+      path.style.cursor = 'pointer';
       
-      this.dependencyContainer.appendChild(path);
+      // Create invisible wider path for easier clicking
+      const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitArea.setAttribute('d', d);
+      hitArea.setAttribute('fill', 'none');
+      hitArea.setAttribute('stroke', 'transparent');
+      hitArea.setAttribute('stroke-width', '10');
+      hitArea.setAttribute('pointer-events', 'visibleStroke');
+      hitArea.style.cursor = 'pointer';
+      hitArea.setAttribute('data-dependency-id', dep.id);
+      
+      // Add hover effect
+      depGroup.addEventListener('mouseenter', () => {
+        path.setAttribute('stroke', '#3b82f6');
+        path.setAttribute('stroke-width', '3');
+      });
+      
+      depGroup.addEventListener('mouseleave', () => {
+        if (!depGroup.classList.contains('selected')) {
+          path.setAttribute('stroke', '#6b7280');
+          path.setAttribute('stroke-width', '2');
+        }
+      });
+      
+      // Add click handler for selection
+      depGroup.addEventListener('click', (e) => {
+        e.stopPropagation();
+        console.log('Dependency clicked:', dep.id);
+        
+        // Remove previous selection
+        this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
+          el.classList.remove('selected');
+          const pathEl = el.querySelector('.vibegantt-dependency');
+          if (pathEl) {
+            pathEl.setAttribute('stroke', '#6b7280');
+            pathEl.setAttribute('stroke-width', '2');
+          }
+        });
+        
+        // Select this dependency
+        depGroup.classList.add('selected');
+        path.setAttribute('stroke', '#3b82f6');
+        path.setAttribute('stroke-width', '3');
+        
+        // Show delete button
+        this.showDependencyControls(depGroup, dep.id, midX, (sourceY + targetY) / 2);
+        
+        // Send selection event
+        this.eventHandler({
+          type: 'DEPENDENCY_SELECT',
+          dependencyId: dep.id
+        });
+      });
+      
+      // Add connection handles for reassignment (initially hidden)
+      const startHandle = this.createConnectionHandle(sourceX, sourceY, 'start', dep.id);
+      const endHandle = this.createConnectionHandle(targetX, targetY, 'end', dep.id);
+      
+      depGroup.appendChild(path);
+      depGroup.appendChild(hitArea);
+      depGroup.appendChild(startHandle);
+      depGroup.appendChild(endHandle);
+      
+      this.dependencyContainer.appendChild(depGroup);
     }
+  }
+  
+  /**
+   * Create a connection handle for dependency reassignment
+   */
+  private createConnectionHandle(x: number, y: number, type: 'start' | 'end', dependencyId: string): SVGElement {
+    const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    handle.setAttribute('class', 'connection-handle');
+    handle.setAttribute('cx', x.toString());
+    handle.setAttribute('cy', y.toString());
+    handle.setAttribute('r', '6');
+    handle.setAttribute('fill', '#3b82f6');
+    handle.setAttribute('stroke', 'white');
+    handle.setAttribute('stroke-width', '2');
+    handle.setAttribute('data-dependency-id', dependencyId);
+    handle.setAttribute('data-handle-type', type);
+    handle.style.opacity = '0';
+    handle.style.cursor = 'move';
+    handle.style.transition = 'opacity 0.2s';
+    handle.style.pointerEvents = 'all';
+    
+    // Add drag functionality
+    handle.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      console.log('Starting dependency drag', { dependencyId, type });
+      
+      // Create visual feedback line
+      const dragLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      dragLine.setAttribute('class', 'dependency-drag-line');
+      dragLine.setAttribute('stroke', '#3b82f6');
+      dragLine.setAttribute('stroke-width', '2');
+      dragLine.setAttribute('stroke-dasharray', '5,5');
+      dragLine.setAttribute('x1', x.toString());
+      dragLine.setAttribute('y1', y.toString());
+      dragLine.setAttribute('x2', x.toString());
+      dragLine.setAttribute('y2', y.toString());
+      
+      this.dependencyContainer.appendChild(dragLine);
+      
+      const containerRect = this.taskContainer.getBoundingClientRect();
+      
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const currentX = moveEvent.clientX - containerRect.left + this.taskContainer.scrollLeft;
+        const currentY = moveEvent.clientY - containerRect.top + this.taskContainer.scrollTop;
+        dragLine.setAttribute('x2', currentX.toString());
+        dragLine.setAttribute('y2', currentY.toString());
+        
+        // Highlight target task on hover
+        const targetElement = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+        const targetTask = targetElement?.closest('.vibegantt-task') as HTMLElement;
+        
+        // Remove previous highlights
+        this.taskContainer.querySelectorAll('.dependency-target-highlight').forEach(el => {
+          el.classList.remove('dependency-target-highlight');
+          (el as HTMLElement).style.outline = '';
+        });
+        
+        if (targetTask) {
+          targetTask.classList.add('dependency-target-highlight');
+          targetTask.style.outline = '2px solid #3b82f6';
+        }
+      };
+      
+      const handleMouseUp = async (upEvent: MouseEvent) => {
+        // Find target task
+        const targetElement = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+        const targetTask = targetElement?.closest('.vibegantt-task') as HTMLElement;
+        
+        if (targetTask) {
+          const newTaskId = targetTask.dataset.taskId;
+          if (newTaskId) {
+            console.log('Reassigning dependency', { 
+              dependencyId, 
+              handleType: type === 'start' ? 'predecessor' : 'successor',
+              newTaskId 
+            });
+            
+            // Call domain service to reassign
+            try {
+              const { entityDependencyService } = await import('/src/domain/entity-dependency-service.ts');
+              await entityDependencyService.reassignDependency(
+                dependencyId,
+                type === 'start' ? 'predecessor' : 'successor',
+                newTaskId
+              );
+              
+              // Trigger re-render
+              this.eventHandler({
+                type: 'DEPENDENCY_REASSIGN',
+                dependencyId,
+                handleType: type === 'start' ? 'predecessor' : 'successor',
+                newTaskId
+              });
+            } catch (error) {
+              console.error('Failed to reassign dependency:', error);
+            }
+          }
+        }
+        
+        // Clean up
+        dragLine.remove();
+        this.taskContainer.querySelectorAll('.dependency-target-highlight').forEach(el => {
+          el.classList.remove('dependency-target-highlight');
+          (el as HTMLElement).style.outline = '';
+        });
+        
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    });
+    
+    return handle;
+  }
+  
+  /**
+   * Show dependency controls (delete button, handles)
+   */
+  private showDependencyControls(depGroup: SVGElement, dependencyId: string, x: number, y: number): void {
+    // Remove any existing controls
+    this.dependencyContainer.querySelectorAll('.dependency-controls').forEach(el => el.remove());
+    
+    // Create controls group
+    const controls = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    controls.setAttribute('class', 'dependency-controls');
+    
+    // Create delete button
+    const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    deleteBtn.setAttribute('class', 'delete-button');
+    deleteBtn.setAttribute('data-dependency-id', dependencyId);
+    deleteBtn.style.cursor = 'pointer';
+    deleteBtn.setAttribute('transform', `translate(${x}, ${y})`);
+    
+    // Delete button background
+    const deleteBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    deleteBg.setAttribute('r', '12');
+    deleteBg.setAttribute('fill', '#ef4444');
+    deleteBg.setAttribute('stroke', 'white');
+    deleteBg.setAttribute('stroke-width', '2');
+    
+    // Delete button X icon
+    const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    deleteIcon.setAttribute('d', 'M -5 -5 L 5 5 M 5 -5 L -5 5');
+    deleteIcon.setAttribute('stroke', 'white');
+    deleteIcon.setAttribute('stroke-width', '2');
+    deleteIcon.setAttribute('stroke-linecap', 'round');
+    deleteIcon.setAttribute('fill', 'none');
+    
+    deleteBtn.appendChild(deleteBg);
+    deleteBtn.appendChild(deleteIcon);
+    
+    // Add click handler for delete
+    deleteBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      console.log('Delete dependency:', dependencyId);
+      
+      // Call domain service to delete
+      try {
+        const { entityDependencyService } = await import('/src/domain/entity-dependency-service.ts');
+        await entityDependencyService.deleteUI(dependencyId);
+        
+        // Remove from DOM
+        depGroup.remove();
+        controls.remove();
+        
+        // Send delete event
+        this.eventHandler({
+          type: 'DEPENDENCY_DELETE',
+          dependencyId
+        });
+      } catch (error) {
+        console.error('Failed to delete dependency:', error);
+      }
+    });
+    
+    controls.appendChild(deleteBtn);
+    
+    // Show connection handles
+    depGroup.querySelectorAll('.connection-handle').forEach(handle => {
+      (handle as SVGElement).style.opacity = '1';
+    });
+    
+    this.dependencyContainer.appendChild(controls);
+    
+    // Hide controls when clicking elsewhere
+    setTimeout(() => {
+      const hideControls = (e: MouseEvent) => {
+        const target = e.target as Element;
+        if (!target.closest('.dependency-controls') && !target.closest('.vibegantt-dependency-group')) {
+          controls.remove();
+          depGroup.classList.remove('selected');
+          depGroup.querySelectorAll('.connection-handle').forEach(handle => {
+            (handle as SVGElement).style.opacity = '0';
+          });
+          const pathEl = depGroup.querySelector('.vibegantt-dependency');
+          if (pathEl) {
+            pathEl.setAttribute('stroke', '#6b7280');
+            pathEl.setAttribute('stroke-width', '2');
+          }
+          document.removeEventListener('click', hideControls);
+        }
+      };
+      document.addEventListener('click', hideControls);
+    }, 100);
   }
   
   /**
