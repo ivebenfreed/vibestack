@@ -394,7 +394,7 @@ export class GanttRenderer {
       left: 0;
       height: 30px;
       width: 100%;
-      display: flex;
+      overflow: hidden;
       border-bottom: 1px solid #e5e7eb;
     `;
     
@@ -406,7 +406,7 @@ export class GanttRenderer {
       left: 0;
       height: 30px;
       width: 100%;
-      display: flex;
+      overflow: hidden;
     `;
     
     // Track current period for header grouping
@@ -446,24 +446,37 @@ export class GanttRenderer {
       
       // Create main segment (only if it has a label)
       if (segment.label) {
-        const mainSegment = document.createElement('div');
-        mainSegment.className = 'vibegantt-timeline-segment vibegantt-timeline-label';
-        mainSegment.style.cssText = `
-          position: absolute;
-          left: ${segment.xPosition}px;
-          width: ${segment.width}px;
-          height: 30px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: ${hasMonthLabels ? '12px' : '11px'};
-          color: ${segment.isMonth || segment.isWeek ? '#374151' : '#6b7280'};
-          font-weight: ${segment.isMonth || segment.isWeek ? '500' : '400'};
-          border-right: 1px solid #e5e7eb;
-          ${(!hasMonthLabels && !hasWeekLabels && (segment.date.getDay() === 0 || segment.date.getDay() === 6)) ? 'background: #f9fafb;' : ''}
-        `;
-        mainSegment.textContent = segment.label;
-        mainRow.appendChild(mainSegment);
+        // For segments that start before the visible area, adjust their position
+        // but still render them if they're at least partially visible
+        const isVisible = segment.xPosition + segment.width > -50; // Allow some buffer for labels
+        
+        if (isVisible) {
+          const mainSegment = document.createElement('div');
+          mainSegment.className = 'vibegantt-timeline-segment vibegantt-timeline-label';
+          
+          // Don't clip segments at the edge - let them render naturally
+          // The container overflow will handle actual clipping
+          mainSegment.style.cssText = `
+            position: absolute;
+            left: ${segment.xPosition}px;
+            width: ${segment.width}px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: ${hasMonthLabels ? '12px' : '11px'};
+            color: ${segment.isMonth || segment.isWeek ? '#374151' : '#6b7280'};
+            font-weight: ${segment.isMonth || segment.isWeek ? '500' : '400'};
+            border-right: 1px solid #e5e7eb;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            ${(!hasMonthLabels && !hasWeekLabels && (segment.date.getDay() === 0 || segment.date.getDay() === 6)) ? 'background: #f9fafb;' : ''}
+          `;
+          
+          mainSegment.textContent = segment.label;
+          mainRow.appendChild(mainSegment);
+        }
       }
     }
     
@@ -479,23 +492,40 @@ export class GanttRenderer {
     
     // Render header labels
     headerLabels.forEach(header => {
-      const headerLabel = document.createElement('div');
-      headerLabel.className = 'vibegantt-timeline-header-label';
-      headerLabel.style.cssText = `
-        position: absolute;
-        left: ${header.start}px;
-        width: ${header.end - header.start}px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 600;
-        color: #374151;
-        border-right: 1px solid #e5e7eb;
-      `;
-      headerLabel.textContent = header.label;
-      headerRow.appendChild(headerLabel);
+      // Only render headers that are at least partially visible
+      if (header.end > 0) {
+        const headerLabel = document.createElement('div');
+        headerLabel.className = 'vibegantt-timeline-header-label';
+        
+        // Adjust position and width if header starts before viewport
+        const adjustedStart = Math.max(0, header.start);
+        const adjustedWidth = header.start < 0 
+          ? header.end - adjustedStart  // Adjust width if cut off at start
+          : header.end - header.start;
+        
+        headerLabel.style.cssText = `
+          position: absolute;
+          left: ${adjustedStart}px;
+          width: ${adjustedWidth}px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 600;
+          color: #374151;
+          border-right: 1px solid #e5e7eb;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        `;
+        
+        // Only show label if there's enough width to display it
+        if (adjustedWidth > 30) {
+          headerLabel.textContent = header.label;
+        }
+        
+        headerRow.appendChild(headerLabel);
+      }
     });
     
     timelineInner.appendChild(headerRow);

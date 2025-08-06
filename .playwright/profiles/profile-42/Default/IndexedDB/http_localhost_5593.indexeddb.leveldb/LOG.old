@@ -1,3 +1,3 @@
-2025/08/06-12:44:31.969 2208f Reusing MANIFEST /home/benfreed/vibestack/worktrees/issue-42/.playwright/profiles/profile-42/Default/IndexedDB/http_localhost_5593.indexeddb.leveldb/MANIFEST-000001
-2025/08/06-12:44:31.970 2208f Recovering log #3
-2025/08/06-12:44:31.980 2208f Reusing old log /home/benfreed/vibestack/worktrees/issue-42/.playwright/profiles/profile-42/Default/IndexedDB/http_localhost_5593.indexeddb.leveldb/000003.log 
+2025/08/06-14:00:30.104 93d21 Reusing MANIFEST /home/benfreed/vibestack/worktrees/issue-42/.playwright/profiles/profile-42/Default/IndexedDB/http_localhost_5593.indexeddb.leveldb/MANIFEST-000001
+2025/08/06-14:00:30.104 93d21 Recovering log #3
+2025/08/06-14:00:30.123 93d21 Reusing old log /home/benfreed/vibestack/worktrees/issue-42/.playwright/profiles/profile-42/Default/IndexedDB/http_localhost_5593.indexeddb.leveldb/000003.log 
