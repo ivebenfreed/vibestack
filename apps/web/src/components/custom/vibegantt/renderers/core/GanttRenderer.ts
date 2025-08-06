@@ -838,25 +838,14 @@ export class GanttRenderer {
               newTaskId 
             });
             
-            // Call domain service to reassign
-            try {
-              const { entityDependencyService } = await import('/src/domain/entity-dependency-service.ts');
-              await entityDependencyService.reassignDependency(
-                dependencyId,
-                type === 'start' ? 'predecessor' : 'successor',
-                newTaskId
-              );
-              
-              // Trigger re-render
-              this.eventHandler({
-                type: 'DEPENDENCY_REASSIGN',
-                dependencyId,
-                handleType: type === 'start' ? 'predecessor' : 'successor',
-                newTaskId
-              });
-            } catch (error) {
-              console.error('Failed to reassign dependency:', error);
-            }
+            // Send reassign event to the machine which will handle the domain service call
+            console.log('Sending DEPENDENCY_REASSIGN event');
+            this.eventHandler({
+              type: 'DEPENDENCY_REASSIGN',
+              dependencyId,
+              handleType: type === 'start' ? 'predecessor' : 'successor',
+              newTaskId
+            });
           }
         }
         
@@ -915,32 +904,24 @@ export class GanttRenderer {
     deleteBtn.appendChild(deleteIcon);
     
     // Add click handler for delete
-    deleteBtn.addEventListener('click', async (e) => {
+    deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       console.log('Delete dependency:', dependencyId);
       
-      // Call domain service to delete
-      try {
-        const { entityDependencyService } = await import('/src/domain/entity-dependency-service.ts');
-        await entityDependencyService.deleteUI(dependencyId);
-        
-        // Clear selected state if deleting selected dependency
-        if (this.selectedDependencyId === dependencyId) {
-          this.selectedDependencyId = null;
-        }
-        
-        // Remove from DOM
-        depGroup.remove();
-        controls.remove();
-        
-        // Send delete event
-        this.eventHandler({
-          type: 'DEPENDENCY_DELETE',
-          dependencyId
-        });
-      } catch (error) {
-        console.error('Failed to delete dependency:', error);
+      // Clear selected state if deleting selected dependency
+      if (this.selectedDependencyId === dependencyId) {
+        this.selectedDependencyId = null;
       }
+      
+      // Remove visual elements immediately for responsive UI
+      depGroup.remove();
+      controls.remove();
+      
+      // Send delete event to machine which will handle the domain service call
+      this.eventHandler({
+        type: 'DEPENDENCY_DELETE',
+        dependencyId
+      });
     });
     
     controls.appendChild(deleteBtn);

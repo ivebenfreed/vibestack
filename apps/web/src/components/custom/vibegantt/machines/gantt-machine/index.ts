@@ -882,10 +882,24 @@ export const ganttMachine = setup({
                 },
                 DEPENDENCY_DELETE: {
                   actions: [
-                    ({ context, event }) => {
-                      if (context.domainService?.deleteDependency) {
-                        console.log('GanttMachine: Deleting dependency', event.dependencyId);
-                        context.domainService.deleteDependency(event.dependencyId);
+                    async ({ context, event }) => {
+                      console.log('GanttMachine: Deleting dependency', event.dependencyId);
+                      
+                      try {
+                        // Import the service
+                        const { entityDependencyService } = await import('@/domain/entity-dependency-service');
+                        
+                        // Delete the dependency
+                        await entityDependencyService.deleteUI(event.dependencyId);
+                        
+                        console.log('GanttMachine: Dependency deleted successfully');
+                        
+                        // Trigger a data refresh to update the UI
+                        if (context.dataStore) {
+                          context.dataStore.send({ type: 'REFRESH' });
+                        }
+                      } catch (error) {
+                        console.error('GanttMachine: Failed to delete dependency:', error);
                       }
                     },
                   ],
@@ -905,36 +919,33 @@ export const ganttMachine = setup({
                 },
                 DEPENDENCY_REASSIGN: {
                   actions: [
-                    ({ context, event }) => {
+                    async ({ context, event }) => {
                       console.log('GanttMachine: Reassigning dependency', {
                         dependencyId: event.dependencyId,
                         handleType: event.handleType,
-                        newTaskId: event.newTaskId,
-                        originalPredecessorId: event.originalPredecessorId,
-                        originalSuccessorId: event.originalSuccessorId
+                        newTaskId: event.newTaskId
                       });
                       
-                      // Calculate the new dependency based on which handle was dragged
-                      const newPredecessorId = event.handleType === 'start' 
-                        ? event.newTaskId 
-                        : event.originalPredecessorId;
-                      const newSuccessorId = event.handleType === 'end' 
-                        ? event.newTaskId 
-                        : event.originalSuccessorId;
-                      
-                      // Use domain service to update the dependency
-                      if (context.domainService?.createDependency && context.domainService?.deleteDependency) {
-                        // Delete the old dependency
-                        context.domainService.deleteDependency(event.dependencyId);
+                      // Use the entityDependencyService to reassign
+                      try {
+                        // Import the service
+                        const { entityDependencyService } = await import('@/domain/entity-dependency-service');
                         
-                        // Create a new dependency with the new connection
-                        context.domainService.createDependency({
-                          predecessorId: newPredecessorId,
-                          successorId: newSuccessorId,
-                          type: 'finish-to-start', // Default type, could be made configurable
-                          lagDays: 0,
-                          metadata: {}
-                        });
+                        // Call the reassign method
+                        await entityDependencyService.reassignDependency(
+                          event.dependencyId,
+                          event.handleType,
+                          event.newTaskId
+                        );
+                        
+                        console.log('GanttMachine: Dependency reassigned successfully');
+                        
+                        // Trigger a data refresh to update the UI
+                        if (context.dataStore) {
+                          context.dataStore.send({ type: 'REFRESH' });
+                        }
+                      } catch (error) {
+                        console.error('GanttMachine: Failed to reassign dependency:', error);
                       }
                     },
                   ],
