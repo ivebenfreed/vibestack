@@ -20,10 +20,6 @@ playwright-report/
 test-results/
 screenshots/
 
-# Playwright auth state (contains sensitive session data)  
-.playwright/auth/
-playwright/.auth/
-
 # Build outputs
 dist
 build
