@@ -15,21 +15,20 @@ export const timelineSlice = {
               if (context.dataStore) {
                 // Get current zoom from store
                 const storeSnapshot = context.dataStore.getSnapshot();
-                const { zoomLevel, zoomFactor } = storeSnapshot.context;
+                const currentZoom = storeSnapshot.context.zoom || 'day';
                 
-                // Calculate next zoom using ZOOM_UTILS
-                const nextZoom = ZOOM_UTILS.calculateNextZoom(
-                  zoomLevel,
-                  zoomFactor,
-                  event.direction
-                );
+                // Calculate next zoom level
+                const nextZoom = ZOOM_UTILS.getNextZoomLevel(currentZoom, event.direction);
                 
-                // Send UPDATE_ZOOM to store
-                context.dataStore.send({
-                  type: 'UPDATE_ZOOM',
-                  level: nextZoom.level,
-                  factor: nextZoom.factor
-                });
+                console.log(`Zoom: ${currentZoom} -> ${nextZoom} (direction: ${event.direction})`);
+                
+                // Send setZoom to store if zoom level changed
+                if (nextZoom !== currentZoom) {
+                  context.dataStore.send({
+                    type: 'setZoom',
+                    zoom: nextZoom
+                  });
+                }
               }
             }
           ],
