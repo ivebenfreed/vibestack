@@ -454,12 +454,30 @@ export class GanttRenderer {
           const mainSegment = document.createElement('div');
           mainSegment.className = 'vibegantt-timeline-segment vibegantt-timeline-label';
           
+          // Calculate appropriate width for week and month labels
+          let segmentWidth = segment.width;
+          if (segment.isWeek && hasWeekLabels) {
+            // Week labels should span 7 days
+            segmentWidth = segment.width * 7;
+          } else if (segment.isMonth && hasMonthLabels) {
+            // Month labels - find the next month label to determine width
+            const currentIndex = i;
+            let nextMonthIndex = segments.findIndex((s, idx) => idx > currentIndex && s.isMonth);
+            if (nextMonthIndex === -1) {
+              // Last month - use remaining width
+              nextMonthIndex = segments.length - 1;
+            }
+            if (nextMonthIndex > currentIndex) {
+              segmentWidth = segments[nextMonthIndex].xPosition - segment.xPosition;
+            }
+          }
+          
           // Don't clip segments at the edge - let them render naturally
           // The container overflow will handle actual clipping
           mainSegment.style.cssText = `
             position: absolute;
             left: ${segment.xPosition}px;
-            width: ${segment.width}px;
+            width: ${segmentWidth}px;
             height: 30px;
             display: flex;
             align-items: center;
