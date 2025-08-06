@@ -256,6 +256,55 @@ export class EntityDependencyDomainService extends BaseDomainService<EntityDepen
     });
   }
   
+  /**
+   * Reassign a dependency endpoint (change predecessor or successor)
+   * @param dependencyId - The dependency to reassign
+   * @param handleType - Which end to reassign ('predecessor' or 'successor')
+   * @param newTaskId - The new task ID to assign to that end
+   */
+  async reassignDependency(
+    dependencyId: string,
+    handleType: 'predecessor' | 'successor',
+    newTaskId: string
+  ): Promise<EntityDependency> {
+    const existing = await this.getTable().get(dependencyId);
+    if (!existing) {
+      throw new Error(`EntityDependency with id ${dependencyId} not found`);
+    }
+    
+    // Build the update based on which handle is being reassigned
+    const updates: UpdateEntityDependencyInput = {};
+    if (handleType === 'predecessor') {
+      updates.predecessorId = newTaskId;
+      // Check for self-dependency
+      if (newTaskId === existing.successorId) {
+        throw new Error('An entity cannot depend on itself');
+      }
+    } else {
+      updates.successorId = newTaskId;
+      // Check for self-dependency
+      if (newTaskId === existing.predecessorId) {
+        throw new Error('An entity cannot depend on itself');
+      }
+    }
+    
+    // Check for duplicate dependency
+    const duplicate = await this.getTable()
+      .where({
+        entityType: existing.entityType,
+        predecessorId: handleType === 'predecessor' ? newTaskId : existing.predecessorId,
+        successorId: handleType === 'successor' ? newTaskId : existing.successorId
+      })
+      .first();
+    
+    if (duplicate && duplicate.id !== dependencyId) {
+      throw new Error('This dependency already exists');
+    }
+    
+    // Update the dependency
+    return this.updateUI(dependencyId, updates);
+  }
+  
   // ============================================================================
   // Business Logic Helpers
   // ============================================================================

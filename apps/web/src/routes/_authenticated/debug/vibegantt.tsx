@@ -206,14 +206,14 @@ function VibeGanttDebug() {
               />
               <span className="text-sm">Show Weekends</span>
             </label>
-            <label className="flex items-center">
+            <label className="flex items-center opacity-50" title="Dependencies temporarily disabled - need proper domain functions">
               <input
                 type="checkbox"
-                checked={viewConfig.showDependencies}
-                onChange={(e) => setViewConfig({ ...viewConfig, showDependencies: e.target.checked })}
+                checked={false}
+                disabled
                 className="mr-2"
               />
-              <span className="text-sm">Show Dependencies</span>
+              <span className="text-sm">Show Dependencies (Disabled)</span>
             </label>
           </div>
           
@@ -299,7 +299,6 @@ function VibeGanttDebug() {
           <li>Click tasks to select them (Ctrl/Cmd+Click for multi-select)</li>
           <li>Use Shift+Drag or Middle Mouse to pan the timeline</li>
           <li>Use Ctrl/Cmd+Scroll to zoom in/out</li>
-          <li>Dependencies will automatically update when tasks move</li>
         </ul>
       </div>
     </div>

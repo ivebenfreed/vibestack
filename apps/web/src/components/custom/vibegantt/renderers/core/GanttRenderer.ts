@@ -293,8 +293,9 @@ export class GanttRenderer {
       }
     }
     
-    // Render dependencies
-    this.renderDependenciesFromCoordinates(coordinateMapping, dependencies);
+    // Render dependencies - TEMPORARILY DISABLED per Issue #12
+    // Dependencies don't work properly - need proper domain functions for CRUD with 4 types (FS, SS, FF, SF)
+    // this.renderDependenciesFromCoordinates(coordinateMapping, dependencies);
     
   }
   
@@ -504,48 +505,49 @@ export class GanttRenderer {
       transition: opacity 0.2s;
     `;
     
-    // Add dependency link handle
-    const linkHandle = document.createElement('div');
-    linkHandle.className = 'vibegantt-link-handle';
-    linkHandle.dataset.taskId = task.id;
-    linkHandle.style.cssText = `
-      position: absolute;
-      right: -12px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 8px;
-      height: 8px;
-      background: #6b7280;
-      border: 2px solid white;
-      border-radius: 50%;
-      cursor: crosshair;
-      opacity: 0;
-      transition: opacity 0.2s;
-      z-index: 10;
-    `;
+    // Add dependency link handle - TEMPORARILY DISABLED per Issue #12
+    // Dependencies don't work properly - need proper domain functions for CRUD with 4 types (FS, SS, FF, SF)
+    // const linkHandle = document.createElement('div');
+    // linkHandle.className = 'vibegantt-link-handle';
+    // linkHandle.dataset.taskId = task.id;
+    // linkHandle.style.cssText = `
+    //   position: absolute;
+    //   right: -12px;
+    //   top: 50%;
+    //   transform: translateY(-50%);
+    //   width: 8px;
+    //   height: 8px;
+    //   background: #6b7280;
+    //   border: 2px solid white;
+    //   border-radius: 50%;
+    //   cursor: crosshair;
+    //   opacity: 0;
+    //   transition: opacity 0.2s;
+    //   z-index: 10;
+    // `;
     
     // Add click handler for dependency creation
-    linkHandle.addEventListener('mousedown', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      this.startDependencyCreation(task.id, e);
-    });
+    // linkHandle.addEventListener('mousedown', (e) => {
+    //   e.stopPropagation();
+    //   e.preventDefault();
+    //   this.startDependencyCreation(task.id, e);
+    // });
     
     taskEl.appendChild(leftHandle);
     taskEl.appendChild(rightHandle);
-    taskEl.appendChild(linkHandle);
+    // taskEl.appendChild(linkHandle); // DISABLED
     
     // Show handles on hover
     taskEl.addEventListener('mouseenter', () => {
       leftHandle.style.opacity = '1';
       rightHandle.style.opacity = '1';
-      linkHandle.style.opacity = '1';
+      // linkHandle.style.opacity = '1'; // DISABLED
     });
     
     taskEl.addEventListener('mouseleave', () => {
       leftHandle.style.opacity = '0';
       rightHandle.style.opacity = '0';
-      linkHandle.style.opacity = '0';
+      // linkHandle.style.opacity = '0'; // DISABLED
     });
     
     this.taskContainer.appendChild(taskEl);
