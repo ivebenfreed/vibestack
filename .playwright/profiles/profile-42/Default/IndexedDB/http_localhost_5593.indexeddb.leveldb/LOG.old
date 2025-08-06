@@ -1,0 +1,3 @@
+2025/08/05-23:03:47.396 3cda07 Reusing MANIFEST /home/benfreed/vibestack/worktrees/issue-42/.playwright/profiles/profile-42/Default/IndexedDB/http_localhost_5593.indexeddb.leveldb/MANIFEST-000001
+2025/08/05-23:03:47.397 3cda07 Recovering log #3
+2025/08/05-23:03:47.408 3cda07 Reusing old log /home/benfreed/vibestack/worktrees/issue-42/.playwright/profiles/profile-42/Default/IndexedDB/http_localhost_5593.indexeddb.leveldb/000003.log 
