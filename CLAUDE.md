@@ -321,3 +321,56 @@ tests/playwright/core/my-feature-test.spec.js
 The Playwright config automatically detects the issue number and only runs:
 - All tests in `core/`
 - Tests specific to the current issue folder
+
+### Worktree Merge Strategy
+
+**Problem**: Features work in worktree but break after merging due to conflicts, missing generated files, and configuration drift.
+
+**Solution**: Create clean branches instead of complex merges.
+
+#### Method 1: Clean Branch from Staging
+```bash
+# Instead of merging staging into worktree
+cd /main/repo
+git checkout staging && git pull
+git checkout -b issue-42-clean
+
+# Cherry-pick your commits
+git cherry-pick <commit1> <commit2>...
+# OR use range: git cherry-pick <first>^..<last>
+
+# Regenerate everything fresh
+cd packages/dataforge && pnpm forge:build
+
+# Force push to replace messy branch
+git push --force-with-lease origin issue-42-clean:issue-42
+```
+
+#### Method 2: Rebase onto Staging
+```bash
+# In your worktree
+git fetch origin staging
+git rebase origin/staging
+
+# Resolve conflicts once, cleanly
+# This replays your commits on top of latest staging
+```
+
+#### Before Creating PR - Always Do:
+```bash
+# 1. Commit generated files
+cd packages/dataforge && pnpm forge:build
+git add src/generated/ && git commit -m "chore: commit generated files"
+
+# 2. Create migrations if entities changed
+pnpm migration:generate:server -- src/migrations/server/DescriptiveName
+git add src/migrations/ && git commit -m "feat: add migration"
+
+# 3. Check for hardcoded ports
+grep -r "558\|919\|584" apps/  # Look for worktree-specific ports
+
+# 4. Test clean build
+pnpm build && pnpm type-check
+```
+
+This avoids merge conflicts, stale files, and ensures features work after merge.
