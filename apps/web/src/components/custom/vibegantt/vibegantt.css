@@ -130,6 +130,7 @@
 /* Task elements in chart */
 .vibegantt-task {
   z-index: 10;
+  overflow: visible !important;
 }
 
 .vibegantt-task-bar-progress {
@@ -280,6 +281,66 @@
   width: 16px;
   height: 16px;
   pointer-events: none;
+}
+
+/* Task Connectors for Creating Dependencies */
+.vibegantt-task-connector {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid white;
+  cursor: crosshair;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 15;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.vibegantt-task-connector-left {
+  left: -10px;
+}
+
+.vibegantt-task-connector-right {
+  right: -10px;
+}
+
+.vibegantt-task:hover .vibegantt-task-connector {
+  opacity: 1;
+}
+
+.vibegantt-task-connector:hover {
+  transform: translateY(-50%) scale(1.2);
+  background: #2563eb;
+}
+
+.vibegantt-task-connector.dragging {
+  opacity: 1 !important;
+}
+
+/* Dependency Drag Line */
+.vibegantt-dependency-drag-line {
+  position: absolute;
+  height: 3px;
+  background-image: repeating-linear-gradient(
+    to right,
+    #3b82f6 0,
+    #3b82f6 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  transform-origin: left center;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Target Task Highlight */
+.vibegantt-task.dependency-target-highlight {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px;
 }
 
 /* Connection Handles for Dependency Reassignment */

@@ -87,6 +87,20 @@ export class GanttEventDelegationManager {
       }
     });
     
+    // Check if clicking on task connector (for creating new dependencies)
+    const taskConnector = target.closest('.vibegantt-task-connector') as HTMLElement;
+    if (taskConnector) {
+      const taskId = taskConnector.dataset.taskId;
+      const connectorType = taskConnector.dataset.connectorType as 'start' | 'finish';
+      if (taskId && connectorType) {
+        console.log('GanttEventDelegationManager: Task connector mousedown', { taskId, connectorType });
+        this.startDependencyCreation(taskId, connectorType, event);
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+    
     // Check if clicking on dependency connection handle (for reassigning)
     const connectionHandle = target.closest('.connection-handle') as HTMLElement;
     if (connectionHandle) {
@@ -224,6 +238,9 @@ export class GanttEventDelegationManager {
         case 'timeline-pan':
           this.updateTimelinePan(event);
           break;
+        case 'dependency-create':
+          this.updateDependencyCreation(event);
+          break;
         case 'dependency-drag':
           this.updateDependencyDrag(event);
           break;
@@ -242,6 +259,9 @@ export class GanttEventDelegationManager {
           break;
         case 'timeline-pan':
           this.endTimelinePan(event);
+          break;
+        case 'dependency-create':
+          this.endDependencyCreation(event);
           break;
         case 'dependency-drag':
           this.endDependencyDrag(event);
@@ -591,6 +611,37 @@ export class GanttEventDelegationManager {
     }
   };
   
+  // Dependency creation handlers
+  private startDependencyCreation(sourceTaskId: string, connectorType: 'start' | 'finish', event: MouseEvent): void {
+    console.log('GanttEventDelegationManager: startDependencyCreation', {
+      sourceTaskId,
+      connectorType,
+      startX: event.clientX,
+      startY: event.clientY
+    });
+    
+    this.dragState = {
+      type: 'dependency-create',
+      startX: event.clientX,
+      startY: event.clientY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      data: { sourceTaskId, connectorType }
+    };
+    
+    // Mark the connector as dragging
+    const connector = event.target as HTMLElement;
+    connector.classList.add('dragging');
+    
+    this.sendEvent({
+      type: 'DEPENDENCY_CREATE_START',
+      sourceTaskId
+    });
+    
+    // Create visual feedback
+    this.createDependencyDragLine(event, connectorType);
+  }
+  
   // Dependency drag handlers
   private startDependencyDrag(dependencyId: string, handleType: 'start' | 'end', event: MouseEvent): void {
     console.log('GanttEventDelegationManager: startDependencyDrag', {
@@ -649,6 +700,179 @@ export class GanttEventDelegationManager {
           newTaskId
         });
       }
+    }
+  }
+  
+  private updateDependencyCreation(event: MouseEvent): void {
+    if (this.dragState.type !== 'dependency-create') return;
+    
+    // Update drag line position
+    this.updateDependencyDragLine(event);
+    
+    // Highlight target task on hover
+    const targetElement = document.elementFromPoint(event.clientX, event.clientY);
+    const targetTask = targetElement?.closest('.vibegantt-task') as HTMLElement;
+    
+    // Remove previous highlights
+    this.container.querySelectorAll('.dependency-target-highlight').forEach(el => {
+      el.classList.remove('dependency-target-highlight');
+    });
+    
+    if (targetTask && targetTask.dataset.taskId !== this.dragState.data?.sourceTaskId) {
+      targetTask.classList.add('dependency-target-highlight');
+      targetTask.style.outline = '2px solid #3b82f6';
+    }
+  }
+  
+  private endDependencyCreation(event: MouseEvent): void {
+    if (this.dragState.type !== 'dependency-create' || !this.dragState.data) return;
+    
+    // Find what we're dropping on
+    const targetElement = document.elementFromPoint(event.clientX, event.clientY);
+    
+    // Check if dropping on a task connector (for specific connection type)
+    const targetConnector = targetElement?.closest('.vibegantt-task-connector') as HTMLElement;
+    let targetTask: HTMLElement | null = null;
+    let targetConnectorType: 'start' | 'finish' = 'start';
+    
+    if (targetConnector) {
+      targetTask = targetConnector.closest('.vibegantt-task') as HTMLElement;
+      targetConnectorType = targetConnector.dataset.connectorType as 'start' | 'finish' || 'start';
+    } else {
+      // If not on a connector, check if on a task (default to start)
+      targetTask = targetElement?.closest('.vibegantt-task') as HTMLElement;
+    }
+    
+    if (targetTask) {
+      const targetTaskId = targetTask.dataset.taskId;
+      const sourceTaskId = this.dragState.data.sourceTaskId;
+      const sourceConnectorType = this.dragState.data.connectorType;
+      
+      if (targetTaskId && targetTaskId !== sourceTaskId) {
+        // Determine dependency type based on connectors
+        let dependencyType: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+        
+        if (sourceConnectorType === 'finish' && targetConnectorType === 'start') {
+          dependencyType = 'finish-to-start';
+        } else if (sourceConnectorType === 'start' && targetConnectorType === 'start') {
+          dependencyType = 'start-to-start';
+        } else if (sourceConnectorType === 'finish' && targetConnectorType === 'finish') {
+          dependencyType = 'finish-to-finish';
+        } else {
+          dependencyType = 'start-to-finish';
+        }
+        
+        console.log('GanttEventDelegationManager: Creating dependency', {
+          sourceTaskId,
+          targetTaskId,
+          dependencyType
+        });
+        
+        // TODO: Update event to include dependency type
+        this.sendEvent({
+          type: 'DEPENDENCY_CREATE_END',
+          targetTaskId
+        });
+      }
+    }
+    
+    // Clean up
+    this.removeDependencyDragLine();
+    this.container.querySelectorAll('.dependency-target-highlight').forEach(el => {
+      el.classList.remove('dependency-target-highlight');
+      (el as HTMLElement).style.outline = '';
+    });
+    
+    // Remove dragging class from connector
+    const connector = this.container.querySelector('.vibegantt-task-connector.dragging');
+    if (connector) {
+      connector.classList.remove('dragging');
+    }
+  }
+  
+  // Create visual feedback line for dependency creation
+  private createDependencyDragLine(event: MouseEvent, connectorType: 'start' | 'finish'): void {
+    // Create a DOM-based drag line with dotted style
+    const dragLine = document.createElement('div');
+    dragLine.className = 'vibegantt-dependency-drag-line';
+    dragLine.style.cssText = `
+      position: absolute;
+      height: 3px;
+      background-image: repeating-linear-gradient(
+        to right,
+        #3b82f6 0,
+        #3b82f6 6px,
+        transparent 6px,
+        transparent 12px
+      );
+      transform-origin: left center;
+      pointer-events: none;
+      z-index: 100;
+    `;
+    
+    // Store reference
+    (this.dragState as any).dragLine = dragLine;
+    
+    // Add to task container for proper positioning
+    const taskContainer = this.container.querySelector('.vibegantt-tasks');
+    if (taskContainer) {
+      taskContainer.appendChild(dragLine);
+    }
+    
+    // Calculate correct starting position based on connector
+    const connector = event.target as HTMLElement;
+    const task = connector.closest('.vibegantt-task') as HTMLElement;
+    if (task && taskContainer) {
+      const taskRect = task.getBoundingClientRect();
+      const containerRect = taskContainer.getBoundingClientRect();
+      
+      // Calculate position relative to task container
+      let startX = taskRect.left - containerRect.left + taskContainer.scrollLeft;
+      const startY = taskRect.top - containerRect.top + taskRect.height / 2 + taskContainer.scrollTop;
+      
+      // Adjust X based on connector type
+      if (connectorType === 'finish') {
+        startX += taskRect.width;
+      }
+      
+      // Store the calculated position
+      (this.dragState as any).lineStartX = startX;
+      (this.dragState as any).lineStartY = startY;
+    }
+    
+    // Initial position
+    this.updateDependencyDragLine(event);
+  }
+  
+  private updateDependencyDragLine(event: MouseEvent): void {
+    const dragLine = (this.dragState as any)?.dragLine as HTMLElement;
+    if (!dragLine) return;
+    
+    const taskContainer = this.container.querySelector('.vibegantt-tasks') as HTMLElement;
+    if (!taskContainer) return;
+    
+    const containerRect = taskContainer.getBoundingClientRect();
+    const startX = (this.dragState as any).lineStartX || 0;
+    const startY = (this.dragState as any).lineStartY || 0;
+    const currentX = event.clientX - containerRect.left + taskContainer.scrollLeft;
+    const currentY = event.clientY - containerRect.top + taskContainer.scrollTop;
+    
+    // Calculate angle and length
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+    
+    dragLine.style.left = `${startX}px`;
+    dragLine.style.top = `${startY}px`;
+    dragLine.style.width = `${length}px`;
+    dragLine.style.transform = `rotate(${angle}deg)`;
+  }
+  
+  private removeDependencyDragLine(): void {
+    const dragLine = (this.dragState as any)?.dragLine as HTMLElement;
+    if (dragLine) {
+      dragLine.remove();
     }
   }
   
