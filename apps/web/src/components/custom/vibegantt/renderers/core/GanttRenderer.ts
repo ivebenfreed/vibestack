@@ -683,9 +683,6 @@ export class GanttRenderer {
     `;
     
     // Hover and click events handled by event delegation manager
-        taskId: task.id
-      });
-    });
     
     // Task name
     const taskName = document.createElement('span');
