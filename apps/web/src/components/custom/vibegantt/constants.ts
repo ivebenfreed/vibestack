@@ -53,7 +53,7 @@ export const TIME_SCALE_CONFIG = {
 } as const;
 
 // Zoom levels in order from most detailed to least detailed
-export const ZOOM_LEVELS: TimeScale[] = ['hour', 'day', 'week', 'month', 'quarter', 'year'];
+export const ZOOM_LEVELS: TimeScale[] = ['day', 'week', 'month', 'quarter', 'year'];
 
 // Zoom factor constraints
 export const ZOOM_FACTOR_CONSTRAINTS = {

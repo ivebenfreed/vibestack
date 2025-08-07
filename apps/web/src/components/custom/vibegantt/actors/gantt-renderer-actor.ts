@@ -26,6 +26,9 @@ export type RendererActorEvent =
   | { type: 'RENDER_COORDINATES'; mapping: CoordinateMapping; tasks: any; dependencies: any }
   | { type: 'UPDATE_VIEWPORT'; width: number; height: number }
   | { type: 'UPDATE_SELECTION'; selectedTaskIds: Set<string> }
+  | { type: 'UPDATE_SCROLL'; scrollX: number; scrollY: number }
+  | { type: 'UPDATE_TIMELINE_LAYOUT'; dayWidth: number; scrollX: number; scrollY: number }
+  | { type: 'APPLY_TIME_SCALE_ZOOM'; dayWidth: number; anchorX: number; anchorDate?: Date }
   | { type: 'HANDLE_DRAG_MOVE'; taskId: string; deltaX: number }
   | { type: 'HANDLE_RESIZE_MOVE'; taskId: string; handle: 'left' | 'right'; deltaX: number }
   | { type: 'RESET_DRAG_STATE'; taskId: string }
@@ -70,7 +73,12 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
         sendBack(event);
       };
       
-      renderer = new GanttRenderer(input.container, eventHandler);
+      const machineEventHandler = (event: any) => {
+        console.log('GanttRendererActor: Forwarding machine event directly:', event);
+        sendBack(event);
+      };
+      
+      renderer = new GanttRenderer(input.container, eventHandler, machineEventHandler);
       renderer.initialize();
       
       isInitializing = false;
@@ -140,7 +148,13 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
             sendBack(event);
           };
           
-          renderer = new GanttRenderer(container, eventHandler);
+          // Create machine event handler that forwards events to the parent machine directly
+          const machineEventHandler = (event: any) => {
+            console.log('GanttRendererActor: Forwarding machine event directly:', event);
+            sendBack(event);
+          };
+          
+          renderer = new GanttRenderer(container, eventHandler, machineEventHandler);
           renderer.initialize();
           
           isInitializing = false;
@@ -212,6 +226,55 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           });
           
           renderer.updateSelection(event.selectedTaskIds);
+          break;
+          
+        case 'UPDATE_SCROLL':
+          if (!renderer) {
+            console.warn('GanttRendererActor: Cannot update scroll - renderer not initialized');
+            return;
+          }
+          
+          console.log('GanttRendererActor: Updating scroll position:', {
+            scrollX: event.scrollX,
+            scrollY: event.scrollY
+          });
+          
+          renderer.updateScroll(event.scrollX, event.scrollY);
+          break;
+          
+        case 'UPDATE_TIMELINE_LAYOUT':
+          if (!renderer) {
+            console.warn('GanttRendererActor: Cannot update timeline layout - renderer not initialized');
+            return;
+          }
+          
+          console.log('GanttRendererActor: Updating timeline layout and scroll:', {
+            dayWidth: event.dayWidth,
+            scrollX: event.scrollX,
+            scrollY: event.scrollY
+          });
+          
+          // Update the timeline layout with new day width and scroll position
+          renderer.updateTimelineLayout(event.dayWidth);
+          renderer.updateScroll(event.scrollX, event.scrollY);
+          break;
+          
+        case 'APPLY_TIME_SCALE_ZOOM':
+          console.log('GanttRendererActor: APPLY_TIME_SCALE_ZOOM message received!', {
+            dayWidth: event.dayWidth,
+            anchorX: event.anchorX,
+            anchorDate: event.anchorDate,
+            rendererExists: !!renderer
+          });
+          
+          if (!renderer) {
+            console.warn('GanttRendererActor: Cannot apply time scale zoom - renderer not initialized');
+            return;
+          }
+          
+          console.log('GanttRendererActor: About to call applyTimeScaleZoom...');
+          renderer.applyTimeScaleZoom(event.dayWidth, event.anchorX, event.anchorDate);
+          console.log('GanttRendererActor: applyTimeScaleZoom call completed');
           break;
           
         case 'HANDLE_DRAG_MOVE':
