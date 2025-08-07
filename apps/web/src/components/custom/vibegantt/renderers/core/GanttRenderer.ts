@@ -174,7 +174,7 @@ export class GanttRenderer {
       position: absolute;
       top: 0;
       left: 0;
-      pointer-events: none;
+      pointer-events: auto;
       overflow: visible;
     `;
     
@@ -289,7 +289,9 @@ export class GanttRenderer {
     console.log('GanttRenderer: Rendering from coordinates', {
       taskCount: params.coordinateMapping.tasks.length,
       segmentCount: params.coordinateMapping.timeline.segments.length,
-      totalWidth: params.coordinateMapping.timeline.totalWidth
+      totalWidth: params.coordinateMapping.timeline.totalWidth,
+      dependencyCount: Object.keys(params.dependencies).length,
+      dependencyIds: Object.keys(params.dependencies)
     });
     
     const { coordinateMapping, tasks, dependencies } = params;
@@ -751,6 +753,11 @@ export class GanttRenderer {
     coordinateMapping: CoordinateMapping,
     dependencies: Record<string, TaskDependency>
   ): void {
+    console.log('GanttRenderer: renderDependenciesFromCoordinates called with', {
+      dependencyCount: Object.keys(dependencies).length,
+      dependencyIds: Object.keys(dependencies)
+    });
+    
     // Render each dependency without arrow markers
     for (const dep of Object.values(dependencies)) {
       const sourceCoord = coordinateMapping.tasks.find(t => t.taskId === dep.predecessorId);
@@ -782,9 +789,12 @@ export class GanttRenderer {
       // Create group for dependency (line + interaction elements)
       const depGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       depGroup.setAttribute('class', 'vibegantt-dependency-group');
+      depGroup.setAttribute('data-testid', `dependency-${dep.id}`);
       depGroup.setAttribute('data-dependency-id', dep.id);
       depGroup.setAttribute('data-predecessor-id', dep.predecessorId);
       depGroup.setAttribute('data-successor-id', dep.successorId);
+      depGroup.style.pointerEvents = 'auto';
+      depGroup.style.cursor = 'pointer';
       
       // Create path
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -802,69 +812,48 @@ export class GanttRenderer {
       path.setAttribute('pointer-events', 'visibleStroke');
       path.style.cursor = 'pointer';
       
-      // Create invisible wider path for easier clicking
+      // Create invisible wider hit area for easier clicking and hovering
       const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       hitArea.setAttribute('d', d);
       hitArea.setAttribute('fill', 'none');
-      hitArea.setAttribute('stroke', 'transparent');
-      hitArea.setAttribute('stroke-width', '10');
-      hitArea.setAttribute('pointer-events', 'visibleStroke');
+      hitArea.setAttribute('stroke', 'transparent'); // Completely invisible
+      hitArea.setAttribute('stroke-width', '10'); // Standard 10px hit area (5px on each side)
+      hitArea.setAttribute('pointer-events', 'stroke'); // Only respond to stroke area
       hitArea.style.cursor = 'pointer';
       hitArea.setAttribute('data-dependency-id', dep.id);
+      hitArea.setAttribute('class', 'vibegantt-dependency-hitarea');
       
-      // Add hover effect
-      depGroup.addEventListener('mouseenter', () => {
-        path.setAttribute('stroke', '#3b82f6');
-        path.setAttribute('stroke-width', '3');
-      });
+      // Add hover effect to both group and hit area for better detection
+      const handleMouseEnter = () => {
+        if (!depGroup.classList.contains('selected')) {
+          path.setAttribute('stroke', '#3b82f6');
+          path.setAttribute('stroke-width', '3');
+        }
+      };
       
-      depGroup.addEventListener('mouseleave', () => {
+      const handleMouseLeave = () => {
         if (!depGroup.classList.contains('selected')) {
           path.setAttribute('stroke', '#6b7280');
           path.setAttribute('stroke-width', '2');
         }
-      });
+      };
       
-      // Add click handler for selection
-      depGroup.addEventListener('click', (e) => {
-        e.stopPropagation();
-        console.log('Dependency clicked:', dep.id);
-        
-        // Store selection state
-        this.selectedDependencyId = dep.id;
-        
-        // Remove previous selection
-        this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
-          el.classList.remove('selected');
-          const pathEl = el.querySelector('.vibegantt-dependency');
-          if (pathEl) {
-            pathEl.setAttribute('stroke', '#6b7280');
-            pathEl.setAttribute('stroke-width', '2');
-          }
-        });
-        
-        // Select this dependency
-        depGroup.classList.add('selected');
-        path.setAttribute('stroke', '#3b82f6');
-        path.setAttribute('stroke-width', '3');
-        
-        // Show delete button
-        this.showDependencyControls(depGroup, dep.id, midX, (sourceY + targetY) / 2);
-        
-        // Send selection event - but don't trigger re-render
-        this.eventHandler({
-          type: 'DEPENDENCY_SELECT',
-          dependencyId: dep.id,
-          skipRender: true  // Add flag to prevent re-render
-        });
-      });
+      // Add hover to both elements
+      depGroup.addEventListener('mouseenter', handleMouseEnter);
+      depGroup.addEventListener('mouseleave', handleMouseLeave);
+      hitArea.addEventListener('mouseenter', handleMouseEnter);
+      hitArea.addEventListener('mouseleave', handleMouseLeave);
+      
+      // Click handling is done through event delegation system
+      // Just store the dependency ID for selection state management
       
       // Add connection handles for reassignment (initially hidden)
       const startHandle = this.createConnectionHandle(sourceX, sourceY, 'start', dep.id);
       const endHandle = this.createConnectionHandle(targetX, targetY, 'end', dep.id);
       
-      depGroup.appendChild(path);
+      // Add hit area first so it's below the visible path
       depGroup.appendChild(hitArea);
+      depGroup.appendChild(path);
       depGroup.appendChild(startHandle);
       depGroup.appendChild(endHandle);
       
@@ -1003,8 +992,10 @@ export class GanttRenderer {
     // Create delete button
     const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     deleteBtn.setAttribute('class', 'delete-button');
+    deleteBtn.setAttribute('data-testid', `delete-btn-${dependencyId}`);
     deleteBtn.setAttribute('data-dependency-id', dependencyId);
     deleteBtn.style.cursor = 'pointer';
+    deleteBtn.style.pointerEvents = 'all';
     deleteBtn.setAttribute('transform', `translate(${x}, ${y})`);
     
     // Delete button background
@@ -1013,6 +1004,7 @@ export class GanttRenderer {
     deleteBg.setAttribute('fill', '#ef4444');
     deleteBg.setAttribute('stroke', 'white');
     deleteBg.setAttribute('stroke-width', '2');
+    deleteBg.style.pointerEvents = 'all';
     
     // Delete button X icon
     const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1021,6 +1013,7 @@ export class GanttRenderer {
     deleteIcon.setAttribute('stroke-width', '2');
     deleteIcon.setAttribute('stroke-linecap', 'round');
     deleteIcon.setAttribute('fill', 'none');
+    deleteIcon.style.pointerEvents = 'none';
     
     deleteBtn.appendChild(deleteBg);
     deleteBtn.appendChild(deleteIcon);
@@ -1028,7 +1021,8 @@ export class GanttRenderer {
     // Add click handler for delete
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log('Delete dependency:', dependencyId);
+      e.preventDefault();
+      console.log('Delete button clicked for dependency:', dependencyId);
       
       // Clear selected state if deleting selected dependency
       if (this.selectedDependencyId === dependencyId) {
@@ -1134,13 +1128,20 @@ export class GanttRenderer {
    * Update dependency selection
    */
   updateDependencySelection(dependencyId: string | null): void {
+    console.log('GanttRenderer: updateDependencySelection called with:', dependencyId);
+    
     // Store the selection
     this.selectedDependencyId = dependencyId;
     
     // Update visual state if dependency exists in current DOM
     if (dependencyId) {
-      const depGroup = this.dependencyContainer.querySelector(`[data-dependency-id="${dependencyId}"]`)?.parentElement as SVGElement;
+      console.log('GanttRenderer: Looking for dependency group with ID:', dependencyId);
+      const depGroup = this.dependencyContainer.querySelector(`.vibegantt-dependency-group[data-dependency-id="${dependencyId}"]`) as SVGElement;
+      console.log('GanttRenderer: Found dependency group:', depGroup);
+      
       if (depGroup) {
+        console.log('GanttRenderer: Applying visual selection to dependency group');
+        
         // Clear other selections
         this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
           el.classList.remove('selected');
@@ -1154,7 +1155,10 @@ export class GanttRenderer {
         // Select this dependency
         depGroup.classList.add('selected');
         const path = depGroup.querySelector('.vibegantt-dependency');
+        console.log('GanttRenderer: Found dependency path:', path);
+        
         if (path) {
+          console.log('GanttRenderer: Setting path to selected style');
           path.setAttribute('stroke', '#3b82f6');
           path.setAttribute('stroke-width', '3');
         }
@@ -1167,9 +1171,12 @@ export class GanttRenderer {
           t.taskId === depGroup.dataset.successorId
         );
         
+        console.log('GanttRenderer: Source/target coords:', { sourceCoord, targetCoord });
+        
         if (sourceCoord && targetCoord) {
           const midX = (sourceCoord.xPosition + sourceCoord.width + targetCoord.xPosition) / 2;
           const midY = (sourceCoord.yPosition + targetCoord.yPosition + sourceCoord.height) / 2;
+          console.log('GanttRenderer: Showing dependency controls at:', { midX, midY });
           this.showDependencyControls(depGroup, dependencyId, midX, midY);
         }
       }

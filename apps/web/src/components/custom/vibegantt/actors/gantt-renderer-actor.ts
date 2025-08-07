@@ -259,6 +259,16 @@ export const ganttRendererActor = fromCallback<RendererActorEvent, RendererActor
           renderer.updateScroll(event.scrollX, event.scrollY);
           break;
           
+        case 'UPDATE_DEPENDENCY_SELECTION':
+          if (!renderer) {
+            console.warn('GanttRendererActor: Cannot update dependency selection - renderer not initialized');
+            return;
+          }
+          
+          console.log('GanttRendererActor: Updating dependency selection:', event.dependencyId);
+          renderer.updateDependencySelection(event.dependencyId);
+          break;
+          
         case 'APPLY_TIME_SCALE_ZOOM':
           console.log('GanttRendererActor: APPLY_TIME_SCALE_ZOOM message received!', {
             dayWidth: event.dayWidth,

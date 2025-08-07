@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manual Dependency Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .instructions {
+      background: #f0f0f0;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+    }
+    .test-steps {
+      margin: 10px 0;
+    }
+    .test-steps li {
+      margin: 5px 0;
+    }
+    .link {
+      color: blue;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Manual Test: Dependency Selection and Deletion</h1>
+  
+  <div class="instructions">
+    <h2>Prerequisites:</h2>
+    <ul>
+      <li>Make sure dev servers are running on port 5703</li>
+      <li>Make sure you're logged in</li>
+    </ul>
+  </div>
+
+  <div class="instructions">
+    <h2>Test Steps:</h2>
+    <ol class="test-steps">
+      <li>Open: <a href="http://localhost:5703/debug/vibegantt" target="_blank" class="link">http://localhost:5703/debug/vibegantt</a></li>
+      <li>Wait for the Gantt chart to load with tasks and dependencies</li>
+      <li><strong>Test 1: Single Selection</strong>
+        <ul>
+          <li>Click on any dependency line (should turn blue/selected)</li>
+          <li>Press Delete key</li>
+          <li>Dependency should disappear</li>
+        </ul>
+      </li>
+      <li><strong>Test 2: Multi Selection</strong>
+        <ul>
+          <li>Click on a dependency line</li>
+          <li>Ctrl+Click (or Cmd+Click on Mac) on another dependency</li>
+          <li>Both should be selected</li>
+          <li>Press Delete key</li>
+          <li>Both dependencies should disappear</li>
+        </ul>
+      </li>
+      <li><strong>Test 3: Clear Selection</strong>
+        <ul>
+          <li>Click on a dependency to select it</li>
+          <li>Click on empty space in the chart</li>
+          <li>Selection should be cleared</li>
+        </ul>
+      </li>
+      <li><strong>Test 4: Delete Button</strong>
+        <ul>
+          <li>Click on a dependency to select it</li>
+          <li>A delete button should appear on the selected dependency</li>
+          <li>Click the delete button</li>
+          <li>Dependency should disappear</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="instructions">
+    <h2>Expected Console Logs:</h2>
+    <ul>
+      <li>When clicking dependency: "GanttEventDelegationManager: Dependency clicked"</li>
+      <li>When pressing Delete: "GanttMachine: Delete key pressed"</li>
+      <li>When deleting: "EntityDependencyService: Deleted entity dependency"</li>
+    </ul>
+  </div>
+
+  <div class="instructions">
+    <h2>Troubleshooting:</h2>
+    <ul>
+      <li>If Delete key doesn't work, click on the Gantt chart first to focus it</li>
+      <li>Open browser console (F12) to see debug logs</li>
+      <li>Make sure you see dependencies rendered as arrow lines between tasks</li>
+    </ul>
+  </div>
+</body>
+</html>

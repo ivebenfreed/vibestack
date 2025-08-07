@@ -512,7 +512,6 @@ export class DependencyRenderer {
     circle.setAttribute('fill', '#ef4444');
     circle.setAttribute('stroke', '#ffffff');
     circle.setAttribute('stroke-width', '2');
-    circle.style.cursor = 'pointer';
     
     // Create X symbol
     const xPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -523,9 +522,15 @@ export class DependencyRenderer {
     xPath.setAttribute('stroke-linecap', 'round');
     xPath.style.pointerEvents = 'none';
     
-    // Add click handler for delete
-    circle.addEventListener('click', (e) => {
+    // Set pointer events on the group to capture clicks
+    group.style.cursor = 'pointer';
+    group.style.pointerEvents = 'all';
+    
+    // Add click handler to the group instead of circle
+    group.addEventListener('click', (e) => {
       e.stopPropagation();
+      e.preventDefault();
+      console.log('Delete button clicked for dependency:', dependencyId);
       this.handleDependencyDelete(dependencyId);
     });
     

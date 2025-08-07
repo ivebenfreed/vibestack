@@ -184,6 +184,56 @@
   stroke-dasharray: 5, 3;
 }
 
+/* Dependency Delete Button */
+.delete-button {
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.delete-button:hover {
+  opacity: 1;
+}
+
+.delete-button circle {
+  fill: #ef4444;
+  stroke: #dc2626;
+  stroke-width: 1;
+}
+
+.delete-button:hover circle {
+  fill: #dc2626;
+}
+
+.delete-button text {
+  fill: white;
+  font-size: 16px;
+  font-weight: bold;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Connection Handles for Dependency Reassignment */
+.connection-handle {
+  cursor: move;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.connection-handle:hover {
+  opacity: 1;
+}
+
+.connection-handle circle {
+  fill: #3b82f6;
+  stroke: #2563eb;
+  stroke-width: 1;
+}
+
+.connection-handle:hover circle {
+  fill: #2563eb;
+}
+
 /* Grid Lines */
 .vibegantt-grid-line-vertical {
   position: absolute;

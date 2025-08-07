@@ -209,10 +209,12 @@ export function VibeGanttStoreIntegrated({
     <div
       ref={containerRefCallback}
       className={`vibegantt ${className}`}
+      tabIndex={0}
       style={{
         height: `${height}px`,
         position: 'relative',
         overflow: 'hidden',
+        outline: 'none',
       }}
     >
       {/* The renderer actor will handle all DOM rendering */}
