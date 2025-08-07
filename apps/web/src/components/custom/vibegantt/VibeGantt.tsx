@@ -60,6 +60,10 @@ export function VibeGantt({
       // The renderer has direct access to the task elements it creates
       
       rendererInitializedRef.current = true;
+      
+      // Set ready state for tests
+      (window as any).__vibegantt_ready = true;
+      node.setAttribute('data-vibegantt-ready', 'true');
     }
     containerRef.current = node;
   }, [send, handleGanttEvent, height]);
