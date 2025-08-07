@@ -109,10 +109,12 @@ export function VibeGantt({
       ref={containerRefCallback}
       className={`vibegantt ${className}`}
       data-testid="vibegantt-container"
+      tabIndex={0}
       style={{
         height: `${height}px`,
         position: 'relative',
         overflow: 'hidden',
+        outline: 'none',
       }}
     >
       {/* The renderer actor will handle all DOM rendering */}

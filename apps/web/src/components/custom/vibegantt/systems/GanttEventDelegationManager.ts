@@ -143,6 +143,10 @@ export class GanttEventDelegationManager {
       const dependencyId = dependencyElement.dataset.dependencyId;
       if (dependencyId) {
         console.log('GanttEventDelegationManager: Dependency clicked', { dependencyId });
+        
+        // Focus the container to ensure keyboard events work
+        this.container.focus();
+        
         this.sendEvent({
           type: 'DEPENDENCY_SELECT',
           dependencyId,
@@ -228,7 +232,24 @@ export class GanttEventDelegationManager {
           multi: event.ctrlKey || event.metaKey
         });
       }
+      return; // Don't clear selection when clicking on tasks
     }
+    
+    // Check if clicking on a dependency or dependency UI element
+    const dependencyElement = target.closest('.vibegantt-dependency') as SVGElement;
+    const deleteButton = target.closest('.delete-button') as SVGElement;
+    const connectionHandle = target.closest('.connection-handle') as SVGElement;
+    if (dependencyElement || deleteButton || connectionHandle) {
+      return; // Don't clear selection when clicking on dependency elements
+    }
+    
+    // Clear dependency selection when clicking on empty space
+    console.log('GanttEventDelegationManager: Clicked empty space, clearing dependency selection');
+    this.sendEvent({
+      type: 'DEPENDENCY_SELECT',
+      dependencyId: null,
+      multi: false
+    });
   }
   
   private handleDoubleClick(event: MouseEvent): void {
@@ -277,8 +298,8 @@ export class GanttEventDelegationManager {
   }
   
   private handleKeyDown(event: KeyboardEvent): void {
-    // Only handle if Gantt is focused
-    if (!this.container.contains(document.activeElement)) return;
+    // Only handle if Gantt container or any of its children is focused
+    if (!this.container.contains(document.activeElement) && document.activeElement !== this.container) return;
     
     const key = event.key;
     const modifiers: string[] = [];
@@ -286,6 +307,8 @@ export class GanttEventDelegationManager {
     if (event.shiftKey) modifiers.push('Shift');
     if (event.altKey) modifiers.push('Alt');
     if (event.metaKey) modifiers.push('Meta');
+    
+    console.log('GanttEventDelegationManager: Keyboard event', { key, modifiers });
     
     this.sendEvent({
       type: 'KEYBOARD_SHORTCUT',
