@@ -862,6 +862,9 @@ export class GanttRenderer {
         depGroup.classList.add('selected');
         path.setAttribute('stroke', '#3b82f6');
         path.setAttribute('stroke-width', '3');
+        // Disable pointer events on the dependency line when selected
+        hitArea.style.pointerEvents = 'none';
+        path.style.pointerEvents = 'none';
         // Show controls after a short delay to ensure DOM is ready
         setTimeout(() => {
           this.showDependencyControls(depGroup, dep.id, midX, (sourceY + targetY) / 2);
@@ -991,10 +994,9 @@ export class GanttRenderer {
     // Ensure controls appear above dependency lines
     controls.style.zIndex = '1000';
     
-    // Offset the delete button to avoid blocking the dependency line
-    // Position it above and to the right of the click point
-    const offsetX = x + 20; // Move 20px to the right
-    const offsetY = y - 20; // Move 20px up
+    // Position the delete button at the click point
+    const offsetX = x;
+    const offsetY = y;
     
     // Create delete button
     const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1011,7 +1013,7 @@ export class GanttRenderer {
     deleteBg.setAttribute('fill', '#ef4444');
     deleteBg.setAttribute('stroke', 'white');
     deleteBg.setAttribute('stroke-width', '2');
-    deleteBg.style.pointerEvents = 'all';
+    deleteBg.style.pointerEvents = 'none'; // Let parent handle clicks
     
     // Delete button X icon
     const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1025,27 +1027,7 @@ export class GanttRenderer {
     deleteBtn.appendChild(deleteBg);
     deleteBtn.appendChild(deleteIcon);
     
-    // Add click handler for delete
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      console.log('Delete button clicked for dependency:', dependencyId);
-      
-      // Clear selected state if deleting selected dependency
-      if (this.selectedDependencyId === dependencyId) {
-        this.selectedDependencyId = null;
-      }
-      
-      // Remove visual elements immediately for responsive UI
-      depGroup.remove();
-      controls.remove();
-      
-      // Send delete event to machine which will handle the domain service call
-      this.eventHandler({
-        type: 'DEPENDENCY_DELETE',
-        dependencyId
-      });
-    });
+    // Click handler is in GanttEventDelegationManager - no need for duplicate here
     
     controls.appendChild(deleteBtn);
     
@@ -1162,13 +1144,19 @@ export class GanttRenderer {
         
         // Select this dependency
         depGroup.classList.add('selected');
-        const path = depGroup.querySelector('.vibegantt-dependency');
+        const path = depGroup.querySelector('.vibegantt-dependency') as SVGElement;
+        const hitArea = depGroup.querySelector('.vibegantt-dependency-hitarea') as SVGElement;
         console.log('GanttRenderer: Found dependency path:', path);
         
         if (path) {
           console.log('GanttRenderer: Setting path to selected style');
           path.setAttribute('stroke', '#3b82f6');
           path.setAttribute('stroke-width', '3');
+          // Disable pointer events on the dependency line when selected
+          path.style.pointerEvents = 'none';
+        }
+        if (hitArea) {
+          hitArea.style.pointerEvents = 'none';
         }
         
         // Show controls
@@ -1192,10 +1180,16 @@ export class GanttRenderer {
       // Clear all dependency selections
       this.dependencyContainer.querySelectorAll('.selected').forEach(el => {
         el.classList.remove('selected');
-        const pathEl = el.querySelector('.vibegantt-dependency');
+        const pathEl = el.querySelector('.vibegantt-dependency') as SVGElement;
+        const hitAreaEl = el.querySelector('.vibegantt-dependency-hitarea') as SVGElement;
         if (pathEl) {
           pathEl.setAttribute('stroke', '#6b7280');
           pathEl.setAttribute('stroke-width', '2');
+          // Re-enable pointer events when deselected
+          pathEl.style.pointerEvents = '';
+        }
+        if (hitAreaEl) {
+          hitAreaEl.style.pointerEvents = '';
         }
       });
       
