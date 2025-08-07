@@ -127,6 +127,13 @@ export class GanttEventDelegationManager {
       const dependencyId = deleteButton.dataset.dependencyId;
       if (dependencyId) {
         console.log('GanttEventDelegationManager: Dependency delete button clicked', { dependencyId });
+        
+        // Remove visual elements immediately for responsive UI
+        const depGroup = document.querySelector(`.vibegantt-dependency-group[data-dependency-id="${dependencyId}"]`);
+        const controls = deleteButton.closest('.dependency-controls');
+        if (depGroup) depGroup.remove();
+        if (controls) controls.remove();
+        
         this.sendEvent({
           type: 'DEPENDENCY_DELETE',
           dependencyId
@@ -149,6 +156,17 @@ export class GanttEventDelegationManager {
                         dependencyGroup?.dataset.dependencyId;
     
     if (clickedDependency && dependencyId) {
+      // Check if this dependency is already selected (has controls showing)
+      const hasControls = document.querySelector('.dependency-controls') !== null;
+      const isSelected = dependencyGroup?.classList.contains('selected');
+      
+      if (hasControls && isSelected) {
+        console.log('GanttEventDelegationManager: Dependency already selected, ignoring click');
+        event.stopPropagation();
+        event.preventDefault();
+        return; // Don't allow further interaction when controls are showing
+      }
+      
       console.log('GanttEventDelegationManager: Found dependency element', { 
         dependencyId, 
         element: clickedDependency,
