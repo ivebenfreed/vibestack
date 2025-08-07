@@ -57,12 +57,14 @@ fi
 # Run the setup tests
 echo -e "\n${YELLOW}🚀 Running setup tests...${NC}"
 
-# First, run the persistent login test to create the browser profile
-echo -e "\n${YELLOW}🔐 Setting up persistent browser profile...${NC}"
-if npx playwright test tests/playwright/core/persistent-login.spec.js; then
-    echo -e "${GREEN}   ✅ Browser profile created successfully${NC}"
+# First, run the initial auth setup test to create the browser profile
+echo -e "\n${YELLOW}🔐 Setting up persistent browser profile with authentication...${NC}"
+echo -e "${YELLOW}   Running: tests/playwright/core/initial-auth-setup.spec.js${NC}"
+if npx playwright test tests/playwright/core/initial-auth-setup.spec.js; then
+    echo -e "${GREEN}   ✅ Browser profile created successfully with authentication${NC}"
 else
     echo -e "${RED}   ❌ Failed to create browser profile${NC}"
+    echo -e "${YELLOW}   Make sure you have VIBE_DEV_EMAIL and VIBE_DEV_PASSWORD in .env.local${NC}"
     exit 1
 fi
 

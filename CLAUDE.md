@@ -133,8 +133,8 @@ Each worktree uses a **persistent browser profile** that maintains login state a
 # Run in debug mode (automatically shows browser)
 ./scripts/playwright-test.sh --debug
 
-# Manual profile creation (only if needed)
-npx playwright test tests/playwright/core/persistent-login.spec.js
+# 🔐 IMPORTANT: Initial authentication setup (run this FIRST in new worktrees!)
+npx playwright test tests/playwright/core/initial-auth-setup.spec.js
 ```
 
 #### Using Persistent Context
@@ -300,6 +300,17 @@ Where `{N}` is the issue number (e.g., `vibestack-dev-issue-24` for Issue #24)
 - Pay special attention to WebSocket message structures and sync protocols
 
 ## Worktree-Specific Rules
+
+### 🔐 First-Time Worktree Setup
+
+**IMPORTANT**: When setting up a new worktree, you MUST run the initial authentication setup:
+
+```bash
+# After creating worktree and installing dependencies
+npx playwright test tests/playwright/core/initial-auth-setup.spec.js
+```
+
+This creates a persistent browser profile with authentication. Without this, all other tests will fail!
 
 ### Playwright Test Organization
 

@@ -17,13 +17,15 @@ test('my test', async ({ page }) => {
 - Realistic testing with full browser state
 - Fast test startup (no auth setup needed)
 
-### First Time Setup:
+### 🔐 First Time Setup (REQUIRED!):
 ```bash
-# Run the login test once to set up your profile
-npx playwright test tests/playwright/core/persistent-login.spec.js
+# ⚠️ MUST RUN THIS FIRST in any new worktree!
+npx playwright test tests/playwright/core/initial-auth-setup.spec.js
 
 # All subsequent tests will use the saved profile
 ```
+
+**Important**: You need `VIBE_DEV_EMAIL` and `VIBE_DEV_PASSWORD` in your `.env.local` file!
 
 ## Isolated Tests (Fresh Context)
 
@@ -162,4 +164,8 @@ ls -la .playwright/profiles/profile-main/
 ```
 
 ### Profile Corruption
-If a profile gets corrupted, just delete it and run the login test again.
+If a profile gets corrupted, just delete it and run the initial auth setup again:
+```bash
+rm -rf .playwright/profiles/profile-{issue-number}
+npx playwright test tests/playwright/core/initial-auth-setup.spec.js
+```

@@ -5,7 +5,7 @@ This directory contains end-to-end tests using Playwright.
 ## Folder Structure
 
 - **`core/`** - Core tests that run for all issues
-  - `persistent-login.spec.js` - One-time login setup for persistent browser profile
+  - `initial-auth-setup.spec.js` - **⚠️ MUST RUN FIRST** - One-time authentication setup for persistent browser profile
   - `test-template.spec.js` - Template for creating new tests
   - `db-test-helpers.js` - Database testing utilities
   - `app-loads.spec.js` - Basic smoke test
@@ -27,9 +27,11 @@ This directory contains end-to-end tests using Playwright.
    - Only add to `core/` if the test is truly reusable across all issues
    - Examples: auth setup, basic smoke tests, test helpers
 
-## Authentication Setup
+## 🔐 Authentication Setup (IMPORTANT - READ FIRST!)
 
 This project uses **persistent browser profiles** for Playwright tests. Each worktree maintains its own browser profile that persists login state across test runs.
+
+**⚠️ CRITICAL**: You must run the initial authentication setup test before any other tests will work!
 
 ### Automatic Setup
 The browser profile is **automatically created** when you create a worktree with the `--test-setup` flag:
@@ -44,8 +46,11 @@ This runs the persistent login test and creates the profile during setup.
 If you need to recreate the profile or didn't use `--test-setup`:
 
 ```bash
-npx playwright test tests/playwright/core/persistent-login.spec.js
+# 🔐 Run this FIRST in any new worktree!
+npx playwright test tests/playwright/core/initial-auth-setup.spec.js
 ```
+
+**Note**: Make sure you have `VIBE_DEV_EMAIL` and `VIBE_DEV_PASSWORD` set in your `.env.local` file!
 
 After setup, all tests will use the saved authentication automatically.
 
