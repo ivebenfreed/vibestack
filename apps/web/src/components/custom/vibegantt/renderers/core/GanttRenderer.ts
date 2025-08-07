@@ -578,7 +578,7 @@ export class GanttRenderer {
       padding: 0 8px;
       color: white;
       font-size: 12px;
-      overflow: hidden;
+      overflow: visible;
       text-overflow: ellipsis;
       white-space: nowrap;
       transition: transform 0.1s ease;
@@ -662,8 +662,68 @@ export class GanttRenderer {
     //   this.startDependencyCreation(task.id, e);
     // });
     
+    // Add dependency creation connectors (both ends)
+    const leftConnector = document.createElement('div');
+    leftConnector.className = 'vibegantt-task-connector vibegantt-task-connector-left';
+    leftConnector.dataset.taskId = task.id;
+    leftConnector.dataset.connectorType = 'start';
+    leftConnector.style.cssText = `
+      position: absolute;
+      left: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 2px solid white;
+      cursor: crosshair;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 20;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    `;
+    
+    const rightConnector = document.createElement('div');
+    rightConnector.className = 'vibegantt-task-connector vibegantt-task-connector-right';
+    rightConnector.dataset.taskId = task.id;
+    rightConnector.dataset.connectorType = 'finish';
+    rightConnector.style.cssText = `
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 2px solid white;
+      cursor: crosshair;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 20;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    `;
+    
+    // Show connectors on task hover
+    taskEl.addEventListener('mouseenter', () => {
+      leftConnector.style.opacity = '1';
+      rightConnector.style.opacity = '1';
+    });
+    
+    taskEl.addEventListener('mouseleave', () => {
+      if (!leftConnector.classList.contains('dragging')) {
+        leftConnector.style.opacity = '0';
+      }
+      if (!rightConnector.classList.contains('dragging')) {
+        rightConnector.style.opacity = '0';
+      }
+    });
+    
     taskEl.appendChild(leftHandle);
     taskEl.appendChild(rightHandle);
+    taskEl.appendChild(leftConnector);
+    taskEl.appendChild(rightConnector);
     // taskEl.appendChild(linkHandle); // DISABLED
     
     // Hover effects should be handled by CSS or the event delegation manager
