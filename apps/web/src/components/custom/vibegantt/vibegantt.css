@@ -119,11 +119,17 @@
   border-radius: 4px;
   cursor: move;
   transition: transform 0.15s ease;
+  z-index: 10;
 }
 
 .vibegantt-task-bar.dragging {
   opacity: 0.8;
   z-index: 100;
+}
+
+/* Task elements in chart */
+.vibegantt-task {
+  z-index: 10;
 }
 
 .vibegantt-task-bar-progress {
@@ -166,51 +172,114 @@
 }
 
 /* Dependencies */
-.vibegantt-dependency {
-  stroke: var(--gantt-dependency-color, #94a3b8);
-  stroke-width: 2;
-  fill: none;
-  pointer-events: stroke;
-  cursor: pointer;
+.vibegantt-dependencies {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
 }
 
-.vibegantt-dependency:hover {
-  stroke: var(--gantt-dependency-hover, #64748b);
-  stroke-width: 3;
+.vibegantt-dependency-group {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.vibegantt-dependency {
+  background-color: var(--gantt-dependency-color, #6b7280);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.vibegantt-dependency-horizontal {
+  height: 2px;
+}
+
+.vibegantt-dependency-vertical {
+  width: 2px;
+}
+
+.vibegantt-dependency-group:hover .vibegantt-dependency {
+  background-color: var(--gantt-dependency-hover, #3b82f6);
+}
+
+.vibegantt-dependency-group:hover .vibegantt-dependency-horizontal {
+  height: 3px;
+}
+
+.vibegantt-dependency-group:hover .vibegantt-dependency-vertical {
+  width: 3px;
+}
+
+.vibegantt-dependency-group.selected .vibegantt-dependency {
+  background-color: var(--gantt-dependency-hover, #3b82f6);
+}
+
+.vibegantt-dependency-group.selected .vibegantt-dependency-horizontal {
+  height: 3px;
+}
+
+.vibegantt-dependency-group.selected .vibegantt-dependency-vertical {
+  width: 3px;
+}
+
+.vibegantt-dependency-hitarea {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .vibegantt-dependency.critical-path {
-  stroke: var(--gantt-critical-path-color, #ef4444);
-  stroke-dasharray: 5, 3;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--gantt-critical-path-color, #ef4444) 0,
+    var(--gantt-critical-path-color, #ef4444) 5px,
+    transparent 5px,
+    transparent 8px
+  );
 }
 
 /* Dependency Delete Button */
+.dependency-controls {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
 .delete-button {
   cursor: pointer;
-  opacity: 0.8;
-  transition: opacity 0.2s ease;
+  opacity: 0.9;
+  transition: all 0.15s ease;
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  border: 2px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .delete-button:hover {
   opacity: 1;
+  transform: scale(1.1);
+  background-color: #dc2626;
 }
 
-.delete-button circle {
-  fill: #ef4444;
-  stroke: #dc2626;
-  stroke-width: 1;
-}
-
-.delete-button:hover circle {
-  fill: #dc2626;
-}
-
-.delete-button text {
-  fill: white;
-  font-size: 16px;
-  font-weight: bold;
+.delete-button svg {
+  width: 16px;
+  height: 16px;
   pointer-events: none;
-  user-select: none;
 }
 
 /* Connection Handles for Dependency Reassignment */
