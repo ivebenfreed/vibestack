@@ -56,10 +56,8 @@ console.log(`   Profile Dir: ${userDataDir}`);
 export default defineConfig({
   testDir: './tests/playwright',
   testMatch: [
-    'core/**/*.spec.js',
-    'core/**/*.setup.js',
-    `issue-${issueNumber}/**/*.spec.js`,
-    `issue-${issueNumber}/**/*.setup.js`
+    '**/*.spec.js',
+    '**/*.setup.js'
   ],
   fullyParallel: false, // Run tests serially to avoid conflicts
   forbidOnly: !!process.env.CI,
