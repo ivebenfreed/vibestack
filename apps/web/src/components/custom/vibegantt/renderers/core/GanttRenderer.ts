@@ -988,6 +988,13 @@ export class GanttRenderer {
     // Create controls group
     const controls = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     controls.setAttribute('class', 'dependency-controls');
+    // Ensure controls appear above dependency lines
+    controls.style.zIndex = '1000';
+    
+    // Offset the delete button to avoid blocking the dependency line
+    // Position it above and to the right of the click point
+    const offsetX = x + 20; // Move 20px to the right
+    const offsetY = y - 20; // Move 20px up
     
     // Create delete button
     const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -996,7 +1003,7 @@ export class GanttRenderer {
     deleteBtn.setAttribute('data-dependency-id', dependencyId);
     deleteBtn.style.cursor = 'pointer';
     deleteBtn.style.pointerEvents = 'all';
-    deleteBtn.setAttribute('transform', `translate(${x}, ${y})`);
+    deleteBtn.setAttribute('transform', `translate(${offsetX}, ${offsetY})`);
     
     // Delete button background
     const deleteBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1047,6 +1054,7 @@ export class GanttRenderer {
       (handle as SVGElement).style.opacity = '1';
     });
     
+    // Append controls to container
     this.dependencyContainer.appendChild(controls);
     
     // Hide controls when clicking elsewhere
