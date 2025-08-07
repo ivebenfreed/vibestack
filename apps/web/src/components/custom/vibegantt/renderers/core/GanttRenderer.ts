@@ -828,6 +828,14 @@ export class GanttRenderer {
       // Add click handler for selection
       depGroup.addEventListener('click', (e) => {
         e.stopPropagation();
+        
+        // If this dependency is already selected, don't re-select it
+        // Let the click bubble to clear selection or hit overlay elements
+        if (depGroup.classList.contains('selected')) {
+          console.log('Dependency already selected, ignoring click');
+          return;
+        }
+        
         console.log('Dependency clicked:', dep.id);
         
         // Store selection state
@@ -1005,6 +1013,7 @@ export class GanttRenderer {
     deleteBtn.setAttribute('class', 'delete-button');
     deleteBtn.setAttribute('data-dependency-id', dependencyId);
     deleteBtn.style.cursor = 'pointer';
+    deleteBtn.style.pointerEvents = 'all';
     deleteBtn.setAttribute('transform', `translate(${x}, ${y})`);
     
     // Delete button background
@@ -1013,6 +1022,7 @@ export class GanttRenderer {
     deleteBg.setAttribute('fill', '#ef4444');
     deleteBg.setAttribute('stroke', 'white');
     deleteBg.setAttribute('stroke-width', '2');
+    deleteBg.style.pointerEvents = 'all';
     
     // Delete button X icon
     const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1021,6 +1031,7 @@ export class GanttRenderer {
     deleteIcon.setAttribute('stroke-width', '2');
     deleteIcon.setAttribute('stroke-linecap', 'round');
     deleteIcon.setAttribute('fill', 'none');
+    deleteIcon.style.pointerEvents = 'none';
     
     deleteBtn.appendChild(deleteBg);
     deleteBtn.appendChild(deleteIcon);
@@ -1028,7 +1039,8 @@ export class GanttRenderer {
     // Add click handler for delete
     deleteBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log('Delete dependency:', dependencyId);
+      e.preventDefault();
+      console.log('Delete button clicked for dependency:', dependencyId);
       
       // Clear selected state if deleting selected dependency
       if (this.selectedDependencyId === dependencyId) {
