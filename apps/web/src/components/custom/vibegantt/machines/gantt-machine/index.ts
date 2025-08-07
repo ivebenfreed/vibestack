@@ -48,7 +48,7 @@ const createInitialContext = (): GanttMachineContext => ({
   timelineLayout: {
     totalWidth: 0,
     totalHeight: 0,
-    dayWidth: TIME_SCALE_CONFIG.day.minPixelsPerUnit, // Use default from constants
+    dayWidth: 50, // Default 50px per day - single source of truth
     headerHeight: 60,
     visibleStartX: 0,
     visibleEndX: 0,
@@ -194,19 +194,19 @@ export const ganttMachine = setup({
             }
             
             const task = tasks[event.taskId];
-            if (task && task.plannedStartDate && task.plannedEndDate) {
+            if (task && task.startDate && task.dueDate) {
               console.log('GanttMachine: BEFORE move calculation', {
                 taskId: task.id,
-                originalStartDate: task.plannedStartDate,
-                originalEndDate: task.plannedEndDate,
+                originalStartDate: task.startDate,
+                originalDueDate: task.dueDate,
                 deltaX: event.deltaX,
                 dayWidth: dayWidth,
                 daysDelta
               });
               
               // Create new dates with proper snapping to day boundaries
-              const originalStart = new Date(task.plannedStartDate);
-              const originalEnd = new Date(task.plannedEndDate);
+              const originalStart = new Date(task.startDate);
+              const originalEnd = new Date(task.dueDate);
               
               // Snap to start of day for consistent calculations
               const newStartDate = new Date(originalStart);
@@ -214,24 +214,24 @@ export const ganttMachine = setup({
               // Keep the original time of day to avoid timezone issues
               newStartDate.setHours(originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds(), originalStart.getMilliseconds());
               
-              const newEndDate = new Date(originalEnd);
-              newEndDate.setDate(originalEnd.getDate() + daysDelta);
+              const newDueDate = new Date(originalEnd);
+              newDueDate.setDate(originalEnd.getDate() + daysDelta);
               // Keep the original time of day to avoid timezone issues
-              newEndDate.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
+              newDueDate.setHours(originalEnd.getHours(), originalEnd.getMinutes(), originalEnd.getSeconds(), originalEnd.getMilliseconds());
               
               // Check if dates actually changed
-              const originalStartTime = new Date(task.plannedStartDate).getTime();
-              const originalEndTime = new Date(task.plannedEndDate).getTime();
+              const originalStartTime = new Date(task.startDate).getTime();
+              const originalEndTime = new Date(task.dueDate).getTime();
               const newStartTime = newStartDate.getTime();
-              const newEndTime = newEndDate.getTime();
+              const newEndTime = newDueDate.getTime();
               
               if (originalStartTime === newStartTime && originalEndTime === newEndTime) {
                 console.log('GanttMachine: No date changes detected, skipping update', {
                   taskId: task.id,
-                  originalStartDate: task.plannedStartDate,
-                  originalEndDate: task.plannedEndDate,
+                  originalStartDate: task.startDate,
+                  originalDueDate: task.dueDate,
                   newStartDate: newStartDate.toISOString(),
-                  newEndDate: newEndDate.toISOString()
+                  newDueDate: newDueDate.toISOString()
                 });
                 return;
               }
@@ -239,7 +239,7 @@ export const ganttMachine = setup({
               console.log('GanttMachine: AFTER move calculation', {
                 taskId: task.id,
                 newStartDate: newStartDate.toISOString(),
-                newEndDate: newEndDate.toISOString(),
+                newDueDate: newDueDate.toISOString(),
                 daysDelta
               });
               
@@ -248,21 +248,21 @@ export const ganttMachine = setup({
                 console.log('GanttMachine: Calling domain service updateTask', {
                   taskId: task.id,
                   updateData: {
-                    plannedStartDate: newStartDate,
-                    plannedEndDate: newEndDate
+                    startDate: newStartDate,
+                    dueDate: newDueDate
                   }
                 });
                 
                 // Make the call async and handle the promise
                 context.domainService.updateTask(task.id, {
-                  plannedStartDate: newStartDate,
-                  plannedEndDate: newEndDate
+                  startDate: newStartDate,
+                  dueDate: newDueDate
                 }).then((updateResult) => {
                   console.log('GanttMachine: Domain service updateTask SUCCESS', {
                     taskId: task.id,
                     result: updateResult,
-                    updatedStartDate: updateResult?.plannedStartDate,
-                    updatedEndDate: updateResult?.plannedEndDate
+                    updatedStartDate: updateResult?.startDate,
+                    updatedDueDate: updateResult?.dueDate
                   });
                 }).catch((error) => {
                   console.error('GanttMachine: Domain service updateTask ERROR', {
@@ -278,8 +278,8 @@ export const ganttMachine = setup({
               console.error('GanttMachine: Invalid task data', {
                 taskId: event.taskId,
                 hasTask: !!task,
-                hasStartDate: task?.plannedStartDate,
-                hasEndDate: task?.plannedEndDate
+                hasStartDate: task?.startDate,
+                hasDueDate: task?.dueDate
               });
             }
           }
@@ -304,18 +304,18 @@ export const ganttMachine = setup({
             const daysDelta = Math.round(event.deltaX / dayWidth);
             
             const task = tasks[event.taskId];
-            if (task && task.plannedStartDate && task.plannedEndDate) {
+            if (task && task.startDate && task.dueDate) {
               // Only update through domain service - live query will update store automatically
               if (context.domainService?.updateTask) {
                 const updates: any = {};
                 if (event.handle === 'start' || event.handle === 'left') {
-                  const newStartDate = new Date(task.plannedStartDate);
+                  const newStartDate = new Date(task.startDate);
                   newStartDate.setDate(newStartDate.getDate() + daysDelta);
-                  updates.plannedStartDate = newStartDate;
+                  updates.startDate = newStartDate;
                 } else {
-                  const newEndDate = new Date(task.plannedEndDate);
-                  newEndDate.setDate(newEndDate.getDate() + daysDelta);
-                  updates.plannedEndDate = newEndDate;
+                  const newDueDate = new Date(task.dueDate);
+                  newDueDate.setDate(newDueDate.getDate() + daysDelta);
+                  updates.dueDate = newDueDate;
                 }
                 
                 console.log('GanttMachine: Applying task resize via domain service', {
@@ -551,8 +551,12 @@ export const ganttMachine = setup({
               dataStore: ({ spawn, context }) => {
                 console.log('GanttMachine: Creating atomic data store with projectId:', context.projectId);
                 
-                // Create the atomic store logic with domainService
-                const storeLogic = createAtomicGanttStoreLogic(context.projectId, context.domainService);
+                // Create the atomic store logic with domainService and initial dayWidth
+                const storeLogic = createAtomicGanttStoreLogic(
+                  context.projectId, 
+                  context.domainService,
+                  context.timelineLayout.dayWidth // Pass initial dayWidth from machine
+                );
                 
                 // Spawn the store actor
                 const store = spawn(storeLogic, { id: 'dataStore' });
@@ -870,33 +874,140 @@ export const ganttMachine = setup({
                         return newSelection;
                       },
                     }),
-                    // Update renderer with new selection
-                    ({ context }) => {
-                      if (context.renderer) {
-                        // Re-render dependencies with updated selection
-                        const storeSnapshot = context.dataStore?.getSnapshot();
-                        if (storeSnapshot?.context?.coordinateMapping) {
-                          context.renderer.send({
-                            type: 'RENDER_COORDINATES',
-                            mapping: storeSnapshot.context.coordinateMapping,
-                            tasks: storeSnapshot.context.tasks,
-                            dependencies: storeSnapshot.context.dependencies,
-                            selectedDependencyIds: context.selectedDependencyIds
-                          });
-                        }
+                    // Don't re-render - the renderer already handles the visual update
+                    ({ context, event }) => {
+                      // Only send the selection update, not a full re-render
+                      if (context.renderer && !event.skipRender) {
+                        // The renderer will maintain the visual state internally
+                        console.log('GanttMachine: Dependency selection handled by renderer');
                       }
                     },
                   ],
                 },
                 DEPENDENCY_DELETE: {
                   actions: [
-                    ({ context, event }) => {
-                      if (context.domainService?.deleteDependency) {
-                        console.log('GanttMachine: Deleting dependency', event.dependencyId);
-                        context.domainService.deleteDependency(event.dependencyId);
+                    async ({ context, event }) => {
+                      console.log('GanttMachine: Deleting dependency', event.dependencyId);
+                      
+                      try {
+                        // Import the service
+                        const { entityDependencyService } = await import('@/domain/entity-dependency-service');
+                        
+                        // Delete the dependency
+                        await entityDependencyService.deleteUI(event.dependencyId);
+                        
+                        console.log('GanttMachine: Dependency deleted successfully');
+                        
+                        // Trigger a data refresh to update the UI
+                        if (context.dataStore) {
+                          context.dataStore.send({ type: 'REFRESH' });
+                        }
+                      } catch (error) {
+                        console.error('GanttMachine: Failed to delete dependency:', error);
                       }
                     },
                   ],
+                },
+                // Handle zoom events forwarded from renderer actor
+                ZOOM_REQUEST: {
+                  actions: [
+                    // Calculate viewport anchoring and new day width
+                    ({ context, event }) => {
+                      console.log('GanttMachine: Received ZOOM_REQUEST from renderer actor', event);
+                      
+                      const currentDayWidth = context.timelineLayout.dayWidth;
+                      const currentScrollX = context.viewport.scrollX;
+                      const anchorX = event.anchorX || 0;
+                      
+                      // Calculate new day width first
+                      const ZOOM_STEP = 10; // pixels per day
+                      let newDayWidth = event.direction === 'in' 
+                        ? currentDayWidth + ZOOM_STEP 
+                        : currentDayWidth - ZOOM_STEP;
+                      
+                      // Reasonable limits for day width (5px to 500px per day)
+                      newDayWidth = Math.max(5, Math.min(500, newDayWidth));
+                      
+                      // Simplified viewport anchoring: maintain same content position
+                      // The key insight: after zoom, we want the same visual content at the anchor point
+                      // This is simply a ratio calculation: new_scroll = old_scroll * (new_width / old_width)
+                      
+                      const scrollRatio = newDayWidth / currentDayWidth;
+                      const newScrollX = currentScrollX * scrollRatio;
+                      
+                      console.log('GanttMachine: Simplified viewport anchoring', {
+                        currentScrollX,
+                        currentDayWidth,
+                        newDayWidth,
+                        scrollRatio,
+                        newScrollX
+                      });
+                      
+                      console.log(`GanttMachine: Time Scale Zoom: ${currentDayWidth}px/day -> ${newDayWidth}px/day`);
+                      console.log(`GanttMachine: Scroll adjustment: ${currentScrollX} -> ${newScrollX} (maintaining anchor)`);
+                      
+                      // Store calculated values for use in assign actions
+                      (event as any)._calculatedDayWidth = newDayWidth;
+                      (event as any)._newScrollX = Math.max(0, newScrollX);
+                    },
+                    // Update timeline layout with new day width and viewport scroll for anchoring
+                    assign({
+                      timelineLayout: ({ context, event }) => {
+                        const newDayWidth = (event as any)._calculatedDayWidth;
+                        return {
+                          ...context.timelineLayout,
+                          dayWidth: newDayWidth
+                        };
+                      },
+                      viewport: ({ context, event }) => {
+                        const newScrollX = (event as any)._newScrollX;
+                        return {
+                          ...context.viewport,
+                          scrollX: newScrollX
+                        };
+                      },
+                      viewConfig: ({ context, event }) => {
+                        const newDayWidth = (event as any)._calculatedDayWidth;
+                        // Update zoom factor for consistency (derived from day width)
+                        const zoomFactor = newDayWidth / TIME_SCALE_CONFIG.day.minPixelsPerUnit;
+                        return {
+                          ...context.viewConfig,
+                          zoomFactor: zoomFactor
+                        };
+                      }
+                    }),
+                    // Trigger coordinate recalculation in store (which will update renderer via subscription)
+                    ({ context, event }) => {
+                      console.log('GanttMachine: Triggering coordinate recalculation with new time scale');
+                      
+                      const newDayWidth = (event as any)._calculatedDayWidth;
+                      const newScrollX = (event as any)._newScrollX;
+                      
+                      // Send dayWidth update to store for coordinate recalculation
+                      if (context.dataStore) {
+                        console.log('GanttMachine: Sending dayWidth to store for timeline label recalculation', {
+                          dayWidth: newDayWidth
+                        });
+                        context.dataStore.send({
+                          type: 'setDayWidth',
+                          dayWidth: newDayWidth
+                        });
+                      }
+                      
+                      // Send scroll position update directly to renderer
+                      if (context.renderer) {
+                        console.log('GanttMachine: Updating renderer scroll position', {
+                          scrollX: newScrollX,
+                          scrollY: context.viewport.scrollY
+                        });
+                        context.renderer.send({
+                          type: 'UPDATE_SCROLL',
+                          scrollX: newScrollX,
+                          scrollY: context.viewport.scrollY
+                        });
+                      }
+                    }
+                  ]
                 },
                 DEPENDENCY_DRAG_START: {
                   actions: [
@@ -913,36 +1024,33 @@ export const ganttMachine = setup({
                 },
                 DEPENDENCY_REASSIGN: {
                   actions: [
-                    ({ context, event }) => {
+                    async ({ context, event }) => {
                       console.log('GanttMachine: Reassigning dependency', {
                         dependencyId: event.dependencyId,
                         handleType: event.handleType,
-                        newTaskId: event.newTaskId,
-                        originalPredecessorId: event.originalPredecessorId,
-                        originalSuccessorId: event.originalSuccessorId
+                        newTaskId: event.newTaskId
                       });
                       
-                      // Calculate the new dependency based on which handle was dragged
-                      const newPredecessorId = event.handleType === 'start' 
-                        ? event.newTaskId 
-                        : event.originalPredecessorId;
-                      const newSuccessorId = event.handleType === 'end' 
-                        ? event.newTaskId 
-                        : event.originalSuccessorId;
-                      
-                      // Use domain service to update the dependency
-                      if (context.domainService?.createDependency && context.domainService?.deleteDependency) {
-                        // Delete the old dependency
-                        context.domainService.deleteDependency(event.dependencyId);
+                      // Use the entityDependencyService to reassign
+                      try {
+                        // Import the service
+                        const { entityDependencyService } = await import('@/domain/entity-dependency-service');
                         
-                        // Create a new dependency with the new connection
-                        context.domainService.createDependency({
-                          predecessorId: newPredecessorId,
-                          successorId: newSuccessorId,
-                          type: 'finish-to-start', // Default type, could be made configurable
-                          lagDays: 0,
-                          metadata: {}
-                        });
+                        // Call the reassign method
+                        await entityDependencyService.reassignDependency(
+                          event.dependencyId,
+                          event.handleType,
+                          event.newTaskId
+                        );
+                        
+                        console.log('GanttMachine: Dependency reassigned successfully');
+                        
+                        // Trigger a data refresh to update the UI
+                        if (context.dataStore) {
+                          context.dataStore.send({ type: 'REFRESH' });
+                        }
+                      } catch (error) {
+                        console.error('GanttMachine: Failed to reassign dependency:', error);
                       }
                     },
                   ],
@@ -977,6 +1085,85 @@ export const ganttMachine = setup({
           ...event.config,
         }),
       }),
+    },
+    
+    // Scroll events - update viewport state directly
+    SCROLL: {
+      actions: [
+        assign({
+          viewport: ({ context, event }) => ({
+            ...context.viewport,
+            scrollX: event.scrollX,
+            scrollY: event.scrollY,
+          }),
+        }),
+        // Forward to renderer for visual updates
+        ({ context, event }) => {
+          if (context.renderer) {
+            context.renderer.send({
+              type: 'UPDATE_SCROLL',
+              scrollX: event.scrollX,
+              scrollY: event.scrollY,
+            });
+          }
+        }
+      ],
+    },
+    
+    // Zoom events - handle directly with current scroll position
+    ZOOM_REQUEST: {
+      actions: [
+        ({ context, event }) => {
+          console.log('GanttMachine: Handling ZOOM_REQUEST directly', {
+            direction: event.direction,
+            anchorX: event.anchorX,
+            currentScrollX: context.viewport.scrollX,
+            currentScrollY: context.viewport.scrollY
+          });
+          
+          const currentDayWidth = context.timelineLayout.dayWidth;
+          const currentScrollX = context.viewport.scrollX;
+          const anchorX = event.anchorX || 0;
+          
+          // Calculate new day width
+          const ZOOM_STEP = 10;
+          let newDayWidth = event.direction === 'in' 
+            ? currentDayWidth + ZOOM_STEP 
+            : currentDayWidth - ZOOM_STEP;
+          
+          newDayWidth = Math.max(5, Math.min(500, newDayWidth));
+          
+          console.log('GanttMachine: Zoom calculation', {
+            currentDayWidth,
+            newDayWidth,
+            currentScrollX,
+            anchorX
+          });
+          
+          // Calculate viewport anchoring
+          const scrollRatio = newDayWidth / currentDayWidth;
+          const newScrollX = currentScrollX * scrollRatio;
+          
+          console.log('GanttMachine: Anchoring calculation', {
+            scrollRatio,
+            newScrollX
+          });
+          
+          // Update timeline layout
+          context.timelineLayout.dayWidth = newDayWidth;
+          
+          // Update viewport scroll position
+          context.viewport.scrollX = newScrollX;
+          
+          // Note: The coordinate recalculation and renderer updates are handled
+          // in the nested ZOOM_REQUEST action within the main state machine
+          
+          console.log('GanttMachine: Zoom complete, new state:', {
+            dayWidth: context.timelineLayout.dayWidth,
+            scrollX: context.viewport.scrollX
+          });
+        }
+      ],
     },
     
     // Forward events from renderer

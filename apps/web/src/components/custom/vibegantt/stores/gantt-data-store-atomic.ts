@@ -21,7 +21,7 @@ const MEMORY_LIMITS = {
 // ATOMIC STORE WITH EVENT-BASED MUTATIONS
 // ====================================
 
-export const createGanttStoreLogic = (projectId?: string) => {
+export const createGanttStoreLogic = (projectId?: string, domainService?: any, initialDayWidth: number = 50) => {
   // Load persisted display state
   const persistedState = loadDisplayState(projectId || 'global');
   
@@ -58,6 +58,8 @@ export const createGanttStoreLogic = (projectId?: string) => {
         end: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
       },
       zoom: persistedState?.zoom || 'day' as 'hour' | 'day' | 'week' | 'month',
+      zoomFactor: persistedState?.zoomFactor || 1.0,
+      dayWidth: persistedState?.dayWidth || initialDayWidth, // Use initial dayWidth from machine
       showWeekends: persistedState?.showWeekends ?? true,
       showDependencies: persistedState?.showDependencies ?? true,
       
@@ -120,6 +122,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
             zoom: context.zoom,
+            dayWidth: context.dayWidth,
           });
         },
         loading: false,
@@ -184,6 +187,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
             zoom: context.zoom,
+            dayWidth: context.dayWidth,
           });
         },
         lastUpdatedAt: Date.now()
@@ -368,6 +372,7 @@ export const createGanttStoreLogic = (projectId?: string) => {
             expandedTasks: expanded,
             visibleDateRange: context.visibleDateRange,
             zoom: context.zoom,
+            dayWidth: context.dayWidth,
           });
         }
       },
@@ -392,26 +397,33 @@ export const createGanttStoreLogic = (projectId?: string) => {
             expandedTasks: context.expandedTasks,
             visibleDateRange: event.range,
             zoom: context.zoom,
+            dayWidth: context.dayWidth,
           });
         }
       },
       
       setZoom: {
-        zoom: (context, event: { zoom: 'hour' | 'day' | 'week' | 'month' }) => {
+        zoom: (context, event: { zoom: 'hour' | 'day' | 'week' | 'month'; factor?: number }) => {
           // Persist zoom level
           saveDisplayState(context.projectId || 'global', {
             ...context,
-            zoom: event.zoom
+            zoom: event.zoom,
+            zoomFactor: event.factor || 1.0
           });
           return event.zoom;
         },
+        zoomFactor: (context, event: { zoom: 'hour' | 'day' | 'week' | 'month'; factor?: number }) => {
+          return event.factor || 1.0;
+        },
         coordinateMapping: (context, event) => {
-          // Recalculate with new zoom level
+          // Recalculate with new zoom level and factor
           return calculateCoordinateMapping({
             taskTree: context.taskTree,
             expandedTasks: context.expandedTasks,
             visibleDateRange: context.visibleDateRange,
             zoom: event.zoom,
+            zoomFactor: event.factor || 1.0,
+            dayWidth: context.dayWidth
           });
         }
       },
@@ -433,6 +445,37 @@ export const createGanttStoreLogic = (projectId?: string) => {
             showDependencies: event.show
           });
           return event.show;
+        }
+      },
+      
+      setDayWidth: {
+        dayWidth: (context, event: { dayWidth: number }) => {
+          console.log('📐 GanttStore: setDayWidth handler - updating dayWidth', {
+            oldDayWidth: context.dayWidth,
+            newDayWidth: event.dayWidth,
+            eventType: event.type || 'setDayWidth'
+          });
+          saveDisplayState(context.projectId || 'global', {
+            ...context,
+            dayWidth: event.dayWidth
+          });
+          return event.dayWidth;
+        },
+        coordinateMapping: (context, event) => {
+          console.log('📐 GanttStore: setDayWidth handler - recalculating coordinates', {
+            eventDayWidth: event.dayWidth,
+            contextDayWidth: context.dayWidth,
+            zoom: context.zoom,
+            taskCount: context.taskTree.length
+          });
+          // Recalculate coordinates with new day width
+          return calculateCoordinateMapping({
+            taskTree: context.taskTree,
+            expandedTasks: context.expandedTasks,
+            visibleDateRange: context.visibleDateRange,
+            zoom: context.zoom,
+            dayWidth: event.dayWidth,
+          });
         }
       },
       
@@ -1129,10 +1172,10 @@ export function loadDisplayState(projectId: string): any | null {
 // FACTORY FUNCTION
 // ====================================
 
-export function createGanttStoreActor(projectId?: string) {
+export function createGanttStoreActor(projectId?: string, domainService?: any, initialDayWidth: number = 50) {
   if (process.env.NODE_ENV === 'development') {
     console.log('📊 GanttStore: Creating atomic store logic', { projectId });
   }
   
-  return createGanttStoreLogic(projectId);
+  return createGanttStoreLogic(projectId, domainService, initialDayWidth);
 }
