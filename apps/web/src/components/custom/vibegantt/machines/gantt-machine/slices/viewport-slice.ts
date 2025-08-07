@@ -24,23 +24,7 @@ export const viewportSlice = {
             'queueFullRender',
           ],
         },
-        SCROLL: {
-          actions: [
-            assign({
-              viewport: ({ context, event }: {
-                context: GanttMachineContext;
-                event: Extract<GanttEvent, { type: 'SCROLL' }>;
-              }) => ({
-                ...context.viewport,
-                scrollX: event.scrollX,
-                scrollY: event.scrollY,
-              }),
-            }),
-            'updateVisibleDateRange',
-            'updateVisibleTasks',
-            'queueViewportRender',
-          ],
-        },
+        // SCROLL is now handled by the main machine centrally
       },
     },
   },

@@ -1,5 +1,5 @@
 import type { GanttTask, TaskDependency, TimeScale } from '../types';
-import { TIME_SCALE_CONFIG } from '../constants';
+import { TIME_SCALE_CONFIG, ZOOM_UTILS } from '../constants';
 
 // Coordinate mapping for pre-calculated positions
 export interface CoordinateMapping {
@@ -36,6 +36,7 @@ interface CalculateCoordinatesParams {
   expandedTasks: Set<string>;
   visibleDateRange: { start: Date; end: Date };
   zoom: TimeScale;
+  zoomFactor?: number;
   rowHeight?: number;
   dayWidth?: number;
 }
@@ -49,6 +50,7 @@ export function calculateCoordinateMapping({
   expandedTasks,
   visibleDateRange,
   zoom,
+  zoomFactor = 1.0,
   rowHeight = 40,
   dayWidth = 50,
 }: CalculateCoordinatesParams): CoordinateMapping {
@@ -86,9 +88,15 @@ export function calculateCoordinateMapping({
   startDate.setDate(startDate.getDate() - 7);
   endDate.setDate(endDate.getDate() + 7);
   
-  // Calculate day width based on zoom
-  const zoomConfig = TIME_SCALE_CONFIG[zoom];
-  const adjustedDayWidth = dayWidth * (zoomConfig?.dayWidth || 1);
+  // Use the dayWidth directly - it's already calculated by the machine
+  // The machine handles zoom calculations and sends us the final dayWidth
+  const adjustedDayWidth = dayWidth;
+  
+  console.log('📐 Using dayWidth from machine:', {
+    receivedDayWidth: dayWidth,
+    adjustedDayWidth,
+    zoomFactor
+  });
   
   // Calculate timeline segments
   const timelineSegments = calculateTimelineSegments(
@@ -189,7 +197,9 @@ export function calculateCoordinateMapping({
 }
 
 /**
- * Calculate timeline segments based on zoom level
+ * Calculate timeline segments based on zoom level for display
+ * IMPORTANT: Keep segments as daily intervals to maintain coordinate consistency
+ * Only change the labels based on zoom level to avoid cramped display
  */
 function calculateTimelineSegments(
   startDate: Date,
@@ -201,71 +211,62 @@ function calculateTimelineSegments(
   const currentDate = new Date(startDate);
   let xPosition = 0;
   
+  // Choose label granularity based on dayWidth to avoid cramped display
+  // BUT keep segments as daily for coordinate consistency
+  let labelType: 'day' | 'week' | 'month' = 'day';
+  if (dayWidth < 15) {
+    labelType = 'month';
+  } else if (dayWidth < 35) {
+    labelType = 'week';
+  }
+  
+  console.log('📅 Timeline label mode:', { 
+    dayWidth: `${dayWidth}px`, 
+    labelType,
+    reason: dayWidth < 15 ? 'Too cramped - showing months' : 
+            dayWidth < 35 ? 'Moderate zoom - showing weeks' : 
+            'Wide zoom - showing days'
+  });
+  
   while (currentDate <= endDate) {
     const segment = {
       date: new Date(currentDate),
       xPosition,
-      width: dayWidth,
+      width: dayWidth, // Always use dayWidth for consistent coordinates
       label: '',
       isMonth: false,
       isWeek: false,
     };
     
-    // Format label based on zoom level
-    switch (zoom) {
-      case 'hour':
-        segment.label = currentDate.toLocaleTimeString('en-US', { hour: 'numeric' });
-        segment.width = dayWidth / 24;
-        break;
+    // Set label based on display granularity but keep daily segments
+    switch (labelType) {
       case 'day':
         segment.label = currentDate.getDate().toString();
         break;
       case 'week':
-        segment.label = `W${getWeekNumber(currentDate)}`;
-        segment.isWeek = true;
-        segment.width = dayWidth * 7;
+        // Only show label on Mondays or first day of timeline
+        if (currentDate.getDay() === 1 || currentDate.getTime() === startDate.getTime()) {
+          segment.label = `W${getWeekNumber(currentDate)}`;
+          segment.isWeek = true;
+        }
         break;
       case 'month':
-        segment.label = currentDate.toLocaleDateString('en-US', { month: 'short' });
-        segment.isMonth = true;
-        segment.width = dayWidth * getDaysInMonth(currentDate);
-        break;
-      case 'quarter':
-        segment.label = `Q${Math.floor(currentDate.getMonth() / 3) + 1}`;
-        segment.width = dayWidth * 90; // Approximate
-        break;
-      case 'year':
-        segment.label = currentDate.getFullYear().toString();
-        segment.width = dayWidth * 365;
+        // Only show label on first of month or first day of timeline
+        if (currentDate.getDate() === 1 || currentDate.getTime() === startDate.getTime()) {
+          segment.label = currentDate.toLocaleDateString('en-US', { month: 'short' });
+          segment.isMonth = true;
+        }
         break;
     }
     
     segments.push(segment);
-    xPosition += segment.width;
+    xPosition += dayWidth;
     
-    // Increment date based on zoom
-    switch (zoom) {
-      case 'hour':
-        currentDate.setHours(currentDate.getHours() + 1);
-        break;
-      case 'day':
-        currentDate.setDate(currentDate.getDate() + 1);
-        break;
-      case 'week':
-        currentDate.setDate(currentDate.getDate() + 7);
-        break;
-      case 'month':
-        currentDate.setMonth(currentDate.getMonth() + 1);
-        break;
-      case 'quarter':
-        currentDate.setMonth(currentDate.getMonth() + 3);
-        break;
-      case 'year':
-        currentDate.setFullYear(currentDate.getFullYear() + 1);
-        break;
-    }
+    // Always increment by one day to maintain coordinate consistency
+    currentDate.setDate(currentDate.getDate() + 1);
   }
   
+  console.log(`Generated ${segments.length} daily segments with ${labelType} labels`);
   return segments;
 }
 
