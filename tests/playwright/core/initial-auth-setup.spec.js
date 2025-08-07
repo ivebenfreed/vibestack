@@ -1,4 +1,14 @@
-// Simple login test for persistent context
+/**
+ * INITIAL AUTHENTICATION SETUP FOR PLAYWRIGHT TESTS
+ * 
+ * This test MUST be run first when setting up a new worktree to establish
+ * authentication in the persistent browser profile.
+ * 
+ * Run this test with:
+ *   ./scripts/playwright-test.sh tests/playwright/core/initial-auth-setup.spec.js
+ * 
+ * After running once, you'll stay logged in for all subsequent tests!
+ */
 import { test, expect } from '../fixtures/persistent-context.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,7 +34,7 @@ function loadEnvFile() {
   return env;
 }
 
-test('login to persistent profile', async ({ page }) => {
+test('🔐 Initial Authentication Setup - Run this FIRST in new worktrees!', async ({ page }) => {
   const env = loadEnvFile();
   
   // Skip if no credentials
