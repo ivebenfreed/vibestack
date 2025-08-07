@@ -88,7 +88,7 @@ export class GanttEventDelegationManager {
     });
     
     // Check if clicking on dependency connection handle (for reassigning)
-    const connectionHandle = target.closest('.connection-handle') as SVGElement;
+    const connectionHandle = target.closest('.connection-handle') as HTMLElement;
     if (connectionHandle) {
       const dependencyId = connectionHandle.dataset.dependencyId;
       const handleType = connectionHandle.dataset.handleType as 'start' | 'end';
@@ -132,7 +132,7 @@ export class GanttEventDelegationManager {
     }
     
     // Check if clicking on dependency delete button
-    const deleteButton = target.closest('.delete-button') as SVGElement;
+    const deleteButton = target.closest('.delete-button') as HTMLElement;
     if (deleteButton) {
       console.log('GanttEventDelegationManager: Delete button found in mousedown', {
         deleteButton,
@@ -162,9 +162,9 @@ export class GanttEventDelegationManager {
     }
     
     // Check if clicking on dependency line or hit area
-    const dependencyElement = target.closest('.vibegantt-dependency') as SVGElement;
-    const dependencyHitArea = target.closest('.vibegantt-dependency-hitarea') as SVGElement;
-    const dependencyGroup = target.closest('.vibegantt-dependency-group') as SVGElement;
+    const dependencyElement = target.closest('.vibegantt-dependency') as HTMLElement;
+    const dependencyHitArea = target.closest('.vibegantt-dependency-hitarea') as HTMLElement;
+    const dependencyGroup = target.closest('.vibegantt-dependency-group') as HTMLElement;
     
     // Get the actual dependency element from any of these
     const clickedDependency = dependencyElement || dependencyHitArea || (dependencyGroup ? dependencyGroup.querySelector('.vibegantt-dependency') : null);
@@ -262,11 +262,16 @@ export class GanttEventDelegationManager {
   private handleClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     
-    // If we're clicking on the SVG container itself, check if the actual click
-    // originated from a dependency element
-    if (target.tagName === 'svg' && target.classList.contains('vibegantt-dependencies')) {
+    // Check if this event was already handled in mousedown
+    if ((event as any)._ganttHandled) {
+      console.log('GanttEventDelegationManager: Click already handled in mousedown, ignoring');
+      return;
+    }
+    
+    // If we're clicking on the dependencies container itself, check if it's from a child
+    if (target.classList.contains('vibegantt-dependencies')) {
       // This is a bubbled event from a child element, ignore it
-      console.log('GanttEventDelegationManager: Ignoring bubbled click on dependencies SVG');
+      console.log('GanttEventDelegationManager: Ignoring bubbled click on dependencies container');
       return;
     }
     
@@ -299,12 +304,13 @@ export class GanttEventDelegationManager {
     }
     
     // Check if clicking on a dependency or dependency UI element
-    const dependencyElement = target.closest('.vibegantt-dependency') as SVGElement;
-    const dependencyHitarea = target.closest('.vibegantt-dependency-hitarea') as SVGElement;
-    const dependencyGroup = target.closest('.vibegantt-dependency-group') as SVGElement;
-    const deleteButton = target.closest('.delete-button') as SVGElement;
-    const connectionHandle = target.closest('.connection-handle') as SVGElement;
-    const dependencySvg = target.closest('.vibegantt-dependencies') as SVGElement;
+    const dependencyElement = target.closest('.vibegantt-dependency') as HTMLElement;
+    const dependencyHitarea = target.closest('.vibegantt-dependency-hitarea') as HTMLElement;
+    const dependencyGroup = target.closest('.vibegantt-dependency-group') as HTMLElement;
+    const deleteButton = target.closest('.delete-button') as HTMLElement;
+    const connectionHandle = target.closest('.connection-handle') as HTMLElement;
+    const dependencyControls = target.closest('.dependency-controls') as HTMLElement;
+    const dependencySvg = target.closest('.vibegantt-dependencies') as HTMLElement;
     
     console.log('GanttEventDelegationManager: Dependency element checks', {
       dependencyElement: !!dependencyElement,
@@ -312,16 +318,17 @@ export class GanttEventDelegationManager {
       dependencyGroup: !!dependencyGroup,
       deleteButton: !!deleteButton,
       connectionHandle: !!connectionHandle,
-      shouldReturn: !!(dependencyElement || dependencyHitarea || dependencyGroup || deleteButton || connectionHandle)
+      dependencyControls: !!dependencyControls,
+      shouldReturn: !!(dependencyElement || dependencyHitarea || dependencyGroup || deleteButton || connectionHandle || dependencyControls)
     });
     
-    if (dependencyElement || dependencyHitarea || dependencyGroup || deleteButton || connectionHandle) {
+    if (dependencyElement || dependencyHitarea || dependencyGroup || deleteButton || connectionHandle || dependencyControls) {
       console.log('GanttEventDelegationManager: Clicking on dependency element, not clearing selection');
       return; // Don't clear selection when clicking on dependency elements
     }
     
-    // Don't clear selection if clicking within the dependencies SVG container
-    // unless it's a direct click on the SVG itself (not on child elements)
+    // Don't clear selection if clicking within the dependencies container
+    // unless it's a direct click on the container itself (not on child elements)
     if (dependencySvg && target !== dependencySvg) {
       return;
     }
