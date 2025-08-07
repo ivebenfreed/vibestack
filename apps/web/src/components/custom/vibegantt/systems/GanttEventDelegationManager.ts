@@ -77,6 +77,16 @@ export class GanttEventDelegationManager {
   private handleMouseDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     
+    console.log('GanttEventDelegationManager: mousedown', {
+      target: target.tagName,
+      className: target.className,
+      closest: {
+        deleteButton: !!target.closest('.delete-button'),
+        dependency: !!target.closest('.vibegantt-dependency'),
+        controls: !!target.closest('.dependency-controls')
+      }
+    });
+    
     // Check if clicking on dependency connection handle (for reassigning)
     const connectionHandle = target.closest('.connection-handle') as SVGElement;
     if (connectionHandle) {
@@ -124,6 +134,11 @@ export class GanttEventDelegationManager {
     // Check if clicking on dependency delete button
     const deleteButton = target.closest('.delete-button') as SVGElement;
     if (deleteButton) {
+      console.log('GanttEventDelegationManager: Delete button found in mousedown', {
+        deleteButton,
+        target,
+        dataset: deleteButton.dataset
+      });
       const dependencyId = deleteButton.dataset.dependencyId;
       if (dependencyId) {
         console.log('GanttEventDelegationManager: Dependency delete button clicked', { dependencyId });
@@ -140,6 +155,8 @@ export class GanttEventDelegationManager {
         });
         event.stopPropagation();
         event.preventDefault();
+      } else {
+        console.error('GanttEventDelegationManager: Delete button has no dependencyId!');
       }
       return;
     }
