@@ -5,7 +5,7 @@ type EventHandler = (event: MouseEvent | KeyboardEvent | WheelEvent) => void;
 type GanttEventCallback = (event: GanttEvent) => void;
 
 interface DragState {
-  type: 'task-move' | 'task-resize' | 'timeline-pan' | 'dependency-create' | null;
+  type: 'task-move' | 'task-resize' | 'timeline-pan' | 'dependency-create' | 'dependency-drag' | null;
   startX: number;
   startY: number;
   currentX: number;
@@ -77,6 +77,23 @@ export class GanttEventDelegationManager {
   private handleMouseDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     
+    // Check if clicking on dependency connection handle (for reassigning)
+    const connectionHandle = target.closest('.connection-handle') as SVGElement;
+    if (connectionHandle) {
+      const dependencyId = connectionHandle.dataset.dependencyId;
+      const handleType = connectionHandle.dataset.handleType as 'start' | 'end';
+      if (dependencyId && handleType) {
+        console.log('GanttEventDelegationManager: Dependency handle mousedown', { 
+          dependencyId, 
+          handleType 
+        });
+        this.startDependencyDrag(dependencyId, handleType, event);
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
+    }
+    
     // Check if clicking on a task
     const taskElement = target.closest('.vibegantt-task') as HTMLElement;
     if (taskElement) {
@@ -104,12 +121,34 @@ export class GanttEventDelegationManager {
       return;
     }
     
-    // Check if clicking on dependency
+    // Check if clicking on dependency delete button
+    const deleteButton = target.closest('.delete-button') as SVGElement;
+    if (deleteButton) {
+      const dependencyId = deleteButton.dataset.dependencyId;
+      if (dependencyId) {
+        console.log('GanttEventDelegationManager: Dependency delete button clicked', { dependencyId });
+        this.sendEvent({
+          type: 'DEPENDENCY_DELETE',
+          dependencyId
+        });
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      return;
+    }
+    
+    // Check if clicking on dependency line
     const dependencyElement = target.closest('.vibegantt-dependency') as SVGElement;
     if (dependencyElement) {
       const dependencyId = dependencyElement.dataset.dependencyId;
       if (dependencyId) {
-        // Could implement dependency selection or deletion
+        console.log('GanttEventDelegationManager: Dependency clicked', { dependencyId });
+        this.sendEvent({
+          type: 'DEPENDENCY_SELECT',
+          dependencyId,
+          multi: event.ctrlKey || event.metaKey
+        });
+        event.stopPropagation();
       }
       return;
     }
@@ -131,6 +170,9 @@ export class GanttEventDelegationManager {
         case 'timeline-pan':
           this.updateTimelinePan(event);
           break;
+        case 'dependency-drag':
+          this.updateDependencyDrag(event);
+          break;
       }
     }
   }
@@ -146,6 +188,9 @@ export class GanttEventDelegationManager {
           break;
         case 'timeline-pan':
           this.endTimelinePan(event);
+          break;
+        case 'dependency-drag':
+          this.endDependencyDrag(event);
           break;
       }
       
@@ -200,26 +245,33 @@ export class GanttEventDelegationManager {
   }
   
   private handleWheel(event: WheelEvent): void {
+    console.log('🖱️ Wheel event detected:', {
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      deltaY: event.deltaY
+    });
+    
     // Only handle zoom functionality with Ctrl/Cmd + scroll
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       
       // Send zoom request to the machine
       const direction = event.deltaY > 0 ? 'out' : 'in';
-      console.log('Zoom requested:', direction);
+      console.log('🔍 Zoom requested:', direction);
       
-      // Get mouse position relative to the container for zoom anchoring
+      // Get mouse position relative to the timeline for anchoring
       const rect = this.container.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
+      const mouseX = event.clientX - rect.left;
       
+      console.log('📤 Sending ZOOM_REQUEST event to machine...');
       this.sendEvent({
         type: 'ZOOM_REQUEST',
         direction,
-        anchorX: x,
-        anchorY: y,
-        deltaY: event.deltaY
+        anchorX: mouseX
       });
+      console.log('✅ ZOOM_REQUEST event sent');
+    } else {
+      console.log('⏭️ Wheel without Ctrl/Cmd - letting native scroll handle');
     }
     // Let native scroll handle panning
   }
@@ -261,6 +313,12 @@ export class GanttEventDelegationManager {
   
   // Task drag handlers
   private startTaskDrag(taskId: string, event: MouseEvent): void {
+    console.log('GanttEventDelegationManager: startTaskDrag', {
+      taskId,
+      startX: event.clientX,
+      startY: event.clientY
+    });
+    
     this.dragState = {
       type: 'task-move',
       startX: event.clientX,
@@ -285,6 +343,12 @@ export class GanttEventDelegationManager {
     
     const deltaX = event.clientX - this.dragState.startX;
     
+    console.log('GanttEventDelegationManager: updateTaskDrag', {
+      currentX: event.clientX,
+      startX: this.dragState.startX,
+      deltaX: deltaX
+    });
+    
     this.sendEvent({
       type: 'TASK_DRAG_MOVE',
       taskId: this.dragState.data.taskId,
@@ -298,6 +362,13 @@ export class GanttEventDelegationManager {
     if (this.dragState.type !== 'task-move' || !this.dragState.data?.taskId) return;
     
     const deltaX = event.clientX - this.dragState.startX;
+    
+    console.log('GanttEventDelegationManager: endTaskDrag', {
+      endX: event.clientX,
+      startX: this.dragState.startX,
+      deltaX: deltaX,
+      taskId: this.dragState.data.taskId
+    });
     
     // Calculate new dates based on delta
     // This will be handled by the machine with proper date calculations
@@ -406,6 +477,67 @@ export class GanttEventDelegationManager {
       this.handleMouseUp(event);
     }
   };
+  
+  // Dependency drag handlers
+  private startDependencyDrag(dependencyId: string, handleType: 'start' | 'end', event: MouseEvent): void {
+    console.log('GanttEventDelegationManager: startDependencyDrag', {
+      dependencyId,
+      handleType,
+      startX: event.clientX,
+      startY: event.clientY
+    });
+    
+    this.dragState = {
+      type: 'dependency-drag',
+      startX: event.clientX,
+      startY: event.clientY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      data: { dependencyId, handleType }
+    };
+    
+    this.sendEvent({
+      type: 'DEPENDENCY_DRAG_START',
+      dependencyId,
+      handleType,
+      x: event.clientX,
+      y: event.clientY
+    });
+  }
+  
+  private updateDependencyDrag(event: MouseEvent): void {
+    if (this.dragState.type !== 'dependency-drag' || !this.dragState.data) return;
+    
+    // Visual feedback could be handled here
+    // For now, just track the position
+    this.dragState.currentX = event.clientX;
+    this.dragState.currentY = event.clientY;
+  }
+  
+  private endDependencyDrag(event: MouseEvent): void {
+    if (this.dragState.type !== 'dependency-drag' || !this.dragState.data) return;
+    
+    // Check if we're over a task
+    const taskElement = document.elementFromPoint(event.clientX, event.clientY)?.closest('.vibegantt-task') as HTMLElement;
+    if (taskElement) {
+      const newTaskId = taskElement.dataset.taskId;
+      if (newTaskId) {
+        console.log('GanttEventDelegationManager: endDependencyDrag - reassigning to task', {
+          dependencyId: this.dragState.data.dependencyId,
+          handleType: this.dragState.data.handleType,
+          newTaskId
+        });
+        
+        // Send reassign event with all necessary data
+        this.sendEvent({
+          type: 'DEPENDENCY_REASSIGN',
+          dependencyId: this.dragState.data.dependencyId,
+          handleType: this.dragState.data.handleType === 'start' ? 'predecessor' : 'successor',
+          newTaskId
+        });
+      }
+    }
+  }
   
   /**
    * Clean up all event listeners

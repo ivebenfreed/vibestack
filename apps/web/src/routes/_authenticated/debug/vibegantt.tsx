@@ -5,7 +5,8 @@ import type { GanttTask, TaskDependency, GanttViewConfig } from '@/components/cu
 import { addDays, addWeeks, startOfDay } from 'date-fns';
 import { taskService } from '@/domain/task-service';
 import { entityDependencyService } from '@/domain/entity-dependency-service';
-import type { EntityDependency } from '@repo/dataforge/client-entities';
+import type { Task } from '@repo/dataforge/client-entities';
+import type { UpdateTaskInput, CreateTaskInput } from '@repo/dataforge/task-operations';
 import { usePlaywrightReady } from '@/hooks/use-playwright-ready';
 
 export const Route = createFileRoute('/_authenticated/debug/vibegantt')({
@@ -28,31 +29,25 @@ function VibeGanttDebug() {
     updateTask: async (taskId: string, updates: Partial<GanttTask>) => {
       console.log('Updating task via domain service:', taskId, updates);
       try {
-        // Convert dates to ISO strings if they exist
-        const taskUpdates: any = {};
-        if (updates.plannedStartDate) {
-          taskUpdates.plannedStartDate = updates.plannedStartDate instanceof Date 
-            ? updates.plannedStartDate.toISOString() 
-            : updates.plannedStartDate;
+        // Build type-safe UpdateTaskInput, filtering out visualization metadata
+        const taskUpdates: UpdateTaskInput = {};
+        
+        // Only include fields that exist in UpdateTaskInput
+        if (updates.title !== undefined) taskUpdates.title = updates.title;
+        if (updates.description !== undefined) taskUpdates.description = updates.description;
+        if (updates.priority !== undefined) taskUpdates.priority = updates.priority;
+        if (updates.startDate !== undefined) {
+          taskUpdates.startDate = updates.startDate instanceof Date 
+            ? updates.startDate 
+            : updates.startDate ? new Date(updates.startDate) : undefined;
         }
-        if (updates.plannedEndDate) {
-          taskUpdates.plannedEndDate = updates.plannedEndDate instanceof Date 
-            ? updates.plannedEndDate.toISOString() 
-            : updates.plannedEndDate;
+        if (updates.dueDate !== undefined) {
+          taskUpdates.dueDate = updates.dueDate instanceof Date 
+            ? updates.dueDate 
+            : updates.dueDate ? new Date(updates.dueDate) : undefined;
         }
-        if (updates.actualStartDate) {
-          taskUpdates.actualStartDate = updates.actualStartDate instanceof Date 
-            ? updates.actualStartDate.toISOString() 
-            : updates.actualStartDate;
-        }
-        if (updates.actualEndDate) {
-          taskUpdates.actualEndDate = updates.actualEndDate instanceof Date 
-            ? updates.actualEndDate.toISOString() 
-            : updates.actualEndDate;
-        }
-        if (updates.progress !== undefined) {
-          taskUpdates.progress = updates.progress;
-        }
+        if (updates.completedAt !== undefined) taskUpdates.completedAt = updates.completedAt;
+        if (updates.assigneeId !== undefined) taskUpdates.assigneeId = updates.assigneeId;
         
         const updatedTask = await taskService.updateUI(taskId, taskUpdates);
         console.log('Task updated successfully:', updatedTask);
@@ -66,17 +61,17 @@ function VibeGanttDebug() {
     createTask: async (task: Partial<GanttTask>) => {
       console.log('Creating task via domain service:', task);
       try {
-        const createInput: any = {
+        const createInput: CreateTaskInput = {
           title: task.title || 'New Task',
-          description: task.description || '',
+          priority: task.priority || 'medium', // Required field
+          description: task.description,
           projectId: task.projectId || selectedProjectId,
-          plannedStartDate: task.plannedStartDate instanceof Date 
-            ? task.plannedStartDate.toISOString() 
-            : task.plannedStartDate,
-          plannedEndDate: task.plannedEndDate instanceof Date 
-            ? task.plannedEndDate.toISOString() 
-            : task.plannedEndDate,
-          progress: task.progress || 0,
+          startDate: task.startDate instanceof Date 
+            ? task.startDate
+            : task.startDate ? new Date(task.startDate) : undefined,
+          dueDate: task.dueDate instanceof Date 
+            ? task.dueDate
+            : task.dueDate ? new Date(task.dueDate) : undefined,
         };
         
         const newTask = await taskService.createUI(createInput);
@@ -304,7 +299,6 @@ function VibeGanttDebug() {
           <li>Click tasks to select them (Ctrl/Cmd+Click for multi-select)</li>
           <li>Use Shift+Drag or Middle Mouse to pan the timeline</li>
           <li>Use Ctrl/Cmd+Scroll to zoom in/out</li>
-          <li>Dependencies will automatically update when tasks move</li>
         </ul>
       </div>
     </div>

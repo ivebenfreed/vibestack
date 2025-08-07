@@ -91,6 +91,20 @@ export class TaskBarRenderer {
     const element = document.createElement('div');
     element.className = 'vibegantt-task';
     element.dataset.taskId = task.id;
+    element.dataset.testid = `task-bar-${task.id}`;
+    
+    // Add date attributes for testing
+    if (task.startDate) {
+      element.dataset.startDate = task.startDate.toISOString();
+    }
+    if (task.endDate) {
+      element.dataset.endDate = task.endDate.toISOString();
+    }
+    
+    // Add dependency info for testing
+    if (task.dependencies && task.dependencies.length > 0) {
+      element.dataset.hasDependencies = 'true';
+    }
     
     // Apply base styles
     const backgroundColor = this.getTaskColor(task, options);
@@ -182,6 +196,19 @@ export class TaskBarRenderer {
     // Update background color
     const backgroundColor = this.getTaskColor(task, options);
     element.style.backgroundColor = backgroundColor;
+    
+    // Update test attributes
+    if (task.startDate) {
+      element.dataset.startDate = task.startDate.toISOString();
+    }
+    if (task.endDate) {
+      element.dataset.endDate = task.endDate.toISOString();
+    }
+    if (task.dependencies && task.dependencies.length > 0) {
+      element.dataset.hasDependencies = 'true';
+    } else {
+      delete element.dataset.hasDependencies;
+    }
     
     // Update label
     const label = element.querySelector('.vibegantt-task-label') as HTMLElement;
