@@ -7,49 +7,11 @@ export const timelineSlice = {
   states: {
     idle: {
       on: {
-        // Handle zoom requests from event delegation
-        ZOOM_REQUEST: {
-          actions: [
-            // Forward zoom event to store with calculated level/factor
-            ({ context, event }) => {
-              if (context.dataStore) {
-                // Get current zoom from store
-                const storeSnapshot = context.dataStore.getSnapshot();
-                const currentZoom = storeSnapshot.context.zoom || 'day';
-                
-                // Calculate next zoom level
-                const nextZoom = ZOOM_UTILS.getNextZoomLevel(currentZoom, event.direction);
-                
-                console.log(`Zoom: ${currentZoom} -> ${nextZoom} (direction: ${event.direction})`);
-                
-                // Send setZoom to store if zoom level changed
-                if (nextZoom !== currentZoom) {
-                  context.dataStore.send({
-                    type: 'setZoom',
-                    zoom: nextZoom
-                  });
-                }
-              }
-            }
-          ],
-        },
+        // ZOOM_REQUEST is now handled by the main machine to avoid duplicate processing
         PAN: {
           target: 'panning',
         },
-        SCROLL: {
-          actions: [
-            // Forward scroll event to store
-            ({ context, event }) => {
-              if (context.dataStore) {
-                context.dataStore.send({
-                  type: 'UPDATE_SCROLL',
-                  x: event.scrollX,
-                  y: event.scrollY
-                });
-              }
-            }
-          ],
-        },
+        // SCROLL is now handled by the main machine centrally
       },
     },
     panning: {

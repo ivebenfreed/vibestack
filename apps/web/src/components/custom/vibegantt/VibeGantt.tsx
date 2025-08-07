@@ -108,6 +108,7 @@ export function VibeGantt({
     <div
       ref={containerRefCallback}
       className={`vibegantt ${className}`}
+      data-testid="vibegantt-container"
       style={{
         height: `${height}px`,
         position: 'relative',
