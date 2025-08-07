@@ -60,6 +60,10 @@ export function VibeGantt({
       // The renderer has direct access to the task elements it creates
       
       rendererInitializedRef.current = true;
+      
+      // Set ready state for tests
+      (window as any).__vibegantt_ready = true;
+      node.setAttribute('data-vibegantt-ready', 'true');
     }
     containerRef.current = node;
   }, [send, handleGanttEvent, height]);
@@ -109,10 +113,12 @@ export function VibeGantt({
       ref={containerRefCallback}
       className={`vibegantt ${className}`}
       data-testid="vibegantt-container"
+      tabIndex={0}
       style={{
         height: `${height}px`,
         position: 'relative',
         overflow: 'hidden',
+        outline: 'none',
       }}
     >
       {/* The renderer actor will handle all DOM rendering */}

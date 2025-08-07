@@ -459,11 +459,16 @@ export const ganttMachine = setup({
     },
     
     // Handle keyboard shortcuts
-    handleKeyboardShortcut: ({ context, event }) => {
+    handleKeyboardShortcut: async ({ context, event }) => {
       if (event.type !== 'KEYBOARD_SHORTCUT') return;
       
       // Handle Delete key
       if (event.key === 'Delete') {
+        console.log('GanttMachine: Delete key pressed', {
+          selectedTasks: context.selection.selectedTaskIds.size,
+          selectedDependencies: context.selectedDependencyIds.size
+        });
+        
         // Delete selected tasks
         if (context.selection.selectedTaskIds.size > 0) {
           context.selection.selectedTaskIds.forEach(taskId => {
@@ -475,11 +480,33 @@ export const ganttMachine = setup({
         
         // Delete selected dependencies
         if (context.selectedDependencyIds && context.selectedDependencyIds.size > 0) {
-          context.selectedDependencyIds.forEach(depId => {
-            if (context.domainService?.deleteDependency) {
-              context.domainService.deleteDependency(depId);
-            }
+          console.log('GanttMachine: Deleting selected dependencies', {
+            count: context.selectedDependencyIds.size,
+            ids: Array.from(context.selectedDependencyIds)
           });
+          
+          try {
+            // Import the service
+            const { entityDependencyService } = await import('@/domain/entity-dependency-service');
+            
+            // Delete each selected dependency
+            for (const depId of context.selectedDependencyIds) {
+              console.log('GanttMachine: Calling entityDependencyService.deleteUI', { depId });
+              await entityDependencyService.deleteUI(depId);
+            }
+            
+            console.log('GanttMachine: All selected dependencies deleted successfully');
+            
+            // Clear selection after deletion
+            context.selectedDependencyIds.clear();
+            
+            // Trigger a data refresh to update the UI
+            if (context.dataStore) {
+              context.dataStore.send({ type: 'REFRESH' });
+            }
+          } catch (error) {
+            console.error('GanttMachine: Failed to delete dependencies:', error);
+          }
         }
       }
     },
@@ -856,6 +883,13 @@ export const ganttMachine = setup({
                         console.log('GanttMachine: Handling DEPENDENCY_SELECT event', { dependencyId: event.dependencyId, multi: event.multi });
                         const newSelection = new Set(context.selectedDependencyIds);
                         
+                        // Handle null dependencyId to clear selection
+                        if (event.dependencyId === null) {
+                          newSelection.clear();
+                          console.log('GanttMachine: Cleared dependency selection');
+                          return newSelection;
+                        }
+                        
                         if (event.multi) {
                           // Toggle selection in multi-select mode
                           if (newSelection.has(event.dependencyId)) {
@@ -874,12 +908,14 @@ export const ganttMachine = setup({
                         return newSelection;
                       },
                     }),
-                    // Don't re-render - the renderer already handles the visual update
+                    // Send selection update to renderer
                     ({ context, event }) => {
-                      // Only send the selection update, not a full re-render
                       if (context.renderer && !event.skipRender) {
-                        // The renderer will maintain the visual state internally
-                        console.log('GanttMachine: Dependency selection handled by renderer');
+                        console.log('GanttMachine: Sending dependency selection to renderer');
+                        context.renderer.send({
+                          type: 'UPDATE_DEPENDENCY_SELECTION',
+                          dependencyId: event.dependencyId
+                        });
                       }
                     },
                   ],
@@ -894,13 +930,31 @@ export const ganttMachine = setup({
                         const { entityDependencyService } = await import('@/domain/entity-dependency-service');
                         
                         // Delete the dependency
-                        await entityDependencyService.deleteUI(event.dependencyId);
+                        const deleted = await entityDependencyService.deleteUI(event.dependencyId);
                         
-                        console.log('GanttMachine: Dependency deleted successfully');
+                        console.log('GanttMachine: Dependency deletion result:', deleted);
                         
-                        // Trigger a data refresh to update the UI
-                        if (context.dataStore) {
-                          context.dataStore.send({ type: 'REFRESH' });
+                        if (deleted) {
+                          console.log('GanttMachine: Dependency deleted successfully');
+                          
+                          // Clear selection after successful deletion
+                          assign({
+                            selectedDependencyIds: (context) => {
+                              const newSet = new Set(context.selectedDependencyIds);
+                              newSet.delete(event.dependencyId);
+                              return newSet;
+                            }
+                          });
+                          
+                          // Update the renderer to clear the selection
+                          if (context.renderer) {
+                            context.renderer.send({
+                              type: 'UPDATE_DEPENDENCY_SELECTION',
+                              dependencyId: null
+                            });
+                          }
+                        } else {
+                          console.error('GanttMachine: Dependency deletion returned false');
                         }
                       } catch (error) {
                         console.error('GanttMachine: Failed to delete dependency:', error);
