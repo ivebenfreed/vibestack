@@ -661,18 +661,7 @@ export class GanttRenderer {
     taskEl.appendChild(rightHandle);
     // taskEl.appendChild(linkHandle); // DISABLED
     
-    // Show handles on hover
-    taskEl.addEventListener('mouseenter', () => {
-      leftHandle.style.opacity = '1';
-      rightHandle.style.opacity = '1';
-      // linkHandle.style.opacity = '1'; // DISABLED
-    });
-    
-    taskEl.addEventListener('mouseleave', () => {
-      leftHandle.style.opacity = '0';
-      rightHandle.style.opacity = '0';
-      // linkHandle.style.opacity = '0'; // DISABLED
-    });
+    // Hover effects should be handled by CSS or the event delegation manager
     
     this.taskContainer.appendChild(taskEl);
   }
@@ -693,24 +682,7 @@ export class GanttRenderer {
       ${this.selectedTaskIds.has(task.id) ? 'background: #eff6ff;' : ''}
     `;
     
-    // Add hover effect
-    taskItem.addEventListener('mouseenter', () => {
-      if (!this.selectedTaskIds.has(task.id)) {
-        taskItem.style.backgroundColor = '#f9fafb';
-      }
-    });
-    
-    taskItem.addEventListener('mouseleave', () => {
-      if (!this.selectedTaskIds.has(task.id)) {
-        taskItem.style.backgroundColor = 'transparent';
-      }
-    });
-    
-    // Add click handler to select task
-    taskItem.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.eventHandler({
-        type: 'SELECT_TASK',
+    // Hover and click events handled by event delegation manager
         taskId: task.id
       });
     });
@@ -838,14 +810,7 @@ export class GanttRenderer {
         }
       };
       
-      // Add hover to both elements
-      depGroup.addEventListener('mouseenter', handleMouseEnter);
-      depGroup.addEventListener('mouseleave', handleMouseLeave);
-      hitArea.addEventListener('mouseenter', handleMouseEnter);
-      hitArea.addEventListener('mouseleave', handleMouseLeave);
-      
-      // Click handling is done through event delegation system
-      // Just store the dependency ID for selection state management
+      // All event handling is done through event delegation system
       
       // Add connection handles for reassignment (initially hidden)
       const startHandle = this.createConnectionHandle(sourceX, sourceY, 'start', dep.id);
