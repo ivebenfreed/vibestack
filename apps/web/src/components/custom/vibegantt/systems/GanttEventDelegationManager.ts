@@ -768,10 +768,11 @@ export class GanttEventDelegationManager {
           dependencyType
         });
         
-        // TODO: Update event to include dependency type
+        // Pass dependency type in the event
         this.sendEvent({
           type: 'DEPENDENCY_CREATE_END',
-          targetTaskId
+          targetTaskId,
+          dependencyType
         });
       }
     }
