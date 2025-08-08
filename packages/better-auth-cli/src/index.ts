@@ -22,7 +22,7 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
 }
 
 // Create the auth instance with the same configuration as the server
-const auth = betterAuth({
+betterAuth({
   database: new Pool({
     connectionString: requiredEnvVars.DATABASE_URL as string,
   }),
