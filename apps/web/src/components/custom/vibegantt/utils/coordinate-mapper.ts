@@ -51,7 +51,7 @@ export function calculateCoordinateMapping({
   visibleDateRange,
   zoom,
   zoomFactor = 1.0,
-  rowHeight = 40,
+  rowHeight = 48,
   dayWidth = 50,
 }: CalculateCoordinatesParams): CoordinateMapping {
   // Ensure dates are valid Date objects (handle both Date objects and ISO strings)
@@ -162,7 +162,7 @@ export function calculateCoordinateMapping({
         yPosition,
         xPosition,
         width: Math.max(width, 20), // Minimum width
-        height: rowHeight - 4, // Small gap between rows
+        height: rowHeight - 20, // Increased gap between rows for dependency visibility
       });
       
       rowIndex.current++;

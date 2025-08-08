@@ -164,7 +164,7 @@ export const DEFAULT_VIEW_CONFIG = {
   showProgress: true,
   showToday: true,
   showBaseline: false,
-  rowHeight: 36,
+  rowHeight: 48,
   timeHeaderHeight: 60,
   resourcePanelWidth: 200,
   taskLabelWidth: 300,

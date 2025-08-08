@@ -567,7 +567,7 @@ export class GanttRenderer {
     taskEl.style.cssText = `
       position: absolute;
       left: ${coordinates.xPosition}px;
-      top: ${coordinates.yPosition}px;
+      top: ${coordinates.yPosition + 10}px;
       width: ${coordinates.width}px;
       height: ${coordinates.height}px;
       background: ${task.color || '#3b82f6'};
@@ -736,7 +736,7 @@ export class GanttRenderer {
     taskItem.className = 'vibegantt-task-list-item';
     taskItem.dataset.taskId = task.id;
     taskItem.style.cssText = `
-      height: ${coordinates.height}px;
+      height: 48px;
       display: flex;
       align-items: center;
       padding: 0 16px;
@@ -821,9 +821,9 @@ export class GanttRenderer {
       
       // Default to finish-to-start positioning
       sourceX = sourceCoord.xPosition + sourceCoord.width;
-      sourceY = sourceCoord.yPosition + sourceCoord.height / 2;
+      sourceY = sourceCoord.yPosition + 10 + sourceCoord.height / 2;
       targetX = targetCoord.xPosition;
-      targetY = targetCoord.yPosition + targetCoord.height / 2;
+      targetY = targetCoord.yPosition + 10 + targetCoord.height / 2;
       
       // Adjust based on dependency type if available
       if (dep.type === 'start-to-start') {
@@ -854,58 +854,200 @@ export class GanttRenderer {
       `;
       
       // Calculate the bounding box for the dependency line
-      const minX = Math.min(sourceX, targetX);
-      const maxX = Math.max(sourceX, targetX);
-      const minY = Math.min(sourceY, targetY);
-      const maxY = Math.max(sourceY, targetY);
-      const width = maxX - minX || 2;
-      const height = maxY - minY || 2;
+      const isBackward = targetX < sourceX;
+      const offset = 20;
       
-      // Create horizontal line from source
+      console.log('GanttRenderer: Dependency routing', {
+        dep: dep.id,
+        type: dep.type,
+        sourceX,
+        targetX,
+        isBackward,
+        sourceName: dep.predecessorId,
+        targetName: dep.successorId
+      });
+      
+      let minX: number, maxX: number, minY: number, maxY: number, width: number, height: number;
+      
+      if (isBackward) {
+        // For backward dependencies, bounding box includes the wrap-around
+        minX = targetX - offset;
+        maxX = sourceX + offset;
+        minY = Math.min(sourceY, targetY);
+        maxY = Math.max(sourceY, targetY);
+        width = maxX - minX || 2;
+        height = maxY - minY || 2;
+      } else {
+        // For forward dependencies, simple bounding box
+        minX = Math.min(sourceX, targetX);
+        maxX = Math.max(sourceX, targetX);
+        minY = Math.min(sourceY, targetY);
+        maxY = Math.max(sourceY, targetY);
+        width = maxX - minX || 2;
+        height = maxY - minY || 2;
+      }
+      
+      // Use the already calculated values
+      const lines: HTMLElement[] = [];
+      
+      // Reliable routing: 3 segments for forward, 4 segments for backward
+      const gap = 20; // Gap for routing around
+      
+      if (targetX >= sourceX) {
+        // FORWARD DEPENDENCY: 3 segments (source → middle → target)
+        const midX = sourceX + (targetX - sourceX) / 2;
+        
+        // Line 1: Horizontal from source to midpoint
+        const line1 = document.createElement('div');
+        line1.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+        line1.dataset.dependencyId = dep.id;
+        line1.style.cssText = `
+          position: absolute;
+          left: ${sourceX}px;
+          top: ${sourceY - 1}px;
+          width: ${midX - sourceX}px;
+          height: 2px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        // Line 2: Vertical connector
+        const line2 = document.createElement('div');
+        line2.className = 'vibegantt-dependency vibegantt-dependency-vertical';
+        line2.dataset.dependencyId = dep.id;
+        const verticalTop = Math.min(sourceY, targetY);
+        const verticalHeight = Math.abs(targetY - sourceY) || 2;
+        line2.style.cssText = `
+          position: absolute;
+          left: ${midX - 1}px;
+          top: ${verticalTop - 1}px;
+          width: 2px;
+          height: ${verticalHeight + 2}px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        // Line 3: Horizontal to target
+        const line3 = document.createElement('div');
+        line3.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+        line3.dataset.dependencyId = dep.id;
+        line3.style.cssText = `
+          position: absolute;
+          left: ${midX}px;
+          top: ${targetY - 1}px;
+          width: ${targetX - midX}px;
+          height: 2px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        lines.push(line1, line2, line3);
+        depGroup.appendChild(line1);
+        depGroup.appendChild(line2);
+        depGroup.appendChild(line3);
+        
+      } else {
+        // BACKWARD DEPENDENCY: 5 segments forming continuous flow
+        // Pattern: source → right → down/up → across → down/up → target
+        
+        const sourceRightX = sourceX + gap;  // First turn point
+        const targetLeftX = targetX - gap;   // Second turn point
+        
+        // Use the midpoint between the two task levels for the bridge
+        const bridgeY = (sourceY + targetY) / 2;
+        
+        // Line 1: Horizontal right from source bar
+        const line1 = document.createElement('div');
+        line1.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+        line1.dataset.dependencyId = dep.id;
+        line1.style.cssText = `
+          position: absolute;
+          left: ${sourceX}px;
+          top: ${sourceY - 1}px;
+          width: ${gap}px;
+          height: 2px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        // Line 2: Vertical from source level to bridge level
+        const line2 = document.createElement('div');
+        line2.className = 'vibegantt-dependency vibegantt-dependency-vertical';
+        line2.dataset.dependencyId = dep.id;
+        const vertical2Top = Math.min(sourceY, bridgeY);
+        const vertical2Height = Math.abs(bridgeY - sourceY);
+        line2.style.cssText = `
+          position: absolute;
+          left: ${sourceRightX - 1}px;
+          top: ${vertical2Top - 1}px;
+          width: 2px;
+          height: ${vertical2Height + 2}px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        // Line 3: Horizontal bridge across the gap at bridge level
+        const line3 = document.createElement('div');
+        line3.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+        line3.dataset.dependencyId = dep.id;
+        line3.style.cssText = `
+          position: absolute;
+          left: ${targetLeftX}px;
+          top: ${bridgeY - 1}px;
+          width: ${sourceRightX - targetLeftX}px;
+          height: 2px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        // Line 4: Vertical from bridge level to target level
+        const line4 = document.createElement('div');
+        line4.className = 'vibegantt-dependency vibegantt-dependency-vertical';
+        line4.dataset.dependencyId = dep.id;
+        const vertical4Top = Math.min(bridgeY, targetY);
+        const vertical4Height = Math.abs(targetY - bridgeY);
+        line4.style.cssText = `
+          position: absolute;
+          left: ${targetLeftX - 1}px;
+          top: ${vertical4Top - 1}px;
+          width: 2px;
+          height: ${vertical4Height + 2}px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        // Line 5: Horizontal left to target bar
+        const line5 = document.createElement('div');
+        line5.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+        line5.dataset.dependencyId = dep.id;
+        line5.style.cssText = `
+          position: absolute;
+          left: ${targetLeftX}px;
+          top: ${targetY - 1}px;
+          width: ${gap}px;
+          height: 2px;
+          background-color: #6b7280;
+          pointer-events: auto;
+          cursor: pointer;
+        `;
+        
+        lines.push(line1, line2, line3, line4, line5);
+        depGroup.appendChild(line1);
+        depGroup.appendChild(line2);
+        depGroup.appendChild(line3);
+        depGroup.appendChild(line4);
+        depGroup.appendChild(line5);
+      }
+      
+      // Calculate midpoint for controls positioning
       const midX = sourceX + (targetX - sourceX) / 2;
-      const line1 = document.createElement('div');
-      line1.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
-      line1.dataset.dependencyId = dep.id;
-      line1.style.cssText = `
-        position: absolute;
-        left: ${Math.min(sourceX, midX)}px;
-        top: ${sourceY - 1}px;
-        width: ${Math.abs(midX - sourceX)}px;
-        height: 2px;
-        background-color: #6b7280;
-        pointer-events: auto;
-        cursor: pointer;
-      `;
-      
-      // Create vertical line
-      const line2 = document.createElement('div');
-      line2.className = 'vibegantt-dependency vibegantt-dependency-vertical';
-      line2.dataset.dependencyId = dep.id;
-      line2.style.cssText = `
-        position: absolute;
-        left: ${midX - 1}px;
-        top: ${Math.min(sourceY, targetY) - 1}px;
-        width: 2px;
-        height: ${Math.abs(targetY - sourceY) + 2}px;
-        background-color: #6b7280;
-        pointer-events: auto;
-        cursor: pointer;
-      `;
-      
-      // Create horizontal line to target
-      const line3 = document.createElement('div');
-      line3.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
-      line3.dataset.dependencyId = dep.id;
-      line3.style.cssText = `
-        position: absolute;
-        left: ${Math.min(midX, targetX)}px;
-        top: ${targetY - 1}px;
-        width: ${Math.abs(targetX - midX)}px;
-        height: 2px;
-        background-color: #6b7280;
-        pointer-events: auto;
-        cursor: pointer;
-      `;
       
       // Create hit area overlay for easier interaction
       const hitArea = document.createElement('div');
@@ -925,7 +1067,7 @@ export class GanttRenderer {
       // Add hover effect
       const handleMouseEnter = () => {
         if (!depGroup.classList.contains('selected')) {
-          [line1, line2, line3].forEach(line => {
+          lines.forEach(line => {
             line.style.backgroundColor = '#3b82f6';
             line.style.height = line.classList.contains('vibegantt-dependency-vertical') ? line.style.height : '3px';
             line.style.width = line.classList.contains('vibegantt-dependency-horizontal') ? line.style.width : '3px';
@@ -935,7 +1077,7 @@ export class GanttRenderer {
       
       const handleMouseLeave = () => {
         if (!depGroup.classList.contains('selected')) {
-          [line1, line2, line3].forEach(line => {
+          lines.forEach(line => {
             line.style.backgroundColor = '#6b7280';
             line.style.height = line.classList.contains('vibegantt-dependency-vertical') ? line.style.height : '2px';
             line.style.width = line.classList.contains('vibegantt-dependency-horizontal') ? line.style.width : '2px';
@@ -948,9 +1090,7 @@ export class GanttRenderer {
       
       // Add elements to group
       depGroup.appendChild(hitArea);
-      depGroup.appendChild(line1);
-      depGroup.appendChild(line2);
-      depGroup.appendChild(line3);
+      // Lines are already appended in the conditional blocks above
       
       // Apply selected state if this dependency is selected
       if (this.selectedDependencyId === dep.id) {

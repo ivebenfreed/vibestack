@@ -411,29 +411,29 @@ export const ganttMachine = setup({
     },
     
     // Create dependency action
-    createDependency: ({ context, event }) => {
+    createDependency: async ({ context, event }) => {
       if (event.type === 'DEPENDENCY_CREATE_END' && context.dragState?.taskId) {
         const predecessorId = context.dragState.taskId;
         const successorId = event.targetTaskId;
         
         console.log('GanttMachine: Creating dependency', { predecessorId, successorId });
         
-        // Create a new dependency
-        const newDependency = {
-          id: `dep-${Date.now()}`,
-          entityType: 'Task' as const,
-          predecessorId,
-          successorId,
-          type: 'finish-to-start' as const,
-          lagDays: 0
-        };
-        
-        // Send to store
-        if (context.dataStore) {
-          context.dataStore.send({
-            type: 'updateDependencies',
-            dependencies: [...Object.values(context.dependencies), newDependency]
-          });
+        try {
+          // Import the service
+          const { entityDependencyService } = await import('@/domain/entity-dependency-service');
+          
+          // Create the dependency
+          const newDep = await entityDependencyService.createTaskDependency(
+            predecessorId,
+            successorId,
+            'finish-to-start',
+            0, // lagDays
+            {} // metadata
+          );
+          
+          console.log('GanttMachine: Dependency created successfully', newDep);
+        } catch (error) {
+          console.error('GanttMachine: Failed to create dependency', error);
         }
       }
     },
