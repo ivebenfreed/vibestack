@@ -54,7 +54,7 @@
 .vibegantt-task-row {
   display: flex;
   align-items: center;
-  height: var(--gantt-row-height, 40px);
+  height: var(--gantt-row-height, 48px);
   padding: 0 0.75rem;
   border-bottom: 1px solid var(--gantt-border-light, #f1f5f9);
   cursor: pointer;
@@ -114,8 +114,8 @@
 /* Task Bars */
 .vibegantt-task-bar {
   position: absolute;
-  height: calc(var(--gantt-row-height, 40px) - 12px);
-  margin: 6px 0;
+  height: calc(var(--gantt-row-height, 48px) - 20px);
+  margin: 10px 0;
   border-radius: 4px;
   cursor: move;
   transition: transform 0.15s ease;
