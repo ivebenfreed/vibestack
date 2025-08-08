@@ -222,6 +222,44 @@ This bypasses the automatic issue number detection and uses the default ports:
 - Database: postgres://localhost:5432/vibestack_dev
 - Proxy: Port 4444
 
+## Staging Server Mocking for Merge Testing
+
+When testing merge-ready branches (like `issue-57-pure-merge`) that need to simulate production-like conditions, you can mock the staging server configuration:
+
+### Method 1: Using MAIN_MODE (Recommended)
+```bash
+# Start dev servers with staging ports and database
+MAIN_MODE=true ./scripts/tmux-bg.sh vibestack-dev-main "pnpm dev:local"
+
+# Or use the convenience script
+./scripts/dev-main.sh
+```
+
+This configuration:
+- Uses staging database: `postgres://localhost:5432/vibestack_dev`
+- Runs web app on staging port: `http://localhost:5173`  
+- Runs API server on staging port: `http://localhost:8787`
+- Avoids port conflicts with worktree environments
+
+### Method 2: Manual Environment Override
+```bash
+# Set explicit environment variables for staging-like testing
+SERVER_PORT=8787 WEB_PORT=5173 DB_PORT=5432 pnpm dev:local
+```
+
+### When to Use Staging Mocking
+- **Merge testing**: Before creating PRs, test with staging-like configuration
+- **Integration testing**: Verify features work with production database schema
+- **Performance testing**: Test against the same database used in staging
+- **Branch validation**: Confirm branches work outside worktree environments
+
+### Database Considerations
+The staging mock uses the main `vibestack_dev` database, so:
+- ✅ Same schema as production staging
+- ✅ Realistic data volumes for testing  
+- ⚠️ **Caution**: Changes affect the main development database
+- 💡 **Tip**: Use database migrations to test schema changes safely
+
 ## Background Process Management
 
 ### tmux-based Background Processes
@@ -393,3 +431,48 @@ pnpm build && pnpm type-check
 ```
 
 This avoids merge conflicts, stale files, and ensures features work after merge.
+
+## Worktree Cleanup Process
+
+When issues are completed and merged, clean up the associated resources to maintain a tidy development environment.
+
+### Manual Cleanup (Selective)
+Clean up specific completed issues:
+
+```bash
+# 1. Close the GitHub issue
+gh issue close 57 --comment "Completed: Description of what was accomplished"
+
+# 2. Stop any running tmux sessions
+./scripts/bg-stop.sh vibestack-dev-issue-57
+
+# 3. Clean up Docker resources  
+./scripts/cleanup-pr-docker.sh 57
+
+# 4. Remove the worktree and branch
+git worktree remove --force worktrees/issue-57
+git branch -D issue-57
+```
+
+### Automated Cleanup (All worktrees)
+⚠️ **Caution**: This removes ALL worktrees except the main repository
+
+```bash
+# Clean up everything (worktrees, Docker, tmux, branches)
+./scripts/cleanup-all-worktrees.sh
+```
+
+### Best Practices
+- **Keep active issues**: Only clean up completed/merged issues
+- **Preserve issue-60**: Currently in progress, should not be cleaned
+- **Close GitHub issues first**: This maintains the paper trail
+- **Verify before cleanup**: Check `git worktree list` and `./scripts/bg-status.sh`
+
+### Current Active Worktrees
+After recent cleanup, only active issues remain:
+```bash
+git worktree list
+# /home/benfreed/vibestack                     [staging]
+# /home/benfreed/vibestack/worktrees/issue-53  [issue-53]  
+# /home/benfreed/vibestack/worktrees/issue-60  [issue-60]
+```
