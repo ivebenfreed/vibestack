@@ -10,6 +10,7 @@ import { tagsAtom } from '@/domain-xstate/tag'
 import { tagSetsAtom } from '@/domain-xstate/tag-set'
 import { shallowEqual } from '@xstate/store'
 import { useStableEntityArray, useStableEntityArraySorted } from '@/hooks/useStableEntityArray'
+import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -55,6 +56,9 @@ const topNav = [
 ]
 
 export default function Dashboard() {
+  // Signal that the Dashboard is ready for Playwright tests
+  usePlaywrightReady('[PLAYWRIGHT_READY] Dashboard loaded');
+  
   const [activeTab, setActiveTab] = useState('overview');
   
   // 🎯 XSTATE REACTIVITY: Stable sorted array that only changes when data changes

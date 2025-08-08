@@ -56,25 +56,25 @@ export default function TasksProvider({ children }: Props) {
     tags?: string[];
   }) => {
     console.log('[TasksContext] Creating task with data:', taskData);
-    return await domainServices.task.createUI(taskData);
+    return await domainServices.task.create(taskData);
   }, []);
 
   // Update an existing task using domain services
   const updateTask = useCallback(async (id: string, changes: Partial<Task>) => {
     console.log('[TasksContext] Updating task with id:', id, 'and changes:', changes);
-    return await domainServices.task.updateUI(id, changes);
+    return await domainServices.task.update(id, changes);
   }, []);
 
   // Delete a task using domain services
   const deleteTask = useCallback(async (id: string) => {
     console.log('[TasksContext] Deleting task with id:', id);
-    return await domainServices.task.deleteUI(id);
+    return await domainServices.task.delete(id);
   }, []);
 
   // Update a task's status using domain services
   const updateTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
     console.log('[TasksContext] Updating task status with id:', id, 'and status:', status);
-    return await domainServices.task.updateUI(id, { status });
+    return await domainServices.task.update(id, { status });
   }, []);
 
   return (

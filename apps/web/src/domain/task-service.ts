@@ -11,7 +11,7 @@ import { taskDexieService } from '@repo/dataforge/dexie-domain';
 import type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
-import { trackOutgoingChange } from '@/db/dexie-change-tracking';
+// trackOutgoingChange no longer needed - automatic hooks handle change tracking
 
 // Re-export types from DataForge
 export type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
@@ -29,10 +29,10 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   }
   
   // ============================================================================
-  // UI Operations (with sync tracking)
+  // Unified CRUD Operations (automatic sync tracking via hooks)
   // ============================================================================
   
-  async createUI(input: CreateTaskInput): Promise<Task> {
+  async create(input: CreateTaskInput): Promise<Task> {
     // Validate input
     if (this.validateCreate) {
       this.validateCreate(input);
@@ -42,15 +42,13 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     const processedInput = this.beforeCreate ? this.beforeCreate(input) : input;
     
     // Use generated Dexie service for creation
+    // Note: Change tracking happens automatically via hooks
     const task = await taskDexieService.create(processedInput);
-    
-    // Track for outgoing sync
-    await trackOutgoingChange('tasks', 'insert', task);
     
     console.log('[TaskService] Created task', {
       id: task.id,
       title: task.title,
-      trackingSync: true
+      trackingAutomatic: true
     });
     
     // Call after hook if defined
@@ -91,7 +89,7 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     return result;
   }
   
-  async updateUI(id: string, updates: UpdateTaskInput): Promise<Task> {
+  async update(id: string, updates: UpdateTaskInput): Promise<Task> {
     const existing = await taskDexieService.getById(id);
     if (!existing) {
       throw new Error(`Task ${id} not found`);
@@ -119,18 +117,16 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     };
     
     // Use generated Dexie service for update
+    // Note: Change tracking happens automatically via hooks
     const updated = await taskDexieService.update(id, finalUpdates);
     if (!updated) {
       throw new Error(`Failed to update task ${id}`);
     }
     
-    // Track for outgoing sync
-    await trackOutgoingChange('tasks', 'update', updated);
-    
     console.log('[TaskService] Updated task', {
       id: updated.id,
       updates: finalUpdates,
-      trackingSync: true
+      trackingAutomatic: true
     });
     
     // Call after hook if defined
@@ -141,22 +137,20 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     return updated;
   }
   
-  async deleteUI(id: string): Promise<boolean> {
+  async delete(id: string): Promise<boolean> {
     const existing = await taskDexieService.getById(id);
     if (!existing) {
       return false;
     }
     
     // Use generated Dexie service for deletion
+    // Note: Change tracking happens automatically via hooks
     const result = await taskDexieService.delete(id);
     
     if (result) {
-      // Track for outgoing sync
-      await trackOutgoingChange('tasks', 'delete', { id });
-      
       console.log('[TaskService] Deleted task', {
         id,
-        trackingSync: true
+        trackingAutomatic: true
       });
     }
     
@@ -164,19 +158,26 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   }
   
   // ============================================================================
-  // Incoming Operations (no sync tracking)
+  // Sync Operations (executed within sync transactions to avoid tracking)
   // ============================================================================
   
-  async createIncoming(task: Task): Promise<Task> {
-    await db.tasks.put(task);
-    console.log('[TaskService] Created task from incoming sync', {
+  async createSync(task: Task): Promise<Task> {
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
+    
+    await applySyncChanges(async () => {
+      await db.tasks.put(task);
+    });
+    
+    console.log('[TaskService] Created task from sync', {
       id: task.id,
       title: task.title
     });
     return task;
   }
   
-  async updateIncoming(id: string, updates: Partial<Task>): Promise<Task> {
+  async updateSync(id: string, updates: Partial<Task>): Promise<Task> {
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
+    
     const existing = await taskDexieService.getById(id);
     if (!existing) {
       throw new Error(`Task ${id} not found`);
@@ -188,8 +189,11 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
       updatedAt: updates.updatedAt || new Date().toISOString()
     };
     
-    await db.tasks.put(updated);
-    console.log('[TaskService] Updated task from incoming sync', {
+    await applySyncChanges(async () => {
+      await db.tasks.put(updated);
+    });
+    
+    console.log('[TaskService] Updated task from sync', {
       id: updated.id,
       updates
     });
@@ -197,12 +201,52 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
     return updated;
   }
   
-  async deleteIncoming(id: string): Promise<boolean> {
-    const result = await taskDexieService.delete(id);
+  async deleteSync(id: string): Promise<boolean> {
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
+    let result = false;
+    
+    await applySyncChanges(async () => {
+      result = await taskDexieService.delete(id);
+    });
+    
     if (result) {
-      console.log('[TaskService] Deleted task from incoming sync', { id });
+      console.log('[TaskService] Deleted task from sync', { id });
     }
     return result;
+  }
+
+  // ============================================================================
+  // Backward Compatibility Aliases (deprecated - use create/update/delete)
+  // ============================================================================
+  
+  /** @deprecated Use create() instead - will be removed in next version */
+  async createUI(input: CreateTaskInput): Promise<Task> {
+    return this.create(input);
+  }
+  
+  /** @deprecated Use update() instead - will be removed in next version */
+  async updateUI(id: string, updates: UpdateTaskInput): Promise<Task> {
+    return this.update(id, updates);
+  }
+  
+  /** @deprecated Use delete() instead - will be removed in next version */
+  async deleteUI(id: string): Promise<boolean> {
+    return this.delete(id);
+  }
+  
+  /** @deprecated Use createSync() instead - will be removed in next version */
+  async createIncoming(task: Task): Promise<Task> {
+    return this.createSync(task);
+  }
+  
+  /** @deprecated Use updateSync() instead - will be removed in next version */
+  async updateIncoming(id: string, updates: Partial<Task>): Promise<Task> {
+    return this.updateSync(id, updates);
+  }
+  
+  /** @deprecated Use deleteSync() instead - will be removed in next version */
+  async deleteIncoming(id: string): Promise<boolean> {
+    return this.deleteSync(id);
   }
   
   // ============================================================================
@@ -269,38 +313,82 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
   // ============================================================================
   
   /**
-   * Bulk create tasks (used by incoming sync)
+   * Bulk create tasks for sync operations
    */
-  async bulkCreateIncoming(tasks: Task[]): Promise<Task[]> {
+  async batchCreateSync(tasks: Task[]): Promise<Task[]> {
     if (tasks.length === 0) return [];
     
-    await db.tasks.bulkPut(tasks);
-    console.log('[TaskService] Bulk created tasks from incoming sync', {
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
+    
+    await applySyncChanges(async () => {
+      await db.tasks.bulkPut(tasks);
+    });
+    
+    console.log('[TaskService] Batch created tasks from sync', {
       count: tasks.length
     });
     
     return tasks;
   }
   
+  /** @deprecated Use batchCreateSync() instead - will be removed in next version */
+  async bulkCreateIncoming(tasks: Task[]): Promise<Task[]> {
+    return this.batchCreateSync(tasks);
+  }
+  
+  // ============================================================================
+  // Batch Operations (unified interface)
+  // ============================================================================
+  
+  /** @deprecated Use batchUpdate() instead - will be removed in next version */
+  async batchUpdateUI(updates: Array<{ id: string; updates: Partial<Task> }>): Promise<Task[]> {
+    return this.batchUpdate(updates);
+  }
+  
+  /** @deprecated Use batchDelete() instead - will be removed in next version */
+  async batchDeleteUI(ids: string[]): Promise<{ deleted: string[]; notFound: string[] }> {
+    return this.batchDelete(ids);
+  }
+  
+  /** @deprecated Use batchCreate() instead - will be removed in next version */
+  async batchCreateUI(inputs: any[]): Promise<Task[]> {
+    return this.batchCreate(inputs);
+  }
+  
+  /** @deprecated Use batchUpdateSync() instead - will be removed in next version */
+  async batchUpdateIncoming(updates: Array<{ id: string; updates: Partial<Task> }>): Promise<Task[]> {
+    return this.batchUpdateSync(updates);
+  }
+  
+  /** @deprecated Use batchDeleteSync() instead - will be removed in next version */
+  async batchDeleteIncoming(ids: string[]): Promise<number> {
+    return this.batchDeleteSync(ids);
+  }
+  
+  /** @deprecated Use batchCreateSync() instead - will be removed in next version */
+  async batchCreateIncoming(tasks: Task[]): Promise<Task[]> {
+    return this.batchCreateSync(tasks);
+  }
+
   /**
    * Move task to a different project
    */
   async moveToProject(taskId: string, projectId: string | null): Promise<Task> {
-    return this.updateUI(taskId, { projectId });
+    return this.update(taskId, { projectId });
   }
   
   /**
    * Assign task to a user
    */
   async assignTo(taskId: string, userId: string | null): Promise<Task> {
-    return this.updateUI(taskId, { assigneeId: userId });
+    return this.update(taskId, { assigneeId: userId });
   }
   
   /**
    * Update task status with business logic
    */
   async updateStatus(taskId: string, status: TaskStatus): Promise<Task> {
-    return this.updateUI(taskId, { status });
+    return this.update(taskId, { status });
   }
   
   // ============================================================================
@@ -339,11 +427,7 @@ export class TaskDomainService extends BaseDomainService<Task, CreateTaskInput, 
    */
   async setTags(taskId: string, tagIds: string[]) {
     await taskDexieService.setTags(taskId, tagIds);
-    // Track the change for sync
-    const task = await taskDexieService.getById(taskId);
-    if (task) {
-      await trackOutgoingChange('tasks', 'update', task);
-    }
+    // Note: Change tracking happens automatically via hooks when the junction table is updated
   }
   
   /**

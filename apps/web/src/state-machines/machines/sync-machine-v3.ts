@@ -675,7 +675,12 @@ export const syncMachineV3 = setup({
           target: 'pre_live_validation',
           actions: [
             assign({ syncPhase: 'validating' as const }),
-            () => console.log('[SyncMachineV3] ✅ Server determined: Already current, validating before live')
+            () => console.log('[SyncMachineV3] ✅ Server determined: Already current, validating before live'),
+            () => {
+              // Re-enable tracking since we're going straight to live (no sync needed)
+              console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking (already in sync, skipping sync phases)');
+              enableChangeTracking();
+            }
           ]
         },
         
@@ -689,7 +694,12 @@ export const syncMachineV3 = setup({
             }),
             'notifyParentLive',
             'saveOwnState',
-            () => console.log('[SyncMachineV3] ✅ Server says initial sync already completed - skipping baseline (IntegrityService disabled)')
+            () => console.log('[SyncMachineV3] ✅ Server says initial sync already completed - skipping baseline (IntegrityService disabled)'),
+            () => {
+              // Re-enable tracking since we skipped the initial_sync state
+              console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking (skipped initial_sync state)');
+              enableChangeTracking();
+            }
           ]
         },
         
@@ -697,7 +707,12 @@ export const syncMachineV3 = setup({
           target: 'pre_live_validation',
           actions: [
             assign({ syncPhase: 'validating' as const }),
-            () => console.log('[SyncMachineV3] ✅ Server says catchup sync already completed - validating before live')
+            () => console.log('[SyncMachineV3] ✅ Server says catchup sync already completed - validating before live'),
+            () => {
+              // Re-enable tracking since we skipped the catchup_sync state
+              console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking (skipped catchup_sync state)');
+              enableChangeTracking();
+            }
           ]
         }
       }
@@ -707,8 +722,15 @@ export const syncMachineV3 = setup({
       entry: [
         () => syncLogger.stateEntry('initial_sync', 'Running initial synchronization'),
         () => {
-          console.log('[SyncMachineV3] 🔇 Disabling change tracking during initial sync');
+          console.log('[SyncMachineV3] 🔴 DISABLING change tracking for ENTIRE initial sync phase');
           disableChangeTracking();
+        }
+      ],
+      
+      exit: [
+        () => {
+          console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking after initial sync complete');
+          enableChangeTracking();
         }
       ],
       
@@ -774,8 +796,15 @@ export const syncMachineV3 = setup({
       entry: [
         () => syncLogger.stateEntry('catchup_sync', 'Running catchup synchronization'),
         () => {
-          console.log('[SyncMachineV3] 🔇 Disabling change tracking during catchup sync');
+          console.log('[SyncMachineV3] 🔴 DISABLING change tracking for ENTIRE catchup sync phase');
           disableChangeTracking();
+        }
+      ],
+      
+      exit: [
+        () => {
+          console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking after catchup sync complete');
+          enableChangeTracking();
         }
       ],
       
@@ -913,11 +942,7 @@ export const syncMachineV3 = setup({
     live_sync: {
       entry: [
         () => syncLogger.stateEntry('live_sync', 'Enhanced validation complete, system ready for real-time sync'),
-        () => {
-          // Re-enable change tracking now that initial/catchup sync is complete
-          console.log('[SyncMachineV3] 🔄 Re-enabling Dexie change tracking for live sync');
-          enableChangeTracking();
-        },
+        // Change tracking is already enabled by exit handlers of initial/catchup sync
         ({ context }) => {
           // Start Dexie outgoing sync monitoring if available
           const dexieService = context.serviceCoordinator?.getServices()?.dexieOutgoing;

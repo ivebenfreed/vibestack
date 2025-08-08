@@ -1,15 +1,5 @@
 # CLAUDE.md
 
-## Current Worktree Configuration
-
-**This is Issue #53 worktree with the following ports:**
-
-- Web application: `http://localhost:5703`
-- Server API: `http://localhost:9317`
-- Database: `postgres://postgres:postgres@localhost:5962/vibestack_dev_issue_53`
-- Proxy: Port 4984
-
-
 ## Current Configuration
 
 **This is the main staging branch with the following default ports:**
@@ -213,6 +203,24 @@ rm -rf .playwright/profiles/profile-main/
 
 # Profiles are automatically created per worktree
 ```
+
+## Running Dev Servers on Main/Staging Ports
+
+When testing merge-ready branches or working on the main/staging branch, use:
+
+```bash
+# Start dev server with default main/staging ports (5173, 8787, 5432)
+./scripts/dev-main.sh
+
+# Or manually with MAIN_MODE flag
+MAIN_MODE=true ./scripts/tmux-bg.sh vibestack-dev-main "pnpm dev:local"
+```
+
+This bypasses the automatic issue number detection and uses the default ports:
+- Web: http://localhost:5173
+- Server: http://localhost:8787  
+- Database: postgres://localhost:5432/vibestack_dev
+- Proxy: Port 4444
 
 ## Background Process Management
 
