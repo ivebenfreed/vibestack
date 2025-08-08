@@ -207,7 +207,7 @@ export type GanttEvent =
   | { type: 'TASK_RESIZE_MOVE'; taskId?: string; handle?: 'start' | 'end'; x: number; deltaX?: number }
   | { type: 'TASK_RESIZE_END'; taskId: string; handle: 'start' | 'end' | 'left' | 'right'; deltaX?: number; newStartDate?: Date; newEndDate?: Date }
   | { type: 'DEPENDENCY_CREATE_START'; sourceTaskId: string }
-  | { type: 'DEPENDENCY_CREATE_END'; targetTaskId: string }
+  | { type: 'DEPENDENCY_CREATE_END'; targetTaskId: string; dependencyType?: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish' }
   | { type: 'DEPENDENCY_DELETE'; dependencyId: string }
   | { type: 'DEPENDENCY_SELECT'; dependencyId: string; multi?: boolean }
   | { type: 'DEPENDENCY_DRAG_START'; dependencyId: string; handleType: 'start' | 'end'; x: number; y: number }

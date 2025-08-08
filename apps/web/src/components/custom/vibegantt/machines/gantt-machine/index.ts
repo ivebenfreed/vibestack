@@ -415,8 +415,9 @@ export const ganttMachine = setup({
       if (event.type === 'DEPENDENCY_CREATE_END' && context.dragState?.taskId) {
         const predecessorId = context.dragState.taskId;
         const successorId = event.targetTaskId;
+        const dependencyType = event.dependencyType || 'finish-to-start';
         
-        console.log('GanttMachine: Creating dependency', { predecessorId, successorId });
+        console.log('GanttMachine: Creating dependency', { predecessorId, successorId, dependencyType });
         
         try {
           // Import the service
@@ -426,7 +427,7 @@ export const ganttMachine = setup({
           const newDep = await entityDependencyService.createTaskDependency(
             predecessorId,
             successorId,
-            'finish-to-start',
+            dependencyType,
             0, // lagDays
             {} // metadata
           );

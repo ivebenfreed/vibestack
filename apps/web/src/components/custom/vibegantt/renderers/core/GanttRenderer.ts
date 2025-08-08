@@ -662,7 +662,7 @@ export class GanttRenderer {
     //   this.startDependencyCreation(task.id, e);
     // });
     
-    // Add dependency creation connectors (both ends)
+    // Add dependency creation connectors (2 attachment points: start and finish)
     const leftConnector = document.createElement('div');
     leftConnector.className = 'vibegantt-task-connector vibegantt-task-connector-left';
     leftConnector.dataset.taskId = task.id;
@@ -675,7 +675,7 @@ export class GanttRenderer {
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: #3b82f6;
+      background: #10b981;
       border: 2px solid white;
       cursor: crosshair;
       opacity: 0;
@@ -696,7 +696,7 @@ export class GanttRenderer {
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: #3b82f6;
+      background: #ef4444;
       border: 2px solid white;
       cursor: crosshair;
       opacity: 0;
@@ -704,6 +704,7 @@ export class GanttRenderer {
       z-index: 20;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     `;
+    
     
     // Show connectors on task hover
     taskEl.addEventListener('mouseenter', () => {
@@ -819,22 +820,40 @@ export class GanttRenderer {
       // Calculate connection points based on dependency type
       let sourceX: number, sourceY: number, targetX: number, targetY: number;
       
-      // Default to finish-to-start positioning
-      sourceX = sourceCoord.xPosition + sourceCoord.width;
-      sourceY = sourceCoord.yPosition + 10 + sourceCoord.height / 2;
-      targetX = targetCoord.xPosition;
-      targetY = targetCoord.yPosition + 10 + targetCoord.height / 2;
-      
-      // Adjust based on dependency type if available
-      if (dep.type === 'start-to-start') {
-        sourceX = sourceCoord.xPosition;
-        targetX = targetCoord.xPosition;
-      } else if (dep.type === 'finish-to-finish') {
-        sourceX = sourceCoord.xPosition + sourceCoord.width;
-        targetX = targetCoord.xPosition + targetCoord.width;
-      } else if (dep.type === 'start-to-finish') {
-        sourceX = sourceCoord.xPosition;
-        targetX = targetCoord.xPosition + targetCoord.width;
+      // Calculate attachment points based on dependency type
+      switch (dep.type) {
+        case 'start-to-start':
+          // Start (left) of source to start (left) of target
+          sourceX = sourceCoord.xPosition;
+          sourceY = sourceCoord.yPosition + 10 + sourceCoord.height / 2;
+          targetX = targetCoord.xPosition;
+          targetY = targetCoord.yPosition + 10 + targetCoord.height / 2;
+          break;
+          
+        case 'finish-to-finish':
+          // Finish (right) of source to finish (right) of target
+          sourceX = sourceCoord.xPosition + sourceCoord.width;
+          sourceY = sourceCoord.yPosition + 10 + sourceCoord.height / 2;
+          targetX = targetCoord.xPosition + targetCoord.width;
+          targetY = targetCoord.yPosition + 10 + targetCoord.height / 2;
+          break;
+          
+        case 'start-to-finish':
+          // Start (left) of source to finish (right) of target
+          sourceX = sourceCoord.xPosition;
+          sourceY = sourceCoord.yPosition + 10 + sourceCoord.height / 2;
+          targetX = targetCoord.xPosition + targetCoord.width;
+          targetY = targetCoord.yPosition + 10 + targetCoord.height / 2;
+          break;
+          
+        case 'finish-to-start':
+        default:
+          // Finish (right) of source to start (left) of target (default)
+          sourceX = sourceCoord.xPosition + sourceCoord.width;
+          sourceY = sourceCoord.yPosition + 10 + sourceCoord.height / 2;
+          targetX = targetCoord.xPosition;
+          targetY = targetCoord.yPosition + 10 + targetCoord.height / 2;
+          break;
       }
       
       // Create DOM-based dependency line using positioned divs
@@ -890,11 +909,37 @@ export class GanttRenderer {
       // Use the already calculated values
       const lines: HTMLElement[] = [];
       
-      // Reliable routing: 3 segments for forward, 4 segments for backward
+      // Choose line color based on dependency type for visual clarity
+      let lineColor = '#6b7280'; // Default gray
+      switch (dep.type) {
+        case 'start-to-start':
+          lineColor = '#10b981'; // Green (matches start connectors)
+          break;
+        case 'finish-to-finish':
+          lineColor = '#ef4444'; // Red (matches finish connectors)
+          break;
+        case 'start-to-finish':
+          lineColor = '#8b5cf6'; // Purple (mixed type)
+          break;
+        case 'finish-to-start':
+        default:
+          lineColor = '#3b82f6'; // Blue (most common type)
+          break;
+      }
+      
+      // Reliable routing based on dependency type
       const gap = 20; // Gap for routing around
       
-      if (targetX >= sourceX) {
-        // FORWARD DEPENDENCY: 3 segments (source → middle → target)
+      // Determine routing strategy based on dependency type and positions
+      const needsSpecialRouting = (
+        dep.type === 'start-to-start' || 
+        dep.type === 'finish-to-finish' ||
+        (dep.type === 'finish-to-start' && targetX < sourceX) ||
+        (dep.type === 'start-to-finish' && targetX < sourceX)
+      );
+      
+      if (!needsSpecialRouting && targetX >= sourceX) {
+        // SIMPLE FORWARD ROUTING: 3 segments (source → middle → target)
         const midX = sourceX + (targetX - sourceX) / 2;
         
         // Line 1: Horizontal from source to midpoint
@@ -907,7 +952,7 @@ export class GanttRenderer {
           top: ${sourceY - 1}px;
           width: ${midX - sourceX}px;
           height: 2px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -924,7 +969,7 @@ export class GanttRenderer {
           top: ${verticalTop - 1}px;
           width: 2px;
           height: ${verticalHeight + 2}px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -939,7 +984,7 @@ export class GanttRenderer {
           top: ${targetY - 1}px;
           width: ${targetX - midX}px;
           height: 2px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -950,14 +995,131 @@ export class GanttRenderer {
         depGroup.appendChild(line3);
         
       } else {
-        // BACKWARD DEPENDENCY: 5 segments forming continuous flow
-        // Pattern: source → right → down/up → across → down/up → target
+        // SPECIAL ROUTING: For backward dependencies, SS, FF, and SF
         
-        const sourceRightX = sourceX + gap;  // First turn point
-        const targetLeftX = targetX - gap;   // Second turn point
-        
-        // Use the midpoint between the two task levels for the bridge
-        const bridgeY = (sourceY + targetY) / 2;
+        if (dep.type === 'start-to-start') {
+          // START-TO-START: Route around left side with right angles
+          const leftExtent = Math.min(sourceX, targetX) - gap;
+          const bridgeY = (sourceY + targetY) / 2;
+          
+          // Line 1: Horizontal left from source start
+          const line1 = document.createElement('div');
+          line1.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+          line1.dataset.dependencyId = dep.id;
+          line1.style.cssText = `
+            position: absolute;
+            left: ${leftExtent}px;
+            top: ${sourceY - 1}px;
+            width: ${sourceX - leftExtent}px;
+            height: 2px;
+            background-color: ${lineColor};
+            pointer-events: auto;
+            cursor: pointer;
+          `;
+          
+          // Line 2: Vertical connector
+          const line2 = document.createElement('div');
+          line2.className = 'vibegantt-dependency vibegantt-dependency-vertical';
+          line2.dataset.dependencyId = dep.id;
+          const verticalTop = Math.min(sourceY, targetY);
+          const verticalHeight = Math.abs(targetY - sourceY) || 2;
+          line2.style.cssText = `
+            position: absolute;
+            left: ${leftExtent - 1}px;
+            top: ${verticalTop - 1}px;
+            width: 2px;
+            height: ${verticalHeight + 2}px;
+            background-color: ${lineColor};
+            pointer-events: auto;
+            cursor: pointer;
+          `;
+          
+          // Line 3: Horizontal to target start
+          const line3 = document.createElement('div');
+          line3.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+          line3.dataset.dependencyId = dep.id;
+          line3.style.cssText = `
+            position: absolute;
+            left: ${leftExtent}px;
+            top: ${targetY - 1}px;
+            width: ${targetX - leftExtent}px;
+            height: 2px;
+            background-color: ${lineColor};
+            pointer-events: auto;
+            cursor: pointer;
+          `;
+          
+          lines.push(line1, line2, line3);
+          depGroup.appendChild(line1);
+          depGroup.appendChild(line2);
+          depGroup.appendChild(line3);
+          
+        } else if (dep.type === 'finish-to-finish') {
+          // FINISH-TO-FINISH: Route around right side with right angles
+          const rightExtent = Math.max(sourceX, targetX) + gap;
+          const bridgeY = (sourceY + targetY) / 2;
+          
+          // Line 1: Horizontal right from source finish
+          const line1 = document.createElement('div');
+          line1.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+          line1.dataset.dependencyId = dep.id;
+          line1.style.cssText = `
+            position: absolute;
+            left: ${sourceX}px;
+            top: ${sourceY - 1}px;
+            width: ${rightExtent - sourceX}px;
+            height: 2px;
+            background-color: ${lineColor};
+            pointer-events: auto;
+            cursor: pointer;
+          `;
+          
+          // Line 2: Vertical connector
+          const line2 = document.createElement('div');
+          line2.className = 'vibegantt-dependency vibegantt-dependency-vertical';
+          line2.dataset.dependencyId = dep.id;
+          const verticalTop = Math.min(sourceY, targetY);
+          const verticalHeight = Math.abs(targetY - sourceY) || 2;
+          line2.style.cssText = `
+            position: absolute;
+            left: ${rightExtent - 1}px;
+            top: ${verticalTop - 1}px;
+            width: 2px;
+            height: ${verticalHeight + 2}px;
+            background-color: ${lineColor};
+            pointer-events: auto;
+            cursor: pointer;
+          `;
+          
+          // Line 3: Horizontal to target finish
+          const line3 = document.createElement('div');
+          line3.className = 'vibegantt-dependency vibegantt-dependency-horizontal';
+          line3.dataset.dependencyId = dep.id;
+          line3.style.cssText = `
+            position: absolute;
+            left: ${targetX}px;
+            top: ${targetY - 1}px;
+            width: ${rightExtent - targetX}px;
+            height: 2px;
+            background-color: ${lineColor};
+            pointer-events: auto;
+            cursor: pointer;
+          `;
+          
+          lines.push(line1, line2, line3);
+          depGroup.appendChild(line1);
+          depGroup.appendChild(line2);
+          depGroup.appendChild(line3);
+          
+        } else {
+          // BACKWARD DEPENDENCY (FS or SF): 5 segments forming continuous flow
+          // Pattern: source → right → down/up → across → down/up → target
+          
+          const sourceRightX = sourceX + gap;  // First turn point
+          const targetLeftX = targetX - gap;   // Second turn point
+          
+          // Use the midpoint between the two task levels for the bridge
+          const bridgeY = (sourceY + targetY) / 2;
         
         // Line 1: Horizontal right from source bar
         const line1 = document.createElement('div');
@@ -969,7 +1131,7 @@ export class GanttRenderer {
           top: ${sourceY - 1}px;
           width: ${gap}px;
           height: 2px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -986,7 +1148,7 @@ export class GanttRenderer {
           top: ${vertical2Top - 1}px;
           width: 2px;
           height: ${vertical2Height + 2}px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -1001,7 +1163,7 @@ export class GanttRenderer {
           top: ${bridgeY - 1}px;
           width: ${sourceRightX - targetLeftX}px;
           height: 2px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -1018,7 +1180,7 @@ export class GanttRenderer {
           top: ${vertical4Top - 1}px;
           width: 2px;
           height: ${vertical4Height + 2}px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -1033,7 +1195,7 @@ export class GanttRenderer {
           top: ${targetY - 1}px;
           width: ${gap}px;
           height: 2px;
-          background-color: #6b7280;
+          background-color: ${lineColor};
           pointer-events: auto;
           cursor: pointer;
         `;
@@ -1044,6 +1206,7 @@ export class GanttRenderer {
         depGroup.appendChild(line3);
         depGroup.appendChild(line4);
         depGroup.appendChild(line5);
+        }
       }
       
       // Calculate midpoint for controls positioning
@@ -1064,11 +1227,12 @@ export class GanttRenderer {
         z-index: 1;
       `;
       
-      // Add hover effect
+      // Add hover effect - brighten the line color on hover
+      const hoverColor = lineColor === '#6b7280' ? '#3b82f6' : lineColor; // Keep same color or use blue for gray
       const handleMouseEnter = () => {
         if (!depGroup.classList.contains('selected')) {
           lines.forEach(line => {
-            line.style.backgroundColor = '#3b82f6';
+            line.style.backgroundColor = hoverColor;
             line.style.height = line.classList.contains('vibegantt-dependency-vertical') ? line.style.height : '3px';
             line.style.width = line.classList.contains('vibegantt-dependency-horizontal') ? line.style.width : '3px';
           });
@@ -1078,7 +1242,7 @@ export class GanttRenderer {
       const handleMouseLeave = () => {
         if (!depGroup.classList.contains('selected')) {
           lines.forEach(line => {
-            line.style.backgroundColor = '#6b7280';
+            line.style.backgroundColor = lineColor;
             line.style.height = line.classList.contains('vibegantt-dependency-vertical') ? line.style.height : '2px';
             line.style.width = line.classList.contains('vibegantt-dependency-horizontal') ? line.style.width : '2px';
           });
@@ -1095,12 +1259,13 @@ export class GanttRenderer {
       // Apply selected state if this dependency is selected
       if (this.selectedDependencyId === dep.id) {
         depGroup.classList.add('selected');
-        [line1, line2, line3].forEach(line => {
-          line.style.backgroundColor = '#3b82f6';
+        lines.forEach(line => {
+          line.style.backgroundColor = hoverColor;
           line.style.height = line.classList.contains('vibegantt-dependency-vertical') ? line.style.height : '3px';
           line.style.width = line.classList.contains('vibegantt-dependency-horizontal') ? line.style.width : '3px';
         });
         // Show controls after a short delay to ensure DOM is ready
+        const midX = sourceX + (targetX - sourceX) / 2;
         setTimeout(() => {
           this.showDependencyControls(depGroup, dep.id, midX, (sourceY + targetY) / 2);
         }, 10);
