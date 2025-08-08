@@ -675,7 +675,12 @@ export const syncMachineV3 = setup({
           target: 'pre_live_validation',
           actions: [
             assign({ syncPhase: 'validating' as const }),
-            () => console.log('[SyncMachineV3] ✅ Server determined: Already current, validating before live')
+            () => console.log('[SyncMachineV3] ✅ Server determined: Already current, validating before live'),
+            () => {
+              // Re-enable tracking since we're going straight to live (no sync needed)
+              console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking (already in sync, skipping sync phases)');
+              enableChangeTracking();
+            }
           ]
         },
         
@@ -689,7 +694,12 @@ export const syncMachineV3 = setup({
             }),
             'notifyParentLive',
             'saveOwnState',
-            () => console.log('[SyncMachineV3] ✅ Server says initial sync already completed - skipping baseline (IntegrityService disabled)')
+            () => console.log('[SyncMachineV3] ✅ Server says initial sync already completed - skipping baseline (IntegrityService disabled)'),
+            () => {
+              // Re-enable tracking since we skipped the initial_sync state
+              console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking (skipped initial_sync state)');
+              enableChangeTracking();
+            }
           ]
         },
         
@@ -697,7 +707,12 @@ export const syncMachineV3 = setup({
           target: 'pre_live_validation',
           actions: [
             assign({ syncPhase: 'validating' as const }),
-            () => console.log('[SyncMachineV3] ✅ Server says catchup sync already completed - validating before live')
+            () => console.log('[SyncMachineV3] ✅ Server says catchup sync already completed - validating before live'),
+            () => {
+              // Re-enable tracking since we skipped the catchup_sync state
+              console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking (skipped catchup_sync state)');
+              enableChangeTracking();
+            }
           ]
         }
       }
