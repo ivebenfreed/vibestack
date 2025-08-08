@@ -142,7 +142,7 @@ export class IncomingChangeService {
       // Process in batches
       for (let i = 0; i < changes.length; i += batchSize) {
         const batch = changes.slice(i, i + batchSize);
-        const batchResults = await this.processBatch(batch);
+        const batchResults = await this.processBatch(batch, messageType);
         results.push(...batchResults);
         
         // Report progress
@@ -256,10 +256,38 @@ export class IncomingChangeService {
 
   // Private methods
 
-  private async processBatch(batch: TableChange[]): Promise<ProcessingResult[]> {
+  private async processBatch(batch: TableChange[], messageType?: string): Promise<ProcessingResult[]> {
     const results: ProcessingResult[] = [];
 
     try {
+      // Determine if this is live sync (needs individual operations with flags)
+      // or initial/catchup sync (can use bulk operations with disabled tracking)
+      const isLiveSync = messageType === 'srv_live_changes';
+      
+      if (isLiveSync) {
+        // LIVE SYNC: Process individually with SYNC_TRANSACTION flags
+        // This allows concurrent user operations while preventing sync loops
+        console.log(`[IncomingChangeService] 🔄 LIVE SYNC: Processing ${batch.length} changes individually with SYNC_TRANSACTION flags`);
+        
+        for (const change of batch) {
+          try {
+            // For live sync, we need to handle it differently
+            const result = await this.applyChangeInTransactionLiveSync(change);
+            results.push(result);
+          } catch (error) {
+            console.error(`[IncomingChangeService] Error processing live sync change for ${change.table}:`, error);
+            results.push({
+              change,
+              success: false,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+        
+        return results;
+      }
+      
+      // INITIAL/CATCHUP SYNC: Use bulk operations for performance
       // Group changes by table and operation for bulk optimization
       const grouped = this.groupChangesByTableAndOperation(batch);
       
@@ -368,7 +396,7 @@ export class IncomingChangeService {
       // Extract entities data from changes
       const entitiesData = changes.map(change => change.data);
       
-      // Perform bulk insert to Dexie - no need for transaction wrapper since hooks are disabled
+      // Perform bulk insert - change tracking is managed at sync phase level
       const { db } = await import('@repo/dataforge/dexie-schema');
       
       // Check if it's a domain table
@@ -378,7 +406,13 @@ export class IncomingChangeService {
         const dexieTable = (db as any)[tableName];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
+          
+          // Change tracking is controlled at sync phase level by sync-machine-v3
+          // Initial/catchup sync: tracking disabled for entire phase
+          // Live sync: uses individual operations with SYNC_TRANSACTION flag
           await dexieTable.bulkPut(entitiesData);
+          
+          console.log(`[IncomingChangeService] ✅ Bulk inserted ${entitiesData.length} ${table} entities`);
         } else {
           throw new Error(`Dexie table not found for: ${table}`);
         }
@@ -388,7 +422,13 @@ export class IncomingChangeService {
         const dexieTable = (db as any)[this.snakeToCamel(table)];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
+          
+          // Change tracking is controlled at sync phase level by sync-machine-v3
+          // Initial/catchup sync: tracking disabled for entire phase
+          // Live sync: uses individual operations with SYNC_TRANSACTION flag
           await dexieTable.bulkPut(entitiesData);
+          
+          console.log(`[IncomingChangeService] ✅ Bulk inserted ${entitiesData.length} ${table} entities`);
         } else {
           throw new Error(`Dexie junction table not found for: ${table}`);
         }
@@ -458,7 +498,7 @@ export class IncomingChangeService {
       // Extract entities data from changes
       const entitiesData = changes.map(change => change.data);
       
-      // Perform bulk update - no need for transaction wrapper since hooks are disabled
+      // Perform bulk update - change tracking is managed at sync phase level
       const { db } = await import('@repo/dataforge/dexie-schema');
       
       // Check if it's a domain table
@@ -468,7 +508,13 @@ export class IncomingChangeService {
         const dexieTable = (db as any)[tableName];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} ${table} in IndexedDB`);
+          
+          // Change tracking is controlled at sync phase level by sync-machine-v3
+          // Initial/catchup sync: tracking disabled for entire phase
+          // Live sync: uses individual operations with SYNC_TRANSACTION flag
           await dexieTable.bulkPut(entitiesData);
+          
+          console.log(`[IncomingChangeService] ✅ Bulk updated ${entitiesData.length} ${table} entities`);
         } else {
           throw new Error(`Dexie table not found for: ${table}`);
         }
@@ -545,7 +591,7 @@ export class IncomingChangeService {
       // Check if it's a domain table (without quotes)
       const tableWithQuotes = `"${change.table}"`;
       if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
-        await this.applyDomainTableChange(change);
+        await this.applyDomainTableChange(change, false); // false = not live sync
       } 
       // Check if it's a junction table
       else if (CLIENT_JUNCTION_TABLE_MAPPING[change.table]) {
@@ -581,6 +627,61 @@ export class IncomingChangeService {
   }
 
   /**
+   * Apply changes during live sync using SYNC_TRANSACTION flag
+   */
+  private async applyChangeInTransactionLiveSync(change: TableChange): Promise<ProcessingResult> {
+    try {
+      // Skip our own changes to prevent loops
+      if (change.clientId === this.config.clientId) {
+        return {
+          change,
+          success: true,
+          skipped: true,
+          reason: 'own_change'
+        };
+      }
+
+      console.log(`[IncomingChangeService] 🔄 Live sync: Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
+      
+      // Check if it's a domain table (without quotes)
+      const tableWithQuotes = `"${change.table}"`;
+      if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
+        await this.applyDomainTableChange(change, true); // true = live sync
+      } 
+      // Check if it's a junction table
+      else if (CLIENT_JUNCTION_TABLE_MAPPING[change.table]) {
+        console.log(`[IncomingChangeService] 🔧 Processing junction table ${change.table} with data:`, change.data);
+        await this.applyJunctionTableChange(change);
+      }
+      // Unknown table
+      else {
+        throw new Error(`No incoming function support for table: ${change.table}`);
+      }
+
+      console.log(`[IncomingChangeService] ✅ Live sync: Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
+      
+      // Process relationship updates if present
+      if (change.relationshipUpdates && change.relationshipUpdates.length > 0) {
+        console.log(`[IncomingChangeService] Processing ${change.relationshipUpdates.length} relationship updates for ${change.table}:${change.data.id}`);
+        await this.applyRelationshipUpdates(change);
+      }
+      
+      return {
+        change,
+        success: true
+      };
+
+    } catch (error) {
+      console.error(`[IncomingChangeService] Error applying live sync ${change.operation} to ${change.table}:`, error);
+      return {
+        change,
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
    * Helper to merge incoming update data with existing record
    * This prevents partial updates from clearing existing fields
    */
@@ -606,8 +707,10 @@ export class IncomingChangeService {
   /**
    * Generic handler for domain table changes
    * Works for any table that follows the standard CRUD pattern
+   * @param change - The change to apply
+   * @param isLiveSync - If true, uses SYNC_TRANSACTION flag; if false, assumes tracking is already disabled
    */
-  private async applyDomainTableChange(change: TableChange): Promise<void> {
+  private async applyDomainTableChange(change: TableChange, isLiveSync: boolean = false): Promise<void> {
     const { db } = await import('@repo/dataforge/dexie-schema');
     const tableName = this.snakeToCamel(change.table); // Convert snake_case to camelCase for Dexie table names
     const dexieTable = (db as any)[tableName];
@@ -616,230 +719,61 @@ export class IncomingChangeService {
       throw new Error(`Dexie table not found for: ${change.table} (tried: ${tableName})`);
     }
     
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting ${change.table} ${change.data.id} into IndexedDB`);
-        await dexieTable.put(change.data as any);
-        break;
+    if (isLiveSync) {
+      // LIVE SYNC: Use SYNC_TRANSACTION flag for individual operations
+      const { SYNC_TRANSACTION } = await import('../db/dexie-change-tracking');
       
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating ${change.table} ${change.data.id} in IndexedDB`);
-        const mergedData = await this.mergeUpdateData(dexieTable, change.data.id, change.data);
-        await dexieTable.put(mergedData);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting ${change.table} ${change.data.id} from IndexedDB`);
-        await dexieTable.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown operation for ${change.table}: ${change.operation}`);
+      await db.transaction('rw', dexieTable, async (trans) => {
+        (trans as any)[SYNC_TRANSACTION] = true;
+        
+        switch (change.operation) {
+          case 'insert':
+            console.log(`[IncomingChangeService] 🔄 Live sync: Inserting ${change.table} ${change.data.id} with SYNC_TRANSACTION`);
+            await dexieTable.put(change.data as any);
+            break;
+          
+          case 'update':
+            console.log(`[IncomingChangeService] 🔄 Live sync: Updating ${change.table} ${change.data.id} with SYNC_TRANSACTION`);
+            const mergedData = await this.mergeUpdateData(dexieTable, change.data.id, change.data);
+            await dexieTable.put(mergedData);
+            break;
+          
+          case 'delete':
+            console.log(`[IncomingChangeService] 🔄 Live sync: Deleting ${change.table} ${change.data.id} with SYNC_TRANSACTION`);
+            await dexieTable.delete(change.data.id);
+            break;
+          
+          default:
+            throw new Error(`Unknown operation for ${change.table}: ${change.operation}`);
+        }
+      });
+    } else {
+      // INITIAL/CATCHUP SYNC: Change tracking is already disabled at sync phase level
+      // Just apply the changes directly
+      switch (change.operation) {
+        case 'insert':
+          console.log(`[IncomingChangeService] 📥 Initial/catchup: Inserting ${change.table} ${change.data.id}`);
+          await dexieTable.put(change.data as any);
+          break;
+        
+        case 'update':
+          console.log(`[IncomingChangeService] 📥 Initial/catchup: Updating ${change.table} ${change.data.id}`);
+          const mergedData = await this.mergeUpdateData(dexieTable, change.data.id, change.data);
+          await dexieTable.put(mergedData);
+          break;
+        
+        case 'delete':
+          console.log(`[IncomingChangeService] 📥 Initial/catchup: Deleting ${change.table} ${change.data.id}`);
+          await dexieTable.delete(change.data.id);
+          break;
+        
+        default:
+          throw new Error(`Unknown operation for ${change.table}: ${change.operation}`);
+      }
     }
   }
 
-  /**
-   * Apply task changes using Dexie only
-   */
-  private async applyTaskChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting task ${change.data.id} into IndexedDB`);
-        await db.tasks.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating task ${change.data.id} in IndexedDB`);
-        const mergedTask = await this.mergeUpdateData(db.tasks, change.data.id, change.data);
-        await db.tasks.put(mergedTask);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting task ${change.data.id} from IndexedDB`);
-        await db.tasks.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown task operation: ${change.operation}`);
-    }
-  }
 
-  /**
-   * Apply project changes using Dexie only
-   */
-  private async applyProjectChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting project ${change.data.id} into IndexedDB`);
-        await db.projects.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating project ${change.data.id} in IndexedDB`);
-        const mergedProject = await this.mergeUpdateData(db.projects, change.data.id, change.data);
-        await db.projects.put(mergedProject);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting project ${change.data.id} from IndexedDB`);
-        await db.projects.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown project operation: ${change.operation}`);
-    }
-  }
-
-  /**
-   * Apply user changes using Dexie only
-   */
-  private async applyUserChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting user ${change.data.id} into IndexedDB`);
-        await db.users.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating user ${change.data.id} in IndexedDB`);
-        const mergedUser = await this.mergeUpdateData(db.users, change.data.id, change.data);
-        await db.users.put(mergedUser);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting user ${change.data.id} from IndexedDB`);
-        await db.users.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown user operation: ${change.operation}`);
-    }
-  }
-
-  /**
-   * Apply comment changes using Dexie only
-   */
-  private async applyCommentChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting comment ${change.data.id} into IndexedDB`);
-        await db.comments.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating comment ${change.data.id} in IndexedDB`);
-        const mergedComment = await this.mergeUpdateData(db.comments, change.data.id, change.data);
-        await db.comments.put(mergedComment);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting comment ${change.data.id} from IndexedDB`);
-        await db.comments.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown comment operation: ${change.operation}`);
-    }
-  }
-
-  /**
-   * Apply status set changes using Dexie only
-   */
-  private async applyStatusSetChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_set ${change.data.id} into IndexedDB`);
-        await db.statusSets.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_set ${change.data.id} in IndexedDB`);
-        const mergedStatusSet = await this.mergeUpdateData(db.statusSets, change.data.id, change.data);
-        await db.statusSets.put(mergedStatusSet);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_set ${change.data.id} from IndexedDB`);
-        await db.statusSets.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown status set operation: ${change.operation}`);
-    }
-  }
-
-  /**
-   * Apply status definition changes using Dexie only
-   */
-  private async applyStatusDefinitionChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting status_definition ${change.data.id} into IndexedDB`);
-        await db.statusDefinitions.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating status_definition ${change.data.id} in IndexedDB`);
-        const mergedStatusDef = await this.mergeUpdateData(db.statusDefinitions, change.data.id, change.data);
-        await db.statusDefinitions.put(mergedStatusDef);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting status_definition ${change.data.id} from IndexedDB`);
-        await db.statusDefinitions.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown status definition operation: ${change.operation}`);
-    }
-  }
-
-  /**
-   * Apply tag changes using Dexie only
-   */
-  private async applyTagChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag ${change.data.id} into IndexedDB`);
-        await db.tags.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag ${change.data.id} in IndexedDB`);
-        const mergedTag = await this.mergeUpdateData(db.tags, change.data.id, change.data);
-        await db.tags.put(mergedTag);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag ${change.data.id} from IndexedDB`);
-        await db.tags.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown tag operation: ${change.operation}`);
-    }
-  }
 
   /**
    * Helper to match table names with entity names
@@ -934,34 +868,6 @@ export class IncomingChangeService {
     }
   }
   
-  /**
-   * Apply tag set changes using Dexie only
-   */
-  private async applyTagSetChange(change: TableChange): Promise<void> {
-    // Apply to Dexie system only - no need for transaction wrapper since hooks are disabled
-    const { db } = await import('@repo/dataforge/dexie-schema');
-    
-    switch (change.operation) {
-      case 'insert':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting tag_set ${change.data.id} into IndexedDB`);
-        await db.tagSets.put(change.data as any);
-        break;
-      
-      case 'update':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Updating tag_set ${change.data.id} in IndexedDB`);
-        const mergedTagSet = await this.mergeUpdateData(db.tagSets, change.data.id, change.data);
-        await db.tagSets.put(mergedTagSet);
-        break;
-      
-      case 'delete':
-        console.log(`[IncomingChangeService] 🗄️ Dexie: Deleting tag_set ${change.data.id} from IndexedDB`);
-        await db.tagSets.delete(change.data.id);
-        break;
-      
-      default:
-        throw new Error(`Unknown tag set operation: ${change.operation}`);
-    }
-  }
 
   /**
    * Convert snake_case field names to camelCase

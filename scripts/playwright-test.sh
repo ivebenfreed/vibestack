@@ -72,8 +72,8 @@ if [[ ! -f "playwright.config.js" ]]; then
     echo ""
 fi
 
-# Check if @playwright/test is installed
-if ! npm list @playwright/test > /dev/null 2>&1; then
+# Check if @playwright/test is installed (suppress npm warnings)
+if ! npm list @playwright/test --depth=0 2>/dev/null | grep -q "@playwright/test"; then
     echo -e "${YELLOW}⚠️  @playwright/test not installed${NC}"
     echo -e "${YELLOW}   Run: pnpm add -D @playwright/test -w${NC}"
     echo ""
