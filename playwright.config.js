@@ -17,11 +17,15 @@ function getIssueNumber() {
     const branchName = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
     const match = branchName.match(/(?:issue-|feature-|pr-)(\d+)/);
     if (match) {
-      console.log(`🔍 Auto-detected issue number ${match[1]} from branch: ${branchName}`);
+      // Suppress logs for json/dot reporters to avoid EPIPE errors
+      const suppressLogs = process.argv.some(arg => arg.includes('json') || arg.includes('dot'));
+      if (!suppressLogs) {
+        console.log(`🔍 Auto-detected issue number ${match[1]} from branch: ${branchName}`);
+      }
       return match[1];
     }
   } catch (error) {
-    console.log('Could not detect branch name, using default');
+    // Silent fail
   }
   
   return 'main';
@@ -47,11 +51,15 @@ const issueNumber = getIssueNumber();
 const ports = getPorts(issueNumber);
 const userDataDir = path.resolve(process.cwd(), '.playwright', 'profiles', `profile-${issueNumber}`);
 
-console.log(`🎭 Playwright Config (Persistent Context):`);
-console.log(`   Issue: ${issueNumber}`);
-console.log(`   Web Port: ${ports.webPort}`);
-console.log(`   Server Port: ${ports.serverPort}`);
-console.log(`   Profile Dir: ${userDataDir}`);
+// Suppress logs for json/dot reporters to avoid EPIPE errors
+const suppressLogs = process.argv.some(arg => arg.includes('json') || arg.includes('dot'));
+if (!suppressLogs) {
+  console.log(`🎭 Playwright Config (Persistent Context):`);
+  console.log(`   Issue: ${issueNumber}`);
+  console.log(`   Web Port: ${ports.webPort}`);
+  console.log(`   Server Port: ${ports.serverPort}`);
+  console.log(`   Profile Dir: ${userDataDir}`);
+}
 
 export default defineConfig({
   testDir: './tests/playwright',
