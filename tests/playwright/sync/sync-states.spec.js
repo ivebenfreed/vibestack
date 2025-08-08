@@ -4,7 +4,12 @@ import {
   getSyncState, 
   getCurrentLSN,
   waitForSyncInitialized,
-  getSyncMetrics
+  getSyncMetrics,
+  monitorSyncEvents,
+  disconnectSync,
+  reconnectSync,
+  forceSyncCatchup,
+  waitForSyncLive
 } from '../core/sync-test-helpers.js';
 import { 
   createEntity, 
@@ -15,7 +20,11 @@ import {
 
 test.describe('Sync State Transitions', () => {
   test('verify sync initialization process', async ({ page }) => {
-    await page.goto('/');
+    // Navigate only if not already on the app
+    const currentUrl = page.url();
+    if (!currentUrl.includes('localhost:')) {
+      await page.goto('/');
+    }
     
     console.log('\n=== SYNC INITIALIZATION TEST ===');
     
@@ -48,7 +57,11 @@ test.describe('Sync State Transitions', () => {
   });
 
   test('verify sync state after operations', async ({ page }) => {
-    await page.goto('/');
+    // Navigate only if not already on the app
+    const currentUrl = page.url();
+    if (!currentUrl.includes('localhost:')) {
+      await page.goto('/');
+    }
     await waitForSyncInitialized(page, 15000);
     
     await withTestContext(page, async () => {
@@ -100,7 +113,11 @@ test.describe('Sync State Transitions', () => {
   });
 
   test('test sync reconnection after disconnect', async ({ page }) => {
-    await page.goto('/');
+    // Navigate only if not already on the app
+    const currentUrl = page.url();
+    if (!currentUrl.includes('localhost:')) {
+      await page.goto('/');
+    }
     await waitForSyncInitialized(page, 15000);
     
     console.log('\n=== SYNC RECONNECTION TEST ===');
@@ -148,7 +165,11 @@ test.describe('Sync State Transitions', () => {
   });
 
   test('test sync catchup after operations', async ({ page }) => {
-    await page.goto('/');
+    // Navigate only if not already on the app
+    const currentUrl = page.url();
+    if (!currentUrl.includes('localhost:')) {
+      await page.goto('/');
+    }
     await waitForSyncInitialized(page, 15000);
     
     await withTestContext(page, async () => {
@@ -203,7 +224,11 @@ test.describe('Sync State Transitions', () => {
   });
 
   test('test live sync transition monitoring', async ({ page }) => {
-    await page.goto('/');
+    // Navigate only if not already on the app
+    const currentUrl = page.url();
+    if (!currentUrl.includes('localhost:')) {
+      await page.goto('/');
+    }
     await waitForSyncInitialized(page, 15000);
     
     console.log('\n=== LIVE SYNC TRANSITION TEST ===');
@@ -252,7 +277,11 @@ test.describe('Sync State Transitions', () => {
   });
 
   test('test sync metrics and monitoring', async ({ page }) => {
-    await page.goto('/');
+    // Navigate only if not already on the app
+    const currentUrl = page.url();
+    if (!currentUrl.includes('localhost:')) {
+      await page.goto('/');
+    }
     await waitForSyncInitialized(page, 15000);
     
     await withTestContext(page, async () => {

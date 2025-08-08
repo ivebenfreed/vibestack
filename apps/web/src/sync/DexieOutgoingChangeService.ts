@@ -38,6 +38,7 @@ export class DexieOutgoingChangeService {
   private config: DexieOutgoingChangeServiceConfig;
   private callbacks: DexieOutgoingChangeServiceCallbacks = {};
   private isProcessing = false;
+  private hasPendingRequest = false; // Track if there's a pending process request
   private instanceId: string;
   private inFlightChangeIds = new Set<string>(); // Track changes being sent to prevent duplicates
   
@@ -92,11 +93,14 @@ export class DexieOutgoingChangeService {
    */
   async processPendingChanges(): Promise<void> {
     if (this.isProcessing) {
-      console.log('[DexieOutgoingChangeService] Already processing, skipping');
+      // Instead of skipping, mark that another process is needed after current one completes
+      this.hasPendingRequest = true;
+      console.log('[DexieOutgoingChangeService] Already processing, queueing another process cycle');
       return;
     }
     
     this.isProcessing = true;
+    this.hasPendingRequest = false; // Clear pending flag
     const batchSize = this.config.batchSize || 100;
     
     try {
@@ -221,6 +225,13 @@ export class DexieOutgoingChangeService {
       this.callbacks.onError?.(error as Error, 'process_changes');
     } finally {
       this.isProcessing = false;
+      
+      // If there was a pending request while we were processing, start another cycle
+      if (this.hasPendingRequest) {
+        console.log('[DexieOutgoingChangeService] Processing queued request');
+        // Schedule the next processing cycle asynchronously to avoid recursion
+        setTimeout(() => this.processPendingChanges(), 0);
+      }
     }
   }
   
@@ -240,13 +251,44 @@ export class DexieOutgoingChangeService {
         operation: change.operation,
         data: dataWithClientId,
         clientId: this.config.clientId,
-        updatedAt: change.updatedAt.toISOString()
+        updatedAt: change.updatedAt.toISOString(),
+        changeId: change.id // Include the localChanges record ID for direct acknowledgment
       };
     });
   }
   
   /**
-   * Mark changes as processed based on record IDs from server
+   * Mark changes as processed based on change IDs directly from server
+   */
+  async markChangesAsProcessedByChangeIds(changeIds: string[]): Promise<void> {
+    console.log('[DexieOutgoingChangeService] markChangesAsProcessedByChangeIds called with:', changeIds);
+    
+    if (changeIds.length === 0) {
+      console.warn('[DexieOutgoingChangeService] No change IDs provided');
+      return;
+    }
+    
+    // Remove from in-flight tracking
+    changeIds.forEach(id => this.inFlightChangeIds.delete(id));
+    
+    // Mark as processed in database - direct lookup by change ID
+    const modifiedCount = await db.localChanges
+      .where('id')
+      .anyOf(changeIds)
+      .modify({ processedSync: 1 });
+    
+    console.log(`[DexieOutgoingChangeService] Successfully marked ${modifiedCount} changes as processed from ${changeIds.length} provided IDs`);
+    
+    // Debug: Check if any changes weren't found
+    if (modifiedCount < changeIds.length) {
+      const notFound = changeIds.length - modifiedCount;
+      console.warn(`[DexieOutgoingChangeService] Warning: ${notFound} change IDs were not found in localChanges table`);
+    }
+  }
+
+  /**
+   * Mark changes as processed based on record IDs from server (legacy method)
+   * @deprecated Use markChangesAsProcessedByChangeIds instead
    */
   async markChangesAsProcessedByRecordIds(recordIds: string[]): Promise<void> {
     console.log('[DexieOutgoingChangeService] markChangesAsProcessedByRecordIds called with:', recordIds);

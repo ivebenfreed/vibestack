@@ -707,8 +707,15 @@ export const syncMachineV3 = setup({
       entry: [
         () => syncLogger.stateEntry('initial_sync', 'Running initial synchronization'),
         () => {
-          console.log('[SyncMachineV3] 🔇 Disabling change tracking during initial sync');
+          console.log('[SyncMachineV3] 🔴 DISABLING change tracking for ENTIRE initial sync phase');
           disableChangeTracking();
+        }
+      ],
+      
+      exit: [
+        () => {
+          console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking after initial sync complete');
+          enableChangeTracking();
         }
       ],
       
@@ -774,8 +781,15 @@ export const syncMachineV3 = setup({
       entry: [
         () => syncLogger.stateEntry('catchup_sync', 'Running catchup synchronization'),
         () => {
-          console.log('[SyncMachineV3] 🔇 Disabling change tracking during catchup sync');
+          console.log('[SyncMachineV3] 🔴 DISABLING change tracking for ENTIRE catchup sync phase');
           disableChangeTracking();
+        }
+      ],
+      
+      exit: [
+        () => {
+          console.log('[SyncMachineV3] 🟢 RE-ENABLING change tracking after catchup sync complete');
+          enableChangeTracking();
         }
       ],
       
@@ -913,11 +927,7 @@ export const syncMachineV3 = setup({
     live_sync: {
       entry: [
         () => syncLogger.stateEntry('live_sync', 'Enhanced validation complete, system ready for real-time sync'),
-        () => {
-          // Re-enable change tracking now that initial/catchup sync is complete
-          console.log('[SyncMachineV3] 🔄 Re-enabling Dexie change tracking for live sync');
-          enableChangeTracking();
-        },
+        // Change tracking is already enabled by exit handlers of initial/catchup sync
         ({ context }) => {
           // Start Dexie outgoing sync monitoring if available
           const dexieService = context.serviceCoordinator?.getServices()?.dexieOutgoing;

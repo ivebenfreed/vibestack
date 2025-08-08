@@ -40,7 +40,7 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
   const createProject = useCallback(async (projectData: { name: string; description?: string; status?: ProjectStatus }) => {
     console.log('Creating project with data:', projectData);
     
-    const created = await domainServices.project.createUI({
+    const created = await domainServices.project.create({
       name: projectData.name,
       description: projectData.description || '',
       status: projectData.status || ProjectStatus.ACTIVE
@@ -60,7 +60,7 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
   const updateProject = useCallback(async (id: string, changes: Partial<Project>) => {
     console.log('Updating project with id:', id, 'and changes:', changes);
     
-    const updated = await domainServices.project.updateUI(id, changes);
+    const updated = await domainServices.project.update(id, changes);
     
     // Dispatch a custom event to notify that a project was updated
     const event = new CustomEvent('project-updated', { 
@@ -76,7 +76,7 @@ const ProjectsProvider: React.FC<ProjectsProviderProps> = ({ children }) => {
   const deleteProject = useCallback(async (id: string) => {
     console.log('Deleting project with id:', id);
     
-    const success = await domainServices.project.deleteUI(id);
+    const success = await domainServices.project.delete(id);
     
     if (success) {
       // Dispatch a custom event to notify that a project was deleted

@@ -35,6 +35,7 @@ export interface TableChange {
   
   lsn?: string;        // WAL LSN for ordering
   clientId?: string;  // Client ID for conflict resolution
+  changeId?: string;  // Client change ID for direct acknowledgment (Dexie localChanges record ID)
   
   // ✨ TypeORM-native relationship support
   relationshipUpdates?: RelationshipUpdate[];
