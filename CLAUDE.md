@@ -473,6 +473,7 @@ After recent cleanup, only active issues remain:
 ```bash
 git worktree list
 # /home/benfreed/vibestack                     [staging]
-# /home/benfreed/vibestack/worktrees/issue-53  [issue-53]  
 # /home/benfreed/vibestack/worktrees/issue-60  [issue-60]
 ```
+
+All completed issues (38, 53, 57) have been cleaned up.
