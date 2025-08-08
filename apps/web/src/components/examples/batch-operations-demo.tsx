@@ -22,7 +22,7 @@ export function BatchOperationsDemo() {
     ];
     
     try {
-      const updatedTasks = await domainServices.task.batchUpdateUI(tasksToUpdate);
+      const updatedTasks = await domainServices.task.batchUpdate(tasksToUpdate);
       console.log('Batch updated tasks:', updatedTasks);
     } catch (error) {
       console.error('Batch update failed:', error);
@@ -53,7 +53,7 @@ export function BatchOperationsDemo() {
     ];
     
     try {
-      const createdTasks = await domainServices.task.batchCreateUI(newTasks);
+      const createdTasks = await domainServices.task.batchCreate(newTasks);
       console.log('Batch created tasks:', createdTasks);
     } catch (error) {
       console.error('Batch create failed:', error);
@@ -65,7 +65,7 @@ export function BatchOperationsDemo() {
     const tasksToDelete = ['task-1', 'task-2', 'task-3'];
     
     try {
-      const result = await domainServices.task.batchDeleteUI(tasksToDelete);
+      const result = await domainServices.task.batchDelete(tasksToDelete);
       console.log('Batch delete result:', result);
       console.log('Deleted:', result.deleted);
       console.log('Not found:', result.notFound);
@@ -87,7 +87,7 @@ function TasksTable() {
   // Define batch update handler
   const handleBatchUpdate = useCallback(async (updates) => {
     try {
-      await domainServices.task.batchUpdateUI(updates);
+      await domainServices.task.batchUpdate(updates);
     } catch (error) {
       console.error('Batch update failed', error);
       throw error;
@@ -99,7 +99,7 @@ function TasksTable() {
       tableId="tasks-table"
       entityType="task"
       columns={columns}
-      onEntityUpdate={(id, updates) => domainServices.task.updateUI(id, updates)}
+      onEntityUpdate={(id, updates) => domainServices.task.update(id, updates)}
       onBatchEntityUpdate={handleBatchUpdate}    // Batch updates for fill & paste
     />
   );
@@ -138,15 +138,15 @@ async function handleIncomingChanges(changes: TableChange[]) {
     }
   }
   
-  // Apply batch operations (no sync tracking for incoming)
+  // Apply batch operations (sync transactions to avoid tracking)
   if (creates.length > 0) {
-    await domainServices.task.batchCreateIncoming(creates);
+    await domainServices.task.batchCreateSync(creates);
   }
   if (updates.length > 0) {
-    await domainServices.task.batchUpdateIncoming(updates);
+    await domainServices.task.batchUpdateSync(updates);
   }
   if (deletes.length > 0) {
-    await domainServices.task.batchDeleteIncoming(deletes);
+    await domainServices.task.batchDeleteSync(deletes);
   }
 }`}</pre>
       </div>

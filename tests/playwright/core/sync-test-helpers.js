@@ -37,6 +37,36 @@ export async function waitForLSN(page, targetLSN, timeout = 30000) {
  * @returns {Promise<void>}
  */
 export async function waitForSyncInitialized(page, timeout = 30000) {
+  // First ensure the page is loaded (wait for network idle or specific element)
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+    console.log('⚠️  Network not idle, continuing...');
+  });
+
+  // Then ensure the app is loaded
+  await page.waitForFunction(
+    () => {
+      // Check if the app is ready (body has data-playwright-ready attribute or we have window.db)
+      const isReady = document.body?.getAttribute('data-playwright-ready') === 'true' || 
+                      (typeof window !== 'undefined' && window.db);
+      return isReady;
+    },
+    {},
+    { timeout: 10000 }
+  ).catch(() => {
+    console.log('⚠️  App may not be using playwright-ready detection, continuing...');
+  });
+
+  // Check if sync is already initialized (from previous test runs with persistent context)
+  const existingState = await page.evaluate(() => {
+    return JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
+  });
+  
+  if (existingState.clientId && existingState.currentLSN) {
+    console.log('✅ Sync already initialized from previous session:', existingState.currentLSN);
+    return;
+  }
+
+  // Wait for sync to be initialized
   await page.waitForFunction(
     () => {
       const syncState = JSON.parse(localStorage.getItem('sync-machine-state') || '{}');
