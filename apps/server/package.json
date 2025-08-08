@@ -1,5 +1,5 @@
 {
-  "name": "server-issue-53",
+  "name": "server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
