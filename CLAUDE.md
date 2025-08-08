@@ -43,6 +43,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. Use `./scripts/bg-status.sh` to check running processes
 5. Use `./scripts/bg-logs.sh <session>` to view logs
 
+### Main Branch Development:
+For testing on main/staging branch (not in issue worktrees):
+- **`./scripts/dev-main.sh`** - Start dev servers with default staging ports
+- Sets `MAIN_MODE=true` to bypass issue detection
+- Uses ports: Web=5173, Server=8787, DB=5432
+
 ### DO NOT:
 - Run dev servers directly (they will be redirected automatically)
 - Use `&` or `nohup` for background processes (use tmux instead)
