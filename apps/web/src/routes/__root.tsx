@@ -11,6 +11,7 @@ import { Task, Project, User } from '@repo/dataforge/client-entities'
 // import { useAuth } from '@/state-machines' // 🔥 REPLACED with V2 orchestrator hook
 import { authClient } from '@/lib/auth'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
+import { IntegrityMonitor } from '@/components/IntegrityMonitor'
 // 🔥 NEW: Import XState machines directly (no orchestrator needed)
 import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
@@ -363,6 +364,7 @@ function AppWithInitialization() {
     <>
       <Outlet />
       {isAuthenticated && !isSystemReady && <UnifiedLoadingScreen />}
+      <IntegrityMonitor />
       <Toaster duration={3000} />
       {import.meta.env.MODE === 'development' && (
         <TanStackRouterDevtools position='bottom-right' />

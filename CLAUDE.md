@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## Current Worktree Configuration
+
+**This is Issue #60 worktree with the following ports:**
+
+- Web application: `http://localhost:5773`
+- Server API: `http://localhost:9387`
+- Database: `postgres://postgres:postgres@localhost:6032/vibestack_dev_issue_60`
+- Proxy: Port 5054
+
+
 ## Current Configuration
 
 **This is the main staging branch with the following default ports:**
