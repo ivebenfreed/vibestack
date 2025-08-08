@@ -47,7 +47,7 @@ function logChange(changeRecord: Omit<LocalChanges, 'id'>, transaction?: any): v
   
   // Skip if this is a sync transaction from the server
   if (transaction && (transaction as any)[SYNC_TRANSACTION]) {
-    console.log(`[Dexie Change Tracking] Skipping change tracking for sync operation: ${changeRecord.table}`);
+    // Skip change tracking for sync operation
     return;
   }
   
@@ -121,7 +121,7 @@ let hooksInitialized = false;
  * @param userId - The current user ID
  */
 export function initializeDexieChangeTracking(clientId: string, userId: string) {
-  console.log('[Dexie Change Tracking] Initializing automatic change tracking with transaction context detection');
+  // Initialize automatic change tracking
   
   // Update global client and user IDs
   currentClientId = clientId;
@@ -245,7 +245,7 @@ export function initializeDexieChangeTracking(clientId: string, userId: string) 
   // Mark as initialized
   hooksInitialized = true;
   
-  console.log(`[Dexie Change Tracking] Successfully initialized automatic tracking for ${TRACKED_TABLES.length} tables`);
+  // Successfully initialized automatic tracking
 }
 
 /**
@@ -318,7 +318,7 @@ export async function getAllChanges(): Promise<LocalChanges[]> {
  * Disable change tracking (used during initial and catchup sync)
  */
 export function disableChangeTracking(): void {
-  console.log('[Dexie Change Tracking] Disabling change tracking');
+  // Disable change tracking during sync
   isTrackingEnabled = false;
 }
 
@@ -326,7 +326,7 @@ export function disableChangeTracking(): void {
  * Enable change tracking (used after sync completes)
  */
 export function enableChangeTracking(): void {
-  console.log('[Dexie Change Tracking] Enabling change tracking');
+  // Re-enable change tracking after sync
   isTrackingEnabled = true;
 }
 

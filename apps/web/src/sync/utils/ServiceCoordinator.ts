@@ -158,7 +158,7 @@ export class ServiceCoordinator {
         conflictResolution: 'server-wins'
       };
       this.services.incoming = new IncomingChangeService(incomingConfig, null as any);
-      console.log('[ServiceCoordinator] ✅ IncomingChangeService created (Dexie mode)');
+      // IncomingChangeService created in Dexie mode
 
       // Initialize Dexie outgoing service if enabled
       if (config.enableDexieSync) {
@@ -170,9 +170,9 @@ export class ServiceCoordinator {
           retryDelay: 1000
         };
         this.services.dexieOutgoing = new DexieOutgoingChangeService(dexieOutgoingConfig);
-        console.log('[ServiceCoordinator] ✅ DexieOutgoingChangeService created successfully');
+        // DexieOutgoingChangeService created successfully
       } else {
-        console.log('[ServiceCoordinator] ⚠️ DexieOutgoingChangeService NOT created - enableDexieSync is false');
+        // DexieOutgoingChangeService disabled
       }
 
       // Validate all services created successfully
@@ -339,18 +339,7 @@ export class ServiceCoordinator {
             try {
               const messageId = Date.now().toString();
               
-              // Debug log what we're sending
-              console.log('[ServiceCoordinator] Sending Dexie changes to server:', {
-                changeCount: changes.length,
-                clientId: this.config!.clientId,
-                changes: changes.map(c => ({
-                  table: c.table,
-                  operation: c.operation,
-                  hasClientIdInData: !!c.data?.clientId,
-                  clientIdValue: c.data?.clientId,
-                  dataKeys: Object.keys(c.data || {})
-                }))
-              });
+              // Sending Dexie changes to server (${changes.length} changes)
               
               this.services.webSocket.send({
                 type: 'clt_send_changes',
