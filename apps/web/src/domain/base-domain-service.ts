@@ -5,7 +5,7 @@
  * Subclasses must implement entity-specific logic while inheriting common patterns.
  */
 
-import { trackOutgoingChange } from '@/db/dexie-change-tracking';
+// trackOutgoingChange no longer needed - automatic hooks handle change tracking
 
 /**
  * Base class for all domain services
@@ -35,23 +35,23 @@ export abstract class BaseDomainService<
   protected abstract getTable(): any;
   
   // ============================================================================
-  // UI Operations (with sync tracking)
+  // Unified CRUD Operations (automatic sync tracking via hooks)
   // ============================================================================
   
   /**
-   * Create entity from UI - includes sync tracking
+   * Create entity - automatic sync tracking via hooks
    */
-  abstract createUI(input: TCreateInput): Promise<TEntity>;
+  abstract create(input: TCreateInput): Promise<TEntity>;
   
   /**
-   * Update entity from UI - includes sync tracking
+   * Update entity - automatic sync tracking via hooks
    */
-  abstract updateUI(id: string, updates: TUpdateInput): Promise<TEntity>;
+  abstract update(id: string, updates: TUpdateInput): Promise<TEntity>;
   
   /**
-   * Delete entity from UI - includes sync tracking
+   * Delete entity - automatic sync tracking via hooks
    */
-  abstract deleteUI(id: string): Promise<boolean>;
+  abstract delete(id: string): Promise<boolean>;
   
   // ============================================================================
   // Batch Operations (with sync tracking)
@@ -61,7 +61,7 @@ export abstract class BaseDomainService<
    * Update multiple entities in a single transaction
    * Each update can have different fields
    */
-  async batchUpdateUI(updates: Array<{ id: string; updates: TUpdateInput }>): Promise<TEntity[]> {
+  async batchUpdate(updates: Array<{ id: string; updates: TUpdateInput }>): Promise<TEntity[]> {
     const table = this.getTable();
     const results: TEntity[] = [];
     const timestamp = new Date().toISOString();
@@ -95,8 +95,7 @@ export abstract class BaseDomainService<
         await table.put(updated);
         results.push(updated);
         
-        // Track each change for sync
-        await trackOutgoingChange(this.tableName, 'update', updated);
+        // Note: Change tracking happens automatically via hooks
       }
     });
     
@@ -111,7 +110,7 @@ export abstract class BaseDomainService<
   /**
    * Delete multiple entities in a single transaction
    */
-  async batchDeleteUI(ids: string[]): Promise<{ deleted: string[]; notFound: string[] }> {
+  async batchDelete(ids: string[]): Promise<{ deleted: string[]; notFound: string[] }> {
     const table = this.getTable();
     const deleted: string[] = [];
     const notFound: string[] = [];
@@ -135,8 +134,7 @@ export abstract class BaseDomainService<
           await table.delete(entity.id);
           deleted.push(entity.id);
           
-          // Track each deletion for sync
-          await trackOutgoingChange(this.tableName, 'delete', entity);
+          // Note: Change tracking happens automatically via hooks
         }
       });
     }
@@ -153,20 +151,19 @@ export abstract class BaseDomainService<
   /**
    * Create multiple entities in a single transaction
    */
-  async batchCreateUI(inputs: TCreateInput[]): Promise<TEntity[]> {
+  async batchCreate(inputs: TCreateInput[]): Promise<TEntity[]> {
     if (inputs.length === 0) {
       return [];
     }
     
     const table = this.getTable();
     const results: TEntity[] = [];
-    const timestamp = new Date().toISOString();
     
     // Perform creates in a single transaction
     await table.db.transaction('rw', table, async () => {
       for (const input of inputs) {
         // Let subclass handle entity creation logic
-        const entity = await this.createUI(input);
+        const entity = await this.create(input);
         results.push(entity);
       }
     });
@@ -177,55 +174,56 @@ export abstract class BaseDomainService<
   }
   
   // ============================================================================
-  // Incoming Operations (no sync tracking)
+  // Sync Operations (executed within sync transactions to avoid tracking)
   // ============================================================================
   
   /**
-   * Create entity from incoming sync - no tracking
+   * Create entity from sync - uses sync transaction to avoid tracking
    */
-  abstract createIncoming(entity: TEntity): Promise<TEntity>;
+  abstract createSync(entity: TEntity): Promise<TEntity>;
   
   /**
-   * Update entity from incoming sync - no tracking
+   * Update entity from sync - uses sync transaction to avoid tracking
    */
-  abstract updateIncoming(id: string, updates: Partial<TEntity>): Promise<TEntity>;
+  abstract updateSync(id: string, updates: Partial<TEntity>): Promise<TEntity>;
   
   /**
-   * Delete entity from incoming sync - no tracking
+   * Delete entity from sync - uses sync transaction to avoid tracking
    */
-  abstract deleteIncoming(id: string): Promise<boolean>;
+  abstract deleteSync(id: string): Promise<boolean>;
   
   // ============================================================================
-  // Batch Incoming Operations (no sync tracking)
+  // Batch Sync Operations (executed within sync transactions to avoid tracking)
   // ============================================================================
   
   /**
-   * Update multiple entities from incoming sync - no tracking
+   * Update multiple entities from sync - uses sync transaction to avoid tracking
    * More efficient than individual updates for bulk sync operations
    */
-  async batchUpdateIncoming(updates: Array<{ id: string; updates: Partial<TEntity> }>): Promise<TEntity[]> {
+  async batchUpdateSync(updates: Array<{ id: string; updates: Partial<TEntity> }>): Promise<TEntity[]> {
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
     const table = this.getTable();
     const results: TEntity[] = [];
     
-    // Get all existing entities in one query
-    const existingEntities = await table.bulkGet(updates.map(u => u.id));
-    const validUpdates: Array<{ existing: TEntity; updates: Partial<TEntity> }> = [];
-    
-    for (let i = 0; i < updates.length; i++) {
-      const existing = existingEntities[i];
-      if (!existing) {
-        console.warn(`[${this.entityName}Service] Skipping incoming update for non-existent ${this.entityName} ${updates[i].id}`);
-        continue;
+    await applySyncChanges(async () => {
+      // Get all existing entities in one query
+      const existingEntities = await table.bulkGet(updates.map(u => u.id));
+      const validUpdates: Array<{ existing: TEntity; updates: Partial<TEntity> }> = [];
+      
+      for (let i = 0; i < updates.length; i++) {
+        const existing = existingEntities[i];
+        if (!existing) {
+          console.warn(`[${this.entityName}Service] Skipping incoming update for non-existent ${this.entityName} ${updates[i].id}`);
+          continue;
+        }
+        validUpdates.push({ existing, updates: updates[i].updates });
       }
-      validUpdates.push({ existing, updates: updates[i].updates });
-    }
-    
-    if (validUpdates.length === 0) {
-      return [];
-    }
-    
-    // Perform all updates in a single transaction (no sync tracking)
-    await table.db.transaction('rw', table, async () => {
+      
+      if (validUpdates.length === 0) {
+        return;
+      }
+      
+      // Perform all updates in a single transaction (sync transaction marked)
       for (const { existing, updates: updateData } of validUpdates) {
         const updated: TEntity = {
           ...existing,
@@ -237,49 +235,113 @@ export abstract class BaseDomainService<
       }
     });
     
-    console.log(`[${this.entityName}Service] Batch updated ${results.length} entities from incoming sync`);
+    console.log(`[${this.entityName}Service] Batch updated ${results.length} entities from sync`);
     
     return results;
   }
   
   /**
-   * Create multiple entities from incoming sync - no tracking
+   * Create multiple entities from sync - uses sync transaction to avoid tracking
    */
-  async batchCreateIncoming(entities: TEntity[]): Promise<TEntity[]> {
+  async batchCreateSync(entities: TEntity[]): Promise<TEntity[]> {
     if (entities.length === 0) {
       return [];
     }
     
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
     const table = this.getTable();
     
-    // Perform all creates in a single transaction
-    await table.db.transaction('rw', table, async () => {
+    await applySyncChanges(async () => {
       await table.bulkPut(entities);
     });
     
-    console.log(`[${this.entityName}Service] Batch created ${entities.length} entities from incoming sync`);
+    console.log(`[${this.entityName}Service] Batch created ${entities.length} entities from sync`);
     
     return entities;
   }
   
   /**
-   * Delete multiple entities from incoming sync - no tracking
+   * Delete multiple entities from sync - uses sync transaction to avoid tracking
    */
-  async batchDeleteIncoming(ids: string[]): Promise<number> {
+  async batchDeleteSync(ids: string[]): Promise<number> {
     if (ids.length === 0) {
       return 0;
     }
     
+    const { applySyncChanges } = await import('@/db/dexie-change-tracking');
     const table = this.getTable();
     
-    // Perform all deletes in a single transaction
-    await table.db.transaction('rw', table, async () => {
+    await applySyncChanges(async () => {
       await table.bulkDelete(ids);
     });
     
-    console.log(`[${this.entityName}Service] Batch deleted ${ids.length} entities from incoming sync`);
+    console.log(`[${this.entityName}Service] Batch deleted ${ids.length} entities from sync`);
     
     return ids.length;
+  }
+
+  // ============================================================================
+  // Backward Compatibility Aliases (deprecated)
+  // ============================================================================
+  
+  /** @deprecated Use create() instead - will be removed in next version */
+  async createUI(input: TCreateInput): Promise<TEntity> {
+    return this.create(input);
+  }
+  
+  /** @deprecated Use update() instead - will be removed in next version */
+  async updateUI(id: string, updates: TUpdateInput): Promise<TEntity> {
+    return this.update(id, updates);
+  }
+  
+  /** @deprecated Use delete() instead - will be removed in next version */
+  async deleteUI(id: string): Promise<boolean> {
+    return this.delete(id);
+  }
+  
+  /** @deprecated Use createSync() instead - will be removed in next version */
+  async createIncoming(entity: TEntity): Promise<TEntity> {
+    return this.createSync(entity);
+  }
+  
+  /** @deprecated Use updateSync() instead - will be removed in next version */
+  async updateIncoming(id: string, updates: Partial<TEntity>): Promise<TEntity> {
+    return this.updateSync(id, updates);
+  }
+  
+  /** @deprecated Use deleteSync() instead - will be removed in next version */
+  async deleteIncoming(id: string): Promise<boolean> {
+    return this.deleteSync(id);
+  }
+  
+  /** @deprecated Use batchUpdate() instead - will be removed in next version */
+  async batchUpdateUI(updates: Array<{ id: string; updates: TUpdateInput }>): Promise<TEntity[]> {
+    return this.batchUpdate(updates);
+  }
+  
+  /** @deprecated Use batchCreate() instead - will be removed in next version */
+  async batchCreateUI(inputs: TCreateInput[]): Promise<TEntity[]> {
+    return this.batchCreate(inputs);
+  }
+  
+  /** @deprecated Use batchDelete() instead - will be removed in next version */
+  async batchDeleteUI(ids: string[]): Promise<{ deleted: string[]; notFound: string[] }> {
+    return this.batchDelete(ids);
+  }
+  
+  /** @deprecated Use batchUpdateSync() instead - will be removed in next version */
+  async batchUpdateIncoming(updates: Array<{ id: string; updates: Partial<TEntity> }>): Promise<TEntity[]> {
+    return this.batchUpdateSync(updates);
+  }
+  
+  /** @deprecated Use batchCreateSync() instead - will be removed in next version */
+  async batchCreateIncoming(entities: TEntity[]): Promise<TEntity[]> {
+    return this.batchCreateSync(entities);
+  }
+  
+  /** @deprecated Use batchDeleteSync() instead - will be removed in next version */
+  async batchDeleteIncoming(ids: string[]): Promise<number> {
+    return this.batchDeleteSync(ids);
   }
   
   // ============================================================================
@@ -307,12 +369,11 @@ export abstract class BaseDomainService<
     // Update in Dexie
     await table.put(updated);
     
-    // Track for outgoing sync
-    await trackOutgoingChange(this.tableName, 'update', updated);
+    // Note: Change tracking happens automatically via hooks
     
     console.log(`[${this.entityName}Service] Updated ${id}`, {
       updates,
-      trackingSync: true
+      trackingAutomatic: true
     });
     
     return updated;
@@ -333,11 +394,10 @@ export abstract class BaseDomainService<
     // Delete from Dexie
     await table.delete(id);
     
-    // Track for outgoing sync
-    await trackOutgoingChange(this.tableName, 'delete', existing);
+    // Note: Change tracking happens automatically via hooks
     
     console.log(`[${this.entityName}Service] Deleted ${id}`, {
-      trackingSync: true
+      trackingAutomatic: true
     });
     
     return true;
