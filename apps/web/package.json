@@ -28,6 +28,7 @@
     "pages:deploy:production": "npm run build && wrangler pages deploy dist/client --project-name vibestack-web --compatibility-date 2025-06-21"
   },
   "dependencies": {
+    "2": "^3.0.0",
     "@casl/ability": "^6.7.3",
     "@casl/react": "^5.0.0",
     "@dnd-kit/core": "^6.3.1",

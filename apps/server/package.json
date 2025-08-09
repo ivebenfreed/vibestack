@@ -38,7 +38,6 @@
     "@neondatabase/serverless": "^1.0.1",
     "@openauthjs/openauth": "^0.4.3",
     "@repo/dataforge": "workspace:*",
-    "@repo/dataforge-next": "workspace:*",
     "@repo/sync-types": "workspace:*",
     "better-auth": "^1.2.7",
     "drizzle-orm": "^0.44.4",

@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    
+    // Dataforge-specific relaxations
+    "strictPropertyInitialization": false, // TypeORM entities need this
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    
+    // Paths
+    "baseUrl": ".",
+    "paths": {
+      "*": ["*"],
+      "src/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/generated/**/*.test.ts"]
+}

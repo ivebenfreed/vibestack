@@ -1,109 +1,30 @@
-import { Entity, Column, ManyToOne, OneToMany, ManyToMany, JoinTable, JoinColumn } from 'typeorm';
-import { 
-  IsString, 
-  MinLength, 
-  IsOptional, 
-  IsUUID, 
-  MaxLength,
-  Matches,
-  IsEnum
-} from 'class-validator';
-// Import User and Task for use in decorators
-// The Relation wrapper will handle circular dependencies
-import { User } from './User.js';
-import { Task } from './Task.js';
+import { Entity, Property, ManyToOne, OneToMany, ManyToMany, Collection } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
-import { StatusSet } from './StatusSet.js';
+import { Task } from './Task.js';
+import { User } from './User.js';
 import { TagSet } from './TagSet.js';
-// No need for ServerOnly/ClientOnly decorators as this is a shared entity
-import { EnumTypeName } from '../utils/decorators.js';
+import { StatusSet } from './StatusSet.js';
 
-export enum ProjectStatus {
-  ACTIVE = 'active',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  ON_HOLD = 'on_hold'
-}
-
-/**
- * Project entity
- * Contains project information and relationships to users and tasks
- * Extends BaseDomainEntity for common fields and behavior
- */
-@Entity('projects')
+@Entity()
 export class Project extends BaseDomainEntity {
-  @Column({ type: "varchar", length: 100 })
-  @IsString({ message: "Name must be a string" })
-  @MinLength(2, { message: "Name must be at least 2 characters long" })
-  @MaxLength(100, { message: "Name cannot exceed 100 characters" })
-  @Matches(/^[a-zA-Z0-9\s\-_'.]+$/, { 
-    message: "Name can only contain letters, numbers, spaces, hyphens, underscores, apostrophes, and periods" 
-  })
+  @Property({ type: 'string' })
   name!: string;
-  
-  @Column({ type: "text", nullable: true })
-  @IsOptional()
-  @IsString({ message: "Description must be a string" })
-  @MaxLength(5000, { message: "Description cannot exceed 5000 characters" })
+
+  @Property({ type: 'text', nullable: true })
   description?: string;
-  
-  @Column({ type: "enum", enum: ProjectStatus, default: ProjectStatus.ACTIVE })
-  @IsEnum(ProjectStatus)
-  @EnumTypeName({ name: 'ProjectStatus', sourcePath: './Project' })
-  status!: ProjectStatus;
-  
-  @Column({ type: "uuid", name: "owner_id", nullable: true })
-  @IsOptional()
-  @IsUUID(4, { message: "Owner ID must be a valid UUID" })
-  ownerId?: string;
-  
-  // Relationship fields using Relation wrapper to avoid circular dependencies
-  @ManyToOne(() => User, (user) => user.ownedProjects, { nullable: true })
-  @JoinColumn({ name: "owner_id" })
-  owner?: Promise<import('./User.js').User>;
-  
-  @ManyToMany(() => User, (user) => user.memberProjects)
-  @JoinTable({
-    name: 'project_members',
-    joinColumn: {
-      name: 'project_id',
-      referencedColumnName: 'id'
-    },
-    inverseJoinColumn: {
-      name: 'user_id',
-      referencedColumnName: 'id'
-    }
-  })
-  members!: Promise<import('./User.js').User[]>;
-  
-  @OneToMany(() => Task, (task) => task.project)
-  tasks!: Promise<import('./Task.js').Task[]>;
-  
-  @ManyToMany(() => StatusSet, (statusSet) => statusSet.projects)
-  @JoinTable({
-    name: 'project_status_sets',
-    joinColumn: {
-      name: 'project_id',
-      referencedColumnName: 'id'
-    },
-    inverseJoinColumn: {
-      name: 'status_set_id',
-      referencedColumnName: 'id'
-    }
-  })
-  statusSets!: Promise<import('./StatusSet.js').StatusSet[]>;
-  
-  @ManyToMany(() => TagSet, (tagSet) => tagSet.projects)
-  @JoinTable({
-    name: 'project_tag_sets',
-    joinColumn: {
-      name: 'project_id',
-      referencedColumnName: 'id'
-    },
-    inverseJoinColumn: {
-      name: 'tag_set_id',
-      referencedColumnName: 'id'
-    }
-  })
-  tagSets!: Promise<import('./TagSet.js').TagSet[]>;
-} 
+
+  @Property({ type: 'string', default: 'active', columnType: 'projects_status_enum' })
+  status!: string;
+
+  @ManyToOne(() => User, { nullable: true, fieldName: 'owner_id' })
+  owner?: User;
+
+  @OneToMany(() => Task, 'project')
+  tasks = new Collection<Task>(this);
+
+  @ManyToMany(() => TagSet, 'projects', { owner: true, pivotTable: 'project_tag_sets' })
+  tagSets = new Collection<TagSet>(this);
+
+  @ManyToMany(() => StatusSet, 'projects', { owner: true, pivotTable: 'project_status_sets' })
+  statusSets = new Collection<StatusSet>(this);
+}

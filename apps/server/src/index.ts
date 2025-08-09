@@ -19,7 +19,6 @@ import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
 import authRouter from './api/auth';
 import bootstrapRouter from './api/bootstrap'; // Adjust path if necessary
-import drizzleRouter from './api/drizzle-test';
 
 // Remove temporary auth instance
 
@@ -107,7 +106,7 @@ apiApp.get('/db/health', async (c) => {
 });
 
 // Mount Drizzle test router BEFORE auth middleware (unprotected for testing)
-apiApp.route('/drizzle-test', drizzleRouter);
+// Drizzle test route removed - using generic API instead
 
 // Apply the authentication middleware to check session status on all requests
 // for routes mounted AFTER this middleware.

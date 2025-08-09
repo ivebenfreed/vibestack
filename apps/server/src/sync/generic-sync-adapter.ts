@@ -11,7 +11,7 @@ import {
   syncMetadata, 
   junctionTables,
   TRACKED_TABLES 
-} from '@repo/dataforge-next';
+} from '@repo/dataforge';
 
 import { 
   TableChange, 

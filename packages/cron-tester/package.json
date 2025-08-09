@@ -12,5 +12,8 @@
     "@repo/eslint-config": "workspace:*",
     "eslint": "^9.25.1",
     "typescript": "~5.8.3"
+  },
+  "dependencies": {
+    "2": "^3.0.0"
   }
-} 
+}
