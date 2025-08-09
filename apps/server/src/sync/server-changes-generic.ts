@@ -191,3 +191,124 @@ function chunkArray<T>(array: T[], chunkSize: number): T[][] {
   }
   return chunks;
 }
+
+/**
+ * Perform catchup sync using the generic sync engine
+ */
+export async function performCatchupSync(
+  context: MinimalContext,
+  clientId: string,
+  clientLSN: string,
+  initialServerLSN: string,
+  messageHandler: WebSocketHandler,
+  stateManager: SyncStateManager
+): Promise<void> {
+  const functionStartTime = Date.now();
+  syncLogger.info('Starting catchup sync', {
+    clientId,
+    clientLSN,
+    initialServerLSN
+  }, MODULE_NAME);
+
+  try {
+    // Use the generic sync engine for catchup
+    const { GenericSyncEngine } = await import('./generic-sync-engine');
+    const syncEngine = new GenericSyncEngine(context.env.DATABASE_URL);
+    
+    // Get changes between client LSN and server LSN
+    const changes = await syncEngine.getCatchupChanges(clientLSN, initialServerLSN);
+    
+    if (changes.length === 0) {
+      syncLogger.info('No catchup changes needed', {
+        clientId,
+        clientLSN,
+        serverLSN: initialServerLSN
+      });
+      
+      // Send catchup completed message
+      const completedMessage: ServerCatchupCompletedMessage = {
+        type: 'srv_catchup_completed',
+        messageId: `srv_${Date.now()}_catchup_completed`,
+        timestamp: Date.now(),
+        clientId,
+        startLSN: clientLSN,
+        endLSN: initialServerLSN,
+        changeCount: 0,
+        success: true
+      };
+      
+      await messageHandler.send(completedMessage);
+      return;
+    }
+    
+    // Send changes in batches
+    const BATCH_SIZE = 500;
+    const batches = chunkArray(changes, BATCH_SIZE);
+    
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const message: ServerChangesMessage = {
+        type: 'srv_catchup_changes',
+        messageId: `srv_${Date.now()}_catchup_${i}`,
+        timestamp: Date.now(),
+        clientId,
+        changes: batch,
+        startLSN: clientLSN,
+        endLSN: initialServerLSN,
+        batchIndex: i,
+        totalBatches: batches.length,
+        isLastBatch: i === batches.length - 1
+      };
+      
+      await messageHandler.send(message);
+    }
+    
+    // Send catchup completed
+    const completedMessage: ServerCatchupCompletedMessage = {
+      type: 'srv_catchup_completed',
+      messageId: `srv_${Date.now()}_catchup_completed`,
+      timestamp: Date.now(),
+      clientId,
+      startLSN: clientLSN,
+      endLSN: initialServerLSN,
+      changeCount: changes.length,
+      success: true
+    };
+    
+    await messageHandler.send(completedMessage);
+    
+    const duration = Date.now() - functionStartTime;
+    syncLogger.info('Catchup sync completed', {
+      clientId,
+      changeCount: changes.length,
+      batchCount: batches.length,
+      durationMs: duration
+    });
+    
+  } catch (error) {
+    syncLogger.error('Catchup sync failed', {
+      clientId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+}
+
+/**
+ * Create a live sync confirmation message
+ */
+export function createLiveSyncConfirmation(
+  clientId: string,
+  lsn: string
+): ServerLiveStartMessage {
+  return {
+    type: 'srv_live_start',
+    messageId: `srv_${Date.now()}_live_start`,
+    timestamp: Date.now(),
+    clientId,
+    startLSN: lsn,
+    serverLSN: lsn,
+    changeCount: 0,
+    success: true
+  };
+}
