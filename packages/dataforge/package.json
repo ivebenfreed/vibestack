@@ -24,6 +24,10 @@
       "types": "./dist/generated/dexie-schema.d.ts",
       "import": "./dist/dexie-schema.js"
     },
+    "./drizzle-schema": {
+      "types": "./dist/generated/drizzle-schema.d.ts",
+      "import": "./dist/drizzle-schema.js"
+    },
     "./dexie-domain": {
       "types": "./dist/generated/dexie-domain/index.d.ts",
       "import": "./dist/dexie-domain/index.js"
@@ -56,7 +60,8 @@
     "generate-crud-operations": "tsx src/scripts/generate-crud-operations.ts",
     "generate-client-schema": "tsx src/scripts/generate-dexie-schema.ts",
     "generate-client-services": "tsx src/scripts/generate-dexie-domain-services.ts",
-    "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-client-schema && pnpm run generate-client-services",
+    "generate-drizzle-schema": "tsx src/scripts/generate-drizzle-schema.ts",
+    "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-client-schema && pnpm run generate-client-services && pnpm run generate-drizzle-schema",
     "compile": "tsup && tsc --project tsconfig.dts.json",
     "build": "pnpm run forge:build",
     "migration:generate:server": "tsx ./node_modules/typeorm/cli.js -d src/datasources/server.ts migration:generate",

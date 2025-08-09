@@ -2,7 +2,8 @@ import { betterAuth } from "better-auth";
 // import { google } from "better-auth/providers";
 import { admin, emailOTP, oneTimeToken } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
-import { NeonHTTPDialect } from "kysely-neon";
+// import { NeonHTTPDialect } from "kysely-neon"; // Replaced with custom adapter
+import { NeonHTTPDialectV1 } from "./kysely-neon-v1-adapter";
 import { neonConfig } from "@neondatabase/serverless";
 import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
@@ -66,9 +67,9 @@ const dbUrlForCli = typeof process !== 'undefined' ? process.env.DATABASE_URL : 
 const secretForCli = typeof process !== 'undefined' ? process.env.BETTER_AUTH_SECRET : undefined;
 const baseUrlForCli = typeof process !== 'undefined' ? process.env.BETTER_AUTH_URL : undefined;
 
-// Use NeonHTTPDialect (Stateless HTTPS) for CLI instance if dbUrlForCli is available
+// Use NeonHTTPDialectV1 (Stateless HTTPS) for CLI instance if dbUrlForCli is available
 const cliNeonDialect = dbUrlForCli
-  ? new NeonHTTPDialect({ connectionString: dbUrlForCli })
+  ? new NeonHTTPDialectV1({ connectionString: dbUrlForCli })
   : undefined;
 
 // Top-level auth instance for CLI schema generation and potentially type inference.
@@ -154,7 +155,7 @@ export function initializeAuth(env: Env) {
     };
   }
 
-  const neonDialect = new NeonHTTPDialect({
+  const neonDialect = new NeonHTTPDialectV1({
     connectionString: env.DATABASE_URL,
   });
 
