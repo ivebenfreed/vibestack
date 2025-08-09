@@ -5,8 +5,8 @@
  * Handles the decision logic for initial, catchup, and live sync strategies.
  */
 
-import { performInitialSync } from './initial-sync';
-import { performCatchupSync, createLiveSyncConfirmation } from './server-changes';
+import { performInitialSync } from './initial-sync-generic';
+import { performCatchupSync, createLiveSyncConfirmation } from './server-changes-generic';
 import type { MinimalContext } from '../types/hono';
 import type { WebSocketHandler } from './types';
 import { syncLogger } from '../middleware/logger';
