@@ -14,6 +14,7 @@ import { IncomingChangeService, IncomingChangeServiceConfig } from '../IncomingC
 // import { OutgoingChangeService, OutgoingChangeServiceConfig } from '../OutgoingChangeService';
 import { DexieOutgoingChangeService, DexieOutgoingChangeServiceConfig } from '../DexieOutgoingChangeService';
 // import { IntegrityService, IntegrityServiceConfig } from '../IntegrityService';
+import { DexieIntegrityService, IntegrityServiceConfig } from '../DexieIntegrityService';
 // import { NewPGliteDataSource } from '../../db/newtypeorm/NewDataSource';
 import { syncLogger } from './SyncLogger';
 
@@ -22,7 +23,7 @@ export interface Services {
   incoming?: IncomingChangeService; // Has Dexie implementation
   outgoing?: any; // OutgoingChangeService - DISABLED for TypeORM removal
   dexieOutgoing?: DexieOutgoingChangeService; // Primary sync service for Dexie
-  integrity?: any; // IntegrityService - DISABLED for TypeORM removal
+  integrity?: DexieIntegrityService; // Dexie-based integrity service
 }
 
 export interface ServiceCoordinatorConfig {
@@ -52,7 +53,7 @@ export class ServiceCoordinator {
     incoming: IncomingChangeService | null; // Has Dexie implementation
     outgoing: any | null; // OutgoingChangeService - DISABLED for TypeORM removal
     dexieOutgoing: DexieOutgoingChangeService | null;
-    integrity: any | null; // IntegrityService - DISABLED for TypeORM removal
+    integrity: DexieIntegrityService | null; // Dexie-based integrity service
   } = {
     webSocket: null,
     incoming: null,
@@ -106,27 +107,13 @@ export class ServiceCoordinator {
         maxReconnectAttempts: config.maxReconnectAttempts || 5
       };
 
-      // DISABLED: TypeORM service configurations
-      // const incomingConfig: IncomingChangeServiceConfig = {
-      //   clientId: config.clientId,
-      //   enableBatching: config.enableBatching ?? true,
-      //   batchSize: config.batchSize || 50,
-      //   batchTimeoutMs: config.batchTimeoutMs || 1000
-      // };
-
-      // const outgoingConfig: OutgoingChangeServiceConfig = {
-      //   clientId: config.clientId,
-      //   enableBatching: config.enableBatching ?? true,
-      //   batchSize: config.batchSize || 50,
-      //   batchTimeoutMs: config.batchTimeoutMs || 1000
-      // };
-
-      // const integrityConfig: IntegrityServiceConfig = {
-      //   clientId: config.clientId,
-      //   enableServerValidation: config.enableServerValidation ?? true,
-      //   validationTimeoutMs: config.validationTimeoutMs || 30000,
-      //   autoResetOnFailure: config.autoResetOnFailure ?? false
-      // };
+      // Create integrity service configuration
+      const integrityConfig: IntegrityServiceConfig = {
+        clientId: config.clientId,
+        enableServerValidation: config.enableServerValidation ?? true,
+        validationTimeoutMs: config.validationTimeoutMs || 30000,
+        autoResetOnFailure: config.autoResetOnFailure ?? false
+      };
 
       // Initialize services in correct order with proper dependencies
       syncLogger.info('service', 'Creating WebSocketService...');
@@ -175,6 +162,11 @@ export class ServiceCoordinator {
         // DexieOutgoingChangeService disabled
       }
 
+      // Initialize Dexie-based integrity service
+      syncLogger.info('service', 'Creating DexieIntegrityService with WebSocket message sender...');
+      this.services.integrity = new DexieIntegrityService(integrityConfig);
+      this.services.integrity.setMessageSender(this.services.webSocket);
+
       // Validate all services created successfully
       // In Dexie-only mode, we require WebSocketService and IncomingChangeService
       const requiredServices = [this.services.webSocket, this.services.incoming];
@@ -183,7 +175,7 @@ export class ServiceCoordinator {
         throw new Error('Failed to create required services (WebSocketService or IncomingChangeService)');
       }
       
-      syncLogger.info('service', 'Dexie-only mode: WebSocketService, IncomingChangeService and DexieOutgoingChangeService are active');
+      syncLogger.info('service', 'Dexie-only mode: WebSocketService, IncomingChangeService, DexieIntegrityService and DexieOutgoingChangeService are active');
 
       syncLogger.serviceInitialized('ServiceCoordinator', {
         webSocket: !!this.services.webSocket,
@@ -288,31 +280,33 @@ export class ServiceCoordinator {
     // });
     // }
 
-    // // Integrity service callbacks
-    // this.services.integrity.setCallbacks({
-    //   onValidationStarted: (reason: string) => {
-    //     syncLogger.validationStarted(reason);
-    //   },
-    //   onValidationCompleted: (result: any) => {
-    //     syncLogger.validationCompleted(result.isValid, result.issues?.length || 0);
-    //     eventHandler({ type: 'INTEGRITY_VALIDATION_COMPLETED', result });
-    //   },
-    //   onValidationError: (error: Error, reason?: string) => {
-    //     syncLogger.validationError(error, reason);
-    //     eventHandler({ type: 'SERVICE_ERROR', service: 'integrity', error });
-    //   },
-    //   onResetStarted: (reason: string) => {
-    //     syncLogger.info('validation', `Reset started: ${reason}`);
-    //   },
-    //   onResetCompleted: (result: any) => {
-    //     syncLogger.info('validation', `Reset completed successfully`, result);
-    //     eventHandler({ type: 'INTEGRITY_RESET_COMPLETED', result });
-    //   },
-    //   onResetError: (error: Error, reason?: string) => {
-    //     syncLogger.serviceError('IntegrityReset', error, reason);
-    //     eventHandler({ type: 'SERVICE_ERROR', service: 'integrity', error });
-    //   }
-    // });
+    // Integrity service callbacks (Dexie-based)
+    if (this.services.integrity) {
+      this.services.integrity.setCallbacks({
+        onValidationStarted: (reason: string) => {
+          syncLogger.validationStarted(reason);
+        },
+        onValidationCompleted: (result: any) => {
+          syncLogger.validationCompleted(result.isValid, result.issues?.length || 0);
+          eventHandler({ type: 'INTEGRITY_VALIDATION_COMPLETED', result });
+        },
+        onValidationError: (error: Error, reason?: string) => {
+          syncLogger.validationError(error, reason);
+          eventHandler({ type: 'SERVICE_ERROR', service: 'integrity', error });
+        },
+        onResetStarted: (reason: string) => {
+          syncLogger.info('validation', `Reset started: ${reason}`);
+        },
+        onResetCompleted: (result: any) => {
+          syncLogger.info('validation', `Reset completed successfully`, result);
+          eventHandler({ type: 'INTEGRITY_RESET_COMPLETED', result });
+        },
+        onResetError: (error: Error, reason?: string) => {
+          syncLogger.serviceError('IntegrityReset', error, reason);
+          eventHandler({ type: 'SERVICE_ERROR', service: 'integrity', error });
+        }
+      });
+    }
 
     // Dexie outgoing service callbacks (if enabled)
     if (this.services.dexieOutgoing) {
@@ -383,7 +377,7 @@ export class ServiceCoordinator {
       incoming: this.services.incoming, // Will be null
       outgoing: this.services.outgoing, // Will be null
       dexieOutgoing: this.services.dexieOutgoing,
-      integrity: this.services.integrity // Will be null
+      integrity: this.services.integrity // Dexie-based integrity service
     };
   }
 
