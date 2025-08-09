@@ -8,6 +8,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import { eq, and, or, sql } from 'drizzle-orm';
 import * as schema from '@repo/dataforge/drizzle-schema';
+import * as schemaMikro from '@repo/dataforge/drizzle-schema-mikro';
 import type { AppBindings } from '../types/hono';
 
 const drizzleRouter = new Hono<AppBindings>();
