@@ -13,7 +13,8 @@ function getEntryPoints() {
   const coreFiles = [
     'client-entities',
     'server-entities', 
-    'dexie-schema'
+    'dexie-schema',
+    'drizzle-schema'
   ];
   
   for (const file of coreFiles) {
