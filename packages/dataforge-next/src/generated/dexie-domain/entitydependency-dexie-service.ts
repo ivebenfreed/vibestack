@@ -23,31 +23,31 @@ export class EntityDependencyDexieService {
       updatedAt: now,
     } as EntityDependency;
     
-    await db.entity_dependency.add(record);
+    await db.entity_dependencies.add(record);
     return id;
   }
 
   async findById(id: string): Promise<EntityDependency | undefined> {
-    return await db.entity_dependency.get(id);
+    return await db.entity_dependencies.get(id);
   }
 
   async findAll(): Promise<EntityDependency[]> {
-    return await db.entity_dependency.toArray();
+    return await db.entity_dependencies.toArray();
   }
 
   async update(id: string, updates: EntityDependencyUpdateInput): Promise<void> {
-    await db.entity_dependency.update(id, {
+    await db.entity_dependencies.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
   }
 
   async delete(id: string): Promise<void> {
-    await db.entity_dependency.delete(id);
+    await db.entity_dependencies.delete(id);
   }
 
   async deleteAll(): Promise<void> {
-    await db.entity_dependency.clear();
+    await db.entity_dependencies.clear();
   }
 }
 

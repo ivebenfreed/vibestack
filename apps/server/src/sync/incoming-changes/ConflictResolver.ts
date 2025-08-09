@@ -310,19 +310,6 @@ export class ConflictResolver {
         }
         break;
 
-      case 'task_dependencies':
-        if (change.operation !== 'delete') {
-          if (!data.dependent_task_id) {
-            errors.push('Task dependencies require a dependent_task_id field');
-          }
-          if (!data.dependency_task_id) {
-            errors.push('Task dependencies require a dependency_task_id field');
-          }
-          if (data.dependent_task_id === data.dependency_task_id) {
-            errors.push('Task cannot depend on itself');
-          }
-        }
-        break;
 
       case 'users':
         if (change.operation !== 'delete' && !data.email) {

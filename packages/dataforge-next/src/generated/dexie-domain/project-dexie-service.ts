@@ -3,19 +3,14 @@ import { db } from '../dexie-schema.js';
 import type { Project } from '../client-entities.js';
 
 export interface ProjectUpdateInput {
-  version?: any;
-  deleted?: any;
   clientId?: any;
-  createdBy?: any;
-  updatedBy?: any;
   name?: any;
   description?: any;
   status?: any;
-  startDate?: any;
-  endDate?: any;
-  color?: any;
   owner?: any;
   tasks?: any;
+  tagSets?: any;
+  statusSets?: any;
 }
 
 export class ProjectDexieService {
@@ -33,20 +28,20 @@ export class ProjectDexieService {
       clientId: crypto.randomUUID(),
     } as Project;
     
-    await db.project.add(record);
+    await db.projects.add(record);
     return id;
   }
 
   async findById(id: string): Promise<Project | undefined> {
-    return await db.project.get(id);
+    return await db.projects.get(id);
   }
 
   async findAll(): Promise<Project[]> {
-    return await db.project.where('deleted').equals(0).toArray();
+    return await db.projects.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: ProjectUpdateInput): Promise<void> {
-    await db.project.update(id, {
+    await db.projects.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -54,14 +49,14 @@ export class ProjectDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.project.update(id, {
+    await db.projects.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.project.clear();
+    await db.projects.clear();
   }
 }
 

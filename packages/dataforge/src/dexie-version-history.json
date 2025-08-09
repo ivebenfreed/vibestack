@@ -1,5 +1,5 @@
 {
-  "currentVersion": 12,
+  "currentVersion": 13,
   "versions": [
     {
       "version": 1,
@@ -274,6 +274,29 @@
         "projectTagSets": "[projectId+tagSetId], projectId, tagSetId",
         "taskTags": "[taskId+tagId], taskId, tagId",
         "taskDependencies": "[dependentTaskId+dependencyTaskId], dependentTaskId, dependencyTaskId"
+      }
+    },
+    {
+      "version": 13,
+      "generatedAt": "2025-08-09T14:00:14.701Z",
+      "schemaHash": "f69247a60dfd59de",
+      "stores": {
+        "clientMigrationStatus": "id",
+        "comments": "id, authorId, parentId, taskId, projectId, updatedAt, clientId",
+        "entityDependencies": "id, entityType, predecessorId, successorId, updatedAt, clientId",
+        "localChanges": "id, processedSync",
+        "projects": "id, ownerId, updatedAt, clientId, status",
+        "statusDefinitions": "id, statusSetId, updatedAt, clientId, name, isDefault",
+        "statusSets": "id, updatedAt, clientId",
+        "syncMetadata": "id",
+        "tags": "id, tagSetId, parentId, updatedAt, clientId, name",
+        "tagSets": "id, updatedAt, clientId",
+        "tasks": "id, statusId, projectId, assigneeId, updatedAt, clientId, [statusId+priority], legacyStatus",
+        "users": "id, updatedAt, clientId, &email",
+        "projectMembers": "[projectId+userId], projectId, userId",
+        "projectStatusSets": "[projectId+statusSetId], projectId, statusSetId",
+        "projectTagSets": "[projectId+tagSetId], projectId, tagSetId",
+        "taskTags": "[taskId+tagId], taskId, tagId"
       }
     }
   ]

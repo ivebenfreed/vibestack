@@ -30,6 +30,15 @@ export type ProjectStatus = typeof ProjectStatus[keyof typeof ProjectStatus];
 // Entity Interfaces
 // ============================================
 
+export interface Verification {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  identifier: string;
+  value: string;
+  expiresAt: any;
+}
+
 export interface User {
   id: string;
   createdAt: Date;
@@ -41,35 +50,76 @@ export interface User {
   isSuperAdmin: boolean;
   account?: any;
   assignedTasks: any;
-  createdTasks: any;
   comments: any;
-  createdProjects: any;
+  ownedProjects: any;
+}
+
+export interface task_tags {
+  Task_owner: any;
+  Tag_inverse: any;
 }
 
 export interface Task {
   id: string;
   createdAt: Date;
   updatedAt: Date;
-  version: number;
-  deleted: boolean;
-  clientId: string;
-  createdBy?: any;
-  updatedBy?: any;
+  clientId?: string;
   title: string;
   description?: string;
-  status: string;
+  legacyStatus?: string;
   priority: string;
   dueDate?: any;
   startDate?: any;
-  estimatedHours: number;
-  actualHours: number;
-  completionPercentage: number;
-  tags?: any;
+  completedAt?: any;
+  timeRange?: string;
+  estimatedDuration?: any;
+  legacyTags?: any;
   project?: any;
   assignee?: any;
   parent?: any;
   subtasks: any;
   comments: any;
+  tags: any;
+}
+
+export interface TagSet {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  clientId?: string;
+  name: string;
+  description?: string;
+  category?: string;
+  isSystem: boolean;
+  isActive: boolean;
+  defaultColor: string;
+  displayOrder: number;
+  isExclusive: boolean;
+  maxTags?: number;
+  metadata: any;
+  tags: any;
+  projects: any;
+}
+
+export interface Tag {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  clientId?: string;
+  name: string;
+  slug: string;
+  color: string;
+  icon?: string;
+  variant: string;
+  sortOrder: number;
+  isActive: boolean;
+  usageCount: number;
+  lastUsedAt?: any;
+  metadata: any;
+  tagSet: any;
+  parent?: any;
+  children: any;
+  tasks: any;
 }
 
 export interface SyncMetadata {
@@ -81,6 +131,43 @@ export interface SyncMetadata {
   lastSyncedAt?: Date;
 }
 
+export interface StatusSet {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  clientId?: string;
+  name: string;
+  description?: string;
+  entityType: string;
+  isDefault: boolean;
+  isActive: boolean;
+  isSystem: boolean;
+  workflow: any;
+  metadata: any;
+  statuses: any;
+  projects: any;
+}
+
+export interface StatusDefinition {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  clientId?: string;
+  name: string;
+  label: string;
+  color: string;
+  icon?: string;
+  variant?: string;
+  sortOrder: number;
+  isDefault: boolean;
+  isFinal: boolean;
+  isActive: boolean;
+  allowedTransitions?: any;
+  autoTransitionDays?: number;
+  metadata: any;
+  statusSet: any;
+}
+
 export interface Session {
   id: string;
   createdAt: Date;
@@ -90,23 +177,28 @@ export interface Session {
   account: any;
 }
 
+export interface project_tag_sets {
+  Project_owner: any;
+  TagSet_inverse: any;
+}
+
+export interface project_status_sets {
+  Project_owner: any;
+  StatusSet_inverse: any;
+}
+
 export interface Project {
   id: string;
   createdAt: Date;
   updatedAt: Date;
-  version: number;
-  deleted: boolean;
-  clientId: string;
-  createdBy?: any;
-  updatedBy?: any;
+  clientId?: string;
   name: string;
   description?: string;
   status: string;
-  startDate?: any;
-  endDate?: any;
-  color?: string;
   owner?: any;
   tasks: any;
+  tagSets: any;
+  statusSets: any;
 }
 
 export interface LocalChanges {
@@ -137,14 +229,21 @@ export interface Comment {
   id: string;
   createdAt: Date;
   updatedAt: Date;
-  version: number;
-  deleted: boolean;
-  clientId: string;
-  createdBy?: any;
-  updatedBy?: any;
+  clientId?: string;
   content: string;
   task: any;
   author?: any;
+}
+
+export interface ChangeHistory {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lsn: string;
+  tableName: string;
+  operation: string;
+  data?: any;
+  timestamp: any;
 }
 
 export interface Account {
@@ -165,16 +264,25 @@ export interface Account {
 }
 
 export const tableNames = {
-  User: 'user',
-  Task: 'task',
+  Verification: 'verifications',
+  User: 'users',
+  task_tags: 'task_tags',
+  Task: 'tasks',
+  TagSet: 'tag_sets',
+  Tag: 'tags',
   SyncMetadata: 'sync_metadata',
-  Session: 'session',
-  Project: 'project',
+  StatusSet: 'status_sets',
+  StatusDefinition: 'status_definitions',
+  Session: 'sessions',
+  project_tag_sets: 'project_tag_sets',
+  project_status_sets: 'project_status_sets',
+  Project: 'projects',
   LocalChanges: 'local_changes',
-  EntityDependency: 'entity_dependency',
-  Comment: 'comment',
-  Account: 'account',
+  EntityDependency: 'entity_dependencies',
+  Comment: 'comments',
+  ChangeHistory: 'change_history',
+  Account: 'accounts',
 } as const;
 
 export type TableName = keyof typeof tableNames;
-export type EntityType = User | Task | SyncMetadata | Session | Project | LocalChanges | EntityDependency | Comment | Account;
+export type EntityType = Verification | User | task_tags | Task | TagSet | Tag | SyncMetadata | StatusSet | StatusDefinition | Session | project_tag_sets | project_status_sets | Project | LocalChanges | EntityDependency | Comment | ChangeHistory | Account;

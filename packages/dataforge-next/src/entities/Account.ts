@@ -1,7 +1,7 @@
 import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
-import type { User } from './User.js';
-import type { Session } from './Session.js';
+import { User } from './User.js';
+import { Session } from './Session.js';
 
 @Entity()
 export class Account extends BaseSystemEntity {
@@ -32,9 +32,9 @@ export class Account extends BaseSystemEntity {
   @Property({ type: 'string', nullable: true })
   sessionState?: string;
 
-  @OneToMany(() => 'User', 'account')
+  @OneToMany(() => User, 'account')
   users = new Collection<User>(this);
 
-  @OneToMany(() => 'Session', 'account')
+  @OneToMany(() => Session, 'account')
   sessions = new Collection<Session>(this);
 }

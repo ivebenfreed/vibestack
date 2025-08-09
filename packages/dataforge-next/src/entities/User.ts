@@ -1,9 +1,9 @@
 import { Entity, Property, Unique, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
-import type { Account } from './Account.js';
-import type { Task } from './Task.js';
-import type { Comment } from './Comment.js';
-import type { Project } from './Project.js';
+import { Account } from './Account.js';
+import { Task } from './Task.js';
+import { Comment } from './Comment.js';
+import { Project } from './Project.js';
 
 @Entity()
 export class User extends BaseSystemEntity {
@@ -23,18 +23,15 @@ export class User extends BaseSystemEntity {
   @Property({ type: 'boolean', default: false })
   isSuperAdmin!: boolean;
 
-  @ManyToOne(() => 'Account', { nullable: true })
+  @ManyToOne(() => Account, { nullable: true })
   account?: Account;
 
-  @OneToMany(() => 'Task', 'assignee')
+  @OneToMany(() => Task, 'assignee')
   assignedTasks = new Collection<Task>(this);
 
-  @OneToMany(() => 'Task', 'createdBy')
-  createdTasks = new Collection<Task>(this);
-
-  @OneToMany(() => 'Comment', 'createdBy')
+  @OneToMany(() => Comment, 'author')
   comments = new Collection<Comment>(this);
 
-  @OneToMany(() => 'Project', 'createdBy')
-  createdProjects = new Collection<Project>(this);
+  @OneToMany(() => Project, 'owner')
+  ownedProjects = new Collection<Project>(this);
 }

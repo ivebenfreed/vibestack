@@ -3,11 +3,7 @@ import { db } from '../dexie-schema.js';
 import type { Comment } from '../client-entities.js';
 
 export interface CommentUpdateInput {
-  version?: any;
-  deleted?: any;
   clientId?: any;
-  createdBy?: any;
-  updatedBy?: any;
   content?: any;
   task?: any;
   author?: any;
@@ -28,20 +24,20 @@ export class CommentDexieService {
       clientId: crypto.randomUUID(),
     } as Comment;
     
-    await db.comment.add(record);
+    await db.comments.add(record);
     return id;
   }
 
   async findById(id: string): Promise<Comment | undefined> {
-    return await db.comment.get(id);
+    return await db.comments.get(id);
   }
 
   async findAll(): Promise<Comment[]> {
-    return await db.comment.where('deleted').equals(0).toArray();
+    return await db.comments.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: CommentUpdateInput): Promise<void> {
-    await db.comment.update(id, {
+    await db.comments.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -49,14 +45,14 @@ export class CommentDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.comment.update(id, {
+    await db.comments.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.comment.clear();
+    await db.comments.clear();
   }
 }
 

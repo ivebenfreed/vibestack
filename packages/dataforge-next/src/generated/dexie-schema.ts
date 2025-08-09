@@ -3,35 +3,59 @@ import Dexie, { type Table } from 'dexie';
 import type * as Entities from './client-entities.js';
 
 export interface DexieSchema extends Dexie {
-  user: Table<Entities.User>;
-  task: Table<Entities.Task>;
+  users: Table<Entities.User>;
+  task_tags: Table<Entities.task_tags>;
+  tasks: Table<Entities.Task>;
+  tag_sets: Table<Entities.TagSet>;
+  tags: Table<Entities.Tag>;
   sync_metadata: Table<Entities.SyncMetadata>;
-  project: Table<Entities.Project>;
+  status_sets: Table<Entities.StatusSet>;
+  status_definitions: Table<Entities.StatusDefinition>;
+  project_tag_sets: Table<Entities.project_tag_sets>;
+  project_status_sets: Table<Entities.project_status_sets>;
+  projects: Table<Entities.Project>;
   local_changes: Table<Entities.LocalChanges>;
-  entity_dependency: Table<Entities.EntityDependency>;
-  comment: Table<Entities.Comment>;
+  entity_dependencies: Table<Entities.EntityDependency>;
+  comments: Table<Entities.Comment>;
+  change_history: Table<Entities.ChangeHistory>;
 }
 
 class VibeStackDatabase extends Dexie implements DexieSchema {
-  user!: Table<Entities.User>;
-  task!: Table<Entities.Task>;
+  users!: Table<Entities.User>;
+  task_tags!: Table<Entities.task_tags>;
+  tasks!: Table<Entities.Task>;
+  tag_sets!: Table<Entities.TagSet>;
+  tags!: Table<Entities.Tag>;
   sync_metadata!: Table<Entities.SyncMetadata>;
-  project!: Table<Entities.Project>;
+  status_sets!: Table<Entities.StatusSet>;
+  status_definitions!: Table<Entities.StatusDefinition>;
+  project_tag_sets!: Table<Entities.project_tag_sets>;
+  project_status_sets!: Table<Entities.project_status_sets>;
+  projects!: Table<Entities.Project>;
   local_changes!: Table<Entities.LocalChanges>;
-  entity_dependency!: Table<Entities.EntityDependency>;
-  comment!: Table<Entities.Comment>;
+  entity_dependencies!: Table<Entities.EntityDependency>;
+  comments!: Table<Entities.Comment>;
+  change_history!: Table<Entities.ChangeHistory>;
 
   constructor() {
     super('VibeStackDB');
     
     this.version(1).stores({
-      user: '++id, &email',
-      task: '++id, clientId, version, deleted, createdAt, updatedAt',
+      users: '++id, &email',
+      task_tags: '++Task_owner',
+      tasks: '++id, clientId, version, deleted, createdAt, updatedAt',
+      tag_sets: '++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt',
+      tags: '++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt',
       sync_metadata: '++id',
-      project: '++id, clientId, version, deleted, createdAt, updatedAt',
+      status_sets: '++id, [entityType], clientId, version, deleted, createdAt, updatedAt',
+      status_definitions: '++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt',
+      project_tag_sets: '++Project_owner',
+      project_status_sets: '++Project_owner',
+      projects: '++id, clientId, version, deleted, createdAt, updatedAt',
       local_changes: '++id, [tableName+recordId]',
-      entity_dependency: '++id, [toTable+toId], [fromTable+fromId]',
-      comment: '++id, clientId, version, deleted, createdAt, updatedAt',
+      entity_dependencies: '++id, [toTable+toId], [fromTable+fromId]',
+      comments: '++id, clientId, version, deleted, createdAt, updatedAt',
+      change_history: '++id, [tableName+timestamp], [lsn]',
     });
   }
 }
@@ -41,13 +65,21 @@ export const db = new VibeStackDatabase();
 // Helper function to clear all data
 export async function clearDatabase() {
   const tables = [
-    'user',
-    'task',
+    'users',
+    'task_tags',
+    'tasks',
+    'tag_sets',
+    'tags',
     'sync_metadata',
-    'project',
+    'status_sets',
+    'status_definitions',
+    'project_tag_sets',
+    'project_status_sets',
+    'projects',
     'local_changes',
-    'entity_dependency',
-    'comment',
+    'entity_dependencies',
+    'comments',
+    'change_history',
   ];
   
   for (const tableName of tables) {
@@ -62,13 +94,21 @@ export function getTable(tableName: string): Table<any> | undefined {
 
 // Export table names for reference
 export const dexieTableNames = [
-  'user',
-  'task',
+  'users',
+  'task_tags',
+  'tasks',
+  'tag_sets',
+  'tags',
   'sync_metadata',
-  'project',
+  'status_sets',
+  'status_definitions',
+  'project_tag_sets',
+  'project_status_sets',
+  'projects',
   'local_changes',
-  'entity_dependency',
-  'comment',
+  'entity_dependencies',
+  'comments',
+  'change_history',
 ] as const;
 
 export type DexieTableName = typeof dexieTableNames[number];

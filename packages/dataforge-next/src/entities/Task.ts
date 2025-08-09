@@ -1,8 +1,9 @@
-import { Entity, Property, ManyToOne, OneToMany, Collection, Check } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne, OneToMany, ManyToMany, Collection, Check } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
-import type { Project } from './Project.js';
-import type { User } from './User.js';
-import type { Comment } from './Comment.js';
+import { Project } from './Project.js';
+import { User } from './User.js';
+import { Comment } from './Comment.js';
+import { Tag } from './Tag.js';
 
 @Entity()
 @Check({ expression: 'start_date IS NULL OR due_date IS NULL OR start_date <= due_date' })
@@ -13,42 +14,45 @@ export class Task extends BaseDomainEntity {
   @Property({ type: 'text', nullable: true })
   description?: string;
 
-  @Property({ type: 'string', default: 'pending' })
-  status!: string;
+  @Property({ type: 'string', nullable: true, columnType: 'tasks_legacy_status_enum', fieldName: 'legacy_status' })
+  legacyStatus?: string;
 
-  @Property({ type: 'string', default: 'medium' })
+  @Property({ type: 'string', default: 'medium', columnType: 'tasks_priority_enum' })
   priority!: string;
 
-  @Property({ type: 'date', nullable: true })
+  @Property({ type: 'date', nullable: true, fieldName: 'due_date' })
   dueDate?: Date;
 
-  @Property({ type: 'date', nullable: true })
+  @Property({ type: 'date', nullable: true, fieldName: 'start_date' })
   startDate?: Date;
 
-  @Property({ type: 'integer', default: 0 })
-  estimatedHours!: number;
+  @Property({ type: 'date', nullable: true, fieldName: 'completed_at' })
+  completedAt?: Date;
 
-  @Property({ type: 'integer', default: 0 })
-  actualHours!: number;
+  @Property({ type: 'string', nullable: true, columnType: 'tsrange', fieldName: 'time_range' })
+  timeRange?: string;
 
-  @Property({ type: 'integer', default: 0 })
-  completionPercentage!: number;
+  @Property({ type: 'string', nullable: true, columnType: 'interval', fieldName: 'estimated_duration' })
+  estimatedDuration?: string;
 
-  @Property({ type: 'json', nullable: true })
-  tags?: string[];
+  @Property({ type: 'array', nullable: true, fieldName: 'legacy_tags' })
+  legacyTags?: string[];
 
-  @ManyToOne(() => 'Project', { nullable: true })
+  @ManyToOne(() => Project, { nullable: true, fieldName: 'project_id' })
   project?: Project;
 
-  @ManyToOne(() => 'User', { nullable: true })
+  @ManyToOne(() => User, { nullable: true, fieldName: 'assignee_id' })
   assignee?: User;
 
-  @ManyToOne(() => 'Task', { nullable: true })
+  @ManyToOne(() => Task, { nullable: true })
   parent?: Task;
 
-  @OneToMany(() => 'Task', 'parent')
+  @OneToMany(() => Task, 'parent')
   subtasks = new Collection<Task>(this);
 
-  @OneToMany(() => 'Comment', 'task')
+  @OneToMany(() => Comment, 'task')
   comments = new Collection<Comment>(this);
+
+  @ManyToMany(() => Tag, 'tasks', { owner: true, pivotTable: 'task_tags' })
+  tags = new Collection<Tag>(this);
 }

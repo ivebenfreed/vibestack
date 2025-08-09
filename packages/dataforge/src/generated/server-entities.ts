@@ -422,10 +422,6 @@ export class Task {
 
   assignee?: Promise<User>;
 
-  dependencies!: Promise<Task[]>;
-
-  tasksDependentOnThis!: Promise<Task[]>;
-
 }
 
 export class User {
@@ -1323,21 +1319,6 @@ export const TaskSchema = new EntitySchema<Task>({
             inverseSide: 'tasks',
             joinColumn: { name: 'assignee_id' },
             nullable: true
-        },
-        'dependencies': {
-            target: 'Task', // Target Entity Name (String)
-            type: 'many-to-many',
-            inverseSide: 'tasksDependentOnThis',
-            joinTable: {
-                name: 'task_dependencies',
-                joinColumns: [{ name: 'dependent_task_id', referencedColumnName: 'id' }],
-                inverseJoinColumns: [{ name: 'dependency_task_id', referencedColumnName: 'id' }],
-            }
-        },
-        'tasksDependentOnThis': {
-            target: 'Task', // Target Entity Name (String)
-            type: 'many-to-many',
-            inverseSide: 'dependencies'
         }
     },
 });
@@ -1506,7 +1487,6 @@ export const SERVER_JUNCTION_TABLES = [
   '"project_members"',
   '"project_status_sets"',
   '"project_tag_sets"',
-  '"task_dependencies"',
   '"task_tags"',
 ];
 
@@ -1524,7 +1504,6 @@ export const SERVER_TRACKED_TABLES = [
   '"project_members"',
   '"project_status_sets"',
   '"project_tag_sets"',
-  '"task_dependencies"',
   '"task_tags"',
 ];
 
@@ -1561,14 +1540,6 @@ export const SERVER_JUNCTION_TABLE_MAPPING = {
     targetEntity: 'Tag',
     targetColumn: 'tagId',
     relationName: 'tags'
-  },
-  "task_dependencies": {
-    sourceEntity: 'Task',
-    sourceTable: '"tasks"',
-    sourceColumn: 'dependentTaskId',
-    targetEntity: 'Task',
-    targetColumn: 'dependencyTaskId',
-    relationName: 'dependencies'
   },
 } as const;
 
@@ -1735,13 +1706,6 @@ export const SERVER_RELATIONSHIP_CONFIGS: Record<string, RelationshipConfig> = {
         sourceColumn: 'taskId',
         targetColumn: 'tagId',
         targetEntity: 'tags',
-      },
-      {
-        junctionTable: 'task_dependencies',
-        relationName: 'dependencies',
-        sourceColumn: 'dependentTaskId',
-        targetColumn: 'dependencyTaskId',
-        targetEntity: 'tasks',
       },
     ],
     customValidators: [],

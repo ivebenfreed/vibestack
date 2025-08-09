@@ -137,14 +137,6 @@ export class Task extends BaseDomainEntity {
   @JoinColumn({ name: "assignee_id" })
   assignee?: Promise<import('./User.js').User>;
   
-  @ManyToMany(() => Task, task => task.tasksDependentOnThis)
-  @JoinTable({
-    name: 'task_dependencies',
-    joinColumn: { name: 'dependent_task_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'dependency_task_id', referencedColumnName: 'id' }
-  })
-  dependencies!: Promise<import('./Task.js').Task[]>;
-
-  @ManyToMany(() => Task, task => task.dependencies)
-  tasksDependentOnThis!: Promise<Task[]>;
+  // DEPRECATED: task_dependencies table removed from database
+  // These relationships are no longer functional
 }

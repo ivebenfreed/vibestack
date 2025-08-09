@@ -60,6 +60,9 @@ importers:
       '@repo/dataforge':
         specifier: workspace:*
         version: link:../../packages/dataforge
+      '@repo/dataforge-next':
+        specifier: workspace:*
+        version: link:../../packages/dataforge-next
       '@repo/sync-types':
         specifier: workspace:*
         version: link:../../packages/sync-types
