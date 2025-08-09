@@ -14,7 +14,8 @@ function getEntryPoints() {
     'client-entities',
     'server-entities', 
     'dexie-schema',
-    'drizzle-schema'
+    'drizzle-schema',
+    'drizzle-schema-mikro'
   ];
   
   for (const file of coreFiles) {
