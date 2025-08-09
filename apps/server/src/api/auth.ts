@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { getAuth, AuthType } from "../lib/auth";
 import { dbLogger } from "../middleware/logger";
-import { NeonService } from "../lib/neon-orm/neon-service";
-import { UserRepository } from "../domains/users";
+import { KyselyUserService } from "../services/KyselyUserService";
 import { Resend } from 'resend';
 
 // Utility to sanitize auth request logging - removes sensitive fields
@@ -271,12 +270,11 @@ authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
       .selectAll()
       .executeTakeFirst();
 
-    // Use UserRepository for domain relationship cleanup
-    const neonService = new NeonService(c);
-    const userRepo = new UserRepository(neonService);
+    // Use Kysely-based user deletion with relationship cleanup
+    const userService = new KyselyUserService(c);
     
     // First, do a dry run to check for blockers
-    const dryRunResult = await userRepo.deleteWithRelationships(userId, {
+    const dryRunResult = await userService.deleteWithRelationships(userId, {
       transferProjectsTo: adminForTransfer?.id,
       dryRun: true
     });
@@ -323,7 +321,7 @@ authRouter.delete("/admin/users/:id", adminAuthMiddleware, async (c) => {
     }
 
     // STEP 2: Execute domain deletion (now that auth constraints are removed)
-    const deletionResult = await userRepo.deleteWithRelationships(userId, {
+    const deletionResult = await userService.deleteWithRelationships(userId, {
       transferProjectsTo: adminForTransfer?.id,
       dryRun: false
     });
