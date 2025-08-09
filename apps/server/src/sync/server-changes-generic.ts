@@ -211,12 +211,26 @@ export async function performCatchupSync(
   }, MODULE_NAME);
 
   try {
-    // Use the generic sync engine for catchup
-    const { GenericSyncEngine } = await import('./generic-sync-engine');
-    const syncEngine = new GenericSyncEngine(context.env.DATABASE_URL);
+    // Query change_history table for catchup changes
+    const { getDBClient } = await import('../lib/db');
+    const client = await getDBClient(context.env.DATABASE_URL);
     
-    // Get changes between client LSN and server LSN
-    const changes = await syncEngine.getCatchupChanges(clientLSN, initialServerLSN);
+    // Query for changes between client LSN and server LSN
+    const query = `
+      SELECT 
+        table_name as table,
+        operation,
+        data,
+        lsn,
+        created_at as timestamp
+      FROM change_history
+      WHERE lsn > $1 AND lsn <= $2
+      ORDER BY lsn ASC
+      LIMIT 5000
+    `;
+    
+    const result = await client.query(query, [clientLSN, initialServerLSN]);
+    const changes = result.rows;
     
     if (changes.length === 0) {
       syncLogger.info('No catchup changes needed', {
@@ -247,7 +261,7 @@ export async function performCatchupSync(
     
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      const message: ServerChangesMessage = {
+      const message = {
         type: 'srv_catchup_changes',
         messageId: `srv_${Date.now()}_catchup_${i}`,
         timestamp: Date.now(),
