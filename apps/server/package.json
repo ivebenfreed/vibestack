@@ -40,12 +40,12 @@
     "@repo/dataforge": "workspace:*",
     "@repo/sync-types": "workspace:*",
     "better-auth": "^1.2.7",
+    "class-validator": "^0.14.2",
     "drizzle-orm": "^0.44.4",
     "hono": "^4.7.7",
     "kysely": "^0.27.0",
     "kysely-neon": "^1.0.0",
     "resend": "^4.0.0",
-    "typeorm": "^0.3.22",
     "valibot": "^1.0.0",
     "zod": "^3.22.4"
   },

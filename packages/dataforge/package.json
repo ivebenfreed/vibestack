@@ -10,24 +10,24 @@
       "import": "./src/index.ts"
     },
     "./client-entities": {
-      "types": "./dist/generated/client-entities.d.ts",
-      "import": "./dist/generated/client-entities.js"
+      "types": "./src/generated/client-entities.ts",
+      "import": "./src/generated/client-entities.ts"
     },
     "./server-entities": {
-      "types": "./dist/generated/server-entities.d.ts",
-      "import": "./dist/generated/server-entities.js"
+      "types": "./src/generated/server-entities.ts",
+      "import": "./src/generated/server-entities.ts"
     },
     "./dexie-schema": {
-      "types": "./dist/generated/dexie-schema.d.ts",
-      "import": "./dist/generated/dexie-schema.js"
+      "types": "./src/generated/dexie-schema.ts",
+      "import": "./src/generated/dexie-schema.ts"
     },
     "./drizzle-schema": {
-      "types": "./dist/generated/drizzle-schema.d.ts",
-      "import": "./dist/generated/drizzle-schema.js"
+      "types": "./src/generated/drizzle-schema.ts",
+      "import": "./src/generated/drizzle-schema.ts"
     },
     "./sync-metadata": {
-      "types": "./dist/generated/sync-metadata.d.ts",
-      "import": "./dist/generated/sync-metadata.js"
+      "types": "./src/generated/sync-metadata.ts",
+      "import": "./src/generated/sync-metadata.ts"
     }
   },
   "scripts": {
@@ -42,10 +42,22 @@
     "forge:build": "npm run generate",
     "forge:client": "npm run generate-client-schema && npm run generate-client-services",
     "type-check": "tsc --noEmit",
-    "build": "npm run forge:build"
+    "build": "npm run forge:build",
+    "migration:create": "mikro-orm migration:create",
+    "migration:up": "mikro-orm migration:up",
+    "migration:down": "mikro-orm migration:down",
+    "migration:list": "mikro-orm migration:list",
+    "migration:pending": "mikro-orm migration:pending",
+    "migration:fresh": "mikro-orm migration:fresh",
+    "schema:drop": "mikro-orm schema:drop",
+    "schema:update": "mikro-orm schema:update",
+    "schema:create": "mikro-orm schema:create",
+    "schema:fresh": "mikro-orm schema:fresh"
   },
   "dependencies": {
+    "@mikro-orm/cli": "^6.4.0",
     "@mikro-orm/core": "^6.4.0",
+    "@mikro-orm/migrations": "^6.4.0",
     "@mikro-orm/postgresql": "^6.4.0",
     "@mikro-orm/reflection": "^6.4.0",
     "dexie": "^4.0.10",

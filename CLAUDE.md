@@ -38,6 +38,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use `&` or `nohup` for background processes (use tmux instead)
 - Kill processes with `pkill` (use `./scripts/bg-stop.sh`)
 
+## Database Synchronization
+
+### Initialize Local Database from Remote
+
+When starting fresh on the main/staging branch or setting up a new development environment:
+
+```bash
+./scripts/init-local-from-remote.sh
+```
+
+This will:
+- Reset your local database (prompts for confirmation)
+- Clone all data from the remote Neon database
+- Use the DATABASE_URL from `apps/server/.dev.vars`
+
+### Sync Remote to Local
+
+To update your existing local database with latest remote data:
+
+```bash
+./scripts/sync-remote-to-local.sh
+```
+
+This preserves your local test data while pulling in new records from remote.
+
+### Verify Sync Status
+
+Check if your databases are in sync:
+
+```bash
+npx tsx scripts/verify-sync-status.ts
+```
+
+### Database Ports
+
+- **Main/Staging**: Port 5432 (default)
+- **Worktree Issue #N**: Port = 5580 + (N % 100)
+  - Example: Issue #60 uses port 5640
+
 ## Development Standards
 
 ### Linting and Type Checking
