@@ -213,7 +213,7 @@ export async function performCatchupSync(
   try {
     // Query change_history table for catchup changes
     const { getDBClient } = await import('../lib/db');
-    const client = await getDBClient(context.env.DATABASE_URL);
+    const client = await getDBClient(context);
     
     // Query for changes between client LSN and server LSN
     const query = `
