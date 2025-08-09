@@ -6,8 +6,8 @@
  */
 
 import { GenericSyncEngine, type LocalChange } from './generic-sync-engine.js';
-import * as schema from '@repo/dataforge-next';
 import { 
+  schema,
   syncMetadata, 
   junctionTables,
   TRACKED_TABLES 
@@ -33,7 +33,7 @@ function convertToLocalChange(tableChange: TableChange): LocalChange {
     id: crypto.randomUUID(), // Generate a unique ID for the change
     tableName: tableChange.table,
     recordId: tableChange.data.id || tableChange.data.clientId || crypto.randomUUID(),
-    operationType: tableChange.operation as ('INSERT' | 'UPDATE' | 'DELETE'),
+    operationType: tableChange.operation.toUpperCase() as ('INSERT' | 'UPDATE' | 'DELETE'),
     data: tableChange.data,
     clientSequence: tableChange.sequenceNumber || 0,
     loopProtection: 0
@@ -87,7 +87,9 @@ export class GenericSyncAdapter {
       
       // Send error message to client
       await this.sendErrorMessage(clientId, error instanceof Error ? error.message : 'Unknown error');
-      throw error;
+      
+      // Don't throw - we've already sent the error to the client
+      // Throwing would prevent the error message from being delivered
     }
   }
 
@@ -116,11 +118,12 @@ export class GenericSyncAdapter {
    * Send received confirmation message to client
    */
   private async sendReceivedMessage(clientId: string, changes: TableChange[]): Promise<void> {
-    const message: ServerReceivedMessage = {
-      type: 'server-received',
+    const message = {
+      type: 'srv_changes_received' as const,
       clientId,
       requestId: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
+      messageId: `srv_${Date.now()}_received`,
       acknowledgedChanges: changes.map(change => ({
         table: change.table,
         operation: change.operation,
@@ -129,18 +132,19 @@ export class GenericSyncAdapter {
       }))
     };
 
-    await this.messageHandler.sendMessage(clientId, message);
+    await this.messageHandler.send(message);
   }
 
   /**
    * Send applied confirmation message to client
    */
   private async sendAppliedMessage(clientId: string, changes: TableChange[]): Promise<void> {
-    const message: ServerAppliedMessage = {
-      type: 'server-applied',
+    const message = {
+      type: 'srv_changes_applied' as const,
       clientId,
       requestId: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
+      messageId: `srv_${Date.now()}_applied`,
       appliedChanges: changes.map(change => ({
         table: change.table,
         operation: change.operation,
@@ -150,7 +154,7 @@ export class GenericSyncAdapter {
       results: changes.map(() => ({ success: true })) // Assume success if we got here
     };
 
-    await this.messageHandler.sendMessage(clientId, message);
+    await this.messageHandler.send(message);
   }
 
   /**
@@ -158,13 +162,14 @@ export class GenericSyncAdapter {
    */
   private async sendErrorMessage(clientId: string, error: string): Promise<void> {
     const message = {
-      type: 'server-error',
+      type: 'srv_error' as const,
       clientId,
       requestId: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      error
+      error,
+      messageId: `srv_${Date.now()}_error`
     };
 
-    await this.messageHandler.sendMessage(clientId, message);
+    await this.messageHandler.send(message);
   }
 }

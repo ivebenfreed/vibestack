@@ -1,33 +1,16 @@
 import React, { useState } from 'react';
-import { useAuth, useAppInit, useSystem } from '@/state-machines';
+import { useAuth, useAppInit, useSystem, useSync } from '@/state-machines';
 
 export function SyncDebugPanel() {
   const { isAuthenticated, user } = useAuth();
-  const { isSyncReady, connectionStatus, liveChangesStatus, syncError } = useAppInit();
+  const { isDatabaseInitialized } = useAppInit();
   const { isSystemReady } = useSystem();
   
-  // Map v2 data to legacy sync machine structure for compatibility
-  const sync = {
-    currentLSN: null, // Not available in v2
-    error: syncError,
-    isError: !!syncError,
-    isConnecting: connectionStatus === 'connecting',
-    isInitialSync: connectionStatus === 'connecting' && !isSyncReady,
-    isCatchupSync: false, // Not available in v2
-    isLiveSync: isSyncReady && liveChangesStatus === 'connected',
-    isIdle: connectionStatus === 'disconnected',
-    isActive: connectionStatus === 'connected' || connectionStatus === 'connecting',
-    syncPhase: isSyncReady ? 'live' : 'connecting',
-    machineState: connectionStatus,
-    syncProgress: 0, // Not available in v2
-    syncPhaseProgress: null, // Not available in v2
-    statusText: isSyncReady && liveChangesStatus === 'connected' ? 'Live' :
-                connectionStatus === 'connecting' ? 'Connecting...' :
-                'Disconnected'
-  };
+  // Use the real sync machine state instead of legacy useAppInit
+  const sync = useSync();
   
   const connection = {
-    isOnline: connectionStatus === 'connected'
+    isOnline: sync.isConnected
   };
   
   const readiness = {
@@ -35,9 +18,9 @@ export function SyncDebugPanel() {
     canLoadRoutes: isSystemReady,
     readinessChecks: {
       auth: isAuthenticated,
-      database: true, // Assume initialized if we're here
-      sync: isSyncReady,
-      liveChanges: liveChangesStatus === 'connected'
+      database: isDatabaseInitialized,
+      sync: sync.isConnected,
+      liveChanges: sync.isLiveSync // This should now show the correct live sync status
     }
   };
   
@@ -60,16 +43,23 @@ export function SyncDebugPanel() {
     setTestResults(prev => ({ ...prev, connection: 'Testing sync connection...' }));
     
     try {
-      // Send CONNECT event to sync machine v2
-      orchestratorActor.send({
-        type: 'LSN_UPDATE', // This will forward to sync machine
-        lsn: sync.currentLSN
-      });
-      
-      setTestResults(prev => ({ 
-        ...prev, 
-        connection: `✅ Connection test sent - Current LSN: ${sync.currentLSN}` 
-      }));
+      // Access sync machine directly from window (matches useSync hook pattern)
+      const syncMachine = (window as any).syncMachineActor;
+      if (syncMachine) {
+        syncMachine.send({
+          type: 'FORCE_RECONNECT'
+        });
+        
+        setTestResults(prev => ({ 
+          ...prev, 
+          connection: `✅ Connection test sent - Current LSN: ${sync.currentLSN}` 
+        }));
+      } else {
+        setTestResults(prev => ({ 
+          ...prev, 
+          connection: `❌ Sync machine not available` 
+        }));
+      }
     } catch (error) {
       setTestResults(prev => ({ 
         ...prev, 
@@ -98,13 +88,28 @@ export function SyncDebugPanel() {
   const resetSyncState = () => {
     setTestResults(prev => ({ ...prev, reset: 'Requesting sync reset...' }));
     
-    // Send reset event that the new sync machine can handle
-    orchestratorActor.send({ type: 'SYNC_CLIENT_ID_RESET' });
-    
-    setTestResults(prev => ({ 
-      ...prev, 
-      reset: '🔄 Sync reset requested via orchestrator' 
-    }));
+    try {
+      // Access sync machine directly from window
+      const syncMachine = (window as any).syncMachineActor;
+      if (syncMachine) {
+        syncMachine.send({ type: 'RESET' });
+        
+        setTestResults(prev => ({ 
+          ...prev, 
+          reset: '🔄 Sync reset requested' 
+        }));
+      } else {
+        setTestResults(prev => ({ 
+          ...prev, 
+          reset: '❌ Sync machine not available for reset' 
+        }));
+      }
+    } catch (error) {
+      setTestResults(prev => ({ 
+        ...prev, 
+        reset: `❌ Reset failed: ${error}` 
+      }));
+    }
   };
 
   const inspectServices = () => {

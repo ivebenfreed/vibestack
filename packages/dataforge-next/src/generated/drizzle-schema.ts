@@ -19,7 +19,7 @@ import { relations } from 'drizzle-orm';
 // Table Definitions
 // ============================================
 
-export const verificationTable = pgTable('verifications', {
+export const verifications = pgTable('verifications', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -28,7 +28,7 @@ export const verificationTable = pgTable('verifications', {
   expires_at: text('expires_at').notNull()
 });
 
-export const userTable = pgTable('users', {
+export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -40,12 +40,12 @@ export const userTable = pgTable('users', {
   accounts_id: text('accounts_id')
 });
 
-export const task_tagsTable = pgTable('task_tags', {
+export const task_tags = pgTable('task_tags', {
   tasks_id: text('tasks_id'),
   tags_id: text('tags_id')
 });
 
-export const taskTable = pgTable('tasks', {
+export const tasks = pgTable('tasks', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -61,11 +61,10 @@ export const taskTable = pgTable('tasks', {
   estimated_duration: text('estimated_duration'),
   legacy_tags: text('legacy_tags'),
   project_id: text('project_id'),
-  assignee_id: text('assignee_id'),
-  parents_id: text('parents_id')
+  assignee_id: text('assignee_id')
 });
 
-export const tagsetTable = pgTable('tag_sets', {
+export const tag_sets = pgTable('tag_sets', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -84,7 +83,7 @@ export const tagsetTable = pgTable('tag_sets', {
   idx_tag_sets_displayOrder: index('idx_tag_sets_displayOrder').on(table.display_order),
 }));
 
-export const tagTable = pgTable('tags', {
+export const tags = pgTable('tags', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -106,7 +105,7 @@ export const tagTable = pgTable('tags', {
   idx_tags_slug: index('idx_tags_slug').on(table.slug),
 }));
 
-export const syncmetadataTable = pgTable('sync_metadata', {
+export const sync_metadata = pgTable('sync_metadata', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -115,7 +114,7 @@ export const syncmetadataTable = pgTable('sync_metadata', {
   last_synced_at: timestamp('last_synced_at', { mode: 'date' })
 });
 
-export const statussetTable = pgTable('status_sets', {
+export const status_sets = pgTable('status_sets', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -132,7 +131,7 @@ export const statussetTable = pgTable('status_sets', {
   idx_status_sets_entityType: index('idx_status_sets_entityType').on(table.entity_type),
 }));
 
-export const statusdefinitionTable = pgTable('status_definitions', {
+export const status_definitions = pgTable('status_definitions', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -155,7 +154,7 @@ export const statusdefinitionTable = pgTable('status_definitions', {
   idx_status_definitions_statusSet_sortOrder: index('idx_status_definitions_statusSet_sortOrder').on(table.status_set_id, table.sort_order),
 }));
 
-export const sessionTable = pgTable('sessions', {
+export const sessions = pgTable('sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -164,17 +163,17 @@ export const sessionTable = pgTable('sessions', {
   accounts_id: text('accounts_id').notNull()
 });
 
-export const project_tag_setsTable = pgTable('project_tag_sets', {
+export const project_tag_sets = pgTable('project_tag_sets', {
   projects_id: text('projects_id'),
   tag_sets_id: text('tag_sets_id')
 });
 
-export const project_status_setsTable = pgTable('project_status_sets', {
+export const project_status_sets = pgTable('project_status_sets', {
   projects_id: text('projects_id'),
   status_sets_id: text('status_sets_id')
 });
 
-export const projectTable = pgTable('projects', {
+export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -185,7 +184,7 @@ export const projectTable = pgTable('projects', {
   owner_id: text('owner_id')
 });
 
-export const localchangesTable = pgTable('local_changes', {
+export const local_changes = pgTable('local_changes', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -199,7 +198,7 @@ export const localchangesTable = pgTable('local_changes', {
   idx_local_changes_tableName_recordId: index('idx_local_changes_tableName_recordId').on(table.table_name, table.record_id),
 }));
 
-export const entitydependencyTable = pgTable('entity_dependencies', {
+export const entity_dependencies = pgTable('entity_dependencies', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -214,7 +213,7 @@ export const entitydependencyTable = pgTable('entity_dependencies', {
   idx_entity_dependencies_fromTable_fromId: index('idx_entity_dependencies_fromTable_fromId').on(table.from_table, table.from_id),
 }));
 
-export const commentTable = pgTable('comments', {
+export const comments = pgTable('comments', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -224,7 +223,7 @@ export const commentTable = pgTable('comments', {
   authors_id: text('authors_id')
 });
 
-export const changehistoryTable = pgTable('change_history', {
+export const change_history = pgTable('change_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -238,7 +237,7 @@ export const changehistoryTable = pgTable('change_history', {
   idx_change_history_lsn: index('idx_change_history_lsn').on(table.lsn),
 }));
 
-export const accountTable = pgTable('accounts', {
+export const accounts = pgTable('accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -257,42 +256,41 @@ export const accountTable = pgTable('accounts', {
 // Relations
 // ============================================
 
-export const userRelations = relations(userTable, ({ one, many }) => ({
-  assignedTasks: many(taskTable),
-  comments: many(commentTable),
-  ownedProjects: many(projectTable),
+export const usersRelations = relations(users, ({ one, many }) => ({
+  assignedTasks: many(tasks),
+  comments: many(comments),
+  ownedProjects: many(projects),
 }));
 
-export const taskRelations = relations(taskTable, ({ one, many }) => ({
-  subtasks: many(taskTable),
-  comments: many(commentTable),
-  tags: many(tagTable),
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  comments: many(comments),
+  tags: many(tags),
 }));
 
-export const tagsetRelations = relations(tagsetTable, ({ one, many }) => ({
-  tags: many(tagTable),
-  projects: many(projectTable),
+export const tagSetsRelations = relations(tag_sets, ({ one, many }) => ({
+  tags: many(tags),
+  projects: many(projects),
 }));
 
-export const tagRelations = relations(tagTable, ({ one, many }) => ({
-  children: many(tagTable),
-  tasks: many(taskTable),
+export const tagsRelations = relations(tags, ({ one, many }) => ({
+  children: many(tags),
+  tasks: many(tasks),
 }));
 
-export const statussetRelations = relations(statussetTable, ({ one, many }) => ({
-  statuses: many(statusdefinitionTable),
-  projects: many(projectTable),
+export const statusSetsRelations = relations(status_sets, ({ one, many }) => ({
+  statuses: many(status_definitions),
+  projects: many(projects),
 }));
 
-export const projectRelations = relations(projectTable, ({ one, many }) => ({
-  tasks: many(taskTable),
-  tagSets: many(tagsetTable),
-  statusSets: many(statussetTable),
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  tasks: many(tasks),
+  tagSets: many(tag_sets),
+  statusSets: many(status_sets),
 }));
 
-export const accountRelations = relations(accountTable, ({ one, many }) => ({
-  users: many(userTable),
-  sessions: many(sessionTable),
+export const accountsRelations = relations(accounts, ({ one, many }) => ({
+  users: many(users),
+  sessions: many(sessions),
 }));
 
 // ============================================
@@ -300,70 +298,70 @@ export const accountRelations = relations(accountTable, ({ one, many }) => ({
 // ============================================
 
 export const schema = {
-  verificationTable,
-  userTable,
-  userRelations,
-  task_tagsTable,
-  taskTable,
-  taskRelations,
-  tagsetTable,
-  tagsetRelations,
-  tagTable,
-  tagRelations,
-  syncmetadataTable,
-  statussetTable,
-  statussetRelations,
-  statusdefinitionTable,
-  sessionTable,
-  project_tag_setsTable,
-  project_status_setsTable,
-  projectTable,
-  projectRelations,
-  localchangesTable,
-  entitydependencyTable,
-  commentTable,
-  changehistoryTable,
-  accountTable,
-  accountRelations,
+  verifications,
+  users,
+  usersRelations,
+  task_tags,
+  tasks,
+  tasksRelations,
+  tag_sets,
+  tagSetsRelations,
+  tags,
+  tagsRelations,
+  sync_metadata,
+  status_sets,
+  statusSetsRelations,
+  status_definitions,
+  sessions,
+  project_tag_sets,
+  project_status_sets,
+  projects,
+  projectsRelations,
+  local_changes,
+  entity_dependencies,
+  comments,
+  change_history,
+  accounts,
+  accountsRelations,
 };
 
 // ============================================
 // Type Exports
 // ============================================
 
-export type Verification = typeof verificationTable.$inferSelect;
-export type NewVerification = typeof verificationTable.$inferInsert;
-export type User = typeof userTable.$inferSelect;
-export type NewUser = typeof userTable.$inferInsert;
-export type task_tags = typeof task_tagsTable.$inferSelect;
-export type Newtask_tags = typeof task_tagsTable.$inferInsert;
-export type Task = typeof taskTable.$inferSelect;
-export type NewTask = typeof taskTable.$inferInsert;
-export type TagSet = typeof tagsetTable.$inferSelect;
-export type NewTagSet = typeof tagsetTable.$inferInsert;
-export type Tag = typeof tagTable.$inferSelect;
-export type NewTag = typeof tagTable.$inferInsert;
-export type SyncMetadata = typeof syncmetadataTable.$inferSelect;
-export type NewSyncMetadata = typeof syncmetadataTable.$inferInsert;
-export type StatusSet = typeof statussetTable.$inferSelect;
-export type NewStatusSet = typeof statussetTable.$inferInsert;
-export type StatusDefinition = typeof statusdefinitionTable.$inferSelect;
-export type NewStatusDefinition = typeof statusdefinitionTable.$inferInsert;
-export type Session = typeof sessionTable.$inferSelect;
-export type NewSession = typeof sessionTable.$inferInsert;
-export type project_tag_sets = typeof project_tag_setsTable.$inferSelect;
-export type Newproject_tag_sets = typeof project_tag_setsTable.$inferInsert;
-export type project_status_sets = typeof project_status_setsTable.$inferSelect;
-export type Newproject_status_sets = typeof project_status_setsTable.$inferInsert;
-export type Project = typeof projectTable.$inferSelect;
-export type NewProject = typeof projectTable.$inferInsert;
-export type LocalChanges = typeof localchangesTable.$inferSelect;
-export type NewLocalChanges = typeof localchangesTable.$inferInsert;
-export type EntityDependency = typeof entitydependencyTable.$inferSelect;
-export type NewEntityDependency = typeof entitydependencyTable.$inferInsert;
-export type Comment = typeof commentTable.$inferSelect;
-export type NewComment = typeof commentTable.$inferInsert;
-export type ChangeHistory = typeof changehistoryTable.$inferSelect;
-export type NewChangeHistory = typeof changehistoryTable.$inferInsert;
-export type Account = typeof accountTable.$inferSelect;
-export type NewAccount = typeof accountTable.$inferInsert;
+export type Verification = typeof verifications.$inferSelect;
+export type NewVerification = typeof verifications.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type task_tags = typeof task_tags.$inferSelect;
+export type Newtask_tags = typeof task_tags.$inferInsert;
+export type Task = typeof tasks.$inferSelect;
+export type NewTask = typeof tasks.$inferInsert;
+export type TagSet = typeof tag_sets.$inferSelect;
+export type NewTagSet = typeof tag_sets.$inferInsert;
+export type Tag = typeof tags.$inferSelect;
+export type NewTag = typeof tags.$inferInsert;
+export type SyncMetadata = typeof sync_metadata.$inferSelect;
+export type NewSyncMetadata = typeof sync_metadata.$inferInsert;
+export type StatusSet = typeof status_sets.$inferSelect;
+export type NewStatusSet = typeof status_sets.$inferInsert;
+export type StatusDefinition = typeof status_definitions.$inferSelect;
+export type NewStatusDefinition = typeof status_definitions.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
+export type project_tag_sets = typeof project_tag_sets.$inferSelect;
+export type Newproject_tag_sets = typeof project_tag_sets.$inferInsert;
+export type project_status_sets = typeof project_status_sets.$inferSelect;
+export type Newproject_status_sets = typeof project_status_sets.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+export type LocalChanges = typeof local_changes.$inferSelect;
+export type NewLocalChanges = typeof local_changes.$inferInsert;
+export type EntityDependency = typeof entity_dependencies.$inferSelect;
+export type NewEntityDependency = typeof entity_dependencies.$inferInsert;
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
+export type ChangeHistory = typeof change_history.$inferSelect;
+export type NewChangeHistory = typeof change_history.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;

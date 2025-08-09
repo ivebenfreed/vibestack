@@ -45,7 +45,7 @@ export async function performInitialSync(
       tableCount: TRACKED_TABLES.length
     };
     
-    await messageHandler.sendMessage(clientId, startMessage);
+    await messageHandler.send(startMessage);
 
     // Create generic sync adapter
     const syncAdapter = new GenericSyncAdapter(
@@ -83,7 +83,7 @@ export async function performInitialSync(
         totalRecords: 0
       };
       
-      await messageHandler.sendMessage(clientId, completeMessage);
+      await messageHandler.send(completeMessage);
       return;
     }
 
@@ -105,7 +105,7 @@ export async function performInitialSync(
         totalChunks: chunks.length
       };
       
-      await messageHandler.sendMessage(clientId, changesMessage);
+      await messageHandler.send(changesMessage);
       
       syncLogger.debug(`Sent initial sync chunk ${i + 1}/${chunks.length} with ${chunk.length} records to client ${clientId}`, {
         clientId,
@@ -129,7 +129,7 @@ export async function performInitialSync(
       totalRecords: allChanges.length
     };
     
-    await messageHandler.sendMessage(clientId, completeMessage);
+    await messageHandler.send(completeMessage);
 
     // Update sync metadata
     const syncVersion = new Date().toISOString();
@@ -172,7 +172,7 @@ export async function performInitialSync(
       error: error instanceof Error ? error.message : String(error)
     };
     
-    await messageHandler.sendMessage(clientId, errorMessage);
+    await messageHandler.send(errorMessage);
     throw error;
   }
 }

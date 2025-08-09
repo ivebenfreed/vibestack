@@ -310,9 +310,10 @@ export class MessageProcessor {
           
           if (message.appliedChanges && Array.isArray(message.appliedChanges)) {
             try {
-              // appliedChanges contains record IDs, not change IDs
-              const recordIds = message.appliedChanges;
-              console.log('[MessageProcessor] Record IDs from server:', recordIds);
+              // Extract record IDs from appliedChanges objects
+              const recordIds = message.appliedChanges.map((change: any) => change.recordId).filter(Boolean);
+              console.log('[MessageProcessor] Extracted record IDs from server:', recordIds);
+              console.log('[MessageProcessor] Applied changes structure:', message.appliedChanges);
               
               if (recordIds.length > 0) {
                 // Use the service's method to mark changes as processed based on record IDs
@@ -323,6 +324,8 @@ export class MessageProcessor {
                   .catch((error: any) => {
                     console.error('[MessageProcessor] Failed to mark Dexie changes as processed:', error);
                   });
+              } else {
+                console.warn('[MessageProcessor] No valid record IDs found in appliedChanges');
               }
             } catch (error) {
               console.error('[MessageProcessor] Error processing Dexie change confirmations:', error);

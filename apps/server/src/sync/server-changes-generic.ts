@@ -81,7 +81,7 @@ export async function sendLiveChanges(
         changeCount: 0
       };
       
-      await messageHandler.sendMessage(clientId, completedMessage);
+      await messageHandler.send(completedMessage);
       return;
     }
 
@@ -104,7 +104,7 @@ export async function sendLiveChanges(
         lsn: targetLSN || currentLSN || '0/0'
       };
       
-      await messageHandler.sendMessage(clientId, changesMessage);
+      await messageHandler.send(changesMessage);
       
       syncLogger.debug(`Sent chunk ${i + 1}/${chunks.length} with ${chunk.length} changes to client ${clientId}`, {
         clientId,
@@ -124,7 +124,7 @@ export async function sendLiveChanges(
       changeCount: tableChanges.length
     };
     
-    await messageHandler.sendMessage(clientId, completedMessage);
+    await messageHandler.send(completedMessage);
 
     // Update sync metadata
     const syncVersion = new Date().toISOString();
@@ -152,7 +152,7 @@ export async function sendLiveChanges(
       error: error instanceof Error ? error.message : String(error)
     };
     
-    await messageHandler.sendMessage(clientId, errorMessage);
+    await messageHandler.send(errorMessage);
     throw error;
   }
 }
@@ -211,10 +211,14 @@ export async function performCatchupSync(
   }, MODULE_NAME);
 
   try {
-    // Query change_history table for catchup changes
-    syncLogger.info('Getting DB client for catchup sync', { clientId });
-    const { getDBClient } = await import('../lib/db');
-    const client = await getDBClient(context);
+    // Use Drizzle with Neon HTTP driver for catchup changes
+    syncLogger.info('Setting up Drizzle client for catchup sync', { clientId });
+    const { drizzle } = await import('drizzle-orm/neon-http');
+    const { neon } = await import('@neondatabase/serverless');
+    const { sql } = await import('drizzle-orm');
+    
+    const sqlClient = neon(context.env.DATABASE_URL);
+    const db = drizzle(sqlClient);
     
     syncLogger.info('Querying change_history table', {
       clientId,
@@ -222,8 +226,9 @@ export async function performCatchupSync(
       serverLSN: initialServerLSN
     });
     
-    // Query for changes between client LSN and server LSN
-    const query = `
+    // Query for changes between client LSN and server LSN using Drizzle
+    syncLogger.info('Executing catchup query', { clientId });
+    const changes = await db.execute(sql`
       SELECT 
         table_name as table,
         operation,
@@ -231,14 +236,11 @@ export async function performCatchupSync(
         lsn,
         created_at as timestamp
       FROM change_history
-      WHERE lsn > $1 AND lsn <= $2
+      WHERE lsn > ${clientLSN} AND lsn <= ${initialServerLSN}
       ORDER BY lsn ASC
       LIMIT 5000
-    `;
+    `);
     
-    syncLogger.info('Executing catchup query', { clientId });
-    const result = await client.query(query, [clientLSN, initialServerLSN]);
-    const changes = result.rows;
     syncLogger.info('Catchup query completed', {
       clientId,
       changeCount: changes.length
