@@ -8,7 +8,7 @@ import tasks from './tasks'
 import { entityDependencies, taskDependencies } from './entity-dependencies'
 import users from './users'
 import comments from './comments'
-import { sync } from './sync'
+import syncV2Router from './sync-v2'
 import replication from './replication'
 import { migrations } from './migrations'
 import { db } from './db'
@@ -33,7 +33,7 @@ api.route('/entity-dependencies', entityDependencies)
 api.route('/task-dependencies', taskDependencies) // Backward compatibility
 api.route('/users', users)
 api.route('/comments', comments)
-api.route('/sync', sync)
+api.route('/sync', syncV2Router)
 api.route('/replication', replication)
 api.route('/migrations', migrations)
 api.route('/db', db)

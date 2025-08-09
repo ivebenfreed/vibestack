@@ -1,7 +1,9 @@
-import { Entity, Property, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne, OneToMany, ManyToMany, Collection } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
-import type { Task } from './Task.js';
-import type { User } from './User.js';
+import { Task } from './Task.js';
+import { User } from './User.js';
+import { TagSet } from './TagSet.js';
+import { StatusSet } from './StatusSet.js';
 
 @Entity()
 export class Project extends BaseDomainEntity {
@@ -11,21 +13,18 @@ export class Project extends BaseDomainEntity {
   @Property({ type: 'text', nullable: true })
   description?: string;
 
-  @Property({ type: 'string', default: 'active' })
+  @Property({ type: 'string', default: 'active', columnType: 'projects_status_enum' })
   status!: string;
 
-  @Property({ type: 'date', nullable: true })
-  startDate?: Date;
-
-  @Property({ type: 'date', nullable: true })
-  endDate?: Date;
-
-  @Property({ type: 'string', nullable: true })
-  color?: string;
-
-  @ManyToOne(() => 'User', { nullable: true })
+  @ManyToOne(() => User, { nullable: true, fieldName: 'owner_id' })
   owner?: User;
 
-  @OneToMany(() => 'Task', 'project')
+  @OneToMany(() => Task, 'project')
   tasks = new Collection<Task>(this);
+
+  @ManyToMany(() => TagSet, 'projects', { owner: true, pivotTable: 'project_tag_sets' })
+  tagSets = new Collection<TagSet>(this);
+
+  @ManyToMany(() => StatusSet, 'projects', { owner: true, pivotTable: 'project_status_sets' })
+  statusSets = new Collection<StatusSet>(this);
 }

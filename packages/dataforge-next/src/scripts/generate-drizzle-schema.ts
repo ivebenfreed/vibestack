@@ -41,7 +41,10 @@ interface DrizzleIndexInfo {
 }
 
 async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
-  const orm = await MikroORM.init(mikroOrmConfig);
+  const orm = await MikroORM.init({
+    ...mikroOrmConfig,
+    connect: false, // Don't connect to DB, just need metadata
+  });
   const metadata = orm.getMetadata();
   const tables: DrizzleTableInfo[] = [];
 
@@ -62,6 +65,28 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
 
     // Extract columns
     for (const prop of Object.values(meta.properties) as any[]) {
+      // Skip Collection properties (OneToMany, ManyToMany)
+      // These have 'kind' values like '1:m' or 'm:n'
+      if (prop.kind === '1:m' || prop.kind === 'm:n') {
+        // Add to relations but not columns
+        if (prop.kind === '1:m') {
+          tableInfo.relations.push({
+            name: prop.name,
+            type: 'many',
+            targetEntity: prop.type,
+            targetTable: prop.type.toLowerCase(),
+          });
+        } else if (prop.kind === 'm:n') {
+          tableInfo.relations.push({
+            name: prop.name,
+            type: 'many',
+            targetEntity: prop.type,
+            targetTable: prop.type.toLowerCase(),
+          });
+        }
+        continue;
+      }
+      
       if (!prop.reference || prop.reference === 'scalar' || prop.reference === 'embedded') {
         tableInfo.columns.push({
           name: prop.fieldNames?.[0] || prop.name,
@@ -92,13 +117,6 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
           type: 'one',
           targetEntity: prop.type,
           targetTable: targetMeta?.tableName || prop.type.toLowerCase(),
-        });
-      } else if (prop.reference === '1:m') {
-        tableInfo.relations.push({
-          name: prop.name,
-          type: 'many',
-          targetEntity: prop.type,
-          targetTable: prop.type.toLowerCase(),
         });
       }
     }
@@ -231,7 +249,39 @@ import { relations } from 'drizzle-orm';
       for (const idx of table.indexes) {
         const indexName = idx.name;
         const indexFn = idx.unique ? 'uniqueIndex' : 'index';
-        const columns = idx.columns.map(c => `table.${c}`).join(', ');
+        // Convert MikroORM property names to Drizzle field names (camelCase to snake_case)
+        const columns = idx.columns.map(c => {
+          // Find the actual column in the table definition
+          const field = table.columns.find(col => {
+            const camelCase = col.name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            return camelCase === c;
+          });
+          
+          if (field) {
+            return `table.${field.name}`;
+          }
+          
+          // Handle relationship fields - tagSet becomes tag_set_id
+          if (c === 'tagSet') {
+            return 'table.tag_set_id';
+          }
+          if (c === 'statusSet') {
+            return 'table.status_set_id';
+          }
+          
+          // Fallback: convert to snake_case
+          let snakeCase = c.replace(/[A-Z]/g, (letter, index) => 
+            index === 0 ? letter.toLowerCase() : `_${letter.toLowerCase()}`
+          );
+          
+          // For relationship fields, check if we need to add _id suffix
+          const relationshipField = table.columns.find(col => col.name === snakeCase + '_id' || col.name === snakeCase + 's_id');
+          if (relationshipField) {
+            return `table.${relationshipField.name}`;
+          }
+          
+          return `table.${snakeCase}`;
+        }).join(', ');
         output += `  ${indexName}: ${indexFn}('${indexName}').on(${columns}),\n`;
       }
       output += `})`;

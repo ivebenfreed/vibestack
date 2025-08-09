@@ -9,7 +9,8 @@
     "generate-dexie-schema": "tsx src/scripts/generate-dexie-schema.ts",
     "generate-dexie-services": "tsx src/scripts/generate-dexie-domain-services.ts",
     "generate-drizzle-schema": "tsx src/scripts/generate-drizzle-schema.ts",
-    "generate-all": "npm run generate-entities && npm run generate-dexie-schema && npm run generate-dexie-services && npm run generate-drizzle-schema",
+    "generate-sync-metadata": "tsx src/scripts/generate-sync-metadata.ts",
+    "generate-all": "npm run generate-entities && npm run generate-dexie-schema && npm run generate-dexie-services && npm run generate-drizzle-schema && npm run generate-sync-metadata",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

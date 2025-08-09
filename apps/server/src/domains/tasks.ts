@@ -134,40 +134,19 @@ export class TaskRepository extends BaseServerRepository<Task> {
     return await this.systemUpdate(id, { timeRange } as TaskUpdateInput);
   }
 
-  /**
-   * Add dependency to task using TypeORM query builder
-   */
+  // DEPRECATED: Task dependencies table removed from database
+  // These methods are no longer functional
+  /*
   async addDependency(taskId: string, dependencyId: string): Promise<Task | null> {
-    const queryBuilder = await this.neonService.createQueryBuilder(TaskClass, 'task');
-    await queryBuilder
-      .insert()
-      .into('task_dependencies')
-      .values({
-        dependent_task_id: taskId,
-        dependency_task_id: dependencyId
-      })
-      .orIgnore() // ON CONFLICT DO NOTHING
-      .execute();
-    
+    // Deprecated - task_dependencies table no longer exists
     return await this.findById(taskId);
   }
 
-  /**
-   * Remove dependency from task using TypeORM query builder
-   */
   async removeDependency(taskId: string, dependencyId: string): Promise<Task | null> {
-    const queryBuilder = await this.neonService.createQueryBuilder(TaskClass, 'task');
-    await queryBuilder
-      .delete()
-      .from('task_dependencies')
-      .where('dependent_task_id = :taskId AND dependency_task_id = :dependencyId', { 
-        taskId, 
-        dependencyId 
-      })
-      .execute();
-    
+    // Deprecated - task_dependencies table no longer exists
     return await this.findById(taskId);
   }
+  */
 
   /**
    * Add tag to task
@@ -382,11 +361,8 @@ export class TaskRepository extends BaseServerRepository<Task> {
     return Array.isArray(tagsResult) ? tagsResult : tagsResult?.rows || [];
   }
 
-  /**
-   * Update task dependencies using junction table manipulation
-   * Used by sync operations - preserves clientId
-   * Follows the same pattern as ProjectRepository.updateMembers
-   */
+  // DEPRECATED: Task dependencies table removed from database
+  /*
   async updateDependencies(taskId: string, newDependencyIds: string[], skipValidation = false): Promise<any[]> {
     // Skip task existence check if already validated upstream
     if (!skipValidation) {
@@ -464,31 +440,19 @@ export class TaskRepository extends BaseServerRepository<Task> {
       }
     }
 
-    // Return the updated dependencies
-    const depsQuery = `
-      SELECT t.* 
-      FROM tasks t
-      JOIN task_dependencies td ON t.id = td.dependency_task_id 
-      WHERE td.dependent_task_id = $1
-    `;
-    const depsResult = await this.neonService.query(depsQuery, [taskId]);
-    return depsResult;
+    // Deprecated - task_dependencies table no longer exists
+    return [];
   }
+  */
 
   /**
    * Delete task
    */
   override async delete(id: string): Promise<boolean> {
     try {
-      // First delete all dependencies
-      const dependencyQueryBuilder = await this.neonService.createQueryBuilder(TaskClass, 'task');
-      await dependencyQueryBuilder
-        .delete()
-        .from('task_dependencies')
-        .where('dependent_task_id = :id OR dependency_task_id = :id', { id })
-        .execute();
+      // task_dependencies table removed - no longer need to delete dependencies
       
-      // Then delete the task
+      // Delete the task
       const result = await this.neonService.delete(TaskClass, { id } as FindOptionsWhere<Task>);
       
       return (result.affected !== null && result.affected !== undefined && result.affected > 0);

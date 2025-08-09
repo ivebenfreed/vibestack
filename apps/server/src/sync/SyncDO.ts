@@ -9,8 +9,8 @@
  */
 
 import { SyncStateManager } from './state-manager';
-import { performInitialSync } from './initial-sync';
-import { sendLiveChanges } from './server-changes';
+import { performInitialSync } from './initial-sync-generic';
+import { sendLiveChanges } from './server-changes-generic';
 import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';

@@ -1,6 +1,6 @@
 import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
-import type { Account } from './Account.js';
+import { Account } from './Account.js';
 
 @Entity()
 export class Session extends BaseSystemEntity {
@@ -10,6 +10,6 @@ export class Session extends BaseSystemEntity {
   @Property({ type: 'timestamptz' })
   expiresAt!: Date;
 
-  @ManyToOne(() => 'Account')
+  @ManyToOne(() => Account)
   account!: Account;
 }

@@ -10,9 +10,8 @@ export interface UserUpdateInput {
   isSuperAdmin?: any;
   account?: any;
   assignedTasks?: any;
-  createdTasks?: any;
   comments?: any;
-  createdProjects?: any;
+  ownedProjects?: any;
 }
 
 export class UserDexieService {
@@ -27,31 +26,31 @@ export class UserDexieService {
       updatedAt: now,
     } as User;
     
-    await db.user.add(record);
+    await db.users.add(record);
     return id;
   }
 
   async findById(id: string): Promise<User | undefined> {
-    return await db.user.get(id);
+    return await db.users.get(id);
   }
 
   async findAll(): Promise<User[]> {
-    return await db.user.toArray();
+    return await db.users.toArray();
   }
 
   async update(id: string, updates: UserUpdateInput): Promise<void> {
-    await db.user.update(id, {
+    await db.users.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
   }
 
   async delete(id: string): Promise<void> {
-    await db.user.delete(id);
+    await db.users.delete(id);
   }
 
   async deleteAll(): Promise<void> {
-    await db.user.clear();
+    await db.users.clear();
   }
 }
 

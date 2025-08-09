@@ -3,26 +3,23 @@ import { db } from '../dexie-schema.js';
 import type { Task } from '../client-entities.js';
 
 export interface TaskUpdateInput {
-  version?: any;
-  deleted?: any;
   clientId?: any;
-  createdBy?: any;
-  updatedBy?: any;
   title?: any;
   description?: any;
-  status?: any;
+  legacyStatus?: any;
   priority?: any;
   dueDate?: any;
   startDate?: any;
-  estimatedHours?: any;
-  actualHours?: any;
-  completionPercentage?: any;
-  tags?: any;
+  completedAt?: any;
+  timeRange?: any;
+  estimatedDuration?: any;
+  legacyTags?: any;
   project?: any;
   assignee?: any;
   parent?: any;
   subtasks?: any;
   comments?: any;
+  tags?: any;
 }
 
 export class TaskDexieService {
@@ -40,20 +37,20 @@ export class TaskDexieService {
       clientId: crypto.randomUUID(),
     } as Task;
     
-    await db.task.add(record);
+    await db.tasks.add(record);
     return id;
   }
 
   async findById(id: string): Promise<Task | undefined> {
-    return await db.task.get(id);
+    return await db.tasks.get(id);
   }
 
   async findAll(): Promise<Task[]> {
-    return await db.task.where('deleted').equals(0).toArray();
+    return await db.tasks.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: TaskUpdateInput): Promise<void> {
-    await db.task.update(id, {
+    await db.tasks.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -61,14 +58,14 @@ export class TaskDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.task.update(id, {
+    await db.tasks.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.task.clear();
+    await db.tasks.clear();
   }
 }
 
