@@ -44,12 +44,6 @@ export class Task extends BaseDomainEntity {
   @ManyToOne(() => User, { nullable: true, fieldName: 'assignee_id' })
   assignee?: User;
 
-  @ManyToOne(() => Task, { nullable: true })
-  parent?: Task;
-
-  @OneToMany(() => Task, 'parent')
-  subtasks = new Collection<Task>(this);
-
   @OneToMany(() => Comment, 'task')
   comments = new Collection<Comment>(this);
 

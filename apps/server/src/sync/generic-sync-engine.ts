@@ -103,10 +103,10 @@ export class GenericSyncEngine {
     junctionTable: JunctionTable,
     changes: LocalChange[]
   ): Promise<void> {
-    // Junction tables preserve underscores in schema export names
-    const table = this.schema[junctionTable.tableName + 'Table'];
+    // Get junction table from schema - direct lookup
+    const table = this.schema[junctionTable.tableName];
     if (!table) {
-      console.warn(`No schema found for junction table: ${junctionTable.tableName} (looking for ${this.toCamelCase(junctionTable.tableName) + 'Table'})`);
+      console.warn(`No schema found for junction table: ${junctionTable.tableName}`);
       return;
     }
 
@@ -179,7 +179,7 @@ export class GenericSyncEngine {
       const existingRecord = await this.db
         .select()
         .from(table)
-        .where(eq(table.clientId, data.client_id))
+        .where(eq(table.client_id, data.client_id))
         .limit(1);
 
       if (existingRecord.length > 0) {
@@ -187,7 +187,7 @@ export class GenericSyncEngine {
         await this.db
           .update(table)
           .set(data)
-          .where(eq(table.clientId, data.client_id));
+          .where(eq(table.client_id, data.client_id));
       } else {
         // Insert new record
         await this.db.insert(table).values(data);
@@ -232,7 +232,7 @@ export class GenericSyncEngine {
         await this.db
           .update(table)
           .set(updateData)
-          .where(eq(table.clientId, change.data.client_id));
+          .where(eq(table.client_id, change.data.client_id));
       } else {
         await this.db
           .update(table)
@@ -244,7 +244,7 @@ export class GenericSyncEngine {
       if (metadata.features.hasClientId && change.data.client_id) {
         await this.db
           .delete(table)
-          .where(eq(table.clientId, change.data.client_id));
+          .where(eq(table.client_id, change.data.client_id));
       } else {
         await this.db
           .delete(table)
@@ -266,24 +266,26 @@ export class GenericSyncEngine {
     for (const [key, value] of Object.entries(rawData)) {
       const snakeKey = this.toSnakeCase(key);
       
-      // Skip fields that shouldn't be updated
-      if (snakeKey === 'id' || snakeKey === 'created_at') {
+      // Skip id field - it's handled separately
+      if (snakeKey === 'id') {
         if (!data[snakeKey]) {
           data[snakeKey] = value;
         }
         continue;
       }
       
-      // Handle special date fields
-      if (snakeKey === 'updated_at') {
-        data[snakeKey] = new Date();
-      } else if (value !== undefined && value !== null) {
-        // Handle date strings
-        if (snakeKey.includes('_at') || snakeKey.includes('date')) {
-          data[snakeKey] = new Date(value);
-        } else {
+      // Handle special timestamp fields that need Date objects
+      if (snakeKey === 'created_at' || snakeKey === 'updated_at') {
+        if (value instanceof Date) {
           data[snakeKey] = value;
+        } else if (typeof value === 'string') {
+          data[snakeKey] = new Date(value);
+        } else if (snakeKey === 'updated_at') {
+          data[snakeKey] = new Date(); // Always update updated_at
         }
+      } else if (value !== undefined && value !== null) {
+        // All other fields pass through as-is (including text date fields)
+        data[snakeKey] = value;
       }
     }
     
@@ -336,8 +338,8 @@ export class GenericSyncEngine {
     
     // Also get junction table changes
     for (const junctionTable of this.junctionTables) {
-      // Junction tables preserve underscores in schema export names
-    const table = this.schema[junctionTable.tableName + 'Table'];
+      // Get junction table - direct lookup
+      const table = this.schema[junctionTable.tableName];
       if (!table) {
         continue;
       }
@@ -376,45 +378,13 @@ export class GenericSyncEngine {
     return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
   }
 
-  // Manual mapping table for known mismatches between table names and schema exports
-  private static readonly TABLE_MAPPINGS: Record<string, string> = {
-    'tag_sets': 'tagsetTable',
-    'tags': 'tagTable', 
-    'status_sets': 'statussetTable',
-    'status_definitions': 'statusdefinitionTable'
-  };
-
   /**
-   * Get table from schema by table name, handling various naming conventions
+   * Get table from schema by table name
+   * Direct 1:1 mapping with database table names
    */
   private getTableFromSchema(tableName: string): any {
-    // Check manual mappings first
-    if (GenericSyncEngine.TABLE_MAPPINGS[tableName]) {
-      return this.schema[GenericSyncEngine.TABLE_MAPPINGS[tableName]];
-    }
-
-    // Standard pattern: toCamelCase + 'Table'
-    const camelCase = this.toCamelCase(tableName);
-    let table = this.schema[camelCase + 'Table'];
-    if (table) return table;
-
-    // Try className.toLowerCase() + 'Table' pattern (used in schema generation)
-    const schemaKeys = Object.keys(this.schema);
-    const matchingKey = schemaKeys.find(key => {
-      if (!key.endsWith('Table')) return false;
-      const baseName = key.slice(0, -5); // Remove 'Table' suffix
-      
-      // Check if this table name matches our target in various forms
-      return baseName.toLowerCase() === tableName.toLowerCase() ||
-             baseName.toLowerCase() === camelCase.toLowerCase() ||
-             key.toLowerCase() === (tableName + 'table').toLowerCase();
-    });
-
-    if (matchingKey) {
-      return this.schema[matchingKey];
-    }
-
-    return null;
+    // Direct lookup - the schema keys match the database table names exactly
+    return this.schema[tableName];
   }
 
   /**

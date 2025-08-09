@@ -1,6 +1,7 @@
 import React from 'react';
 import { ContentContainer } from '@/components/layout/content-container';
 import { SyncDebugPanel } from '@/components/debug/SyncDebugPanel';
+import { LocalChangesInspector } from '@/components/debug/LocalChangesInspector';
 import { SyncVisualizer } from '../sync/components/SyncVisualizer';
 
 export function SyncPage() {
@@ -41,20 +42,29 @@ export function SyncPage() {
           </div>
           
           <SyncDebugPanel />
+          
+          {/* Local Changes Inspector */}
+          <LocalChangesInspector />
         </div>
         
-        {/* Legacy Sync Visualizer (for comparison) */}
+        {/* Legacy Sync Visualizer - DISABLED */}
         <div className="space-y-4">
-          <div className="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded-r-lg">
-            <h3 className="font-semibold text-yellow-900">📊 Legacy Sync Visualizer (for comparison)</h3>
-            <p className="text-yellow-800 text-sm mt-1">
-              This is the old sync visualizer for comparison. It may show outdated information 
-              as it was built for the legacy SyncManager architecture.
+          <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg">
+            <h3 className="font-semibold text-red-900">🚫 Legacy Sync Visualizer (Disabled)</h3>
+            <p className="text-red-800 text-sm mt-1">
+              The legacy SyncVisualizer has been disabled as it's incompatible with the new architecture. 
+              It was trying to access deprecated sync manager state that no longer exists.
+            </p>
+            <p className="text-red-800 text-xs mt-2">
+              <strong>Error:</strong> Cannot read properties of null (reading 'live') - 
+              The old sync manager is null in the new pure services architecture.
             </p>
           </div>
           
-          <div className="opacity-60">
-            <SyncVisualizer />
+          <div className="opacity-40 p-4 bg-gray-100 rounded text-center text-gray-600">
+            <div className="text-2xl mb-2">🏗️</div>
+            <div className="text-sm">Legacy Sync Visualizer Removed</div>
+            <div className="text-xs mt-1">Use the enhanced debug panel above instead</div>
           </div>
         </div>
         

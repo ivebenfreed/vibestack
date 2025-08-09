@@ -68,20 +68,24 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
       // Skip Collection properties (OneToMany, ManyToMany)
       // These have 'kind' values like '1:m' or 'm:n'
       if (prop.kind === '1:m' || prop.kind === 'm:n') {
+        // Find the target metadata to get the actual table name
+        const targetMeta = allMetadata.find((m: any) => m.className === prop.type);
+        const targetTableName = targetMeta?.tableName || prop.type.toLowerCase() + 's';
+        
         // Add to relations but not columns
         if (prop.kind === '1:m') {
           tableInfo.relations.push({
             name: prop.name,
             type: 'many',
             targetEntity: prop.type,
-            targetTable: prop.type.toLowerCase(),
+            targetTable: targetTableName,
           });
         } else if (prop.kind === 'm:n') {
           tableInfo.relations.push({
             name: prop.name,
             type: 'many',
             targetEntity: prop.type,
-            targetTable: prop.type.toLowerCase(),
+            targetTable: targetTableName,
           });
         }
         continue;
@@ -189,7 +193,10 @@ import { relations } from 'drizzle-orm';
 
   // Generate table schemas
   for (const table of tables) {
-    output += `export const ${table.entityName.toLowerCase()}Table = pgTable('${table.tableName}', {
+    // Use the exact table name from the database for the export name
+    // This ensures 1:1 mapping and no conflicts
+    const exportName = table.tableName;
+    output += `export const ${exportName} = pgTable('${table.tableName}', {
 `;
 
     // Add columns
@@ -300,17 +307,21 @@ import { relations } from 'drizzle-orm';
   for (const table of tables) {
     if (table.relations.length === 0) continue;
 
-    output += `export const ${table.entityName.toLowerCase()}Relations = relations(${table.entityName.toLowerCase()}Table, ({ one, many }) => ({
+    const exportName = table.tableName;
+    // For relation names, convert to camelCase for consistency
+    const relationName = table.tableName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()) + 'Relations';
+    output += `export const ${relationName} = relations(${exportName}, ({ one, many }) => ({
 `;
 
     for (const rel of table.relations) {
+      const targetExportName = rel.targetTable;
       if (rel.type === 'one') {
-        output += `  ${rel.name}: one(${rel.targetEntity.toLowerCase()}Table, {
-    fields: [${table.entityName.toLowerCase()}Table.${rel.name}Id],
-    references: [${rel.targetEntity.toLowerCase()}Table.id],
+        output += `  ${rel.name}: one(${targetExportName}, {
+    fields: [${exportName}.${rel.name}Id],
+    references: [${targetExportName}.id],
   }),\n`;
       } else {
-        output += `  ${rel.name}: many(${rel.targetEntity.toLowerCase()}Table),\n`;
+        output += `  ${rel.name}: many(${targetExportName}),\n`;
       }
     }
 
@@ -326,9 +337,11 @@ export const schema = {
 `;
 
   for (const table of tables) {
-    output += `  ${table.entityName.toLowerCase()}Table,\n`;
+    const exportName = table.tableName;
+    output += `  ${exportName},\n`;
     if (table.relations.length > 0) {
-      output += `  ${table.entityName.toLowerCase()}Relations,\n`;
+      const relationName = table.tableName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()) + 'Relations';
+      output += `  ${relationName},\n`;
     }
   }
 
@@ -342,8 +355,9 @@ export const schema = {
 `;
 
   for (const table of tables) {
-    output += `export type ${table.entityName} = typeof ${table.entityName.toLowerCase()}Table.$inferSelect;\n`;
-    output += `export type New${table.entityName} = typeof ${table.entityName.toLowerCase()}Table.$inferInsert;\n`;
+    const exportName = table.tableName;
+    output += `export type ${table.entityName} = typeof ${exportName}.$inferSelect;\n`;
+    output += `export type New${table.entityName} = typeof ${exportName}.$inferInsert;\n`;
   }
 
   return output;
