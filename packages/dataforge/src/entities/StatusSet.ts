@@ -1,69 +1,38 @@
-import { Entity, Column, OneToMany, ManyToMany } from 'typeorm';
-import { 
-  IsString, 
-  MinLength, 
-  MaxLength,
-  IsIn,
-  IsOptional,
-  IsHexColor,
-  IsInt,
-  Min
-} from 'class-validator';
+import { Entity, Property, OneToMany, ManyToMany, Collection, Index } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { StatusDefinition } from './StatusDefinition.js';
 import { Project } from './Project.js';
-import { EnumTypeName } from '../utils/decorators.js';
 
-/**
- * StatusSet entity
- * Represents a collection of status definitions that can be applied to entities
- * Supports sharing status workflows across multiple projects
- */
-@Entity('status_sets')
+@Entity({ tableName: 'status_sets' })
+@Index({ properties: ['entityType'] })
 export class StatusSet extends BaseDomainEntity {
-  @Column({ type: 'varchar', length: 100 })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @Property({ type: 'string', length: 100 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  @IsString()
-  @IsIn(['task', 'project'])
-  @EnumTypeName({ name: 'EntityType', sourcePath: './StatusSet' })
-  entityType!: string;
-
-  @Column({ type: 'text', nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
+  @Property({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'boolean', default: false })
-  isSystem!: boolean;
+  @Property({ type: 'string', length: 50 })
+  entityType!: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Property({ type: 'boolean', default: false })
+  isDefault!: boolean;
+
+  @Property({ type: 'boolean', default: true })
   isActive!: boolean;
 
-  // Visual metadata as columns
-  @Column({ type: 'varchar', length: 7, nullable: true, name: 'default_color' })
-  @IsOptional()
-  @IsHexColor()
-  defaultColor?: string;
+  @Property({ type: 'boolean', default: false })
+  isSystem!: boolean;
 
-  @Column({ type: 'int', default: 0, name: 'display_order' })
-  @IsInt()
-  @Min(0)
-  displayOrder!: number;
+  @Property({ type: 'json', default: {} })
+  workflow!: Record<string, any>;
 
-  // Extended metadata for rare/future properties
-  @Column({ type: 'jsonb', default: {} })
+  @Property({ type: 'json', default: {} })
   metadata!: Record<string, any>;
 
-  // Relationships
-  @OneToMany(() => StatusDefinition, def => def.statusSet)
-  statuses!: Promise<StatusDefinition[]>;
+  @OneToMany(() => StatusDefinition, 'statusSet')
+  statuses = new Collection<StatusDefinition>(this);
 
-  @ManyToMany(() => Project, project => project.statusSets)
-  projects!: Promise<Project[]>;
+  @ManyToMany(() => Project, 'statusSets')
+  projects = new Collection<Project>(this);
 }

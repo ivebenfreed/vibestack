@@ -1,34 +1,26 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  Index
-} from 'typeorm';
-import { ServerOnly } from '../utils/context.js';
+import { Entity, Property, Index } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 
 /**
  * ChangeHistory entity for tracking changes for catchup sync
  * Server-only entity - not replicated to clients
  */
-@Entity({ name: 'change_history' })
-@ServerOnly()
+@Entity({ tableName: 'change_history' })
+@Index({ properties: ['lsn'] })
+@Index({ properties: ['tableName', 'timestamp'] })
 export class ChangeHistory extends BaseSystemEntity {
-  // Regular text index for basic lookups
-  @Index()
-  @Column({ type: 'text', nullable: false })
+  @Property({ type: 'text' })
   lsn!: string;
 
-  @Column({ type: 'text', nullable: false, name: 'table_name' })
+  @Property({ type: 'text' })
   tableName!: string;
 
-  @Column({ type: 'text', nullable: false })
+  @Property({ type: 'text' })
   operation!: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Property({ type: 'json', nullable: true })
   data?: Record<string, any>;
 
-  @CreateDateColumn({ type: 'timestamptz', default: () => 'NOW()' })
+  @Property({ type: 'date', onCreate: () => new Date() })
   timestamp!: Date;
-} 
+}

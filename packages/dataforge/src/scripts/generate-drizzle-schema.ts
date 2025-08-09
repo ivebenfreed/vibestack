@@ -1,454 +1,388 @@
-import 'reflect-metadata';
+import { MikroORM } from '@mikro-orm/postgresql';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { MetadataFilter } from '../utils/metadata-filter.js';
-import { getTableCategory, shouldIncludeInServer } from '../utils/context.js';
-import { getMetadataArgsStorage, DefaultNamingStrategy } from 'typeorm';
-
-console.log('[generate-drizzle-schema] Starting Drizzle schema generation...');
+import mikroOrmConfig from '../mikro-orm.config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PACKAGE_ROOT = path.resolve(__dirname, '../..');
 
-/**
- * Main function to generate Drizzle schema from TypeORM entities
- */
-async function generateDrizzleSchema() {
-  console.log('[generate-drizzle-schema] Extracting entity metadata...');
-  
-  // Ensure generated directory exists
-  const generatedDir = path.join(PACKAGE_ROOT, 'src/generated');
-  await fs.mkdir(generatedDir, { recursive: true });
-  
-  // Extract entity metadata for all server entities
-  const entityMetadataMap = await extractAllEntityMetadata();
-  const junctionTables = extractJunctionTables(entityMetadataMap);
-  
-  // Generate Drizzle schema
-  const schemaOutput = generateDrizzleSchemaFile(entityMetadataMap, junctionTables);
-  
-  // Write the generated file
-  const outputPath = path.join(generatedDir, 'drizzle-schema.ts');
-  await fs.writeFile(outputPath, schemaOutput);
-  
-  console.log(`[generate-drizzle-schema] Generated Drizzle schema at: ${outputPath}`);
+interface DrizzleTableInfo {
+  entityName: string;
+  tableName: string;
+  columns: DrizzleColumnInfo[];
+  relations: DrizzleRelationInfo[];
+  indexes: DrizzleIndexInfo[];
+  isBaseDomain: boolean;
 }
 
-/**
- * Extract metadata for all server entities using TypeORM metadata
- */
-async function extractAllEntityMetadata(): Promise<Map<string, any>> {
-  const filter = new MetadataFilter();
-  const entities = await filter.discoverEntities();
-  const entityMetadataMap = new Map<string, any>();
-  
-  console.log('[generate-drizzle-schema] Discovered entities:', entities.map(e => e.name));
-  
-  // Filter to server-only entities
-  const serverEntities = entities.filter(entity => shouldIncludeInServer(entity));
-  console.log('[generate-drizzle-schema] Server entities:', serverEntities.map(e => e.name));
-  
-  for (const entity of serverEntities) {
-    const { columns, relations } = filter.filterEntityMetadata(entity, 'server');
-    const tableName = filter.getTableName(entity);
-    const category = getTableCategory(entity) || 'utility';
-    
-    entityMetadataMap.set(entity.name, {
-      name: entity.name,
-      tableName,
-      columns,
-      relations,
-      entity,
-      category
-    });
-  }
-  
-  return entityMetadataMap;
+interface DrizzleColumnInfo {
+  name: string;
+  type: string;
+  drizzleType: string;
+  nullable: boolean;
+  primary: boolean;
+  unique: boolean;
+  default?: any;
 }
 
-/**
- * Extract junction tables from entity relationships
- */
-function extractJunctionTables(entityMetadataMap: Map<string, any>): Array<any> {
-  const storage = getMetadataArgsStorage();
-  const junctionTables = new Map<string, any>();
-  
-  for (const [entityName, metadata] of entityMetadataMap) {
-    for (const relation of metadata.relations) {
-      if (relation.relationType === 'many-to-many') {
-        const joinTableMeta = storage.joinTables.find(j => 
-          j.target === metadata.entity && j.propertyName === relation.propertyName
-        );
+interface DrizzleRelationInfo {
+  name: string;
+  type: 'many' | 'one';
+  targetEntity: string;
+  targetTable: string;
+}
+
+interface DrizzleIndexInfo {
+  name: string;
+  columns: string[];
+  unique: boolean;
+}
+
+async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
+  const orm = await MikroORM.init({
+    ...mikroOrmConfig,
+    connect: false, // Don't connect to DB, just need metadata
+  });
+  const metadata = orm.getMetadata();
+  const tables: DrizzleTableInfo[] = [];
+
+  const allMetadata = Object.values(metadata.getAll());
+
+  for (const meta of allMetadata as any[]) {
+    // Skip abstract base classes
+    if (meta.abstract) continue;
+
+    const tableInfo: DrizzleTableInfo = {
+      entityName: meta.className,
+      tableName: meta.tableName,
+      columns: [],
+      relations: [],
+      indexes: [],
+      isBaseDomain: meta.extends?.includes('BaseDomainEntity') || false,
+    };
+
+    // Extract columns
+    for (const prop of Object.values(meta.properties) as any[]) {
+      // Skip Collection properties (OneToMany, ManyToMany)
+      // These have 'kind' values like '1:m' or 'm:n'
+      if (prop.kind === '1:m' || prop.kind === 'm:n') {
+        // Find the target metadata to get the actual table name
+        const targetMeta = allMetadata.find((m: any) => m.className === prop.type);
+        const targetTableName = targetMeta?.tableName || prop.type.toLowerCase() + 's';
         
-        if (joinTableMeta) {
-          const targetEntityGetter = relation.type as () => Function;
-          const targetEntityClass = targetEntityGetter();
-          const targetEntityName = targetEntityClass?.name;
-          
-          if (!targetEntityName) continue;
-          
-          const namingStrategy = new DefaultNamingStrategy();
-          const junctionTableName = joinTableMeta.name || namingStrategy.joinTableName(
-            metadata.tableName,
-            metadata.tableName, // This should be target table name but we'll simplify
-            relation.propertyName,
-            targetEntityName.toLowerCase()
-          );
-          
-          if (!junctionTables.has(junctionTableName)) {
-            // Determine column structure based on common patterns
-            let columns: Array<{ name: string; type: string; references?: string }>;
-            
-            if (junctionTableName === 'task_tags') {
-              columns = [
-                { name: 'task_id', type: 'uuid', references: 'tasks.id' },
-                { name: 'tag_id', type: 'uuid', references: 'tags.id' }
-              ];
-            } else if (junctionTableName === 'task_dependencies') {
-              columns = [
-                { name: 'dependent_task_id', type: 'uuid', references: 'tasks.id' },
-                { name: 'dependency_task_id', type: 'uuid', references: 'tasks.id' }
-              ];
-            } else if (junctionTableName === 'project_members') {
-              columns = [
-                { name: 'project_id', type: 'uuid', references: 'projects.id' },
-                { name: 'user_id', type: 'uuid', references: 'users.id' },
-                { name: 'role', type: 'text' }
-              ];
-            } else {
-              // Generic pattern
-              const sourceTable = metadata.tableName;
-              const targetTable = targetEntityName.toLowerCase() + 's';
-              
-              columns = [
-                { name: `${sourceTable.slice(0, -1)}_id`, type: 'uuid', references: `${sourceTable}.id` },
-                { name: `${targetTable.slice(0, -1)}_id`, type: 'uuid', references: `${targetTable}.id` }
-              ];
-            }
-            
-            junctionTables.set(junctionTableName, {
-              name: junctionTableName,
-              columns,
-              sourceEntity: entityName,
-              targetEntity: targetEntityName
-            });
-          }
+        // Add to relations but not columns
+        if (prop.kind === '1:m') {
+          tableInfo.relations.push({
+            name: prop.name,
+            type: 'many',
+            targetEntity: prop.type,
+            targetTable: targetTableName,
+          });
+        } else if (prop.kind === 'm:n') {
+          tableInfo.relations.push({
+            name: prop.name,
+            type: 'many',
+            targetEntity: prop.type,
+            targetTable: targetTableName,
+          });
         }
-      }
-    }
-  }
-  
-  return Array.from(junctionTables.values());
-}
-
-/**
- * Map TypeORM column metadata to Drizzle column function
- */
-function mapColumnToDrizzle(column: any): string {
-  const storage = getMetadataArgsStorage();
-  const originalColumnMeta = storage.columns.find(c => 
-    c.target === column.target && c.propertyName === column.propertyName
-  );
-  
-  if (!originalColumnMeta) {
-    console.warn(`[generate-drizzle-schema] Could not find original metadata for column ${column.propertyName}`);
-    return `text('${column.propertyName}')`;
-  }
-  
-  const options = originalColumnMeta.options || {};
-  const dbName = options.name || column.propertyName;
-  const nullable = options.nullable ? '' : '.notNull()';
-  
-  // Handle default values properly based on type
-  let defaultValue = '';
-  if (options.default !== undefined && options.default !== null) {
-    // Special handling for specific defaults
-    if (options.default === 'now()' || options.default === 'CURRENT_TIMESTAMP') {
-      // Don't add default for timestamps with now() - they're handled differently in Drizzle
-      defaultValue = '';
-    } else if (options.type === 'json' || options.type === 'jsonb') {
-      // JSON defaults need special handling
-      defaultValue = `.default(${JSON.stringify(options.default)})`;
-    } else if (Array.isArray(options.default)) {
-      // Array defaults (like for text array columns)
-      defaultValue = `.default('{}')`;  // PostgreSQL array literal
-    } else if (typeof options.default === 'string') {
-      defaultValue = `.default("${options.default}")`;
-    } else if (typeof options.default === 'boolean' || typeof options.default === 'number') {
-      defaultValue = `.default(${options.default})`;
-    } else {
-      // Skip undefined/null defaults
-      defaultValue = '';
-    }
-  }
-  
-  // Determine the column type
-  let columnType: string;
-  const type = options.type || 'text';
-  
-  switch (type) {
-    case 'uuid':
-      columnType = `uuid('${dbName}')`;
-      break;
-    case 'varchar':
-    case 'text':
-      if (options.length && typeof options.length === 'number' && options.length <= 255) {
-        columnType = `varchar('${dbName}', { length: ${options.length} })`;
-      } else {
-        columnType = `text('${dbName}')`;
-      }
-      break;
-    case 'integer':
-    case 'int':
-      columnType = `integer('${dbName}')`;
-      break;
-    case 'bigint':
-      columnType = `bigint('${dbName}', { mode: 'number' })`;
-      break;
-    case 'decimal':
-    case 'numeric':
-      columnType = `numeric('${dbName}')`;
-      break;
-    case 'boolean':
-      columnType = `boolean('${dbName}')`;
-      break;
-    case 'timestamptz':
-    case 'timestamp':
-      columnType = `timestamp('${dbName}', { withTimezone: true })`;
-      break;
-    case 'date':
-      columnType = `date('${dbName}')`;
-      break;
-    case 'time':
-      columnType = `time('${dbName}')`;
-      break;
-    case 'interval':
-      columnType = `interval('${dbName}')`;
-      break;
-    case 'json':
-    case 'jsonb':
-      columnType = `json('${dbName}')`;
-      break;
-    case 'enum':
-      if (options.enum) {
-        const enumValues = Object.values(options.enum).map(v => `'${v}'`).join(', ');
-        columnType = `text('${dbName}', { enum: [${enumValues}] })`;
-      } else {
-        columnType = `text('${dbName}')`;
-      }
-      break;
-    case 'tsrange':
-      // PostgreSQL range types aren't directly supported in Drizzle, use text
-      columnType = `text('${dbName}')`;
-      break;
-    default:
-      // Handle array types
-      if (options.array) {
-        columnType = `text('${dbName}')`;  // Arrays stored as text in Drizzle
-      } else {
-        console.warn(`[generate-drizzle-schema] Unknown column type: ${type}, defaulting to text`);
-        columnType = `text('${dbName}')`;
-      }
-  }
-  
-  return `${columnType}${defaultValue}${nullable}`;
-}
-
-/**
- * Generate the Drizzle schema TypeScript file
- */
-function generateDrizzleSchemaFile(
-  entityMetadataMap: Map<string, any>,
-  junctionTables: Array<any>
-): string {
-  const entities = Array.from(entityMetadataMap.values());
-  
-  // Generate table definitions
-  const tableDefinitions: string[] = [];
-  
-  // Entity tables
-  for (const entity of entities) {
-    const columns: string[] = [];
-    
-    // Regular columns
-    for (const column of entity.columns) {
-      const columnDef = mapColumnToDrizzle(column);
-      columns.push(`  ${column.propertyName}: ${columnDef}`);
-    }
-    
-    const tableDef = `export const ${entity.tableName} = pgTable('${entity.tableName}', {
-${columns.join(',\n')}
-});`;
-    
-    tableDefinitions.push(tableDef);
-  }
-  
-  // Junction tables
-  for (const junction of junctionTables) {
-    const columns: string[] = [];
-    
-    for (const col of junction.columns) {
-      const nullable = col.name.includes('role') ? '' : '.notNull()';
-      const columnDef = col.type === 'uuid' 
-        ? `uuid('${col.name}')${nullable}`
-        : `text('${col.name}')${nullable}`;
-      columns.push(`  ${toCamelCase(col.name)}: ${columnDef}`);
-    }
-    
-    const tableDef = `export const ${junction.name} = pgTable('${junction.name}', {
-${columns.join(',\n')}
-});`;
-    
-    tableDefinitions.push(tableDef);
-  }
-  
-  // Generate relationships (simplified for now)
-  const relationshipDefinitions: string[] = [];
-  
-  for (const entity of entities) {
-    if (entity.relations.length > 0) {
-      const relations: string[] = [];
-      
-      for (const rel of entity.relations) {
-        if (rel.relationType === 'many-to-one') {
-          const targetEntityClass = (rel.type as () => Function)();
-          // Find the target entity's metadata to get its actual table name
-          const targetMeta = entities.find(m => m.target === targetEntityClass || m.name === targetEntityClass.name);
-          if (!targetMeta) {
-            console.warn(`[generate-drizzle-schema] Could not find metadata for relation target: ${targetEntityClass.name}`);
-            continue;
-          }
-          relations.push(`    ${rel.propertyName}: one(${targetMeta.tableName})`);
-        } else if (rel.relationType === 'one-to-many') {
-          const targetEntityClass = (rel.type as () => Function)();
-          // Find the target entity's metadata to get its actual table name
-          const targetMeta = entities.find(m => m.target === targetEntityClass || m.name === targetEntityClass.name);
-          if (!targetMeta) {
-            console.warn(`[generate-drizzle-schema] Could not find metadata for relation target: ${targetEntityClass.name}`);
-            continue;
-          }
-          relations.push(`    ${rel.propertyName}: many(${targetMeta.tableName})`);
-        }
+        continue;
       }
       
-      if (relations.length > 0) {
-        const relationDef = `export const ${entity.tableName}Relations = relations(${entity.tableName}, ({ one, many }) => ({
-${relations.join(',\n')}
-}));`;
+      if (!prop.reference || prop.reference === 'scalar' || prop.reference === 'embedded') {
+        tableInfo.columns.push({
+          name: prop.fieldNames?.[0] || prop.name,
+          type: prop.type,
+          drizzleType: mapToDrizzleType(prop.type, prop),
+          nullable: prop.nullable,
+          primary: prop.primary || false,
+          unique: prop.unique || false,
+          default: prop.defaultRaw || prop.default,
+        });
+      } else if (prop.reference === 'm:1' || prop.reference === '1:1') {
+        // Add foreign key column
+        const fkColumn = prop.fieldNames?.[0] || `${prop.name}Id`;
+        const targetMeta = allMetadata.find((m: any) => m.className === prop.type);
         
-        relationshipDefinitions.push(relationDef);
+        tableInfo.columns.push({
+          name: fkColumn,
+          type: 'uuid',
+          drizzleType: 'uuid',
+          nullable: prop.nullable,
+          primary: false,
+          unique: false,
+          default: undefined,
+        });
+
+        tableInfo.relations.push({
+          name: prop.name,
+          type: 'one',
+          targetEntity: prop.type,
+          targetTable: targetMeta?.tableName || prop.type.toLowerCase(),
+        });
       }
     }
-  }
-  
-  // Generate type exports
-  const typeExports = entities.map(entity => {
-    const typeName = toPascalCase(entity.name);
-    const selectType = `export type ${typeName} = typeof ${entity.tableName}.$inferSelect;`;
-    const insertType = `export type New${typeName} = typeof ${entity.tableName}.$inferInsert;`;
-    return [selectType, insertType].join('\n');
-  }).join('\n\n');
-  
-  return `/**
- * Auto-generated Drizzle schema from TypeORM entities
- * Generated at: ${new Date().toISOString()}
- * 
- * This file is auto-generated. Do not edit manually.
- * Run 'pnpm generate-drizzle-schema' to regenerate.
- */
 
+    // Extract indexes
+    for (const index of meta.indexes || []) {
+      const idx = index as any;
+      if (!idx.primary) {
+        const properties = Array.isArray(idx.properties) ? idx.properties : [idx.properties];
+        tableInfo.indexes.push({
+          name: idx.name || `idx_${tableInfo.tableName}_${properties.join('_')}`,
+          columns: properties,
+          unique: idx.unique || false,
+        });
+      }
+    }
+
+    tables.push(tableInfo);
+  }
+
+  await orm.close();
+  return tables;
+}
+
+function mapToDrizzleType(type: string, prop: any): string {
+  const typeMap: Record<string, string> = {
+    'string': 'text',
+    'text': 'text',
+    'uuid': 'uuid',
+    'integer': 'integer',
+    'bigint': 'bigint',
+    'boolean': 'boolean',
+    'date': 'timestamp',
+    'timestamptz': 'timestamp',
+    'json': 'jsonb',
+    'jsonb': 'jsonb',
+  };
+
+  // Special cases
+  if (prop.columnType === 'varchar' && prop.length) {
+    return `varchar(${prop.length})`;
+  }
+
+  return typeMap[type] || 'text';
+}
+
+function generateDrizzleSchema(tables: DrizzleTableInfo[]): string {
+  let output = `// Generated Drizzle ORM schema from MikroORM entities
 import { 
   pgTable, 
   uuid, 
-  varchar, 
   text, 
-  integer, 
-  bigint, 
-  numeric, 
-  boolean, 
   timestamp, 
-  date, 
-  time, 
-  interval, 
-  json 
+  boolean, 
+  integer,
+  bigint,
+  varchar,
+  jsonb,
+  index,
+  uniqueIndex,
+  primaryKey
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
-// =====================================
-// TABLE DEFINITIONS
-// =====================================
+// ============================================
+// Table Definitions
+// ============================================
 
-${tableDefinitions.join('\n\n')}
+`;
 
-// =====================================
-// RELATIONSHIPS
-// =====================================
+  // Generate table schemas
+  for (const table of tables) {
+    // Use the exact table name from the database for the export name
+    // This ensures 1:1 mapping and no conflicts
+    const exportName = table.tableName;
+    output += `export const ${exportName} = pgTable('${table.tableName}', {
+`;
 
-${relationshipDefinitions.join('\n\n')}
+    // Add columns
+    for (const col of table.columns) {
+      let columnDef = `  ${col.name}: `;
 
-// =====================================
-// TYPE EXPORTS
-// =====================================
+      // Generate column type
+      switch (col.drizzleType) {
+        case 'uuid':
+          columnDef += `uuid('${col.name}')`;
+          if (col.primary) columnDef += `.primaryKey()`;
+          if (col.default === 'gen_random_uuid()') columnDef += `.defaultRandom()`;
+          break;
+        case 'text':
+          columnDef += `text('${col.name}')`;
+          break;
+        case 'integer':
+          columnDef += `integer('${col.name}')`;
+          if (col.default !== undefined) columnDef += `.default(${col.default})`;
+          break;
+        case 'bigint':
+          columnDef += `bigint('${col.name}', { mode: 'bigint' })`;
+          if (col.default !== undefined) columnDef += `.default(${col.default}n)`;
+          break;
+        case 'boolean':
+          columnDef += `boolean('${col.name}')`;
+          if (col.default !== undefined) columnDef += `.default(${col.default})`;
+          break;
+        case 'timestamp':
+          columnDef += `timestamp('${col.name}', { mode: 'date' })`;
+          if (col.default === 'now()') columnDef += `.defaultNow()`;
+          break;
+        case 'jsonb':
+          columnDef += `jsonb('${col.name}')`;
+          break;
+        default:
+          if (col.drizzleType.startsWith('varchar')) {
+            columnDef += `${col.drizzleType.replace('varchar', 'varchar')}('${col.name}')`;
+          } else {
+            columnDef += `text('${col.name}')`;
+          }
+      }
 
-${typeExports}
+      if (!col.nullable && !col.primary) columnDef += `.notNull()`;
+      if (col.unique && !col.primary) columnDef += `.unique()`;
 
-// =====================================
-// SCHEMA EXPORT
-// =====================================
+      columnDef += ',';
+      output += columnDef + '\n';
+    }
+
+    output = output.slice(0, -2) + '\n'; // Remove last comma
+    output += `}`;
+
+    // Add indexes
+    if (table.indexes.length > 0) {
+      output += `, (table) => ({\n`;
+      for (const idx of table.indexes) {
+        const indexName = idx.name;
+        const indexFn = idx.unique ? 'uniqueIndex' : 'index';
+        // Convert MikroORM property names to Drizzle field names (camelCase to snake_case)
+        const columns = idx.columns.map(c => {
+          // Find the actual column in the table definition
+          const field = table.columns.find(col => {
+            const camelCase = col.name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            return camelCase === c;
+          });
+          
+          if (field) {
+            return `table.${field.name}`;
+          }
+          
+          // Handle relationship fields - tagSet becomes tag_set_id
+          if (c === 'tagSet') {
+            return 'table.tag_set_id';
+          }
+          if (c === 'statusSet') {
+            return 'table.status_set_id';
+          }
+          
+          // Fallback: convert to snake_case
+          let snakeCase = c.replace(/[A-Z]/g, (letter, index) => 
+            index === 0 ? letter.toLowerCase() : `_${letter.toLowerCase()}`
+          );
+          
+          // For relationship fields, check if we need to add _id suffix
+          const relationshipField = table.columns.find(col => col.name === snakeCase + '_id' || col.name === snakeCase + 's_id');
+          if (relationshipField) {
+            return `table.${relationshipField.name}`;
+          }
+          
+          return `table.${snakeCase}`;
+        }).join(', ');
+        output += `  ${indexName}: ${indexFn}('${indexName}').on(${columns}),\n`;
+      }
+      output += `})`;
+    }
+
+    output += `);\n\n`;
+  }
+
+  // Generate relations
+  output += `// ============================================
+// Relations
+// ============================================
+
+`;
+
+  for (const table of tables) {
+    if (table.relations.length === 0) continue;
+
+    const exportName = table.tableName;
+    // For relation names, convert to camelCase for consistency
+    const relationName = table.tableName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()) + 'Relations';
+    output += `export const ${relationName} = relations(${exportName}, ({ one, many }) => ({
+`;
+
+    for (const rel of table.relations) {
+      const targetExportName = rel.targetTable;
+      if (rel.type === 'one') {
+        output += `  ${rel.name}: one(${targetExportName}, {
+    fields: [${exportName}.${rel.name}Id],
+    references: [${targetExportName}.id],
+  }),\n`;
+      } else {
+        output += `  ${rel.name}: many(${targetExportName}),\n`;
+      }
+    }
+
+    output += `}));\n\n`;
+  }
+
+  // Export all schemas
+  output += `// ============================================
+// Export Schema
+// ============================================
 
 export const schema = {
-  // Entity tables
-${entities.map(e => `  ${e.tableName}`).join(',\n')},
-  
-  // Junction tables
-${junctionTables.map(j => `  ${j.name}`).join(',\n')},
-  
-  // Relations
-${entities.filter(e => e.relations.length > 0).map(e => `  ${e.tableName}Relations`).join(',\n')}
-};
-
-// Table name constants for migrations
-export const TABLE_NAMES = {
-${entities.map(e => `  ${e.name.toUpperCase()}: '${e.tableName}'`).join(',\n')},
-${junctionTables.map(j => `  ${toPascalCase(j.name).toUpperCase()}: '${j.name}'`).join(',\n')}
-} as const;
-
-// Table categories for sync
-export const tableCategories = {
-  domain: [
-${entities.filter(e => e.category === 'domain').map(e => `    '${e.tableName}'`).join(',\n')}
-  ],
-  system: [
-${entities.filter(e => e.category === 'system').map(e => `    '${e.tableName}'`).join(',\n')}
-  ],
-  utility: [
-${entities.filter(e => e.category === 'utility').map(e => `    '${e.tableName}'`).join(',\n')}
-  ]
-} as const;
 `;
+
+  for (const table of tables) {
+    const exportName = table.tableName;
+    output += `  ${exportName},\n`;
+    if (table.relations.length > 0) {
+      const relationName = table.tableName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase()) + 'Relations';
+      output += `  ${relationName},\n`;
+    }
+  }
+
+  output += `};\n\n`;
+
+  // Export types
+  output += `// ============================================
+// Type Exports
+// ============================================
+
+`;
+
+  for (const table of tables) {
+    const exportName = table.tableName;
+    output += `export type ${table.entityName} = typeof ${exportName}.$inferSelect;\n`;
+    output += `export type New${table.entityName} = typeof ${exportName}.$inferInsert;\n`;
+  }
+
+  return output;
 }
 
-/**
- * Convert snake_case to camelCase
- */
-function toCamelCase(str: string): string {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+async function main() {
+  try {
+    console.log('🔍 Extracting Drizzle schema from MikroORM entities...');
+    const tables = await extractDrizzleSchema();
+    
+    console.log(`📦 Found ${tables.length} tables for Drizzle`);
+    
+    // Generate Drizzle schema file
+    const drizzleSchema = generateDrizzleSchema(tables);
+    const schemaPath = path.join(PACKAGE_ROOT, 'src/generated/drizzle-schema.ts');
+    
+    await fs.mkdir(path.dirname(schemaPath), { recursive: true });
+    await fs.writeFile(schemaPath, drizzleSchema);
+    
+    console.log('✅ Generated drizzle-schema.ts');
+    
+  } catch (error) {
+    console.error('❌ Error generating Drizzle schema:', error);
+    process.exit(1);
+  }
 }
 
-/**
- * Convert snake_case to PascalCase
- */
-function toPascalCase(str: string): string {
-  return str
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('');
-}
-
-// Run the generator
-generateDrizzleSchema().catch(error => {
-  console.error('[generate-drizzle-schema] Error:', error);
-  process.exit(1);
-});
+main();

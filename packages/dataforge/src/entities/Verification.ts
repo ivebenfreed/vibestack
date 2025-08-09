@@ -1,31 +1,19 @@
-import { 
-  Entity, 
-  Column, 
-  UpdateDateColumn
-} from 'typeorm';
-import { IsString } from 'class-validator';
+import { Entity, Property } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
-import { ServerOnly } from '../utils/context.js';
 
 /**
  * Verification entity
  * Stores tokens for email verification, password reset, etc.
  * Aligned with Better Auth's verification schema
  */
-@Entity('verifications')
-@(ServerOnly() as ClassDecorator)
+@Entity({ tableName: 'verifications' })
 export class Verification extends BaseSystemEntity {
-  @Column({ type: 'text' })
-  @IsString()
+  @Property({ type: 'text' })
   identifier!: string;
 
-  @Column({ type: 'text' })
-  @IsString()
+  @Property({ type: 'text' })
   value!: string;
 
-  @Column({ type: 'timestamptz', name: 'expires_at' })
+  @Property({ type: 'date' })
   expiresAt!: Date;
-
-  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
-  updatedAt!: Date;
-} 
+}

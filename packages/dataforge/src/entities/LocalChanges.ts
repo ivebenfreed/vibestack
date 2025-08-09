@@ -1,54 +1,25 @@
-import { Entity, Column, Index } from 'typeorm';
-import { IsString, IsJSON, IsNumber } from 'class-validator';
-import { ClientOnly, DexieIndex } from '../utils/context.js';
+import { Entity, Property, Index, Unique } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 
-/**
- * LocalChanges entity
- * Tracks local changes that need to be synced to the server
- * This is a client-only entity that won't be exposed to the server
- * Extends BaseSystemEntity for common system fields and behavior
- */
-@Entity('local_changes')
-@ClientOnly()
+@Entity()
+@Index({ properties: ['tableName', 'recordId'] })
+@Unique({ properties: ['clientSequence'] })
 export class LocalChanges extends BaseSystemEntity {
-  @Column({ type: 'text' })
-  @IsString()
-  table!: string;
+  @Property({ type: 'string' })
+  tableName!: string;
 
-  @Column({ type: 'text' })
-  @IsString()
-  operation!: string;
+  @Property({ type: 'string' })
+  recordId!: string;
 
-  @Column({ type: 'jsonb' })
-  @IsJSON()
-  data!: Record<string, unknown>;
+  @Property({ type: 'string' })
+  operationType!: string;
 
-  @Column({ type: 'text' })
-  @IsString()
-  lsn!: string;
+  @Property({ type: 'json' })
+  data!: any;
 
-  @Column({ type: 'text', nullable: true })
-  @IsString()
-  clientSequence?: string; // Client-side sequence for ordering
+  @Property({ type: 'bigint' })
+  clientSequence!: bigint;
 
-  @Column({ type: 'timestamptz', name: 'updated_at' })
-  updatedAt!: Date;
-
-  @Column({ type: 'integer', default: 0, name: 'processed_sync' })
-  @Index()
-  @DexieIndex()
-  @IsNumber()
-  processedSync!: number;
-
-  @Column({ type: 'integer', default: 0, name: 'send_attempts' })
-  @IsNumber()
-  sendAttempts!: number;
-
-  @Column({ type: 'timestamptz', nullable: true, name: 'last_send_attempt' })
-  lastSendAttempt?: Date;
-
-  @Column({ type: 'text', nullable: true, name: 'last_error' })
-  @IsString()
-  lastError?: string;
-} 
+  @Property({ type: 'integer', default: 0 })
+  loopProtection!: number;
+}

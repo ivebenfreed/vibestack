@@ -1,99 +1,53 @@
-import { Entity, Column, ManyToOne, OneToMany, ManyToMany, JoinColumn } from 'typeorm';
-import { 
-  IsString, 
-  IsUUID,
-  IsHexColor,
-  IsOptional,
-  IsIn,
-  IsInt,
-  Min,
-  IsDate,
-  Matches,
-  MaxLength
-} from 'class-validator';
+import { Entity, Property, ManyToOne, OneToMany, ManyToMany, Collection, Index } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { TagSet } from './TagSet.js';
 import { Task } from './Task.js';
-import { EnumTypeName } from '../utils/decorators.js';
 
-/**
- * Tag entity
- * Represents an individual tag within a tag set
- * Supports hierarchical organization and usage tracking
- */
-@Entity('tags')
+@Entity({ tableName: 'tags' })
+@Index({ properties: ['slug'] })
+@Index({ properties: ['tagSet', 'sortOrder'] })
 export class Tag extends BaseDomainEntity {
-  @Column({ type: 'uuid', name: 'tag_set_id' })
-  @IsUUID()
-  tagSetId!: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  @IsString()
-  @MaxLength(50)
+  @Property({ type: 'string', length: 50 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 50, unique: true })
-  @IsString()
-  @Matches(/^[a-z][a-z0-9-]*$/, { message: 'Slug must be kebab-case' })
+  @Property({ type: 'string', length: 50, unique: true })
   slug!: string;
 
-  // Visual properties as columns
-  @Column({ type: 'varchar', length: 7 })
-  @IsHexColor()
+  @Property({ type: 'string', length: 7 })
   color!: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  @IsOptional()
-  @IsString()
+  @Property({ type: 'string', length: 50, nullable: true })
   icon?: string;
 
-  @Column({ type: 'varchar', length: 20, default: 'solid' })
-  @IsString()
-  @IsIn(['solid', 'outline', 'ghost'])
-  @EnumTypeName({ name: 'TagVariant', sourcePath: './Tag' })
+  @Property({ type: 'string', length: 20, default: 'solid' })
   variant!: string;
 
-  // Organization
-  @Column({ type: 'int', default: 0, name: 'sort_order' })
-  @IsInt()
-  @Min(0)
+  @Property({ type: 'integer', default: 0 })
   sortOrder!: number;
 
-  @Column({ type: 'uuid', nullable: true, name: 'parent_id' })
-  @IsOptional()
-  @IsUUID()
-  parentId?: string;
 
-  @Column({ type: 'boolean', default: true, name: 'is_active' })
+  @Property({ type: 'boolean', default: true })
   isActive!: boolean;
 
-  // Usage tracking
-  @Column({ type: 'int', default: 0, name: 'usage_count' })
-  @IsInt()
-  @Min(0)
+  @Property({ type: 'integer', default: 0 })
   usageCount!: number;
 
-  @Column({ type: 'timestamptz', nullable: true, name: 'last_used_at' })
-  @IsOptional()
-  @IsDate()
+  @Property({ type: 'date', nullable: true })
   lastUsedAt?: Date;
 
-  // Extended metadata
-  @Column({ type: 'jsonb', default: {} })
+  @Property({ type: 'json', default: {} })
   metadata!: Record<string, any>;
 
-  // Relationships
-  @ManyToOne(() => TagSet, set => set.tags)
-  @JoinColumn({ name: 'tag_set_id' })
-  tagSet!: Promise<TagSet>;
+  @ManyToOne(() => TagSet, { fieldName: 'tag_set_id' })
+  tagSet!: TagSet;
 
-  @ManyToOne(() => Tag, tag => tag.children, { nullable: true })
-  @JoinColumn({ name: 'parent_id' })
-  parent?: Promise<Tag>;
+  @ManyToOne(() => Tag, { nullable: true, fieldName: 'parent_id' })
+  parent?: Tag;
 
-  @OneToMany(() => Tag, tag => tag.parent)
-  children!: Promise<Tag[]>;
+  @OneToMany(() => Tag, 'parent')
+  children = new Collection<Tag>(this);
 
-  @ManyToMany(() => Task, task => task.tags)
-  tasks!: Promise<Task[]>;
+  @ManyToMany(() => Task, 'tags')
+  tasks = new Collection<Task>(this);
 }

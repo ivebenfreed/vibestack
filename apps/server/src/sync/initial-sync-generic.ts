@@ -18,7 +18,7 @@ import type { WebSocket } from '../types/cloudflare';
 import type { StateManager } from './state-manager';
 import type { InitialSyncState, WebSocketHandler } from './types';
 import { GenericSyncAdapter } from './generic-sync-adapter';
-import { TRACKED_TABLES } from '@repo/dataforge-next';
+import { TRACKED_TABLES } from '@repo/dataforge';
 
 const MODULE_NAME = 'initial-sync-generic';
 const DEFAULT_CHUNK_SIZE = 500;

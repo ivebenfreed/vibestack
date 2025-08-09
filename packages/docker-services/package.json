@@ -3,5 +3,8 @@
   "private": true,
   "scripts": {
     "ensure:local": "node ../../scripts/ensure-docker-services.js"
+  },
+  "dependencies": {
+    "2": "^3.0.0"
   }
 }

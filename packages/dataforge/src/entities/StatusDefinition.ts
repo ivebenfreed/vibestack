@@ -1,92 +1,49 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { 
-  IsString, 
-  IsUUID,
-  IsHexColor,
-  IsOptional,
-  IsIn,
-  IsInt,
-  Min,
-  Matches
-} from 'class-validator';
+import { Entity, Property, ManyToOne, Index } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { StatusSet } from './StatusSet.js';
-import { Task } from './Task.js';
-import { EnumTypeName } from '../utils/decorators.js';
 
-/**
- * StatusDefinition entity
- * Represents an individual status within a status set
- * Contains visual properties, workflow rules, and sort order
- */
-@Entity('status_definitions')
+@Entity({ tableName: 'status_definitions' })
+@Index({ properties: ['statusSet', 'sortOrder'] })
+@Index({ properties: ['name'] })
 export class StatusDefinition extends BaseDomainEntity {
-  @Column({ type: 'uuid', name: 'status_set_id' })
-  @IsUUID()
-  statusSetId!: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  @IsString()
-  @Matches(/^[a-z][a-z0-9_]*$/, { message: 'Name must be snake_case' })
+  @Property({ type: 'string', length: 50 })
   name!: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  @IsString()
+  @Property({ type: 'string', length: 100 })
   label!: string;
 
-  // Core visual properties as columns
-  @Column({ type: 'varchar', length: 7 })
-  @IsHexColor()
+  @Property({ type: 'string', length: 7 })
   color!: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  @IsOptional()
-  @IsString()
+  @Property({ type: 'string', length: 50, nullable: true })
   icon?: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  @IsOptional()
-  @IsString()
-  @IsIn(['solid', 'outline', 'ghost'])
-  @EnumTypeName({ name: 'StatusVariant', sourcePath: './StatusDefinition' })
+  @Property({ type: 'string', length: 20, nullable: true })
   variant?: string;
 
-  // Workflow properties as columns
-  @Column({ type: 'int', name: 'sort_order' })
-  @IsInt()
-  @Min(0)
+  @Property({ type: 'integer' })
   sortOrder!: number;
 
-  @Column({ type: 'boolean', default: false, name: 'is_default' })
+  @Property({ type: 'boolean', default: false })
   isDefault!: boolean;
 
-  @Column({ type: 'boolean', default: false, name: 'is_final' })
+  @Property({ type: 'boolean', default: false })
   isFinal!: boolean;
 
-  @Column({ type: 'boolean', default: true, name: 'is_active' })
+  @Property({ type: 'boolean', default: true })
   isActive!: boolean;
 
-  // Workflow rules
-  @Column({ type: 'uuid', array: true, nullable: true, name: 'allowed_transitions' })
-  @IsOptional()
-  @IsUUID('4', { each: true })
+  @Property({ type: 'array', nullable: true })
   allowedTransitions?: string[];
 
-  @Column({ type: 'int', nullable: true, name: 'auto_transition_days' })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
+  @Property({ type: 'integer', nullable: true })
   autoTransitionDays?: number;
 
-  // Extended metadata for rare properties
-  @Column({ type: 'jsonb', default: {} })
+  @Property({ type: 'json', default: {} })
   metadata!: Record<string, any>;
 
-  // Relationships
-  @ManyToOne(() => StatusSet, set => set.statuses)
-  @JoinColumn({ name: 'status_set_id' })
-  statusSet!: Promise<StatusSet>;
+  @ManyToOne(() => StatusSet, { fieldName: 'status_set_id' })
+  statusSet!: StatusSet;
 
-  @OneToMany(() => Task, task => task.status)
-  tasks!: Promise<Task[]>;
 }

@@ -12,7 +12,7 @@ import type {
   TableSyncMetadata, 
   JunctionTable,
   TRACKED_TABLES
-} from '@repo/dataforge-next/sync-metadata';
+} from '@repo/dataforge/sync-metadata';
 
 export interface LocalChange {
   id: string;

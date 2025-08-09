@@ -1,71 +1,40 @@
-import { 
-  Entity, 
-  Column, 
-  ManyToOne, 
-  JoinColumn, 
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn
-} from 'typeorm';
-import { IsString, IsOptional } from 'class-validator';
+import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { User } from './User.js';
-import { ServerOnly } from '../utils/context.js';
+import { Session } from './Session.js';
 
-/**
- * Account entity
- * Links users to authentication methods (email/password, social providers)
- * Aligned with Better Auth's account schema
- */
-@Entity('accounts')
-@(ServerOnly() as ClassDecorator)
+@Entity()
 export class Account extends BaseSystemEntity {
-  @Column({ type: 'uuid', name: 'user_id' })
-  userId!: string;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
-  user!: Promise<import('./User.js').User>;
-
-  @Column({ type: 'text', name: 'account_id' })
-  @IsString()
-  accountId!: string;
-
-  @Column({ type: 'text', name: 'provider_id' })
-  @IsString()
+  @Property({ type: 'string' })
   providerId!: string;
 
-  @Column({ type: 'text', name: 'access_token', nullable: true })
-  @IsOptional()
-  @IsString()
-  accessToken?: string;
+  @Property({ type: 'string' })
+  providerAccountId!: string;
 
-  @Column({ type: 'text', name: 'refresh_token', nullable: true })
-  @IsOptional()
-  @IsString()
+  @Property({ type: 'string', nullable: true })
   refreshToken?: string;
 
-  @Column({ type: 'text', name: 'id_token', nullable: true })
-  @IsOptional()
-  @IsString()
-  idToken?: string;
+  @Property({ type: 'string', nullable: true })
+  accessToken?: string;
 
-  @Column({ type: 'timestamptz', name: 'access_token_expires_at', nullable: true })
-  accessTokenExpiresAt?: Date;
+  @Property({ type: 'bigint', nullable: true })
+  expiresAt?: bigint;
 
-  @Column({ type: 'timestamptz', name: 'refresh_token_expires_at', nullable: true })
-  refreshTokenExpiresAt?: Date;
+  @Property({ type: 'string', nullable: true })
+  tokenType?: string;
 
-  @Column({ type: 'text', nullable: true })
-  @IsOptional()
-  @IsString()
+  @Property({ type: 'string', nullable: true })
   scope?: string;
 
-  @Column({ type: 'text', nullable: true })
-  @IsOptional()
-  @IsString()
-  password?: string;
+  @Property({ type: 'string', nullable: true })
+  idToken?: string;
 
-  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
-  updatedAt!: Date;
-} 
+  @Property({ type: 'string', nullable: true })
+  sessionState?: string;
+
+  @OneToMany(() => User, 'account')
+  users = new Collection<User>(this);
+
+  @OneToMany(() => Session, 'account')
+  sessions = new Collection<Session>(this);
+}
