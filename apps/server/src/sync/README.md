@@ -153,8 +153,8 @@ apps/server/src/sync/
 │   └── websocket-handlers.ts // WebSocket event handlers
 ├── client-registry.ts        // Client registration in KV store
 ├── changes.ts                // Change processing logic
-├── initial-sync.ts           // Initial sync implementation
-├── server-changes.ts         // Server changes implementation using change_history
+├── initial-sync-generic.ts  // Generic initial sync implementation
+├── server-changes-generic.ts // Generic server changes implementation
 ├── index.ts                  // Main exports
 ├── README.md                 // This file
 ├── replication.ts            // Replication logic
