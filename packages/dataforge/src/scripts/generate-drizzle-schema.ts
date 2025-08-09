@@ -53,13 +53,15 @@ async function extractAllEntityMetadata(): Promise<Map<string, any>> {
   for (const entity of serverEntities) {
     const { columns, relations } = filter.filterEntityMetadata(entity, 'server');
     const tableName = filter.getTableName(entity);
+    const category = getTableCategory(entity) || 'utility';
     
     entityMetadataMap.set(entity.name, {
       name: entity.name,
       tableName,
       columns,
       relations,
-      entity
+      entity,
+      category
     });
   }
   
@@ -281,12 +283,22 @@ ${columns.join(',\n')}
       for (const rel of entity.relations) {
         if (rel.relationType === 'many-to-one') {
           const targetEntityClass = (rel.type as () => Function)();
-          const targetTableName = targetEntityClass.name.toLowerCase() + 's';
-          relations.push(`    ${rel.propertyName}: one(${targetTableName})`);
+          // Find the target entity's metadata to get its actual table name
+          const targetMeta = entities.find(m => m.target === targetEntityClass || m.name === targetEntityClass.name);
+          if (!targetMeta) {
+            console.warn(`[generate-drizzle-schema] Could not find metadata for relation target: ${targetEntityClass.name}`);
+            continue;
+          }
+          relations.push(`    ${rel.propertyName}: one(${targetMeta.tableName})`);
         } else if (rel.relationType === 'one-to-many') {
           const targetEntityClass = (rel.type as () => Function)();
-          const targetTableName = targetEntityClass.name.toLowerCase() + 's';
-          relations.push(`    ${rel.propertyName}: many(${targetTableName})`);
+          // Find the target entity's metadata to get its actual table name
+          const targetMeta = entities.find(m => m.target === targetEntityClass || m.name === targetEntityClass.name);
+          if (!targetMeta) {
+            console.warn(`[generate-drizzle-schema] Could not find metadata for relation target: ${targetEntityClass.name}`);
+            continue;
+          }
+          relations.push(`    ${rel.propertyName}: many(${targetMeta.tableName})`);
         }
       }
       
@@ -370,6 +382,19 @@ ${entities.filter(e => e.relations.length > 0).map(e => `  ${e.tableName}Relatio
 export const TABLE_NAMES = {
 ${entities.map(e => `  ${e.name.toUpperCase()}: '${e.tableName}'`).join(',\n')},
 ${junctionTables.map(j => `  ${toPascalCase(j.name).toUpperCase()}: '${j.name}'`).join(',\n')}
+} as const;
+
+// Table categories for sync
+export const tableCategories = {
+  domain: [
+${entities.filter(e => e.category === 'domain').map(e => `    '${e.tableName}'`).join(',\n')}
+  ],
+  system: [
+${entities.filter(e => e.category === 'system').map(e => `    '${e.tableName}'`).join(',\n')}
+  ],
+  utility: [
+${entities.filter(e => e.category === 'utility').map(e => `    '${e.tableName}'`).join(',\n')}
+  ]
 } as const;
 `;
 }

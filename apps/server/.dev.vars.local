@@ -1,4 +1,4 @@
-DATABASE_URL=postgresql://postgres:postgres@db.localtest.me:5432/vibestack_dev
+DATABASE_URL=postgresql://postgres:postgres@localhost:6072/vibestack_dev_issue_64
 NEON_API_KEY=napi_z1ema88q0fv6fcv3sbo8q1ux73db2waa1gka1idfz4hn554lbdcdbt66klvgvo6c
 API_URL=https://127.0.0.1:8787
 ENVIRONMENT=development

@@ -62,7 +62,7 @@
     "generate-client-services": "tsx src/scripts/generate-dexie-domain-services.ts",
     "generate-drizzle-schema": "tsx src/scripts/generate-drizzle-schema.ts",
     "generate": "pnpm run generate-entities && pnpm run generate-crud-operations && pnpm run generate-client-schema && pnpm run generate-client-services && pnpm run generate-drizzle-schema",
-    "compile": "tsup && tsc --project tsconfig.dts.json",
+    "compile": "tsup",
     "build": "pnpm run forge:build",
     "forge:build": "pnpm run generate && pnpm run compile",
     "forge:client": "pnpm run generate-client-schema",
