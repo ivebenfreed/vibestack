@@ -167,9 +167,9 @@ function RouteComponent() {
 
 function AuthenticatedContent() {
   return (
-    <>
+    <div data-testid="authenticated-content">
       {/* <SkipToMain /> - Disabled: phantom component issue */}
       <UnifiedLayout />
-    </>
+    </div>
   )
 }

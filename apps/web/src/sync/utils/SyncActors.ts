@@ -126,8 +126,42 @@ export const syncActors = {
       throw new Error(`Failed to check pending changes: ${error}`);
     }
     
-    // Step 2: Skip integrity validation (TypeORM service disabled)
-    syncLogger.info('validation', 'Skipping integrity validation - TypeORM services disabled');
+    // Step 2: Simple integrity validation with auto-reset
+    try {
+      // Use SimpleIntegrityValidator directly for cleaner logic
+      const { SimpleIntegrityValidator } = await import('../../sync/integrity/SimpleIntegrityValidator');
+      const validator = new SimpleIntegrityValidator(clientId);
+      
+      syncLogger.info('validation', 'Running simple integrity validation...');
+      const result = await validator.validate();
+      
+      if (!result.isValid && result.action === 'reset') {
+        syncLogger.warn('validation', 'Integrity validation failed - performing reset');
+        
+        // Reset the database
+        await validator.reset();
+        
+        // Throw error to trigger reconnection and re-sync
+        throw new Error('Integrity reset performed - reconnection required');
+      }
+      
+      if (result.action === 'establish_baseline') {
+        // Will establish baseline after initial sync completes
+        syncLogger.info('validation', 'Baseline will be established after initial sync');
+      }
+      
+      syncLogger.info('validation', 'Integrity validation completed', result);
+    } catch (error) {
+      syncLogger.serviceError('SimpleIntegrityValidator', error as Error, 'pre-live validation');
+      
+      // If it's a reset error, re-throw to trigger reconnection
+      if (error instanceof Error && error.message.includes('reconnection required')) {
+        throw error;
+      }
+      
+      // Otherwise continue
+      syncLogger.warn('validation', 'Continuing despite validation error');
+    }
     
     syncLogger.info('validation', 'Pre-live validation completed successfully');
     return { success: true };
@@ -290,20 +324,19 @@ export const syncActors = {
   }): Promise<{ baselineEstablished: boolean }> => {
     syncLogger.info('validation', 'Establishing baseline after initial sync completion');
     
-    const services = input.serviceCoordinator.getServices();
-    if (!services) {
-      throw new Error('Services not available from ServiceCoordinator');
-    }
-    
     try {
-      // Call the establishBaseline method on IntegrityService
-      await services.integrity.establishBaseline('post-initial-sync');
+      // Use SimpleIntegrityValidator directly
+      const { SimpleIntegrityValidator } = await import('../../sync/integrity/SimpleIntegrityValidator');
+      const validator = new SimpleIntegrityValidator(input.clientId);
+      
+      // Establish baseline after successful initial sync
+      await validator.establishBaseline('post-initial-sync');
       
       syncLogger.info('validation', 'Baseline successfully established after initial sync');
       return { baselineEstablished: true };
       
     } catch (error) {
-      syncLogger.serviceError('IntegrityService', error as Error, 'baseline establishment');
+      syncLogger.serviceError('SimpleIntegrityValidator', error as Error, 'baseline establishment');
       throw error;
     }
   })

@@ -1,7 +1,0 @@
-
-> server@0.1.0 build /home/benfreed/vibestack/apps/server
-> ../../scripts/type-check-focused/type-check-all.sh && wrangler deploy --outdir=dist
-
-=== Running Focused Type Checks ===
-
-Checking server...
