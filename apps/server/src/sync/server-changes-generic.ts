@@ -212,8 +212,15 @@ export async function performCatchupSync(
 
   try {
     // Query change_history table for catchup changes
+    syncLogger.info('Getting DB client for catchup sync', { clientId });
     const { getDBClient } = await import('../lib/db');
     const client = await getDBClient(context);
+    
+    syncLogger.info('Querying change_history table', {
+      clientId,
+      clientLSN,
+      serverLSN: initialServerLSN
+    });
     
     // Query for changes between client LSN and server LSN
     const query = `
@@ -229,8 +236,13 @@ export async function performCatchupSync(
       LIMIT 5000
     `;
     
+    syncLogger.info('Executing catchup query', { clientId });
     const result = await client.query(query, [clientLSN, initialServerLSN]);
     const changes = result.rows;
+    syncLogger.info('Catchup query completed', {
+      clientId,
+      changeCount: changes.length
+    });
     
     if (changes.length === 0) {
       syncLogger.info('No catchup changes needed', {
