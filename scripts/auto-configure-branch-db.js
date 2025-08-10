@@ -64,7 +64,7 @@ class BranchDbConfigurator {
     }
 
     // Branch-specific configuration
-    const offset = this.prNumber * 10;
+    const offset = this.prNumber;
     return {
       mode: 'branch',
       branch: this.currentBranch,

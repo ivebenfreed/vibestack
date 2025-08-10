@@ -6,8 +6,8 @@ echo "=================================="
 
 # Check if server is running on expected port
 PR_NUMBER=${1:-1}
-SERVER_PORT=$((8787 + PR_NUMBER * 10))
-WEB_PORT=$((5173 + PR_NUMBER * 10))
+SERVER_PORT=$((8787 + PR_NUMBER))
+WEB_PORT=$((5173 + PR_NUMBER))
 
 echo "Testing PR #$PR_NUMBER"
 echo "Expected Server Port: $SERVER_PORT"

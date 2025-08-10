@@ -27,9 +27,9 @@ git worktree list | grep "vibestack-issue-" | while read -r line; do
     echo "     Path: ${WORKTREE_PATH}"
     
     # Check if containers are running for this issue
-    DB_PORT=$((5432 + ISSUE_NUM * 10))
-    WEB_PORT=$((5173 + ISSUE_NUM * 10))
-    SERVER_PORT=$((8787 + ISSUE_NUM * 10))
+    DB_PORT=$((5432 + ISSUE_NUM))
+    WEB_PORT=$((5173 + ISSUE_NUM))
+    SERVER_PORT=$((8787 + ISSUE_NUM))
     
     if docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -q ":${DB_PORT}->"; then
         echo "     Status: 🟢 Running"

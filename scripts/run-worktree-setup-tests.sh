@@ -29,8 +29,8 @@ echo -e "\n${YELLOW}🔍 Checking if development servers are running...${NC}"
 
 # Get the correct port based on issue number
 if [[ -n "$ISSUE_NUMBER" ]]; then
-    WEB_PORT=$((5173 + $ISSUE_NUMBER * 10))
-    SERVER_PORT=$((8787 + $ISSUE_NUMBER * 10))
+    WEB_PORT=$((5173 + $ISSUE_NUMBER))
+    SERVER_PORT=$((8787 + $ISSUE_NUMBER))
 else
     WEB_PORT=5173
     SERVER_PORT=8787

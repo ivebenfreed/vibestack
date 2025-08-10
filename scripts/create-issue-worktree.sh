@@ -65,9 +65,9 @@ if [ -d "$WORKTREE_PATH" ]; then
             echo "   pnpm forge:migrate:run:local  # Run migrations"
             echo ""
             echo "📱 Your environment:"
-            echo "   Web:    http://localhost:$((5173 + ISSUE_NUMBER * 10))"
-            echo "   API:    http://localhost:$((8787 + ISSUE_NUMBER * 10))"
-            echo "   DB:     localhost:$((5432 + ISSUE_NUMBER * 10))"
+            echo "   Web:    http://localhost:$((5173 + ISSUE_NUMBER))"
+            echo "   API:    http://localhost:$((8787 + ISSUE_NUMBER))"
+            echo "   DB:     localhost:$((5432 + ISSUE_NUMBER))"
             exit 0
             ;;
         *)
@@ -224,8 +224,8 @@ echo "4️⃣ Starting development servers..."
 echo "   🚀 Running pnpm dev:local..."
 echo ""
 echo "📱 Your services will be available at:"
-echo "   • Web: http://localhost:$((5173 + ISSUE_NUMBER * 10))"
-echo "   • API: http://localhost:$((8787 + ISSUE_NUMBER * 10))"
+echo "   • Web: http://localhost:$((5173 + ISSUE_NUMBER))"
+echo "   • API: http://localhost:$((8787 + ISSUE_NUMBER))"
 echo ""
 
 # Option to run setup tests
