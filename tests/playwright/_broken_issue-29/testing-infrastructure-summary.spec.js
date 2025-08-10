@@ -1,5 +1,5 @@
 // Summary test for Issue #29 - Testing Infrastructure Improvements
-import { test, expect } from '../fixtures/persistent-context.js';
+import { test, expect } from '../helpers/fixtures/persistent-context.js';
 import { 
   waitForSyncInitialized,
   getCurrentLSN,

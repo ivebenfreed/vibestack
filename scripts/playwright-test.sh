@@ -36,14 +36,14 @@ else
     echo -e "${YELLOW}📊 Using main branch configuration${NC}"
 fi
 
-# Calculate ports
-if [[ "$ISSUE_NUMBER" == "main" ]]; then
-    WEB_PORT=5173
-    SERVER_PORT=8787
-else
-    WEB_PORT=$((5173 + ISSUE_NUMBER * 10))
-    SERVER_PORT=$((8787 + ISSUE_NUMBER * 10))
-fi
+# Get ports from environment variables (with defaults)
+WEB_PORT="${WEB_PORT:-5173}"
+SERVER_PORT="${SERVER_PORT:-8787}"
+
+# Export for Playwright config to use
+export WEB_PORT
+export SERVER_PORT
+export PR_NUMBER="$ISSUE_NUMBER"
 
 echo -e "${BLUE}🔧 Configuration:${NC}"
 echo "   Issue: ${ISSUE_NUMBER}"
@@ -54,12 +54,27 @@ echo ""
 
 # Check if servers are running
 echo -e "${BLUE}🔍 Checking if dev servers are running...${NC}"
-if curl -s "http://localhost:${WEB_PORT}" > /dev/null 2>&1; then
+
+# Check web server - make sure it's actually serving the app, not just responding
+WEB_RESPONSE=$(curl -s "http://localhost:${WEB_PORT}" 2>/dev/null || echo "")
+if [[ -n "$WEB_RESPONSE" ]] && [[ "$WEB_RESPONSE" == *"<div id=\"root\""* ]]; then
     echo -e "${GREEN}✅ Web server is running on port ${WEB_PORT}${NC}"
 else
-    echo -e "${YELLOW}⚠️  Web server not detected on port ${WEB_PORT}${NC}"
+    echo -e "${RED}❌ Web server not properly serving app on port ${WEB_PORT}${NC}"
     echo -e "${YELLOW}   Make sure to run: ./scripts/dev-start.sh${NC}"
     echo ""
+fi
+
+# Check API server - THIS IS CRITICAL!
+if curl -s "http://localhost:${SERVER_PORT}/api/health" > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ API server is running on port ${SERVER_PORT}${NC}"
+else
+    echo -e "${RED}❌ API SERVER IS NOT RUNNING on port ${SERVER_PORT}${NC}"
+    echo -e "${RED}   The app WILL NOT WORK without the API server!${NC}"
+    echo -e "${YELLOW}   Start it with: ./scripts/tmux-bg.sh vibestack-dev-main \"pnpm dev:local\"${NC}"
+    echo ""
+    echo -e "${RED}ABORTING: Cannot run tests without API server${NC}"
+    exit 1
 fi
 
 # Ensure Playwright directories exist

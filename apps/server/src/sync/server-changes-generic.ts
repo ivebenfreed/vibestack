@@ -253,10 +253,33 @@ export async function performCatchupSync(
     });
     
     // Parse the JSON data field for each change
-    const parsedChanges = changes.map(change => ({
-      ...change,
-      data: change.data ? JSON.parse(change.data) : null
-    }));
+    // The data field is stored as text/JSON string in the database
+    const parsedChanges = changes.map(change => {
+      let parsedData = null;
+      if (change.data) {
+        try {
+          // Check if data is already an object (shouldn't happen with text column)
+          if (typeof change.data === 'object') {
+            parsedData = change.data;
+          } else if (typeof change.data === 'string') {
+            parsedData = JSON.parse(change.data);
+          }
+        } catch (e) {
+          syncLogger.error('Failed to parse change data', {
+            clientId,
+            lsn: change.lsn,
+            dataType: typeof change.data,
+            error: e instanceof Error ? e.message : String(e)
+          });
+          // Keep original data if parsing fails
+          parsedData = change.data;
+        }
+      }
+      return {
+        ...change,
+        data: parsedData
+      };
+    });
     
     if (parsedChanges.length === 0) {
       syncLogger.info('No catchup changes needed', {

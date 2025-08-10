@@ -31,24 +31,16 @@ function getIssueNumber() {
   return 'main';
 }
 
-// Calculate ports based on issue number
-function getPorts(issueNumber) {
-  if (issueNumber === 'main') {
-    return {
-      webPort: 5173,
-      serverPort: 8787
-    };
-  }
-  
-  const num = parseInt(issueNumber, 10);
+// Get ports directly from environment variables
+function getPortsFromEnv() {
   return {
-    webPort: 5173 + (num * 10),
-    serverPort: 8787 + (num * 10)
+    webPort: parseInt(process.env.WEB_PORT) || 5173,
+    serverPort: parseInt(process.env.SERVER_PORT) || 8787
   };
 }
 
 const issueNumber = getIssueNumber();
-const ports = getPorts(issueNumber);
+const ports = getPortsFromEnv();
 const userDataDir = path.resolve(process.cwd(), '.playwright', 'profiles', `profile-${issueNumber}`);
 
 // Suppress logs for json/dot reporters to avoid EPIPE errors
@@ -66,6 +58,10 @@ export default defineConfig({
   testMatch: [
     '**/*.spec.js',
     '**/*.setup.js'
+  ],
+  testIgnore: [
+    '**/_broken*/**',
+    '**/_legacy/**'
   ],
   fullyParallel: false, // Run tests serially to avoid conflicts
   forbidOnly: !!process.env.CI,

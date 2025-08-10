@@ -9,7 +9,7 @@
  * 
  * After running once, you'll stay logged in for all subsequent tests!
  */
-import { test, expect } from '../fixtures/persistent-context.js';
+import { test, expect } from '../helpers/fixtures/persistent-context.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
