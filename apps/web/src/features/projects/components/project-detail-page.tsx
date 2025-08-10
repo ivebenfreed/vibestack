@@ -29,20 +29,9 @@ export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ projectId:
   // 🎯 UNIVERSAL REACTIVE DATA PATTERN: Use loader data as fallback, XState for surgical updates
   const loaderData = useLoaderData({ from: '/_authenticated/projects/$projectId' })
   
-  // 🎯 XSTATE SURGICAL: Get live data from XState stores - surgical updates when data changes
-  const project = useSelector(
-    projectsAtom, 
-    (projectsRecord) => projectsRecord[projectId] || null
-  )
-  const allUsers = useSelector(
-    usersAtom, 
-    (usersRecord) => Object.values(usersRecord),
-    shallowEqual
-  )
-  
-  // Use loader data as fallback if XState stores are empty
-  const finalProject = project || loaderData.project as Project | null
-  const finalUsers = allUsers.length > 0 ? allUsers : (loaderData.users as User[] || [])
+  // TODO: Replace with Dexie query
+  const finalProject = null as Project | null
+  const finalUsers = [] as User[]
 
   // Performance monitor state
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(

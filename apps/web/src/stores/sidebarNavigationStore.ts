@@ -7,7 +7,7 @@ import {
   type GlobalSidebarSection 
 } from '@/components/layout/data/sidebar-data'
 import { Project } from '@repo/dataforge/client-entities'
-// import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource' // TypeORM removed
+// Dexie handles all database operations
 import { Project as ProjectEntity, Task, User } from '@repo/dataforge/client-entities'
 import { useMemo, useEffect, useRef } from 'react'
 import { shallowEqual } from '@xstate/store'
@@ -111,20 +111,8 @@ async function loadProjectsForSidebar() {
   
 
   
-  // ✅ CHECK ATOMS FIRST: Route loaders likely already populated them
-  const { projectsAtom } = await import('@/domain/project-service')
-  const { tasksAtom } = await import('@/domain/task-service')
-  const { usersAtom } = await import('@/domain/user-service')
-  
-  const currentProjects = projectsAtom.get()
-  const currentTasks = tasksAtom.get()
-  const currentUsers = usersAtom.get()
-  
-  // If atoms are already populated, no need to load from database
-  if (Object.keys(currentProjects).length > 0 || Object.keys(currentTasks).length > 0 || Object.keys(currentUsers).length > 0) {
-    console.log('[SidebarNavigation] ✅ Atoms already populated by route loaders - skipping database loading')
-    return
-  }
+  // Atoms removed - using Dexie directly
+  console.log('[SidebarNavigation] Using Dexie for data loading')
   
   // ✅ FALLBACK: Only load if atoms are empty and provider is ready
   const { isGlobalDataSourceReady } = await import('@/db/global-datasource')

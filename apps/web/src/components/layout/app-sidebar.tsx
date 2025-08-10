@@ -36,7 +36,6 @@ const DebugSidebarContent = React.memo(function DebugSidebarContent() {
       title: "Testing",
       items: [
         { title: "Multi-Query", url: "/debug/multi-query", icon: Database },
-        { title: "TypeORM Test", url: "/debug/typeorm-test", icon: Database },
       ]
     }
   ]
@@ -99,7 +98,7 @@ const AppSidebarInternal = React.memo(function AppSidebarInternal({ collapsible 
   const isCollapsed = state === 'collapsed'
   
   // ⚡ PERFORMANCE: Different content strategies for different sections
-  const shouldShowExpensiveContent = activeSection === 'projects' || activeSection === 'settings'
+  const shouldShowExpensiveContent = activeSection === 'projects' || activeSection === 'settings' || activeSection === 'home'
   const shouldShowDebugContent = activeSection === 'debug'
 
   return (

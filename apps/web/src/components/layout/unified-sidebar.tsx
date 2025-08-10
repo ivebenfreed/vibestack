@@ -324,31 +324,12 @@ function ProjectNavigation({ isCollapsed, onNavigate }: {
 }) {
   const location = useLocation()
   
-  // 🎯 SURGICAL SELECTORS: Individual selectors for each status to avoid object creation
-  const activeProjects = useSelector(projectsAtom, (projectsRecord) => 
-    Object.values(projectsRecord).filter(p => p.status === ProjectStatus.ACTIVE), 
-    shallowEqual
-  )
-  
-  const inProgressProjects = useSelector(projectsAtom, (projectsRecord) => 
-    Object.values(projectsRecord).filter(p => p.status === ProjectStatus.IN_PROGRESS), 
-    shallowEqual
-  )
-  
-  const onHoldProjects = useSelector(projectsAtom, (projectsRecord) => 
-    Object.values(projectsRecord).filter(p => p.status === ProjectStatus.ON_HOLD), 
-    shallowEqual
-  )
-  
-  const completedProjects = useSelector(projectsAtom, (projectsRecord) => 
-    Object.values(projectsRecord).filter(p => p.status === ProjectStatus.COMPLETED), 
-    shallowEqual
-  )
-
-  // Total projects count for empty state
-  const totalProjects = useSelector(projectsAtom, (projectsRecord) => 
-    Object.keys(projectsRecord).length
-  )
+  // TODO: Replace with Dexie queries
+  const activeProjects: any[] = []
+  const inProgressProjects: any[] = []
+  const onHoldProjects: any[] = []
+  const completedProjects: any[] = []
+  const totalProjects = 0
 
   // Group for easy iteration (no new object creation in selector)
   const projectsByStatus = {
