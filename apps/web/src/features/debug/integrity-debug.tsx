@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
-import { getGlobalDataSourceSync } from '@/db/global-datasource';
+// import { getGlobalDataSourceSync } from '@/db/global-datasource'; // TypeORM removed
 import { User, Project, Task, Comment, UserRole, ProjectStatus, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
 
 interface IntegrityTestResult {
@@ -264,7 +264,7 @@ export default function IntegrityDebugPage() {
     try {
       addLog('Creating local-only entities (not synced to server)...');
       
-      const dataSource = getGlobalDataSourceSync();
+      const dataSource = null; // getGlobalDataSourceSync(); // TypeORM removed
       if (!dataSource) {
         throw new Error('DataSource not available');
       }

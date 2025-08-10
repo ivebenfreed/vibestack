@@ -14,8 +14,8 @@
 import { setup, assign, fromPromise, sendParent, sendTo } from 'xstate';
 import { WebSocketService } from '../../sync/WebSocketService';
 import { IncomingChangeService } from '../../sync/IncomingChangeService';
-import { OutgoingChangeService } from '../../sync/OutgoingChangeService';
-import { IntegrityService } from '../../sync/IntegrityService';
+import { DexieOutgoingChangeService } from '../../sync/DexieOutgoingChangeService';
+import { DexieIntegrityService } from '../../sync/DexieIntegrityService';
 import { getSyncWebSocketUrl } from '../../sync/config';
 import { integrityMachine } from './integrity-machine';
 
@@ -62,8 +62,8 @@ export type SyncMachineV3Event = SyncMachineEvent;
 let globalServicesV3: {
   webSocketService: WebSocketService | null;
   incomingChangeService: IncomingChangeService | null;
-  outgoingChangeService: OutgoingChangeService | null;
-  integrityService: IntegrityService | null;
+  outgoingChangeService: DexieOutgoingChangeService | null;
+  integrityService: DexieIntegrityService | null;
 } | null = null;
 
 // Getter for global services (for domain service integration)
