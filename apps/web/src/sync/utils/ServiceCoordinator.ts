@@ -9,13 +9,9 @@
  */
 
 import { WebSocketService, WebSocketServiceConfig } from '../WebSocketService';
-// DISABLED: TypeORM services - migrating to Dexie-only
 import { IncomingChangeService, IncomingChangeServiceConfig } from '../IncomingChangeService';
-// import { OutgoingChangeService, OutgoingChangeServiceConfig } from '../OutgoingChangeService';
 import { DexieOutgoingChangeService, DexieOutgoingChangeServiceConfig } from '../DexieOutgoingChangeService';
-// import { IntegrityService, IntegrityServiceConfig } from '../IntegrityService';
 import { DexieIntegrityService, IntegrityServiceConfig } from '../DexieIntegrityService';
-// import { NewPGliteDataSource } from '../../db/newtypeorm/NewDataSource';
 import { syncLogger } from './SyncLogger';
 
 export interface Services {

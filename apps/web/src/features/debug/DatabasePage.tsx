@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { usePGliteContext } from '@/db/pglite-provider';
+// import { usePGliteContext } from '@/db/pglite-provider'; // TypeORM removed
 
 const DatabasePage: React.FC = () => {
-  const { db } = usePGliteContext();
+  // const { db } = usePGliteContext(); // TypeORM removed
+  const db = null; // TypeORM removed - debug page disabled
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<string>('');
 

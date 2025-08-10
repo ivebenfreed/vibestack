@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Activity, Zap, BarChart3, RefreshCw, Eye, TestTube } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-import { usePGliteContext } from '@/db/pglite-provider';
+// import { usePGliteContext } from '@/db/pglite-provider'; // TypeORM removed
 // Using XState atoms for reactive data
 import { Task } from '@repo/dataforge/client-entities';
 import { getDatabase } from '@/db/db';
@@ -27,7 +27,10 @@ interface PerformanceMetrics {
 }
 
 export function LiveQueryDebugPage() {
-  const { services, createQueryBuilder, isDataSourceReady } = usePGliteContext();
+  // const { services, createQueryBuilder, isDataSourceReady } = usePGliteContext(); // TypeORM removed
+  const services = null;
+  const createQueryBuilder = null;
+  const isDataSourceReady = false; // TypeORM removed
   
   // Main state
   const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(undefined);

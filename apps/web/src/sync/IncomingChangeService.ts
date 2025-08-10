@@ -7,9 +7,8 @@
  * Part of Phase 2: Pure Services Extraction
  */
 
-import { NewPGliteDataSource } from '../db/newtypeorm/NewDataSource';
 import { TableChange } from '@repo/sync-types';
-import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '@repo/dataforge/client-entities';
+import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '@repo/dataforge/sync-metadata';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -36,7 +35,6 @@ export interface ProcessingResult {
 
 export class IncomingChangeService {
   private config: IncomingChangeServiceConfig;
-  private dataSource: NewPGliteDataSource;
   private callbacks: IncomingChangeServiceCallbacks = {};
   private isProcessing = false;
   
@@ -51,11 +49,11 @@ export class IncomingChangeService {
 
   constructor(
     config: IncomingChangeServiceConfig,
-    dataSource: NewPGliteDataSource
+    dataSource?: any // Kept for compatibility but not used
   ) {
     this.config = config;
-    this.dataSource = dataSource;
     console.log('[IncomingChangeService] Initialized with config:', config);
+    console.log('[IncomingChangeService] Using Dexie-only mode (TypeORM removed)');
   }
 
 
@@ -569,9 +567,8 @@ export class IncomingChangeService {
   }
 
   private async applyChange(change: TableChange): Promise<ProcessingResult> {
-    return await this.dataSource.manager.transaction(async (transactionalEntityManager: any) => {
-      return await this.applyChangeInTransaction(change, transactionalEntityManager);
-    });
+    // TypeORM removed - call applyChangeInTransaction directly
+    return await this.applyChangeInTransaction(change, null);
   }
 
   private async applyChangeInTransaction(change: TableChange, entityManager: any): Promise<ProcessingResult> {
