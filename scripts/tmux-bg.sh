@@ -62,22 +62,31 @@ detect_issue_number() {
     echo "0"
 }
 
-# Calculate ports based on issue number
+# Get issue number for session naming
 ISSUE_NUMBER=$(detect_issue_number)
-OFFSET=$((ISSUE_NUMBER * 10))
 
-# Base ports
-BASE_SERVER_PORT=8787
-BASE_WEB_PORT=5173
-BASE_DB_PORT=5432
-BASE_PROXY_PORT=4444
+# Load environment from .env.local (single source of truth)
+if [ -f ".env.local" ]; then
+    set -a
+    source .env.local
+    set +a
+else
+    echo "⚠️  Warning: .env.local not found. Running configure-worktree-env.sh..."
+    ./scripts/configure-worktree-env.sh
+    
+    # Now load the created .env.local
+    set -a
+    source .env.local
+    set +a
+fi
 
-# Calculate ports with offset
-export SERVER_PORT=$((BASE_SERVER_PORT + OFFSET))
-export WEB_PORT=$((BASE_WEB_PORT + OFFSET))
-export DB_PORT=$((BASE_DB_PORT + OFFSET))
-export PROXY_PORT=$((BASE_PROXY_PORT + OFFSET))
-export PR_NUMBER="$ISSUE_NUMBER"
+# Export for child processes
+export SERVER_PORT
+export WEB_PORT
+export DB_PORT
+export PROXY_PORT
+export PR_NUMBER
+export ISSUE_NUMBER
 
 # Check if session already exists
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then

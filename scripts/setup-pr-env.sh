@@ -17,9 +17,14 @@ echo "🚀 Setting up PR environment..."
 echo "   PR Number: ${PR_NUMBER:-"main"}"
 echo ""
 
-# Step 1: Setup ports and configs
+# Step 1: Configure environment (single source of truth)
 echo "1️⃣ Configuring ports and environment..."
-PR_NUMBER=${PR_NUMBER} node scripts/setup-dev-ports.js
+PR_NUMBER=${PR_NUMBER} ./scripts/configure-worktree-env.sh
+
+# Load the configured environment
+set -a
+source .env.local
+set +a
 
 # Step 1.5: Copy Claude configuration (skip - handled by postinstall)
 # The postinstall script already handles Claude configuration
@@ -28,9 +33,8 @@ PR_NUMBER=${PR_NUMBER} node scripts/setup-dev-ports.js
 echo ""
 echo "2️⃣ Starting Docker containers..."
 if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
-    # Use PR-specific docker-compose with different ports
-    DB_PORT=$((5432 + PR_NUMBER * 10))
-    PROXY_PORT=$((4444 + PR_NUMBER * 10))
+    # Ports are already loaded from .env.local
+    # No need to calculate - single source of truth
     
     # Generate PR-specific docker-compose with unique container names and volumes
     sed -e "s/\"5432:5432\"/\"${DB_PORT}:5432\"/g" \
@@ -68,8 +72,8 @@ echo "✅ PR environment setup complete!"
 echo ""
 echo "🎯 Next steps:"
 echo "   • Run: pnpm dev:local"
-echo "   • Visit: http://localhost:$((5173 + ${PR_NUMBER:-0} * 10))"
-echo "   • API: http://localhost:$((8787 + ${PR_NUMBER:-0} * 10))"
+echo "   • Visit: http://localhost:$((5173 + ${PR_NUMBER:-0}))"
+echo "   • API: http://localhost:$((8787 + ${PR_NUMBER:-0}))"
 echo ""
 echo "🔧 Cleanup when done:"
 if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
