@@ -12,6 +12,7 @@ const LOCAL_DATABASE_URL = process.env.LOCAL_DATABASE_URL || 'postgresql://postg
 const TABLES_TO_CLONE = [
   'accounts',  // Add accounts table for Better Auth
   'sessions',  // Add sessions table for Better Auth
+  'verifications',  // Add verifications table for Better Auth
   'users',
   'projects', 
   'status_sets',
