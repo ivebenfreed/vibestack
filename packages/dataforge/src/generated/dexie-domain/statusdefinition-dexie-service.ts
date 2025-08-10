@@ -66,4 +66,4 @@ export class StatusdefinitionDexieService {
   }
 }
 
-export const statusDefinitionDexieService = new StatusdefinitionDexieService();
+export const statusdefinitionDexieService = new StatusdefinitionDexieService();

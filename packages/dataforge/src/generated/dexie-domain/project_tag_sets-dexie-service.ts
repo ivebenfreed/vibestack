@@ -47,4 +47,4 @@ export class ProjectTagSetsDexieService {
   }
 }
 
-export const project_tag_setsDexieService = new ProjectTagSetsDexieService();
+export const projectTagSetsDexieService = new ProjectTagSetsDexieService();

@@ -98,6 +98,9 @@ function generateServiceFile(service: EntityServiceInfo): string {
     .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join('') + 'DexieService';
   
+  // Generate consistent service instance name
+  const serviceName = className.charAt(0).toLowerCase() + className.slice(1, -7); // Remove 'Service' and lowercase first char
+  
   let output = `// Generated Dexie domain service for ${service.entityName}
 import { db } from '../dexie-schema.js';
 import type { ${service.entityName} } from '../client-entities.js';
@@ -194,7 +197,7 @@ export class ${className} {
 
   output += `}
 
-export const ${lowerName}DexieService = new ${className}();
+export const ${serviceName}Service = new ${className}();
 `;
 
   return output;

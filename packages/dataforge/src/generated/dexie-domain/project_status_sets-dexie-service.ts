@@ -47,4 +47,4 @@ export class ProjectStatusSetsDexieService {
   }
 }
 
-export const project_status_setsDexieService = new ProjectStatusSetsDexieService();
+export const projectStatusSetsDexieService = new ProjectStatusSetsDexieService();
