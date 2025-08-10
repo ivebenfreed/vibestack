@@ -80,4 +80,4 @@ packages/cli/dist
 packages/cli/node_modules
 
 # Git worktrees
-worktrees/
+worktrees/vibestack-env-*.tar.gz
