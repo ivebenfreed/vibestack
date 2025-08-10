@@ -36,17 +36,21 @@ detect_issue_number() {
     echo "0"
 }
 
-# Calculate ports based on issue number
+# Get issue number for session naming
 ISSUE_NUMBER=$(detect_issue_number)
-OFFSET=$((ISSUE_NUMBER * 10))
 
-# Base ports
-BASE_SERVER_PORT=8787
-BASE_WEB_PORT=5173
-
-# Calculate ports with offset
-WEB_PORT=$((BASE_WEB_PORT + OFFSET))
-SERVER_PORT=$((BASE_SERVER_PORT + OFFSET))
+# Load environment from .env.local (single source of truth)
+if [ -f ".env.local" ]; then
+    set -a
+    source .env.local
+    set +a
+else
+    # If no .env.local, run configuration
+    ./scripts/configure-worktree-env.sh
+    set -a
+    source .env.local
+    set +a
+fi
 
 # Dynamic session name based on issue number
 if [ "$ISSUE_NUMBER" != "0" ]; then

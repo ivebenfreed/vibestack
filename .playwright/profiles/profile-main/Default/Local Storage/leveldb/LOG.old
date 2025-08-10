@@ -1,3 +1,3 @@
-2025/08/10-08:43:28.988 7462d Reusing MANIFEST /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/Local Storage/leveldb/MANIFEST-000001
-2025/08/10-08:43:29.000 7462d Recovering log #3
-2025/08/10-08:43:29.000 7462d Reusing old log /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/Local Storage/leveldb/000003.log 
+2025/08/10-15:37:01.665 f7308 Reusing MANIFEST /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/Local Storage/leveldb/MANIFEST-000001
+2025/08/10-15:37:01.674 f7308 Recovering log #4
+2025/08/10-15:37:01.674 f7308 Reusing old log /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/Local Storage/leveldb/000004.log 

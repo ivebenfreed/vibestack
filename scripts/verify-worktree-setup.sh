@@ -19,8 +19,8 @@ CURRENT_DIR=$(pwd)
 if [[ $CURRENT_DIR =~ issue-([0-9]+) ]]; then
     ISSUE_NUMBER="${BASH_REMATCH[1]}"
     echo -e "${GREEN}✅ Issue #${ISSUE_NUMBER} worktree detected${NC}"
-    WEB_PORT=$((5173 + $ISSUE_NUMBER * 10))
-    SERVER_PORT=$((8787 + $ISSUE_NUMBER * 10))
+    WEB_PORT=$((5173 + $ISSUE_NUMBER))
+    SERVER_PORT=$((8787 + $ISSUE_NUMBER))
     PROFILE_DIR=".playwright/profiles/profile-${ISSUE_NUMBER}"
 else
     echo -e "${YELLOW}⚠️  Not in a worktree, using default ports${NC}"

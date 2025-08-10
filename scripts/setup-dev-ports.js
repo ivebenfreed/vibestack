@@ -60,7 +60,7 @@ function detectIssueNumber() {
 async function setupPorts() {
   // Auto-detect PR/issue number from various sources
   const prNumber = detectIssueNumber();
-  const offset = parseInt(prNumber) * 10; // Use 10 as offset to avoid conflicts
+  const offset = parseInt(prNumber); // Simple offset: just add the issue number
 
   // Base ports
   const BASE_SERVER_PORT = 8787;

@@ -45,12 +45,12 @@ update_claude_md_ports() {
         return
     fi
     
-    # Calculate ports based on issue number
-    local port_offset=$((issue_number * 10))
+    # Calculate ports based on issue number (simple offset, no multiplication)
+    local port_offset=$issue_number
     local web_port=$((5173 + port_offset))
     local server_port=$((8787 + port_offset))
     local db_port=$((5432 + port_offset))
-    local proxy_port=$((65432 - 60978 + port_offset))  # 4454 for Issue #1
+    local proxy_port=$((4444 + port_offset))
     
     echo "📝 Updating CLAUDE.md configuration for Issue #$issue_number..."
     
