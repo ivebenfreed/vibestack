@@ -281,6 +281,9 @@ export class ConflictResolver {
   private validateTableSpecificFields(change: TableChange, errors: string[]): void {
     const data = change.data as any;
 
+    // Business logic validations for specific tables
+    // These are intentionally hardcoded as they represent core business rules
+    // TODO: Consider moving to a validation configuration system
     switch (change.table) {
       case 'projects':
         if (change.operation !== 'delete' && !data.name) {
@@ -503,7 +506,9 @@ export class ConflictResolver {
    * Determine conflict resolution strategy for specific field
    */
   private getFieldConflictStrategy(tableName: string, fieldName: string): 'always_merge' | 'last_write_wins' | 'timestamp_wins' {
-    // Table-specific field strategies
+    // Table-specific field strategies for conflict resolution
+    // These are business logic rules, intentionally hardcoded
+    // TODO: Consider moving to a conflict resolution configuration
     switch (tableName) {
       case 'tasks':
         switch (fieldName) {

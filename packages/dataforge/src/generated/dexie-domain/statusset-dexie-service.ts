@@ -16,7 +16,7 @@ export interface StatusSetUpdateInput {
   projects?: any;
 }
 
-export class StatusSetDexieService {
+export class StatussetDexieService {
   async create(data: Partial<StatusSet>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -63,4 +63,4 @@ export class StatusSetDexieService {
   }
 }
 
-export const statusSetDexieService = new StatusSetDexieService();
+export const statusSetDexieService = new StatussetDexieService();

@@ -11,7 +11,7 @@ export interface EntityDependencyUpdateInput {
   metadata?: any;
 }
 
-export class EntityDependencyDexieService {
+export class EntitydependencyDexieService {
   async create(data: Partial<EntityDependency>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -51,4 +51,4 @@ export class EntityDependencyDexieService {
   }
 }
 
-export const entityDependencyDexieService = new EntityDependencyDexieService();
+export const entityDependencyDexieService = new EntitydependencyDexieService();

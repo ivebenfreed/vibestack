@@ -10,7 +10,7 @@ test.describe('Catchup Sync Tests', () => {
     await page.evaluate(() => {
       const oldState = {
         clientId: crypto.randomUUID(),
-        currentLSN: '0/1000000' // Old LSN that will trigger catchup
+        currentLSN: '0/186F14B8' // Use a real LSN from change_history that will trigger catchup
       };
       localStorage.setItem('sync-machine-state', JSON.stringify(oldState));
       console.log('Set old LSN in localStorage:', oldState);

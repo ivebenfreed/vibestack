@@ -244,37 +244,6 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "syncable": true,
     "trackChanges": true
   },
-  "SyncMetadata": {
-    "tableName": "sync_metadata",
-    "className": "SyncMetadata",
-    "category": "system",
-    "features": {
-      "hasClientId": false,
-      "hasVersion": false,
-      "hasSoftDelete": false,
-      "hasCreatedBy": false,
-      "hasUpdatedBy": false
-    },
-    "columns": {
-      "id": "id",
-      "clientId": null,
-      "version": null,
-      "deleted": null,
-      "createdAt": "created_at",
-      "updatedAt": "updated_at"
-    },
-    "updateableColumns": [
-      "updatedAt",
-      "tableName",
-      "lastSyncedVersion",
-      "lastSyncedAt"
-    ],
-    "foreignKeys": [],
-    "indexes": [],
-    "conflictResolution": "id",
-    "syncable": false,
-    "trackChanges": false
-  },
   "StatusSet": {
     "tableName": "status_sets",
     "className": "StatusSet",
@@ -462,18 +431,22 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     },
     "updateableColumns": [
       "updatedAt",
-      "tableName",
+      "table",
       "recordId",
-      "operationType",
+      "operation",
       "data",
+      "lsn",
       "clientSequence",
-      "loopProtection"
+      "processedSync",
+      "sendAttempts",
+      "lastSendAttempt",
+      "lastError"
     ],
     "foreignKeys": [],
     "indexes": [
       {
         "properties": [
-          "tableName",
+          "table",
           "recordId"
         ],
         "unique": false
@@ -663,11 +636,11 @@ export const junctionTables: JunctionTable[] = [
     "className": "task_tags",
     "columns": [
       {
-        "name": "tasks_id",
+        "name": "task_id",
         "type": "Task"
       },
       {
-        "name": "tags_id",
+        "name": "tag_id",
         "type": "Tag"
       }
     ],
@@ -678,11 +651,11 @@ export const junctionTables: JunctionTable[] = [
     "className": "project_tag_sets",
     "columns": [
       {
-        "name": "projects_id",
+        "name": "project_id",
         "type": "Project"
       },
       {
-        "name": "tag_sets_id",
+        "name": "tag_set_id",
         "type": "TagSet"
       }
     ],
@@ -693,11 +666,11 @@ export const junctionTables: JunctionTable[] = [
     "className": "project_status_sets",
     "columns": [
       {
-        "name": "projects_id",
+        "name": "project_id",
         "type": "Project"
       },
       {
-        "name": "status_sets_id",
+        "name": "status_set_id",
         "type": "StatusSet"
       }
     ],
@@ -741,13 +714,64 @@ export function hasSoftDelete(tableName: string): boolean {
 }
 
 // Type-safe table name lookup
-export type EntityClassName = 'Verification' | 'User' | 'Task' | 'TagSet' | 'Tag' | 'SyncMetadata' | 'StatusSet' | 'StatusDefinition' | 'Session' | 'Project' | 'LocalChanges' | 'EntityDependency' | 'Comment' | 'ChangeHistory' | 'Account';
-export type TableName = 'verifications' | 'users' | 'tasks' | 'tag_sets' | 'tags' | 'sync_metadata' | 'status_sets' | 'status_definitions' | 'sessions' | 'projects' | 'local_changes' | 'entity_dependencies' | 'comments' | 'change_history' | 'accounts';
+export type EntityClassName = 'Verification' | 'User' | 'Task' | 'TagSet' | 'Tag' | 'StatusSet' | 'StatusDefinition' | 'Session' | 'Project' | 'LocalChanges' | 'EntityDependency' | 'Comment' | 'ChangeHistory' | 'Account';
+export type TableName = 'verifications' | 'users' | 'tasks' | 'tag_sets' | 'tags' | 'status_sets' | 'status_definitions' | 'sessions' | 'projects' | 'local_changes' | 'entity_dependencies' | 'comments' | 'change_history' | 'accounts';
 
-export const entityClassNames = ["Verification","User","Task","TagSet","Tag","SyncMetadata","StatusSet","StatusDefinition","Session","Project","LocalChanges","EntityDependency","Comment","ChangeHistory","Account"] as const;
-export const tableNames = ["verifications","users","tasks","tag_sets","tags","sync_metadata","status_sets","status_definitions","sessions","projects","local_changes","entity_dependencies","comments","change_history","accounts"] as const;
+export const entityClassNames = ["Verification","User","Task","TagSet","Tag","StatusSet","StatusDefinition","Session","Project","LocalChanges","EntityDependency","Comment","ChangeHistory","Account"] as const;
+export const tableNames = ["verifications","users","tasks","tag_sets","tags","status_sets","status_definitions","sessions","projects","local_changes","entity_dependencies","comments","change_history","accounts"] as const;
 
 // Export domain and junction tables for sync
 export const DOMAIN_TABLES = ["tasks","tag_sets","tags","status_sets","status_definitions","projects","comments"] as const;
 export const JUNCTION_TABLE_NAMES = ["task_tags","project_tag_sets","project_status_sets"] as const;
 export const TRACKED_TABLES = [...DOMAIN_TABLES, ...JUNCTION_TABLE_NAMES] as const;
+
+// Table hierarchy for ordered sync
+export const TABLE_HIERARCHY = {
+  "tag_sets": [],
+  "tags": [],
+  "status_sets": [],
+  "status_definitions": [],
+  "projects": [],
+  "tasks": [],
+  "comments": [],
+  "task_tags": ["tasks", "tags"],
+  "project_tag_sets": ["projects", "tag_sets"],
+  "project_status_sets": ["projects", "status_sets"]
+} as const;
+
+/**
+ * Orders tables based on their dependencies.
+ * Tables with no dependencies come first, then tables that depend on them.
+ */
+export function getOrderedTables(tables: readonly string[]): string[] {
+  const visited = new Set<string>();
+  const result: string[] = [];
+  
+  function visit(table: string) {
+    if (visited.has(table)) return;
+    
+    // Get dependencies for this table
+    const deps = TABLE_HIERARCHY[table as keyof typeof TABLE_HIERARCHY] || [];
+    
+    // Visit dependencies first
+    for (const dep of deps) {
+      if (tables.includes(dep)) {
+        visit(dep);
+      }
+    }
+    
+    // Then add this table
+    visited.add(table);
+    result.push(table);
+  }
+  
+  // Visit all tables
+  for (const table of tables) {
+    visit(table);
+  }
+  
+  return result;
+}
+
+// Export ordered tracked tables for initial sync
+export const ORDERED_TRACKED_TABLES = getOrderedTables(TRACKED_TABLES);

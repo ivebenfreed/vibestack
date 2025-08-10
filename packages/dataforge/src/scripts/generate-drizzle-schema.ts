@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mikroOrmConfig from '../mikro-orm.config.js';
+import { extractContextFromComment } from '../utils/entity-context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,13 +48,37 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
   });
   const metadata = orm.getMetadata();
   const tables: DrizzleTableInfo[] = [];
+  const junctionTables = new Map<string, DrizzleTableInfo>(); // Track junction tables
 
   const allMetadata = Object.values(metadata.getAll());
 
+  // First pass: collect all junction table names
+  const junctionTableNames = new Set<string>();
+  for (const meta of allMetadata as any[]) {
+    if (meta.abstract) continue;
+    for (const prop of Object.values(meta.properties) as any[]) {
+      if (prop.kind === 'm:n' && prop.owner) {
+        junctionTableNames.add(prop.pivotTable);
+      }
+    }
+  }
+  
   for (const meta of allMetadata as any[]) {
     // Skip abstract base classes
     if (meta.abstract) continue;
-
+    
+    // Skip client-only entities (Drizzle is server-side only)
+    const entityContext = extractContextFromComment(meta.comment);
+    if (entityContext === 'client-only') {
+      console.log(`⏭️  Skipping client-only entity: ${meta.className}`);
+      continue;
+    }
+    
+    // Skip junction tables (they'll be handled separately)
+    if (junctionTableNames.has(meta.tableName)) {
+      continue;
+    }
+    
     const tableInfo: DrizzleTableInfo = {
       entityName: meta.className,
       tableName: meta.tableName,
@@ -87,23 +112,64 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
             targetEntity: prop.type,
             targetTable: targetTableName,
           });
+          
+          // Extract junction table info if this is the owning side
+          if (prop.owner) {
+            const pivotTableName = prop.pivotTable;
+            const namingStrategy = orm.config.getNamingStrategy();
+            
+            // Get the join column names
+            const joinColumn = prop.joinColumns?.[0] || namingStrategy.joinKeyColumnName(meta.className, 'id');
+            const inverseJoinColumn = prop.inverseJoinColumns?.[0] || namingStrategy.joinKeyColumnName(prop.type, 'id');
+            
+            // Create junction table if not already created
+            if (!junctionTables.has(pivotTableName)) {
+              junctionTables.set(pivotTableName, {
+                entityName: pivotTableName, // Use table name as entity name for junction tables
+                tableName: pivotTableName,
+                columns: [
+                  {
+                    name: joinColumn,
+                    type: 'uuid',
+                    drizzleType: 'uuid',
+                    nullable: false,
+                    primary: false,
+                    unique: false,
+                    default: undefined,
+                  },
+                  {
+                    name: inverseJoinColumn,
+                    type: 'uuid',
+                    drizzleType: 'uuid',
+                    nullable: false,
+                    primary: false,
+                    unique: false,
+                    default: undefined,
+                  }
+                ],
+                relations: [],
+                indexes: [],
+                isBaseDomain: false,
+              });
+            }
+          }
         }
         continue;
       }
       
-      if (!prop.reference || prop.reference === 'scalar' || prop.reference === 'embedded') {
-        tableInfo.columns.push({
-          name: prop.fieldNames?.[0] || prop.name,
-          type: prop.type,
-          drizzleType: mapToDrizzleType(prop.type, prop),
-          nullable: prop.nullable,
-          primary: prop.primary || false,
-          unique: prop.unique || false,
-          default: prop.defaultRaw || prop.default,
-        });
-      } else if (prop.reference === 'm:1' || prop.reference === '1:1') {
+      if (prop.kind === 'm:1' || prop.kind === '1:1') {
         // Add foreign key column
-        const fkColumn = prop.fieldNames?.[0] || `${prop.name}Id`;
+        let fkColumn = prop.fieldNames?.[0] || `${prop.name}Id`;
+        
+        // Fix known incorrect mappings
+        if (meta.className === 'Comment') {
+          if (prop.name === 'task') {
+            fkColumn = 'task_id';
+          } else if (prop.name === 'author') {
+            fkColumn = 'author_id';
+          }
+        }
+        
         const targetMeta = allMetadata.find((m: any) => m.className === prop.type);
         
         tableInfo.columns.push({
@@ -122,6 +188,16 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
           targetEntity: prop.type,
           targetTable: targetMeta?.tableName || prop.type.toLowerCase(),
         });
+      } else if (!prop.reference || prop.reference === 'scalar' || prop.reference === 'embedded') {
+        tableInfo.columns.push({
+          name: prop.fieldNames?.[0] || prop.name,
+          type: prop.type,
+          drizzleType: mapToDrizzleType(prop.type, prop),
+          nullable: prop.nullable,
+          primary: prop.primary || false,
+          unique: prop.unique || false,
+          default: prop.defaultRaw || prop.default,
+        });
       }
     }
 
@@ -139,6 +215,11 @@ async function extractDrizzleSchema(): Promise<DrizzleTableInfo[]> {
     }
 
     tables.push(tableInfo);
+  }
+
+  // Add junction tables to the main tables array
+  for (const junctionTable of junctionTables.values()) {
+    tables.push(junctionTable);
   }
 
   await orm.close();
@@ -234,7 +315,13 @@ import { relations } from 'drizzle-orm';
           break;
         default:
           if (col.drizzleType.startsWith('varchar')) {
-            columnDef += `${col.drizzleType.replace('varchar', 'varchar')}('${col.name}')`;
+            // Extract length from varchar(n) if present
+            const lengthMatch = col.drizzleType.match(/varchar\((\d+)\)/);
+            if (lengthMatch) {
+              columnDef += `varchar('${col.name}', { length: ${lengthMatch[1]} })`;
+            } else {
+              columnDef += `varchar('${col.name}')`;
+            }
           } else {
             columnDef += `text('${col.name}')`;
           }
@@ -316,8 +403,33 @@ import { relations } from 'drizzle-orm';
     for (const rel of table.relations) {
       const targetExportName = rel.targetTable;
       if (rel.type === 'one') {
+        // Find the actual foreign key column name from the table columns
+        let fieldName = `${rel.name}_id`;
+        
+        // Look for the actual foreign key column in the table
+        const fkColumn = table.columns.find(col => 
+          col.name === `${rel.name}_id` || 
+          col.name === `${rel.name}s_id` ||
+          col.name === fieldName
+        );
+        
+        if (fkColumn) {
+          fieldName = fkColumn.name;
+        } else {
+          // Handle special cases for known mappings
+          if (rel.name === 'account' && table.tableName === 'users') {
+            fieldName = 'accounts_id';
+          } else if (rel.name === 'account' && table.tableName === 'sessions') {
+            fieldName = 'accounts_id';
+          } else if (rel.name === 'tagSet') {
+            fieldName = 'tag_set_id';
+          } else if (rel.name === 'statusSet') {
+            fieldName = 'status_set_id';
+          }
+        }
+        
         output += `  ${rel.name}: one(${targetExportName}, {
-    fields: [${exportName}.${rel.name}Id],
+    fields: [${exportName}.${fieldName}],
     references: [${targetExportName}.id],
   }),\n`;
       } else {

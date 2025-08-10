@@ -28,6 +28,14 @@
     "./sync-metadata": {
       "types": "./src/generated/sync-metadata.ts",
       "import": "./src/generated/sync-metadata.ts"
+    },
+    "./dexie-domain": {
+      "types": "./src/generated/dexie-domain/index.ts",
+      "import": "./src/generated/dexie-domain/index.ts"
+    },
+    "./dexie-domain/*": {
+      "types": "./src/generated/dexie-domain/*.ts",
+      "import": "./src/generated/dexie-domain/*.ts"
     }
   },
   "scripts": {

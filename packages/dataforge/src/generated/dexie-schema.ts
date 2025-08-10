@@ -8,7 +8,6 @@ export interface DexieSchema extends Dexie {
   tasks: Table<Entities.Task>;
   tag_sets: Table<Entities.TagSet>;
   tags: Table<Entities.Tag>;
-  sync_metadata: Table<Entities.SyncMetadata>;
   status_sets: Table<Entities.StatusSet>;
   status_definitions: Table<Entities.StatusDefinition>;
   project_tag_sets: Table<Entities.project_tag_sets>;
@@ -17,7 +16,6 @@ export interface DexieSchema extends Dexie {
   local_changes: Table<Entities.LocalChanges>;
   entity_dependencies: Table<Entities.EntityDependency>;
   comments: Table<Entities.Comment>;
-  change_history: Table<Entities.ChangeHistory>;
 }
 
 class VibeStackDatabase extends Dexie implements DexieSchema {
@@ -26,7 +24,6 @@ class VibeStackDatabase extends Dexie implements DexieSchema {
   tasks!: Table<Entities.Task>;
   tag_sets!: Table<Entities.TagSet>;
   tags!: Table<Entities.Tag>;
-  sync_metadata!: Table<Entities.SyncMetadata>;
   status_sets!: Table<Entities.StatusSet>;
   status_definitions!: Table<Entities.StatusDefinition>;
   project_tag_sets!: Table<Entities.project_tag_sets>;
@@ -35,28 +32,63 @@ class VibeStackDatabase extends Dexie implements DexieSchema {
   local_changes!: Table<Entities.LocalChanges>;
   entity_dependencies!: Table<Entities.EntityDependency>;
   comments!: Table<Entities.Comment>;
-  change_history!: Table<Entities.ChangeHistory>;
 
   constructor() {
     super('VibeStackDB');
     
-    this.version(1).stores({
+    // Version 2 - Generated at 2025-08-10T12:49:51.431Z
+    this.version(2).stores({
       users: '++id, &email',
       task_tags: '++Task_owner',
       tasks: '++id, clientId, version, deleted, createdAt, updatedAt',
       tag_sets: '++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt',
       tags: '++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt',
-      sync_metadata: '++id',
       status_sets: '++id, [entityType], clientId, version, deleted, createdAt, updatedAt',
       status_definitions: '++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt',
       project_tag_sets: '++Project_owner',
       project_status_sets: '++Project_owner',
       projects: '++id, clientId, version, deleted, createdAt, updatedAt',
-      local_changes: '++id, [tableName+recordId]',
+      local_changes: '++id, [tableName+recordId], processedSync',
       entity_dependencies: '++id, [toTable+toId], [fromTable+fromId]',
       comments: '++id, clientId, version, deleted, createdAt, updatedAt',
       change_history: '++id, [tableName+timestamp], [lsn]',
     });
+
+    // Version 3 - Generated at 2025-08-10T13:08:02.921Z
+    this.version(3).stores({
+      users: '++id, &email',
+      task_tags: '++Task_owner',
+      tasks: '++id, clientId, version, deleted, createdAt, updatedAt',
+      tag_sets: '++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt',
+      tags: '++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt',
+      status_sets: '++id, [entityType], clientId, version, deleted, createdAt, updatedAt',
+      status_definitions: '++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt',
+      project_tag_sets: '++Project_owner',
+      project_status_sets: '++Project_owner',
+      projects: '++id, clientId, version, deleted, createdAt, updatedAt',
+      local_changes: '++id, table, processed_sync, [table+recordId], processedSync',
+      entity_dependencies: '++id, [toTable+toId], [fromTable+fromId]',
+      comments: '++id, clientId, version, deleted, createdAt, updatedAt',
+      change_history: '++id, [tableName+timestamp], [lsn]',
+    });
+
+    // Version 4 - Generated at 2025-08-10T13:34:22.336Z
+    this.version(4).stores({
+      users: '++id, &email',
+      task_tags: '++Task_owner',
+      tasks: '++id, clientId, version, deleted, createdAt, updatedAt',
+      tag_sets: '++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt',
+      tags: '++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt',
+      status_sets: '++id, [entityType], clientId, version, deleted, createdAt, updatedAt',
+      status_definitions: '++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt',
+      project_tag_sets: '++Project_owner',
+      project_status_sets: '++Project_owner',
+      projects: '++id, clientId, version, deleted, createdAt, updatedAt',
+      local_changes: '++id, table, processed_sync, [table+recordId], processedSync',
+      entity_dependencies: '++id, [toTable+toId], [fromTable+fromId]',
+      comments: '++id, clientId, version, deleted, createdAt, updatedAt',
+    });
+
   }
 }
 
@@ -70,7 +102,6 @@ export async function clearDatabase() {
     'tasks',
     'tag_sets',
     'tags',
-    'sync_metadata',
     'status_sets',
     'status_definitions',
     'project_tag_sets',
@@ -79,7 +110,6 @@ export async function clearDatabase() {
     'local_changes',
     'entity_dependencies',
     'comments',
-    'change_history',
   ];
   
   for (const tableName of tables) {
@@ -99,7 +129,6 @@ export const dexieTableNames = [
   'tasks',
   'tag_sets',
   'tags',
-  'sync_metadata',
   'status_sets',
   'status_definitions',
   'project_tag_sets',
@@ -108,7 +137,73 @@ export const dexieTableNames = [
   'local_changes',
   'entity_dependencies',
   'comments',
-  'change_history',
 ] as const;
 
 export type DexieTableName = typeof dexieTableNames[number];
+
+// Re-export commonly used constants from client-entities
+export { 
+  CLIENT_DOMAIN_TABLES,
+  CLIENT_DOMAIN_TABLE_HIERARCHY,
+  CLIENT_JUNCTION_TABLE_MAPPING 
+} from './client-entities.js';
+
+// Dynamically generated table lists based on actual metadata
+export const ENTITY_TABLES = [
+  'users',
+  'task_tags',
+  'tasks',
+  'tag_sets',
+  'tags',
+  'status_sets',
+  'status_definitions',
+  'project_tag_sets',
+  'project_status_sets',
+  'projects',
+  'local_changes',
+  'entity_dependencies',
+  'comments'
+] as const;
+
+// System tables (client-side system tables like local_changes)
+export const SYSTEM_TABLES = [
+  'local_changes'
+] as const;
+
+// Domain tables (non-system entity tables)
+export const DOMAIN_TABLES = [
+  'users',
+  'task_tags',
+  'tasks',
+  'tag_sets',
+  'tags',
+  'status_sets',
+  'status_definitions',
+  'project_tag_sets',
+  'project_status_sets',
+  'projects',
+  'entity_dependencies',
+  'comments'
+] as const;
+
+// Junction tables (many-to-many relationships)
+export const JUNCTION_TABLES = [
+
+] as const;
+
+// Mapping from Dexie table names to database table names
+export const DEXIE_TO_DB_TABLE_MAP = {
+  users: 'users',
+  task_tags: 'task_tags',
+  tasks: 'tasks',
+  tag_sets: 'tag_sets',
+  tags: 'tags',
+  status_sets: 'status_sets',
+  status_definitions: 'status_definitions',
+  project_tag_sets: 'project_tag_sets',
+  project_status_sets: 'project_status_sets',
+  projects: 'projects',
+  local_changes: 'local_changes',
+  entity_dependencies: 'entity_dependencies',
+  comments: 'comments'
+} as const;

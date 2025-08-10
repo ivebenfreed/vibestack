@@ -18,7 +18,7 @@ export interface TagSetUpdateInput {
   projects?: any;
 }
 
-export class TagSetDexieService {
+export class TagsetDexieService {
   async create(data: Partial<TagSet>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -65,4 +65,4 @@ export class TagSetDexieService {
   }
 }
 
-export const tagSetDexieService = new TagSetDexieService();
+export const tagSetDexieService = new TagsetDexieService();

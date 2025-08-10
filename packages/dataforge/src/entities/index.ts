@@ -7,7 +7,6 @@ export * from './Project.js';
 export * from './Task.js';
 export * from './Comment.js';
 export * from './LocalChanges.js';
-export * from './SyncMetadata.js';
 export * from './EntityDependency.js';
 export * from './Tag.js';
 export * from './TagSet.js';

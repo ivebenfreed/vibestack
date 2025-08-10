@@ -1,7 +1,7 @@
 import { Entity, Property, Index, Unique } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 
-@Entity()
+@Entity() // Core domain table for tracking entity relationships
 @Index({ properties: ['fromTable', 'fromId'] })
 @Index({ properties: ['toTable', 'toId'] })
 @Unique({ properties: ['fromTable', 'fromId', 'toTable', 'toId', 'dependencyType'] })

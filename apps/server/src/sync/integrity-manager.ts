@@ -14,6 +14,7 @@ import { getLatestChangeHistoryLSN, compareLSN } from '../lib/sync-common';
 import type { MinimalContext } from '../types/hono';
 import type { WebSocketHandler } from './types';
 import type { TableChange } from '@repo/sync-types';
+import { DOMAIN_TABLES } from '@repo/dataforge/sync-metadata';
 
 const MODULE_NAME = 'IntegrityManager';
 
@@ -68,8 +69,8 @@ export class IntegrityManager {
   private context: MinimalContext;
   private messageHandler: WebSocketHandler;
   
-  // Tables to validate for integrity
-  private readonly CRITICAL_TABLES = ['users', 'projects', 'tasks', 'comments'];
+  // Tables to validate for integrity (use all domain tables from dataforge)
+  private readonly CRITICAL_TABLES = DOMAIN_TABLES;
   
   // Thresholds for determining action
   private readonly RESET_THRESHOLDS = {

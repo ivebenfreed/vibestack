@@ -37,12 +37,7 @@ export const users = pgTable('users', {
   email_verified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
   is_super_admin: boolean('is_super_admin').default(false).notNull(),
-  accounts_id: text('accounts_id')
-});
-
-export const task_tags = pgTable('task_tags', {
-  tasks_id: text('tasks_id'),
-  tags_id: text('tags_id')
+  accounts_id: uuid('accounts_id')
 });
 
 export const tasks = pgTable('tasks', {
@@ -60,8 +55,8 @@ export const tasks = pgTable('tasks', {
   time_range: text('time_range'),
   estimated_duration: text('estimated_duration'),
   legacy_tags: text('legacy_tags'),
-  project_id: text('project_id'),
-  assignee_id: text('assignee_id')
+  project_id: uuid('project_id'),
+  assignee_id: uuid('assignee_id')
 });
 
 export const tag_sets = pgTable('tag_sets', {
@@ -98,21 +93,12 @@ export const tags = pgTable('tags', {
   usage_count: integer('usage_count').default(0).notNull(),
   last_used_at: text('last_used_at'),
   metadata: text('metadata').notNull(),
-  tag_set_id: text('tag_set_id').notNull(),
-  parent_id: text('parent_id')
+  tag_set_id: uuid('tag_set_id').notNull(),
+  parent_id: uuid('parent_id')
 }, (table) => ({
   idx_tags_tagSet_sortOrder: index('idx_tags_tagSet_sortOrder').on(table.tag_set_id, table.sort_order),
   idx_tags_slug: index('idx_tags_slug').on(table.slug),
 }));
-
-export const sync_metadata = pgTable('sync_metadata', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
-  table_name: text('table_name').notNull(),
-  last_synced_version: text('last_synced_version').notNull(),
-  last_synced_at: timestamp('last_synced_at', { mode: 'date' })
-});
 
 export const status_sets = pgTable('status_sets', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -148,7 +134,7 @@ export const status_definitions = pgTable('status_definitions', {
   allowed_transitions: text('allowed_transitions'),
   auto_transition_days: integer('auto_transition_days'),
   metadata: text('metadata').notNull(),
-  status_set_id: text('status_set_id').notNull()
+  status_set_id: uuid('status_set_id').notNull()
 }, (table) => ({
   idx_status_definitions_name: index('idx_status_definitions_name').on(table.name),
   idx_status_definitions_statusSet_sortOrder: index('idx_status_definitions_statusSet_sortOrder').on(table.status_set_id, table.sort_order),
@@ -160,17 +146,7 @@ export const sessions = pgTable('sessions', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
   session_token: text('session_token').notNull(),
   expires_at: timestamp('expires_at', { mode: 'date' }).notNull(),
-  accounts_id: text('accounts_id').notNull()
-});
-
-export const project_tag_sets = pgTable('project_tag_sets', {
-  projects_id: text('projects_id'),
-  tag_sets_id: text('tag_sets_id')
-});
-
-export const project_status_sets = pgTable('project_status_sets', {
-  projects_id: text('projects_id'),
-  status_sets_id: text('status_sets_id')
+  accounts_id: uuid('accounts_id').notNull()
 });
 
 export const projects = pgTable('projects', {
@@ -181,22 +157,8 @@ export const projects = pgTable('projects', {
   name: text('name').notNull(),
   description: text('description'),
   status: text('status').notNull(),
-  owner_id: text('owner_id')
+  owner_id: uuid('owner_id')
 });
-
-export const local_changes = pgTable('local_changes', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
-  table_name: text('table_name').notNull(),
-  record_id: text('record_id').notNull(),
-  operation_type: text('operation_type').notNull(),
-  data: text('data').notNull(),
-  client_sequence: text('client_sequence').notNull(),
-  loop_protection: integer('loop_protection').default(0).notNull()
-}, (table) => ({
-  idx_local_changes_tableName_recordId: index('idx_local_changes_tableName_recordId').on(table.table_name, table.record_id),
-}));
 
 export const entity_dependencies = pgTable('entity_dependencies', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -219,8 +181,8 @@ export const comments = pgTable('comments', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
   client_id: uuid('client_id'),
   content: text('content').notNull(),
-  tasks_id: text('tasks_id').notNull(),
-  authors_id: text('authors_id')
+  task_id: uuid('task_id').notNull(),
+  author_id: uuid('author_id')
 });
 
 export const change_history = pgTable('change_history', {
@@ -252,17 +214,44 @@ export const accounts = pgTable('accounts', {
   session_state: text('session_state')
 });
 
+export const task_tags = pgTable('task_tags', {
+  task_id: uuid('task_id').notNull(),
+  tag_id: uuid('tag_id').notNull()
+});
+
+export const project_tag_sets = pgTable('project_tag_sets', {
+  project_id: uuid('project_id').notNull(),
+  tag_set_id: uuid('tag_set_id').notNull()
+});
+
+export const project_status_sets = pgTable('project_status_sets', {
+  project_id: uuid('project_id').notNull(),
+  status_set_id: uuid('status_set_id').notNull()
+});
+
 // ============================================
 // Relations
 // ============================================
 
 export const usersRelations = relations(users, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [users.accounts_id],
+    references: [accounts.id],
+  }),
   assignedTasks: many(tasks),
   comments: many(comments),
   ownedProjects: many(projects),
 }));
 
 export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [tasks.project_id],
+    references: [projects.id],
+  }),
+  assignee: one(users, {
+    fields: [tasks.assignee_id],
+    references: [users.id],
+  }),
   comments: many(comments),
   tags: many(tags),
 }));
@@ -273,6 +262,14 @@ export const tagSetsRelations = relations(tag_sets, ({ one, many }) => ({
 }));
 
 export const tagsRelations = relations(tags, ({ one, many }) => ({
+  tagSet: one(tag_sets, {
+    fields: [tags.tag_set_id],
+    references: [tag_sets.id],
+  }),
+  parent: one(tags, {
+    fields: [tags.parent_id],
+    references: [tags.id],
+  }),
   children: many(tags),
   tasks: many(tasks),
 }));
@@ -282,10 +279,39 @@ export const statusSetsRelations = relations(status_sets, ({ one, many }) => ({
   projects: many(projects),
 }));
 
+export const statusDefinitionsRelations = relations(status_definitions, ({ one, many }) => ({
+  statusSet: one(status_sets, {
+    fields: [status_definitions.status_set_id],
+    references: [status_sets.id],
+  }),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [sessions.accounts_id],
+    references: [accounts.id],
+  }),
+}));
+
 export const projectsRelations = relations(projects, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [projects.owner_id],
+    references: [users.id],
+  }),
   tasks: many(tasks),
   tagSets: many(tag_sets),
   statusSets: many(status_sets),
+}));
+
+export const commentsRelations = relations(comments, ({ one, many }) => ({
+  task: one(tasks, {
+    fields: [comments.task_id],
+    references: [tasks.id],
+  }),
+  author: one(users, {
+    fields: [comments.author_id],
+    references: [users.id],
+  }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -301,28 +327,29 @@ export const schema = {
   verifications,
   users,
   usersRelations,
-  task_tags,
   tasks,
   tasksRelations,
   tag_sets,
   tagSetsRelations,
   tags,
   tagsRelations,
-  sync_metadata,
   status_sets,
   statusSetsRelations,
   status_definitions,
+  statusDefinitionsRelations,
   sessions,
-  project_tag_sets,
-  project_status_sets,
+  sessionsRelations,
   projects,
   projectsRelations,
-  local_changes,
   entity_dependencies,
   comments,
+  commentsRelations,
   change_history,
   accounts,
   accountsRelations,
+  task_tags,
+  project_tag_sets,
+  project_status_sets,
 };
 
 // ============================================
@@ -333,30 +360,20 @@ export type Verification = typeof verifications.$inferSelect;
 export type NewVerification = typeof verifications.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
-export type task_tags = typeof task_tags.$inferSelect;
-export type Newtask_tags = typeof task_tags.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
 export type TagSet = typeof tag_sets.$inferSelect;
 export type NewTagSet = typeof tag_sets.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
-export type SyncMetadata = typeof sync_metadata.$inferSelect;
-export type NewSyncMetadata = typeof sync_metadata.$inferInsert;
 export type StatusSet = typeof status_sets.$inferSelect;
 export type NewStatusSet = typeof status_sets.$inferInsert;
 export type StatusDefinition = typeof status_definitions.$inferSelect;
 export type NewStatusDefinition = typeof status_definitions.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
-export type project_tag_sets = typeof project_tag_sets.$inferSelect;
-export type Newproject_tag_sets = typeof project_tag_sets.$inferInsert;
-export type project_status_sets = typeof project_status_sets.$inferSelect;
-export type Newproject_status_sets = typeof project_status_sets.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
-export type LocalChanges = typeof local_changes.$inferSelect;
-export type NewLocalChanges = typeof local_changes.$inferInsert;
 export type EntityDependency = typeof entity_dependencies.$inferSelect;
 export type NewEntityDependency = typeof entity_dependencies.$inferInsert;
 export type Comment = typeof comments.$inferSelect;
@@ -365,3 +382,9 @@ export type ChangeHistory = typeof change_history.$inferSelect;
 export type NewChangeHistory = typeof change_history.$inferInsert;
 export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
+export type task_tags = typeof task_tags.$inferSelect;
+export type Newtask_tags = typeof task_tags.$inferInsert;
+export type project_tag_sets = typeof project_tag_sets.$inferSelect;
+export type Newproject_tag_sets = typeof project_tag_sets.$inferInsert;
+export type project_status_sets = typeof project_status_sets.$inferSelect;
+export type Newproject_status_sets = typeof project_status_sets.$inferInsert;

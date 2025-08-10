@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mikroOrmConfig from '../mikro-orm.config.js';
+import { extractContextFromComment } from '../utils/entity-context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,8 +32,15 @@ async function extractServiceInfo(): Promise<EntityServiceInfo[]> {
   const allMetadata = Object.values(metadata.getAll());
 
   for (const meta of allMetadata as any[]) {
-    // Skip abstract base classes and system entities
-    if (meta.abstract || ['Account', 'Session', 'Verification'].includes(meta.className)) {
+    // Skip abstract base classes
+    if (meta.abstract) {
+      continue;
+    }
+    
+    // Skip server-only entities (Dexie services are client-side only)
+    const entityContext = extractContextFromComment(meta.comment);
+    if (entityContext === 'server-only') {
+      console.log(`⏭️  Skipping server-only entity: ${meta.className}`);
       continue;
     }
 
@@ -85,6 +93,11 @@ function mapReferenceToRelationType(reference: string): 'ManyToOne' | 'OneToMany
 function generateServiceFile(service: EntityServiceInfo): string {
   const lowerName = service.entityName.charAt(0).toLowerCase() + service.entityName.slice(1);
   
+  // Convert snake_case entity names to PascalCase for class names
+  const className = service.entityName.split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join('') + 'DexieService';
+  
   let output = `// Generated Dexie domain service for ${service.entityName}
 import { db } from '../dexie-schema.js';
 import type { ${service.entityName} } from '../client-entities.js';
@@ -96,7 +109,7 @@ export interface ${service.entityName}UpdateInput {
     .join('\n  ')}
 }
 
-export class ${service.entityName}DexieService {
+export class ${className} {
   async create(data: Partial<${service.entityName}>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -181,7 +194,7 @@ export class ${service.entityName}DexieService {
 
   output += `}
 
-export const ${lowerName}DexieService = new ${service.entityName}DexieService();
+export const ${lowerName}DexieService = new ${className}();
 `;
 
   return output;

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres-${PR_NUMBER:-0}:
+    image: postgres:17
+    container_name: vibestack-postgres-pr-${PR_NUMBER:-0}
+    command: '-d 1'  # Enable debug logging
+    volumes:
+      - db_data_pr_${PR_NUMBER:-0}:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=vibestack_pr_${PR_NUMBER:-0}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neon-proxy-${PR_NUMBER:-0}:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    container_name: vibestack-neon-proxy-pr-${PR_NUMBER:-0}
+    environment:
+      - PG_CONNECTION_STRING=postgres://postgres:postgres@postgres-${PR_NUMBER:-0}:5432/vibestack_pr_${PR_NUMBER:-0}
+    ports:
+      - "${PROXY_PORT:-4444}:4444"
+    depends_on:
+      postgres-${PR_NUMBER:-0}:
+        condition: service_healthy
+
+volumes:
+  db_data_pr_${PR_NUMBER:-0}:
+    name: vibestack_db_pr_${PR_NUMBER:-0}

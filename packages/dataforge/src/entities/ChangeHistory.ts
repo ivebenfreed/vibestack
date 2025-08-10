@@ -1,11 +1,12 @@
-import { Entity, Property, Index } from '@mikro-orm/core';
+import { Property, Index } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
+import { ServerSystemEntity } from '../utils/entity-context.js';
 
 /**
  * ChangeHistory entity for tracking changes for catchup sync
  * Server-only entity - not replicated to clients
  */
-@Entity({ tableName: 'change_history' })
+@ServerSystemEntity({ tableName: 'change_history' }) // Server-side system table for change tracking
 @Index({ properties: ['lsn'] })
 @Index({ properties: ['tableName', 'timestamp'] })
 export class ChangeHistory extends BaseSystemEntity {

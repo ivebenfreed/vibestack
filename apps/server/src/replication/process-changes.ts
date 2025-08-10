@@ -255,11 +255,12 @@ export function shouldTrackTable(tableName: string): boolean {
 // Static list of tracked tables to be logged once on module initialization
 // ✨ NEW: Now includes both domain tables and junction tables
 const TRACKED_TABLES = SERVER_TRACKED_TABLES.join(', ');
+const junctionTableCount = Object.keys(SERVER_JUNCTION_TABLE_MAPPING).length;
 replicationLogger.info('Replication tracking tables', { 
   count: SERVER_TRACKED_TABLES.length,
   tables: TRACKED_TABLES,
-  domainTableCount: SERVER_DOMAIN_TABLES.length,
-  junctionTableCount: SERVER_TRACKED_TABLES.length - SERVER_DOMAIN_TABLES.length
+  domainTableCount: SERVER_DOMAIN_TABLES.length - junctionTableCount,
+  junctionTableCount: junctionTableCount
 }, MODULE_NAME);
 
 /**

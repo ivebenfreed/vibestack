@@ -110,7 +110,7 @@ export class DexieOutgoingChangeService {
       while (hasMore) {
         // Get next batch of pending changes that haven't been sent too many times
         // AND are not currently being processed (in-flight)
-        const pendingChanges = await db.localChanges
+        const pendingChanges = await db.local_changes
           .where('processedSync')
           .equals(0)
           .filter(change => {
@@ -151,7 +151,7 @@ export class DexieOutgoingChangeService {
         });
         
         // Update send attempts before sending
-        await db.localChanges
+        await db.local_changes
           .where('id')
           .anyOf(changeIds)
           .modify(change => {
@@ -181,7 +181,7 @@ export class DexieOutgoingChangeService {
               changeIds.forEach(id => this.inFlightChangeIds.delete(id));
               
               // Update error in database
-              await db.localChanges
+              await db.local_changes
                 .where('id')
                 .anyOf(changeIds)
                 .modify({ lastError: 'Send failed' });
@@ -193,7 +193,7 @@ export class DexieOutgoingChangeService {
             console.error('[DexieOutgoingChangeService] Error sending changes:', error);
             
             // Update error in database
-            await db.localChanges
+            await db.local_changes
               .where('id')
               .anyOf(changeIds)
               .modify({ lastError: (error as Error).message || 'Unknown error' });
@@ -272,7 +272,7 @@ export class DexieOutgoingChangeService {
     changeIds.forEach(id => this.inFlightChangeIds.delete(id));
     
     // Mark as processed in database - direct lookup by change ID
-    const modifiedCount = await db.localChanges
+    const modifiedCount = await db.local_changes
       .where('id')
       .anyOf(changeIds)
       .modify({ processedSync: 1 });
@@ -299,7 +299,7 @@ export class DexieOutgoingChangeService {
     }
     
     // Find all unprocessed changes for these record IDs
-    const changes = await db.localChanges
+    const changes = await db.local_changes
       .where('processedSync')
       .equals(0)
       .toArray();
@@ -317,7 +317,7 @@ export class DexieOutgoingChangeService {
       changeIds.forEach(id => this.inFlightChangeIds.delete(id));
       
       // Mark as processed in database
-      await db.localChanges
+      await db.local_changes
         .where('id')
         .anyOf(changeIds)
         .modify({ processedSync: 1 });

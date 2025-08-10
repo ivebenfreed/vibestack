@@ -176,10 +176,14 @@ export class GenericSyncEngine {
     
     if (metadata.features.hasClientId) {
       // Use client_id for conflict resolution
+      console.log('DEBUG: Table keys:', Object.keys(table));
+      console.log('DEBUG: Looking for column:', metadata.columns.clientId);
+      const clientIdColumn = table[metadata.columns.clientId];
+      console.log('DEBUG: ClientId column:', clientIdColumn);
       const existingRecord = await this.db
         .select()
         .from(table)
-        .where(eq(table.client_id, data.client_id))
+        .where(eq(clientIdColumn, data[metadata.columns.clientId]))
         .limit(1);
 
       if (existingRecord.length > 0) {
@@ -187,17 +191,18 @@ export class GenericSyncEngine {
         await this.db
           .update(table)
           .set(data)
-          .where(eq(table.client_id, data.client_id));
+          .where(eq(clientIdColumn, data[metadata.columns.clientId]));
       } else {
         // Insert new record
         await this.db.insert(table).values(data);
       }
     } else {
       // Use id for conflict resolution
+      const idColumn = table[metadata.columns.id];
       const existingRecord = await this.db
         .select()
         .from(table)
-        .where(eq(table.id, data.id))
+        .where(eq(idColumn, data[metadata.columns.id]))
         .limit(1);
 
       if (existingRecord.length > 0) {
@@ -205,7 +210,7 @@ export class GenericSyncEngine {
         await this.db
           .update(table)
           .set(data)
-          .where(eq(table.id, data.id));
+          .where(eq(idColumn, data[metadata.columns.id]));
       } else {
         // Insert new record
         await this.db.insert(table).values(data);
@@ -223,32 +228,35 @@ export class GenericSyncEngine {
   ): Promise<void> {
     if (metadata.features.hasSoftDelete) {
       // Soft delete - just mark as deleted
-      const updateData = {
-        deleted: true,
-        updated_at: new Date()
-      };
+      const updateData: Record<string, any> = {};
+      updateData[metadata.columns.deleted] = true;
+      updateData[metadata.columns.updatedAt] = new Date();
       
-      if (metadata.features.hasClientId && change.data.client_id) {
+      if (metadata.features.hasClientId && change.data[metadata.columns.clientId]) {
+        const clientIdColumn = table[metadata.columns.clientId];
         await this.db
           .update(table)
           .set(updateData)
-          .where(eq(table.client_id, change.data.client_id));
+          .where(eq(clientIdColumn, change.data[metadata.columns.clientId]));
       } else {
+        const idColumn = table[metadata.columns.id];
         await this.db
           .update(table)
           .set(updateData)
-          .where(eq(table.id, change.recordId));
+          .where(eq(idColumn, change.recordId));
       }
     } else {
       // Hard delete
-      if (metadata.features.hasClientId && change.data.client_id) {
+      if (metadata.features.hasClientId && change.data[metadata.columns.clientId]) {
+        const clientIdColumn = table[metadata.columns.clientId];
         await this.db
           .delete(table)
-          .where(eq(table.client_id, change.data.client_id));
+          .where(eq(clientIdColumn, change.data[metadata.columns.clientId]));
       } else {
+        const idColumn = table[metadata.columns.id];
         await this.db
           .delete(table)
-          .where(eq(table.id, change.recordId));
+          .where(eq(idColumn, change.recordId));
       }
     }
   }
@@ -308,47 +316,57 @@ export class GenericSyncEngine {
     lastSyncTimestamp: Date,
     tables: string[] = []
   ): Promise<Record<string, any[]>> {
+    console.log('DEBUG: getChangesForClient called');
     const changes: Record<string, any[]> = {};
     
-    // Use provided tables or all tracked tables
+    // Use provided tables (should be TRACKED_TABLES)
     const tablesToSync = tables.length > 0 ? tables : this.getTrackedTables();
+    console.log('DEBUG: Tables to sync:', tablesToSync);
     
     for (const tableName of tablesToSync) {
-      const metadata = this.getMetadataByTableName(tableName);
-      if (!metadata || !metadata.syncable) {
-        continue;
-      }
+      console.log('DEBUG: Processing table:', tableName);
       
-      const table = this.getTableFromSchema(tableName);
+      // Get table from schema
+      const table = this.schema[tableName];
       if (!table) {
+        console.log('DEBUG: Table not found in schema:', tableName);
         continue;
       }
       
-      // Get records updated since last sync
-      const records = await this.db
-        .select()
-        .from(table)
-        .where(gt(table.updated_at, lastSyncTimestamp))
-        .limit(1000); // Paginate for large datasets
+      // Check if this is a junction table
+      const isJunctionTable = this.junctionTables.some(jt => jt.tableName === tableName);
       
-      if (records.length > 0) {
-        changes[tableName] = records;
-      }
-    }
-    
-    // Also get junction table changes
-    for (const junctionTable of this.junctionTables) {
-      // Get junction table - direct lookup
-      const table = this.schema[junctionTable.tableName];
-      if (!table) {
-        continue;
-      }
-      
-      // Junction tables might not have updatedAt, so we need a different strategy
-      // This is simplified - in production you'd track junction table changes separately
-      const records = await this.db.select().from(table);
-      if (records.length > 0) {
-        changes[junctionTable.tableName] = records;
+      if (isJunctionTable) {
+        // Junction tables don't have updatedAt, so we get all records
+        // In production, you'd track changes differently
+        const records = await this.db.select().from(table);
+        console.log(`DEBUG: Found ${records.length} records in junction table ${tableName}`);
+        if (records.length > 0) {
+          changes[tableName] = records;
+        }
+      } else {
+        // Regular tables have updated_at column for filtering
+        const updatedAtColumn = table.updated_at;
+        if (!updatedAtColumn) {
+          console.log('DEBUG: No updated_at column found for table:', tableName);
+          // Get all records if no updated_at column
+          const records = await this.db.select().from(table);
+          if (records.length > 0) {
+            changes[tableName] = records;
+          }
+        } else {
+          // Get records updated since last sync
+          const records = await this.db
+            .select()
+            .from(table)
+            .where(gt(updatedAtColumn, lastSyncTimestamp))
+            .limit(1000); // Paginate for large datasets
+          
+          console.log(`DEBUG: Found ${records.length} records in ${tableName} newer than ${lastSyncTimestamp.toISOString()}`);
+          if (records.length > 0) {
+            changes[tableName] = records;
+          }
+        }
       }
     }
     
@@ -398,19 +416,18 @@ export class GenericSyncEngine {
    * Update sync metadata after successful sync
    */
   async updateSyncMetadata(clientId: string, syncVersion: string): Promise<void> {
-    const syncMetadataTable = this.schema.syncMetadata;
+    const syncMetadataTable = this.schema.sync_metadata;
     if (!syncMetadataTable) {
       console.warn('No sync_metadata table in schema');
       return;
     }
     
+    console.log('DEBUG: Updating sync metadata for client:', clientId, 'with version:', syncVersion);
+    
     await this.db.insert(syncMetadataTable).values({
-      id: crypto.randomUUID(),
       table_name: 'all', // Could track per-table sync status
       last_synced_version: syncVersion,
-      last_synced_at: new Date(),
-      created_at: new Date(),
-      updated_at: new Date()
+      last_synced_at: new Date()
     });
   }
 }

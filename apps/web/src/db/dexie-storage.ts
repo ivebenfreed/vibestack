@@ -5,7 +5,7 @@
  * replacing the PGLite-based storage utilities with Dexie equivalents.
  */
 
-import { db, CLIENT_DOMAIN_TABLES, ENTITY_TABLES, JUNCTION_TABLES } from '@repo/dataforge/dexie-schema';
+import { db, CLIENT_DOMAIN_TABLES, ENTITY_TABLES, JUNCTION_TABLES, SYSTEM_TABLES } from '@repo/dataforge/dexie-schema';
 import type { Table } from 'dexie';
 
 /**
@@ -57,7 +57,7 @@ export async function clearDomainDataOnly(): Promise<boolean> {
       }
     }
     
-    // Then clear domain tables (CLIENT_DOMAIN_TABLES excludes system tables like syncMetadata)
+    // Then clear domain tables (CLIENT_DOMAIN_TABLES excludes system tables)
     console.log('[Dexie Storage] Clearing domain tables:', CLIENT_DOMAIN_TABLES);
     for (const tableName of CLIENT_DOMAIN_TABLES) {
       const table = db[tableName] as Table;
@@ -67,9 +67,8 @@ export async function clearDomainDataOnly(): Promise<boolean> {
       }
     }
     
-    // System tables (syncMetadata, localChanges, clientMigrationStatus) are preserved
-    const systemTables = ['syncMetadata', 'localChanges', 'clientMigrationStatus'];
-    console.log('[Dexie Storage] System tables preserved:', systemTables);
+    // System tables are preserved (dynamically from dataforge)
+    console.log('[Dexie Storage] System tables preserved:', SYSTEM_TABLES);
     console.log('[Dexie Storage] Domain data cleared successfully while preserving system tables');
     return true;
   } catch (error) {
@@ -181,8 +180,8 @@ export async function getDetailedDatabaseStats(): Promise<{
       total: 0
     };
     
-    // Define system tables (these are in ENTITY_TABLES but not in CLIENT_DOMAIN_TABLES)
-    const systemTables = ['syncMetadata', 'localChanges', 'clientMigrationStatus'];
+    // System tables from dataforge generation
+    const systemTables = SYSTEM_TABLES;
     
     // Count domain tables
     for (const tableName of CLIENT_DOMAIN_TABLES) {

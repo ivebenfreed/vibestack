@@ -771,10 +771,6 @@ export const syncMachineV3 = setup({
           ]
         },
         
-        LSN_UPDATE: {
-          actions: ['updateLSN', 'saveOwnState']
-        },
-        
         WS_DISCONNECTED: {
           target: 'reconnecting',
           actions: [
@@ -838,10 +834,6 @@ export const syncMachineV3 = setup({
             assign({ syncPhase: 'validating' as const }),
             () => console.log('[SyncMachineV3] ✅ Catchup sync completed - validating before live')
           ]
-        },
-        
-        LSN_UPDATE: {
-          actions: ['updateLSN', 'saveOwnState']
         },
         
         WS_DISCONNECTED: {
