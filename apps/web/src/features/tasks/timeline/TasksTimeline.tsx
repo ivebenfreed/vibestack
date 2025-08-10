@@ -31,9 +31,6 @@ import {
 // Import domain atoms for real data
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { tasksAtom } from '@/domain-xstate/task'
-import { projectsAtom } from '@/domain-xstate/project'
-import { usersAtom } from '@/domain-xstate/user'
 import type { Task } from '@repo/dataforge/client-entities'
 
 // Define custom node types

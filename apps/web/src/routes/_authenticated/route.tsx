@@ -3,9 +3,6 @@ import { useEffect } from 'react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
-import { projectUtils } from '@/domain-xstate/project'
-import { taskUtils } from '@/domain-xstate/task'
-import { userUtils } from '@/domain-xstate/user'
 import { Project, Task, User } from '@repo/dataforge/client-entities'
 import { getDefaultStore } from 'jotai'
 

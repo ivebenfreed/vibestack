@@ -8,7 +8,6 @@ import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
 import { useProjects } from '../context/projects-context';
 import { Link } from '@tanstack/react-router';
 import { useSelector } from '@xstate/store/react';
-import { projectsAtom } from '@/domain-xstate/project';
 import { shallowEqual } from '@xstate/store';
 
 interface ProjectCardProps {

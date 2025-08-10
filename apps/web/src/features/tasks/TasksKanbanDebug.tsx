@@ -4,7 +4,6 @@
 
 import React from 'react'
 import { useSelector } from '@xstate/store/react'
-import { tasksAtom } from '@/domain-xstate/task'
 import { shallowEqual } from '@xstate/store'
 import { Task, TaskStatus } from '@repo/dataforge/client-entities'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
