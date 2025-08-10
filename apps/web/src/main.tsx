@@ -1,17 +1,13 @@
-// TypeORM patches no longer needed with Dexie
-// import './db/newtypeorm/applyPatches';
-
-// Reflect metadata no longer needed with Dexie
-// import "reflect-metadata"; // Required for TypeORM decorators
+// Dexie uses native IndexedDB, no patches or decorators needed
 
 // Debug utilities (only in development)
 if (process.env.NODE_ENV === 'development') {
-  import('./debug/manual-integrity-reset');
+  // Commented out - file needs to be updated for new architecture
+  // import('./debug/manual-integrity-reset');
   import('./test-utils/sync-test-helpers');
 }
 
-// Dexie uses native IndexedDB, which is more stable than PGLite
-// No special error handling needed for Dexie
+// Dexie uses native IndexedDB for local persistence
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'

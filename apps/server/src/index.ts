@@ -1,7 +1,7 @@
 /// <reference path="../worker-configuration.d.ts" />
 
 // Set up node polyfills first
-import 'reflect-metadata';
+// reflect-metadata no longer needed with Drizzle
 
 // Import other dependencies
 import { Hono, Context } from 'hono';

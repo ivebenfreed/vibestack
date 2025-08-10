@@ -1,5 +1,4 @@
 import type { TableChange, RelationshipUpdate } from '@repo/sync-types';
-import type { ChangeHistory } from '@repo/dataforge/server-entities';
 import { replicationLogger } from '../middleware/logger';
 import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';
@@ -17,8 +16,10 @@ import {
   SERVER_JUNCTION_TABLE_MAPPING
 } from '@repo/dataforge/server-entities';
 import type { Env } from '../types/env';
-import { NeonService } from '../lib/neon-orm/neon-service';
-import { RepositoryContainer } from '../domains/RepositoryContainer';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import { change_history } from '@repo/dataforge/drizzle-schema';
+import { eq, and, or, inArray, sql as drizzleSql } from 'drizzle-orm';
 
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'process-changes';
@@ -591,36 +592,17 @@ function convertSnakeToCamelCase(obj: Record<string, unknown>): Record<string, u
 }
 
 /**
- * Create a RepositoryContainer instance from context
- * Helper function to initialize repository for replication operations
+ * Create a Drizzle database instance from context
+ * Helper function to initialize Drizzle for replication operations
  */
-function createRepositoryContainer(context: MinimalContext): RepositoryContainer {
-  // Create a mock Hono context from MinimalContext (similar to EntityOperations pattern)
-  const stableRequestId = `repl-${context.env.DATABASE_URL?.slice(-10) || 'default'}`;
+function createDrizzleDb(context: MinimalContext) {
+  const databaseUrl = context.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required');
+  }
   
-  const honoContext = {
-    req: { 
-      header: (name: string) => {
-        if (name === 'cf-request-id') {
-          return stableRequestId;
-        }
-        return undefined;
-      }
-    },
-    env: context.env,
-    finalized: false,
-    error: null,
-    get executionCtx() { return null; },
-    get event() { return null; },
-    var: {},
-    get: (key: string) => undefined,
-    set: (key: string, value: any) => {},
-    json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
-    text: (text: string) => Promise.resolve(new Response(text))
-  } as unknown as any;
-  
-  const neonService = new NeonService(honoContext);
-  return new RepositoryContainer(neonService);
+  const sqlClient = neon(databaseUrl);
+  return drizzle(sqlClient);
 }
 
 export async function storeChangesInHistory(
@@ -653,31 +635,37 @@ export async function storeChangesInHistory(
   }, MODULE_NAME);
   
   try {
-    // Try using repository first
-    const repositories = createRepositoryContainer(context);
+    // Use Drizzle for database operations
+    const db = createDrizzleDb(context);
     
-    // Convert TableChange[] to Partial<ChangeHistory>[]
-    const changeHistoryEntries: Partial<ChangeHistory>[] = changes.map(change => ({
+    // Convert TableChange[] to change_history records
+    const changeHistoryEntries = changes.map(change => ({
       lsn: change.lsn || '',
-      tableName: change.table,
+      table_name: change.table,
       operation: change.operation,
       data: change.data,
       timestamp: new Date()
     }));
     
-    const result = await repositories.changeHistory.bulkInsertChanges(changeHistoryEntries);
-    const success = result.length > 0;
+    // Insert in batches for better performance
+    const totalBatches = Math.ceil(changeHistoryEntries.length / storeBatchSize);
     
-    if (success) {
-      return true;
-    } else {
-      replicationLogger.warn('Repository bulk insert returned false, falling back to raw SQL', {
-        count: changes.length
-      }, MODULE_NAME);
-      throw new Error('Repository bulk insert failed');
+    for (let i = 0; i < totalBatches; i++) {
+      const start = i * storeBatchSize;
+      const end = Math.min(start + storeBatchSize, changeHistoryEntries.length);
+      const batch = changeHistoryEntries.slice(start, end);
+      
+      await db.insert(change_history).values(batch);
     }
+    
+    replicationLogger.info('Successfully stored changes using Drizzle', {
+      count: changes.length,
+      batches: totalBatches
+    }, MODULE_NAME);
+    
+    return true;
   } catch (error) {
-    replicationLogger.warn('Repository storage failed, falling back to raw SQL', { 
+    replicationLogger.warn('Drizzle storage failed, falling back to raw SQL', { 
       error: error instanceof Error ? error.message : String(error),
       count: changes.length
     }, MODULE_NAME);

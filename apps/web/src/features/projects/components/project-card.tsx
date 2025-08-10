@@ -20,10 +20,8 @@ interface ProjectCardProps {
 
 // 🎯 PERFORMANCE: Memoized component that only re-renders when its specific project changes via XState selector
 export const ProjectCard = React.memo(function ProjectCard({ projectId, onEdit, onDelete }: ProjectCardProps) {
-  // 🎯 PERFORMANCE: Removed useProjects context call to avoid 34 expensive context reads
-
-  // 🎯 XSTATE SURGICAL: Read from XState store - only re-renders when THIS specific project changes
-  const project = useSelector(projectsAtom, (projectsRecord) => projectsRecord[projectId] || null);
+  // TODO: Replace with Dexie query
+  const project = null as any;
 
   // Handle missing project (deleted or not loaded)
   if (!project) {

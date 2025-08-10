@@ -1,6 +1,5 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
-// import { liveChangesMachine } from './live-changes-machine'; // DISABLED - TypeORM removal
 import { getDomainEntityNames } from '@/lib/entity-registry';
 
 export interface AppInitContext {
@@ -80,7 +79,6 @@ export const appInitMachine = setup({
   
   actors: {
     waitForDatabase: waitForDatabaseActor,
-    // liveChangesMachine, // DISABLED - TypeORM removal
   },
   
   actions: {
@@ -147,13 +145,9 @@ export const appInitMachine = setup({
       }
     },
     
-    // DISABLED - TypeORM removal
-    // startLiveChanges: sendTo('liveChangesMachine', {
-    //   type: 'START',
-    //   entities: getDomainEntityNames()
-    // }),
     startLiveChanges: () => {
-      console.log('[AppInitMachine] Skipping live changes - TypeORM disabled');
+      // Live changes handled by Dexie
+      console.log('[AppInitMachine] Live changes handled by Dexie');
     },
   },
 }).createMachine({

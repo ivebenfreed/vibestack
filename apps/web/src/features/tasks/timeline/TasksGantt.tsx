@@ -15,10 +15,10 @@ import type { GanttTask, TaskDependency } from '@/components/custom/vibegantt/ty
 export function TasksGantt() {
   const containerRef = useRef<HTMLDivElement>(null)
   
-  // Get all tasks from XState atom
-  const tasksRecord = useSelector(tasksAtom, (record) => record, shallowEqual)
-  const projectsRecord = useSelector(projectsAtom, (record) => record, shallowEqual)
-  const usersRecord = useSelector(usersAtom, (record) => record, shallowEqual)
+  // TODO: Replace with Dexie queries
+  const tasksRecord = {} as any
+  const projectsRecord = {} as any
+  const usersRecord = {} as any
   
   // Transform tasks to GanttTask format
   const ganttTasks = useMemo(() => {

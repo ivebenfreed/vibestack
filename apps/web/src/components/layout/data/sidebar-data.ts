@@ -325,11 +325,6 @@ export const globalSidebarData: GlobalSidebarSection[] = [
             icon: IconBug,
           },
           {
-            title: 'TypeORM Test',
-            url: '/debug/typeorm-test',
-            icon: IconBug,
-          },
-          {
             title: 'Tasks New Pattern',
             url: '/debug/tasks-new-pattern',
             icon: IconChecklist,

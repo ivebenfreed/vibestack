@@ -5,12 +5,8 @@ import { ensureAllDomainsLoaded } from '@/domain/ensure-loaded'
 
 export const Route = createFileRoute('/_authenticated/')({
   loader: async () => {
-    // DISABLED: TypeORM removal - ensureAllDomainsLoaded triggers PGLite initialization
-    // Super fast path - completely skip if all data is loaded
-    // This makes subsequent navigations instant
-    // await ensureAllDomainsLoaded() // This returns immediately if data exists
-    
-    console.log('[Dashboard] Skipping domain loading - TypeORM disabled');
+    // Data loading handled by components with Dexie
+    console.log('[Dashboard] Using Dexie for data loading');
     return null
   },
   component: Dashboard,

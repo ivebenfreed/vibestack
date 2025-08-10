@@ -1,7 +1,7 @@
 /// <reference path="../worker-configuration.d.ts" />
 
 // Set up node polyfills first
-import 'reflect-metadata';
+// reflect-metadata no longer needed with Drizzle
 
 // Import and re-export Durable Objects
 import { SyncDO } from './sync/SyncDO';
