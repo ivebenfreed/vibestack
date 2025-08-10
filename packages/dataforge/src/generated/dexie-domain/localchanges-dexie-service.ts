@@ -55,4 +55,4 @@ export class LocalchangesDexieService {
   }
 }
 
-export const localChangesDexieService = new LocalchangesDexieService();
+export const localchangesDexieService = new LocalchangesDexieService();
