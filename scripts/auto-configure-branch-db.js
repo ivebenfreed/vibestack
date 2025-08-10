@@ -183,7 +183,9 @@ class BranchDbConfigurator {
     
     while (retries < maxRetries) {
       try {
-        execSync(`pg_isready -h localhost -p ${config.postgresPort}`, { stdio: 'pipe' });
+        // Check if postgres is ready by attempting a simple query
+        const containerName = config.mode === 'branch' ? `vibestack-postgres-${config.prNumber}` : 'vibestack-postgres';
+        execSync(`docker exec ${containerName} psql -U postgres -c "SELECT 1" > /dev/null 2>&1`, { stdio: 'pipe' });
         console.log('   ✅ Database ready');
         return;
       } catch (error) {

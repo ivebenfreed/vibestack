@@ -105,9 +105,10 @@ fi
 echo "Ports: Web=$WEB_PORT, Server=$SERVER_PORT, DB=$DB_PORT"
 echo "Command: $COMMAND"
 
-# Create session and run command with environment variables
+# Create session with bash that stays alive even if command fails
+# The session will remain open for debugging
 tmux new-session -d -s "$SESSION_NAME" -c "$(pwd)" \
-    "SERVER_PORT=$SERVER_PORT WEB_PORT=$WEB_PORT DB_PORT=$DB_PORT PROXY_PORT=$PROXY_PORT PR_NUMBER=$PR_NUMBER $COMMAND"
+    bash -c "SERVER_PORT=$SERVER_PORT WEB_PORT=$WEB_PORT DB_PORT=$DB_PORT PROXY_PORT=$PROXY_PORT PR_NUMBER=$PR_NUMBER $COMMAND; echo ''; echo '⚠️  Command exited with code: $?'; echo 'Session kept alive for debugging. Press Ctrl+C to close.'; exec bash"
 
 # Wait a moment for the command to start
 sleep 2
