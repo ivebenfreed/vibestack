@@ -4,6 +4,7 @@
 export * from './generated/client-entities.js';
 export * from './generated/dexie-schema.js';
 export * from './generated/drizzle-schema.js';
+export * from './generated/server-entities.js';
 export * from './generated/sync-metadata.js';
 
 // Export entities

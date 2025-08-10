@@ -17,6 +17,7 @@ import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
 import { appInitMachine } from '@/state-machines/machines/app-init-machine'
 import { syncMachineV3 } from '@/state-machines/machines/sync-machine-v3'
+import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
 import { useAuth, useSystem } from '@/state-machines'
 import React from 'react'
 import { useRouter } from '@tanstack/react-router'
@@ -33,7 +34,15 @@ interface RouterContext {
 const createAppInitActor = () => {
   console.log('[XSTATE] Creating app init machine actor...')
   
-  const actor = createActor(appInitMachine)
+  // Add inspection in test/dev mode
+  const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
+    ? { inspect: xstateTestInspector.inspect }
+    : {};
+  
+  const actor = createActor(appInitMachine, {
+    ...inspectOptions,
+    id: 'app-init-machine'
+  })
   actor.start()
   return actor
 }
@@ -113,7 +122,16 @@ let authMachineActor = (window as any).authMachineActor
 
 if (!authMachineActor) {
   console.log('[AuthMachine] Creating new auth machine actor')
-  authMachineActor = createActor(authMachine)
+  
+  // Add inspection in test/dev mode
+  const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
+    ? { inspect: xstateTestInspector.inspect }
+    : {};
+  
+  authMachineActor = createActor(authMachine, {
+    ...inspectOptions,
+    id: 'auth-machine'
+  })
   
   // XState 5: Start with snapshot if available
   if (persistedAuthSnapshot) {
@@ -161,7 +179,16 @@ let syncMachineActor = (window as any).syncMachineActor
 
 if (!syncMachineActor) {
   console.log('[SyncMachine] Creating new sync machine actor')
-  syncMachineActor = createActor(syncMachineV3)
+  
+  // Add inspection in test/dev mode
+  const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
+    ? { inspect: xstateTestInspector.inspect }
+    : {};
+  
+  syncMachineActor = createActor(syncMachineV3, {
+    ...inspectOptions,
+    id: 'sync-machine-v3'
+  })
   
   // SyncMachine handles its own persistence internally
   console.log('[SyncMachine] Starting (state persistence handled internally)')

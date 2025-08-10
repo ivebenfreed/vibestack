@@ -92,11 +92,13 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
   })
 
   return (
-    <div className={cn(
-      'flex flex-col bg-sidebar transition-all duration-200 border-r border-sidebar-border',
-      'h-screen',
-      isCollapsed ? 'w-16' : 'w-full'
-    )}>
+    <div 
+      data-testid="sidebar"
+      className={cn(
+        'flex flex-col bg-sidebar transition-all duration-200 border-r border-sidebar-border',
+        'h-screen',
+        isCollapsed ? 'w-16' : 'w-full'
+      )}>
       {/* Header - only show on desktop (collapsed sidebar) */}
       {isCollapsed && (
         <header className="border-b border-border flex-shrink-0">
@@ -181,6 +183,7 @@ function NavItem({ item, isActive, isCollapsed }: {
   const content = (
     <Link
       to={item.href}
+      data-testid={`nav-link-${item.id}`}
       className={cn(
         'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
         'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',

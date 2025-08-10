@@ -1,5 +1,5 @@
 // Issue #12: Test EntityDependency sync system
-import { test, expect } from '../fixtures/persistent-context.js';
+import { test, expect } from '../helpers/fixtures/persistent-context.js';
 
 test.describe('EntityDependency Sync System', () => {
   test.setTimeout(60000);

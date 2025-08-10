@@ -133,6 +133,7 @@ pnpm type-check
 1. Run `pnpm check` to ensure no type or lint errors
 2. Fix any issues before pushing
 3. Generated files in `packages/dataforge/src/generated/` are ignored
+4. Run essential baseline tests (see Testing section below)
 
 ## Playwright Testing with Persistent Browser Profiles
 
@@ -147,8 +148,13 @@ Each worktree uses a **persistent browser profile** that maintains login state a
 #### Quick Start
 
 ```bash
-# Profile is automatically created during worktree setup with --test-setup flag
-# No manual setup needed!
+# 🔐 IMPORTANT: Initial authentication setup (run this FIRST in new worktrees!)
+npx playwright test tests/playwright/setup/01-initial-auth.spec.js
+
+# Run essential baseline tests (RECOMMENDED for every worktree)
+./scripts/playwright-test.sh tests/playwright/smoke  # Verify app loads
+./scripts/playwright-test.sh tests/playwright/sync   # Verify sync works
+./scripts/playwright-test.sh tests/playwright/ui     # Verify UI works
 
 # Run all tests (headless by default, uses saved profile)
 ./scripts/playwright-test.sh
@@ -161,9 +167,33 @@ Each worktree uses a **persistent browser profile** that maintains login state a
 
 # Run in debug mode (automatically shows browser)
 ./scripts/playwright-test.sh --debug
+```
 
-# 🔐 IMPORTANT: Initial authentication setup (run this FIRST in new worktrees!)
-npx playwright test tests/playwright/core/initial-auth-setup.spec.js
+#### Essential Baseline Tests for Every Worktree
+
+When working on any issue, these baseline tests ensure your changes don't break core functionality:
+
+1. **Smoke Tests** (`tests/playwright/smoke/`)
+   - App loads successfully
+   - Authentication state works
+   - All main pages accessible
+   
+2. **Sync Tests** (`tests/playwright/sync/`)
+   - Initial sync for new clients
+   - Catchup sync after disconnect
+   - Live sync between tabs
+   - Uses XState inspection for monitoring
+
+3. **UI Tests** (`tests/playwright/ui/`)
+   - Task CRUD operations
+   - Project management
+   - Navigation and routing
+   - Search and filtering
+
+Run them with:
+```bash
+# Quick baseline validation (< 2 minutes)
+./scripts/playwright-test.sh tests/playwright/smoke tests/playwright/sync tests/playwright/ui
 ```
 
 #### Using Persistent Context
@@ -226,10 +256,16 @@ await page.waitForFunction(() =>
 
 #### Test Organization
 
+- `tests/playwright/setup/` - One-time setup (authentication)
+- `tests/playwright/smoke/` - Quick essential tests
+- `tests/playwright/sync/` - Synchronization tests with XState
+- `tests/playwright/auth/` - Authentication flow tests
+- `tests/playwright/error-scenarios/` - Error handling tests
+- `tests/playwright/ui/` - User interface tests
 - `tests/playwright/core/` - Core tests and utilities
 - `tests/playwright/issue-{number}/` - Issue-specific tests
 - `tests/playwright/fixtures/` - Custom test fixtures
-- `tests/playwright/TESTING-GUIDE.md` - Detailed testing guide
+- `tests/playwright/helpers/` - Test helpers and utilities
 
 #### Profile Management
 

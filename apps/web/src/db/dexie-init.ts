@@ -63,6 +63,12 @@ export async function initializeDexieDatabase(): Promise<void> {
     console.log(`[Dexie Init] Database ready in ${endTime - startTime}ms`);
     console.log(`[Dexie Init] Current data: ${taskCount} tasks, ${userCount} users`);
     
+    // Expose database to window for testing
+    if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
+      (window as any).db = db;
+      console.log('[Dexie Init] Database exposed to window.db for testing');
+    }
+    
     // Dispatch success event for XState
     window.dispatchEvent(new CustomEvent('database:ready', { 
       detail: { 
@@ -85,6 +91,12 @@ export async function initializeDexieDatabase(): Promise<void> {
         await db.delete();
         await db.open();
         console.log('[Dexie Init] Database reset successful after schema error');
+        
+        // Expose database to window for testing after recovery
+        if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
+          (window as any).db = db;
+          console.log('[Dexie Init] Database exposed to window.db for testing (after recovery)');
+        }
         
         // Dispatch success after recovery
         window.dispatchEvent(new CustomEvent('database:ready', { 
@@ -189,6 +201,12 @@ export async function forceResetDatabase(): Promise<void> {
     const userId = 'current-user';
     const { initializeDexieChangeTracking } = await import('./dexie-change-tracking');
     initializeDexieChangeTracking(clientId, userId);
+    
+    // Expose database to window for testing after force reset
+    if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
+      (window as any).db = db;
+      console.log('[Dexie Init] Database exposed to window.db for testing (after force reset)');
+    }
     
     // Dispatch ready event
     window.dispatchEvent(new CustomEvent('database:ready', { 

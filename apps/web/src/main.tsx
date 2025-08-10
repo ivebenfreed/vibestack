@@ -7,6 +7,7 @@
 // Debug utilities (only in development)
 if (process.env.NODE_ENV === 'development') {
   import('./debug/manual-integrity-reset');
+  import('./test-utils/sync-test-helpers');
 }
 
 // Dexie uses native IndexedDB, which is more stable than PGLite

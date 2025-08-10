@@ -423,9 +423,13 @@ export class MessageProcessor {
       console.log('[MessageProcessor] ✅ Catchup sync completed');
       
       // Update LSN from server at end of catchup sync
-      if (message.serverLSN && message.serverLSN !== context.currentLSN) {
-        console.log(`[MessageProcessor] 📊 LSN update at catchup complete: ${context.currentLSN} → ${message.serverLSN}`);
-        sendEvent({ type: 'LSN_UPDATE', lsn: message.serverLSN, source: 'catchup_complete' });
+      // Server sends 'endLSN' not 'serverLSN'
+      const newLSN = message.endLSN || message.serverLSN;
+      if (newLSN && newLSN !== context.currentLSN) {
+        console.log(`[MessageProcessor] 📊 LSN update at catchup complete: ${context.currentLSN} → ${newLSN}`);
+        sendEvent({ type: 'LSN_UPDATE', lsn: newLSN, source: 'catchup_complete' });
+      } else if (!newLSN) {
+        console.warn('[MessageProcessor] ⚠️ No LSN in catchup completed message');
       }
       
       // Send acknowledgment
@@ -434,7 +438,7 @@ export class MessageProcessor {
         messageId: `catchup_complete_ack_${Date.now()}`,
         timestamp: Date.now(),
         clientId: context.clientId,
-        serverLSN: message.serverLSN || context.currentLSN
+        serverLSN: newLSN || context.currentLSN
       };
       services.webSocket.send(ackMessage);
       console.log(`[MessageProcessor] 📤 Sent acknowledgment: ${ackMessage.type}`);
