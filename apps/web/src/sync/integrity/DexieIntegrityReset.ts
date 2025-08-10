@@ -184,8 +184,8 @@ export class DexieIntegrityReset {
     try {
       console.log('[DexieIntegrityReset] Resetting LSN tracking...');
       
-      // Clear sync metadata using Dexie
-      await db.syncMetadata.clear();
+      // Clear sync metadata from localStorage (deprecated table removed)
+      // syncMetadata table no longer exists, only use localStorage
       
       // Clear any localStorage sync state
       const syncKeys = Object.keys(localStorage).filter(key => 

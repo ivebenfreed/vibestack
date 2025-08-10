@@ -210,6 +210,57 @@ export const tableNames = ${JSON.stringify(Object.values(entities).map((m: any) 
 export const DOMAIN_TABLES = ${JSON.stringify(Object.values(entities).filter((m: any) => m.category === 'domain').map((m: any) => m.tableName))} as const;
 export const JUNCTION_TABLE_NAMES = ${JSON.stringify(junctionTables.map((j: any) => j.tableName))} as const;
 export const TRACKED_TABLES = [...DOMAIN_TABLES, ...JUNCTION_TABLE_NAMES] as const;
+
+// Table hierarchy for ordered sync
+export const TABLE_HIERARCHY = {
+  "tag_sets": [],
+  "tags": [],
+  "status_sets": [],
+  "status_definitions": [],
+  "projects": [],
+  "tasks": [],
+  "comments": [],
+  "task_tags": ["tasks", "tags"],
+  "project_tag_sets": ["projects", "tag_sets"],
+  "project_status_sets": ["projects", "status_sets"]
+} as const;
+
+/**
+ * Orders tables based on their dependencies.
+ * Tables with no dependencies come first, then tables that depend on them.
+ */
+export function getOrderedTables(tables: readonly string[]): string[] {
+  const visited = new Set<string>();
+  const result: string[] = [];
+  
+  function visit(table: string) {
+    if (visited.has(table)) return;
+    
+    // Get dependencies for this table
+    const deps = TABLE_HIERARCHY[table as keyof typeof TABLE_HIERARCHY] || [];
+    
+    // Visit dependencies first
+    for (const dep of deps) {
+      if (tables.includes(dep)) {
+        visit(dep);
+      }
+    }
+    
+    // Then add this table
+    visited.add(table);
+    result.push(table);
+  }
+  
+  // Visit all tables
+  for (const table of tables) {
+    visit(table);
+  }
+  
+  return result;
+}
+
+// Export ordered tracked tables for initial sync
+export const ORDERED_TRACKED_TABLES = getOrderedTables(TRACKED_TABLES);
 `;
 }
 

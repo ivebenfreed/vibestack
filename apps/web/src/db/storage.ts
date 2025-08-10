@@ -17,8 +17,8 @@ const ENTITY_CONFIG = {
     return CLIENT_DOMAIN_TABLES.map(table => table.replace(/"/g, ''));
   },
   
-  // System tables that should be handled separately
-  systemTables: ['sync_metadata', 'schema_version', 'client_migration_status', 'local_changes'] as const,
+  // System tables that should be handled separately (should be imported from dataforge)
+  systemTables: ['local_changes'] as const, // TODO: Import from @repo/dataforge/dexie-schema SYSTEM_TABLES
   
   // Junction/relationship tables from centralized dataforge configuration (without quotes)
   get junctionTables() {
@@ -27,7 +27,6 @@ const ENTITY_CONFIG = {
   
   // Known enum types
   enumTypes: [
-    'client_migration_status_status_enum',
     'tasks_status_enum', 
     'tasks_priority_enum',
     'users_role_enum',

@@ -3,15 +3,19 @@ import { db } from '../dexie-schema.js';
 import type { LocalChanges } from '../client-entities.js';
 
 export interface LocalChangesUpdateInput {
-  tableName?: any;
+  table?: any;
   recordId?: any;
-  operationType?: any;
+  operation?: any;
   data?: any;
+  lsn?: any;
   clientSequence?: any;
-  loopProtection?: any;
+  processedSync?: any;
+  sendAttempts?: any;
+  lastSendAttempt?: any;
+  lastError?: any;
 }
 
-export class LocalChangesDexieService {
+export class LocalchangesDexieService {
   async create(data: Partial<LocalChanges>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -51,4 +55,4 @@ export class LocalChangesDexieService {
   }
 }
 
-export const localChangesDexieService = new LocalChangesDexieService();
+export const localChangesDexieService = new LocalchangesDexieService();

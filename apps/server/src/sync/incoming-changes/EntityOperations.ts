@@ -1040,17 +1040,8 @@ export class EntityOperations {
    * Get repository for an entity table name
    */
   private getRepositoryForEntity(entityTableOrName: string): any {
-    // Handle both plural table names and entity names
-    const entityMap: Record<string, string> = {
-      'users': 'users',
-      'projects': 'projects', 
-      'tasks': 'tasks',
-      'comments': 'comments',
-      // Add more mappings as needed
-    };
-
-    const repoKey = entityMap[entityTableOrName] || entityTableOrName;
-    return this.repositories.getRepository(repoKey);
+    // Table names and repository keys should match, no need for mapping
+    return this.repositories.getRepository(entityTableOrName);
   }
 
   /**

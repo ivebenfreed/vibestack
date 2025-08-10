@@ -211,11 +211,12 @@ export async function performCatchupSync(
   }, MODULE_NAME);
 
   try {
-    // Use Drizzle with Neon HTTP driver for catchup changes
+    // Use Drizzle with proper schema instead of raw SQL
     syncLogger.info('Setting up Drizzle client for catchup sync', { clientId });
     const { drizzle } = await import('drizzle-orm/neon-http');
     const { neon } = await import('@neondatabase/serverless');
-    const { sql } = await import('drizzle-orm');
+    const { gt, lte, and, asc } = await import('drizzle-orm');
+    const { change_history } = await import('@repo/dataforge');
     
     const sqlClient = neon(context.env.DATABASE_URL);
     const db = drizzle(sqlClient);
@@ -226,27 +227,38 @@ export async function performCatchupSync(
       serverLSN: initialServerLSN
     });
     
-    // Query for changes between client LSN and server LSN using Drizzle
+    // Query for changes between client LSN and server LSN using Drizzle schema
     syncLogger.info('Executing catchup query', { clientId });
-    const changes = await db.execute(sql`
-      SELECT 
-        table_name as table,
-        operation,
-        data,
-        lsn,
-        created_at as timestamp
-      FROM change_history
-      WHERE lsn > ${clientLSN} AND lsn <= ${initialServerLSN}
-      ORDER BY lsn ASC
-      LIMIT 5000
-    `);
+    const changes = await db
+      .select({
+        table: change_history.table_name,
+        operation: change_history.operation,
+        data: change_history.data,
+        lsn: change_history.lsn,
+        timestamp: change_history.created_at
+      })
+      .from(change_history)
+      .where(
+        and(
+          gt(change_history.lsn, clientLSN),
+          lte(change_history.lsn, initialServerLSN)
+        )
+      )
+      .orderBy(asc(change_history.lsn))
+      .limit(5000);
     
     syncLogger.info('Catchup query completed', {
       clientId,
       changeCount: changes.length
     });
     
-    if (changes.length === 0) {
+    // Parse the JSON data field for each change
+    const parsedChanges = changes.map(change => ({
+      ...change,
+      data: change.data ? JSON.parse(change.data) : null
+    }));
+    
+    if (parsedChanges.length === 0) {
       syncLogger.info('No catchup changes needed', {
         clientId,
         clientLSN,
@@ -271,7 +283,7 @@ export async function performCatchupSync(
     
     // Send changes in batches
     const BATCH_SIZE = 500;
-    const batches = chunkArray(changes, BATCH_SIZE);
+    const batches = chunkArray(parsedChanges, BATCH_SIZE);
     
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
@@ -299,7 +311,7 @@ export async function performCatchupSync(
       clientId,
       startLSN: clientLSN,
       endLSN: initialServerLSN,
-      changeCount: changes.length,
+      changeCount: parsedChanges.length,
       success: true
     };
     
@@ -308,7 +320,7 @@ export async function performCatchupSync(
     const duration = Date.now() - functionStartTime;
     syncLogger.info('Catchup sync completed', {
       clientId,
-      changeCount: changes.length,
+      changeCount: parsedChanges.length,
       batchCount: batches.length,
       durationMs: duration
     });

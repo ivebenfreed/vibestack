@@ -257,39 +257,38 @@ export class SyncStrategyAnalyzer {
     // Update sync state
     await this.context.stateManager.updateClientSyncState(clientId, 'initial');
     
-    // Perform initial sync
-    await performInitialSync(
-      context,
+    // Perform initial sync and get the LSNs
+    const { startLSN, endLSN } = await performInitialSync(
       this.context.webSocketHandler,
-      this.context.stateManager,
-      clientId
+      context,
+      clientId,
+      this.context.stateManager
     );
-    
-    // After initial sync completes, get the current client and server LSNs
-    // to determine if catchup sync is needed
-    const updatedClientLSN = await this.context.stateManager.getLSN() || '0/0';
-    const currentServerLSN = await this.context.stateManager.getServerLSN();
     
     syncLogger.info('Initial sync completed, checking if catchup sync is needed', {
       clientId,
-      updatedClientLSN,
-      currentServerLSN
+      startLSN,
+      endLSN
     }, MODULE_NAME);
     
-    // If client LSN is still behind server LSN, perform catchup sync
-    if (compareLSN(updatedClientLSN, currentServerLSN) < 0) {
+    // Only perform catchup if the server LSN changed during initial sync
+    // (i.e., new changes came in while we were syncing)
+    if (compareLSN(startLSN, endLSN) < 0) {
       syncLogger.info('Starting automatic catchup sync after initial sync', {
         clientId,
-        clientLSN: updatedClientLSN,
-        serverLSN: currentServerLSN
+        reason: 'Changes occurred during initial sync',
+        startLSN,
+        endLSN
       }, MODULE_NAME);
       
-      await this.performCatchupSync(context, clientId, updatedClientLSN, currentServerLSN);
+      // Client is now at startLSN (the point where initial sync started)
+      // and needs to catch up to endLSN
+      await this.performCatchupSync(context, clientId, startLSN, endLSN);
     } else {
       syncLogger.info('No catchup sync needed after initial sync', {
         clientId,
-        clientLSN: updatedClientLSN,
-        serverLSN: currentServerLSN
+        reason: 'No changes during initial sync',
+        lsn: endLSN
       }, MODULE_NAME);
       
       // Update client sync state to live

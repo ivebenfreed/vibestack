@@ -82,7 +82,7 @@ function logChange(changeRecord: Omit<LocalChanges, 'id'>, transaction?: any): v
         id: nanoid(),
         ...changeRecord
       };
-      await db.localChanges.add(record);
+      await db.local_changes.add(record);
       console.log(`[Dexie Change Tracking] Logged ${changeRecord.operation} for ${changeRecord.table}:`, record.id);
       
       // Trigger change processor to handle the new change
@@ -252,7 +252,7 @@ export function initializeDexieChangeTracking(clientId: string, userId: string) 
  * Get pending changes that haven't been synced
  */
 export async function getPendingChanges(limit = 100): Promise<LocalChanges[]> {
-  return await db.localChanges
+  return await db.local_changes
     .where('processedSync')
     .equals(0)
     .limit(limit)
@@ -265,7 +265,7 @@ export async function getPendingChanges(limit = 100): Promise<LocalChanges[]> {
 export async function markChangesAsProcessed(changeIds: string[]): Promise<void> {
   console.log(`[Dexie Change Tracking] Marking ${changeIds.length} changes as processed:`, changeIds);
   
-  const modifiedCount = await db.localChanges
+  const modifiedCount = await db.local_changes
     .where('id')
     .anyOf(changeIds)
     .modify({ processedSync: 1 });
@@ -273,7 +273,7 @@ export async function markChangesAsProcessed(changeIds: string[]): Promise<void>
   console.log(`[Dexie Change Tracking] Successfully marked ${modifiedCount} changes as processed`);
   
   // Debug: Check if changes were actually marked
-  const stillPending = await db.localChanges
+  const stillPending = await db.local_changes
     .where('id')
     .anyOf(changeIds)
     .and(change => change.processedSync === 0)
@@ -290,7 +290,7 @@ export async function markChangesAsProcessed(changeIds: string[]): Promise<void>
 export async function clearProcessedChanges(olderThanMs = 24 * 60 * 60 * 1000): Promise<void> {
   const cutoffTime = new Date(Date.now() - olderThanMs);
   
-  await db.localChanges
+  await db.local_changes
     .where('processedSync')
     .equals(1)
     .and(change => change.updatedAt < cutoffTime)
@@ -301,7 +301,7 @@ export async function clearProcessedChanges(olderThanMs = 24 * 60 * 60 * 1000): 
  * Get change count for monitoring
  */
 export async function getPendingChangeCount(): Promise<number> {
-  return await db.localChanges
+  return await db.local_changes
     .where('processedSync')
     .equals(0)
     .count();
@@ -311,7 +311,7 @@ export async function getPendingChangeCount(): Promise<number> {
  * Debug: Get all changes for inspection
  */
 export async function getAllChanges(): Promise<LocalChanges[]> {
-  return await db.localChanges.toArray();
+  return await db.local_changes.toArray();
 }
 
 /**
@@ -393,7 +393,7 @@ export async function trackOutgoingChange(
   };
   
   try {
-    await db.localChanges.add(changeRecord);
+    await db.local_changes.add(changeRecord);
     console.log(`[Dexie Change Tracking] Manually tracked ${operation} for ${table}:`, changeRecord.id, {
       entityId: data.id,
       stack: new Error().stack?.split('\n').slice(2, 5).join('\n')

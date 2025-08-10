@@ -27,6 +27,15 @@ class NeonHTTPConnection implements DatabaseConnection {
   async executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
     const { sql: queryText, parameters } = compiledQuery;
     
+    // DEBUG: Log all INSERT queries to sessions table
+    if (queryText.toLowerCase().includes('insert into') && queryText.toLowerCase().includes('sessions')) {
+      console.log('🔍 DEBUG: Sessions INSERT query:', {
+        query: queryText,
+        parameters: parameters,
+        paramCount: parameters?.length || 0
+      });
+    }
+    
     try {
       let result: any;
       
@@ -49,6 +58,22 @@ class NeonHTTPConnection implements DatabaseConnection {
       };
     } catch (error: any) {
       console.error('NeonHTTPDialect error:', error);
+      
+      // DEBUG: Additional error context for sessions table
+      if (queryText.toLowerCase().includes('sessions')) {
+        console.error('🔍 DEBUG: Failed sessions query details:', {
+          query: queryText,
+          parameters: parameters,
+          error: {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            column: error.column,
+            table: error.table
+          }
+        });
+      }
+      
       throw error;
     }
   }

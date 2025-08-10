@@ -47,6 +47,11 @@ export class Task extends BaseDomainEntity {
   @OneToMany(() => Comment, 'task')
   comments = new Collection<Comment>(this);
 
-  @ManyToMany(() => Tag, 'tasks', { owner: true, pivotTable: 'task_tags' })
+  @ManyToMany(() => Tag, 'tasks', { 
+    owner: true, 
+    pivotTable: 'task_tags',
+    joinColumn: 'task_id',
+    inverseJoinColumn: 'tag_id'
+  })
   tags = new Collection<Tag>(this);
 }

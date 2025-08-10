@@ -402,8 +402,8 @@ export class IncomingChangeService {
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
       if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
-        const tableName = this.snakeToCamel(table); // Convert snake_case to camelCase for Dexie table names
-        const dexieTable = (db as any)[tableName];
+        // Use table name directly - Dexie tables use snake_case
+        const dexieTable = (db as any)[table];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
           
@@ -419,7 +419,7 @@ export class IncomingChangeService {
       } 
       // Check if it's a junction table
       else if (CLIENT_JUNCTION_TABLE_MAPPING[table]) {
-        const dexieTable = (db as any)[this.snakeToCamel(table)];
+        const dexieTable = (db as any)[table];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk inserting ${entitiesData.length} ${table} into IndexedDB`);
           
@@ -504,8 +504,8 @@ export class IncomingChangeService {
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
       if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
-        const tableName = this.snakeToCamel(table); // Convert snake_case to camelCase for Dexie table names
-        const dexieTable = (db as any)[tableName];
+        // Use table name directly - Dexie tables use snake_case
+        const dexieTable = (db as any)[table];
         if (dexieTable) {
           console.log(`[IncomingChangeService] 🗄️ Dexie: Bulk updating ${entitiesData.length} ${table} in IndexedDB`);
           
@@ -588,9 +588,9 @@ export class IncomingChangeService {
 
       console.log(`[IncomingChangeService] Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
-      // Check if it's a domain table (without quotes)
-      const tableWithQuotes = `"${change.table}"`;
-      if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
+      // Check if it's a domain table
+      // CLIENT_DOMAIN_TABLES contains table names without quotes
+      if (CLIENT_DOMAIN_TABLES.includes(change.table)) {
         await this.applyDomainTableChange(change, false); // false = not live sync
       } 
       // Check if it's a junction table
@@ -643,9 +643,9 @@ export class IncomingChangeService {
 
       console.log(`[IncomingChangeService] 🔄 Live sync: Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
-      // Check if it's a domain table (without quotes)
-      const tableWithQuotes = `"${change.table}"`;
-      if (CLIENT_DOMAIN_TABLES.includes(tableWithQuotes)) {
+      // Check if it's a domain table
+      // CLIENT_DOMAIN_TABLES contains table names without quotes
+      if (CLIENT_DOMAIN_TABLES.includes(change.table)) {
         await this.applyDomainTableChange(change, true); // true = live sync
       } 
       // Check if it's a junction table
@@ -697,12 +697,6 @@ export class IncomingChangeService {
     return incomingData;
   }
 
-  /**
-   * Convert snake_case to camelCase
-   */
-  private snakeToCamel(str: string): string {
-    return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-  }
 
   /**
    * Generic handler for domain table changes
@@ -712,11 +706,11 @@ export class IncomingChangeService {
    */
   private async applyDomainTableChange(change: TableChange, isLiveSync: boolean = false): Promise<void> {
     const { db } = await import('@repo/dataforge/dexie-schema');
-    const tableName = this.snakeToCamel(change.table); // Convert snake_case to camelCase for Dexie table names
-    const dexieTable = (db as any)[tableName];
+    // Use table name directly - Dexie tables use snake_case
+    const dexieTable = (db as any)[change.table];
     
     if (!dexieTable) {
-      throw new Error(`Dexie table not found for: ${change.table} (tried: ${tableName})`);
+      throw new Error(`Dexie table not found for: ${change.table}`);
     }
     
     if (isLiveSync) {
@@ -726,7 +720,7 @@ export class IncomingChangeService {
       await db.transaction('rw', dexieTable, async (trans) => {
         (trans as any)[SYNC_TRANSACTION] = true;
         
-        switch (change.operation) {
+        switch (change.operation.toLowerCase()) {
           case 'insert':
             console.log(`[IncomingChangeService] 🔄 Live sync: Inserting ${change.table} ${change.data.id} with SYNC_TRANSACTION`);
             await dexieTable.put(change.data as any);
@@ -750,7 +744,7 @@ export class IncomingChangeService {
     } else {
       // INITIAL/CATCHUP SYNC: Change tracking is already disabled at sync phase level
       // Just apply the changes directly
-      switch (change.operation) {
+      switch (change.operation.toLowerCase()) {
         case 'insert':
           console.log(`[IncomingChangeService] 📥 Initial/catchup: Inserting ${change.table} ${change.data.id}`);
           await dexieTable.put(change.data as any);
@@ -897,7 +891,7 @@ export class IncomingChangeService {
     // Convert snake_case field names to camelCase for Dexie
     const convertedData = this.convertJunctionTableFieldNames(change.data, table);
     
-    switch (change.operation) {
+    switch (change.operation.toLowerCase()) {
       case 'insert':
         console.log(`[IncomingChangeService] 🗄️ Dexie: Inserting into junction table ${table}`, convertedData);
         await (db as any)[table].put(convertedData);

@@ -10,7 +10,8 @@ import {
   schema,
   syncMetadata, 
   junctionTables,
-  TRACKED_TABLES 
+  TRACKED_TABLES,
+  DOMAIN_TABLES 
 } from '@repo/dataforge';
 
 import { 
@@ -51,12 +52,16 @@ export class GenericSyncAdapter {
     private messageHandler: WebSocketHandler,
     private env: { DATABASE_URL: string; NODE_ENV?: string }
   ) {
+    console.log('DEBUG: GenericSyncAdapter constructor called');
+    console.log('DEBUG: Database URL provided:', !!databaseUrl);
+    console.log('DEBUG: Schema keys:', Object.keys(schema).slice(0, 5));
     this.syncEngine = new GenericSyncEngine(
       databaseUrl,
       schema,
       syncMetadata,
       junctionTables
     );
+    console.log('DEBUG: GenericSyncEngine created successfully');
   }
 
   /**
@@ -97,14 +102,29 @@ export class GenericSyncAdapter {
    * Get server changes for a client using the generic sync engine
    */
   async getServerChanges(clientId: string, lastSyncTimestamp?: Date): Promise<Record<string, any[]>> {
+    console.log('DEBUG: getServerChanges called for client:', clientId);
     syncLogger.info(`${MODULE_NAME}: Getting server changes for client ${clientId} since ${lastSyncTimestamp?.toISOString()}`);
     
     const timestamp = lastSyncTimestamp || new Date(0);
+    console.log('DEBUG: Calling syncEngine.getChangesForClient with TRACKED_TABLES:', TRACKED_TABLES);
     const changes = await this.syncEngine.getChangesForClient(timestamp, TRACKED_TABLES as unknown as string[]);
+    console.log('DEBUG: getChangesForClient returned successfully');
     
     syncLogger.info(`${MODULE_NAME}: Found changes in ${Object.keys(changes).length} tables for client ${clientId}`);
     
     return changes;
+  }
+
+  /**
+   * Get data for a specific table (for initial sync table-by-table processing)
+   */
+  async getTableData(tableName: string, lastSyncTimestamp?: Date): Promise<any[]> {
+    syncLogger.debug(`${MODULE_NAME}: Getting data for table ${tableName}`);
+    
+    const timestamp = lastSyncTimestamp || new Date(0);
+    const changes = await this.syncEngine.getChangesForClient(timestamp, [tableName]);
+    
+    return changes[tableName] || [];
   }
 
   /**

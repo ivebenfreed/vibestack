@@ -76,10 +76,10 @@ export default function Dashboard() {
           db.projects.count(),
           db.tasks.count(),
           db.comments.count(),
-          db.statusDefinitions.count(),
-          db.statusSets.count(),
+          db.status_definitions.count(),
+          db.status_sets.count(),
           db.tags.count(),
-          db.tagSets.count()
+          db.tag_sets.count()
         ]);
 
         setTableCounts({

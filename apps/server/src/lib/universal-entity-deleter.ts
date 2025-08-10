@@ -1,10 +1,9 @@
 import { 
-  CLIENT_RELATIONSHIP_CONFIGS, 
-  getEntityRelationships, 
-  getJunctionRelationships,
-  CLIENT_DOMAIN_TABLE_HIERARCHY,
-  CLIENT_JUNCTION_TABLE_MAPPING
-} from '@repo/dataforge/client-entities';
+  SERVER_RELATIONSHIP_CONFIGS, 
+  getEntityRelationships,
+  SERVER_DOMAIN_TABLE_HIERARCHY,
+  SERVER_JUNCTION_TABLE_MAPPING
+} from '@repo/dataforge';
 import { NeonService } from './neon-orm/neon-service';
 import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
@@ -186,7 +185,7 @@ export class UniversalEntityDeleter {
     const referencingEntities: string[] = [];
     const junctionTablesToClean: string[] = [];
 
-    for (const [entityName, config] of Object.entries(CLIENT_RELATIONSHIP_CONFIGS)) {
+    for (const [entityName, config] of Object.entries(SERVER_RELATIONSHIP_CONFIGS)) {
       // Check required references (direct foreign keys)
       if (config && 'requiredReferences' in config && config.requiredReferences) {
         for (const ref of config.requiredReferences) {
@@ -213,7 +212,7 @@ export class UniversalEntityDeleter {
     // Add special handling for junction tables where target entity is the source
     // This handles the reverse case: when deleting a user, we need to clean up
     // project_members entries where user_id = target_user_id
-    for (const [entityName, config] of Object.entries(CLIENT_RELATIONSHIP_CONFIGS)) {
+    for (const [entityName, config] of Object.entries(SERVER_RELATIONSHIP_CONFIGS)) {
       if (config && 'junctionRelationships' in config && config.junctionRelationships) {
         for (const junction of config.junctionRelationships) {
           // If this junction table connects TO the target entity via sourceColumn,
@@ -238,7 +237,7 @@ export class UniversalEntityDeleter {
    * Sorts entities by their dependency hierarchy to ensure proper deletion order
    */
   private sortEntitiesByHierarchy(entities: string[]): string[] {
-    const hierarchy = CLIENT_DOMAIN_TABLE_HIERARCHY;
+    const hierarchy = SERVER_DOMAIN_TABLE_HIERARCHY;
     
     return entities.sort((a, b) => {
       const keyA = `"${a}"` as keyof typeof hierarchy;

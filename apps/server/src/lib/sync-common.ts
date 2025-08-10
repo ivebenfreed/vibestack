@@ -3,44 +3,7 @@ import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
 import { getDBClient, sql } from './db'; // Import necessary DB helpers
 import type { MinimalContext } from '../types/hono'; // Import context type
 import { syncLogger } from '../middleware/logger'; // Import logger
-import type { QueryResult } from '@neondatabase/serverless'; // Import QueryResult type
-import { NeonService } from './neon-orm/neon-service';
-import { RepositoryContainer } from '../domains/RepositoryContainer';
-
 const MODULE_NAME = 'sync-common';
-
-/**
- * Create a ChangeHistoryRepository instance from context
- * Helper function to initialize repository for sync-common operations
- */
-function createChangeHistoryRepository(context: MinimalContext): RepositoryContainer {
-  // Create a mock Hono context from MinimalContext (similar to EntityOperations pattern)
-  const stableRequestId = `sync-${context.env.DATABASE_URL?.slice(-10) || 'default'}`;
-  
-  const honoContext = {
-    req: { 
-      header: (name: string) => {
-        if (name === 'cf-request-id') {
-          return stableRequestId;
-        }
-        return undefined;
-      }
-    },
-    env: context.env,
-    finalized: false,
-    error: null,
-    get executionCtx() { return null; },
-    get event() { return null; },
-    var: {},
-    get: (key: string) => undefined,
-    set: (key: string, value: any) => {},
-    json: (data: any) => Promise.resolve(new Response(JSON.stringify(data))),
-    text: (text: string) => Promise.resolve(new Response(text))
-  } as unknown as any;
-  
-  const neonService = new NeonService(honoContext);
-  return new RepositoryContainer(neonService);
-}
 
 /**
  * Compare two LSNs
@@ -341,46 +304,62 @@ export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
 }
 
 /**
- * Get the latest LSN recorded in the change_history table.
- * Returns '0/0' if the table is empty or an error occurs.
+ * Get the latest LSN from PostgreSQL replication slot or change_history table.
+ * Returns '0/0' if no LSN is found or an error occurs.
  */
 export async function getLatestChangeHistoryLSN(context: MinimalContext): Promise<string> {
   try {
-    // Try using repository first
-    const repositories = createChangeHistoryRepository(context);
-    const latestLSN = await repositories.changeHistory.getLatestLSN();
-    
-    if (latestLSN && latestLSN !== '0/0') {
-      return latestLSN;
+    // First, try to get LSN from replication slot (preferred method)
+    try {
+      const slotResult = await sql<{ slot_name: string; confirmed_flush_lsn: string }>(
+        context,
+        `SELECT slot_name, confirmed_flush_lsn 
+         FROM pg_replication_slots 
+         WHERE slot_name = 'vibestack_replication_slot'
+         LIMIT 1;`
+      );
+      
+      if (slotResult[0]?.confirmed_flush_lsn) {
+        syncLogger.debug('Got LSN from replication slot', {
+          lsn: slotResult[0].confirmed_flush_lsn
+        }, MODULE_NAME);
+        return slotResult[0].confirmed_flush_lsn;
+      }
+    } catch (slotError) {
+      syncLogger.debug('Replication slot not available, checking change_history table', {
+        error: slotError instanceof Error ? slotError.message : 'Unknown error'
+      }, MODULE_NAME);
     }
     
-    // Fallback to direct query if repository returns default value
-    const result = await sql<{ latest_lsn: string | null }>(context,
-      'SELECT MAX(lsn::pg_lsn)::text as latest_lsn FROM change_history;'
-    );
-    
-    const fallbackLSN = result[0]?.latest_lsn;
-    
-    if (fallbackLSN) {
-      return fallbackLSN;
-    }
-    
-    return '0/0'; // Return default if table is empty
-  } catch (error) {
-    console.error('Error getting latest change history LSN:', error);
-    
-    // Last resort fallback to direct query
+    // Fallback to change_history table if replication slot is not available
     try {
       const result = await sql<{ latest_lsn: string | null }>(context,
         'SELECT MAX(lsn::pg_lsn)::text as latest_lsn FROM change_history;'
       );
       
       const fallbackLSN = result[0]?.latest_lsn;
-      return fallbackLSN || '0/0';
-    } catch (fallbackError) {
-      console.error('Fallback query also failed:', fallbackError);
-      return '0/0'; // Return default on error
+      
+      if (fallbackLSN) {
+        syncLogger.debug('Got LSN from change_history table', {
+          lsn: fallbackLSN
+        }, MODULE_NAME);
+        return fallbackLSN;
+      }
+    } catch (tableError) {
+      // Table might be empty on fresh install
+      syncLogger.debug('change_history table empty or error', {
+        error: tableError instanceof Error ? tableError.message : 'Unknown error'
+      }, MODULE_NAME);
     }
+    
+    // Return default for fresh installations
+    syncLogger.debug('No LSN found, returning default for initial sync', {}, MODULE_NAME);
+    return '0/0';
+  } catch (error) {
+    syncLogger.error('Error getting latest LSN', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, MODULE_NAME);
+    return '0/0'; // Return default on error
   }
 }
 

@@ -22,9 +22,19 @@ export class Project extends BaseDomainEntity {
   @OneToMany(() => Task, 'project')
   tasks = new Collection<Task>(this);
 
-  @ManyToMany(() => TagSet, 'projects', { owner: true, pivotTable: 'project_tag_sets' })
+  @ManyToMany(() => TagSet, 'projects', { 
+    owner: true, 
+    pivotTable: 'project_tag_sets',
+    joinColumn: 'project_id',
+    inverseJoinColumn: 'tag_set_id'
+  })
   tagSets = new Collection<TagSet>(this);
 
-  @ManyToMany(() => StatusSet, 'projects', { owner: true, pivotTable: 'project_status_sets' })
+  @ManyToMany(() => StatusSet, 'projects', { 
+    owner: true, 
+    pivotTable: 'project_status_sets',
+    joinColumn: 'project_id',
+    inverseJoinColumn: 'status_set_id'
+  })
   statusSets = new Collection<StatusSet>(this);
 }

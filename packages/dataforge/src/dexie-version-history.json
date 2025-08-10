@@ -1,0 +1,67 @@
+{
+  "currentVersion": 4,
+  "versions": [
+    {
+      "version": 2,
+      "generatedAt": "2025-08-10T12:49:51.431Z",
+      "schemaHash": "22affd2a5dc6b67c",
+      "stores": {
+        "users": "++id, &email",
+        "task_tags": "++Task_owner",
+        "tasks": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "tag_sets": "++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt",
+        "tags": "++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt",
+        "status_sets": "++id, [entityType], clientId, version, deleted, createdAt, updatedAt",
+        "status_definitions": "++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt",
+        "project_tag_sets": "++Project_owner",
+        "project_status_sets": "++Project_owner",
+        "projects": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "local_changes": "++id, [tableName+recordId], processedSync",
+        "entity_dependencies": "++id, [toTable+toId], [fromTable+fromId]",
+        "comments": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "change_history": "++id, [tableName+timestamp], [lsn]"
+      }
+    },
+    {
+      "version": 3,
+      "generatedAt": "2025-08-10T13:08:02.921Z",
+      "schemaHash": "03c8693b497e8636",
+      "stores": {
+        "users": "++id, &email",
+        "task_tags": "++Task_owner",
+        "tasks": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "tag_sets": "++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt",
+        "tags": "++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt",
+        "status_sets": "++id, [entityType], clientId, version, deleted, createdAt, updatedAt",
+        "status_definitions": "++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt",
+        "project_tag_sets": "++Project_owner",
+        "project_status_sets": "++Project_owner",
+        "projects": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "local_changes": "++id, table, processed_sync, [table+recordId], processedSync",
+        "entity_dependencies": "++id, [toTable+toId], [fromTable+fromId]",
+        "comments": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "change_history": "++id, [tableName+timestamp], [lsn]"
+      }
+    },
+    {
+      "version": 4,
+      "generatedAt": "2025-08-10T13:34:22.336Z",
+      "schemaHash": "45e315d8bb4d7b41",
+      "stores": {
+        "users": "++id, &email",
+        "task_tags": "++Task_owner",
+        "tasks": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "tag_sets": "++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt",
+        "tags": "++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt",
+        "status_sets": "++id, [entityType], clientId, version, deleted, createdAt, updatedAt",
+        "status_definitions": "++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt",
+        "project_tag_sets": "++Project_owner",
+        "project_status_sets": "++Project_owner",
+        "projects": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "local_changes": "++id, table, processed_sync, [table+recordId], processedSync",
+        "entity_dependencies": "++id, [toTable+toId], [fromTable+fromId]",
+        "comments": "++id, clientId, version, deleted, createdAt, updatedAt"
+      }
+    }
+  ]
+}

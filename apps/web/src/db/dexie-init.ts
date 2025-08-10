@@ -7,6 +7,7 @@
  */
 
 import { db } from '@repo/dataforge/dexie-schema';
+import Dexie from 'dexie';
 
 /**
  * Initialize Dexie database
@@ -17,8 +18,26 @@ export async function initializeDexieDatabase(): Promise<void> {
     console.log('[Dexie Init] Starting database initialization...');
     const startTime = performance.now();
     
-    // Dexie opens automatically on first use, but we can force it
-    await db.open();
+    // Try to open the database, handle schema conflicts
+    try {
+      await db.open();
+    } catch (error) {
+      // Check if it's an UpgradeError (schema conflict)
+      if (error instanceof Dexie.UpgradeError || error?.name === 'UpgradeError') {
+        console.warn('[Dexie Init] Schema upgrade error detected, resetting database...', error.message);
+        
+        // Delete the entire database
+        await db.delete();
+        console.log('[Dexie Init] Database deleted');
+        
+        // Try to open again with fresh schema
+        await db.open();
+        console.log('[Dexie Init] Database recreated with new schema');
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
     
     // Verify database is ready
     const version = db.verno;
@@ -56,6 +75,30 @@ export async function initializeDexieDatabase(): Promise<void> {
     
   } catch (error) {
     console.error('[Dexie Init] Database initialization failed:', error);
+    
+    // Special handling for SchemaError (e.g., KeyPath not indexed)
+    if (error instanceof Dexie.SchemaError || error?.name === 'SchemaError') {
+      console.warn('[Dexie Init] Schema error detected, attempting database reset...', error.message);
+      
+      try {
+        // Delete and recreate database for schema errors
+        await db.delete();
+        await db.open();
+        console.log('[Dexie Init] Database reset successful after schema error');
+        
+        // Dispatch success after recovery
+        window.dispatchEvent(new CustomEvent('database:ready', { 
+          detail: { 
+            success: true, 
+            recovered: true,
+            version: db.verno
+          } 
+        }));
+        return;
+      } catch (resetError) {
+        console.error('[Dexie Init] Failed to reset database:', resetError);
+      }
+    }
     
     // Dispatch error event for XState
     window.dispatchEvent(new CustomEvent('database:error', { 
@@ -118,6 +161,49 @@ export async function clearAllDexieData(): Promise<void> {
   });
   
   console.log('[Dexie Init] All data cleared');
+}
+
+/**
+ * Force reset database (delete and recreate)
+ * This is useful when encountering persistent schema issues
+ */
+export async function forceResetDatabase(): Promise<void> {
+  console.log('[Dexie Init] Force resetting database...');
+  
+  try {
+    // Close if open
+    if (db.isOpen()) {
+      db.close();
+    }
+    
+    // Delete the entire database
+    await db.delete();
+    console.log('[Dexie Init] Database deleted');
+    
+    // Reopen with fresh schema
+    await db.open();
+    console.log('[Dexie Init] Database recreated successfully');
+    
+    // Re-initialize change tracking
+    const clientId = 'dexie-client-temp';
+    const userId = 'current-user';
+    const { initializeDexieChangeTracking } = await import('./dexie-change-tracking');
+    initializeDexieChangeTracking(clientId, userId);
+    
+    // Dispatch ready event
+    window.dispatchEvent(new CustomEvent('database:ready', { 
+      detail: { 
+        success: true, 
+        reset: true,
+        version: db.verno
+      } 
+    }));
+    
+    return;
+  } catch (error) {
+    console.error('[Dexie Init] Force reset failed:', error);
+    throw error;
+  }
 }
 
 /**
