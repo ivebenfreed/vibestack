@@ -1,13 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useSelector } from '@xstate/store/react'
-import { tasksAtom } from '@/domain-xstate/task'
-import { projectsAtom } from '@/domain-xstate/project'
-import { usersAtom } from '@/domain-xstate/user'
-import { commentsAtom } from '@/domain-xstate/comment'
-import { statusDefinitionsAtom } from '@/domain-xstate/status-definition'
-import { statusSetsAtom } from '@/domain-xstate/status-set'
-import { tagsAtom } from '@/domain-xstate/tag'
-import { tagSetsAtom } from '@/domain-xstate/tag-set'
 import { shallowEqual } from '@xstate/store'
 import { useStableEntityArray, useStableEntityArraySorted } from '@/hooks/useStableEntityArray'
 import { usePlaywrightReady } from '@/hooks/use-playwright-ready'

@@ -2,9 +2,6 @@ import React, { useMemo, useRef } from 'react'
 import { VibeGantt } from '@/components/custom/vibegantt/VibeGantt'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { tasksAtom } from '@/domain-xstate/task'
-import { projectsAtom } from '@/domain-xstate/project'
-import { usersAtom } from '@/domain-xstate/user'
 import type { GanttTask, TaskDependency } from '@/components/custom/vibegantt/types'
 
 /**

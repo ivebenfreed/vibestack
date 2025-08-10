@@ -1,8 +1,5 @@
 import { createStore } from '@xstate/store'
 import { useSelector } from '@xstate/store/react'
-import { projectsAtom, projectUtils } from '@/domain-xstate/project'
-import { tasksAtom, taskUtils } from '@/domain-xstate/task'
-import { usersAtom, userUtils } from '@/domain-xstate/user'
 import { type NavGroup } from '@/components/layout/types'
 import { 
   generateProjectsSection, 
@@ -10,7 +7,7 @@ import {
   type GlobalSidebarSection 
 } from '@/components/layout/data/sidebar-data'
 import { Project } from '@repo/dataforge/client-entities'
-import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource'
+// import { getNewPGliteDataSource } from '@/db/newtypeorm/NewDataSource' // TypeORM removed
 import { Project as ProjectEntity, Task, User } from '@repo/dataforge/client-entities'
 import { useMemo, useEffect, useRef } from 'react'
 import { shallowEqual } from '@xstate/store'
@@ -142,15 +139,8 @@ async function loadProjectsForSidebar() {
   console.log('[SidebarNavigation] Atoms empty and provider ready - loading data via atoms...')
   
   try {
-    // 🎯 SERIALIZED: Load atoms sequentially to avoid PGlite database contention
-    console.log('[SidebarNavigation] Loading atoms sequentially to prevent database conflicts...')
-    const { projectUtils } = await import('@/domain/project-service')
-    const { taskUtils } = await import('@/domain/task-service')
-    const { userUtils } = await import('@/domain/user-service')
-    
-    await projectUtils.ensureLoaded()
-    await taskUtils.ensureLoaded()
-    await userUtils.ensureLoaded()
+    // 🎯 Domain-xstate removed - loading handled by Dexie
+    console.log('[SidebarNavigation] Domain-xstate removed - data loaded via Dexie')
     
     console.log('[SidebarNavigation] ✅ All atoms loaded successfully')
     

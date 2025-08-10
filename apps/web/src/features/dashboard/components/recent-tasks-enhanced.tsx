@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react'
 import { useSelector } from '@xstate/store/react'
-import { tasksAtom } from '@/domain-xstate/task'
 import { shallowEqual } from '@xstate/store'
 import { useStableEntityArraySorted } from '@/hooks/useStableEntityArray'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"

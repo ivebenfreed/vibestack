@@ -23,9 +23,6 @@ import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 // TODO: Migrate to Dexie - these imports need to be updated to use the new domain services
-// import { taskUtils } from '@/domain-xstate/task'
-// import { projectUtils } from '@/domain-xstate/project'
-// import { userUtils } from '@/domain-xstate/user'
 
 // 🔥 DEXIE INTEGRATION FLOW:
 // 1. main.tsx: Creates router and renders root providers

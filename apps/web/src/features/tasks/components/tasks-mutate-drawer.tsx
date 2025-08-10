@@ -27,7 +27,6 @@ import { useState, useEffect } from 'react'
 import { useTasks } from '../context/tasks-context'
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { useProjectAtoms } from '@/domain-xstate/project'
 
 interface Props {
   open: boolean

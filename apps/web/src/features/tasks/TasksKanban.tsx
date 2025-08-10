@@ -30,7 +30,6 @@ import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useSelector } from '@xstate/store/react'
-import { tasksAtom } from '@/domain-xstate/task'
 import { shallowEqual } from '@xstate/store'
 import { Task, TaskStatus } from '@repo/dataforge/client-entities'
 
