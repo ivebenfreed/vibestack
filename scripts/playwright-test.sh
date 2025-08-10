@@ -36,9 +36,18 @@ else
     echo -e "${YELLOW}📊 Using main branch configuration${NC}"
 fi
 
-# Get ports from environment variables (with defaults)
-WEB_PORT="${WEB_PORT:-5173}"
-SERVER_PORT="${SERVER_PORT:-8787}"
+# Load environment from .env.local (single source of truth)
+if [ -f ".env.local" ]; then
+    set -a
+    source .env.local
+    set +a
+else
+    echo -e "${YELLOW}⚠️  No .env.local found. Creating configuration...${NC}"
+    ./scripts/configure-worktree-env.sh
+    set -a
+    source .env.local
+    set +a
+fi
 
 # Export for Playwright config to use
 export WEB_PORT
