@@ -189,6 +189,19 @@ async function main() {
     // Reset sequences to prevent ID conflicts
     await resetSequences(localClient);
     
+    // Fix email verification for development
+    console.log('\n🔧 Setting email_verified to true for development...');
+    try {
+      const result = await localClient.query(`
+        UPDATE users 
+        SET email_verified = true 
+        WHERE email_verified = false
+      `);
+      console.log(`   ✅ Updated ${result.rowCount} users to have verified emails`);
+    } catch (error) {
+      console.log('   ⚠️  Could not update email verification:', error.message);
+    }
+    
     console.log('\n✅ Data clone completed successfully!');
     console.log('\n📊 Summary:');
     
