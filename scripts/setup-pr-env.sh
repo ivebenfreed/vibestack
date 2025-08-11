@@ -58,13 +58,15 @@ fi
 echo "   ⏳ Waiting for PostgreSQL to be ready..."
 sleep 5
 
-# Step 3: Database setup will be handled by pnpm dev
+# Step 3: Run auto-configure-branch-db to set up and clone database
 echo ""
-echo "3️⃣ Database setup will be handled automatically by pnpm dev"
-
-# Step 4: Database cloning will be handled by auto-configure-branch-db.js
-echo ""
-echo "4️⃣ Database setup and cloning will be handled automatically by pnpm dev"
+echo "3️⃣ Setting up and cloning database..."
+if [ -f "./scripts/auto-configure-branch-db.js" ]; then
+    node ./scripts/auto-configure-branch-db.js
+else
+    echo "   ⚠️ Database configuration script not found, skipping automatic setup"
+    echo "   You may need to manually run: node scripts/auto-configure-branch-db.js"
+fi
 
 echo ""
 echo "✅ PR environment setup complete!"
