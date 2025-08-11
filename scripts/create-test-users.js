@@ -10,12 +10,24 @@ const crypto = require('crypto');
 
 const DB_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/vibestack_dev';
 
+// Use environment variable or generate random passwords
+const DEFAULT_TEST_PASSWORD = process.env.TEST_USER_PASSWORD || process.env.DEFAULT_TEST_PASSWORD || generateTestPassword();
+
+function generateTestPassword() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#';
+  let password = '';
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
 const TEST_USERS = [
-  { email: 'alice@example.com', password: 'Test123!', name: 'Alice Johnson', role: 'member' },
-  { email: 'bob@example.com', password: 'Test123!', name: 'Bob Smith', role: 'member' },
-  { email: 'charlie@example.com', password: 'Test123!', name: 'Charlie Brown', role: 'viewer' },
-  { email: 'demo@vibestack.com', password: 'Demo123!', name: 'Demo User', role: 'member' },
-  { email: 'playwright@test.com', password: 'Test123!', name: 'Playwright Test', role: 'member' },
+  { email: 'alice@example.com', password: DEFAULT_TEST_PASSWORD, name: 'Alice Johnson', role: 'member' },
+  { email: 'bob@example.com', password: DEFAULT_TEST_PASSWORD, name: 'Bob Smith', role: 'member' },
+  { email: 'charlie@example.com', password: DEFAULT_TEST_PASSWORD, name: 'Charlie Brown', role: 'viewer' },
+  { email: 'demo@vibestack.com', password: DEFAULT_TEST_PASSWORD, name: 'Demo User', role: 'member' },
+  { email: 'playwright@test.com', password: DEFAULT_TEST_PASSWORD, name: 'Playwright Test', role: 'member' },
 ];
 
 async function createUser(client, userData) {

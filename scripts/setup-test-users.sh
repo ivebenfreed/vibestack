@@ -65,29 +65,33 @@ echo ""
 echo "Creating test users..."
 echo "----------------------"
 
+# Use environment variable for passwords or a placeholder
+TEST_PASSWORD="${TEST_USER_PASSWORD:-ChangeMe123!}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-ChangeMe123!}"
+
 # Super admin user
-create_user "admin@vibestack.com" "Admin123!@#" "Admin User" "super_admin"
+create_user "admin@vibestack.com" "$ADMIN_PASSWORD" "Admin User" "super_admin"
 
 # Regular test users
-create_user "alice@example.com" "Test123!" "Alice Johnson" "user"
-create_user "bob@example.com" "Test123!" "Bob Smith" "user"
-create_user "charlie@example.com" "Test123!" "Charlie Brown" "user"
+create_user "alice@example.com" "$TEST_PASSWORD" "Alice Johnson" "user"
+create_user "bob@example.com" "$TEST_PASSWORD" "Bob Smith" "user"
+create_user "charlie@example.com" "$TEST_PASSWORD" "Charlie Brown" "user"
 
 # Demo user for testing
-create_user "demo@vibestack.com" "Demo123!" "Demo User" "user"
+create_user "demo@vibestack.com" "$TEST_PASSWORD" "Demo User" "user"
 
 # Playwright test user
-create_user "playwright@test.com" "Test123!" "Playwright Test" "user"
+create_user "playwright@test.com" "$TEST_PASSWORD" "Playwright Test" "user"
 
 echo ""
 echo "=================================="
 echo -e "${GREEN}✨ Test users setup complete!${NC}"
 echo ""
 echo "You can now log in with:"
-echo "  Admin:     admin@vibestack.com / Admin123!@#"
-echo "  Demo:      demo@vibestack.com / Demo123!"
-echo "  Test:      alice@example.com / Test123!"
-echo "  Playwright: playwright@test.com / Test123!"
+echo "  Admin:     admin@vibestack.com / $ADMIN_PASSWORD"
+echo "  Demo:      demo@vibestack.com / $TEST_PASSWORD"
+echo "  Test:      alice@example.com / $TEST_PASSWORD"
+echo "  Playwright: playwright@test.com / $TEST_PASSWORD"
 echo ""
 echo "Note: The bootstrap endpoint only works for creating the first super admin."
 echo "      Additional users should be created through the normal signup flow."

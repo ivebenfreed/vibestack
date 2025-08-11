@@ -36,9 +36,9 @@ SELECT
     u.id,
     u.id, -- For credential provider, account_id = user_id
     'credential',
-    -- Password hash for 'Admin123!' using bcrypt
-    -- This is a placeholder - we'll need to generate this properly
-    '$2a$10$K5L.2NMg.pE5.y5.0J5.5eO5.5.5.5.5.5.5.5.5.5.5.5.5.5.5.5.',
+    -- Password hash should be generated externally and passed as parameter
+    -- Use scripts/bootstrap-admin.js instead of this SQL file
+    NULL, -- Cannot set password directly in SQL
     NOW(),
     NOW()
 FROM users u
