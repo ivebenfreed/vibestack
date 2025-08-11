@@ -103,9 +103,9 @@ DB_PORT=${DB_PORT}
 PROXY_PORT=${PROXY_PORT}
 
 # Local database configuration (using db.localtest.me for proxy compatibility)
-DATABASE_URL=postgres://postgres:postgres@db.localtest.me:${DB_PORT}/vibestack_dev
-DIRECT_DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/vibestack_dev
-LOCAL_DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/vibestack_dev
+DATABASE_URL=postgres://postgres:postgres@db.localtest.me:${PROXY_PORT}/vibestack_dev${issueNumber !== '0' ? '_issue_' + issueNumber : ''}
+DIRECT_DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/vibestack_dev${issueNumber !== '0' ? '_issue_' + issueNumber : ''}
+LOCAL_DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/vibestack_dev${issueNumber !== '0' ? '_issue_' + issueNumber : ''}
 
 # Local development environment
 ENVIRONMENT=local
