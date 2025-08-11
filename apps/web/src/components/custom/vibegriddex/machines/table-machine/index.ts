@@ -179,6 +179,9 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Entity update handler
     onEntityUpdate: input.onEntityUpdate,
     
+    // Batch entity update handler
+    onBatchEntityUpdate: input.onBatchEntityUpdate,
+    
     // Notification handler
     onNotification: input.onNotification,
     
@@ -1145,6 +1148,17 @@ export const tableBaseMachine = setup({
                     type: 'UPDATE_COORDINATES',
                     mapping: context.coordinateMapping
                   });
+                }
+                
+                // Send initial viewport to canvas after a small delay to ensure canvas is ready
+                if (context.viewport) {
+                  setTimeout(() => {
+                    console.log('TableMachine: Sending initial viewport to canvas (delayed)', context.viewport);
+                    context.actors.canvasActor.send({
+                      type: 'UPDATE_VIEWPORT',
+                      viewport: context.viewport
+                    });
+                  }, 50); // Small delay to ensure canvas initialization is complete
                 }
               });
             }
