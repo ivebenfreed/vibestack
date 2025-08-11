@@ -78,7 +78,10 @@ PR_NUMBER=${ISSUE_NUMBER}
 ISSUE_NUMBER=${ISSUE_NUMBER}
 
 # Database Configuration
-DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/${DB_NAME}
+# Use proxy port for DATABASE_URL (Neon serverless adapter needs HTTP proxy)
+DATABASE_URL=postgres://postgres:postgres@db.localtest.me:${PROXY_PORT}/${DB_NAME}
+# Direct connection to PostgreSQL (bypasses proxy)
+DIRECT_DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/${DB_NAME}
 DATABASE_NAME=${DB_NAME}
 
 # API URLs
