@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## Current Worktree Configuration
+
+**This is Issue #71 worktree with the following ports:**
+
+- Web application: `http://localhost:5244`
+- Server API: `http://localhost:8858`
+- Database: `postgres://postgres:postgres@localhost:5503/vibestack_dev_issue_71`
+- Proxy: Port 4515
+
+
 ## Current Configuration
 
 **This is the main staging branch with the following default ports:**
@@ -147,9 +157,15 @@ Each worktree uses a **persistent browser profile** that maintains login state a
 
 #### Quick Start
 
+**IMPORTANT**: Always use `./scripts/playwright-test.sh` wrapper script instead of `npx playwright test` directly. The wrapper script automatically:
+- Detects the correct issue number and ports for worktrees
+- Sources `.env.local` for proper configuration
+- Uses the correct persistent browser profile
+- Ensures dev servers are running
+
 ```bash
 # 🔐 IMPORTANT: Initial authentication setup (run this FIRST in new worktrees!)
-npx playwright test tests/playwright/setup/01-initial-auth.spec.js
+./scripts/playwright-test.sh tests/playwright/setup/01-initial-auth.spec.js
 
 # Run essential baseline tests (RECOMMENDED for every worktree)
 ./scripts/playwright-test.sh tests/playwright/smoke  # Verify app loads
@@ -168,6 +184,8 @@ npx playwright test tests/playwright/setup/01-initial-auth.spec.js
 # Run in debug mode (automatically shows browser)
 ./scripts/playwright-test.sh --debug
 ```
+
+**Note**: Running `npx playwright test` directly will use incorrect ports and configuration. Always use the wrapper script.
 
 #### Essential Baseline Tests for Every Worktree
 
