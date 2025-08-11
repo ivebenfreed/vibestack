@@ -12,8 +12,19 @@ const crypto = require('crypto');
 // Configuration
 const DB_URL = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/vibestack_dev';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@vibestack.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.DEFAULT_ADMIN_PASSWORD || generateSecurePassword();
 const ADMIN_NAME = process.env.ADMIN_NAME || 'Admin User';
+
+function generateSecurePassword() {
+  // Generate a secure random password if none provided
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let password = '';
+  for (let i = 0; i < 16; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  console.log('⚠️  No ADMIN_PASSWORD provided, generated:', password);
+  return password;
+}
 
 async function createAdminUser() {
   const client = new Client({
