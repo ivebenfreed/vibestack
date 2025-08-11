@@ -101,11 +101,8 @@ function generateServiceFile(service: EntityServiceInfo): string {
   const className = pascalCaseEntity + 'DexieService';
   
   // Generate consistent service instance name (camelCase without 'Service' suffix)
-  const camelCaseEntity = service.entityName.split('_')
-    .map((part, index) => index === 0 
-      ? part.toLowerCase() 
-      : part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
+  // For entities like StatusDefinition, we want statusDefinitionDexieService (not statusdefinitionDexieService)
+  const camelCaseEntity = service.entityName.charAt(0).toLowerCase() + service.entityName.slice(1);
   const serviceName = camelCaseEntity + 'DexieService';
   
   let output = `// Generated Dexie domain service for ${service.entityName}

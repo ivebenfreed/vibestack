@@ -47,4 +47,4 @@ export class TaskTagsDexieService {
   }
 }
 
-export const taskTagsDexieService = new TaskTagsDexieService();
+export const task_tagsDexieService = new TaskTagsDexieService();

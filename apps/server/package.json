@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "prebuild": "cd ../../packages/dataforge && pnpm forge:build",
     "build": "../../scripts/type-check-focused/type-check-all.sh && wrangler deploy --outdir=dist",
     "dev": "wrangler dev --port ${SERVER_PORT:-8787} --ip 127.0.0.1",
     "dev:local": "wrangler dev --port ${SERVER_PORT:-8787} --ip 127.0.0.1",

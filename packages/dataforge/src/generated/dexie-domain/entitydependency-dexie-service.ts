@@ -51,4 +51,4 @@ export class EntityDependencyDexieService {
   }
 }
 
-export const entitydependencyDexieService = new EntityDependencyDexieService();
+export const entityDependencyDexieService = new EntityDependencyDexieService();
