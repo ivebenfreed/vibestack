@@ -3,6 +3,7 @@
 /**
  * Setup development ports for multi-instance support
  * Supports running multiple dev servers for different PRs
+ * Now also manages .env.local generation for Wrangler 4+ support
  */
 
 const fs = require('fs');

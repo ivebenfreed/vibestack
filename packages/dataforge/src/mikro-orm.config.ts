@@ -1,4 +1,5 @@
 import { defineConfig, UnderscoreNamingStrategy } from '@mikro-orm/postgresql';
+import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import * as entities from './entities/index.js';
 
 // Custom naming strategy that uses plural table names but singular column names
@@ -64,4 +65,10 @@ export default defineConfig({
     warnWhenNoEntities: false,
   },
   namingStrategy: PluralNamingStrategy,
+  metadataProvider: TsMorphMetadataProvider,
+  metadataCache: { 
+    enabled: true,
+    pretty: true,
+  },
+  connect: false, // Don't auto-connect to database
 });

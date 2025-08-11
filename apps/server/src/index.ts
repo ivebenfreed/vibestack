@@ -73,6 +73,33 @@ apiApp.route('/bootstrap', bootstrapRouter);
 
 // Add public health endpoints BEFORE authMiddleware
 apiApp.get('/health', (c) => c.text('Server OK'));
+apiApp.get('/env/debug', (c) => {
+  // Debug endpoint to verify which environment is being used
+  const dbUrl = c.env.DATABASE_URL || 'NOT SET';
+  const environment = c.env.ENVIRONMENT || 'NOT SET';
+  const webPort = c.env.WEB_PORT || 'NOT SET';
+  const serverPort = c.env.SERVER_PORT || 'NOT SET';
+  
+  // Parse database URL to show which database is being used
+  let dbInfo = 'unknown';
+  if (dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')) {
+    const portMatch = dbUrl.match(/:(\d+)\//);
+    dbInfo = `local (port ${portMatch ? portMatch[1] : 'unknown'})`;
+  } else if (dbUrl.includes('neon.tech')) {
+    dbInfo = 'remote (Neon)';
+  }
+  
+  return c.json({
+    environment,
+    database: dbInfo,
+    databaseUrl: dbUrl.substring(0, 50) + '...',  // Show partial URL for security
+    ports: {
+      web: webPort,
+      server: serverPort
+    },
+    issueNumber: c.env.ISSUE_NUMBER || 'NOT SET'
+  });
+});
 apiApp.get('/db/health', async (c) => {
   try {
     const url = c.env.DATABASE_URL;

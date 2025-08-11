@@ -19,7 +19,7 @@ export interface StatusDefinitionUpdateInput {
   statusSet?: any;
 }
 
-export class StatusdefinitionDexieService {
+export class StatusDefinitionDexieService {
   async create(data: Partial<StatusDefinition>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -66,4 +66,4 @@ export class StatusdefinitionDexieService {
   }
 }
 
-export const statusdefinitionDexieService = new StatusdefinitionDexieService();
+export const statusDefinitionDexieService = new StatusDefinitionDexieService();

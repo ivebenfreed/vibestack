@@ -15,7 +15,7 @@ export interface LocalChangesUpdateInput {
   lastError?: any;
 }
 
-export class LocalchangesDexieService {
+export class LocalChangesDexieService {
   async create(data: Partial<LocalChanges>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -55,4 +55,4 @@ export class LocalchangesDexieService {
   }
 }
 
-export const localchangesDexieService = new LocalchangesDexieService();
+export const localChangesDexieService = new LocalChangesDexieService();
