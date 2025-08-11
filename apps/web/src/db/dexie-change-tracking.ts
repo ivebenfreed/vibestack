@@ -101,10 +101,10 @@ const TRACKED_TABLES = [
   'projects',
   'users',
   'comments',
-  'statusDefinitions',
-  'statusSets',
+  'status_definitions',
+  'status_sets',
   'tags',
-  'tagSets'
+  'tag_sets'
 ] as const;
 
 // Track if hooks have been initialized to prevent duplicates
