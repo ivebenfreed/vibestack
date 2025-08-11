@@ -1,5 +1,5 @@
 {
-  "name": "vibestack-web",
+  "name": "vibestack-web-issue-71",
   "private": false,
   "version": "1.3.0",
   "type": "module",
@@ -28,7 +28,6 @@
     "pages:deploy:production": "npm run build && wrangler pages deploy dist/client --project-name vibestack-web --compatibility-date 2025-06-21"
   },
   "dependencies": {
-    "2": "^3.0.0",
     "@casl/ability": "^6.7.3",
     "@casl/react": "^5.0.0",
     "@dnd-kit/core": "^6.3.1",
@@ -85,7 +84,6 @@
     "input-otp": "^1.4.2",
     "jotai": "^2.12.5",
     "js-cookie": "^3.0.5",
-    "konva": "^9.3.21",
     "lucide-react": "^0.488.0",
     "react": "^19.1.0",
     "react-aria-components": "^1.10.1",
@@ -94,7 +92,6 @@
     "react-dom": "^19.1.0",
     "react-edit-text": "^5.1.1",
     "react-hook-form": "^7.55.0",
-    "react-konva": "^19.0.7",
     "react-select": "^5.8.0",
     "react-top-loading-bar": "^3.0.2",
     "recharts": "^2.15.2",
