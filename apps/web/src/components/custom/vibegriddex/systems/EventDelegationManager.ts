@@ -57,6 +57,10 @@ export class EventDelegationManager {
   private lastDragMoveTime = 0;
   private readonly DRAG_MOVE_THROTTLE_MS = 50; // ~20fps for smoother performance
   
+  // Semantic throttling for resize operations - only update when width changes meaningfully
+  private lastResizeWidth: number = 0;
+  private readonly RESIZE_THRESHOLD_PX = 5; // Only update every 5px width change
+  
   // Bound handlers for cleanup
   private boundHandlers = {
     handleMouseDown: this.handleMouseDown.bind(this),
@@ -213,18 +217,53 @@ export class EventDelegationManager {
     // Check if we have potential for drag (startPos exists) OR are already dragging
     if (!this.dragState.startPos && !this.dragState.isDragging) return;
     
+    // CENTRALIZED DRAG THROTTLING - apply to all drag operations except fill (which has semantic throttling)
+    if (this.dragState.dragType !== 'fill') {
+      const now = Date.now();
+      if (now - this.lastDragMoveTime < this.DRAG_MOVE_THROTTLE_MS) {
+        // Cancel any existing scheduled update
+        if (this.dragMoveThrottleId) {
+          cancelAnimationFrame(this.dragMoveThrottleId);
+        }
+        
+        // Schedule a single update for the next frame
+        const currentEvent = {
+          clientX: event.clientX,
+          clientY: event.clientY,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey
+        };
+        
+        this.dragMoveThrottleId = requestAnimationFrame(() => {
+          this.lastDragMoveTime = Date.now();
+          this.processDragMove(currentEvent);
+        });
+        return; // Return early - don't process event now
+      }
+      
+      // Enough time has passed, process immediately and update timestamp
+      this.lastDragMoveTime = now;
+    }
+    this.processDragMove(event);
+  }
+  
+  /**
+   * Process drag move events (called either immediately or throttled)
+   */
+  private processDragMove(event: { clientX: number; clientY: number; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean }): void {
     switch (this.dragState.dragType) {
       case 'selection':
-        this.handleSelectionDrag(event);
+        this.handleSelectionDrag(event as MouseEvent);
         break;
       case 'column':
-        this.handleColumnDrag(event);
+        this.handleColumnDrag(event as MouseEvent);
         break;
       case 'resize':
-        this.handleResizeDrag(event);
+        this.handleResizeDrag(event as MouseEvent);
         break;
       case 'fill':
-        this.handleFillDrag(event);
+        this.handleFillDrag(event as MouseEvent);
         break;
     }
   }
@@ -353,7 +392,15 @@ export class EventDelegationManager {
       const columnId = cell.dataset.columnId;
       
       if (rowId && columnId) {
-        // Cell click handling - currently just handled by single-click content editing
+        // Send selection event on click (for tests and simplified click handling)
+        console.log('🎯 EventDelegationManager: Cell clicked, sending selection event', { rowId, columnId });
+        this.send({
+          type: 'selection.cell.select',
+          rowId,
+          columnId,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey
+        });
       }
     }
   }
@@ -633,6 +680,9 @@ export class EventDelegationManager {
       }
     }
     
+    // Reset semantic throttling state for new resize operation
+    this.lastResizeWidth = currentWidth;
+    
     const containerRect = this.config.container.getBoundingClientRect();
     this.dragState = {
       isDragging: true,
@@ -765,40 +815,7 @@ export class EventDelegationManager {
         }
       }
       
-      // FIXED: Proper throttling - only send if enough time has passed
-      const now = Date.now();
-      if (now - this.lastDragMoveTime < this.DRAG_MOVE_THROTTLE_MS) {
-        // Cancel any existing scheduled update
-        if (this.dragMoveThrottleId) {
-          cancelAnimationFrame(this.dragMoveThrottleId);
-        }
-        
-        // Schedule a single update for the next frame
-        // Store the current mouse position to avoid closure issues
-        const currentClientX = event.clientX;
-        const currentClientY = event.clientY;
-        
-        this.dragMoveThrottleId = requestAnimationFrame(() => {
-          this.lastDragMoveTime = Date.now();
-          
-          // Use the stored position instead of the closed-over event
-          const freshEvent = { clientX: currentClientX, clientY: currentClientY } as MouseEvent;
-          const containerCoords = this.convertToContainerCoordinates(freshEvent);
-          
-          this.send({
-            type: 'view.columns.drag.move',
-            x: containerCoords.x,
-            y: containerCoords.y,
-            clientX: currentClientX,
-            clientY: currentClientY
-          });
-          this.dragMoveThrottleId = null;
-        });
-        return; // CRITICAL: Return early - don't send event now
-      }
-      
-      // Enough time has passed, send immediately and update timestamp
-      this.lastDragMoveTime = now;
+      // Send drag move event - throttling is handled at the top level in handleMouseMove
       const containerCoords = this.convertToContainerCoordinates(event);
       this.send({
         type: 'view.columns.drag.move',
@@ -819,6 +836,16 @@ export class EventDelegationManager {
     // Calculate the delta from the start position
     const deltaX = event.clientX - this.dragState.startX;
     const newWidth = Math.max(50, this.dragState.startWidth + deltaX); // Minimum width of 50
+    
+    // SEMANTIC THROTTLING: Only send resize events when width changes meaningfully
+    const widthChange = Math.abs(newWidth - this.lastResizeWidth);
+    if (widthChange < this.RESIZE_THRESHOLD_PX && this.lastResizeWidth !== 0) {
+      // Width hasn't changed enough to warrant an update
+      return;
+    }
+    
+    // Update last width for next comparison
+    this.lastResizeWidth = newWidth;
     
     const containerCoords = this.convertToContainerCoordinates(event);
     this.send({
