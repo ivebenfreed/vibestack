@@ -1,5 +1,96 @@
 
-> server-issue-71@0.1.0 build /home/ben-freed/dev/vibestack/worktrees/issue-71/apps/server
+> server-issue-71@0.1.0 prebuild /home/ben-freed/dev/vibestack/apps/server
+> cd ../../packages/dataforge && pnpm forge:build
+
+
+> @repo/dataforge@0.1.0 forge:build /home/ben-freed/dev/vibestack/packages/dataforge
+> npm run generate
+
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+
+> @repo/dataforge@0.1.0 generate
+> npm run generate-entities && npm run generate-dexie-schema && npm run generate-dexie-services && npm run generate-drizzle-schema && npm run generate-sync-metadata
+
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+
+> @repo/dataforge@0.1.0 generate-entities
+> tsx src/scripts/generate-entities.ts
+
+🔍 Extracting MikroORM entity metadata...
+📦 Found 17 entities
+✅ Generated client-entities.ts
+✅ Generated server-entities.ts
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+
+> @repo/dataforge@0.1.0 generate-dexie-schema
+> tsx src/scripts/generate-dexie-schema.ts
+
+🔍 Extracting Dexie schema from MikroORM entities...
+📦 Found 13 tables for Dexie
+✅ Schema unchanged, keeping version 4
+✅ Generated dexie-schema.ts
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+
+> @repo/dataforge@0.1.0 generate-dexie-services
+> tsx src/scripts/generate-dexie-domain-services.ts
+
+🔍 Extracting service info from MikroORM entities...
+⏭️  Skipping server-only entity: Verification
+⏭️  Skipping server-only entity: Session
+⏭️  Skipping server-only entity: ChangeHistory
+⏭️  Skipping server-only entity: Account
+📦 Generating 13 Dexie domain services
+  ✓ Generated user-dexie-service.ts
+  ✓ Generated task_tags-dexie-service.ts
+  ✓ Generated task-dexie-service.ts
+  ✓ Generated tagset-dexie-service.ts
+  ✓ Generated tag-dexie-service.ts
+  ✓ Generated statusset-dexie-service.ts
+  ✓ Generated statusdefinition-dexie-service.ts
+  ✓ Generated project_tag_sets-dexie-service.ts
+  ✓ Generated project_status_sets-dexie-service.ts
+  ✓ Generated project-dexie-service.ts
+  ✓ Generated localchanges-dexie-service.ts
+  ✓ Generated entitydependency-dexie-service.ts
+  ✓ Generated comment-dexie-service.ts
+✅ Generated Dexie domain services
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+
+> @repo/dataforge@0.1.0 generate-drizzle-schema
+> tsx src/scripts/generate-drizzle-schema.ts
+
+🔍 Extracting Drizzle schema from MikroORM entities...
+⏭️  Skipping client-only entity: LocalChanges
+📦 Found 16 tables for Drizzle
+✅ Generated drizzle-schema.ts
+npm warn config optional Use `--omit=optional` to exclude optional dependencies, or
+npm warn config `--include=optional` to include them.
+npm warn config
+npm warn config       Default value does install optional deps unless otherwise omitted.
+
+> @repo/dataforge@0.1.0 generate-sync-metadata
+> tsx src/scripts/generate-sync-metadata.ts
+
+🔍 Extracting sync metadata from MikroORM entities...
+📦 Found 14 entities and 3 junction tables
+✅ Generated sync-metadata.ts
+
+> server-issue-71@0.1.0 build /home/ben-freed/dev/vibestack/apps/server
 > ../../scripts/type-check-focused/type-check-all.sh && wrangler deploy --outdir=dist
 
 === Running Focused Type Checks ===
@@ -8,8 +99,8 @@ Checking server...
 ../../scripts/type-check-focused/type-check-all.sh: line 14: cd: /home/ben-freed/vibestack/apps/server: No such file or directory
 ../../scripts/type-check-focused/type-check-all.sh: line 16: /home/ben-freed/vibestack/type-check-server.log: No such file or directory
   Errors: 0
-../../scripts/type-check-focused/type-check-all.sh: line 26: cd: OLDPWD not set
 
+../../scripts/type-check-focused/type-check-all.sh: line 26: cd: OLDPWD not set
 Checking web...
 ../../scripts/type-check-focused/type-check-all.sh: line 14: cd: /home/ben-freed/vibestack/apps/web: No such file or directory
 ../../scripts/type-check-focused/type-check-all.sh: line 16: /home/ben-freed/vibestack/type-check-web.log: No such file or directory
@@ -20,8 +111,8 @@ Checking dataforge...
 ../../scripts/type-check-focused/type-check-all.sh: line 14: cd: /home/ben-freed/vibestack/packages/dataforge: No such file or directory
 ../../scripts/type-check-focused/type-check-all.sh: line 16: /home/ben-freed/vibestack/type-check-dataforge.log: No such file or directory
   Errors: 0
-
 ../../scripts/type-check-focused/type-check-all.sh: line 26: cd: OLDPWD not set
+
 === Summary ===
 
 
@@ -44,5 +135,5 @@ Checking dataforge...
 [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mIn a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN environment variable for wrangler to work. Please go to https://developers.cloudflare.com/fundamentals/api/get-started/create-token/ for instructions on how to create an api token, and assign its value to CLOUDFLARE_API_TOKEN.[0m
 
 
-🪵  Logs were written to "/home/ben-freed/.config/.wrangler/logs/wrangler-2025-08-11_10-22-29_030.log"
+🪵  Logs were written to "/home/ben-freed/.config/.wrangler/logs/wrangler-2025-08-11_17-46-50_288.log"
  ELIFECYCLE  Command failed with exit code 1.
