@@ -7,7 +7,7 @@
 
 import { StatusSet } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
-import { statussetDexieService } from '@repo/dataforge/dexie-domain';
+import { statusSetDexieService } from '@repo/dataforge/dexie-domain';
 import type { CreateStatusSetInput, UpdateStatusSetInput } from '@repo/dataforge/statusset-operations';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
