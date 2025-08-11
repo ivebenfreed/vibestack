@@ -722,7 +722,8 @@ export const viewHandlers = {
               type: 'FORWARD_TO_CANVAS',
               event: {
                 type: 'RENDER_FILL_HANDLE',
-                visualCells: visualPositions
+                visualCells: visualPositions,
+                viewport: context.viewport
               }
             });
           }

@@ -302,6 +302,9 @@ export interface TableContext {
   // Entity update handler for self-contained saves
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void;
   
+  // Batch entity update handler for bulk operations
+  onBatchEntityUpdate?: (updates: Array<{ id: string; updates: Record<string, any> }>) => Promise<void> | void;
+  
   // Notification handler for user feedback
   onNotification?: (message: string, type: 'info' | 'warning' | 'error' | 'success') => void;
   
@@ -515,6 +518,7 @@ export interface TableConfig {
   enableSelectionColumn?: boolean;
   persistedData?: any; // Persisted UI state from localStorage (sync machine pattern)
   onEntityUpdate?: (rowId: string, updates: Record<string, any>) => Promise<void> | void; // Generic entity update handler
+  onBatchEntityUpdate?: (updates: Array<{ id: string; updates: Record<string, any> }>) => Promise<void> | void; // Batch entity update handler
   onNotification?: (message: string, type: 'info' | 'warning' | 'error' | 'success') => void; // Notification handler
   
   // New store-based architecture
