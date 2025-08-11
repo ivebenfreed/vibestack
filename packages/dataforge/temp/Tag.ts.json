@@ -180,16 +180,16 @@
     "uniques": [],
     "className": "Tag",
     "path": "./src/entities/Tag.ts",
-    "collection": "tags",
     "name": "Tag",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseDomainEntity",
-    "useCache": true
+    "useCache": true,
+    "collection": "tag"
   },
   "origin": "./src/entities/Tag.ts",
-  "hash": "6e479ee9f1312b70071c2eb1d83f12bf",
+  "hash": "932e126c7b745f78432a8e2c0f872364",
   "version": "6.4.16"
 }

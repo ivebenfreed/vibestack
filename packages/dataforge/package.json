@@ -25,6 +25,10 @@
       "types": "./src/generated/drizzle-schema.ts",
       "import": "./src/generated/drizzle-schema.ts"
     },
+    "./kysely-types": {
+      "types": "./src/generated/kysely-types.ts",
+      "import": "./src/generated/kysely-types.ts"
+    },
     "./sync-metadata": {
       "types": "./src/generated/sync-metadata.ts",
       "import": "./src/generated/sync-metadata.ts"
@@ -45,22 +49,24 @@
     "generate-dexie-services": "tsx src/scripts/generate-dexie-domain-services.ts",
     "generate-client-services": "tsx src/scripts/generate-dexie-domain-services.ts",
     "generate-drizzle-schema": "tsx src/scripts/generate-drizzle-schema.ts",
+    "generate-kysely-types": "tsx src/scripts/generate-kysely-types.ts",
     "generate-sync-metadata": "tsx src/scripts/generate-sync-metadata.ts",
-    "generate": "npm run generate-entities && npm run generate-dexie-schema && npm run generate-dexie-services && npm run generate-drizzle-schema && npm run generate-sync-metadata",
+    "generate": "npm run generate-entities && npm run generate-dexie-schema && npm run generate-dexie-services && npm run generate-drizzle-schema && npm run generate-kysely-types && npm run generate-sync-metadata",
     "forge:build": "npm run generate",
     "forge:client": "npm run generate-client-schema && npm run generate-client-services",
     "type-check": "tsc --noEmit",
     "build": "npm run forge:build",
-    "migration:create": "mikro-orm migration:create",
-    "migration:up": "mikro-orm migration:up",
-    "migration:down": "mikro-orm migration:down",
-    "migration:list": "mikro-orm migration:list",
-    "migration:pending": "mikro-orm migration:pending",
-    "migration:fresh": "mikro-orm migration:fresh",
-    "schema:drop": "mikro-orm schema:drop",
-    "schema:update": "mikro-orm schema:update",
-    "schema:create": "mikro-orm schema:create",
-    "schema:fresh": "mikro-orm schema:fresh"
+    "migration:create": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:create --blank",
+    "migration:create:initial": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:create --initial",
+    "migration:up": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:up",
+    "migration:down": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:down",
+    "migration:list": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:list",
+    "migration:pending": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:pending",
+    "migration:fresh": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:fresh",
+    "schema:drop": "tsx ./node_modules/@mikro-orm/cli/cli.js schema:drop",
+    "schema:update": "tsx ./node_modules/@mikro-orm/cli/cli.js schema:update",
+    "schema:create": "tsx ./node_modules/@mikro-orm/cli/cli.js schema:create",
+    "schema:fresh": "tsx ./node_modules/@mikro-orm/cli/cli.js schema:fresh"
   },
   "dependencies": {
     "@mikro-orm/cli": "^6.4.0",

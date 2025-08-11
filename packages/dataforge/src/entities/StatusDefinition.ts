@@ -2,7 +2,7 @@ import { Entity, Property, ManyToOne, Index } from '@mikro-orm/core';
 import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { StatusSet } from './StatusSet.js';
 
-@Entity({ tableName: 'status_definitions' })
+@Entity()
 @Index({ properties: ['statusSet', 'sortOrder'] })
 @Index({ properties: ['name'] })
 export class StatusDefinition extends BaseDomainEntity {

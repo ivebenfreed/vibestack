@@ -3,7 +3,7 @@ import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { TagSet } from './TagSet.js';
 import { Task } from './Task.js';
 
-@Entity({ tableName: 'tags' })
+@Entity()
 @Index({ properties: ['slug'] })
 @Index({ properties: ['tagSet', 'sortOrder'] })
 export class Tag extends BaseDomainEntity {

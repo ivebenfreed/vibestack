@@ -55,6 +55,36 @@ export function createErrorResponse(type: ServiceErrorType, message: string): Er
 }
 
 /**
+ * Pagination metadata
+ */
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Paged response wrapper
+ */
+export interface PagedResponse<T> {
+  ok: true;
+  data: T[];
+  meta: PaginationMeta;
+}
+
+/**
+ * Helper to create a paged response
+ */
+export function createPagedResponse<T>(data: T[], meta: PaginationMeta): PagedResponse<T> {
+  return {
+    ok: true,
+    data,
+    meta
+  };
+}
+
+/**
  * API environment type for Hono routes
  */
 import type { AppBindings } from './hono'; // Import AppBindings

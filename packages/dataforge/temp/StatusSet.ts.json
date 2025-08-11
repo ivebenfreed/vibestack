@@ -120,16 +120,16 @@
     "uniques": [],
     "className": "StatusSet",
     "path": "./src/entities/StatusSet.ts",
-    "collection": "status_sets",
     "name": "StatusSet",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseDomainEntity",
-    "useCache": true
+    "useCache": true,
+    "collection": "status_set"
   },
   "origin": "./src/entities/StatusSet.ts",
-  "hash": "55bab3122507546e467aef28ecebbaec",
+  "hash": "e58d3254ea3a9e0131c20a01e27b65b8",
   "version": "6.4.16"
 }

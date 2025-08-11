@@ -8,9 +8,9 @@ export class Comment extends BaseDomainEntity {
   @Property({ type: 'text' })
   content!: string;
 
-  @ManyToOne(() => Task)
+  @ManyToOne(() => Task, { fieldName: 'task_id' })
   task!: Task;
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, fieldName: 'author_id' })
   author?: User;
 }

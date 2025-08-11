@@ -14,10 +14,6 @@ import replication from './replication'
 import { migrations } from './migrations'
 // import { db } from './db' // TypeORM-based
 import authRouter from './auth'
-import { generic } from './generic'
-import { HTTPException } from 'hono/http-exception'
-import { serverLogger as log } from '../middleware/logger'
-import type { AppBindings } from '../types/hono'
 
 // Create API router
 const api = new Hono<ApiEnv>()
@@ -38,18 +34,23 @@ api.use('*', logger())
 // api.route('/users', users)
 // api.route('/comments', comments)
 
-// Redirect legacy routes to generic API for backward compatibility
-api.all('/projects/*', (c) => c.redirect(`/api/generic/projects${c.req.path.replace('/projects', '')}`))
-api.all('/tasks/*', (c) => c.redirect(`/api/generic/tasks${c.req.path.replace('/tasks', '')}`))
-api.all('/users/*', (c) => c.redirect(`/api/generic/users${c.req.path.replace('/users', '')}`))
-api.all('/comments/*', (c) => c.redirect(`/api/generic/comments${c.req.path.replace('/comments', '')}`))
+// Redirect legacy routes to Kysely generic API for backward compatibility
+api.all('/projects/*', (c) => c.redirect(`/api/generic-kysely/project${c.req.path.replace('/projects', '')}`))
+api.all('/tasks/*', (c) => c.redirect(`/api/generic-kysely/task${c.req.path.replace('/tasks', '')}`))
+api.all('/users/*', (c) => c.redirect(`/api/generic-kysely/user${c.req.path.replace('/users', '')}`))
+api.all('/comments/*', (c) => c.redirect(`/api/generic-kysely/comment${c.req.path.replace('/comments', '')}`))
 
 api.route('/sync', syncV2Router)
 api.route('/replication', replication)
 api.route('/migrations', migrations)
 // api.route('/db', db) // TypeORM-based
 api.route('/auth', authRouter)
-api.route('/generic', generic)
+
+// Import and mount Kysely-based generic API
+import { genericKysely } from './generic-kysely'
+api.route('/generic-kysely', genericKysely)
+// Replace the old Drizzle generic API with Kysely
+api.route('/generic', genericKysely) // Now using Kysely instead of Drizzle
 
 // Basic health check endpoint
 api.get('/health', (c) => {
