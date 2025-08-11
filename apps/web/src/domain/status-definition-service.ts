@@ -7,7 +7,7 @@
 
 import { StatusDefinition, StatusSet } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
-import { statusdefinitionDexieService, type StatusDefinitionRelationshipContext } from '@repo/dataforge/dexie-domain';
+import { statusDefinitionDexieService, type StatusDefinitionRelationshipContext } from '@repo/dataforge/dexie-domain';
 import type { CreateStatusDefinitionInput, UpdateStatusDefinitionInput } from '@repo/dataforge/statusdefinition-operations';
 import { BaseDomainService } from './base-domain-service';
 import { trackOutgoingChange } from '@/db/dexie-change-tracking';
@@ -42,7 +42,7 @@ export class StatusDefinitionDomainService extends BaseDomainService<StatusDefin
     const processedInput = this.beforeCreate ? this.beforeCreate(input) : input;
     
     // Use generated Dexie service for creation
-    const statusDefinition = await statusdefinitionDexieService.create(processedInput);
+    const statusDefinition = await statusDefinitionDexieService.create(processedInput);
     
     // Track for outgoing sync
     await trackOutgoingChange('status_definitions', 'insert', statusDefinition);
