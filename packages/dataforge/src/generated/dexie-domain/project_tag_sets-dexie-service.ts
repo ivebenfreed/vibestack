@@ -7,7 +7,7 @@ export interface project_tag_setsUpdateInput {
   TagSet_inverse?: any;
 }
 
-export class project_tag_setsDexieService {
+export class ProjectTagSetsDexieService {
   async create(data: Partial<project_tag_sets>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -47,4 +47,4 @@ export class project_tag_setsDexieService {
   }
 }
 
-export const project_tag_setsDexieService = new project_tag_setsDexieService();
+export const projectTagSetsDexieService = new ProjectTagSetsDexieService();
