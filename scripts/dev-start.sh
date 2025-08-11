@@ -71,6 +71,13 @@ echo ""
 ./scripts/tmux-bg.sh "$SESSION_NAME" "$DEV_COMMAND"
 
 if [ $? -eq 0 ]; then
+    # Start database monitor alongside dev servers
+    MONITOR_SESSION="db-monitor-${ISSUE_NUMBER:-main}"
+    if ! tmux has-session -t "$MONITOR_SESSION" 2>/dev/null; then
+        echo "🔍 Starting database monitor..."
+        ./scripts/tmux-bg.sh "$MONITOR_SESSION" "./scripts/monitor-db-changes.sh" >/dev/null 2>&1
+    fi
+    
     echo ""
     echo "🚀 Development servers starting in background!"
     echo ""
@@ -78,6 +85,7 @@ if [ $? -eq 0 ]; then
     echo "  📋 Status:  ./scripts/bg-status.sh $SESSION_NAME"
     echo "  📄 Logs:    ./scripts/dev-logs.sh [lines]"
     echo "  🛑 Stop:    ./scripts/bg-stop.sh $SESSION_NAME"
+    echo "  🔍 Monitor: ./scripts/bg-logs.sh $MONITOR_SESSION"
     echo ""
     echo "Once servers are up, you can access:"
     echo "  🌐 Web:     http://localhost:$WEB_PORT"

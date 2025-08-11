@@ -1,22 +1,12 @@
 # CLAUDE.md
 
-## Current Worktree Configuration
-
-**This is Issue #71 worktree with the following ports:**
-
-- Web application: `http://localhost:5244`
-- Server API: `http://localhost:8858`
-- Database: `postgres://postgres:postgres@localhost:5503/vibestack_dev_issue_71`
-- Proxy: Port 4515
-
-
 ## Current Configuration
 
 **This is the main staging branch with the following default ports:**
 
 - Web application: `http://localhost:5173`
 - Server API: `http://localhost:8787`
-- Database: `postgres://postgres:postgres@localhost:5432/vibestack_dev` staging
+- Database: `postgres://postgres:postgres@localhost:5432/vibestack_dev`
 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

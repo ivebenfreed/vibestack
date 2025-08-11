@@ -1,5 +1,5 @@
 {
-  "name": "vibestack-issue-71",
+  "name": "vibestack",
   "private": true,
   "scripts": {
     "build": "turbo run build",
@@ -64,10 +64,10 @@
     "@faker-js/faker": "^9.7.0",
     "@playwright/test": "^1.54.2",
     "@repo/eslint-config": "workspace:*",
-    "@types/pg": "^8.11.0",
+    "@types/pg": "^8.11.14",
     "eslint": "^9.25.1",
     "eslint-plugin-import": "^2.29.1",
-    "pg": "^8.11.3",
+    "pg": "^8.16.0",
     "prettier": "^3.5.3",
     "turbo": "^2.5.2",
     "typescript": "~5.8.3",
@@ -89,6 +89,8 @@
     }
   },
   "dependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "bcryptjs": "^3.0.2",
     "playwright": "^1.54.2"
   }
 }

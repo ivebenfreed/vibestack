@@ -5,7 +5,22 @@
 
 set -e
 
-PR_NUMBER=${PR_NUMBER:-$(git rev-parse --abbrev-ref HEAD | grep -o '[0-9]\+' | head -1)}
+# If PR_NUMBER not provided, try to detect it
+if [ -z "$PR_NUMBER" ]; then
+    # Try git branch first
+    PR_NUMBER=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | grep -o '[0-9]\+' | head -1 || true)
+    
+    # If still empty, try to extract from working directory
+    if [ -z "$PR_NUMBER" ]; then
+        CWD=$(pwd)
+        if [[ "$CWD" =~ /issue-([0-9]+) ]]; then
+            PR_NUMBER="${BASH_REMATCH[1]}"
+        fi
+    fi
+    
+    # Default to 0 if still not found
+    PR_NUMBER=${PR_NUMBER:-0}
+fi
 # Setup .env.local if it doesn't exist
 if [ ! -f "apps/server/.env.local" ]; then
     echo "📝 Generating .env.local..."

@@ -105,10 +105,20 @@ fi
 echo "Ports: Web=$WEB_PORT, Server=$SERVER_PORT, DB=$DB_PORT"
 echo "Command: $COMMAND"
 
+# If the command is "pnpm dev", we need to run the setup-dev-ports script
+# which will detect the issue number and pass the right ports to turbo
+if [[ "$COMMAND" == "pnpm dev" ]]; then
+    # Just run pnpm dev as-is, which already includes setup-dev-ports.js
+    ACTUAL_COMMAND="pnpm dev"
+    echo "Running with dynamic ports via setup-dev-ports.js"
+else
+    ACTUAL_COMMAND="$COMMAND"
+fi
+
 # Create session with bash that stays alive even if command fails
 # The session will remain open for debugging
 tmux new-session -d -s "$SESSION_NAME" -c "$(pwd)" \
-    bash -c "SERVER_PORT=$SERVER_PORT WEB_PORT=$WEB_PORT DB_PORT=$DB_PORT PROXY_PORT=$PROXY_PORT PR_NUMBER=$PR_NUMBER $COMMAND; echo ''; echo '⚠️  Command exited with code: $?'; echo 'Session kept alive for debugging. Press Ctrl+C to close.'; exec bash"
+    bash -c "SERVER_PORT=$SERVER_PORT WEB_PORT=$WEB_PORT DB_PORT=$DB_PORT PROXY_PORT=$PROXY_PORT PR_NUMBER=$PR_NUMBER $ACTUAL_COMMAND; echo ''; echo '⚠️  Command exited with code: $?'; echo 'Session kept alive for debugging. Press Ctrl+C to close.'; exec bash"
 
 # Wait a moment for the command to start
 sleep 2

@@ -13,6 +13,7 @@ import type {
   JunctionTable,
   TRACKED_TABLES
 } from '@repo/dataforge/sync-metadata';
+import { DeleteSafetyCheck } from './delete-safety-check.js';
 
 export interface LocalChange {
   id: string;
@@ -226,38 +227,77 @@ export class GenericSyncEngine {
     metadata: TableSyncMetadata,
     change: LocalChange
   ): Promise<void> {
+    // CRITICAL: Extract the UUID for the specific record to delete
+    const recordUuid = change.recordId || change.data?.id;
+    
+    // Validate UUID format (must be a valid UUID v4)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!recordUuid || !uuidRegex.test(recordUuid)) {
+      console.error('🚨 DELETE BLOCKED - Invalid UUID:', {
+        table: metadata.tableName,
+        recordId: change.recordId,
+        dataId: change.data?.id,
+        clientId: change.data?.clientId || change.data?.client_id,
+        fullData: change.data
+      });
+      throw new Error(
+        `DELETE BLOCKED: Invalid or missing UUID for ${metadata.tableName}. ` +
+        `Got: ${recordUuid}, expected UUID format`
+      );
+    }
+    
+    // Safety check: Prevent mass deletions
+    const safetyCheck = DeleteSafetyCheck.checkDelete(metadata.tableName, recordUuid);
+    if (!safetyCheck.allowed) {
+      console.error('🚫 DELETE BLOCKED by safety check:', {
+        table: metadata.tableName,
+        uuid: recordUuid,
+        reason: safetyCheck.reason
+      });
+      throw new Error(`DELETE BLOCKED: ${safetyCheck.reason}`);
+    }
+    
+    // Log exactly what we're about to delete
+    console.log('🗑️ DELETE Operation:', {
+      table: metadata.tableName,
+      uuid: recordUuid,
+      clientId: change.data?.clientId || change.data?.client_id,
+      softDelete: metadata.features.hasSoftDelete
+    });
+    
     if (metadata.features.hasSoftDelete) {
-      // Soft delete - just mark as deleted
+      // Soft delete - mark as deleted using the UUID primary key
       const updateData: Record<string, any> = {};
       updateData[metadata.columns.deleted] = true;
       updateData[metadata.columns.updatedAt] = new Date();
       
-      if (metadata.features.hasClientId && change.data[metadata.columns.clientId]) {
-        const clientIdColumn = table[metadata.columns.clientId];
-        await this.db
-          .update(table)
-          .set(updateData)
-          .where(eq(clientIdColumn, change.data[metadata.columns.clientId]));
-      } else {
-        const idColumn = table[metadata.columns.id];
-        await this.db
-          .update(table)
-          .set(updateData)
-          .where(eq(idColumn, change.recordId));
-      }
+      const idColumn = table[metadata.columns.id];
+      
+      // Log the exact SQL-equivalent operation
+      console.log(`📝 Soft DELETE: UPDATE ${metadata.tableName} SET deleted=true WHERE id='${recordUuid}'`);
+      
+      await this.db
+        .update(table)
+        .set(updateData)
+        .where(eq(idColumn, recordUuid));
+      
+      // Log successful soft delete
+      DeleteSafetyCheck.logDelete(metadata.tableName, recordUuid, change.data?.clientId);
+      console.log(`✅ Soft DELETE completed for ${metadata.tableName}:${recordUuid}`);
     } else {
-      // Hard delete
-      if (metadata.features.hasClientId && change.data[metadata.columns.clientId]) {
-        const clientIdColumn = table[metadata.columns.clientId];
-        await this.db
-          .delete(table)
-          .where(eq(clientIdColumn, change.data[metadata.columns.clientId]));
-      } else {
-        const idColumn = table[metadata.columns.id];
-        await this.db
-          .delete(table)
-          .where(eq(idColumn, change.recordId));
-      }
+      // Hard delete - use the UUID primary key ONLY
+      const idColumn = table[metadata.columns.id];
+      
+      // Log the exact SQL-equivalent operation  
+      console.log(`⚠️ Hard DELETE: DELETE FROM ${metadata.tableName} WHERE id='${recordUuid}'`);
+      
+      await this.db
+        .delete(table)
+        .where(eq(idColumn, recordUuid));
+      
+      // Log successful hard delete
+      DeleteSafetyCheck.logDelete(metadata.tableName, recordUuid, change.data?.clientId);
+      console.log(`✅ Hard DELETE completed for ${metadata.tableName}:${recordUuid}`);
     }
   }
 
