@@ -47,4 +47,3 @@ export class task_tag_entitiesDexieService {
   }
 }
 
-export const task_tag_entitiesDexieService = new task_tag_entitiesDexieService();
