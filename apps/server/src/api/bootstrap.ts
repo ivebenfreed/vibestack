@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { UserRole } from "@repo/dataforge/server-entities";
 import { Kysely } from 'kysely';
-import { NeonHTTPDialect } from 'kysely-neon';
+import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
 import { initializeAuth } from '../lib/auth';
 import type { Env } from '../types/env';
 
@@ -21,7 +21,7 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     throw new HTTPException(403, { message: 'Invalid bootstrap key.' });
   }
 
-  const neonDialect = new NeonHTTPDialect({ connectionString: DATABASE_URL });
+  const neonDialect = new NeonHTTPDialectV1({ connectionString: DATABASE_URL });
   // Specify the database schema type if available, otherwise use 'any'
   // For example, if you have a DB type from Kysely codegen: import type { DB } from '@repo/dataforge/generated-types';
   // const db = new Kysely<DB>({ dialect: neonDialect });
@@ -34,18 +34,26 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
       .where('role', '=', 'super_admin') // Use the enum value directly
       .limit(1)
       .executeTakeFirst();
+    console.log('[Bootstrap] Existing super admin check:', existingSuperAdmin);
     if (existingSuperAdmin) {
       throw new HTTPException(409, { message: 'Super admin already exists.' });
     }
   } catch (dbError) {
+    // Only throw if it's not our HTTPException
+    if (dbError instanceof HTTPException) {
+      throw dbError;
+    }
     console.error('[Bootstrap] DB error checking super admin:', dbError);
     throw new HTTPException(500, { message: 'DB error during bootstrap check.' });
   }
 
   let requestBody;
   try {
-    requestBody = await c.req.json();
+    const rawBody = await c.req.text();
+    console.log('[Bootstrap] Raw request body:', rawBody);
+    requestBody = JSON.parse(rawBody);
   } catch (e) {
+    console.error('[Bootstrap] JSON parse error:', e);
     throw new HTTPException(400, { message: 'Invalid JSON request body.' });
   }
   
@@ -66,7 +74,9 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
         : { email, password, name }
     } as any; // Type assertion to bypass strict typing
     
+    console.log('[Bootstrap] Attempting signup with params:', { email, name, role });
     const result = await authInstance.api.signUpEmail(signUpParams);
+    console.log('[Bootstrap] Signup result:', result?.user?.id);
     
     // If signUpEmail is successful, result will contain user and token.
     // Errors from signUpEmail (like user already exists) are expected to be thrown.
@@ -78,6 +88,7 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     
     // Check for specific error messages from signUpEmail
     if (error.message?.includes("User already exists")) {
+      console.log('[Bootstrap] User already exists:', email);
       throw new HTTPException(409, { message: `User with email ${email} already exists.` });
     }
     

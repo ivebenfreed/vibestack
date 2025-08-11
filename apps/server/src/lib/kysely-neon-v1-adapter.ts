@@ -94,9 +94,9 @@ class NeonHTTPDriver implements Driver {
   }
 
   async init(): Promise<void> {
-    // Test connection
+    // Test connection using the query method for v1.0+
     const sql = neon(this.connectionString);
-    await sql`SELECT 1`;
+    await sql.query('SELECT 1', []);
   }
 
   async acquireConnection(): Promise<DatabaseConnection> {
