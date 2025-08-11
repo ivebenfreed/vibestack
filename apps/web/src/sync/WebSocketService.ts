@@ -74,16 +74,38 @@ export class WebSocketService {
       const lsnRegex = /^[0-9A-Fa-f]+\/[0-9A-Fa-f]+$/;
       let validLsn = this.config.lsn;
       
+      console.log('[WebSocketService] LSN validation:', {
+        configLsn: this.config.lsn,
+        validLsn: validLsn,
+        lsnType: typeof validLsn,
+        lsnLength: validLsn?.length,
+        matchesRegex: lsnRegex.test(validLsn),
+        isTimestamp: /^\d{13}$/.test(validLsn),
+        fullConfig: this.config
+      });
+      
       // Check if it looks like a timestamp (13 digits) or is otherwise invalid
       if (/^\d{13}$/.test(validLsn) || !lsnRegex.test(validLsn)) {
+        console.log('[WebSocketService] LSN validation FAILED - defaulting to 0/0:', {
+          invalidLsn: validLsn,
+          isTimestamp: /^\d{13}$/.test(validLsn),
+          regexTest: lsnRegex.test(validLsn)
+        });
         syncLogger.warn('connection', 'Invalid LSN detected, using default', {
           invalidLsn: validLsn,
           isTimestamp: /^\d{13}$/.test(validLsn)
         });
         validLsn = '0/0';
+      } else {
+        console.log('[WebSocketService] LSN validation PASSED:', validLsn);
       }
       
       wsUrl.searchParams.set('lsn', validLsn);
+      console.log('[WebSocketService] Final WebSocket URL params:', {
+        clientId: wsUrl.searchParams.get('clientId'),
+        lsn: wsUrl.searchParams.get('lsn'),
+        fullUrl: wsUrl.toString()
+      });
       
       syncLogger.connectionAttempt(wsUrl.toString());
       this.ws = new WebSocket(wsUrl.toString());

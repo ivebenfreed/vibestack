@@ -44,6 +44,15 @@ export class SyncStrategyAnalyzer {
     clientId: string, 
     clientLSN: string
   ): Promise<{ strategy: SyncStrategy, serverLSN: string }> {
+    syncLogger.info('Determining sync strategy', {
+      clientId,
+      clientLSN,
+      lsnType: typeof clientLSN,
+      lsnLength: clientLSN?.length,
+      isZero: clientLSN === '0/0',
+      isFalsy: !clientLSN
+    }, MODULE_NAME);
+    
     // Register the client
     await this.context.stateManager.registerClient(clientId);
     
@@ -53,10 +62,19 @@ export class SyncStrategyAnalyzer {
     // Get the current server LSN from WAL position to match what's sent in srv_init_complete
     const serverLSN = await this.context.stateManager.getServerLSN() || '0/0';
     
+    syncLogger.info('LSN comparison', {
+      clientLSN,
+      serverLSN,
+      clientIsZero: clientLSN === '0/0',
+      comparison: compareLSN(clientLSN, serverLSN)
+    }, MODULE_NAME);
+    
     // If client has no LSN (0/0), it needs initial sync
     if (clientLSN === '0/0') {
-      syncLogger.info('Client needs initial sync', {
-        clientId
+      syncLogger.info('Client needs initial sync - LSN is 0/0', {
+        clientId,
+        clientLSN,
+        serverLSN
       }, MODULE_NAME);
       return { strategy: SyncStrategy.INITIAL, serverLSN };
     }
