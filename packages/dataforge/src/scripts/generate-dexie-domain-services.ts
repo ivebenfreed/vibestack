@@ -93,10 +93,8 @@ function mapReferenceToRelationType(reference: string): 'ManyToOne' | 'OneToMany
 function generateServiceFile(service: EntityServiceInfo): string {
   const lowerName = service.entityName.charAt(0).toLowerCase() + service.entityName.slice(1);
   
-  // Convert snake_case entity names to PascalCase for class names
-  const className = service.entityName.split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join('') + 'DexieService';
+  // Generate proper PascalCase class name from entity name
+  const className = service.entityName + 'DexieService';
   
   // Generate consistent service instance name
   const serviceName = className.charAt(0).toLowerCase() + className.slice(1, -7); // Remove 'Service' and lowercase first char

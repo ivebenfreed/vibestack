@@ -55,7 +55,9 @@
     "logs:tail": "./scripts/tail-logs.sh",
     "logs:errors": "./scripts/view-logs.sh --errors",
     "logs:cull": "./scripts/cull-logs.sh",
-    "ensure-docker:local": "node scripts/ensure-docker-services.js"
+    "ensure-docker:local": "node scripts/ensure-docker-services.js",
+    "setup:env": "node scripts/setup-worktree-env.js",
+    "setup:worktree": "pnpm install && node scripts/setup-worktree-env.js && echo '✅ Worktree setup complete'"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",

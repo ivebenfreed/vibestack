@@ -7,7 +7,7 @@ export interface task_tagsUpdateInput {
   Tag_inverse?: any;
 }
 
-export class TaskTagsDexieService {
+export class task_tagsDexieService {
   async create(data: Partial<task_tags>): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date();
@@ -47,4 +47,4 @@ export class TaskTagsDexieService {
   }
 }
 
-export const taskTagsDexieService = new TaskTagsDexieService();
+export const task_tagsDexieService = new task_tagsDexieService();

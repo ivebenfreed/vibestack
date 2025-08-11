@@ -13,18 +13,18 @@
   },
   "scripts": {
     "build": "../../scripts/type-check-focused/type-check-all.sh && wrangler deploy --outdir=dist",
-    "dev": "wrangler dev --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
-    "dev:local": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
-    "dev:pr": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
-    "dev:pr:local": "wrangler dev --config wrangler.local.toml --env local --port ${SERVER_PORT:-8787} --var LOG_LEVEL:info --var WEB_PORT:${WEB_PORT:-5173} --var SERVER_PORT:${SERVER_PORT:-8787} --ip 127.0.0.1",
-    "dev:no-logs": "wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1",
-    "dev:no-logs:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
-    "_start_servers_for_pwa_test": "wrangler dev --var LOG_LEVEL:info",
-    "_start_servers_for_pwa_test:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info",
-    "dev:debug": "wrangler dev --var LOG_LEVEL:debug --ip 127.0.0.1",
-    "dev:debug:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:debug --ip 127.0.0.1",
-    "dev:info": "wrangler dev --var LOG_LEVEL:info --ip 127.0.0.1",
-    "dev:info:local": "wrangler dev --config wrangler.local.toml --env local --var LOG_LEVEL:info --ip 127.0.0.1",
+    "dev": "wrangler dev --port ${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:local": "wrangler dev --port ${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:pr": "wrangler dev --port ${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:pr:local": "wrangler dev --port ${SERVER_PORT:-8787} --ip 127.0.0.1",
+    "dev:no-logs": "wrangler dev --ip 127.0.0.1",
+    "dev:no-logs:local": "wrangler dev --ip 127.0.0.1",
+    "_start_servers_for_pwa_test": "wrangler dev",
+    "_start_servers_for_pwa_test:local": "wrangler dev",
+    "dev:debug": "LOG_LEVEL=debug wrangler dev --ip 127.0.0.1",
+    "dev:debug:local": "LOG_LEVEL=debug wrangler dev --ip 127.0.0.1",
+    "dev:info": "wrangler dev --ip 127.0.0.1",
+    "dev:info:local": "wrangler dev --ip 127.0.0.1",
     "deploy": "wrangler deploy",
     "lint": "eslint",
     "format": "prettier --write .",
@@ -55,6 +55,6 @@
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
     "vitest": "^1.2.2",
-    "wrangler": "^4.25.0"
+    "wrangler": "^4.28.1"
   }
 }

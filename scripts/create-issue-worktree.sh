@@ -97,8 +97,8 @@ MAIN_REPO_ROOT="$(git worktree list | head -1 | awk '{print $1}')"
 
 # List of files to copy if they exist
 COPY_FILES=(
-  "apps/server/.dev.vars"
-  "apps/server/.dev.vars.local"
+  "apps/server/.dev.vars.bak"
+  "apps/server/.env.local"
   "apps/web/.env.development"
   "apps/web/.env.development.generated"
   "apps/web/.env.local"
@@ -221,7 +221,7 @@ echo ""
 echo "📍 Current location: $(pwd)"
 echo ""
 echo "4️⃣ Starting development servers..."
-echo "   🚀 Running pnpm dev:local..."
+echo "   🚀 Running pnpm dev..."
 echo ""
 echo "📱 Your services will be available at:"
 echo "   • Web: http://localhost:$((5173 + ISSUE_NUMBER))"
@@ -254,14 +254,14 @@ echo "   ./scripts/finish-issue.sh ${ISSUE_NUMBER}"
 echo ""
 
 # Start the development servers with timeout for automation testing
-# In normal use, users would run 'pnpm dev:local' manually without timeout
+# In normal use, users would run 'pnpm dev' manually without timeout
 if [ "${AUTOMATION_TEST:-false}" = "true" ]; then
     echo "🧪 Running in automation test mode - will timeout after 30 seconds"
-    timeout 30s pnpm dev:local || true
+    timeout 30s pnpm dev || true
 elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
     # Start servers in background and run tests
     echo "🚀 Starting servers in background for setup tests..."
-    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev:local"
+    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev"
     
     # Wait for servers to be ready
     echo "⏳ Waiting for servers to start..."
@@ -286,7 +286,7 @@ elif [ "${RUN_SETUP_TESTS:-false}" = "true" ] || [ "$2" = "--test-setup" ]; then
 else
     # Start servers in background using tmux
     echo "🚀 Starting servers in background..."
-    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev:local"
+    ./scripts/tmux-bg.sh "vibestack-dev-issue-${ISSUE_NUMBER}" "pnpm dev"
     
     echo ""
     echo "📝 Servers are starting in background. To view logs:"

@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-DEV_COMMAND="pnpm dev:local"
+DEV_COMMAND="pnpm dev"  # Now just uses 'pnpm dev' since .env.local handles everything
 
 # Function to detect issue number from branch/directory
 detect_issue_number() {

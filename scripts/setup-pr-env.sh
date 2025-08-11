@@ -6,11 +6,10 @@
 set -e
 
 PR_NUMBER=${PR_NUMBER:-$(git rev-parse --abbrev-ref HEAD | grep -o '[0-9]\+' | head -1)}
-# Try to get remote database URL from .dev.vars if it exists
-if [ -f "apps/server/.dev.vars" ]; then
-    REMOTE_DATABASE_URL=${REMOTE_DATABASE_URL:-$(grep "^DATABASE_URL=" apps/server/.dev.vars | cut -d'=' -f2-)}
-else
-    REMOTE_DATABASE_URL=${REMOTE_DATABASE_URL:-""}
+# Setup .env.local if it doesn't exist
+if [ ! -f "apps/server/.env.local" ]; then
+    echo "📝 Generating .env.local..."
+    npm run setup:env
 fi
 
 echo "🚀 Setting up PR environment..."
@@ -59,19 +58,19 @@ fi
 echo "   ⏳ Waiting for PostgreSQL to be ready..."
 sleep 5
 
-# Step 3: Database setup will be handled by pnpm dev:local
+# Step 3: Database setup will be handled by pnpm dev
 echo ""
-echo "3️⃣ Database setup will be handled automatically by pnpm dev:local"
+echo "3️⃣ Database setup will be handled automatically by pnpm dev"
 
 # Step 4: Database cloning will be handled by auto-configure-branch-db.js
 echo ""
-echo "4️⃣ Database setup and cloning will be handled automatically by pnpm dev:local"
+echo "4️⃣ Database setup and cloning will be handled automatically by pnpm dev"
 
 echo ""
 echo "✅ PR environment setup complete!"
 echo ""
 echo "🎯 Next steps:"
-echo "   • Run: pnpm dev:local"
+echo "   • Run: pnpm dev"
 echo "   • Visit: http://localhost:$((5173 + ${PR_NUMBER:-0}))"
 echo "   • API: http://localhost:$((8787 + ${PR_NUMBER:-0}))"
 echo ""
