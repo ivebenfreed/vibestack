@@ -86,48 +86,13 @@ function setupWorktreeEnv() {
   if (!fs.existsSync(envPath)) {
     console.log('⚠️  WARNING: No .env file found in apps/server/');
     console.log('   The .env file should contain all secrets and base configuration.');
-    console.log('   Copy .dev.vars to .env or use .env.example as a template.');
-    console.log('');
-    console.log('   Run: cp apps/server/.dev.vars apps/server/.env');
+    console.log('   Create it from .dev.vars.bak or .env.example');
     console.log('');
   }
   
-  // Read secrets from existing .env.local (from main repo) or .dev.vars.bak
-  let envContent = '';
-  const mainEnvLocalPath = path.join(serverDir, '.env.local');
-  const devVarsPath = path.join(serverDir, '.dev.vars.bak');
-  
-  if (fs.existsSync(mainEnvLocalPath)) {
-    console.log('📋 Reading secrets from existing .env.local');
-    envContent = fs.readFileSync(mainEnvLocalPath, 'utf8');
-  } else if (fs.existsSync(devVarsPath)) {
-    console.log('📋 Using .dev.vars.bak as base configuration');
-    envContent = fs.readFileSync(devVarsPath, 'utf8');
-  } else {
-    console.log('⚠️  No .env.local or .dev.vars.bak found - using minimal defaults');
-  }
-  
-  // Parse the env content to get all the secrets
-  const envLines = envContent.split('\n');
-  const secrets = [];
-  for (const line of envLines) {
-    if (line.includes('=') && !line.startsWith('#')) {
-      const [key] = line.split('=');
-      const trimmedKey = key.trim();
-      // Include all secrets and API keys
-      if (trimmedKey.includes('SECRET') || 
-          trimmedKey.includes('API_KEY') || 
-          trimmedKey === 'NEON_API_KEY' ||
-          trimmedKey === 'RESEND_API_KEY' ||
-          trimmedKey === 'LOG_TIMESTAMP_FORMAT') {
-        secrets.push(line);
-      }
-    }
-  }
-  
-  // Create .env.local with ALL needed values for local development
-  const envLocalContent = `# Auto-generated .env.local for ${issueNumber !== '0' ? `Issue #${issueNumber}` : 'main/staging development'}
-# This file contains ALL configuration for local development
+  // Create .env.local with ONLY worktree-specific overrides
+  const envLocalContent = `# Worktree-specific overrides for ${issueNumber !== '0' ? `Issue #${issueNumber}` : 'main/staging development'}
+# This file overrides values for local development
 # Generated on ${new Date().toISOString()}
 # To regenerate: FORCE=true npm run setup:env
 
@@ -146,14 +111,9 @@ LOCAL_DATABASE_URL=postgres://postgres:postgres@localhost:${DB_PORT}/vibestack_d
 ENVIRONMENT=local
 BETTER_AUTH_URL=http://localhost:${WEB_PORT}
 API_URL=http://localhost:${SERVER_PORT}
-LOG_LEVEL=info
-LOG_TIMESTAMP_FORMAT=iso
 
 # Issue tracking
-ISSUE_NUMBER=${issueNumber}
-
-# Secrets and API Keys (from base configuration)
-${secrets.join('\n')}`;
+ISSUE_NUMBER=${issueNumber}`;
   
   // Write the .env.local file
   fs.writeFileSync(envLocalPath, envLocalContent);
