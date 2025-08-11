@@ -161,16 +161,16 @@
     "uniques": [],
     "className": "StatusDefinition",
     "path": "./src/entities/StatusDefinition.ts",
-    "collection": "status_definitions",
     "name": "StatusDefinition",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseDomainEntity",
-    "useCache": true
+    "useCache": true,
+    "collection": "status_definition"
   },
   "origin": "./src/entities/StatusDefinition.ts",
-  "hash": "eb542144f9b5a2219cca460e9aa9f8b6",
+  "hash": "1d540e3f561c70618956650b9196f534",
   "version": "6.4.16"
 }

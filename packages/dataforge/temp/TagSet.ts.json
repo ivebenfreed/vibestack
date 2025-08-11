@@ -144,16 +144,16 @@
     "uniques": [],
     "className": "TagSet",
     "path": "./src/entities/TagSet.ts",
-    "collection": "tag_sets",
     "name": "TagSet",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseDomainEntity",
-    "useCache": true
+    "useCache": true,
+    "collection": "tag_set"
   },
   "origin": "./src/entities/TagSet.ts",
-  "hash": "82aeef663d51b865a785910ce3fca4b1",
+  "hash": "3fc868ad0ea8208e22299c845fda835e",
   "version": "6.4.16"
 }

@@ -3,7 +3,7 @@ import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { StatusDefinition } from './StatusDefinition.js';
 import { Project } from './Project.js';
 
-@Entity({ tableName: 'status_sets' })
+@Entity()
 @Index({ properties: ['entityType'] })
 export class StatusSet extends BaseDomainEntity {
   @Property({ type: 'string', length: 100 })
