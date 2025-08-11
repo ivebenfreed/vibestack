@@ -12,7 +12,7 @@
 // ====================================
 
 import { fromCallback } from 'xstate';
-import { CanvasOverlay } from '../overlays/CanvasOverlay';
+import { CanvasOverlayDOM } from '../overlays/CanvasOverlayDOM';
 import type { ViewportInfo, CellRef } from '../types';
 import type { CoordinateMapping } from '../machines/table-machine/slices/dimensions-slice';
 import type { OverlayConfig, VisualCellPosition } from '../overlays/OverlayTypes';
@@ -32,11 +32,14 @@ export type CanvasActorEvent =
   | { type: 'SHOW_COPY_INDICATOR'; isCut: boolean }
   | { type: 'HIDE_COPY_INDICATOR' }
   | { type: 'UPDATE_CLIPBOARD_VISUAL'; clipboardState: { copiedCells: Set<string>; isCut: boolean; visualPositions?: VisualCellPosition[] } | null; viewport: ViewportInfo }
-  | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[]; selectedRows?: Set<string> }
+  | { type: 'CLIPBOARD_CLEAR' }
+  | { type: 'RENDER_FILL_HANDLE'; visualCells: VisualCellPosition[]; selectedRows?: Set<string>; viewport?: ViewportInfo }
   | { type: 'RENDER_FILL_HANDLE_ROW_SELECTION'; selectedRows: Set<string>; visualCells: VisualCellPosition[] }
   | { type: 'RENDER_FILL_PREVIEW'; previewCells: Set<string>; viewport: ViewportInfo }
+  | { type: 'RENDER_FILL_PREVIEW_VISUAL'; visualCells: VisualCellPosition[] }
   | { type: 'CLEAR_FILL_PREVIEW' }
   | { type: 'HIDE_FILL_HANDLE' }
+  | { type: 'FILL_HANDLE_MOVE'; dragPos: { x: number; y: number } }
   | { type: 'SHOW_EDITING'; position: VisualCellPosition }
   | { type: 'HIDE_EDITING' }
   | { type: 'DESTROY' };
@@ -47,6 +50,7 @@ export type CanvasActorResponse =
   | { type: 'SELECTION_UPDATED' }
   | { type: 'CANVAS_COORDINATES_UPDATED' }
   | { type: 'VIEWPORT_UPDATED' }
+  | { type: 'REQUEST_VIEWPORT_UPDATE' }
   | { type: 'FILL_START'; direction: 'vertical' | 'horizontal' }
   | { type: 'FILL_PREVIEW'; previewCells: Set<string> }
   | { type: 'FILL_COMPLETE'; fillCells: Set<string> }
@@ -63,10 +67,10 @@ export type CanvasActorResponse =
 // ====================================
 
 export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>(({ sendBack, receive }) => {
-  let canvas: CanvasOverlay | null = null;
+  let canvas: CanvasOverlayDOM | null = null;
   let queuedCoordinateUpdate: any = null;
   
-  console.log('CanvasActor: Created for embedded mode');
+  console.log('CanvasActor: Created for DOM overlay mode');
   
   receive((event) => {
     // Only log non-viewport events for debugging
@@ -96,23 +100,29 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           // since it runs in idle time and doesn't block the initial table render
           const initializeCanvas = async () => {
             try {
-              console.log('CanvasActor: Starting deferred canvas initialization');
+              console.log('CanvasActor: Starting deferred DOM overlay initialization');
               const deferredStartTime = performance.now();
               
-              canvas = new CanvasOverlay(storedContainer, storedConfig);
+              // Create canvas with event callback to send events back to actor
+              canvas = new CanvasOverlayDOM(storedConfig, (event) => {
+                console.log('CanvasActor: Received fill event from overlay', event);
+                sendBack(event);
+              });
+              canvas.init(storedContainer);
               
-              // Set up callbacks for pure actors approach
-              canvas.onFillStart = (direction) => sendBack({ type: 'FILL_START', direction });
-              canvas.onFillPreview = (previewCells) => sendBack({ type: 'FILL_PREVIEW', previewCells });
-              canvas.onFillComplete = (fillCells) => sendBack({ type: 'FILL_COMPLETE', fillCells });
-              canvas.onFillCancel = () => sendBack({ type: 'FILL_CANCEL' });
-              canvas.onCopy = (cells) => sendBack({ type: 'COPY', cells });
-              canvas.onCut = (cells) => sendBack({ type: 'CUT', cells });
-              canvas.onPaste = () => sendBack({ type: 'PASTE' });
-              canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
+              // TODO: Set up callbacks for DOM overlay approach once implemented
+              // For now, these callbacks won't work with DOM overlay
+              // canvas.onFillStart = (direction) => sendBack({ type: 'FILL_START', direction });
+              // canvas.onFillPreview = (previewCells) => sendBack({ type: 'FILL_PREVIEW', previewCells });
+              // canvas.onFillComplete = (fillCells) => sendBack({ type: 'FILL_COMPLETE', fillCells });
+              // canvas.onFillCancel = () => sendBack({ type: 'FILL_CANCEL' });
+              // canvas.onCopy = (cells) => sendBack({ type: 'COPY', cells });
+              // canvas.onCut = (cells) => sendBack({ type: 'CUT', cells });
+              // canvas.onPaste = () => sendBack({ type: 'PASTE' });
+              // canvas.onClearClipboard = () => sendBack({ type: 'CLEAR_CLIPBOARD' });
               
-              // Pre-initialize Stage progressively
-              await canvas.preInitializeAsync();
+              // DOM overlay doesn't need async pre-initialization
+              // await canvas.preInitializeAsync();
               
               const deferredInitTime = performance.now() - deferredStartTime;
               console.log('🔥 CanvasActor: Deferred canvas initialization complete', {
@@ -123,11 +133,15 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
               // Process any queued events
               if (queuedCoordinateUpdate) {
                 console.log('CanvasActor: Processing queued coordinate update');
-                canvas.updateCoordinates(queuedCoordinateUpdate);
+                canvas.updateCoordinateMapping(queuedCoordinateUpdate);
                 queuedCoordinateUpdate = null;
               }
               
               sendBack({ type: 'CANVAS_DEFERRED_READY' });
+              
+              // Request initial viewport from table machine
+              console.log('CanvasActor: Requesting initial viewport update');
+              sendBack({ type: 'REQUEST_VIEWPORT_UPDATE' });
             } catch (error) {
               console.error('CanvasActor: Failed to create canvas overlay:', error);
               sendBack({ 
@@ -177,7 +191,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           });
           
           // Update canvas overlay with pre-calculated visual positions
-          canvas.updateSelectionVisual(event.visualCells);
+          canvas.updateSelectionWithVisualPositions(event.visualCells);
           sendBack({ type: 'SELECTION_UPDATED' });
           break;
           
@@ -195,7 +209,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             columnCount: event.mapping.columns?.length || 0
           });
           
-          canvas.updateCoordinates(event.mapping);
+          canvas.updateCoordinateMapping(event.mapping);
           sendBack({ type: 'CANVAS_COORDINATES_UPDATED' });
           break;
           
@@ -205,17 +219,30 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             return;
           }
           
-          console.log('CanvasActor: Updating viewport:', event.viewport);
+          console.log('CanvasActor: UPDATE_VIEWPORT received, updating canvas viewport:', event.viewport);
           canvas.updateViewport(event.viewport);
+          console.log('CanvasActor: Viewport updated in canvas, sending VIEWPORT_UPDATED response');
           sendBack({ type: 'VIEWPORT_UPDATED' });
           break;
           
         case 'UPDATE_COLUMN_DRAG':
-          console.log('CanvasActor: Column drag updates handled by DOM elements');
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot update column drag - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Updating column drag preview');
+          canvas.updateColumnDragPreview(event.dragState, event.mouseX, event.mouseY);
           break;
           
         case 'UPDATE_COLUMN_RESIZE':
-          console.log('CanvasActor: Column resize updates handled by DOM elements');
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot update column resize - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Updating column resize preview');
+          canvas.updateColumnResizePreview(event.resizeState);
           break;
           
         case 'SHOW_COPY_INDICATOR':
@@ -225,7 +252,9 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           }
           
           console.log('CanvasActor: Showing copy indicator:', { isCut: event.isCut });
-          canvas.showCopyIndicator(event.isCut);
+          // TODO: Implement showCopyIndicator in DOM overlay
+          // canvas.showCopyIndicator(event.isCut);
+          console.log('CanvasActor: Copy indicator not yet implemented in DOM overlay');
           break;
           
         case 'HIDE_COPY_INDICATOR':
@@ -235,7 +264,9 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           }
           
           console.log('CanvasActor: Hiding copy indicator');
-          canvas.hideCopyIndicator();
+          // TODO: Implement hideCopyIndicator in DOM overlay
+          // canvas.hideCopyIndicator();
+          console.log('CanvasActor: Hide copy indicator not yet implemented in DOM overlay');
           break;
           
         case 'UPDATE_CLIPBOARD_VISUAL':
@@ -250,20 +281,26 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             hasVisualPositions: !!event.clipboardState?.visualPositions
           });
           
-          // Update clipboard overlay if available
-          const clipboardOverlay = (canvas as any).getClipboardOverlay();
-          if (clipboardOverlay) {
-            // Use visual positions if available
-            if (event.clipboardState?.visualPositions && event.clipboardState.visualPositions.length > 0) {
-              clipboardOverlay.updateIndicatorWithVisualPositions(
-                event.clipboardState.visualPositions,
-                event.clipboardState.isCut
-              );
-            } else {
-              // Fall back to coordinate-based calculation
-              clipboardOverlay.updateIndicator(event.clipboardState, event.viewport);
-            }
+          // Use visual positions if available
+          if (event.clipboardState?.visualPositions && event.clipboardState.visualPositions.length > 0) {
+            canvas.updateClipboardWithVisualPositions(
+              event.clipboardState.visualPositions,
+              event.clipboardState.isCut
+            );
+          } else if (event.clipboardState) {
+            // Fall back to coordinate-based calculation
+            canvas.updateClipboardIndicator(event.clipboardState, event.viewport);
           }
+          break;
+          
+        case 'CLIPBOARD_CLEAR':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot clear clipboard - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Clearing clipboard indicators');
+          canvas.clearClipboardIndicators();
           break;
           
         case 'RENDER_FILL_HANDLE':
@@ -274,10 +311,11 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           
           console.log('CanvasActor: Rendering fill handle with visual positions:', {
             cellCount: event.visualCells.length,
-            selectedRowsCount: event.selectedRows?.size || 0
+            selectedRowsCount: event.selectedRows?.size || 0,
+            hasViewport: !!event.viewport
           });
-          const fillHandleLayer = (canvas as any).getFillHandleLayer();
-          fillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells, event.selectedRows);
+          
+          canvas.renderFillHandle(event.visualCells, event.selectedRows, event.viewport);
           break;
           
         case 'RENDER_FILL_HANDLE_ROW_SELECTION':
@@ -290,8 +328,10 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             selectedRowsCount: event.selectedRows.size,
             visualCellsCount: event.visualCells.length
           });
-          const rowFillHandleLayer = (canvas as any).getFillHandleLayer();
-          rowFillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells, event.selectedRows);
+          // TODO: Implement fill handle layer in DOM
+          // const rowFillHandleLayer = (canvas as any).getFillHandleLayer();
+          // rowFillHandleLayer.renderFillHandleWithVisualPositions(event.visualCells, event.selectedRows);
+          console.log('CanvasActor: Row fill handle not yet implemented in DOM overlay');
           break;
           
         case 'RENDER_FILL_PREVIEW':
@@ -300,9 +340,20 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
             return;
           }
           
-          console.log('CanvasActor: Rendering fill preview');
-          const fillLayer = (canvas as any).getFillHandleLayer();
-          fillLayer.renderFillPreview(event.previewCells, event.viewport);
+          console.log('CanvasActor: Rendering fill preview (legacy)');
+          canvas.renderFillPreview(event.previewCells);
+          break;
+          
+        case 'RENDER_FILL_PREVIEW_VISUAL':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot render fill preview visual - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Rendering fill preview with visual positions', {
+            cellCount: event.visualCells.length
+          });
+          canvas.renderFillPreviewWithVisualPositions(event.visualCells);
           break;
           
         case 'CLEAR_FILL_PREVIEW':
@@ -312,8 +363,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           }
           
           console.log('CanvasActor: Clearing fill preview');
-          const clearFillLayer = (canvas as any).getFillHandleLayer();
-          clearFillLayer.clearFillPreview();
+          canvas.clearFillPreview();
           break;
           
         case 'HIDE_FILL_HANDLE':
@@ -323,8 +373,7 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           }
           
           console.log('CanvasActor: Hiding fill handle');
-          const hideFillLayer = (canvas as any).getFillHandleLayer();
-          hideFillLayer.hideFillHandle();
+          canvas.hideFillHandle();
           break;
           
         case 'SHOW_EDITING':
@@ -389,6 +438,19 @@ export const canvasActor = fromCallback<CanvasActorEvent, CanvasActorResponse>((
           });
           break;
           
+        case 'FILL_HANDLE_MOVE':
+          if (!canvas) {
+            console.warn('CanvasActor: Cannot handle fill move - canvas not initialized');
+            return;
+          }
+          
+          console.log('CanvasActor: Handling fill move via unified system');
+          const fillHandleLayer = (canvas as any).getFillHandleLayer();
+          
+          // Use the unified method that was added to FillHandleLayerDOM
+          fillHandleLayer.handleFillMove(event.dragPos);
+          break;
+          
         case 'DESTROY':
           console.log('CanvasActor: Destroying canvas overlay');
           
@@ -433,8 +495,8 @@ export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
     [
       'INITIALIZE', 'UPDATE_SELECTION', 'UPDATE_SELECTION_VISUAL', 'UPDATE_COORDINATES', 'UPDATE_VIEWPORT',
       'UPDATE_COLUMN_DRAG', 'UPDATE_COLUMN_RESIZE', 'SHOW_COPY_INDICATOR', 
-      'HIDE_COPY_INDICATOR', 'UPDATE_CLIPBOARD_VISUAL', 'RENDER_FILL_HANDLE', 'RENDER_FILL_HANDLE_ROW_SELECTION', 'RENDER_FILL_PREVIEW',
-      'CLEAR_FILL_PREVIEW', 'HIDE_FILL_HANDLE', 'DESTROY'
+      'HIDE_COPY_INDICATOR', 'UPDATE_CLIPBOARD_VISUAL', 'CLIPBOARD_CLEAR', 'RENDER_FILL_HANDLE', 'RENDER_FILL_HANDLE_ROW_SELECTION', 'RENDER_FILL_PREVIEW',
+      'RENDER_FILL_PREVIEW_VISUAL', 'CLEAR_FILL_PREVIEW', 'HIDE_FILL_HANDLE', 'FILL_HANDLE_MOVE', 'DESTROY'
     ].includes(event.type);
 }
 
@@ -444,7 +506,7 @@ export function isCanvasActorEvent(event: any): event is CanvasActorEvent {
 export function isCanvasActorResponse(response: any): response is CanvasActorResponse {
   return response && typeof response.type === 'string' && 
     [
-      'CANVAS_READY', 'CANVAS_DEFERRED_READY', 'SELECTION_UPDATED', 'CANVAS_COORDINATES_UPDATED', 'VIEWPORT_UPDATED',
+      'CANVAS_READY', 'CANVAS_DEFERRED_READY', 'SELECTION_UPDATED', 'CANVAS_COORDINATES_UPDATED', 'VIEWPORT_UPDATED', 'REQUEST_VIEWPORT_UPDATE',
       'FILL_START', 'FILL_PREVIEW', 'FILL_COMPLETE', 'FILL_CELLS_CALCULATED', 'FILL_CANCEL',
       'COPY', 'CUT', 'PASTE', 'CLEAR_CLIPBOARD', 'CANVAS_ERROR'
     ].includes(response.type);
