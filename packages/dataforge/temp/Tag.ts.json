@@ -1,0 +1,195 @@
+{
+  "data": {
+    "_id": 2000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "length": 50,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "slug": {
+        "name": "slug",
+        "kind": "scalar",
+        "type": "string",
+        "length": 50,
+        "unique": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "color": {
+        "name": "color",
+        "kind": "scalar",
+        "type": "string",
+        "length": 7,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "icon": {
+        "name": "icon",
+        "kind": "scalar",
+        "type": "string",
+        "length": 50,
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "variant": {
+        "name": "variant",
+        "kind": "scalar",
+        "type": "string",
+        "length": 20,
+        "default": "solid",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "sortOrder": {
+        "name": "sortOrder",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "number"
+      },
+      "isActive": {
+        "name": "isActive",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "usageCount": {
+        "name": "usageCount",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "number"
+      },
+      "lastUsedAt": {
+        "name": "lastUsedAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "metadata": {
+        "name": "metadata",
+        "kind": "scalar",
+        "type": "json",
+        "default": {},
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>"
+      },
+      "tagSet": {
+        "name": "tagSet",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "fieldNames": [
+          "tag_set_id"
+        ],
+        "type": "TagSet",
+        "array": false,
+        "runtimeType": "TagSet"
+      },
+      "parent": {
+        "name": "parent",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "parent_id"
+        ],
+        "type": "Tag",
+        "array": false,
+        "runtimeType": "Tag",
+        "optional": true
+      },
+      "children": {
+        "name": "children",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "parent",
+        "type": "Tag",
+        "array": false,
+        "runtimeType": "Collection<Tag, object>"
+      },
+      "tasks": {
+        "name": "tasks",
+        "kind": "m:n",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "tags",
+        "fixedOrder": false,
+        "type": "Task",
+        "array": false,
+        "runtimeType": "Collection<Task, object>"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [
+      {
+        "properties": [
+          "tagSet",
+          "sortOrder"
+        ]
+      },
+      {
+        "properties": [
+          "slug"
+        ]
+      }
+    ],
+    "uniques": [],
+    "className": "Tag",
+    "path": "./src/entities/Tag.ts",
+    "collection": "tags",
+    "name": "Tag",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/Tag.ts",
+  "hash": "6e479ee9f1312b70071c2eb1d83f12bf",
+  "version": "6.4.16"
+}

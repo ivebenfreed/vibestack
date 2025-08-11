@@ -1,0 +1,143 @@
+{
+  "data": {
+    "_id": 11000,
+    "properties": {
+      "providerId": {
+        "name": "providerId",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "providerAccountId": {
+        "name": "providerAccountId",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "refreshToken": {
+        "name": "refreshToken",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "accessToken": {
+        "name": "accessToken",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "expiresAt": {
+        "name": "expiresAt",
+        "kind": "scalar",
+        "type": "bigint",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "bigint",
+        "optional": true
+      },
+      "tokenType": {
+        "name": "tokenType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "scope": {
+        "name": "scope",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "idToken": {
+        "name": "idToken",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "sessionState": {
+        "name": "sessionState",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "users": {
+        "name": "users",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "account",
+        "type": "User",
+        "array": false,
+        "runtimeType": "Collection<User, object>"
+      },
+      "sessions": {
+        "name": "sessions",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "account",
+        "type": "Session",
+        "array": false,
+        "runtimeType": "Collection<Session, object>"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Account",
+    "path": "./src/entities/Account.ts",
+    "comment": "context:server-only | category:auth",
+    "name": "Account",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseSystemEntity",
+    "useCache": true,
+    "collection": "accounts"
+  },
+  "origin": "./src/entities/Account.ts",
+  "hash": "205ba9b31dde66503be08952d3c969c2",
+  "version": "6.4.16"
+}

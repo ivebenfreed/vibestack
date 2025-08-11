@@ -1,0 +1,55 @@
+{
+  "data": {
+    "_id": 0,
+    "properties": {
+      "id": {
+        "name": "id",
+        "kind": "scalar",
+        "primary": true,
+        "type": "uuid",
+        "defaultRaw": "gen_random_uuid()",
+        "array": false,
+        "runtimeType": "string"
+      },
+      "createdAt": {
+        "name": "createdAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "defaultRaw": "now()",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date"
+      },
+      "updatedAt": {
+        "name": "updatedAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "defaultRaw": "now()",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date"
+      }
+    },
+    "primaryKeys": [
+      "id"
+    ],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "BaseSystemEntity",
+    "path": "./src/entities/BaseSystemEntity.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "useCache": true,
+    "compositePK": false,
+    "simplePK": true
+  },
+  "origin": "./src/entities/BaseSystemEntity.ts",
+  "hash": "d588e591f21e83afcb371ad82de33a54",
+  "version": "6.4.16"
+}

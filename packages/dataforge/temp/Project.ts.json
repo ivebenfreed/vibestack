@@ -1,0 +1,125 @@
+{
+  "data": {
+    "_id": 6000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "description": {
+        "name": "description",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "status": {
+        "name": "status",
+        "kind": "scalar",
+        "type": "string",
+        "default": "active",
+        "getter": false,
+        "setter": false,
+        "columnTypes": [
+          "projects_status_enum"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "owner": {
+        "name": "owner",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "owner_id"
+        ],
+        "type": "User",
+        "array": false,
+        "runtimeType": "User",
+        "optional": true
+      },
+      "tasks": {
+        "name": "tasks",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "project",
+        "type": "Task",
+        "array": false,
+        "runtimeType": "Collection<Task, object>"
+      },
+      "tagSets": {
+        "name": "tagSets",
+        "kind": "m:n",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "pivotTable": "project_tag_sets",
+        "inversedBy": "projects",
+        "fixedOrder": false,
+        "joinColumns": [
+          "project_id"
+        ],
+        "inverseJoinColumns": [
+          "tag_set_id"
+        ],
+        "type": "TagSet",
+        "array": false,
+        "runtimeType": "Collection<TagSet, object>"
+      },
+      "statusSets": {
+        "name": "statusSets",
+        "kind": "m:n",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "pivotTable": "project_status_sets",
+        "inversedBy": "projects",
+        "fixedOrder": false,
+        "joinColumns": [
+          "project_id"
+        ],
+        "inverseJoinColumns": [
+          "status_set_id"
+        ],
+        "type": "StatusSet",
+        "array": false,
+        "runtimeType": "Collection<StatusSet, object>"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Project",
+    "path": "./src/entities/Project.ts",
+    "name": "Project",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "projects"
+  },
+  "origin": "./src/entities/Project.ts",
+  "hash": "ead492634b88020cc48ec79865aba7d6",
+  "version": "6.4.16"
+}

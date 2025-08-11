@@ -97,8 +97,8 @@ MAIN_REPO_ROOT="$(git worktree list | head -1 | awk '{print $1}')"
 
 # List of files to copy if they exist
 COPY_FILES=(
-  "apps/server/.dev.vars.bak"  # Copy backup with all secrets
-  # Don't copy .env.local - it will be generated with correct ports
+  "apps/server/.env.local"  # Copy to get secrets, will be regenerated with correct ports
+  "apps/server/.dev.vars.bak"  # Fallback if .env.local doesn't exist
   "apps/web/.env.development"
   "apps/web/.env.development.generated"
   "apps/web/.env.local"
