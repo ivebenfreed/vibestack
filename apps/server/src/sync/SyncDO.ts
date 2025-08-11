@@ -200,7 +200,17 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     if (response.status === 101) {
       // WebSocket upgrade successful, extract client info and start sync
       const clientId = getQueryParam(request, 'clientId');
-      const clientLSN = getQueryParam(request, 'lsn') || '0/0';
+      const rawLSN = getQueryParam(request, 'lsn');
+      const clientLSN = rawLSN || '0/0';
+      
+      syncLogger.info('WebSocket connection params', {
+        clientId,
+        rawLSN,
+        clientLSN,
+        defaultedTo0: !rawLSN,
+        url: request.url,
+        queryString: new URL(request.url).search
+      }, MODULE_NAME);
       
       if (clientId) {
         this.clientId = clientId;

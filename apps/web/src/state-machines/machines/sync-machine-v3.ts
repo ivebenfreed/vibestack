@@ -485,7 +485,9 @@ export const syncMachineV3 = setup({
     
     console.log('[SyncMachineV3] Initializing with state:', {
       clientId: persistedClientId,
-      currentLSN: persistedLSN
+      currentLSN: persistedLSN,
+      lsnFromLocalStorage: localStorage.getItem('currentLSN'),
+      syncStateFromLocalStorage: localStorage.getItem('sync-machine-state')
     });
     
     return {

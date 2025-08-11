@@ -93,6 +93,12 @@ export class ServiceCoordinator {
       syncLogger.info('service', 'Skipping TypeORM DataSource - using Dexie-only mode');
 
       // Create service configurations using autonomous pattern (no orchestrator)
+      console.log('[ServiceCoordinator] Creating WebSocket config with LSN:', {
+        configCurrentLSN: config.currentLSN,
+        configClientId: config.clientId,
+        fullConfig: config
+      });
+      
       const wsConfig: WebSocketServiceConfig = {
         serverUrl: config.serverUrl,
         clientId: config.clientId,
@@ -102,6 +108,8 @@ export class ServiceCoordinator {
         reconnectDelay: config.reconnectDelay || 1000,
         maxReconnectAttempts: config.maxReconnectAttempts || 5
       };
+      
+      console.log('[ServiceCoordinator] WebSocket config created:', wsConfig);
 
       // Create integrity service configuration
       const integrityConfig: IntegrityServiceConfig = {
