@@ -7,7 +7,7 @@
 
 import { EntityDependency, DependencyType } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
-import { entitydependencyDexieService } from '@repo/dataforge/dexie-domain';
+import { entityDependencyDexieService } from '@repo/dataforge/dexie-domain';
 // Define input types locally since operations may not be generated yet
 export type CreateEntityDependencyInput = {
   entityType: string;
@@ -75,7 +75,7 @@ export class EntityDependencyDomainService extends BaseDomainService<EntityDepen
     const processedInput = this.beforeCreate ? this.beforeCreate(input) : input;
     
     // Use generated Dexie service for creation
-    const dependency = await entitydependencyDexieService.create(processedInput);
+    const dependency = await entityDependencyDexieService.create(processedInput);
     
     // Track for outgoing sync
     await trackOutgoingChange('entity_dependencies', 'insert', dependency);
@@ -115,7 +115,7 @@ export class EntityDependencyDomainService extends BaseDomainService<EntityDepen
     const processedUpdates = this.beforeUpdate ? this.beforeUpdate(id, updates, existing) : updates;
     
     // Use generated Dexie service for update
-    const updatedDependency = await entitydependencyDexieService.update(id, processedUpdates);
+    const updatedDependency = await entityDependencyDexieService.update(id, processedUpdates);
     if (!updatedDependency) {
       throw new Error(`Failed to update entity dependency ${id}`);
     }
@@ -139,7 +139,7 @@ export class EntityDependencyDomainService extends BaseDomainService<EntityDepen
     }
     
     // Use generated Dexie service for deletion
-    const success = await entitydependencyDexieService.delete(id);
+    const success = await entityDependencyDexieService.delete(id);
     
     if (success) {
       // Track for outgoing sync
