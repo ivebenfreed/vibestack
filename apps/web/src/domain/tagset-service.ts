@@ -7,7 +7,7 @@
 
 import { TagSet } from '@repo/dataforge/client-entities';
 import { db } from '@repo/dataforge/dexie-schema';
-import { tagsetDexieService } from '@repo/dataforge/dexie-domain';
+import { tagSetDexieService } from '@repo/dataforge/dexie-domain';
 import type { CreateTagSetInput, UpdateTagSetInput } from '@repo/dataforge/tagset-operations';
 import { BaseDomainService } from './base-domain-service';
 import { trackOutgoingChange } from '@/db/dexie-change-tracking';

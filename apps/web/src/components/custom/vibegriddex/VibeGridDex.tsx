@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useActorRef, useSelector } from '@xstate/react';
 // useLiveQuery removed - handled by XState store
 import { tableBaseMachine } from './machines/table-machine';
+import { xstateTestInspector } from '@/test-utils/xstate-test-inspector';
 import { toast } from 'sonner';
 // InitializationRefs type moved inline since VibeGridXCore was removed
 type InitializationRefs = {
@@ -18,7 +19,7 @@ import {
 } from './VibeGridXHooks';
 import type { RenderState, TableRow, CellRef, Column, RelationshipOptionsProviders } from './types';
 // TableRenderer removed - using CleanTableRenderer via actor
-import { CanvasOverlay } from './overlays/CanvasOverlay';
+// CanvasOverlay removed - using DOM overlays via CanvasOverlayDOM
 // Deprecated coordinate manager removed - using dimensions-slice coordinate mapping
 import { VibeGridXHeader } from './components/VibeGridXHeader';
 import './vibegridx.css';
@@ -85,6 +86,9 @@ interface VibeGridDexProps<T = any> {
   enableSorting?: boolean;
   enableDragAndDrop?: boolean;
   enableSelectionColumn?: boolean;
+  
+  // DOM overlay feature flag (for Issue #71)
+  useDOMOverlays?: boolean;
 }
 
 // ====================================
@@ -145,7 +149,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayContainerRef = useRef<HTMLDivElement>(null);
   // rendererRef removed - using CleanTableRenderer via actor system
-  const canvasOverlayRef = useRef<CanvasOverlay | null>(null);
+  // canvasOverlayRef removed - using DOM overlays via canvas actor
   const selectedCellsRef = useRef<Set<string>>(new Set());
   const anchorCellRef = useRef<CellRef | null>(null);
   const subscriptionRef = useRef<any>(null);
@@ -291,8 +295,23 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     };
   }, [tableId, entityType, columns, enableSelectionColumn, persistedData, height, width, props.enableVirtualScrolling, props.enableGrouping, props.enableFiltering, props.bufferSize]);
   
-  // Create table actor with the machine config
-  const tableActor = useActorRef(tableBaseMachine, machineConfig);
+  // Create table actor with the machine config (with inspection in dev/test)
+  const tableActorOptions = useMemo(() => {
+    const options: any = machineConfig;
+    
+    // Add inspection in development/test mode
+    if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
+      // Check if xstateTestInspector is available
+      if (typeof window !== 'undefined' && (window as any).xstateTestInspector) {
+        options.inspect = (window as any).xstateTestInspector.inspect;
+        console.log('[VibeGridDex] XState inspection enabled for table machine');
+      }
+    }
+    
+    return options;
+  }, [machineConfig]);
+  
+  const tableActor = useActorRef(tableBaseMachine, tableActorOptions);
   const tableSend = tableActor.send;
   
   // The table machine handles persistence internally via persistSnapshot action
@@ -457,6 +476,8 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   return (
     <div
       className={`vibegridx-container ${className}`}
+      data-testid={`vibegridx-${tableId}`}
+      data-entity-type={entityType}
       style={{ 
         width, 
         height, 
@@ -478,6 +499,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       <div
         ref={containerRefCallback}
         className="vibegridx-renderer"
+        data-testid={`vibegridx-renderer-${tableId}`}
         style={{ width: '100%', height: 'calc(100% - 48px)' }} // Subtract header height
       />
       
@@ -486,6 +508,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       {/* Legacy Canvas Overlay Container - hidden, kept for backward compatibility */}
       <div
         ref={overlayContainerRef}
+        data-testid={`vibegridx-overlay-${tableId}`}
         style={{ display: 'none' }}
       />
     </div>
