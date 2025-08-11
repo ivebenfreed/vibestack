@@ -64,6 +64,11 @@ export const clipboardHandlers = {
             clipboardState: null,
             viewport: context.viewport
           });
+          
+          // Also send direct clipboard clear for DOM indicators
+          context.actors.canvasActor.send({
+            type: 'CLIPBOARD_CLEAR'
+          });
         }
       },
       

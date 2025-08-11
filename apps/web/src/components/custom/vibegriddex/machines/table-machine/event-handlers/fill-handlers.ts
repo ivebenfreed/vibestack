@@ -4,6 +4,7 @@
 
 import { emit } from 'xstate';
 import { overlayActions } from '../slices/overlay-slice';
+import { calculateVisualPositions } from '../helpers/visual-position-helpers';
 
 // ====================================
 // FILL PATTERN DETECTION
@@ -276,6 +277,28 @@ export const fillHandlers = {
         applyFillPattern(fillPattern, fillCells, context);
       },
 
+      // Update selection to include filled cells (same as selections do after operations)
+      ({ context, event, self }: any) => {
+        const fillCells = event.fillCells;
+        if (!fillCells || fillCells.size === 0) return;
+        
+        // Combine original selection with filled cells
+        const originalSelection = context.fillState?.originalSelection || context.selectedCells;
+        const newSelection = new Set([...originalSelection, ...fillCells]);
+        
+        console.log('TableMachine: Updating selection after fill completion', {
+          originalSize: originalSelection.size,
+          fillCellsSize: fillCells.size, 
+          newSelectionSize: newSelection.size
+        });
+        
+        // Update the selection state (same pattern as other selection updates)
+        self.send({
+          type: 'selection.set.multiple',
+          cellKeys: newSelection
+        });
+      },
+
       // Clear fill preview from canvas
       ({ context }: any) => {
         if (context.actors.canvasActor) {
@@ -319,14 +342,17 @@ export const fillHandlers = {
   'FILL_MOVE': {
     actions: [
       ({ context, event }: any) => {
-        if (!context.actors.canvasActor || !context.viewport) return;
+        if (!context.actors.canvasActor) return;
         
-        // Get the fill handle layer from canvas to calculate preview cells
-        context.actors.canvasActor.send({
-          type: 'CALCULATE_FILL_PREVIEW',
-          dragPos: { x: event.x, y: event.y },
-          selectedCells: context.selectedCells,
-          viewport: context.viewport
+        // Use unified system: directly call the fill handle's unified event methods
+        // This bypasses the old CALCULATE_FILL_PREVIEW approach and avoids event spam
+        const canvasActor = context.actors.canvasActor;
+        
+        // Check if canvas actor has a fill handle layer we can access
+        // For now, we'll send a direct event to trigger the calculation
+        canvasActor.send({
+          type: 'FILL_HANDLE_MOVE',
+          dragPos: { x: event.x, y: event.y }
         });
       }
     ]
@@ -344,14 +370,28 @@ export const fillHandlers = {
         });
       },
 
-      // Send fill preview to canvas actor for visual rendering
+      // Calculate visual positions for preview cells (same path as selections)
       ({ context, event }: any) => {
-        if (context.actors.canvasActor && context.viewport) {
-          context.actors.canvasActor.send({
-            type: 'RENDER_FILL_PREVIEW',
-            previewCells: event.previewCells,
-            viewport: context.viewport
+        if (context.actors.canvasActor && context.viewport && context.coordinateMapping) {
+          // Convert preview cells to visual positions using the same helper as selections
+          const visualPositions = calculateVisualPositions(
+            event.previewCells,
+            context.coordinateMapping,
+            context.viewport,
+            context.rowHeight || context.settings?.rowHeight || 40
+          );
+          
+          console.log('TableMachine: Calculated fill preview visual positions', {
+            previewCellsCount: event.previewCells.size,
+            visualPositionsCount: visualPositions.length
           });
+          
+          if (visualPositions.length > 0) {
+            context.actors.canvasActor.send({
+              type: 'RENDER_FILL_PREVIEW_VISUAL',
+              visualCells: visualPositions
+            });
+          }
         }
       }
     ]

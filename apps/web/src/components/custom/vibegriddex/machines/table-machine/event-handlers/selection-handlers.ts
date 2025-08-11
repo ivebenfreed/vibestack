@@ -69,7 +69,8 @@ export const selectionHandlers = {
             event: {
               type: 'RENDER_FILL_HANDLE',
               visualCells: visualPositions,
-              selectedRows: context.selectedRows
+              selectedRows: context.selectedRows,
+              viewport: context.viewport
             }
           });
         }
@@ -130,7 +131,8 @@ export const selectionHandlers = {
             event: {
               type: 'RENDER_FILL_HANDLE',
               visualCells: visualPositions,
-              selectedRows: context.selectedRows
+              selectedRows: context.selectedRows,
+              viewport: context.viewport
             }
           });
         }
@@ -232,7 +234,8 @@ export const selectionHandlers = {
             event: {
               type: 'RENDER_FILL_HANDLE',
               visualCells: visualPositions,
-              selectedRows: context.selectedRows
+              selectedRows: context.selectedRows,
+              viewport: context.viewport
             }
           });
         } else {
@@ -319,7 +322,8 @@ export const selectionHandlers = {
             event: {
               type: 'RENDER_FILL_HANDLE',
               visualCells: visualPositions,
-              selectedRows: context.selectedRows
+              selectedRows: context.selectedRows,
+              viewport: context.viewport
             }
           });
         }
