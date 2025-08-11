@@ -36,16 +36,37 @@ export async function performInitialSync(
   try {
     syncLogger.info(`Starting initial sync for client ${clientId}`, { clientId }, MODULE_NAME);
 
-    // Get server LSN at start of initial sync
-    const startLSN = stateManager ? await stateManager.getServerLSN() : '0/0';
+    // Check for existing sync progress (resume capability)
+    let syncProgress: InitialSyncState | null = null;
+    let completedTables: Set<string> = new Set();
+    let startLSN = '0/0';
+    
+    if (stateManager) {
+      syncProgress = await stateManager.getInitialSyncProgress(clientId);
+      if (syncProgress && syncProgress.status !== 'complete') {
+        syncLogger.info(`Resuming initial sync from previous progress`, {
+          clientId,
+          completedTables: syncProgress.completedTables,
+          lastTable: syncProgress.table,
+          status: syncProgress.status
+        }, MODULE_NAME);
+        completedTables = new Set(syncProgress.completedTables);
+        startLSN = syncProgress.startLSN;
+      } else {
+        // Fresh start - get current LSN
+        startLSN = await stateManager.getServerLSN();
+      }
+    }
 
-    // Send initial sync start message
+    // Send initial sync start message (with resume info if applicable)
     const startMessage: ServerInitStartMessage = {
       type: 'srv_init_start',
       clientId,
       requestId: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      tableCount: ORDERED_TRACKED_TABLES.length
+      tableCount: ORDERED_TRACKED_TABLES.length,
+      serverLSN: startLSN,
+      resuming: completedTables.size > 0
     };
     
     await messageHandler.send(startMessage);
@@ -61,11 +82,31 @@ export async function performInitialSync(
 
     // Process each table separately, sending chunks per table
     let totalRecords = 0;
-    let processedTables = 0;
+    let processedTables = completedTables.size; // Start from where we left off
     
     // Process each table in dependency order (parent tables before junction tables)
     for (const tableName of ORDERED_TRACKED_TABLES) {
+      // Skip tables that were already completed in previous sync attempt
+      if (completedTables.has(tableName)) {
+        syncLogger.info(`Skipping already completed table ${tableName}`, { clientId, table: tableName }, MODULE_NAME);
+        continue;
+      }
+      
       syncLogger.info(`Processing table ${tableName} for initial sync`, { clientId, table: tableName }, MODULE_NAME);
+      
+      // Save progress at start of table processing
+      if (stateManager) {
+        const progressState: InitialSyncState = {
+          table: tableName,
+          lastChunk: 0,
+          totalChunks: 0,
+          completedTables: Array.from(completedTables),
+          status: 'in_progress',
+          startLSN,
+          startTimeMs: Date.now()
+        };
+        await stateManager.saveInitialSyncProgress(clientId, progressState);
+      }
       
       // Get data for this specific table
       const tableData = await syncAdapter.getTableData(tableName, new Date(0));
@@ -73,6 +114,8 @@ export async function performInitialSync(
       if (!tableData || tableData.length === 0) {
         syncLogger.debug(`No data in table ${tableName}`, { clientId, table: tableName }, MODULE_NAME);
         processedTables++;
+        // Mark table as completed even if empty
+        completedTables.add(tableName);
         continue;
       }
       
@@ -128,11 +171,27 @@ export async function performInitialSync(
       totalRecords += tableData.length;
       processedTables++;
       
+      // Mark table as completed and save progress
+      completedTables.add(tableName);
+      if (stateManager) {
+        const progressState: InitialSyncState = {
+          table: tableName,
+          lastChunk: chunks.length,
+          totalChunks: chunks.length,
+          completedTables: Array.from(completedTables),
+          status: processedTables === ORDERED_TRACKED_TABLES.length ? 'complete' : 'in_progress',
+          startLSN,
+          startTimeMs: Date.now()
+        };
+        await stateManager.saveInitialSyncProgress(clientId, progressState);
+      }
+      
       syncLogger.info(`Completed table ${tableName}`, {
         clientId,
         table: tableName,
         records: tableData.length,
-        progress: `${processedTables}/${ORDERED_TRACKED_TABLES.length} tables`
+        progress: `${processedTables}/${ORDERED_TRACKED_TABLES.length} tables`,
+        completedSoFar: Array.from(completedTables)
       }, MODULE_NAME);
     }
     
@@ -156,6 +215,20 @@ export async function performInitialSync(
     };
     
     await messageHandler.send(completeMessage);
+    
+    // Clear sync progress on successful completion
+    if (stateManager) {
+      const finalState: InitialSyncState = {
+        table: '',
+        lastChunk: 0,
+        totalChunks: 0,
+        completedTables: Array.from(completedTables),
+        status: 'complete',
+        startLSN,
+        startTimeMs: Date.now()
+      };
+      await stateManager.saveInitialSyncProgress(clientId, finalState);
+    }
 
     // Update sync metadata - DISABLED due to schema mismatch
     // TODO: Fix sync_metadata table structure mismatch
@@ -164,6 +237,9 @@ export async function performInitialSync(
     console.log('DEBUG: Skipping sync metadata update due to schema mismatch');
 
     // Update state manager if provided
+    // TODO: Implement setClientSyncState method in StateManager
+    // Currently disabled as the method doesn't exist yet
+    /*
     if (stateManager) {
       try {
         await stateManager.setClientSyncState(clientId, {
@@ -177,6 +253,7 @@ export async function performInitialSync(
         }, MODULE_NAME);
       }
     }
+    */
 
     syncLogger.info(`Completed initial sync for client ${clientId}`, {
       clientId,

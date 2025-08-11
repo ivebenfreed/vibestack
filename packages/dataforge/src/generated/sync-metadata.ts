@@ -98,8 +98,8 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "foreignKeys": [],
     "indexes": [],
     "conflictResolution": "id",
-    "syncable": false,
-    "trackChanges": false
+    "syncable": true,
+    "trackChanges": true
   },
   "Task": {
     "tableName": "tasks",
@@ -720,24 +720,33 @@ export type TableName = 'verifications' | 'users' | 'tasks' | 'tag_sets' | 'tags
 export const entityClassNames = ["Verification","User","Task","TagSet","Tag","StatusSet","StatusDefinition","Session","Project","LocalChanges","EntityDependency","Comment","ChangeHistory","Account"] as const;
 export const tableNames = ["verifications","users","tasks","tag_sets","tags","status_sets","status_definitions","sessions","projects","local_changes","entity_dependencies","comments","change_history","accounts"] as const;
 
-// Export domain and junction tables for sync
-export const DOMAIN_TABLES = ["tasks","tag_sets","tags","status_sets","status_definitions","projects","comments"] as const;
+// Export tables for sync - automatically determined by syncable flag
+export const SYNCABLE_ENTITY_TABLES = ["users","tasks","tag_sets","tags","status_sets","status_definitions","projects","comments"] as const;
 export const JUNCTION_TABLE_NAMES = ["task_tags","project_tag_sets","project_status_sets"] as const;
-export const TRACKED_TABLES = [...DOMAIN_TABLES, ...JUNCTION_TABLE_NAMES] as const;
+export const TRACKED_TABLES = [...SYNCABLE_ENTITY_TABLES, ...JUNCTION_TABLE_NAMES] as const;
 
-// Table hierarchy for ordered sync
-export const TABLE_HIERARCHY = {
-  "tag_sets": [],
-  "tags": [],
-  "status_sets": [],
-  "status_definitions": [],
-  "projects": [],
-  "tasks": [],
-  "comments": [],
-  "task_tags": ["tasks", "tags"],
-  "project_tag_sets": ["projects", "tag_sets"],
-  "project_status_sets": ["projects", "status_sets"]
-} as const;
+// Legacy exports for backward compatibility
+export const DOMAIN_TABLES = ["tasks","tag_sets","tags","status_sets","status_definitions","projects","comments"] as const;
+
+// Build table hierarchy automatically from metadata
+const tableHierarchy: Record<string, string[]> = {};
+
+// Add all syncable entity tables
+tableHierarchy["users"] = [];
+tableHierarchy["tasks"] = [];
+tableHierarchy["tag_sets"] = [];
+tableHierarchy["tags"] = [];
+tableHierarchy["status_sets"] = [];
+tableHierarchy["status_definitions"] = [];
+tableHierarchy["projects"] = [];
+tableHierarchy["comments"] = [];
+
+// Add junction tables with their dependencies
+tableHierarchy["task_tags"] = ["tasks", "tags"];
+tableHierarchy["project_tag_sets"] = ["projects", "tag_sets"];
+tableHierarchy["project_status_sets"] = ["projects", "status_sets"];
+
+export const TABLE_HIERARCHY = tableHierarchy as const;
 
 /**
  * Orders tables based on their dependencies.

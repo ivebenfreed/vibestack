@@ -7,7 +7,7 @@
 
 import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
-import { eq, and, or, sql, inArray, gt } from 'drizzle-orm';
+import { eq, and, or, sql, inArray } from 'drizzle-orm';
 import type { 
   TableSyncMetadata, 
   JunctionTable,
@@ -311,6 +311,8 @@ export class GenericSyncEngine {
 
   /**
    * Get all changes that need to be synced to a client
+   * For initial sync, this returns ALL records from all tables
+   * (LSN-based sync happens elsewhere in the system)
    */
   async getChangesForClient(
     lastSyncTimestamp: Date,
@@ -333,40 +335,13 @@ export class GenericSyncEngine {
         continue;
       }
       
-      // Check if this is a junction table
-      const isJunctionTable = this.junctionTables.some(jt => jt.tableName === tableName);
+      // For initial sync, get ALL records from each table
+      // LSN-based incremental sync is handled by the replication system
+      const records = await this.db.select().from(table).limit(1000);
+      console.log(`DEBUG: Found ${records.length} records in ${tableName}`);
       
-      if (isJunctionTable) {
-        // Junction tables don't have updatedAt, so we get all records
-        // In production, you'd track changes differently
-        const records = await this.db.select().from(table);
-        console.log(`DEBUG: Found ${records.length} records in junction table ${tableName}`);
-        if (records.length > 0) {
-          changes[tableName] = records;
-        }
-      } else {
-        // Regular tables have updated_at column for filtering
-        const updatedAtColumn = table.updated_at;
-        if (!updatedAtColumn) {
-          console.log('DEBUG: No updated_at column found for table:', tableName);
-          // Get all records if no updated_at column
-          const records = await this.db.select().from(table);
-          if (records.length > 0) {
-            changes[tableName] = records;
-          }
-        } else {
-          // Get records updated since last sync
-          const records = await this.db
-            .select()
-            .from(table)
-            .where(gt(updatedAtColumn, lastSyncTimestamp))
-            .limit(1000); // Paginate for large datasets
-          
-          console.log(`DEBUG: Found ${records.length} records in ${tableName} newer than ${lastSyncTimestamp.toISOString()}`);
-          if (records.length > 0) {
-            changes[tableName] = records;
-          }
-        }
+      if (records.length > 0) {
+        changes[tableName] = records;
       }
     }
     

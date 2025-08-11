@@ -104,8 +104,10 @@ async function extractSyncMetadata() {
       foreignKeys,
       indexes,
       conflictResolution: hasClientId ? 'client_id' : 'id',
-      syncable: category === 'domain',
-      trackChanges: category === 'domain',
+      // Users table needs to sync even though it's a system table
+      // All domain tables and selected system tables should sync
+      syncable: category === 'domain' || meta.className === 'User',
+      trackChanges: category === 'domain' || meta.className === 'User',
     };
   }
 
@@ -206,24 +208,33 @@ export type TableName = ${Object.values(entities).map((m: any) => `'${m.tableNam
 export const entityClassNames = ${JSON.stringify(Object.keys(entities))} as const;
 export const tableNames = ${JSON.stringify(Object.values(entities).map((m: any) => m.tableName))} as const;
 
-// Export domain and junction tables for sync
-export const DOMAIN_TABLES = ${JSON.stringify(Object.values(entities).filter((m: any) => m.category === 'domain').map((m: any) => m.tableName))} as const;
+// Export tables for sync - automatically determined by syncable flag
+export const SYNCABLE_ENTITY_TABLES = ${JSON.stringify(Object.values(entities).filter((m: any) => m.syncable).map((m: any) => m.tableName))} as const;
 export const JUNCTION_TABLE_NAMES = ${JSON.stringify(junctionTables.map((j: any) => j.tableName))} as const;
-export const TRACKED_TABLES = [...DOMAIN_TABLES, ...JUNCTION_TABLE_NAMES] as const;
+export const TRACKED_TABLES = [...SYNCABLE_ENTITY_TABLES, ...JUNCTION_TABLE_NAMES] as const;
 
-// Table hierarchy for ordered sync
-export const TABLE_HIERARCHY = {
-  "tag_sets": [],
-  "tags": [],
-  "status_sets": [],
-  "status_definitions": [],
-  "projects": [],
-  "tasks": [],
-  "comments": [],
-  "task_tags": ["tasks", "tags"],
-  "project_tag_sets": ["projects", "tag_sets"],
-  "project_status_sets": ["projects", "status_sets"]
-} as const;
+// Legacy exports for backward compatibility
+export const DOMAIN_TABLES = ${JSON.stringify(Object.values(entities).filter((m: any) => m.category === 'domain').map((m: any) => m.tableName))} as const;
+
+// Build table hierarchy automatically from metadata
+const tableHierarchy: Record<string, string[]> = {};
+
+// Add all syncable entity tables
+${Object.values(entities).filter((m: any) => m.syncable).map((m: any) => `tableHierarchy["${m.tableName}"] = [];`).join('\n')}
+
+// Add junction tables with their dependencies
+${junctionTables.map((j: any) => {
+  const deps = j.columns.map((c: any) => {
+    // Convert junction column references to table names
+    if (c.referencedTableName) return `"${c.referencedTableName}"`;
+    // Fallback: derive table name from column name (e.g., task_id -> tasks)
+    const tableName = c.name.replace(/_id$/, '') + 's';
+    return `"${tableName}"`;
+  }).filter(Boolean).join(', ');
+  return `tableHierarchy["${j.tableName}"] = [${deps}];`;
+}).join('\n')}
+
+export const TABLE_HIERARCHY = tableHierarchy as const;
 
 /**
  * Orders tables based on their dependencies.
