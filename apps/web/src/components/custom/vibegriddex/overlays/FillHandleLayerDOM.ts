@@ -110,12 +110,6 @@ export class FillHandleLayerDOM {
     if (mapping) {
       this.coordinateMapping = mapping;
     }
-    console.log('FillHandleLayerDOM: Updated viewport and mapping', {
-      hasViewport: !!this.currentViewport,
-      hasMapping: !!this.coordinateMapping,
-      viewport: this.currentViewport,
-      timestamp: Date.now()
-    });
   }
   
   /**
@@ -159,21 +153,10 @@ export class FillHandleLayerDOM {
       handleX = CHECKBOX_COLUMN_WIDTH - this.handleSize / 2;
       handleY = maxY - this.handleSize / 2;
       
-      console.log('FillHandleLayerDOM: Positioning fill handle in checkbox column', {
-        handleX,
-        handleY,
-        selectedRowsCount: selectedRows?.size || 0
-      });
     } else {
       // Position at bottom-right of cell selection
       handleX = maxX - this.handleSize / 2;
       handleY = maxY - this.handleSize / 2;
-      
-      console.log('FillHandleLayerDOM: Positioning fill handle at bottom-right', {
-        handleX,
-        handleY,
-        bounds: { minX, minY, maxX, maxY }
-      });
     }
     
     // Create or update fill handle
@@ -302,15 +285,6 @@ export class FillHandleLayerDOM {
    * Render fill preview with visual positions directly (same path as selections)
    */
   renderFillPreviewWithVisualPositions(visualCells: VisualCellPosition[]): void {
-    console.log('FillHandleLayerDOM: renderFillPreviewWithVisualPositions', {
-      cellCount: visualCells.length,
-      containerExists: !!this.container,
-      firstCells: visualCells.slice(0, 2).map(c => ({
-        key: c.cellKey,
-        pos: { x: c.x, y: c.y, w: c.width, h: c.height }
-      }))
-    });
-    
     // Build set of new cell keys for comparison (same pattern as selections)
     const newCellKeys = new Set(visualCells.map(cell => cell.cellKey));
     const currentCellKeys = new Set(this.previewElements.keys());
@@ -318,7 +292,6 @@ export class FillHandleLayerDOM {
     // Remove elements that are no longer in preview (smooth removal like selections)
     for (const cellKey of currentCellKeys) {
       if (!newCellKeys.has(cellKey)) {
-        console.log(`FillHandleLayerDOM: Removing preview cell ${cellKey}`);
         this.removeFillPreviewElement(cellKey);
       }
     }
@@ -326,14 +299,6 @@ export class FillHandleLayerDOM {
     // Add or update elements for new/existing preview cells (same pattern as selections)
     for (const cell of visualCells) {
       const cellKey = cell.cellKey;
-      const isNewPreview = !currentCellKeys.has(cellKey);
-      
-      console.log(`FillHandleLayerDOM: ${isNewPreview ? 'Adding new' : 'Updating existing'} preview element for ${cellKey}`, {
-        x: cell.x,
-        y: cell.y,
-        width: cell.width,
-        height: cell.height
-      });
       
       this.addOrUpdateFillPreviewElement(cellKey, {
         x: cell.x,
@@ -342,11 +307,6 @@ export class FillHandleLayerDOM {
         height: cell.height
       });
     }
-    
-    console.log('FillHandleLayerDOM: Fill preview elements updated', {
-      elementCount: this.previewElements.size,
-      elementKeys: Array.from(this.previewElements.keys())
-    });
   }
   
   /**
@@ -432,54 +392,27 @@ export class FillHandleLayerDOM {
     selectedCells: Set<string>,
     viewport: ViewportInfo
   ): Set<string> {
-    console.log('FillHandleLayerDOM: calculateFillPreviewCells called', {
-      dragPos,
-      selectedCellsSize: selectedCells.size,
-      selectedCellsArray: Array.from(selectedCells),
-      hasCoordinateMapping: !!this.coordinateMapping
-    });
-    
     if (!this.coordinateMapping || selectedCells.size === 0) {
-      console.log('FillHandleLayerDOM: Early return - missing coordinate mapping or no selected cells');
       return new Set();
     }
     
     // Get bounds of selected cells
     const bounds = this.getSelectionBounds(selectedCells);
-    console.log('FillHandleLayerDOM: getSelectionBounds result', bounds);
     if (!bounds) {
-      console.log('FillHandleLayerDOM: No bounds calculated, returning empty set');
       return new Set();
     }
     
     // Force vertical-only direction as requested (vertical only)
     const dragDeltaY = Math.abs(dragPos.y - bounds.centerY);
-    const direction = 'vertical'; // Always vertical as requested by user
-    
-    console.log('FillHandleLayerDOM: Drag direction and distance', {
-      dragDeltaY,
-      direction,
-      boundsCenter: { x: bounds.centerX, y: bounds.centerY },
-      cellHeight: this.config.cellHeight
-    });
     
     // Only vertical filling (as requested by user)
     const rowsToFill = Math.floor(dragDeltaY / this.config.cellHeight);
     const fillDown = dragPos.y > bounds.centerY;
     
-    console.log('FillHandleLayerDOM: Vertical fill calculation', {
-      rowsToFill,
-      fillDown,
-      dragDeltaY,
-      cellHeight: this.config.cellHeight,
-      availableRows: this.coordinateMapping.rows.length
-    });
-    
     const previewCells = new Set<string>();
     
     // Early return if no cells to fill (user dragged back to original selection)
     if (rowsToFill === 0) {
-      console.log('FillHandleLayerDOM: No rows to fill - user dragged back to original selection');
       // Clear any existing preview immediately
       this.clearFillPreview();
       // Also send empty preview through callback to ensure state machine clears its preview
@@ -493,8 +426,6 @@ export class FillHandleLayerDOM {
         bounds.maxRowIndex + i : 
         bounds.minRowIndex - i;
       
-      console.log(`FillHandleLayerDOM: Processing fill row ${i}, targetRowIndex: ${targetRowIndex}`);
-      
       if (targetRowIndex >= 0 && targetRowIndex < this.coordinateMapping.rows.length) {
         const targetRow = this.coordinateMapping.rows[targetRowIndex];
         
@@ -504,11 +435,8 @@ export class FillHandleLayerDOM {
           if (col) {
             const cellKey = `${targetRow.rowId}:${col.columnId}`;
             previewCells.add(cellKey);
-            console.log(`FillHandleLayerDOM: Added preview cell: ${cellKey}`);
           }
         }
-      } else {
-        console.log(`FillHandleLayerDOM: Target row index ${targetRowIndex} out of bounds`);
       }
     }
     
@@ -535,40 +463,27 @@ export class FillHandleLayerDOM {
    */
   private getSelectionBounds(selectedCells: Set<string>) {
     if (!this.coordinateMapping) {
-      console.log('FillHandleLayerDOM: getSelectionBounds - no coordinate mapping');
       return null;
     }
     
     let minRowIndex = Infinity, maxRowIndex = -Infinity;
     let minColIndex = Infinity, maxColIndex = -Infinity;
     
-    console.log('FillHandleLayerDOM: getSelectionBounds processing cells', {
-      selectedCellsArray: Array.from(selectedCells),
-      availableRows: this.coordinateMapping.rows.length,
-      availableCols: this.coordinateMapping.columns.length
-    });
-    
     for (const cellKey of selectedCells) {
       const [rowId, columnId] = cellKey.split(':');
-      console.log(`FillHandleLayerDOM: Processing cell ${cellKey} (rowId: ${rowId}, columnId: ${columnId})`);
       
       const rowIndex = this.coordinateMapping.rows.findIndex(r => r.rowId === rowId);
       const colIndex = this.coordinateMapping.columns.findIndex(c => c.columnId === columnId);
-      
-      console.log(`FillHandleLayerDOM: Found indices - row: ${rowIndex}, col: ${colIndex}`);
       
       if (rowIndex !== -1 && colIndex !== -1) {
         minRowIndex = Math.min(minRowIndex, rowIndex);
         maxRowIndex = Math.max(maxRowIndex, rowIndex);
         minColIndex = Math.min(minColIndex, colIndex);
         maxColIndex = Math.max(maxColIndex, colIndex);
-      } else {
-        console.log(`FillHandleLayerDOM: Could not find indices for cell ${cellKey}`);
       }
     }
     
     if (minRowIndex === Infinity) {
-      console.log('FillHandleLayerDOM: No valid cell indices found');
       return null;
     }
     
@@ -582,17 +497,6 @@ export class FillHandleLayerDOM {
     const minRowOffset = minRowIndex * this.config.cellHeight;
     const centerY = minRowOffset + this.config.cellHeight / 2;
     
-    console.log('FillHandleLayerDOM: Center calculation', {
-      minColOffset: minCol.offset,
-      maxColOffset: maxCol.offset,
-      maxColWidth: maxCol.width,
-      centerX: centerX,
-      minRowIndex: minRowIndex,
-      minRowOffset: minRowOffset,
-      cellHeight: this.config.cellHeight,
-      centerY: centerY
-    });
-    
     const bounds = {
       minRowIndex,
       maxRowIndex,
@@ -601,8 +505,6 @@ export class FillHandleLayerDOM {
       centerX: centerX,
       centerY: centerY
     };
-    
-    console.log('FillHandleLayerDOM: Calculated bounds', bounds);
     
     return bounds;
   }
@@ -663,10 +565,6 @@ export class FillHandleLayerDOM {
    * Handle fill complete from EventDelegationManager
    */
   handleFillComplete(dragPos: { x: number; y: number }): void {
-    console.log('FillHandleLayerDOM: Fill complete via unified system', {
-      dragPos
-    });
-    
     const selectedCells = this.callbacks.getSelectedCells();
     const viewport = this.currentViewport;
     
@@ -674,14 +572,10 @@ export class FillHandleLayerDOM {
       const fillCells = this.calculateFillPreviewCells(dragPos, selectedCells, viewport);
       
       if (fillCells.size > 0) {
-        console.log('FillHandleLayerDOM: Calling onFillComplete with', fillCells.size, 'cells');
         this.callbacks.onFillComplete(fillCells);
       } else {
-        console.log('FillHandleLayerDOM: Calling onFillCancel - no fill cells calculated');
         this.callbacks.onFillCancel();
       }
-    } else {
-      console.warn('FillHandleLayerDOM: Cannot complete fill - missing viewport or coordinate mapping');
     }
     
     // Clear preview after completion
