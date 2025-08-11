@@ -1,0 +1,104 @@
+{
+  "data": {
+    "_id": 13000,
+    "properties": {
+      "fromTable": {
+        "name": "fromTable",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "fromId": {
+        "name": "fromId",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "toTable": {
+        "name": "toTable",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "toId": {
+        "name": "toId",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "dependencyType": {
+        "name": "dependencyType",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "metadata": {
+        "name": "metadata",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [
+      {
+        "properties": [
+          "toTable",
+          "toId"
+        ]
+      },
+      {
+        "properties": [
+          "fromTable",
+          "fromId"
+        ]
+      }
+    ],
+    "uniques": [
+      {
+        "properties": [
+          "fromTable",
+          "fromId",
+          "toTable",
+          "toId",
+          "dependencyType"
+        ]
+      }
+    ],
+    "className": "EntityDependency",
+    "path": "./src/entities/EntityDependency.ts",
+    "name": "EntityDependency",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseSystemEntity",
+    "useCache": true,
+    "collection": "entity_dependencies"
+  },
+  "origin": "./src/entities/EntityDependency.ts",
+  "hash": "5466073fa05e5df4e03ed68b45004cb2",
+  "version": "6.4.16"
+}

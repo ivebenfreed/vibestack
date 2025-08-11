@@ -92,17 +92,19 @@ function setupWorktreeEnv() {
     console.log('');
   }
   
-  // Read all values from .env if it exists, otherwise use .dev.vars.bak
+  // Read secrets from existing .env.local (from main repo) or .dev.vars.bak
   let envContent = '';
+  const mainEnvLocalPath = path.join(serverDir, '.env.local');
   const devVarsPath = path.join(serverDir, '.dev.vars.bak');
   
-  if (fs.existsSync(envPath)) {
-    envContent = fs.readFileSync(envPath, 'utf8');
+  if (fs.existsSync(mainEnvLocalPath)) {
+    console.log('📋 Reading secrets from existing .env.local');
+    envContent = fs.readFileSync(mainEnvLocalPath, 'utf8');
   } else if (fs.existsSync(devVarsPath)) {
     console.log('📋 Using .dev.vars.bak as base configuration');
     envContent = fs.readFileSync(devVarsPath, 'utf8');
   } else {
-    console.log('⚠️  No .env or .dev.vars.bak found - using minimal defaults');
+    console.log('⚠️  No .env.local or .dev.vars.bak found - using minimal defaults');
   }
   
   // Parse the env content to get all the secrets

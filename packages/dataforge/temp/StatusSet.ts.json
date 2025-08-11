@@ -1,0 +1,135 @@
+{
+  "data": {
+    "_id": 5000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "length": 100,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "description": {
+        "name": "description",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "entityType": {
+        "name": "entityType",
+        "kind": "scalar",
+        "type": "string",
+        "length": 50,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "isDefault": {
+        "name": "isDefault",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "isActive": {
+        "name": "isActive",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "isSystem": {
+        "name": "isSystem",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "workflow": {
+        "name": "workflow",
+        "kind": "scalar",
+        "type": "json",
+        "default": {},
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>"
+      },
+      "metadata": {
+        "name": "metadata",
+        "kind": "scalar",
+        "type": "json",
+        "default": {},
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>"
+      },
+      "statuses": {
+        "name": "statuses",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "statusSet",
+        "type": "StatusDefinition",
+        "array": false,
+        "runtimeType": "Collection<StatusDefinition, object>"
+      },
+      "projects": {
+        "name": "projects",
+        "kind": "m:n",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "statusSets",
+        "fixedOrder": false,
+        "type": "Project",
+        "array": false,
+        "runtimeType": "Collection<Project, object>"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [
+      {
+        "properties": [
+          "entityType"
+        ]
+      }
+    ],
+    "uniques": [],
+    "className": "StatusSet",
+    "path": "./src/entities/StatusSet.ts",
+    "collection": "status_sets",
+    "name": "StatusSet",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/StatusSet.ts",
+  "hash": "55bab3122507546e467aef28ecebbaec",
+  "version": "6.4.16"
+}

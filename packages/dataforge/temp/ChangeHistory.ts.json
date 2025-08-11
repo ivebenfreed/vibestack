@@ -1,0 +1,85 @@
+{
+  "data": {
+    "_id": 15000,
+    "properties": {
+      "lsn": {
+        "name": "lsn",
+        "kind": "scalar",
+        "type": "text",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "tableName": {
+        "name": "tableName",
+        "kind": "scalar",
+        "type": "text",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "operation": {
+        "name": "operation",
+        "kind": "scalar",
+        "type": "text",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "data": {
+        "name": "data",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>",
+        "optional": true
+      },
+      "timestamp": {
+        "name": "timestamp",
+        "kind": "scalar",
+        "type": "date",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [
+      {
+        "properties": [
+          "tableName",
+          "timestamp"
+        ]
+      },
+      {
+        "properties": [
+          "lsn"
+        ]
+      }
+    ],
+    "uniques": [],
+    "className": "ChangeHistory",
+    "path": "./src/entities/ChangeHistory.ts",
+    "collection": "change_history",
+    "comment": "context:server-only | category:system",
+    "name": "ChangeHistory",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseSystemEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/ChangeHistory.ts",
+  "hash": "41e0197eeb69147306c72ec79b9f0769",
+  "version": "6.4.16"
+}

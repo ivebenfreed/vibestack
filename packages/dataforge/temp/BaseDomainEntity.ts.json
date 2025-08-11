@@ -1,0 +1,34 @@
+{
+  "data": {
+    "_id": 1000,
+    "properties": {
+      "clientId": {
+        "name": "clientId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "BaseDomainEntity",
+    "path": "./src/entities/BaseDomainEntity.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseSystemEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/BaseDomainEntity.ts",
+  "hash": "98b98f13fcd66b53fef7cae8c9d89c37",
+  "version": "6.4.16"
+}

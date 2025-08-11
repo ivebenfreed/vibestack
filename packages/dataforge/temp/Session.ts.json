@@ -1,0 +1,55 @@
+{
+  "data": {
+    "_id": 10000,
+    "properties": {
+      "sessionToken": {
+        "name": "sessionToken",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "expiresAt": {
+        "name": "expiresAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date"
+      },
+      "account": {
+        "name": "account",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "type": "Account",
+        "array": false,
+        "runtimeType": "Account"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Session",
+    "path": "./src/entities/Session.ts",
+    "comment": "context:server-only | category:auth",
+    "name": "Session",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseSystemEntity",
+    "useCache": true,
+    "collection": "sessions"
+  },
+  "origin": "./src/entities/Session.ts",
+  "hash": "2f1e1027d9d18aa1f2f60d06f077afef",
+  "version": "6.4.16"
+}
