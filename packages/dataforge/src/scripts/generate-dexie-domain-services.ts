@@ -93,17 +93,20 @@ function mapReferenceToRelationType(reference: string): 'ManyToOne' | 'OneToMany
 function generateServiceFile(service: EntityServiceInfo): string {
   const lowerName = service.entityName.charAt(0).toLowerCase() + service.entityName.slice(1);
   
+  // Generate proper PascalCase class name from entity name
   // Convert snake_case to PascalCase for class name
-  const pascalCaseEntity = service.entityName
-    .split('_')
+  const pascalCaseEntity = service.entityName.split('_')
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
     .join('');
-  
-  // Generate proper PascalCase class name from entity name
   const className = pascalCaseEntity + 'DexieService';
   
-  // Generate consistent service instance name
-  const serviceName = className.charAt(0).toLowerCase() + className.slice(1, -7); // Remove 'Service' and lowercase first char
+  // Generate consistent service instance name (camelCase without 'Service' suffix)
+  const camelCaseEntity = service.entityName.split('_')
+    .map((part, index) => index === 0 
+      ? part.toLowerCase() 
+      : part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+  const serviceName = camelCaseEntity + 'DexieService';
   
   let output = `// Generated Dexie domain service for ${service.entityName}
 import { db } from '../dexie-schema.js';
@@ -201,7 +204,7 @@ export class ${className} {
 
   output += `}
 
-export const ${serviceName}Service = new ${className}();
+export const ${serviceName} = new ${className}();
 `;
 
   return output;
@@ -212,21 +215,9 @@ function generateIndexFile(services: EntityServiceInfo[]): string {
 `;
 
   for (const service of services) {
-    // Convert snake_case to PascalCase for class name
-    const pascalCaseEntity = service.entityName
-      .split('_')
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join('');
-    
-    // Generate the class name and instance name
-    const className = pascalCaseEntity + 'DexieService';
-    const instanceName = pascalCaseEntity.charAt(0).toLowerCase() + pascalCaseEntity.slice(1) + 'DexieService';
-    
     // Use the actual filename we generated
     const fileName = `${service.entityName.toLowerCase()}-dexie-service`;
-    
-    // Export both the class and the instance
-    output += `export { ${className}, ${instanceName} } from './${fileName}.js';\n`;
+    output += `export * from './${fileName}.js';\n`;
   }
 
   return output;

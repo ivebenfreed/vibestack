@@ -65,4 +65,4 @@ export class TagSetDexieService {
   }
 }
 
-export const tagSetDexieService = new TagSetDexieService();
+export const tagsetDexieService = new TagSetDexieService();
