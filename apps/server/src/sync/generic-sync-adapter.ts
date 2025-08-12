@@ -56,7 +56,8 @@ export class GenericSyncAdapter {
     this.syncEngine = new GenericSyncEngine(
       databaseUrl,
       syncMetadata,
-      junctionTables
+      junctionTables,
+      this.env.NODE_ENV || 'development'
     );
     console.log('DEBUG: GenericSyncEngine created successfully');
   }

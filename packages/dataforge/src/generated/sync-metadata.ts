@@ -144,7 +144,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": true
   },
   "TagSet": {
-    "tableName": "tag_sets",
+    "tableName": "tag_set",
     "className": "TagSet",
     "category": "domain",
     "features": {
@@ -190,7 +190,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": true
   },
   "Tag": {
-    "tableName": "tags",
+    "tableName": "tag",
     "className": "Tag",
     "category": "domain",
     "features": {
@@ -245,7 +245,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": true
   },
   "StatusSet": {
-    "tableName": "status_sets",
+    "tableName": "status_set",
     "className": "StatusSet",
     "category": "domain",
     "features": {
@@ -289,7 +289,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": true
   },
   "StatusDefinition": {
-    "tableName": "status_definitions",
+    "tableName": "status_definition",
     "className": "StatusDefinition",
     "category": "domain",
     "features": {
@@ -715,18 +715,18 @@ export function hasSoftDelete(tableName: string): boolean {
 
 // Type-safe table name lookup
 export type EntityClassName = 'Verification' | 'User' | 'Task' | 'TagSet' | 'Tag' | 'StatusSet' | 'StatusDefinition' | 'Session' | 'Project' | 'LocalChanges' | 'EntityDependency' | 'Comment' | 'ChangeHistory' | 'Account';
-export type TableName = 'verifications' | 'users' | 'tasks' | 'tag_sets' | 'tags' | 'status_sets' | 'status_definitions' | 'sessions' | 'projects' | 'local_changes' | 'entity_dependencies' | 'comments' | 'change_history' | 'accounts';
+export type TableName = 'verifications' | 'users' | 'tasks' | 'tag_set' | 'tag' | 'status_set' | 'status_definition' | 'sessions' | 'projects' | 'local_changes' | 'entity_dependencies' | 'comments' | 'change_history' | 'accounts';
 
 export const entityClassNames = ["Verification","User","Task","TagSet","Tag","StatusSet","StatusDefinition","Session","Project","LocalChanges","EntityDependency","Comment","ChangeHistory","Account"] as const;
-export const tableNames = ["verifications","users","tasks","tag_sets","tags","status_sets","status_definitions","sessions","projects","local_changes","entity_dependencies","comments","change_history","accounts"] as const;
+export const tableNames = ["verifications","users","tasks","tag_set","tag","status_set","status_definition","sessions","projects","local_changes","entity_dependencies","comments","change_history","accounts"] as const;
 
 // Export tables for sync - automatically determined by syncable flag
-export const SYNCABLE_ENTITY_TABLES = ["users","tasks","tag_sets","tags","status_sets","status_definitions","projects","comments"] as const;
+export const SYNCABLE_ENTITY_TABLES = ["users","tasks","tag_set","tag","status_set","status_definition","projects","comments"] as const;
 export const JUNCTION_TABLE_NAMES = ["task_tags","project_tag_sets","project_status_sets"] as const;
 export const TRACKED_TABLES = [...SYNCABLE_ENTITY_TABLES, ...JUNCTION_TABLE_NAMES] as const;
 
 // Legacy exports for backward compatibility
-export const DOMAIN_TABLES = ["tasks","tag_sets","tags","status_sets","status_definitions","projects","comments"] as const;
+export const DOMAIN_TABLES = ["tasks","tag_set","tag","status_set","status_definition","projects","comments"] as const;
 
 // Build table hierarchy automatically from metadata
 const tableHierarchy: Record<string, string[]> = {};
@@ -734,10 +734,10 @@ const tableHierarchy: Record<string, string[]> = {};
 // Add all syncable entity tables
 tableHierarchy["users"] = [];
 tableHierarchy["tasks"] = [];
-tableHierarchy["tag_sets"] = [];
-tableHierarchy["tags"] = [];
-tableHierarchy["status_sets"] = [];
-tableHierarchy["status_definitions"] = [];
+tableHierarchy["tag_set"] = [];
+tableHierarchy["tag"] = [];
+tableHierarchy["status_set"] = [];
+tableHierarchy["status_definition"] = [];
 tableHierarchy["projects"] = [];
 tableHierarchy["comments"] = [];
 

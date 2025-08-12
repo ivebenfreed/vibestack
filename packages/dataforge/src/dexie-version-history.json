@@ -1,5 +1,5 @@
 {
-  "currentVersion": 4,
+  "currentVersion": 5,
   "versions": [
     {
       "version": 2,
@@ -55,6 +55,26 @@
         "tags": "++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt",
         "status_sets": "++id, [entityType], clientId, version, deleted, createdAt, updatedAt",
         "status_definitions": "++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt",
+        "project_tag_sets": "++Project_owner",
+        "project_status_sets": "++Project_owner",
+        "projects": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "local_changes": "++id, table, processed_sync, [table+recordId], processedSync",
+        "entity_dependencies": "++id, [toTable+toId], [fromTable+fromId]",
+        "comments": "++id, clientId, version, deleted, createdAt, updatedAt"
+      }
+    },
+    {
+      "version": 5,
+      "generatedAt": "2025-08-12T02:13:58.848Z",
+      "schemaHash": "f20627a038f5f827",
+      "stores": {
+        "users": "++id, &email",
+        "task_tags": "++Task_owner",
+        "tasks": "++id, clientId, version, deleted, createdAt, updatedAt",
+        "tag_set": "++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt",
+        "tag": "++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt",
+        "status_set": "++id, [entityType], clientId, version, deleted, createdAt, updatedAt",
+        "status_definition": "++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt",
         "project_tag_sets": "++Project_owner",
         "project_status_sets": "++Project_owner",
         "projects": "++id, clientId, version, deleted, createdAt, updatedAt",

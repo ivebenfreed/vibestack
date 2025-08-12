@@ -35,20 +35,20 @@ export class TagDexieService {
       clientId: crypto.randomUUID(),
     } as Tag;
     
-    await db.tags.add(record);
+    await db.tag.add(record);
     return id;
   }
 
   async findById(id: string): Promise<Tag | undefined> {
-    return await db.tags.get(id);
+    return await db.tag.get(id);
   }
 
   async findAll(): Promise<Tag[]> {
-    return await db.tags.where('deleted').equals(0).toArray();
+    return await db.tag.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: TagUpdateInput): Promise<void> {
-    await db.tags.update(id, {
+    await db.tag.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -56,14 +56,14 @@ export class TagDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.tags.update(id, {
+    await db.tag.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.tags.clear();
+    await db.tag.clear();
   }
 }
 

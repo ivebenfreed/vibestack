@@ -214,11 +214,23 @@ export async function performCatchupSync(
     // Use Kysely for catchup sync queries
     syncLogger.info('Setting up Kysely client for catchup sync', { clientId });
     const { Kysely } = await import('kysely');
-    const { NeonHTTPDialectV1 } = await import('kysely-neon');
+    const { NeonHTTPDialectV1 } = await import('../lib/kysely-neon-v1-adapter');
+    const { neonConfig } = await import('@neondatabase/serverless');
     const { Database } = await import('@repo/dataforge/kysely-types');
     
+    // Configure Neon for local development
+    const environment = context.env.ENVIRONMENT || context.env.NODE_ENV;
+    if (environment === "local" || environment === "development") {
+      neonConfig.fetchEndpoint = (host) => {
+        if (host === 'db.localtest.me') {
+          return 'http://db.localtest.me:4444/sql';
+        }
+        return `https://${host}/sql`;
+      };
+    }
+    
     const db = new Kysely<Database>({
-      dialect: new NeonHTTPDialectV1(context.env.DATABASE_URL),
+      dialect: new NeonHTTPDialectV1({ connectionString: context.env.DATABASE_URL }),
     });
     
     syncLogger.info('Querying change_history table', {

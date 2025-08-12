@@ -31,20 +31,20 @@ export class StatusSetDexieService {
       clientId: crypto.randomUUID(),
     } as StatusSet;
     
-    await db.status_sets.add(record);
+    await db.status_set.add(record);
     return id;
   }
 
   async findById(id: string): Promise<StatusSet | undefined> {
-    return await db.status_sets.get(id);
+    return await db.status_set.get(id);
   }
 
   async findAll(): Promise<StatusSet[]> {
-    return await db.status_sets.where('deleted').equals(0).toArray();
+    return await db.status_set.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: StatusSetUpdateInput): Promise<void> {
-    await db.status_sets.update(id, {
+    await db.status_set.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -52,14 +52,14 @@ export class StatusSetDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.status_sets.update(id, {
+    await db.status_set.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.status_sets.clear();
+    await db.status_set.clear();
   }
 }
 
