@@ -137,6 +137,7 @@ apiApp.get('/db/kysely-test', async (c) => {
   try {
     const { Kysely } = await import('kysely');
     const { NeonHTTPDialectV1 } = await import('./lib/kysely-neon-v1-adapter');
+    const { neonConfig } = await import('@neondatabase/serverless');
     
     const url = c.env.DATABASE_URL;
     if (!url) {
@@ -144,6 +145,17 @@ apiApp.get('/db/kysely-test', async (c) => {
         success: false,
         error: 'DATABASE_URL not set'
       }, 503);
+    }
+    
+    // Configure Neon for local development
+    const environment = c.env.ENVIRONMENT || c.env.NODE_ENV;
+    if (environment === "local" || environment === "development") {
+      neonConfig.fetchEndpoint = (host) => {
+        if (host === 'db.localtest.me') {
+          return 'http://db.localtest.me:4444/sql';
+        }
+        return `https://${host}/sql`;
+      };
     }
     
     // Create Kysely instance
