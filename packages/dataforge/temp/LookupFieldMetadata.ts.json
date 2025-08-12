@@ -1,0 +1,173 @@
+{
+  "data": {
+    "_id": 29000,
+    "properties": {
+      "option": {
+        "name": "option",
+        "kind": "1:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "unique": true,
+        "fieldNames": [
+          "option_id"
+        ],
+        "type": "Option",
+        "array": false,
+        "runtimeType": "Option"
+      },
+      "targetArchetype": {
+        "name": "targetArchetype",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "target_archetype"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "displayField": {
+        "name": "displayField",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "display_field"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "filterCriteria": {
+        "name": "filterCriteria",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "filter_criteria"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      },
+      "allowMultiple": {
+        "name": "allowMultiple",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "allow_multiple"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "allowCreateNew": {
+        "name": "allowCreateNew",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "allow_create_new"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "relationshipType": {
+        "name": "relationshipType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "relationship_type"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "additionalDisplayFields": {
+        "name": "additionalDisplayFields",
+        "kind": "scalar",
+        "type": "array",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "additional_display_fields"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "sortField": {
+        "name": "sortField",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "sort_field"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "sortDirection": {
+        "name": "sortDirection",
+        "kind": "scalar",
+        "type": "string",
+        "default": "asc",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "sort_direction"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "cascadeRules": {
+        "name": "cascadeRules",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "cascade_rules"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "LookupFieldMetadata",
+    "path": "./src/entities/LookupFieldMetadata.ts",
+    "name": "LookupFieldMetadata",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "lookup_field_metadata"
+  },
+  "origin": "./src/entities/LookupFieldMetadata.ts",
+  "hash": "cc6bdf84508ff693995efb07136de776",
+  "version": "6.4.16"
+}

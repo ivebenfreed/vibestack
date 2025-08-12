@@ -1,0 +1,165 @@
+{
+  "data": {
+    "_id": 25000,
+    "properties": {
+      "option": {
+        "name": "option",
+        "kind": "1:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "unique": true,
+        "fieldNames": [
+          "option_id"
+        ],
+        "type": "Option",
+        "array": false,
+        "runtimeType": "Option"
+      },
+      "defaultPriority": {
+        "name": "defaultPriority",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "default_priority"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "requiredFields": {
+        "name": "requiredFields",
+        "kind": "scalar",
+        "type": "array",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "required_fields"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "autoAssignRules": {
+        "name": "autoAssignRules",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "auto_assign_rules"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      },
+      "workflowTemplate": {
+        "name": "workflowTemplate",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "workflow_template"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "fieldDefaults": {
+        "name": "fieldDefaults",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "field_defaults"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      },
+      "allowedStatuses": {
+        "name": "allowedStatuses",
+        "kind": "scalar",
+        "type": "array",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "allowed_statuses"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "requiresApproval": {
+        "name": "requiresApproval",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "requires_approval"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "approvalWorkflow": {
+        "name": "approvalWorkflow",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "approval_workflow"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "automationTriggers": {
+        "name": "automationTriggers",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "automation_triggers"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "CategoryOptionMetadata",
+    "path": "./src/entities/CategoryOptionMetadata.ts",
+    "name": "CategoryOptionMetadata",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "category_option_metadata"
+  },
+  "origin": "./src/entities/CategoryOptionMetadata.ts",
+  "hash": "9961bbb397aa2256c9038ab839fde760",
+  "version": "6.4.16"
+}

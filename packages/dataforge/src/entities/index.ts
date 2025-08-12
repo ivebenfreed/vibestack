@@ -21,3 +21,18 @@ export * from './Organization.js';
 export * from './OrganizationMember.js';
 export * from './DatabaseInstance.js';
 export * from './ContainerPermission.js';
+
+// Phase 1 Week 2: Universal Option System
+export * from './OptionSet.js';
+export * from './Option.js';
+
+// System Option Type Metadata Tables
+export * from './StatusOptionMetadata.js';
+export * from './PriorityOptionMetadata.js';
+export * from './CategoryOptionMetadata.js';
+export * from './DiscussionTypeOptionMetadata.js';
+
+// Custom Option Type Metadata Tables
+export * from './CustomFieldMetadata.js';
+export * from './CalculatedFieldMetadata.js';
+export * from './LookupFieldMetadata.js';

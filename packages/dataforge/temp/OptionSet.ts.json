@@ -1,0 +1,105 @@
+{
+  "data": {
+    "_id": 22000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "description": {
+        "name": "description",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "optionSetType": {
+        "name": "optionSetType",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "option_set_type"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "isSystemType": {
+        "name": "isSystemType",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_system_type"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "isActive": {
+        "name": "isActive",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_active"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "settings": {
+        "name": "settings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      },
+      "options": {
+        "name": "options",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "optionSet",
+        "type": "Option",
+        "array": false,
+        "runtimeType": "Collection<Option, object>"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "OptionSet",
+    "path": "./src/entities/OptionSet.ts",
+    "name": "OptionSet",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "option_set"
+  },
+  "origin": "./src/entities/OptionSet.ts",
+  "hash": "e5aacbf7ef24a7d71130ee335c7c8b3c",
+  "version": "6.4.16"
+}

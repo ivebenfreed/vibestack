@@ -1,0 +1,150 @@
+{
+  "data": {
+    "_id": 24000,
+    "properties": {
+      "option": {
+        "name": "option",
+        "kind": "1:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "unique": true,
+        "fieldNames": [
+          "option_id"
+        ],
+        "type": "Option",
+        "array": false,
+        "runtimeType": "Option"
+      },
+      "urgencyLevel": {
+        "name": "urgencyLevel",
+        "kind": "scalar",
+        "type": "int",
+        "default": 1,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "urgency_level"
+        ],
+        "array": false,
+        "runtimeType": "number"
+      },
+      "escalationDays": {
+        "name": "escalationDays",
+        "kind": "scalar",
+        "type": "int",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "escalation_days"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "escalationTarget": {
+        "name": "escalationTarget",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "escalation_target"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "slaHours": {
+        "name": "slaHours",
+        "kind": "scalar",
+        "type": "int",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "sla_hours"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "requiresImmediateAttention": {
+        "name": "requiresImmediateAttention",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "requires_immediate_attention"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "notificationRules": {
+        "name": "notificationRules",
+        "kind": "scalar",
+        "type": "array",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "notification_rules"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "escalationRules": {
+        "name": "escalationRules",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "escalation_rules"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      },
+      "weightMultiplier": {
+        "name": "weightMultiplier",
+        "kind": "scalar",
+        "type": "int",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "weight_multiplier"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "PriorityOptionMetadata",
+    "path": "./src/entities/PriorityOptionMetadata.ts",
+    "name": "PriorityOptionMetadata",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "priority_option_metadata"
+  },
+  "origin": "./src/entities/PriorityOptionMetadata.ts",
+  "hash": "8a7f15b519dd2c4e49c1c07f63cab1dc",
+  "version": "6.4.16"
+}
