@@ -25,7 +25,6 @@ export interface UserTable {
   email_verified: ColumnType<boolean, boolean | undefined, boolean>;
   image: string | null;
   is_super_admin: ColumnType<boolean, boolean | undefined, boolean>;
-  account_id: string | null | null;
 }
 
 export interface TaskTable {
@@ -122,9 +121,11 @@ export interface SessionTable {
   id: Generated<string>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+  user_id: string | null;
   session_token: string;
   expires_at: Date;
-  account_id: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
 }
 
 export interface ProjectTable {
@@ -175,8 +176,10 @@ export interface AccountTable {
   id: Generated<string>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+  user_id: string | null;
   provider_id: string;
   provider_account_id: string;
+  password: string | null;
   refresh_token: string | null;
   access_token: string | null;
   expires_at: string | null;
@@ -184,6 +187,8 @@ export interface AccountTable {
   scope: string | null;
   id_token: string | null;
   session_state: string | null;
+  access_token_expires_at: Date | null;
+  refresh_token_expires_at: Date | null;
 }
 
 export interface tasktagsTable {

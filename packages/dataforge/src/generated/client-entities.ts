@@ -13,7 +13,8 @@ export interface User {
   emailVerified: any;
   image?: any;
   isSuperAdmin: any;
-  account?: any;
+  accounts: any;
+  sessions: any;
   assignedTasks: any;
   comments: any;
   ownedProjects: any;
@@ -277,8 +278,11 @@ export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
 
 export const CLIENT_RELATIONSHIP_CONFIGS = {
   "user": {
-    "account": {
+    "accounts": {
       "target": "account"
+    },
+    "sessions": {
+      "target": "session"
     },
     "assignedTasks": {
       "target": "task"
@@ -344,8 +348,8 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
     }
   },
   "session": {
-    "account": {
-      "target": "account"
+    "user": {
+      "target": "user"
     }
   },
   "project": {
@@ -373,11 +377,8 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
     }
   },
   "account": {
-    "users": {
+    "user": {
       "target": "user"
-    },
-    "sessions": {
-      "target": "session"
     }
   }
 };

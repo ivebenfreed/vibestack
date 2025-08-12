@@ -1,6 +1,7 @@
-import { Entity, Property, Unique, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, Unique, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { Account } from './Account.js';
+import { Session } from './Session.js';
 import { Task } from './Task.js';
 import { Comment } from './Comment.js';
 import { Project } from './Project.js';
@@ -14,17 +15,20 @@ export class User extends BaseSystemEntity {
   @Unique()
   email?: string;
 
-  @Property({ type: 'boolean', default: false })
+  @Property({ type: 'boolean', default: false, fieldName: 'email_verified' })
   emailVerified!: boolean;
 
   @Property({ type: 'string', nullable: true })
   image?: string;
 
-  @Property({ type: 'boolean', default: false })
+  @Property({ type: 'boolean', default: false, fieldName: 'is_super_admin' })
   isSuperAdmin!: boolean;
 
-  @ManyToOne(() => Account, { nullable: true })
-  account?: Account;
+  @OneToMany(() => Account, 'user')
+  accounts = new Collection<Account>(this);
+  
+  @OneToMany(() => Session, 'user')
+  sessions = new Collection<Session>(this);
 
   @OneToMany(() => Task, 'assignee')
   assignedTasks = new Collection<Task>(this);

@@ -17,31 +17,38 @@ import {
 } from 'kysely';
 import { neon, neonConfig } from '@neondatabase/serverless';
 
+// HARDCODE: Always configure for local proxy
+neonConfig.fetchEndpoint = (host) => {
+  if (host === 'db.localtest.me') {
+    console.log('[HARDCODED] Using local proxy for host:', host);
+    return 'http://db.localtest.me:4444/sql';
+  }
+  return `https://${host}/sql`;
+};
+neonConfig.fetchFunction = fetch;
+
 class NeonHTTPConnection implements DatabaseConnection {
   private sql: ReturnType<typeof neon>;
 
   constructor(connectionString: string) {
-    // Configure neonConfig for local proxy if using db.localtest.me
-    if (connectionString.includes('db.localtest.me')) {
-      neonConfig.fetchEndpoint = (host) => {
-        const [protocol, port] = host === 'db.localtest.me' ? ['http', 4444] : ['https', 443];
-        return `${protocol}://${host}:${port}/sql`;
-      };
-    }
-    this.sql = neon(connectionString);
+    // neonConfig should be configured globally before this point
+    // The configuration is now done in auth.ts initializeAuth() function
+    // Remove port 4444 if it's a local connection
+    const cleanConnectionString = connectionString.includes('db.localtest.me') 
+      ? connectionString.replace(':4444', '')
+      : connectionString;
+    this.sql = neon(cleanConnectionString);
   }
 
   async executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
     const { sql: queryText, parameters } = compiledQuery;
     
-    // DEBUG: Log all INSERT queries to sessions table
-    if (queryText.toLowerCase().includes('insert into') && queryText.toLowerCase().includes('sessions')) {
-      console.log('🔍 DEBUG: Sessions INSERT query:', {
-        query: queryText,
-        parameters: parameters,
-        paramCount: parameters?.length || 0
-      });
-    }
+    // DEBUG: Log ALL queries for debugging
+    console.log('🔍 [Kysely Query]:', {
+      query: queryText,
+      parameters: parameters,
+      paramCount: parameters?.length || 0
+    });
     
     try {
       let result: any;
@@ -102,8 +109,19 @@ class NeonHTTPDriver implements Driver {
 
   async init(): Promise<void> {
     // Test connection using the query method for v1.0+
-    const sql = neon(this.connectionString);
-    await sql.query('SELECT 1', []);
+    // Remove port 4444 if it's a local connection
+    const cleanConnectionString = this.connectionString.includes('db.localtest.me') 
+      ? this.connectionString.replace(':4444', '')
+      : this.connectionString;
+    console.log('[NeonHTTPDriver] init() called with connectionString:', cleanConnectionString.substring(0, 50) + '...');
+    const sql = neon(cleanConnectionString);
+    try {
+      await sql`SELECT 1`;
+      console.log('[NeonHTTPDriver] init() successful');
+    } catch (error) {
+      console.error('[NeonHTTPDriver] init() failed:', error);
+      throw error;
+    }
   }
 
   async acquireConnection(): Promise<DatabaseConnection> {

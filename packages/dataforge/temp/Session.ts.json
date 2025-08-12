@@ -1,13 +1,27 @@
 {
   "data": {
-    "_id": 10000,
+    "_id": 2000,
     "properties": {
-      "sessionToken": {
-        "name": "sessionToken",
+      "user": {
+        "name": "user",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "type": "User",
+        "array": false,
+        "runtimeType": "User"
+      },
+      "token": {
+        "name": "token",
         "kind": "scalar",
         "type": "string",
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "session_token"
+        ],
         "array": false,
         "runtimeType": "string"
       },
@@ -17,19 +31,33 @@
         "type": "timestamptz",
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "expires_at"
+        ],
         "array": false,
         "runtimeType": "Date"
       },
-      "account": {
-        "name": "account",
-        "kind": "m:1",
-        "cascade": [
-          "persist"
-        ],
-        "owner": true,
-        "type": "Account",
+      "ipAddress": {
+        "name": "ipAddress",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
         "array": false,
-        "runtimeType": "Account"
+        "runtimeType": "string",
+        "optional": true
+      },
+      "userAgent": {
+        "name": "userAgent",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
       }
     },
     "primaryKeys": [],
@@ -50,6 +78,6 @@
     "collection": "session"
   },
   "origin": "./src/entities/Session.ts",
-  "hash": "a4739428861250a0b705d1779756933b",
+  "hash": "bde1150bf5a2fc40662da2482a9994ec",
   "version": "6.4.16"
 }

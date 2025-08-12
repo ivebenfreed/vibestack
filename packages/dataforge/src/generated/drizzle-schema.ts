@@ -36,8 +36,7 @@ export const user = pgTable('user', {
   email: text('email').unique(),
   email_verified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
-  is_super_admin: boolean('is_super_admin').default(false).notNull(),
-  account_id: uuid('account_id')
+  is_super_admin: boolean('is_super_admin').default(false).notNull()
 });
 
 export const task = pgTable('task', {
@@ -144,9 +143,11 @@ export const session = pgTable('session', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  user_id: uuid('user_id').notNull(),
   session_token: text('session_token').notNull(),
   expires_at: timestamp('expires_at', { mode: 'date' }).notNull(),
-  account_id: uuid('account_id').notNull()
+  ip_address: text('ip_address'),
+  user_agent: text('user_agent')
 });
 
 export const project = pgTable('project', {
@@ -203,15 +204,19 @@ export const account = pgTable('account', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  user_id: uuid('user_id').notNull(),
   provider_id: text('provider_id').notNull(),
   provider_account_id: text('provider_account_id').notNull(),
+  password: text('password'),
   refresh_token: text('refresh_token'),
   access_token: text('access_token'),
   expires_at: text('expires_at'),
   token_type: text('token_type'),
   scope: text('scope'),
   id_token: text('id_token'),
-  session_state: text('session_state')
+  session_state: text('session_state'),
+  access_token_expires_at: timestamp('access_token_expires_at', { mode: 'date' }),
+  refresh_token_expires_at: timestamp('refresh_token_expires_at', { mode: 'date' })
 });
 
 export const task_tags = pgTable('task_tags', {
@@ -234,10 +239,8 @@ export const project_status_sets = pgTable('project_status_sets', {
 // ============================================
 
 export const userRelations = relations(user, ({ one, many }) => ({
-  account: one(account, {
-    fields: [user.account_id],
-    references: [account.id],
-  }),
+  accounts: many(account),
+  sessions: many(session),
   assignedTasks: many(task),
   comments: many(comments),
   ownedProjects: many(project),
@@ -287,9 +290,9 @@ export const statusDefinitionRelations = relations(status_definition, ({ one, ma
 }));
 
 export const sessionRelations = relations(session, ({ one, many }) => ({
-  account: one(account, {
-    fields: [session.account_id],
-    references: [account.id],
+  user: one(user, {
+    fields: [session.user_id],
+    references: [user.id],
   }),
 }));
 
@@ -315,8 +318,10 @@ export const commentsRelations = relations(comments, ({ one, many }) => ({
 }));
 
 export const accountRelations = relations(account, ({ one, many }) => ({
-  users: many(user),
-  sessions: many(session),
+  user: one(user, {
+    fields: [account.user_id],
+    references: [user.id],
+  }),
 }));
 
 // ============================================
