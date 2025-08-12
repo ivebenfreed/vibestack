@@ -92,8 +92,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "email",
       "emailVerified",
       "image",
-      "isSuperAdmin",
-      "account"
+      "isSuperAdmin"
     ],
     "foreignKeys": [],
     "indexes": [],
@@ -365,9 +364,11 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     },
     "updateableColumns": [
       "updatedAt",
-      "sessionToken",
+      "user",
+      "token",
       "expiresAt",
-      "account"
+      "ipAddress",
+      "userAgent"
     ],
     "foreignKeys": [],
     "indexes": [],
@@ -605,15 +606,19 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     },
     "updateableColumns": [
       "updatedAt",
+      "user",
       "providerId",
-      "providerAccountId",
+      "accountId",
+      "password",
       "refreshToken",
       "accessToken",
       "expiresAt",
       "tokenType",
       "scope",
       "idToken",
-      "sessionState"
+      "sessionState",
+      "accessTokenExpiresAt",
+      "refreshTokenExpiresAt"
     ],
     "foreignKeys": [],
     "indexes": [],

@@ -22,7 +22,8 @@ export interface User {
   emailVerified: any;
   image?: any;
   isSuperAdmin: any;
-  account?: any;
+  accounts: any;
+  sessions: any;
   assignedTasks: any;
   comments: any;
   ownedProjects: any;
@@ -135,9 +136,11 @@ export interface Session {
   id: any;
   createdAt: any;
   updatedAt: any;
-  sessionToken: any;
+  user: any;
+  token: any;
   expiresAt: any;
-  account: any;
+  ipAddress?: any;
+  userAgent?: any;
 }
 
 export interface project_tag_sets {
@@ -201,8 +204,10 @@ export interface Account {
   id: any;
   createdAt: any;
   updatedAt: any;
+  user: any;
   providerId: any;
-  providerAccountId: any;
+  accountId: any;
+  password?: any;
   refreshToken?: any;
   accessToken?: any;
   expiresAt?: any;
@@ -210,8 +215,8 @@ export interface Account {
   scope?: any;
   idToken?: any;
   sessionState?: any;
-  users: any;
-  sessions: any;
+  accessTokenExpiresAt?: any;
+  refreshTokenExpiresAt?: any;
 }
 
 // ============================================
@@ -316,8 +321,11 @@ export const SERVER_DOMAIN_TABLE_HIERARCHY = {
 
 export const SERVER_RELATIONSHIP_CONFIGS = {
   "user": {
-    "account": {
+    "accounts": {
       "target": "account"
+    },
+    "sessions": {
+      "target": "session"
     },
     "assignedTasks": {
       "target": "task"
@@ -383,8 +391,8 @@ export const SERVER_RELATIONSHIP_CONFIGS = {
     }
   },
   "session": {
-    "account": {
-      "target": "account"
+    "user": {
+      "target": "user"
     }
   },
   "project": {
@@ -412,11 +420,8 @@ export const SERVER_RELATIONSHIP_CONFIGS = {
     }
   },
   "account": {
-    "users": {
+    "user": {
       "target": "user"
-    },
-    "sessions": {
-      "target": "session"
     }
   }
 };

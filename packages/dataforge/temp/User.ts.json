@@ -1,6 +1,6 @@
 {
   "data": {
-    "_id": 9000,
+    "_id": 10000,
     "properties": {
       "name": {
         "name": "name",
@@ -29,6 +29,9 @@
         "default": false,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "email_verified"
+        ],
         "array": false,
         "runtimeType": "boolean"
       },
@@ -50,21 +53,33 @@
         "default": false,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "is_super_admin"
+        ],
         "array": false,
         "runtimeType": "boolean"
       },
-      "account": {
-        "name": "account",
-        "kind": "m:1",
+      "accounts": {
+        "name": "accounts",
+        "kind": "1:m",
         "cascade": [
           "persist"
         ],
-        "nullable": true,
-        "owner": true,
+        "mappedBy": "user",
         "type": "Account",
         "array": false,
-        "runtimeType": "Account",
-        "optional": true
+        "runtimeType": "Collection<Account, object>"
+      },
+      "sessions": {
+        "name": "sessions",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "user",
+        "type": "Session",
+        "array": false,
+        "runtimeType": "Collection<Session, object>"
       },
       "assignedTasks": {
         "name": "assignedTasks",
@@ -121,6 +136,6 @@
     "collection": "user"
   },
   "origin": "./src/entities/User.ts",
-  "hash": "95277a6c4fc0a8fb4e0f880ee1517b36",
+  "hash": "88dbccc940d6c35091d638679609f29a",
   "version": "6.4.16"
 }

@@ -137,7 +137,7 @@ apiApp.get('/db/kysely-test', async (c) => {
   try {
     const { Kysely } = await import('kysely');
     const { NeonHTTPDialectV1 } = await import('./lib/kysely-neon-v1-adapter');
-    const { neonConfig } = await import('@neondatabase/serverless');
+    const { testConnection, configureNeonLocal } = await import('./lib/db-config');
     
     const url = c.env.DATABASE_URL;
     if (!url) {
@@ -147,20 +147,28 @@ apiApp.get('/db/kysely-test', async (c) => {
       }, 503);
     }
     
-    // Configure Neon for local development
-    const environment = c.env.ENVIRONMENT || c.env.NODE_ENV;
-    if (environment === "local" || environment === "development") {
-      neonConfig.fetchEndpoint = (host) => {
-        if (host === 'db.localtest.me') {
-          return 'http://db.localtest.me:4444/sql';
-        }
-        return `https://${host}/sql`;
-      };
-    }
+    console.log('[Kysely Test] Database URL:', url);
+    console.log('[Kysely Test] Environment:', c.env.ENVIRONMENT);
     
-    // Create Kysely instance
+    // First test with Client approach (like db.ts in worktree 78)
+    console.log('[Kysely Test] Testing with Client approach...');
+    const connectionWorks = await testConnection(url);
+    if (!connectionWorks) {
+      return c.json({
+        success: false,
+        error: 'Client connection test failed',
+        url: url.substring(0, 50) + '...'
+      }, 500);
+    }
+    console.log('[Kysely Test] Client connection successful!');
+    
+    // Now configure for Kysely
+    const { connectionString, isLocal } = configureNeonLocal(url);
+    console.log('[Kysely Test] Using connection string for Kysely:', connectionString.substring(0, 50) + '...');
+    
+    // Create Kysely instance with cleaned URL
     const db = new Kysely<any>({
-      dialect: new NeonHTTPDialectV1({ connectionString: url })
+      dialect: new NeonHTTPDialectV1({ connectionString })
     });
     
     // Test query - list tables

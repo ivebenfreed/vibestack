@@ -144,6 +144,8 @@ export const auth = betterAuth({
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env) {
   // Configure Neon for local development
+  let connectionString = env.DATABASE_URL;
+  
   if (env.ENVIRONMENT === "local" || env.ENVIRONMENT === "development") {
     dbLogger.debug("Configuring Neon for local development", {
       databaseUrl: env.DATABASE_URL
@@ -155,10 +157,13 @@ export function initializeAuth(env: Env) {
       }
       return `https://${host}/sql`;
     };
+    
+    // Remove port 4444 from connection string for neon
+    connectionString = connectionString.replace(':4444', '');
   }
 
   const neonDialect = new NeonHTTPDialectV1({
-    connectionString: env.DATABASE_URL,
+    connectionString: connectionString,
   });
 
   // Explicitly create Kysely instance with logging

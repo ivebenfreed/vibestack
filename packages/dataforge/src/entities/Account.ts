@@ -1,17 +1,22 @@
-import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { ServerOnlyEntity } from '../utils/entity-context.js';
 import { User } from './User.js';
-import { Session } from './Session.js';
 
 @ServerOnlyEntity() // Auth-related entity, server-only
 @Entity()
 export class Account extends BaseSystemEntity {
-  @Property({ type: 'string' })
+  @ManyToOne(() => User)
+  user!: User;
+
+  @Property({ type: 'string', fieldName: 'provider_id' })
   providerId!: string;
 
-  @Property({ type: 'string' })
-  providerAccountId!: string;
+  @Property({ type: 'string', fieldName: 'provider_account_id' })
+  accountId!: string;
+  
+  @Property({ type: 'string', nullable: true })
+  password?: string;
 
   @Property({ type: 'string', nullable: true })
   refreshToken?: string;
@@ -33,10 +38,10 @@ export class Account extends BaseSystemEntity {
 
   @Property({ type: 'string', nullable: true })
   sessionState?: string;
-
-  @OneToMany(() => User, 'account')
-  users = new Collection<User>(this);
-
-  @OneToMany(() => Session, 'account')
-  sessions = new Collection<Session>(this);
+  
+  @Property({ type: 'timestamptz', nullable: true, fieldName: 'access_token_expires_at' })
+  accessTokenExpiresAt?: Date;
+  
+  @Property({ type: 'timestamptz', nullable: true, fieldName: 'refresh_token_expires_at' })
+  refreshTokenExpiresAt?: Date;
 }

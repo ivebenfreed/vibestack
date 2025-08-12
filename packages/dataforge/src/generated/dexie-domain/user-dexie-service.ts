@@ -8,7 +8,8 @@ export interface UserUpdateInput {
   emailVerified?: any;
   image?: any;
   isSuperAdmin?: any;
-  account?: any;
+  accounts?: any;
+  sessions?: any;
   assignedTasks?: any;
   comments?: any;
   ownedProjects?: any;
