@@ -1,0 +1,36 @@
+diff --git a/dist/shared/better-auth.CYUtwa8U.cjs b/dist/shared/better-auth.CYUtwa8U.cjs
+index 6b80f1274f529cbb52c4bd45bf75cb0614129025..d5dc687b7c226249d2ae1a6f0206c60c86a5498c 100644
+--- a/dist/shared/better-auth.CYUtwa8U.cjs
++++ b/dist/shared/better-auth.CYUtwa8U.cjs
+@@ -916,9 +916,10 @@ async function getAdapter(options) {
+       acc[key] = [];
+       return acc;
+     }, {});
+-    logger.logger.warn(
+-      "No database configuration provided. Using memory adapter in development"
+-    );
++    // Suppressed warning for edge environments where DATABASE_URL is only available at runtime
++    // logger.logger.warn(
++    //   "No database configuration provided. Using memory adapter in development"
++    // );
+     return memoryAdapter.memoryAdapter(memoryDB)(options);
+   }
+   if (typeof options.database === "function") {
+diff --git a/dist/shared/better-auth.DJ_t77Pd.mjs b/dist/shared/better-auth.DJ_t77Pd.mjs
+index 6fcd05c16d12a78c9722413bcc9898d05e14c236..074e721474a8d24cb1535ae9fe48f7a8a2e3dc46 100644
+--- a/dist/shared/better-auth.DJ_t77Pd.mjs
++++ b/dist/shared/better-auth.DJ_t77Pd.mjs
+@@ -914,9 +914,10 @@ async function getAdapter(options) {
+       acc[key] = [];
+       return acc;
+     }, {});
+-    logger.warn(
+-      "No database configuration provided. Using memory adapter in development"
+-    );
++    // Suppressed warning for edge environments where DATABASE_URL is only available at runtime
++    // logger.warn(
++    //   "No database configuration provided. Using memory adapter in development"
++    // );
+     return memoryAdapter(memoryDB)(options);
+   }
+   if (typeof options.database === "function") {

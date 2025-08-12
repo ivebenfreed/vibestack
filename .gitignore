@@ -82,3 +82,5 @@ packages/cli/node_modules
 
 # Git worktrees
 worktrees/vibestack-env-*.tar.gz
+# Worktree-specific Docker configs
+.docker/

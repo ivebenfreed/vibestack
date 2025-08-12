@@ -1,0 +1,68 @@
+{
+  "name": "kysely-neon-http",
+  "version": "1.0.0",
+  "description": "Modern Kysely dialect for Neon serverless PostgreSQL with auto-routing, local dev support, and full metadata extraction",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
+    "kysely": "^0.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.4",
+    "tsup": "^8.0.1",
+    "typescript": "^5.7.3",
+    "unbuild": "^3.6.0",
+    "vitest": "^0.34.6"
+  },
+  "peerDependencies": {
+    "@neondatabase/serverless": ">=1.0.0",
+    "kysely": ">=0.27.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vibestack/kysely-neon-http.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vibestack/kysely-neon-http/issues"
+  },
+  "homepage": "https://github.com/vibestack/kysely-neon-http#readme",
+  "author": "VibeStack Contributors",
+  "keywords": [
+    "kysely",
+    "neon",
+    "postgres",
+    "serverless",
+    "edge",
+    "workers",
+    "cloudflare",
+    "http",
+    "dialect",
+    "sql",
+    "query-builder"
+  ],
+  "license": "MIT"
+}

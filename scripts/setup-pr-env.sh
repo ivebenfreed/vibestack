@@ -50,23 +50,27 @@ if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
     # Ports are already loaded from .env.local
     # No need to calculate - single source of truth
     
+    # Create .docker folder if it doesn't exist
+    mkdir -p .docker
+    
     # Generate PR-specific docker-compose with unique container names and volumes
+    # This creates the config in the worktree's .docker directory
     sed -e "s/\"5432:5432\"/\"${DB_PORT}:5432\"/g" \
         -e "s/\"4444:4444\"/\"${PROXY_PORT}:4444\"/g" \
         -e "s/vibestack-postgres/vibestack-postgres-${PR_NUMBER}/g" \
         -e "s/vibestack-neon-proxy/vibestack-neon-proxy-${PR_NUMBER}/g" \
         -e "s/vibestack_dev/vibestack_dev_issue_${PR_NUMBER}/g" \
         -e "s/postgres_data:/postgres_data_pr_${PR_NUMBER}:/g" \
-        docker-compose.yml > docker-compose.pr-${PR_NUMBER}.yml
+        docker-configs/docker-compose.yml > .docker/docker-compose.pr-${PR_NUMBER}.yml
     
     echo "   Using ports: DB=${DB_PORT}, Proxy=${PROXY_PORT}"
-    docker compose -f docker-compose.pr-${PR_NUMBER}.yml up -d
+    docker compose -f .docker/docker-compose.pr-${PR_NUMBER}.yml up -d
     
     # Update local database URL for this PR
     LOCAL_DB_URL="postgresql://postgres:postgres@localhost:${DB_PORT}/vibestack_dev_issue_${PR_NUMBER}"
 else
     # Use default ports
-    docker compose up -d
+    docker compose -f docker-configs/docker-compose.yml up -d
     LOCAL_DB_URL="postgresql://postgres:postgres@localhost:5432/vibestack_dev"
 fi
 
@@ -93,8 +97,8 @@ echo "   • API: http://localhost:$((8787 + ${PR_NUMBER:-0}))"
 echo ""
 echo "🔧 Cleanup when done:"
 if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
-    echo "   docker compose -f docker-compose.pr-${PR_NUMBER}.yml down"
-    echo "   rm docker-compose.pr-${PR_NUMBER}.yml"
+    echo "   docker compose -f .docker/docker-compose.pr-${PR_NUMBER}.yml down"
+    echo "   rm -rf .docker"
 else
-    echo "   docker compose down"
+    echo "   docker compose -f docker-configs/docker-compose.yml down"
 fi

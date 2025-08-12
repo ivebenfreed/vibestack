@@ -2,8 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { UserRole } from "@repo/dataforge/server-entities";
 import { Kysely } from 'kysely';
-import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
-import { neonConfig } from '@neondatabase/serverless';
+import { NeonHTTPDialect } from '@repo/kysely-neon-http';
 import { initializeAuth } from '../lib/auth';
 import type { Env } from '../types/env';
 
@@ -22,18 +21,11 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
     throw new HTTPException(403, { message: 'Invalid bootstrap key.' });
   }
 
-  // Configure Neon for local development
-  const environment = ENVIRONMENT || NODE_ENV;
-  if (environment === "local" || environment === "development") {
-    neonConfig.fetchEndpoint = (host) => {
-      if (host === 'db.localtest.me') {
-        return 'http://db.localtest.me:4444/sql';
-      }
-      return `https://${host}/sql`;
-    };
-  }
-
-  const neonDialect = new NeonHTTPDialectV1({ connectionString: DATABASE_URL });
+  // Create Neon dialect with auto-configuration
+  const neonDialect = new NeonHTTPDialect({
+    connectionString: DATABASE_URL,
+    // Auto-detection handles local proxy configuration automatically
+  });
   // Specify the database schema type if available, otherwise use 'any'
   // For example, if you have a DB type from Kysely codegen: import type { DB } from '@repo/dataforge/generated-types';
   // const db = new Kysely<DB>({ dialect: neonDialect });

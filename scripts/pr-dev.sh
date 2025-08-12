@@ -46,7 +46,7 @@ case $ACTION in
     
     # Start Docker containers
     echo -e "${BLUE}Starting Docker containers...${NC}"
-    docker-compose -f docker-compose.dev.yml up -d
+    docker-compose -f docker-configs/docker-compose.dev.yml up -d
     
     # Wait for database to be ready
     echo -e "${BLUE}Waiting for database...${NC}"
@@ -70,13 +70,13 @@ case $ACTION in
     
   stop)
     echo -e "${RED}Stopping PR #${PR_NUMBER} environment...${NC}"
-    docker-compose -f docker-compose.dev.yml stop
+    docker-compose -f docker-configs/docker-compose.dev.yml stop
     echo -e "${GREEN}✅ Environment stopped${NC}"
     ;;
     
   destroy)
     echo -e "${RED}Destroying PR #${PR_NUMBER} environment...${NC}"
-    docker-compose -f docker-compose.dev.yml down -v
+    docker-compose -f docker-configs/docker-compose.dev.yml down -v
     rm -f apps/web/.env.pr-${PR_NUMBER}
     rm -f apps/server/.env.pr-${PR_NUMBER}
     echo -e "${GREEN}✅ Environment destroyed${NC}"
@@ -84,11 +84,11 @@ case $ACTION in
     
   status)
     echo -e "${BLUE}Environment Status:${NC}"
-    docker-compose -f docker-compose.dev.yml ps
+    docker-compose -f docker-configs/docker-compose.dev.yml ps
     ;;
     
   logs)
-    docker-compose -f docker-compose.dev.yml logs -f
+    docker-compose -f docker-configs/docker-compose.dev.yml logs -f
     ;;
     
   test)
