@@ -16,10 +16,9 @@ import {
   SERVER_JUNCTION_TABLE_MAPPING
 } from '@repo/dataforge/server-entities';
 import type { Env } from '../types/env';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
-import { change_history } from '@repo/dataforge/drizzle-schema';
-import { eq, and, or, inArray, sql as drizzleSql } from 'drizzle-orm';
+import { Kysely } from 'kysely';
+import { NeonHTTPDialectV1 } from 'kysely-neon';
+import type { Database } from '@repo/dataforge/kysely-types';
 
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'process-changes';
@@ -592,17 +591,18 @@ function convertSnakeToCamelCase(obj: Record<string, unknown>): Record<string, u
 }
 
 /**
- * Create a Drizzle database instance from context
- * Helper function to initialize Drizzle for replication operations
+ * Create a Kysely database instance from context
+ * Helper function to initialize Kysely for replication operations
  */
-function createDrizzleDb(context: MinimalContext) {
+function createKyselyDb(context: MinimalContext): Kysely<Database> {
   const databaseUrl = context.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');
   }
   
-  const sqlClient = neon(databaseUrl);
-  return drizzle(sqlClient);
+  return new Kysely<Database>({
+    dialect: new NeonHTTPDialectV1(databaseUrl),
+  });
 }
 
 export async function storeChangesInHistory(
@@ -635,15 +635,15 @@ export async function storeChangesInHistory(
   }, MODULE_NAME);
   
   try {
-    // Use Drizzle for database operations
-    const db = createDrizzleDb(context);
+    // Use Kysely for database operations
+    const db = createKyselyDb(context);
     
     // Convert TableChange[] to change_history records
     const changeHistoryEntries = changes.map(change => ({
       lsn: change.lsn || '',
       table_name: change.table,
       operation: change.operation,
-      data: change.data,
+      data: JSON.stringify(change.data),
       timestamp: new Date()
     }));
     
@@ -655,17 +655,20 @@ export async function storeChangesInHistory(
       const end = Math.min(start + storeBatchSize, changeHistoryEntries.length);
       const batch = changeHistoryEntries.slice(start, end);
       
-      await db.insert(change_history).values(batch);
+      await db
+        .insertInto('change_history')
+        .values(batch)
+        .execute();
     }
     
-    replicationLogger.info('Successfully stored changes using Drizzle', {
+    replicationLogger.info('Successfully stored changes using Kysely', {
       count: changes.length,
       batches: totalBatches
     }, MODULE_NAME);
     
     return true;
   } catch (error) {
-    replicationLogger.warn('Drizzle storage failed, falling back to raw SQL', { 
+    replicationLogger.warn('Kysely storage failed, falling back to raw SQL', { 
       error: error instanceof Error ? error.message : String(error),
       count: changes.length
     }, MODULE_NAME);
