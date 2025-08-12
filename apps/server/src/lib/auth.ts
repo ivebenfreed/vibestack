@@ -2,13 +2,8 @@ import { betterAuth } from "better-auth";
 // import { google } from "better-auth/providers";
 import { admin, emailOTP, oneTimeToken } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
-// import { NeonHTTPDialect } from "kysely-neon"; // Replaced with custom adapter
-import { NeonHTTPDialectV1 } from "./kysely-neon-v1-adapter";
-import { neonConfig } from "@neondatabase/serverless";
 import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
-import type { Dialect } from 'kysely';
-import { Kysely, PostgresDialect } from 'kysely';
 import { dbLogger } from '../middleware/logger';
 import { Resend } from 'resend';
 
@@ -143,44 +138,11 @@ export const auth = betterAuth({
 // Helper function to get the auth instance (ensures env vars are accessed within request context)
 // Export this function so it can be used directly in the fetch handler
 export function initializeAuth(env: Env) {
-  // Configure Neon for local development
-  let connectionString = env.DATABASE_URL;
+  // Import our centralized Kysely configuration
+  const { getKysely } = require('./kysely');
   
-  if (env.ENVIRONMENT === "local" || env.ENVIRONMENT === "development") {
-    dbLogger.debug("Configuring Neon for local development", {
-      databaseUrl: env.DATABASE_URL
-    }, 'auth');
-    
-    neonConfig.fetchEndpoint = (host) => {
-      if (host === 'db.localtest.me') {
-        return 'http://db.localtest.me:4444/sql';
-      }
-      return `https://${host}/sql`;
-    };
-    
-    // Remove port 4444 from connection string for neon
-    connectionString = connectionString.replace(':4444', '');
-  }
-
-  const neonDialect = new NeonHTTPDialectV1({
-    connectionString: connectionString,
-  });
-
-  // Explicitly create Kysely instance with logging
-  const kyselyInstance = new Kysely<any>({
-    dialect: neonDialect as any,
-    log: (event) => {
-      if (event.level === 'query') {
-        dbLogger.debug('Kysely Query', {
-          sql: event.query.sql,
-          parameters: event.query.parameters,
-          duration: event.queryDurationMillis
-        }, 'kysely');
-      } else if (event.level === 'error') {
-        dbLogger.error('Kysely Error', event.error, undefined, 'kysely');
-      }
-    }
-  });
+  // Get configured Kysely instance
+  const kyselyInstance = getKysely(env);
 
   const trustedOrigins = getAllowedOrigins(env);
   

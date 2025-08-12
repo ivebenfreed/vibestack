@@ -20,23 +20,24 @@ import { relations } from 'drizzle-orm';
 // ============================================
 
 export const verification = pgTable('verification', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  id: text('id'),
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
-  expires_at: text('expires_at').notNull()
+  expiresAt: timestamp('expiresAt', { mode: 'date' }).notNull()
 });
 
 export const user = pgTable('user', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  id: text('id'),
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
   name: text('name').notNull(),
   email: text('email').unique(),
   email_verified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
-  is_super_admin: boolean('is_super_admin').default(false).notNull()
+  is_super_admin: boolean('is_super_admin').default(false).notNull(),
+  role: text('role').notNull()
 });
 
 export const task = pgTable('task', {
@@ -140,14 +141,14 @@ export const status_definition = pgTable('status_definition', {
 }));
 
 export const session = pgTable('session', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
-  user_id: uuid('user_id').notNull(),
-  session_token: text('session_token').notNull(),
-  expires_at: timestamp('expires_at', { mode: 'date' }).notNull(),
-  ip_address: text('ip_address'),
-  user_agent: text('user_agent')
+  id: text('id'),
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
+  userId: uuid('userId').notNull(),
+  token: text('token').notNull(),
+  expiresAt: timestamp('expiresAt', { mode: 'date' }).notNull(),
+  ipAddress: text('ipAddress'),
+  userAgent: text('userAgent')
 });
 
 export const project = pgTable('project', {
@@ -201,22 +202,21 @@ export const change_history = pgTable('change_history', {
 }));
 
 export const account = pgTable('account', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
-  user_id: uuid('user_id').notNull(),
-  provider_id: text('provider_id').notNull(),
-  provider_account_id: text('provider_account_id').notNull(),
+  id: text('id'),
+  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow().notNull(),
+  userId: uuid('userId').notNull(),
+  providerId: text('providerId').notNull(),
+  accountId: text('accountId').notNull(),
   password: text('password'),
-  refresh_token: text('refresh_token'),
-  access_token: text('access_token'),
-  expires_at: text('expires_at'),
-  token_type: text('token_type'),
+  refreshToken: text('refreshToken'),
+  accessToken: text('accessToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt', { mode: 'date' }),
+  refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt', { mode: 'date' }),
+  tokenType: text('tokenType'),
   scope: text('scope'),
-  id_token: text('id_token'),
-  session_state: text('session_state'),
-  access_token_expires_at: timestamp('access_token_expires_at', { mode: 'date' }),
-  refresh_token_expires_at: timestamp('refresh_token_expires_at', { mode: 'date' })
+  idToken: text('idToken'),
+  sessionState: text('sessionState')
 });
 
 export const task_tags = pgTable('task_tags', {

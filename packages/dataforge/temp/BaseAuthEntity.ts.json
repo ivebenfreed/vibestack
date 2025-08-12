@@ -1,0 +1,61 @@
+{
+  "data": {
+    "_id": 2000,
+    "properties": {
+      "id": {
+        "name": "id",
+        "kind": "scalar",
+        "primary": true,
+        "type": "text",
+        "defaultRaw": "gen_random_uuid()::text",
+        "array": false,
+        "runtimeType": "string"
+      },
+      "createdAt": {
+        "name": "createdAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "defaultRaw": "now()",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "createdAt"
+        ],
+        "array": false,
+        "runtimeType": "Date"
+      },
+      "updatedAt": {
+        "name": "updatedAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "defaultRaw": "now()",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "updatedAt"
+        ],
+        "array": false,
+        "runtimeType": "Date"
+      }
+    },
+    "primaryKeys": [
+      "id"
+    ],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "BaseAuthEntity",
+    "path": "./src/entities/BaseAuthEntity.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "useCache": true,
+    "compositePK": false,
+    "simplePK": true
+  },
+  "origin": "./src/entities/BaseAuthEntity.ts",
+  "hash": "f985f12eb46ec01b3de1da0f83da9282",
+  "version": "6.4.16"
+}

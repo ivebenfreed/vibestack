@@ -1,6 +1,6 @@
 {
   "data": {
-    "_id": 11000,
+    "_id": 12000,
     "properties": {
       "user": {
         "name": "user",
@@ -9,6 +9,9 @@
           "persist"
         ],
         "owner": true,
+        "fieldNames": [
+          "userId"
+        ],
         "type": "User",
         "array": false,
         "runtimeType": "User"
@@ -20,7 +23,7 @@
         "getter": false,
         "setter": false,
         "fieldNames": [
-          "provider_id"
+          "providerId"
         ],
         "array": false,
         "runtimeType": "string"
@@ -32,7 +35,7 @@
         "getter": false,
         "setter": false,
         "fieldNames": [
-          "provider_account_id"
+          "accountId"
         ],
         "array": false,
         "runtimeType": "string"
@@ -55,6 +58,9 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "refreshToken"
+        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
@@ -66,19 +72,39 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "accessToken"
+        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
       },
-      "expiresAt": {
-        "name": "expiresAt",
+      "accessTokenExpiresAt": {
+        "name": "accessTokenExpiresAt",
         "kind": "scalar",
-        "type": "bigint",
+        "type": "timestamptz",
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "accessTokenExpiresAt"
+        ],
         "array": false,
-        "runtimeType": "bigint",
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "refreshTokenExpiresAt": {
+        "name": "refreshTokenExpiresAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "refreshTokenExpiresAt"
+        ],
+        "array": false,
+        "runtimeType": "Date",
         "optional": true
       },
       "tokenType": {
@@ -88,6 +114,9 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "tokenType"
+        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
@@ -110,6 +139,9 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "idToken"
+        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
@@ -121,36 +153,11 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "sessionState"
+        ],
         "array": false,
         "runtimeType": "string",
-        "optional": true
-      },
-      "accessTokenExpiresAt": {
-        "name": "accessTokenExpiresAt",
-        "kind": "scalar",
-        "type": "timestamptz",
-        "nullable": true,
-        "getter": false,
-        "setter": false,
-        "fieldNames": [
-          "access_token_expires_at"
-        ],
-        "array": false,
-        "runtimeType": "Date",
-        "optional": true
-      },
-      "refreshTokenExpiresAt": {
-        "name": "refreshTokenExpiresAt",
-        "kind": "scalar",
-        "type": "timestamptz",
-        "nullable": true,
-        "getter": false,
-        "setter": false,
-        "fieldNames": [
-          "refresh_token_expires_at"
-        ],
-        "array": false,
-        "runtimeType": "Date",
         "optional": true
       }
     },
@@ -167,11 +174,11 @@
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
-    "extends": "BaseSystemEntity",
+    "extends": "BaseAuthEntity",
     "useCache": true,
     "collection": "account"
   },
   "origin": "./src/entities/Account.ts",
-  "hash": "eb2ed90aa1dc3afdc3c1496894f96857",
+  "hash": "c366b64fb9831465ca93eaad0822a7ce",
   "version": "6.4.16"
 }

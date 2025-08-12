@@ -1,5 +1,5 @@
 import { Entity, Property, Unique, OneToMany, Collection } from '@mikro-orm/core';
-import { BaseSystemEntity } from './BaseSystemEntity.js';
+import { BaseAuthEntity } from './BaseAuthEntity.js';
 import { Account } from './Account.js';
 import { Session } from './Session.js';
 import { Task } from './Task.js';
@@ -7,7 +7,7 @@ import { Comment } from './Comment.js';
 import { Project } from './Project.js';
 
 @Entity()
-export class User extends BaseSystemEntity {
+export class User extends BaseAuthEntity {
   @Property({ type: 'string' })
   name!: string;
 
@@ -23,6 +23,9 @@ export class User extends BaseSystemEntity {
 
   @Property({ type: 'boolean', default: false, fieldName: 'is_super_admin' })
   isSuperAdmin!: boolean;
+  
+  @Property({ type: 'string', default: 'member' })
+  role!: string;
 
   @OneToMany(() => Account, 'user')
   accounts = new Collection<Account>(this);

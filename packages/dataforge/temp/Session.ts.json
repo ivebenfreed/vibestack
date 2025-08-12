@@ -1,6 +1,6 @@
 {
   "data": {
-    "_id": 2000,
+    "_id": 3000,
     "properties": {
       "user": {
         "name": "user",
@@ -9,6 +9,9 @@
           "persist"
         ],
         "owner": true,
+        "fieldNames": [
+          "userId"
+        ],
         "type": "User",
         "array": false,
         "runtimeType": "User"
@@ -19,9 +22,6 @@
         "type": "string",
         "getter": false,
         "setter": false,
-        "fieldNames": [
-          "session_token"
-        ],
         "array": false,
         "runtimeType": "string"
       },
@@ -32,7 +32,7 @@
         "getter": false,
         "setter": false,
         "fieldNames": [
-          "expires_at"
+          "expiresAt"
         ],
         "array": false,
         "runtimeType": "Date"
@@ -44,6 +44,9 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "ipAddress"
+        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
@@ -55,6 +58,9 @@
         "nullable": true,
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "userAgent"
+        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
@@ -73,11 +79,11 @@
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
-    "extends": "BaseSystemEntity",
+    "extends": "BaseAuthEntity",
     "useCache": true,
     "collection": "session"
   },
   "origin": "./src/entities/Session.ts",
-  "hash": "bde1150bf5a2fc40662da2482a9994ec",
+  "hash": "fa8909ef6c509840bf2257fee3b01b4d",
   "version": "6.4.16"
 }

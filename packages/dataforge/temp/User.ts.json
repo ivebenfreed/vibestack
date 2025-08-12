@@ -1,6 +1,6 @@
 {
   "data": {
-    "_id": 10000,
+    "_id": 11000,
     "properties": {
       "name": {
         "name": "name",
@@ -58,6 +58,16 @@
         ],
         "array": false,
         "runtimeType": "boolean"
+      },
+      "role": {
+        "name": "role",
+        "kind": "scalar",
+        "type": "string",
+        "default": "member",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
       },
       "accounts": {
         "name": "accounts",
@@ -131,11 +141,11 @@
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
-    "extends": "BaseSystemEntity",
+    "extends": "BaseAuthEntity",
     "useCache": true,
     "collection": "user"
   },
   "origin": "./src/entities/User.ts",
-  "hash": "88dbccc940d6c35091d638679609f29a",
+  "hash": "465cfd1150dd4cc604e8410ac86784a6",
   "version": "6.4.16"
 }

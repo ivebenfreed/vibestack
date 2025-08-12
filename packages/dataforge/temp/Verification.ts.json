@@ -1,6 +1,6 @@
 {
   "data": {
-    "_id": 14000,
+    "_id": 15000,
     "properties": {
       "identifier": {
         "name": "identifier",
@@ -23,9 +23,12 @@
       "expiresAt": {
         "name": "expiresAt",
         "kind": "scalar",
-        "type": "date",
+        "type": "timestamptz",
         "getter": false,
         "setter": false,
+        "fieldNames": [
+          "expiresAt"
+        ],
         "array": false,
         "runtimeType": "Date"
       }
@@ -43,11 +46,11 @@
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
-    "extends": "BaseSystemEntity",
+    "extends": "BaseAuthEntity",
     "useCache": true,
     "collection": "verification"
   },
   "origin": "./src/entities/Verification.ts",
-  "hash": "92b78984da0bf6d1f23503ac206dde31",
+  "hash": "e62328c52bc4b1ad39975a834292297e",
   "version": "6.4.16"
 }
