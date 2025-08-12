@@ -1,4 +1,4 @@
-import { Entity, Property, ManyToOne, Unique } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { Organization } from './Organization.js';
 

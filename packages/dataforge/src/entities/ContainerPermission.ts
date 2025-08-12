@@ -3,7 +3,7 @@ import { BaseDomainEntity } from './BaseDomainEntity.js';
 import { User } from './User.js';
 
 @Entity()
-@Unique({ properties: ['userId', 'containerType', 'containerId'] })
+@Unique({ properties: ['user', 'permissionContainerType', 'permissionContainerId'] })
 export class ContainerPermission extends BaseDomainEntity {
   @ManyToOne(() => User, { fieldName: 'user_id' })
   user!: User;

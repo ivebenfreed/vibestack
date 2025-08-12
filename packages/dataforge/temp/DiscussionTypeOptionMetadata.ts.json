@@ -1,0 +1,173 @@
+{
+  "data": {
+    "_id": 26000,
+    "properties": {
+      "option": {
+        "name": "option",
+        "kind": "1:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "unique": true,
+        "fieldNames": [
+          "option_id"
+        ],
+        "type": "Option",
+        "array": false,
+        "runtimeType": "Option"
+      },
+      "isThreadable": {
+        "name": "isThreadable",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_threadable"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "isResolvable": {
+        "name": "isResolvable",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_resolvable"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "allowsRichContent": {
+        "name": "allowsRichContent",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "allows_rich_content"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "requiresParentEntity": {
+        "name": "requiresParentEntity",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "requires_parent_entity"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "allowsMentions": {
+        "name": "allowsMentions",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "allows_mentions"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "isPrivate": {
+        "name": "isPrivate",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_private"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "requiresModeration": {
+        "name": "requiresModeration",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "requires_moderation"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "allowedAttachments": {
+        "name": "allowedAttachments",
+        "kind": "scalar",
+        "type": "array",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "allowed_attachments"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "maxThreadDepth": {
+        "name": "maxThreadDepth",
+        "kind": "scalar",
+        "type": "int",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "max_thread_depth"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "notificationRules": {
+        "name": "notificationRules",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "notification_rules"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "DiscussionTypeOptionMetadata",
+    "path": "./src/entities/DiscussionTypeOptionMetadata.ts",
+    "name": "DiscussionTypeOptionMetadata",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "discussion_type_option_metadata"
+  },
+  "origin": "./src/entities/DiscussionTypeOptionMetadata.ts",
+  "hash": "62b63d8fef8b2564974d7dfd007042e3",
+  "version": "6.4.16"
+}

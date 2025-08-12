@@ -1,0 +1,159 @@
+{
+  "data": {
+    "_id": 28000,
+    "properties": {
+      "option": {
+        "name": "option",
+        "kind": "1:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "unique": true,
+        "fieldNames": [
+          "option_id"
+        ],
+        "type": "Option",
+        "array": false,
+        "runtimeType": "Option"
+      },
+      "formula": {
+        "name": "formula",
+        "kind": "scalar",
+        "type": "text",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "formula"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "dependencies": {
+        "name": "dependencies",
+        "kind": "scalar",
+        "type": "array",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "dependencies"
+        ],
+        "array": true,
+        "runtimeType": "string[]"
+      },
+      "updateTriggers": {
+        "name": "updateTriggers",
+        "kind": "scalar",
+        "type": "array",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "update_triggers"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "resultType": {
+        "name": "resultType",
+        "kind": "scalar",
+        "type": "string",
+        "default": "number",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "result_type"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "autoRecalculate": {
+        "name": "autoRecalculate",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "auto_recalculate"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "formatPattern": {
+        "name": "formatPattern",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "format_pattern"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "isAggregation": {
+        "name": "isAggregation",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_aggregation"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "aggregationSource": {
+        "name": "aggregationSource",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "aggregation_source"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "calculationMetadata": {
+        "name": "calculationMetadata",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "calculation_metadata"
+        ],
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "CalculatedFieldMetadata",
+    "path": "./src/entities/CalculatedFieldMetadata.ts",
+    "name": "CalculatedFieldMetadata",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "calculated_field_metadata"
+  },
+  "origin": "./src/entities/CalculatedFieldMetadata.ts",
+  "hash": "23dbd42bd27048759ffe8bd588b21074",
+  "version": "6.4.16"
+}

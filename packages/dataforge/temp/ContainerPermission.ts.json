@@ -1,0 +1,130 @@
+{
+  "data": {
+    "_id": 20000,
+    "properties": {
+      "user": {
+        "name": "user",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "owner": true,
+        "fieldNames": [
+          "user_id"
+        ],
+        "type": "User",
+        "array": false,
+        "runtimeType": "User"
+      },
+      "permissionContainerType": {
+        "name": "permissionContainerType",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "permission_container_type"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "permissionContainerId": {
+        "name": "permissionContainerId",
+        "kind": "scalar",
+        "type": "uuid",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "permission_container_id"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "role": {
+        "name": "role",
+        "kind": "scalar",
+        "type": "string",
+        "default": "viewer",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "grantedAt": {
+        "name": "grantedAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "grantedBy": {
+        "name": "grantedBy",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "granted_by_id"
+        ],
+        "type": "User",
+        "array": false,
+        "runtimeType": "User",
+        "optional": true
+      },
+      "expiresAt": {
+        "name": "expiresAt",
+        "kind": "scalar",
+        "type": "timestamptz",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "restrictions": {
+        "name": "restrictions",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [
+      {
+        "properties": [
+          "user",
+          "permissionContainerType",
+          "permissionContainerId"
+        ]
+      }
+    ],
+    "className": "ContainerPermission",
+    "path": "./src/entities/ContainerPermission.ts",
+    "name": "ContainerPermission",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true,
+    "collection": "container_permission"
+  },
+  "origin": "./src/entities/ContainerPermission.ts",
+  "hash": "8157e9a31c3582dd79c1a95f9a273611",
+  "version": "6.4.16"
+}

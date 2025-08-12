@@ -1,0 +1,111 @@
+{
+  "data": {
+    "_id": 19000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "slug": {
+        "name": "slug",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "domain": {
+        "name": "domain",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "settings": {
+        "name": "settings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
+      },
+      "planType": {
+        "name": "planType",
+        "kind": "scalar",
+        "type": "string",
+        "default": "free",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "status": {
+        "name": "status",
+        "kind": "scalar",
+        "type": "string",
+        "default": "active",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "members": {
+        "name": "members",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "organization",
+        "type": "OrganizationMember",
+        "array": false,
+        "runtimeType": "Collection<OrganizationMember, object>"
+      },
+      "databases": {
+        "name": "databases",
+        "kind": "1:m",
+        "cascade": [
+          "persist"
+        ],
+        "mappedBy": "organization",
+        "type": "DatabaseInstance",
+        "array": false,
+        "runtimeType": "Collection<DatabaseInstance, object>"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [
+      {
+        "properties": "slug"
+      }
+    ],
+    "className": "Organization",
+    "path": "./src/entities/Organization.ts",
+    "name": "Organization",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseSystemEntity",
+    "useCache": true,
+    "collection": "organization"
+  },
+  "origin": "./src/entities/Organization.ts",
+  "hash": "c78f92ba461512822af8aa3993f05754",
+  "version": "6.4.16"
+}
