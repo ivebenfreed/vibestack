@@ -43,7 +43,6 @@
     "better-auth": "^1.2.7",
     "class-validator": "^0.14.2",
     "dotenv": "^16.4.5",
-    "drizzle-orm": "^0.44.4",
     "hono": "^4.7.7",
     "kysely": "^0.27.0",
     "kysely-neon": "^1.0.0",
