@@ -12,12 +12,12 @@ echo "   PR Number: ${PR_NUMBER:-"main"}"
 
 if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "0" ]; then
     # Stop PR-specific containers
-    if [ -f "docker-compose.pr-${PR_NUMBER}.yml" ]; then
+    if [ -f ".docker/docker-compose.pr-${PR_NUMBER}.yml" ]; then
         echo "   Stopping PR-specific containers and removing volumes..."
-        docker compose -f docker-compose.pr-${PR_NUMBER}.yml down -v
+        docker compose -f .docker/docker-compose.pr-${PR_NUMBER}.yml down -v
         
-        echo "   Removing PR-specific docker-compose file..."
-        rm docker-compose.pr-${PR_NUMBER}.yml
+        echo "   Removing PR-specific docker config folder..."
+        rm -rf .docker
     else
         echo "   No PR-specific docker-compose file found"
         

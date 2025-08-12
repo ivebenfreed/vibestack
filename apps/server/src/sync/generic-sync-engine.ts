@@ -6,7 +6,7 @@
  */
 
 import { Kysely } from 'kysely';
-import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
+import { NeonHTTPDialect } from '@repo/kysely-neon-http';
 import { neonConfig } from '@neondatabase/serverless';
 import type { Database, TableName } from '@repo/dataforge/kysely-types';
 import type { 
@@ -48,7 +48,7 @@ export class GenericSyncEngine {
     }
     
     this.db = new Kysely<Database>({
-      dialect: new NeonHTTPDialectV1({ connectionString: databaseUrl }),
+      dialect: new NeonHTTPDialect({ connectionString: databaseUrl }),
     });
     this.syncMetadata = syncMetadata;
     this.junctionTables = junctionTables;

@@ -6,6 +6,8 @@ import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
 import { dbLogger } from '../middleware/logger';
 import { Resend } from 'resend';
+import { NeonHTTPDialect } from 'kysely-neon-http';
+import type { Dialect } from 'kysely';
 
 // Helper function to get allowed origins based on dynamic ports
 function getAllowedOrigins(env: Env): string[] {
@@ -64,9 +66,9 @@ const dbUrlForCli = typeof process !== 'undefined' ? process.env.DATABASE_URL : 
 const secretForCli = typeof process !== 'undefined' ? process.env.BETTER_AUTH_SECRET : undefined;
 const baseUrlForCli = typeof process !== 'undefined' ? process.env.BETTER_AUTH_URL : undefined;
 
-// Use NeonHTTPDialectV1 (Stateless HTTPS) for CLI instance if dbUrlForCli is available
+// Use NeonHTTPDialect (Stateless HTTPS) for CLI instance if dbUrlForCli is available
 const cliNeonDialect = dbUrlForCli
-  ? new NeonHTTPDialectV1({ connectionString: dbUrlForCli })
+  ? new NeonHTTPDialect({ connectionString: dbUrlForCli })
   : undefined;
 
 // Top-level auth instance for CLI schema generation and potentially type inference.

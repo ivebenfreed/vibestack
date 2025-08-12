@@ -50,8 +50,8 @@ ENV_FILES=(
 ADDITIONAL_FILES=(
   "CLAUDE.md"
   ".clauderc"
-  "docker-compose.yml"
-  "docker-compose.dev.yml"
+  "docker-configs/docker-compose.yml"
+  "docker-configs/docker-compose.dev.yml"
 )
 
 # Counter for files

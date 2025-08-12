@@ -72,7 +72,7 @@ class BranchDbConfigurator {
       postgresPort: 5432 + offset,
       neonProxyPort: 4444 + offset,
       dbName: `vibestack_dev_${this.currentBranch.replace(/[^a-zA-Z0-9_]/g, '_')}`,
-      compose: `docker-compose.pr-${this.prNumber}.yml`
+      compose: `.docker/docker-compose.pr-${this.prNumber}.yml`
     };
   }
 
@@ -116,7 +116,7 @@ class BranchDbConfigurator {
     
     // Get git root directory to find docker-compose.yml
     const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
-    const baseCompose = fs.readFileSync(path.join(gitRoot, 'docker-compose.yml'), 'utf8');
+    const baseCompose = fs.readFileSync(path.join(gitRoot, 'docker-configs/docker-compose.yml'), 'utf8');
     
     // Replace ports and container names, and remove obsolete version
     const branchCompose = baseCompose
@@ -126,6 +126,12 @@ class BranchDbConfigurator {
       .replace(/vibestack-postgres/g, `vibestack-postgres-${config.prNumber}`)
       .replace(/vibestack-neon-proxy/g, `vibestack-neon-proxy-${config.prNumber}`)
       .replace(/vibestack_dev/g, config.dbName);
+    
+    // Create .docker directory if it doesn't exist
+    const dockerDir = path.join(gitRoot, '.docker');
+    if (!fs.existsSync(dockerDir)) {
+      fs.mkdirSync(dockerDir, { recursive: true });
+    }
     
     const composePath = path.join(gitRoot, config.compose);
     fs.writeFileSync(composePath, branchCompose);
@@ -207,7 +213,7 @@ class BranchDbConfigurator {
       if (!runningContainers.includes('vibestack-postgres') || !runningContainers.includes('vibestack-neon-proxy')) {
         console.log('   ⚡ Starting main database containers...');
         const gitRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
-        execSync(`docker compose -f ${path.join(gitRoot, 'docker-compose.yml')} up -d`, { stdio: 'inherit' });
+        execSync(`docker compose -f ${path.join(gitRoot, 'docker-configs/docker-compose.yml')} up -d`, { stdio: 'inherit' });
         
         // Wait for main database to be ready
         await this.waitForDatabase({ postgresPort: 5432 });

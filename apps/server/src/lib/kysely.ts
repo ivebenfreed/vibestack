@@ -1,6 +1,5 @@
 import { Kysely } from 'kysely';
-import { NeonHTTPDialectV1 } from './kysely-neon-v1-adapter';
-import { neonConfig } from '@neondatabase/serverless';
+import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
 
@@ -9,35 +8,6 @@ import type { Database } from '@repo/dataforge/kysely-types';
 
 let kyselyInstance: Kysely<Database> | null = null;
 
-/**
- * Configure Neon for local development - must be called once before any Kysely usage
- */
-export function configureNeonForEnvironment(env: Env) {
-  const databaseUrl = env.DATABASE_URL;
-  const isLocal = databaseUrl.includes('db.localtest.me') || 
-                  env.ENVIRONMENT === "local" || 
-                  env.ENVIRONMENT === "development";
-  
-  if (isLocal) {
-    dbLogger.debug("Configuring Neon for local development", {
-      databaseUrl: databaseUrl.substring(0, 50) + '...'
-    }, 'kysely');
-    
-    // Configure the fetch endpoint for the local proxy
-    neonConfig.fetchEndpoint = (host) => {
-      if (host === 'db.localtest.me') {
-        return 'http://db.localtest.me:4444/sql';
-      }
-      return `https://${host}/sql`;
-    };
-    neonConfig.fetchFunction = fetch;
-    
-    // Configure WebSocket settings (disabled in Workers)
-    neonConfig.useSecureWebSocket = false;
-    neonConfig.wsProxy = (host) => `${host}:4444/v1`;
-    neonConfig.webSocketConstructor = undefined;
-  }
-}
 
 /**
  * Get or create a Kysely instance with proper configuration
@@ -50,18 +20,15 @@ export function getKysely(env: Env): Kysely<Database> {
     return kyselyInstance;
   }
   
-  // Configure Neon for the environment
-  configureNeonForEnvironment(env);
-  
-  // Get connection string and remove port 4444 for local connections
-  let connectionString = env.DATABASE_URL;
-  if (connectionString.includes('db.localtest.me')) {
-    connectionString = connectionString.replace(':4444', '');
-  }
-  
-  // Create Kysely instance with logging
+  // Create Kysely instance with auto-configuration
+  // The dialect automatically detects local development from the connection string
   kyselyInstance = new Kysely<Database>({
-    dialect: new NeonHTTPDialectV1({ connectionString }),
+    dialect: new NeonHTTPDialect({
+      connectionString: env.DATABASE_URL,
+      debug: env.LOG_LEVEL === 'debug',
+      // Auto-detection handles local proxy configuration automatically
+      // Override only if needed: localProxyPort, localProxyPath, autoDetect
+    }),
     log: (event) => {
       if (event.level === 'query') {
         dbLogger.debug('Kysely Query', {

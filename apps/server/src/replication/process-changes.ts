@@ -17,7 +17,7 @@ import {
 } from '@repo/dataforge/server-entities';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
-import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
+import { NeonHTTPDialect } from '@repo/kysely-neon-http';
 import { neonConfig } from '@neondatabase/serverless';
 import type { Database } from '@repo/dataforge/kysely-types';
 
@@ -613,7 +613,7 @@ function createKyselyDb(context: MinimalContext): Kysely<Database> {
   }
   
   return new Kysely<Database>({
-    dialect: new NeonHTTPDialectV1({ connectionString: databaseUrl }),
+    dialect: new NeonHTTPDialect({ connectionString: databaseUrl }),
   });
 }
 
