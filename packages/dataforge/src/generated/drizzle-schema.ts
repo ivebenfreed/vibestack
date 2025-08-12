@@ -37,7 +37,7 @@ export const users = pgTable('users', {
   email_verified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
   is_super_admin: boolean('is_super_admin').default(false).notNull(),
-  accounts_id: uuid('accounts_id')
+  account_id: uuid('account_id')
 });
 
 export const tasks = pgTable('tasks', {
@@ -59,7 +59,7 @@ export const tasks = pgTable('tasks', {
   assignee_id: uuid('assignee_id')
 });
 
-export const tag_sets = pgTable('tag_sets', {
+export const tag_set = pgTable('tag_set', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -75,10 +75,10 @@ export const tag_sets = pgTable('tag_sets', {
   max_tags: integer('max_tags'),
   metadata: text('metadata').notNull()
 }, (table) => ({
-  idx_tag_sets_displayOrder: index('idx_tag_sets_displayOrder').on(table.display_order),
+  idx_tag_set_displayOrder: index('idx_tag_set_displayOrder').on(table.display_order),
 }));
 
-export const tags = pgTable('tags', {
+export const tag = pgTable('tag', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -96,11 +96,11 @@ export const tags = pgTable('tags', {
   tag_set_id: uuid('tag_set_id').notNull(),
   parent_id: uuid('parent_id')
 }, (table) => ({
-  idx_tags_tagSet_sortOrder: index('idx_tags_tagSet_sortOrder').on(table.tag_set_id, table.sort_order),
-  idx_tags_slug: index('idx_tags_slug').on(table.slug),
+  idx_tag_tagSet_sortOrder: index('idx_tag_tagSet_sortOrder').on(table.tag_set_id, table.sort_order),
+  idx_tag_slug: index('idx_tag_slug').on(table.slug),
 }));
 
-export const status_sets = pgTable('status_sets', {
+export const status_set = pgTable('status_set', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -114,10 +114,10 @@ export const status_sets = pgTable('status_sets', {
   workflow: text('workflow').notNull(),
   metadata: text('metadata').notNull()
 }, (table) => ({
-  idx_status_sets_entityType: index('idx_status_sets_entityType').on(table.entity_type),
+  idx_status_set_entityType: index('idx_status_set_entityType').on(table.entity_type),
 }));
 
-export const status_definitions = pgTable('status_definitions', {
+export const status_definition = pgTable('status_definition', {
   id: uuid('id').primaryKey().defaultRandom(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
@@ -136,8 +136,8 @@ export const status_definitions = pgTable('status_definitions', {
   metadata: text('metadata').notNull(),
   status_set_id: uuid('status_set_id').notNull()
 }, (table) => ({
-  idx_status_definitions_name: index('idx_status_definitions_name').on(table.name),
-  idx_status_definitions_statusSet_sortOrder: index('idx_status_definitions_statusSet_sortOrder').on(table.status_set_id, table.sort_order),
+  idx_status_definition_name: index('idx_status_definition_name').on(table.name),
+  idx_status_definition_statusSet_sortOrder: index('idx_status_definition_statusSet_sortOrder').on(table.status_set_id, table.sort_order),
 }));
 
 export const sessions = pgTable('sessions', {
@@ -146,7 +146,7 @@ export const sessions = pgTable('sessions', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
   session_token: text('session_token').notNull(),
   expires_at: timestamp('expires_at', { mode: 'date' }).notNull(),
-  accounts_id: uuid('accounts_id').notNull()
+  account_id: uuid('account_id').notNull()
 });
 
 export const projects = pgTable('projects', {
@@ -235,7 +235,7 @@ export const project_status_sets = pgTable('project_status_sets', {
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   account: one(accounts, {
-    fields: [users.accounts_id],
+    fields: [users.account_id],
     references: [accounts.id],
   }),
   assignedTasks: many(tasks),
@@ -253,42 +253,42 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     references: [users.id],
   }),
   comments: many(comments),
-  tags: many(tags),
+  tags: many(tag),
 }));
 
-export const tagSetsRelations = relations(tag_sets, ({ one, many }) => ({
-  tags: many(tags),
+export const tagSetRelations = relations(tag_set, ({ one, many }) => ({
+  tags: many(tag),
   projects: many(projects),
 }));
 
-export const tagsRelations = relations(tags, ({ one, many }) => ({
-  tagSet: one(tag_sets, {
-    fields: [tags.tag_set_id],
-    references: [tag_sets.id],
+export const tagRelations = relations(tag, ({ one, many }) => ({
+  tagSet: one(tag_set, {
+    fields: [tag.tag_set_id],
+    references: [tag_set.id],
   }),
-  parent: one(tags, {
-    fields: [tags.parent_id],
-    references: [tags.id],
+  parent: one(tag, {
+    fields: [tag.parent_id],
+    references: [tag.id],
   }),
-  children: many(tags),
+  children: many(tag),
   tasks: many(tasks),
 }));
 
-export const statusSetsRelations = relations(status_sets, ({ one, many }) => ({
-  statuses: many(status_definitions),
+export const statusSetRelations = relations(status_set, ({ one, many }) => ({
+  statuses: many(status_definition),
   projects: many(projects),
 }));
 
-export const statusDefinitionsRelations = relations(status_definitions, ({ one, many }) => ({
-  statusSet: one(status_sets, {
-    fields: [status_definitions.status_set_id],
-    references: [status_sets.id],
+export const statusDefinitionRelations = relations(status_definition, ({ one, many }) => ({
+  statusSet: one(status_set, {
+    fields: [status_definition.status_set_id],
+    references: [status_set.id],
   }),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   account: one(accounts, {
-    fields: [sessions.accounts_id],
+    fields: [sessions.account_id],
     references: [accounts.id],
   }),
 }));
@@ -299,8 +299,8 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
     references: [users.id],
   }),
   tasks: many(tasks),
-  tagSets: many(tag_sets),
-  statusSets: many(status_sets),
+  tagSets: many(tag_set),
+  statusSets: many(status_set),
 }));
 
 export const commentsRelations = relations(comments, ({ one, many }) => ({
@@ -329,14 +329,14 @@ export const schema = {
   usersRelations,
   tasks,
   tasksRelations,
-  tag_sets,
-  tagSetsRelations,
-  tags,
-  tagsRelations,
-  status_sets,
-  statusSetsRelations,
-  status_definitions,
-  statusDefinitionsRelations,
+  tag_set,
+  tagSetRelations,
+  tag,
+  tagRelations,
+  status_set,
+  statusSetRelations,
+  status_definition,
+  statusDefinitionRelations,
   sessions,
   sessionsRelations,
   projects,
@@ -362,14 +362,14 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
-export type TagSet = typeof tag_sets.$inferSelect;
-export type NewTagSet = typeof tag_sets.$inferInsert;
-export type Tag = typeof tags.$inferSelect;
-export type NewTag = typeof tags.$inferInsert;
-export type StatusSet = typeof status_sets.$inferSelect;
-export type NewStatusSet = typeof status_sets.$inferInsert;
-export type StatusDefinition = typeof status_definitions.$inferSelect;
-export type NewStatusDefinition = typeof status_definitions.$inferInsert;
+export type TagSet = typeof tag_set.$inferSelect;
+export type NewTagSet = typeof tag_set.$inferInsert;
+export type Tag = typeof tag.$inferSelect;
+export type NewTag = typeof tag.$inferInsert;
+export type StatusSet = typeof status_set.$inferSelect;
+export type NewStatusSet = typeof status_set.$inferInsert;
+export type StatusDefinition = typeof status_definition.$inferSelect;
+export type NewStatusDefinition = typeof status_definition.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 export type Project = typeof projects.$inferSelect;

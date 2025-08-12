@@ -244,10 +244,10 @@ export const tableNames = {
   User: 'users',
   task_tags: 'task_tags',
   Task: 'tasks',
-  TagSet: 'tag_sets',
-  Tag: 'tags',
-  StatusSet: 'status_sets',
-  StatusDefinition: 'status_definitions',
+  TagSet: 'tag_set',
+  Tag: 'tag',
+  StatusSet: 'status_set',
+  StatusDefinition: 'status_definition',
   Session: 'sessions',
   project_tag_sets: 'project_tag_sets',
   project_status_sets: 'project_status_sets',
@@ -271,10 +271,10 @@ export const SERVER_DOMAIN_TABLES = [
   "project_status_sets",
   "project_tag_sets",
   "projects",
-  "status_definitions",
-  "status_sets",
-  "tag_sets",
-  "tags",
+  "status_definition",
+  "status_set",
+  "tag",
+  "tag_set",
   "task_tags",
   "tasks",
   "users"
@@ -287,16 +287,16 @@ export const SERVER_DOMAIN_TABLE_HIERARCHY = {
   "tasks": [
     "task_tags"
   ],
-  "tag_sets": [
+  "tag_set": [
     "project_tag_sets"
   ],
-  "tags": [
+  "tag": [
     "task_tags"
   ],
-  "status_sets": [
+  "status_set": [
     "project_status_sets"
   ],
-  "status_definitions": [],
+  "status_definition": [],
   "sessions": [],
   "project_tag_sets": [],
   "project_status_sets": [],
@@ -337,46 +337,46 @@ export const SERVER_RELATIONSHIP_CONFIGS = {
       "target": "comments"
     },
     "tags": {
-      "target": "tags",
+      "target": "tag",
       "through": "task_tags"
     }
   },
-  "tag_sets": {
+  "tag_set": {
     "tags": {
-      "target": "tags"
+      "target": "tag"
     },
     "projects": {
       "target": "projects",
       "through": "project_tag_sets"
     }
   },
-  "tags": {
+  "tag": {
     "tagSet": {
-      "target": "tag_sets"
+      "target": "tag_set"
     },
     "parent": {
-      "target": "tags"
+      "target": "tag"
     },
     "children": {
-      "target": "tags"
+      "target": "tag"
     },
     "tasks": {
       "target": "tasks",
       "through": "task_tags"
     }
   },
-  "status_sets": {
+  "status_set": {
     "statuses": {
-      "target": "status_definitions"
+      "target": "status_definition"
     },
     "projects": {
       "target": "projects",
       "through": "project_status_sets"
     }
   },
-  "status_definitions": {
+  "status_definition": {
     "statusSet": {
-      "target": "status_sets"
+      "target": "status_set"
     }
   },
   "sessions": {
@@ -392,11 +392,11 @@ export const SERVER_RELATIONSHIP_CONFIGS = {
       "target": "tasks"
     },
     "tagSets": {
-      "target": "tag_sets",
+      "target": "tag_set",
       "through": "project_tag_sets"
     },
     "statusSets": {
-      "target": "status_sets",
+      "target": "status_set",
       "through": "project_status_sets"
     }
   },
@@ -423,15 +423,15 @@ export const SERVER_TRACKED_TABLES = SERVER_DOMAIN_TABLES;
 export const SERVER_JUNCTION_TABLE_MAPPING = {
   "task_tags": {
     "source": "tasks",
-    "target": "tags"
+    "target": "tag"
   },
   "project_tag_sets": {
     "source": "projects",
-    "target": "tag_sets"
+    "target": "tag_set"
   },
   "project_status_sets": {
     "source": "projects",
-    "target": "status_sets"
+    "target": "status_set"
   }
 };
 

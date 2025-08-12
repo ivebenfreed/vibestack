@@ -6,7 +6,8 @@
  */
 
 import { Kysely } from 'kysely';
-import { NeonHTTPDialectV1 } from 'kysely-neon';
+import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
+import { neonConfig } from '@neondatabase/serverless';
 import type { Database, TableName } from '@repo/dataforge/kysely-types';
 import type { 
   TableSyncMetadata, 
@@ -33,10 +34,21 @@ export class GenericSyncEngine {
   constructor(
     databaseUrl: string,
     syncMetadata: Record<string, TableSyncMetadata>,
-    junctionTables: JunctionTable[]
+    junctionTables: JunctionTable[],
+    environment?: string
   ) {
+    // Configure Neon for local development if environment is provided
+    if (environment === "local" || environment === "development") {
+      neonConfig.fetchEndpoint = (host) => {
+        if (host === 'db.localtest.me') {
+          return 'http://db.localtest.me:4444/sql';
+        }
+        return `https://${host}/sql`;
+      };
+    }
+    
     this.db = new Kysely<Database>({
-      dialect: new NeonHTTPDialectV1(databaseUrl),
+      dialect: new NeonHTTPDialectV1({ connectionString: databaseUrl }),
     });
     this.syncMetadata = syncMetadata;
     this.junctionTables = junctionTables;

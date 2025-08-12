@@ -6,10 +6,10 @@ export interface DexieSchema extends Dexie {
   users: Table<Entities.User>;
   task_tags: Table<Entities.task_tags>;
   tasks: Table<Entities.Task>;
-  tag_sets: Table<Entities.TagSet>;
-  tags: Table<Entities.Tag>;
-  status_sets: Table<Entities.StatusSet>;
-  status_definitions: Table<Entities.StatusDefinition>;
+  tag_set: Table<Entities.TagSet>;
+  tag: Table<Entities.Tag>;
+  status_set: Table<Entities.StatusSet>;
+  status_definition: Table<Entities.StatusDefinition>;
   project_tag_sets: Table<Entities.project_tag_sets>;
   project_status_sets: Table<Entities.project_status_sets>;
   projects: Table<Entities.Project>;
@@ -22,10 +22,10 @@ class VibeStackDatabase extends Dexie implements DexieSchema {
   users!: Table<Entities.User>;
   task_tags!: Table<Entities.task_tags>;
   tasks!: Table<Entities.Task>;
-  tag_sets!: Table<Entities.TagSet>;
-  tags!: Table<Entities.Tag>;
-  status_sets!: Table<Entities.StatusSet>;
-  status_definitions!: Table<Entities.StatusDefinition>;
+  tag_set!: Table<Entities.TagSet>;
+  tag!: Table<Entities.Tag>;
+  status_set!: Table<Entities.StatusSet>;
+  status_definition!: Table<Entities.StatusDefinition>;
   project_tag_sets!: Table<Entities.project_tag_sets>;
   project_status_sets!: Table<Entities.project_status_sets>;
   projects!: Table<Entities.Project>;
@@ -89,6 +89,23 @@ class VibeStackDatabase extends Dexie implements DexieSchema {
       comments: '++id, clientId, version, deleted, createdAt, updatedAt',
     });
 
+    // Version 5 - Generated at 2025-08-12T02:13:58.848Z
+    this.version(5).stores({
+      users: '++id, &email',
+      task_tags: '++Task_owner',
+      tasks: '++id, clientId, version, deleted, createdAt, updatedAt',
+      tag_set: '++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt',
+      tag: '++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt',
+      status_set: '++id, [entityType], clientId, version, deleted, createdAt, updatedAt',
+      status_definition: '++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt',
+      project_tag_sets: '++Project_owner',
+      project_status_sets: '++Project_owner',
+      projects: '++id, clientId, version, deleted, createdAt, updatedAt',
+      local_changes: '++id, table, processed_sync, [table+recordId], processedSync',
+      entity_dependencies: '++id, [toTable+toId], [fromTable+fromId]',
+      comments: '++id, clientId, version, deleted, createdAt, updatedAt',
+    });
+
   }
 }
 
@@ -100,10 +117,10 @@ export async function clearDatabase() {
     'users',
     'task_tags',
     'tasks',
-    'tag_sets',
-    'tags',
-    'status_sets',
-    'status_definitions',
+    'tag_set',
+    'tag',
+    'status_set',
+    'status_definition',
     'project_tag_sets',
     'project_status_sets',
     'projects',
@@ -127,10 +144,10 @@ export const dexieTableNames = [
   'users',
   'task_tags',
   'tasks',
-  'tag_sets',
-  'tags',
-  'status_sets',
-  'status_definitions',
+  'tag_set',
+  'tag',
+  'status_set',
+  'status_definition',
   'project_tag_sets',
   'project_status_sets',
   'projects',
@@ -153,10 +170,10 @@ export const ENTITY_TABLES = [
   'users',
   'task_tags',
   'tasks',
-  'tag_sets',
-  'tags',
-  'status_sets',
-  'status_definitions',
+  'tag_set',
+  'tag',
+  'status_set',
+  'status_definition',
   'project_tag_sets',
   'project_status_sets',
   'projects',
@@ -175,10 +192,10 @@ export const DOMAIN_TABLES = [
   'users',
   'task_tags',
   'tasks',
-  'tag_sets',
-  'tags',
-  'status_sets',
-  'status_definitions',
+  'tag_set',
+  'tag',
+  'status_set',
+  'status_definition',
   'project_tag_sets',
   'project_status_sets',
   'projects',
@@ -196,10 +213,10 @@ export const DEXIE_TO_DB_TABLE_MAP = {
   users: 'users',
   task_tags: 'task_tags',
   tasks: 'tasks',
-  tag_sets: 'tag_sets',
-  tags: 'tags',
-  status_sets: 'status_sets',
-  status_definitions: 'status_definitions',
+  tag_set: 'tag_set',
+  tag: 'tag',
+  status_set: 'status_set',
+  status_definition: 'status_definition',
   project_tag_sets: 'project_tag_sets',
   project_status_sets: 'project_status_sets',
   projects: 'projects',

@@ -8,6 +8,7 @@
 
 import { Kysely } from 'kysely';
 import { NeonHTTPDialectV1 } from './kysely-neon-v1-adapter';
+import { neonConfig } from '@neondatabase/serverless';
 import type { Database } from '@repo/dataforge/kysely-types';
 import type { Context } from 'hono';
 import type { Env } from '../types/env';
@@ -25,9 +26,19 @@ export class KyselyQueryService {
       throw new Error('DATABASE_URL environment variable is required');
     }
 
-    // Initialize Kysely with custom Neon dialect
+    // Configure Neon for local development (same as auth.ts)
+    if (context.env.ENVIRONMENT === "local" || context.env.ENVIRONMENT === "development") {
+      neonConfig.fetchEndpoint = (host) => {
+        if (host === 'db.localtest.me') {
+          return 'http://db.localtest.me:4444/sql';
+        }
+        return `https://${host}/sql`;
+      };
+    }
+
+    // Initialize Kysely with custom Neon dialect - pass as object with connectionString
     this.db = new Kysely<Database>({
-      dialect: new NeonHTTPDialectV1(databaseUrl),
+      dialect: new NeonHTTPDialectV1({ connectionString: databaseUrl }),
     });
   }
 

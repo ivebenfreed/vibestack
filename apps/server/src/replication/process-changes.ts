@@ -17,7 +17,8 @@ import {
 } from '@repo/dataforge/server-entities';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
-import { NeonHTTPDialectV1 } from 'kysely-neon';
+import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
+import { neonConfig } from '@neondatabase/serverless';
 import type { Database } from '@repo/dataforge/kysely-types';
 
 // ====== Types and Interfaces ======
@@ -600,8 +601,19 @@ function createKyselyDb(context: MinimalContext): Kysely<Database> {
     throw new Error('DATABASE_URL is required');
   }
   
+  // Configure Neon for local development
+  const environment = context.env.ENVIRONMENT || context.env.NODE_ENV;
+  if (environment === "local" || environment === "development") {
+    neonConfig.fetchEndpoint = (host) => {
+      if (host === 'db.localtest.me') {
+        return 'http://db.localtest.me:4444/sql';
+      }
+      return `https://${host}/sql`;
+    };
+  }
+  
   return new Kysely<Database>({
-    dialect: new NeonHTTPDialectV1(databaseUrl),
+    dialect: new NeonHTTPDialectV1({ connectionString: databaseUrl }),
   });
 }
 

@@ -1,0 +1,721 @@
+{
+  "exportDate": "2025-08-12T00:48:53.878Z",
+  "databaseVersion": "PostgreSQL 17.5",
+  "tables": {
+    "accounts": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 2
+      },
+      {
+        "name": "account_id",
+        "type": "text",
+        "nullable": false,
+        "default": null,
+        "position": 3
+      },
+      {
+        "name": "provider_id",
+        "type": "text",
+        "nullable": false,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "access_token",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "refresh_token",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "id_token",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 7
+      },
+      {
+        "name": "access_token_expires_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null,
+        "position": 8
+      },
+      {
+        "name": "refresh_token_expires_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null,
+        "position": 9
+      },
+      {
+        "name": "scope",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 10
+      },
+      {
+        "name": "password",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 11
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 12
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 13
+      },
+      {
+        "name": "provider_account_id",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 14
+      },
+      {
+        "name": "expires_at",
+        "type": "bigint",
+        "nullable": true,
+        "default": null,
+        "position": 15
+      },
+      {
+        "name": "token_type",
+        "type": "character varying",
+        "nullable": true,
+        "default": null,
+        "position": 16
+      },
+      {
+        "name": "session_state",
+        "type": "character varying",
+        "nullable": true,
+        "default": null,
+        "position": 17
+      }
+    ],
+    "comments": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 2
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 3
+      },
+      {
+        "name": "client_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "content",
+        "type": "text",
+        "nullable": false,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "author_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "parent_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 7
+      },
+      {
+        "name": "task_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 8
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 9
+      }
+    ],
+    "project_members": [
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 1
+      },
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 2
+      }
+    ],
+    "projects": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 2
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 3
+      },
+      {
+        "name": "client_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "name",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "status",
+        "type": "USER-DEFINED",
+        "nullable": false,
+        "default": "'active'::projects_status_enum",
+        "position": 7
+      },
+      {
+        "name": "owner_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 8
+      }
+    ],
+    "sessions": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 2
+      },
+      {
+        "name": "token",
+        "type": "text",
+        "nullable": false,
+        "default": null,
+        "position": 3
+      },
+      {
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "ip_address",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "user_agent",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 7
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 8
+      },
+      {
+        "name": "session_token",
+        "type": "character varying",
+        "nullable": true,
+        "default": null,
+        "position": 9
+      }
+    ],
+    "tags": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "client_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 2
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 3
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 4
+      },
+      {
+        "name": "tag_set_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "name",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "slug",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 7
+      },
+      {
+        "name": "color",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 8
+      },
+      {
+        "name": "icon",
+        "type": "character varying",
+        "nullable": true,
+        "default": null,
+        "position": 9
+      },
+      {
+        "name": "variant",
+        "type": "character varying",
+        "nullable": false,
+        "default": "'solid'::character varying",
+        "position": 10
+      },
+      {
+        "name": "sort_order",
+        "type": "integer",
+        "nullable": false,
+        "default": "0",
+        "position": 11
+      },
+      {
+        "name": "parent_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 12
+      },
+      {
+        "name": "is_active",
+        "type": "boolean",
+        "nullable": false,
+        "default": "true",
+        "position": 13
+      },
+      {
+        "name": "usage_count",
+        "type": "integer",
+        "nullable": false,
+        "default": "0",
+        "position": 14
+      },
+      {
+        "name": "last_used_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null,
+        "position": 15
+      },
+      {
+        "name": "metadata",
+        "type": "jsonb",
+        "nullable": false,
+        "default": "'{}'::jsonb",
+        "position": 16
+      }
+    ],
+    "task_dependencies": [
+      {
+        "name": "dependent_task_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 1
+      },
+      {
+        "name": "dependency_task_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 2
+      }
+    ],
+    "task_tags": [
+      {
+        "name": "task_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 1
+      },
+      {
+        "name": "tag_id",
+        "type": "uuid",
+        "nullable": false,
+        "default": null,
+        "position": 2
+      }
+    ],
+    "tasks": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 2
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 3
+      },
+      {
+        "name": "client_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "title",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "priority",
+        "type": "USER-DEFINED",
+        "nullable": false,
+        "default": "'medium'::tasks_priority_enum",
+        "position": 8
+      },
+      {
+        "name": "due_date",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null,
+        "position": 9
+      },
+      {
+        "name": "completed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null,
+        "position": 10
+      },
+      {
+        "name": "time_range",
+        "type": "tsrange",
+        "nullable": true,
+        "default": null,
+        "position": 11
+      },
+      {
+        "name": "estimated_duration",
+        "type": "interval",
+        "nullable": true,
+        "default": null,
+        "position": 12
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 14
+      },
+      {
+        "name": "assignee_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 15
+      },
+      {
+        "name": "start_date",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "default": null,
+        "position": 16
+      },
+      {
+        "name": "legacy_status",
+        "type": "USER-DEFINED",
+        "nullable": true,
+        "default": "'open'::tasks_legacy_status_enum",
+        "position": 17
+      },
+      {
+        "name": "status_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 18
+      },
+      {
+        "name": "legacy_tags",
+        "type": "ARRAY",
+        "nullable": true,
+        "default": "'{}'::text[]",
+        "position": 19
+      }
+    ],
+    "users": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 2
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 3
+      },
+      {
+        "name": "client_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "name",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 5
+      },
+      {
+        "name": "email",
+        "type": "character varying",
+        "nullable": false,
+        "default": null,
+        "position": 6
+      },
+      {
+        "name": "email_verified",
+        "type": "boolean",
+        "nullable": false,
+        "default": "false",
+        "position": 7
+      },
+      {
+        "name": "image",
+        "type": "character varying",
+        "nullable": true,
+        "default": null,
+        "position": 8
+      },
+      {
+        "name": "role",
+        "type": "USER-DEFINED",
+        "nullable": false,
+        "default": "'member'::users_role_enum",
+        "position": 9
+      },
+      {
+        "name": "is_super_admin",
+        "type": "boolean",
+        "nullable": true,
+        "default": "false",
+        "position": 10
+      },
+      {
+        "name": "accounts_id",
+        "type": "uuid",
+        "nullable": true,
+        "default": null,
+        "position": 11
+      }
+    ],
+    "verifications": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "default": "uuid_generate_v4()",
+        "position": 1
+      },
+      {
+        "name": "identifier",
+        "type": "text",
+        "nullable": false,
+        "default": null,
+        "position": 2
+      },
+      {
+        "name": "value",
+        "type": "text",
+        "nullable": false,
+        "default": null,
+        "position": 3
+      },
+      {
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": null,
+        "position": 4
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 5
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "default": "now()",
+        "position": 6
+      }
+    ]
+  }
+}

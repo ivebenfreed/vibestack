@@ -33,20 +33,20 @@ export class TagSetDexieService {
       clientId: crypto.randomUUID(),
     } as TagSet;
     
-    await db.tag_sets.add(record);
+    await db.tag_set.add(record);
     return id;
   }
 
   async findById(id: string): Promise<TagSet | undefined> {
-    return await db.tag_sets.get(id);
+    return await db.tag_set.get(id);
   }
 
   async findAll(): Promise<TagSet[]> {
-    return await db.tag_sets.where('deleted').equals(0).toArray();
+    return await db.tag_set.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: TagSetUpdateInput): Promise<void> {
-    await db.tag_sets.update(id, {
+    await db.tag_set.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -54,14 +54,14 @@ export class TagSetDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.tag_sets.update(id, {
+    await db.tag_set.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.tag_sets.clear();
+    await db.tag_set.clear();
   }
 }
 

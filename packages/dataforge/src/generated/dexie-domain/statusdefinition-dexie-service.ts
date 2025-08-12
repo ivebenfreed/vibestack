@@ -34,20 +34,20 @@ export class StatusDefinitionDexieService {
       clientId: crypto.randomUUID(),
     } as StatusDefinition;
     
-    await db.status_definitions.add(record);
+    await db.status_definition.add(record);
     return id;
   }
 
   async findById(id: string): Promise<StatusDefinition | undefined> {
-    return await db.status_definitions.get(id);
+    return await db.status_definition.get(id);
   }
 
   async findAll(): Promise<StatusDefinition[]> {
-    return await db.status_definitions.where('deleted').equals(0).toArray();
+    return await db.status_definition.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: StatusDefinitionUpdateInput): Promise<void> {
-    await db.status_definitions.update(id, {
+    await db.status_definition.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -55,14 +55,14 @@ export class StatusDefinitionDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.status_definitions.update(id, {
+    await db.status_definition.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.status_definitions.clear();
+    await db.status_definition.clear();
   }
 }
 

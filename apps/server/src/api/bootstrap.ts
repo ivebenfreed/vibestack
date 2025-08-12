@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { UserRole } from "@repo/dataforge/server-entities";
 import { Kysely } from 'kysely';
 import { NeonHTTPDialectV1 } from '../lib/kysely-neon-v1-adapter';
+import { neonConfig } from '@neondatabase/serverless';
 import { initializeAuth } from '../lib/auth';
 import type { Env } from '../types/env';
 
@@ -11,7 +12,7 @@ const bootstrapRouter = new Hono<BootstrapEnv>();
 
 bootstrapRouter.post('/create-super-admin', async (c) => {
   const bootstrapKeyHeader = c.req.header('X-Bootstrap-Key');
-  const { BOOTSTRAP_SECRET, DATABASE_URL } = c.env;
+  const { BOOTSTRAP_SECRET, DATABASE_URL, ENVIRONMENT, NODE_ENV } = c.env;
 
   if (!BOOTSTRAP_SECRET) {
     console.error('[Bootstrap] BOOTSTRAP_SECRET not set.');
@@ -19,6 +20,17 @@ bootstrapRouter.post('/create-super-admin', async (c) => {
   }
   if (bootstrapKeyHeader !== BOOTSTRAP_SECRET) {
     throw new HTTPException(403, { message: 'Invalid bootstrap key.' });
+  }
+
+  // Configure Neon for local development
+  const environment = ENVIRONMENT || NODE_ENV;
+  if (environment === "local" || environment === "development") {
+    neonConfig.fetchEndpoint = (host) => {
+      if (host === 'db.localtest.me') {
+        return 'http://db.localtest.me:4444/sql';
+      }
+      return `https://${host}/sql`;
+    };
   }
 
   const neonDialect = new NeonHTTPDialectV1({ connectionString: DATABASE_URL });
