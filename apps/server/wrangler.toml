@@ -21,6 +21,10 @@ host = "127.0.0.1"
 # Environment variables
 [vars]
 ENVIRONMENT = "development"
+# DATABASE_URL should be set in .env file, not here
+BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
+BETTER_AUTH_URL = "http://localhost:5173"
+RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
 
 # Module aliases (correct syntax)
 [alias]

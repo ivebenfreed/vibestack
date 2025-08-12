@@ -36,7 +36,7 @@ export class Tag extends BaseDomainEntity {
   @Property({ type: 'date', nullable: true })
   lastUsedAt?: Date;
 
-  @Property({ type: 'json', default: {} })
+  @Property({ type: 'json', default: '{}' })
   metadata!: Record<string, any>;
 
   @ManyToOne(() => TagSet, { fieldName: 'tag_set_id' })

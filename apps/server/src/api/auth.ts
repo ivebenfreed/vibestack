@@ -603,32 +603,50 @@ authRouter.on(["POST", "GET"], "/*", async (c) => {
   }
 
   const authInstance = getAuth(c);
+  
+  // Debug: Check if authInstance has database config
+  console.log('[Auth Router] Auth instance debug:', {
+    hasHandler: !!authInstance.handler,
+    hasDatabase: !!authInstance.options?.database,
+    databaseType: authInstance.options?.database?.type || 'unknown',
+    baseUrl: authInstance.options?.baseURL || authInstance.options?.baseUrl || 'not set',
+    environment: c.env.ENVIRONMENT,
+    databaseUrlExists: !!c.env.DATABASE_URL,
+    requestUrl: c.req.raw.url
+  });
+  
   try {
-    const request = c.req.raw;
-    const url = new URL(request.url);
-    url.pathname = c.req.path;
-    const modifiedRequest = new Request(url.toString(), {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-      redirect: request.redirect,
-      signal: request.signal,
-    });
-
-    const response = await authInstance.handler(modifiedRequest);
+    // Better Auth expects the raw request directly
+    // It will handle the path routing internally
+    const response = await authInstance.handler(c.req.raw);
     console.log(`[Auth Router] Handler returned response with status: ${response.status}`);
     
     // Log error responses (without sensitive data)
     if (response.status >= 400) {
       console.log(`[Auth Router] Error response for ${c.req.path}: ${response.status} ${response.statusText}`);
+      
+      // Try to get error details from response
+      try {
+        const responseText = await response.clone().text();
+        if (responseText) {
+          console.log(`[Auth Router] Error details:`, responseText.substring(0, 500));
+        }
+      } catch (e) {
+        // Ignore if we can't read response
+      }
     }
 
     return response;
 
   } catch (error) {
     console.error("[Auth Router] Error in Better Auth handler:", error);
+    console.error("[Auth Router] Error stack:", error instanceof Error ? error.stack : 'No stack');
+    
     // Return a simple error response
-    const errorResponse = new Response(JSON.stringify({ error: "Internal Auth Error" }), {
+    const errorResponse = new Response(JSON.stringify({ 
+      error: "Internal Auth Error",
+      details: error instanceof Error ? error.message : "Unknown error"
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });

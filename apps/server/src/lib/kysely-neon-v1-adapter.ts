@@ -21,6 +21,13 @@ class NeonHTTPConnection implements DatabaseConnection {
   private sql: ReturnType<typeof neon>;
 
   constructor(connectionString: string) {
+    // Configure neonConfig for local proxy if using db.localtest.me
+    if (connectionString.includes('db.localtest.me')) {
+      neonConfig.fetchEndpoint = (host) => {
+        const [protocol, port] = host === 'db.localtest.me' ? ['http', 4444] : ['https', 443];
+        return `${protocol}://${host}:${port}/sql`;
+      };
+    }
     this.sql = neon(connectionString);
   }
 

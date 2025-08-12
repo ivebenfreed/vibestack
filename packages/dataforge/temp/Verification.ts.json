@@ -37,17 +37,17 @@
     "uniques": [],
     "className": "Verification",
     "path": "./src/entities/Verification.ts",
-    "collection": "verifications",
-    "comment": "context:server-only | category:auth",
     "name": "Verification",
+    "comment": "context:server-only | category:auth",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseSystemEntity",
-    "useCache": true
+    "useCache": true,
+    "collection": "verification"
   },
   "origin": "./src/entities/Verification.ts",
-  "hash": "317f8fc4a7677f719e0851b4ecac14f3",
+  "hash": "92b78984da0bf6d1f23503ac206dde31",
   "version": "6.4.16"
 }

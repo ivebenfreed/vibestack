@@ -33,15 +33,17 @@ function getAllowedOrigins(env: Env): string[] {
 }
 
 // Helper function to get base URL based on environment
+// This should match where the client accesses the auth endpoints (through Vite proxy)
 function getBaseUrl(env: Env): string {
   const webPort = env.WEB_PORT || '5173';
   
-  if (env.ENVIRONMENT === "development") {
-    return `http://localhost:${webPort}`;
+  if (env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local") {
+    // In dev, client accesses auth through Vite proxy at /api/auth
+    return `http://localhost:${webPort}/api/auth`;
   } else if (env.ENVIRONMENT === "staging") {
-    return "https://dev.codevibesmatter.com";
+    return "https://dev.codevibesmatter.com/api/auth";
   } else {
-    return "https://app.codevibesmatter.com";
+    return "https://app.codevibesmatter.com/api/auth";
   }
 }
 
@@ -183,15 +185,21 @@ export function initializeAuth(env: Env) {
     trustedOrigins: trustedOrigins
   }, 'auth');
 
+  // In development, Better Auth receives requests as http://127.0.0.1/api/auth/* from Vite proxy
+  // We need to set baseURL to match this pattern for route matching to work
+  const baseUrl = env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local"
+    ? "http://127.0.0.1/api/auth"  // Match what Vite proxy sends
+    : getBaseUrl(env);
+  
   const runtimeAuthConfig = {
     // Pass the pre-configured Kysely instance and type
     database: {
       db: kyselyInstance,
-      type: "postgres" as const,
-      casing: "snake" as const // Use literal type
+      type: "postgres" as const
+      // Remove custom casing - let Better Auth use defaults
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseUrl: getBaseUrl(env),
+    baseUrl: baseUrl,
     cookieOptions: {
       secure: env.ENVIRONMENT !== "development", // ✅ FIX: Only secure in production/staging
       sameSite: "lax",
@@ -459,56 +467,15 @@ export function initializeAuth(env: Env) {
       //   }
       // })
     ],
-    // Define core model names directly
-    user: {
-      modelName: 'users',
-      fields: {
-        emailVerified: 'email_verified',
-        createdAt: 'created_at',
-        updatedAt: 'updated_at',
-        // Include role in fields mapping so it's included in session data
-        role: 'role'
-      },
-      additionalFields: {
-        role: {
-          type: "string" as const, // Matches UserRole enum (string values)
-          required: false, // The DB has a default
-          defaultValue: "member", // Default if not provided; DB default is also 'member'
-          input: true, // Allow 'role' to be passed in the body of signUpEmail
-          output: true // CRITICAL: Include role in session/user output
-        }
-      }
-    },
-    session: {
-      modelName: 'sessions',
-      fields: {
-        userId: 'user_id',
-        expiresAt: 'expires_at',
-        ipAddress: 'ip_address',       // Assuming DB uses snake_case
-        userAgent: 'user_agent',       // Assuming DB uses snake_case
-        createdAt: 'created_at',
-        updatedAt: 'updated_at'
-      }
-    },
-    account: {
-      modelName: 'accounts',
-      fields: {
-        userId: 'user_id',
-        accountId: 'account_id',       // Assuming DB uses snake_case
-        providerId: 'provider_id',     // Assuming DB uses snake_case
-        accessTokenExpiresAt: 'access_token_expires_at', // Assuming DB uses snake_case
-        refreshTokenExpiresAt: 'refresh_token_expires_at', // Assuming DB uses snake_case
-        createdAt: 'created_at',
-        updatedAt: 'updated_at'
-        // Note: accessToken, refreshToken, scope, idToken, password might map directly
-      }
-    },
-    verification: {
-      modelName: 'verifications',
-      fields: {
-        expiresAt: 'expires_at',
-        createdAt: 'created_at',
-        updatedAt: 'updated_at'
+    // Use Better Auth defaults - no custom field mappings needed
+    // Tables already match Better Auth naming: users, sessions, accounts, verifications
+    additionalFields: {
+      role: {
+        type: "string" as const,
+        required: false,
+        defaultValue: "member",
+        input: true,
+        output: true
       }
     },
     // Add JWKS model configuration at the top level
@@ -540,13 +507,9 @@ export function initializeAuth(env: Env) {
     },
   };
 
-  // Log the core model names being used
-  dbLogger.debug('Better Auth core model configuration', { 
-    user: runtimeAuthConfig.user.modelName,
-    session: runtimeAuthConfig.session.modelName,
-    account: runtimeAuthConfig.account.modelName,
-    verification: runtimeAuthConfig.verification.modelName
-    // jwks: runtimeAuthConfig.jwks.modelName // Removed jwks from log
+  // Log that we're using Better Auth defaults
+  dbLogger.debug('Better Auth using default table naming', { 
+    tables: ['user', 'session', 'account', 'verification']
   }, 'auth');
 
   // Return a fully configured instance for runtime use

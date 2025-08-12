@@ -118,7 +118,7 @@
     "toJsonParams": [],
     "extends": "BaseSystemEntity",
     "useCache": true,
-    "collection": "users"
+    "collection": "user"
   },
   "origin": "./src/entities/User.ts",
   "hash": "95277a6c4fc0a8fb4e0f880ee1517b36",

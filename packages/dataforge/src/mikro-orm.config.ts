@@ -3,16 +3,6 @@ import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { TSMigrationGenerator } from '@mikro-orm/migrations';
 import * as entities from './entities/index.js';
 
-// Simple naming strategy that just converts to snake_case without pluralization
-class SimpleNamingStrategy extends UnderscoreNamingStrategy {
-  classToTableName(entityName: string): string {
-    // Just convert to snake_case, no pluralization
-    return entityName.replace(/([A-Z])/g, (match, letter, index) => 
-      index === 0 ? letter.toLowerCase() : `_${letter.toLowerCase()}`
-    );
-  }
-}
-
 export default defineConfig({
   entities: Object.values(entities),
   dbName: 'vibestack_dev',
@@ -23,7 +13,7 @@ export default defineConfig({
   discovery: {
     warnWhenNoEntities: false,
   },
-  namingStrategy: SimpleNamingStrategy,  // Use simple singular naming
+  namingStrategy: UnderscoreNamingStrategy,  // Use default MikroORM naming strategy
   metadataProvider: TsMorphMetadataProvider,
   metadataCache: { 
     enabled: true,

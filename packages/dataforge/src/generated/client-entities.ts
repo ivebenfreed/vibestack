@@ -207,16 +207,16 @@ export class Comment implements Comment {}
 // ============================================
 
 export const tableNames = {
-  User: 'users',
+  User: 'user',
   task_tags: 'task_tags',
-  Task: 'tasks',
+  Task: 'task',
   TagSet: 'tag_set',
   Tag: 'tag',
   StatusSet: 'status_set',
   StatusDefinition: 'status_definition',
   project_tag_sets: 'project_tag_sets',
   project_status_sets: 'project_status_sets',
-  Project: 'projects',
+  Project: 'project',
   LocalChanges: 'local_changes',
   EntityDependency: 'entity_dependencies',
   Comment: 'comments',
@@ -232,23 +232,23 @@ export type EntityType = User | task_tags | Task | TagSet | Tag | StatusSet | St
 export const CLIENT_DOMAIN_TABLES = [
   "comments",
   "entity_dependencies",
+  "project",
   "project_status_sets",
   "project_tag_sets",
-  "projects",
   "status_definition",
   "status_set",
   "tag",
   "tag_set",
+  "task",
   "task_tags",
-  "tasks",
-  "users"
+  "user"
 ];
 
 export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
-  "verifications": [],
-  "users": [],
+  "verification": [],
+  "user": [],
   "task_tags": [],
-  "tasks": [
+  "task": [
     "task_tags"
   ],
   "tag_set": [
@@ -261,10 +261,10 @@ export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
     "project_status_sets"
   ],
   "status_definition": [],
-  "sessions": [],
+  "session": [],
   "project_tag_sets": [],
   "project_status_sets": [],
-  "projects": [
+  "project": [
     "project_tag_sets",
     "project_status_sets"
   ],
@@ -272,30 +272,30 @@ export const CLIENT_DOMAIN_TABLE_HIERARCHY = {
   "entity_dependencies": [],
   "comments": [],
   "change_history": [],
-  "accounts": []
+  "account": []
 };
 
 export const CLIENT_RELATIONSHIP_CONFIGS = {
-  "users": {
+  "user": {
     "account": {
-      "target": "accounts"
+      "target": "account"
     },
     "assignedTasks": {
-      "target": "tasks"
+      "target": "task"
     },
     "comments": {
       "target": "comments"
     },
     "ownedProjects": {
-      "target": "projects"
+      "target": "project"
     }
   },
-  "tasks": {
+  "task": {
     "project": {
-      "target": "projects"
+      "target": "project"
     },
     "assignee": {
-      "target": "users"
+      "target": "user"
     },
     "comments": {
       "target": "comments"
@@ -310,7 +310,7 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
       "target": "tag"
     },
     "projects": {
-      "target": "projects",
+      "target": "project",
       "through": "project_tag_sets"
     }
   },
@@ -325,7 +325,7 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
       "target": "tag"
     },
     "tasks": {
-      "target": "tasks",
+      "target": "task",
       "through": "task_tags"
     }
   },
@@ -334,7 +334,7 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
       "target": "status_definition"
     },
     "projects": {
-      "target": "projects",
+      "target": "project",
       "through": "project_status_sets"
     }
   },
@@ -343,17 +343,17 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
       "target": "status_set"
     }
   },
-  "sessions": {
+  "session": {
     "account": {
-      "target": "accounts"
+      "target": "account"
     }
   },
-  "projects": {
+  "project": {
     "owner": {
-      "target": "users"
+      "target": "user"
     },
     "tasks": {
-      "target": "tasks"
+      "target": "task"
     },
     "tagSets": {
       "target": "tag_set",
@@ -366,33 +366,33 @@ export const CLIENT_RELATIONSHIP_CONFIGS = {
   },
   "comments": {
     "task": {
-      "target": "tasks"
+      "target": "task"
     },
     "author": {
-      "target": "users"
+      "target": "user"
     }
   },
-  "accounts": {
+  "account": {
     "users": {
-      "target": "users"
+      "target": "user"
     },
     "sessions": {
-      "target": "sessions"
+      "target": "session"
     }
   }
 };
 
 export const CLIENT_JUNCTION_TABLE_MAPPING = {
   "task_tags": {
-    "source": "tasks",
+    "source": "task",
     "target": "tag"
   },
   "project_tag_sets": {
-    "source": "projects",
+    "source": "project",
     "target": "tag_set"
   },
   "project_status_sets": {
-    "source": "projects",
+    "source": "project",
     "target": "status_set"
   }
 };

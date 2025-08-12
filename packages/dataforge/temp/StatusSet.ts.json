@@ -67,7 +67,7 @@
         "name": "workflow",
         "kind": "scalar",
         "type": "json",
-        "default": {},
+        "default": "{}",
         "getter": false,
         "setter": false,
         "array": false,
@@ -77,7 +77,7 @@
         "name": "metadata",
         "kind": "scalar",
         "type": "json",
-        "default": {},
+        "default": "{}",
         "getter": false,
         "setter": false,
         "array": false,
@@ -130,6 +130,6 @@
     "collection": "status_set"
   },
   "origin": "./src/entities/StatusSet.ts",
-  "hash": "e58d3254ea3a9e0131c20a01e27b65b8",
+  "hash": "ec4d09ff08123fdb0be6907041bfb471",
   "version": "6.4.16"
 }

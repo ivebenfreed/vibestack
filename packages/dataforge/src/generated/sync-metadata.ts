@@ -37,7 +37,7 @@ export interface TableSyncMetadata {
 
 export const syncMetadata: Record<string, TableSyncMetadata> = {
   "Verification": {
-    "tableName": "verifications",
+    "tableName": "verification",
     "className": "Verification",
     "category": "auth",
     "features": {
@@ -68,7 +68,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": false
   },
   "User": {
-    "tableName": "users",
+    "tableName": "user",
     "className": "User",
     "category": "system",
     "features": {
@@ -102,7 +102,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": true
   },
   "Task": {
-    "tableName": "tasks",
+    "tableName": "task",
     "className": "Task",
     "category": "domain",
     "features": {
@@ -345,7 +345,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": true
   },
   "Session": {
-    "tableName": "sessions",
+    "tableName": "session",
     "className": "Session",
     "category": "auth",
     "features": {
@@ -376,7 +376,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": false
   },
   "Project": {
-    "tableName": "projects",
+    "tableName": "project",
     "className": "Project",
     "category": "domain",
     "features": {
@@ -585,7 +585,7 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
     "trackChanges": false
   },
   "Account": {
-    "tableName": "accounts",
+    "tableName": "account",
     "className": "Account",
     "category": "auth",
     "features": {
@@ -715,30 +715,30 @@ export function hasSoftDelete(tableName: string): boolean {
 
 // Type-safe table name lookup
 export type EntityClassName = 'Verification' | 'User' | 'Task' | 'TagSet' | 'Tag' | 'StatusSet' | 'StatusDefinition' | 'Session' | 'Project' | 'LocalChanges' | 'EntityDependency' | 'Comment' | 'ChangeHistory' | 'Account';
-export type TableName = 'verifications' | 'users' | 'tasks' | 'tag_set' | 'tag' | 'status_set' | 'status_definition' | 'sessions' | 'projects' | 'local_changes' | 'entity_dependencies' | 'comments' | 'change_history' | 'accounts';
+export type TableName = 'verification' | 'user' | 'task' | 'tag_set' | 'tag' | 'status_set' | 'status_definition' | 'session' | 'project' | 'local_changes' | 'entity_dependencies' | 'comments' | 'change_history' | 'account';
 
 export const entityClassNames = ["Verification","User","Task","TagSet","Tag","StatusSet","StatusDefinition","Session","Project","LocalChanges","EntityDependency","Comment","ChangeHistory","Account"] as const;
-export const tableNames = ["verifications","users","tasks","tag_set","tag","status_set","status_definition","sessions","projects","local_changes","entity_dependencies","comments","change_history","accounts"] as const;
+export const tableNames = ["verification","user","task","tag_set","tag","status_set","status_definition","session","project","local_changes","entity_dependencies","comments","change_history","account"] as const;
 
 // Export tables for sync - automatically determined by syncable flag
-export const SYNCABLE_ENTITY_TABLES = ["users","tasks","tag_set","tag","status_set","status_definition","projects","comments"] as const;
+export const SYNCABLE_ENTITY_TABLES = ["user","task","tag_set","tag","status_set","status_definition","project","comments"] as const;
 export const JUNCTION_TABLE_NAMES = ["task_tags","project_tag_sets","project_status_sets"] as const;
 export const TRACKED_TABLES = [...SYNCABLE_ENTITY_TABLES, ...JUNCTION_TABLE_NAMES] as const;
 
 // Legacy exports for backward compatibility
-export const DOMAIN_TABLES = ["tasks","tag_set","tag","status_set","status_definition","projects","comments"] as const;
+export const DOMAIN_TABLES = ["task","tag_set","tag","status_set","status_definition","project","comments"] as const;
 
 // Build table hierarchy automatically from metadata
 const tableHierarchy: Record<string, string[]> = {};
 
 // Add all syncable entity tables
-tableHierarchy["users"] = [];
-tableHierarchy["tasks"] = [];
+tableHierarchy["user"] = [];
+tableHierarchy["task"] = [];
 tableHierarchy["tag_set"] = [];
 tableHierarchy["tag"] = [];
 tableHierarchy["status_set"] = [];
 tableHierarchy["status_definition"] = [];
-tableHierarchy["projects"] = [];
+tableHierarchy["project"] = [];
 tableHierarchy["comments"] = [];
 
 // Add junction tables with their dependencies

@@ -69,7 +69,6 @@
     "uniques": [],
     "className": "ChangeHistory",
     "path": "./src/entities/ChangeHistory.ts",
-    "collection": "change_history",
     "comment": "context:server-only | category:system",
     "name": "ChangeHistory",
     "abstract": false,
@@ -77,9 +76,10 @@
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseSystemEntity",
-    "useCache": true
+    "useCache": true,
+    "collection": "change_history"
   },
   "origin": "./src/entities/ChangeHistory.ts",
-  "hash": "41e0197eeb69147306c72ec79b9f0769",
+  "hash": "6dc00928f41cc80495b0e0362cdca19f",
   "version": "6.4.16"
 }

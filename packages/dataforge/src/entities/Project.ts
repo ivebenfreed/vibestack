@@ -13,7 +13,7 @@ export class Project extends BaseDomainEntity {
   @Property({ type: 'text', nullable: true })
   description?: string;
 
-  @Property({ type: 'string', default: 'active', columnType: 'projects_status_enum' })
+  @Property({ type: 'string', default: 'active' })
   status!: string;
 
   @ManyToOne(() => User, { nullable: true, fieldName: 'owner_id' })

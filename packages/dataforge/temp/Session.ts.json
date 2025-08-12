@@ -39,17 +39,17 @@
     "uniques": [],
     "className": "Session",
     "path": "./src/entities/Session.ts",
-    "comment": "context:server-only | category:auth",
     "name": "Session",
+    "comment": "context:server-only | category:auth",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseSystemEntity",
     "useCache": true,
-    "collection": "sessions"
+    "collection": "session"
   },
   "origin": "./src/entities/Session.ts",
-  "hash": "2f1e1027d9d18aa1f2f60d06f077afef",
+  "hash": "a4739428861250a0b705d1779756933b",
   "version": "6.4.16"
 }

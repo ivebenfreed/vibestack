@@ -1,4 +1,4 @@
-import { Property } from '@mikro-orm/core';
+import { Entity, Property } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { ServerOnlyEntity } from '../utils/entity-context.js';
 
@@ -7,7 +7,8 @@ import { ServerOnlyEntity } from '../utils/entity-context.js';
  * Stores tokens for email verification, password reset, etc.
  * Aligned with Better Auth's verification schema
  */
-@ServerOnlyEntity({ tableName: 'verifications' }) // Auth-related entity, server-only
+@ServerOnlyEntity() // Auth-related entity, server-only
+@Entity()
 export class Verification extends BaseSystemEntity {
   @Property({ type: 'text' })
   identifier!: string;
