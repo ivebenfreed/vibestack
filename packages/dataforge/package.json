@@ -76,7 +76,8 @@
     "@mikro-orm/reflection": "^6.4.0",
     "dexie": "^4.0.10",
     "drizzle-orm": "^0.38.0",
-    "postgres": "^3.4.0"
+    "postgres": "^3.4.0",
+    "uuidv7": "^1.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -14,6 +14,7 @@ import replication from './replication'
 import { migrations } from './migrations'
 // import { db } from './db' // TypeORM-based
 import authRouter from './auth'
+import { phase1TestRouter } from './phase1-tests.js'
 
 // Create API router
 const api = new Hono<ApiEnv>()
@@ -45,6 +46,7 @@ api.route('/replication', replication)
 api.route('/migrations', migrations)
 // api.route('/db', db) // TypeORM-based
 api.route('/auth', authRouter)
+api.route('/test', phase1TestRouter)
 
 // Import and mount Kysely-based generic API
 import { genericKysely } from './generic-kysely'

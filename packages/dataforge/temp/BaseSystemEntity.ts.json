@@ -7,7 +7,7 @@
         "kind": "scalar",
         "primary": true,
         "type": "uuid",
-        "defaultRaw": "gen_random_uuid()",
+        "defaultRaw": "generate_uuidv7()",
         "array": false,
         "runtimeType": "string"
       },
@@ -30,6 +30,22 @@
         "setter": false,
         "array": false,
         "runtimeType": "Date"
+      },
+      "createdBy": {
+        "name": "createdBy",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "created_by_id"
+        ],
+        "type": "User",
+        "array": false,
+        "runtimeType": "any",
+        "optional": true
       }
     },
     "primaryKeys": [
@@ -50,6 +66,6 @@
     "simplePK": true
   },
   "origin": "./src/entities/BaseSystemEntity.ts",
-  "hash": "d588e591f21e83afcb371ad82de33a54",
+  "hash": "12266e9c0daf876261a4423a9b5e63b4",
   "version": "6.4.16"
 }

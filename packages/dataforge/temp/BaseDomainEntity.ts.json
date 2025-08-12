@@ -12,6 +12,39 @@
         "array": false,
         "runtimeType": "string",
         "optional": true
+      },
+      "containerType": {
+        "name": "containerType",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "container_type"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "containerId": {
+        "name": "containerId",
+        "kind": "scalar",
+        "type": "uuid",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "container_id"
+        ],
+        "array": false,
+        "runtimeType": "string"
+      },
+      "archetype": {
+        "name": "archetype",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
       }
     },
     "primaryKeys": [],
@@ -29,6 +62,6 @@
     "useCache": true
   },
   "origin": "./src/entities/BaseDomainEntity.ts",
-  "hash": "98b98f13fcd66b53fef7cae8c9d89c37",
+  "hash": "031b00f55e5e6c1e5defcef290a83d8a",
   "version": "6.4.16"
 }
