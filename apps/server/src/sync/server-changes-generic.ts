@@ -1,7 +1,7 @@
 /**
  * Server Changes - Generic Version
  * 
- * Uses GenericSyncAdapter to get server changes instead of TypeORM-based repositories
+ * Uses GenericSyncAdapter with Kysely for database queries instead of TypeORM/Drizzle
  */
 
 import type { 
@@ -26,7 +26,7 @@ const DEFAULT_CHUNK_SIZE = 500;
 
 /**
  * Send live changes to clients using the generic sync adapter
- * This replaces the TypeORM-based implementation with Drizzle-based queries
+ * This replaces the TypeORM-based implementation with Kysely queries
  */
 export async function sendLiveChanges(
   stateManager: SyncStateManager,
@@ -211,15 +211,15 @@ export async function performCatchupSync(
   }, MODULE_NAME);
 
   try {
-    // Use Drizzle with proper schema instead of raw SQL
-    syncLogger.info('Setting up Drizzle client for catchup sync', { clientId });
-    const { drizzle } = await import('drizzle-orm/neon-http');
-    const { neon } = await import('@neondatabase/serverless');
-    const { gt, lte, and, asc } = await import('drizzle-orm');
-    const { change_history } = await import('@repo/dataforge');
+    // Use Kysely for catchup sync queries
+    syncLogger.info('Setting up Kysely client for catchup sync', { clientId });
+    const { Kysely } = await import('kysely');
+    const { NeonHTTPDialectV1 } = await import('kysely-neon');
+    const { Database } = await import('@repo/dataforge/kysely-types');
     
-    const sqlClient = neon(context.env.DATABASE_URL);
-    const db = drizzle(sqlClient);
+    const db = new Kysely<Database>({
+      dialect: new NeonHTTPDialectV1(context.env.DATABASE_URL),
+    });
     
     syncLogger.info('Querying change_history table', {
       clientId,
@@ -227,25 +227,22 @@ export async function performCatchupSync(
       serverLSN: initialServerLSN
     });
     
-    // Query for changes between client LSN and server LSN using Drizzle schema
+    // Query for changes between client LSN and server LSN using Kysely
     syncLogger.info('Executing catchup query', { clientId });
     const changes = await db
-      .select({
-        table: change_history.table_name,
-        operation: change_history.operation,
-        data: change_history.data,
-        lsn: change_history.lsn,
-        timestamp: change_history.created_at
-      })
-      .from(change_history)
-      .where(
-        and(
-          gt(change_history.lsn, clientLSN),
-          lte(change_history.lsn, initialServerLSN)
-        )
-      )
-      .orderBy(asc(change_history.lsn))
-      .limit(5000);
+      .selectFrom('change_history')
+      .select([
+        'table_name as table',
+        'operation',
+        'data',
+        'lsn',
+        'created_at as timestamp'
+      ])
+      .where('lsn', '>', clientLSN)
+      .where('lsn', '<=', initialServerLSN)
+      .orderBy('lsn', 'asc')
+      .limit(5000)
+      .execute();
     
     syncLogger.info('Catchup query completed', {
       clientId,

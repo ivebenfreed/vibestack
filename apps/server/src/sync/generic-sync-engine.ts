@@ -5,9 +5,9 @@
  * without requiring domain-specific code.
  */
 
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
-import { eq, and, or, sql, inArray } from 'drizzle-orm';
+import { Kysely } from 'kysely';
+import { NeonHTTPDialectV1 } from 'kysely-neon';
+import type { Database, TableName } from '@repo/dataforge/kysely-types';
 import type { 
   TableSyncMetadata, 
   JunctionTable,
@@ -26,20 +26,18 @@ export interface LocalChange {
 }
 
 export class GenericSyncEngine {
-  private db: any;
-  private schema: any;
+  private db: Kysely<Database>;
   private syncMetadata: Record<string, TableSyncMetadata>;
   private junctionTables: JunctionTable[];
 
   constructor(
     databaseUrl: string,
-    schema: any,
     syncMetadata: Record<string, TableSyncMetadata>,
     junctionTables: JunctionTable[]
   ) {
-    const client = neon(databaseUrl);
-    this.db = drizzle(client, { schema });
-    this.schema = schema;
+    this.db = new Kysely<Database>({
+      dialect: new NeonHTTPDialectV1(databaseUrl),
+    });
     this.syncMetadata = syncMetadata;
     this.junctionTables = junctionTables;
   }
@@ -81,15 +79,9 @@ export class GenericSyncEngine {
       return;
     }
 
-    const table = this.getTableFromSchema(tableName);
-    if (!table) {
-      console.warn(`No schema found for table: ${tableName}`);
-      return;
-    }
-
     for (const change of changes) {
       try {
-        await this.applyChange(table, metadata, change);
+        await this.applyChange(tableName as TableName, metadata, change);
       } catch (error) {
         console.error(`Error applying change to ${tableName}:`, error);
         // Could implement retry logic or dead letter queue here
@@ -104,32 +96,28 @@ export class GenericSyncEngine {
     junctionTable: JunctionTable,
     changes: LocalChange[]
   ): Promise<void> {
-    // Get junction table from schema - direct lookup
-    const table = this.schema[junctionTable.tableName];
-    if (!table) {
-      console.warn(`No schema found for junction table: ${junctionTable.tableName}`);
-      return;
-    }
+    const tableName = junctionTable.tableName as TableName;
 
     for (const change of changes) {
       try {
         switch (change.operationType) {
           case 'INSERT':
-            await this.db.insert(table).values(change.data);
+            await this.db
+              .insertInto(tableName)
+              .values(change.data)
+              .execute();
             break;
             
           case 'DELETE':
             // For junction tables, we need both keys to delete
-            const conditions = [];
+            let query = this.db.deleteFrom(tableName);
             for (const col of junctionTable.columns) {
               const fieldName = this.toSnakeCase(col.name);
               if (change.data[fieldName]) {
-                conditions.push(eq(table[col.name], change.data[fieldName]));
+                query = query.where(col.name as any, '=', change.data[fieldName]);
               }
             }
-            if (conditions.length > 0) {
-              await this.db.delete(table).where(and(...conditions));
-            }
+            await query.execute();
             break;
             
           // Junction tables typically don't have updates
@@ -146,18 +134,18 @@ export class GenericSyncEngine {
    * Apply a single change to a table
    */
   private async applyChange(
-    table: any,
+    tableName: TableName,
     metadata: TableSyncMetadata,
     change: LocalChange
   ): Promise<void> {
     switch (change.operationType) {
       case 'INSERT':
       case 'UPDATE':
-        await this.upsertRecord(table, metadata, change);
+        await this.upsertRecord(tableName, metadata, change);
         break;
         
       case 'DELETE':
-        await this.deleteRecord(table, metadata, change);
+        await this.deleteRecord(tableName, metadata, change);
         break;
         
       default:
@@ -169,7 +157,7 @@ export class GenericSyncEngine {
    * Upsert a record (insert or update)
    */
   private async upsertRecord(
-    table: any,
+    tableName: TableName,
     metadata: TableSyncMetadata,
     change: LocalChange
   ): Promise<void> {
@@ -177,44 +165,51 @@ export class GenericSyncEngine {
     
     if (metadata.features.hasClientId) {
       // Use client_id for conflict resolution
-      console.log('DEBUG: Table keys:', Object.keys(table));
-      console.log('DEBUG: Looking for column:', metadata.columns.clientId);
-      const clientIdColumn = table[metadata.columns.clientId];
-      console.log('DEBUG: ClientId column:', clientIdColumn);
+      const clientIdField = metadata.columns.clientId as any;
       const existingRecord = await this.db
-        .select()
-        .from(table)
-        .where(eq(clientIdColumn, data[metadata.columns.clientId]))
-        .limit(1);
+        .selectFrom(tableName)
+        .selectAll()
+        .where(clientIdField, '=', data[metadata.columns.clientId])
+        .limit(1)
+        .execute();
 
       if (existingRecord.length > 0) {
         // Update existing record
         await this.db
-          .update(table)
+          .updateTable(tableName)
           .set(data)
-          .where(eq(clientIdColumn, data[metadata.columns.clientId]));
+          .where(clientIdField, '=', data[metadata.columns.clientId])
+          .execute();
       } else {
         // Insert new record
-        await this.db.insert(table).values(data);
+        await this.db
+          .insertInto(tableName)
+          .values(data)
+          .execute();
       }
     } else {
       // Use id for conflict resolution
-      const idColumn = table[metadata.columns.id];
+      const idField = metadata.columns.id as any;
       const existingRecord = await this.db
-        .select()
-        .from(table)
-        .where(eq(idColumn, data[metadata.columns.id]))
-        .limit(1);
+        .selectFrom(tableName)
+        .selectAll()
+        .where(idField, '=', data[metadata.columns.id])
+        .limit(1)
+        .execute();
 
       if (existingRecord.length > 0) {
         // Update existing record
         await this.db
-          .update(table)
+          .updateTable(tableName)
           .set(data)
-          .where(eq(idColumn, data[metadata.columns.id]));
+          .where(idField, '=', data[metadata.columns.id])
+          .execute();
       } else {
         // Insert new record
-        await this.db.insert(table).values(data);
+        await this.db
+          .insertInto(tableName)
+          .values(data)
+          .execute();
       }
     }
   }
@@ -223,7 +218,7 @@ export class GenericSyncEngine {
    * Delete a record (soft or hard delete)
    */
   private async deleteRecord(
-    table: any,
+    tableName: TableName,
     metadata: TableSyncMetadata,
     change: LocalChange
   ): Promise<void> {
@@ -271,29 +266,31 @@ export class GenericSyncEngine {
       updateData[metadata.columns.deleted] = true;
       updateData[metadata.columns.updatedAt] = new Date();
       
-      const idColumn = table[metadata.columns.id];
+      const idField = metadata.columns.id as any;
       
       // Log the exact SQL-equivalent operation
       console.log(`📝 Soft DELETE: UPDATE ${metadata.tableName} SET deleted=true WHERE id='${recordUuid}'`);
       
       await this.db
-        .update(table)
+        .updateTable(tableName)
         .set(updateData)
-        .where(eq(idColumn, recordUuid));
+        .where(idField, '=', recordUuid)
+        .execute();
       
       // Log successful soft delete
       DeleteSafetyCheck.logDelete(metadata.tableName, recordUuid, change.data?.clientId);
       console.log(`✅ Soft DELETE completed for ${metadata.tableName}:${recordUuid}`);
     } else {
       // Hard delete - use the UUID primary key ONLY
-      const idColumn = table[metadata.columns.id];
+      const idField = metadata.columns.id as any;
       
       // Log the exact SQL-equivalent operation  
       console.log(`⚠️ Hard DELETE: DELETE FROM ${metadata.tableName} WHERE id='${recordUuid}'`);
       
       await this.db
-        .delete(table)
-        .where(eq(idColumn, recordUuid));
+        .deleteFrom(tableName)
+        .where(idField, '=', recordUuid)
+        .execute();
       
       // Log successful hard delete
       DeleteSafetyCheck.logDelete(metadata.tableName, recordUuid, change.data?.clientId);
@@ -368,20 +365,21 @@ export class GenericSyncEngine {
     for (const tableName of tablesToSync) {
       console.log('DEBUG: Processing table:', tableName);
       
-      // Get table from schema
-      const table = this.schema[tableName];
-      if (!table) {
-        console.log('DEBUG: Table not found in schema:', tableName);
-        continue;
-      }
-      
-      // For initial sync, get ALL records from each table
-      // LSN-based incremental sync is handled by the replication system
-      const records = await this.db.select().from(table).limit(1000);
-      console.log(`DEBUG: Found ${records.length} records in ${tableName}`);
-      
-      if (records.length > 0) {
-        changes[tableName] = records;
+      try {
+        // For initial sync, get ALL records from each table
+        // LSN-based incremental sync is handled by the replication system
+        const records = await this.db
+          .selectFrom(tableName as TableName)
+          .selectAll()
+          .limit(1000)
+          .execute();
+        console.log(`DEBUG: Found ${records.length} records in ${tableName}`);
+        
+        if (records.length > 0) {
+          changes[tableName] = records;
+        }
+      } catch (error) {
+        console.log(`DEBUG: Error querying table ${tableName}:`, error);
       }
     }
     
@@ -412,15 +410,6 @@ export class GenericSyncEngine {
   }
 
   /**
-   * Get table from schema by table name
-   * Direct 1:1 mapping with database table names
-   */
-  private getTableFromSchema(tableName: string): any {
-    // Direct lookup - the schema keys match the database table names exactly
-    return this.schema[tableName];
-  }
-
-  /**
    * Convert camelCase to snake_case
    */
   private toSnakeCase(str: string): string {
@@ -431,18 +420,20 @@ export class GenericSyncEngine {
    * Update sync metadata after successful sync
    */
   async updateSyncMetadata(clientId: string, syncVersion: string): Promise<void> {
-    const syncMetadataTable = this.schema.sync_metadata;
-    if (!syncMetadataTable) {
-      console.warn('No sync_metadata table in schema');
-      return;
+    try {
+      console.log('DEBUG: Updating sync metadata for client:', clientId, 'with version:', syncVersion);
+      
+      // Try to insert into sync_metadata table if it exists
+      await this.db
+        .insertInto('sync_metadata' as TableName)
+        .values({
+          table_name: 'all', // Could track per-table sync status
+          last_synced_version: syncVersion,
+          last_synced_at: new Date(),
+        } as any)
+        .execute();
+    } catch (error) {
+      console.warn('Could not update sync metadata (table may not exist):', error);
     }
-    
-    console.log('DEBUG: Updating sync metadata for client:', clientId, 'with version:', syncVersion);
-    
-    await this.db.insert(syncMetadataTable).values({
-      table_name: 'all', // Could track per-table sync status
-      last_synced_version: syncVersion,
-      last_synced_at: new Date()
-    });
   }
 }

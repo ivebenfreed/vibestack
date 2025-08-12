@@ -2,12 +2,11 @@
  * Generic Sync Adapter
  * 
  * Adapts the GenericSyncEngine to work with the existing sync infrastructure
- * Replaces TypeORM-based EntityOperations with generic Drizzle-based operations
+ * Uses Kysely-based operations for database access
  */
 
 import { GenericSyncEngine, type LocalChange } from './generic-sync-engine.js';
 import { 
-  schema,
   syncMetadata, 
   junctionTables,
   TRACKED_TABLES,
@@ -54,10 +53,8 @@ export class GenericSyncAdapter {
   ) {
     console.log('DEBUG: GenericSyncAdapter constructor called');
     console.log('DEBUG: Database URL provided:', !!databaseUrl);
-    console.log('DEBUG: Schema keys:', Object.keys(schema).slice(0, 5));
     this.syncEngine = new GenericSyncEngine(
       databaseUrl,
-      schema,
       syncMetadata,
       junctionTables
     );
