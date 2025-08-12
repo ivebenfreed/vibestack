@@ -13,6 +13,7 @@ export interface User {
   emailVerified: any;
   image?: any;
   isSuperAdmin: any;
+  role: any;
   accounts: any;
   sessions: any;
   assignedTasks: any;

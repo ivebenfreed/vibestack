@@ -52,8 +52,8 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "clientId": null,
       "version": null,
       "deleted": null,
-      "createdAt": "created_at",
-      "updatedAt": "updated_at"
+      "createdAt": "createdAt",
+      "updatedAt": "updatedAt"
     },
     "updateableColumns": [
       "updatedAt",
@@ -83,8 +83,8 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "clientId": null,
       "version": null,
       "deleted": null,
-      "createdAt": "created_at",
-      "updatedAt": "updated_at"
+      "createdAt": "createdAt",
+      "updatedAt": "updatedAt"
     },
     "updateableColumns": [
       "updatedAt",
@@ -92,7 +92,8 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "email",
       "emailVerified",
       "image",
-      "isSuperAdmin"
+      "isSuperAdmin",
+      "role"
     ],
     "foreignKeys": [],
     "indexes": [],
@@ -359,8 +360,8 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "clientId": null,
       "version": null,
       "deleted": null,
-      "createdAt": "created_at",
-      "updatedAt": "updated_at"
+      "createdAt": "createdAt",
+      "updatedAt": "updatedAt"
     },
     "updateableColumns": [
       "updatedAt",
@@ -601,8 +602,8 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "clientId": null,
       "version": null,
       "deleted": null,
-      "createdAt": "created_at",
-      "updatedAt": "updated_at"
+      "createdAt": "createdAt",
+      "updatedAt": "updatedAt"
     },
     "updateableColumns": [
       "updatedAt",
@@ -612,13 +613,12 @@ export const syncMetadata: Record<string, TableSyncMetadata> = {
       "password",
       "refreshToken",
       "accessToken",
-      "expiresAt",
+      "accessTokenExpiresAt",
+      "refreshTokenExpiresAt",
       "tokenType",
       "scope",
       "idToken",
-      "sessionState",
-      "accessTokenExpiresAt",
-      "refreshTokenExpiresAt"
+      "sessionState"
     ],
     "foreignKeys": [],
     "indexes": [],

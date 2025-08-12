@@ -9,22 +9,23 @@ import type { ColumnType, Generated, Selectable, Insertable, Updateable } from '
 
 export interface VerificationTable {
   id: Generated<string>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  createdAt: Generated<Date>;
+  updatedAt: Generated<Date>;
   identifier: string;
   value: string;
-  expires_at: string;
+  expiresAt: Date;
 }
 
 export interface UserTable {
   id: Generated<string>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
+  createdAt: Generated<Date>;
+  updatedAt: Generated<Date>;
   name: string;
   email: string | null;
   email_verified: ColumnType<boolean, boolean | undefined, boolean>;
   image: string | null;
   is_super_admin: ColumnType<boolean, boolean | undefined, boolean>;
+  role: ColumnType<string, string | undefined, string>;
 }
 
 export interface TaskTable {
@@ -119,13 +120,13 @@ export interface StatusDefinitionTable {
 
 export interface SessionTable {
   id: Generated<string>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-  user_id: string | null;
-  session_token: string;
-  expires_at: Date;
-  ip_address: string | null;
-  user_agent: string | null;
+  createdAt: Generated<Date>;
+  updatedAt: Generated<Date>;
+  userId: string | null;
+  token: string;
+  expiresAt: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
 }
 
 export interface ProjectTable {
@@ -174,21 +175,20 @@ export interface ChangeHistoryTable {
 
 export interface AccountTable {
   id: Generated<string>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-  user_id: string | null;
-  provider_id: string;
-  provider_account_id: string;
+  createdAt: Generated<Date>;
+  updatedAt: Generated<Date>;
+  userId: string | null;
+  providerId: string;
+  accountId: string;
   password: string | null;
-  refresh_token: string | null;
-  access_token: string | null;
-  expires_at: string | null;
-  token_type: string | null;
+  refreshToken: string | null;
+  accessToken: string | null;
+  accessTokenExpiresAt: Date | null;
+  refreshTokenExpiresAt: Date | null;
+  tokenType: string | null;
   scope: string | null;
-  id_token: string | null;
-  session_state: string | null;
-  access_token_expires_at: Date | null;
-  refresh_token_expires_at: Date | null;
+  idToken: string | null;
+  sessionState: string | null;
 }
 
 export interface tasktagsTable {

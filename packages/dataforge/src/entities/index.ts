@@ -1,5 +1,6 @@
 export * from './BaseSystemEntity.js';
 export * from './BaseDomainEntity.js';
+export * from './BaseAuthEntity.js';
 export * from './Account.js';
 export * from './User.js';
 export * from './Session.js';

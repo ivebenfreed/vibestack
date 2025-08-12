@@ -1,23 +1,23 @@
 import { Entity, Property, ManyToOne } from '@mikro-orm/core';
-import { BaseSystemEntity } from './BaseSystemEntity.js';
+import { BaseAuthEntity } from './BaseAuthEntity.js';
 import { User } from './User.js';
 import { ServerOnlyEntity } from '../utils/entity-context.js';
 
 @ServerOnlyEntity() // Auth-related entity, server-only
 @Entity()
-export class Session extends BaseSystemEntity {
-  @ManyToOne(() => User)
+export class Session extends BaseAuthEntity {
+  @ManyToOne(() => User, { fieldName: 'userId' })
   user!: User;
 
-  @Property({ type: 'string', fieldName: 'session_token' })
+  @Property({ type: 'string' })
   token!: string;
 
-  @Property({ type: 'timestamptz', fieldName: 'expires_at' })
+  @Property({ type: 'timestamptz', fieldName: 'expiresAt' })
   expiresAt!: Date;
   
-  @Property({ type: 'string', nullable: true })
+  @Property({ type: 'string', nullable: true, fieldName: 'ipAddress' })
   ipAddress?: string;
   
-  @Property({ type: 'string', nullable: true })
+  @Property({ type: 'string', nullable: true, fieldName: 'userAgent' })
   userAgent?: string;
 }

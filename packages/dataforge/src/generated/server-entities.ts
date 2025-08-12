@@ -22,6 +22,7 @@ export interface User {
   emailVerified: any;
   image?: any;
   isSuperAdmin: any;
+  role: any;
   accounts: any;
   sessions: any;
   assignedTasks: any;
@@ -210,13 +211,12 @@ export interface Account {
   password?: any;
   refreshToken?: any;
   accessToken?: any;
-  expiresAt?: any;
+  accessTokenExpiresAt?: any;
+  refreshTokenExpiresAt?: any;
   tokenType?: any;
   scope?: any;
   idToken?: any;
   sessionState?: any;
-  accessTokenExpiresAt?: any;
-  refreshTokenExpiresAt?: any;
 }
 
 // ============================================
