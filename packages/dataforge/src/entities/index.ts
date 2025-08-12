@@ -15,3 +15,9 @@ export * from './StatusDefinition.js';
 export * from './StatusSet.js';
 export * from './Verification.js';
 export * from './ChangeHistory.js';
+
+// Phase 1: Multi-Tenant Infrastructure
+export * from './Organization.js';
+export * from './OrganizationMember.js';
+export * from './DatabaseInstance.js';
+export * from './ContainerPermission.js';
