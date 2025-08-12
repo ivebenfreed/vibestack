@@ -14,10 +14,10 @@ export class Task extends BaseDomainEntity {
   @Property({ type: 'text', nullable: true })
   description?: string;
 
-  @Property({ type: 'string', nullable: true, columnType: 'tasks_legacy_status_enum', fieldName: 'legacy_status' })
+  @Property({ type: 'string', nullable: true, fieldName: 'legacy_status' })
   legacyStatus?: string;
 
-  @Property({ type: 'string', default: 'medium', columnType: 'tasks_priority_enum' })
+  @Property({ type: 'string', default: 'medium' })
   priority!: string;
 
   @Property({ type: 'date', nullable: true, fieldName: 'due_date' })

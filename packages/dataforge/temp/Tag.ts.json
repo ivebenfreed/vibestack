@@ -101,7 +101,7 @@
         "name": "metadata",
         "kind": "scalar",
         "type": "json",
-        "default": {},
+        "default": "{}",
         "getter": false,
         "setter": false,
         "array": false,
@@ -190,6 +190,6 @@
     "collection": "tag"
   },
   "origin": "./src/entities/Tag.ts",
-  "hash": "932e126c7b745f78432a8e2c0f872364",
+  "hash": "788cc870f1fed154fb5511e49859df42",
   "version": "6.4.16"
 }

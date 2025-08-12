@@ -32,9 +32,6 @@
         "fieldNames": [
           "legacy_status"
         ],
-        "columnTypes": [
-          "tasks_legacy_status_enum"
-        ],
         "array": false,
         "runtimeType": "string",
         "optional": true
@@ -46,9 +43,6 @@
         "default": "medium",
         "getter": false,
         "setter": false,
-        "columnTypes": [
-          "tasks_priority_enum"
-        ],
         "array": false,
         "runtimeType": "string"
       },
@@ -220,9 +214,9 @@
     "toJsonParams": [],
     "extends": "BaseDomainEntity",
     "useCache": true,
-    "collection": "tasks"
+    "collection": "task"
   },
   "origin": "./src/entities/Task.ts",
-  "hash": "e782cf912ce938f5d7c046779cff0e2c",
+  "hash": "1024c848310ec034a18d61d1d9302dd5",
   "version": "6.4.16"
 }

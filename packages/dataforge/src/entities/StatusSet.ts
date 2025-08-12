@@ -24,10 +24,10 @@ export class StatusSet extends BaseDomainEntity {
   @Property({ type: 'boolean', default: false })
   isSystem!: boolean;
 
-  @Property({ type: 'json', default: {} })
+  @Property({ type: 'json', default: '{}' })
   workflow!: Record<string, any>;
 
-  @Property({ type: 'json', default: {} })
+  @Property({ type: 'json', default: '{}' })
   metadata!: Record<string, any>;
 
   @OneToMany(() => StatusDefinition, 'statusSet')

@@ -1,10 +1,11 @@
-import { Property, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { ServerOnlyEntity } from '../utils/entity-context.js';
 import { User } from './User.js';
 import { Session } from './Session.js';
 
 @ServerOnlyEntity() // Auth-related entity, server-only
+@Entity()
 export class Account extends BaseSystemEntity {
   @Property({ type: 'string' })
   providerId!: string;

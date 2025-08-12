@@ -33,7 +33,7 @@ export class TagSet extends BaseDomainEntity {
   @Property({ type: 'integer', nullable: true })
   maxTags?: number;
 
-  @Property({ type: 'json', default: {} })
+  @Property({ type: 'json', default: '{}' })
   metadata!: Record<string, any>;
 
   @OneToMany(() => Tag, 'tagSet')

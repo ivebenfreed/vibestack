@@ -206,19 +206,19 @@ export interface projectstatussetsTable {
 // ============================================
 
 export interface Database {
-  verifications: VerificationTable;
-  users: UserTable;
-  tasks: TaskTable;
+  verification: VerificationTable;
+  user: UserTable;
+  task: TaskTable;
   tag_set: TagSetTable;
   tag: TagTable;
   status_set: StatusSetTable;
   status_definition: StatusDefinitionTable;
-  sessions: SessionTable;
-  projects: ProjectTable;
+  session: SessionTable;
+  project: ProjectTable;
   entity_dependencies: EntityDependencyTable;
   comments: CommentTable;
   change_history: ChangeHistoryTable;
-  accounts: AccountTable;
+  account: AccountTable;
   task_tags: tasktagsTable;
   project_tag_sets: projecttagsetsTable;
   project_status_sets: projectstatussetsTable;
@@ -297,19 +297,19 @@ export type project_status_setsUpdate = Updateable<projectstatussetsTable>;
 // ============================================
 
 export const tableNames = {
-  Verification: 'verifications' as const,
-  User: 'users' as const,
-  Task: 'tasks' as const,
+  Verification: 'verification' as const,
+  User: 'user' as const,
+  Task: 'task' as const,
   TagSet: 'tag_set' as const,
   Tag: 'tag' as const,
   StatusSet: 'status_set' as const,
   StatusDefinition: 'status_definition' as const,
-  Session: 'sessions' as const,
-  Project: 'projects' as const,
+  Session: 'session' as const,
+  Project: 'project' as const,
   EntityDependency: 'entity_dependencies' as const,
   Comment: 'comments' as const,
   ChangeHistory: 'change_history' as const,
-  Account: 'accounts' as const,
+  Account: 'account' as const,
   task_tags: 'task_tags' as const,
   project_tag_sets: 'project_tag_sets' as const,
   project_status_sets: 'project_status_sets' as const,

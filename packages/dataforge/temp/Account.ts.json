@@ -127,17 +127,17 @@
     "uniques": [],
     "className": "Account",
     "path": "./src/entities/Account.ts",
-    "comment": "context:server-only | category:auth",
     "name": "Account",
+    "comment": "context:server-only | category:auth",
     "abstract": false,
     "internal": true,
     "constructorParams": [],
     "toJsonParams": [],
     "extends": "BaseSystemEntity",
     "useCache": true,
-    "collection": "accounts"
+    "collection": "account"
   },
   "origin": "./src/entities/Account.ts",
-  "hash": "205ba9b31dde66503be08952d3c969c2",
+  "hash": "bd86b7a440ff3bfdb59e240c17a34a7c",
   "version": "6.4.16"
 }

@@ -1,9 +1,10 @@
-import { Property, ManyToOne } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne } from '@mikro-orm/core';
 import { BaseSystemEntity } from './BaseSystemEntity.js';
 import { Account } from './Account.js';
 import { ServerOnlyEntity } from '../utils/entity-context.js';
 
 @ServerOnlyEntity() // Auth-related entity, server-only
+@Entity()
 export class Session extends BaseSystemEntity {
   @Property({ type: 'string' })
   sessionToken!: string;

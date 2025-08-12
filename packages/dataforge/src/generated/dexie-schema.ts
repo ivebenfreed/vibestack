@@ -3,32 +3,32 @@ import Dexie, { type Table } from 'dexie';
 import type * as Entities from './client-entities.js';
 
 export interface DexieSchema extends Dexie {
-  users: Table<Entities.User>;
+  user: Table<Entities.User>;
   task_tags: Table<Entities.task_tags>;
-  tasks: Table<Entities.Task>;
+  task: Table<Entities.Task>;
   tag_set: Table<Entities.TagSet>;
   tag: Table<Entities.Tag>;
   status_set: Table<Entities.StatusSet>;
   status_definition: Table<Entities.StatusDefinition>;
   project_tag_sets: Table<Entities.project_tag_sets>;
   project_status_sets: Table<Entities.project_status_sets>;
-  projects: Table<Entities.Project>;
+  project: Table<Entities.Project>;
   local_changes: Table<Entities.LocalChanges>;
   entity_dependencies: Table<Entities.EntityDependency>;
   comments: Table<Entities.Comment>;
 }
 
 class VibeStackDatabase extends Dexie implements DexieSchema {
-  users!: Table<Entities.User>;
+  user!: Table<Entities.User>;
   task_tags!: Table<Entities.task_tags>;
-  tasks!: Table<Entities.Task>;
+  task!: Table<Entities.Task>;
   tag_set!: Table<Entities.TagSet>;
   tag!: Table<Entities.Tag>;
   status_set!: Table<Entities.StatusSet>;
   status_definition!: Table<Entities.StatusDefinition>;
   project_tag_sets!: Table<Entities.project_tag_sets>;
   project_status_sets!: Table<Entities.project_status_sets>;
-  projects!: Table<Entities.Project>;
+  project!: Table<Entities.Project>;
   local_changes!: Table<Entities.LocalChanges>;
   entity_dependencies!: Table<Entities.EntityDependency>;
   comments!: Table<Entities.Comment>;
@@ -89,18 +89,18 @@ class VibeStackDatabase extends Dexie implements DexieSchema {
       comments: '++id, clientId, version, deleted, createdAt, updatedAt',
     });
 
-    // Version 5 - Generated at 2025-08-12T02:13:58.848Z
+    // Version 5 - Generated at 2025-08-12T00:51:09.923Z
     this.version(5).stores({
-      users: '++id, &email',
+      user: '++id, &email',
       task_tags: '++Task_owner',
-      tasks: '++id, clientId, version, deleted, createdAt, updatedAt',
+      task: '++id, clientId, version, deleted, createdAt, updatedAt',
       tag_set: '++id, [displayOrder], clientId, version, deleted, createdAt, updatedAt',
       tag: '++id, &slug, [tagSet+sortOrder], [slug], clientId, version, deleted, createdAt, updatedAt',
       status_set: '++id, [entityType], clientId, version, deleted, createdAt, updatedAt',
       status_definition: '++id, [name], [statusSet+sortOrder], clientId, version, deleted, createdAt, updatedAt',
       project_tag_sets: '++Project_owner',
       project_status_sets: '++Project_owner',
-      projects: '++id, clientId, version, deleted, createdAt, updatedAt',
+      project: '++id, clientId, version, deleted, createdAt, updatedAt',
       local_changes: '++id, table, processed_sync, [table+recordId], processedSync',
       entity_dependencies: '++id, [toTable+toId], [fromTable+fromId]',
       comments: '++id, clientId, version, deleted, createdAt, updatedAt',
@@ -114,16 +114,16 @@ export const db = new VibeStackDatabase();
 // Helper function to clear all data
 export async function clearDatabase() {
   const tables = [
-    'users',
+    'user',
     'task_tags',
-    'tasks',
+    'task',
     'tag_set',
     'tag',
     'status_set',
     'status_definition',
     'project_tag_sets',
     'project_status_sets',
-    'projects',
+    'project',
     'local_changes',
     'entity_dependencies',
     'comments',
@@ -141,16 +141,16 @@ export function getTable(tableName: string): Table<any> | undefined {
 
 // Export table names for reference
 export const dexieTableNames = [
-  'users',
+  'user',
   'task_tags',
-  'tasks',
+  'task',
   'tag_set',
   'tag',
   'status_set',
   'status_definition',
   'project_tag_sets',
   'project_status_sets',
-  'projects',
+  'project',
   'local_changes',
   'entity_dependencies',
   'comments',
@@ -167,16 +167,16 @@ export {
 
 // Dynamically generated table lists based on actual metadata
 export const ENTITY_TABLES = [
-  'users',
+  'user',
   'task_tags',
-  'tasks',
+  'task',
   'tag_set',
   'tag',
   'status_set',
   'status_definition',
   'project_tag_sets',
   'project_status_sets',
-  'projects',
+  'project',
   'local_changes',
   'entity_dependencies',
   'comments'
@@ -189,16 +189,16 @@ export const SYSTEM_TABLES = [
 
 // Domain tables (non-system entity tables)
 export const DOMAIN_TABLES = [
-  'users',
+  'user',
   'task_tags',
-  'tasks',
+  'task',
   'tag_set',
   'tag',
   'status_set',
   'status_definition',
   'project_tag_sets',
   'project_status_sets',
-  'projects',
+  'project',
   'entity_dependencies',
   'comments'
 ] as const;
@@ -210,16 +210,16 @@ export const JUNCTION_TABLES = [
 
 // Mapping from Dexie table names to database table names
 export const DEXIE_TO_DB_TABLE_MAP = {
-  users: 'users',
+  user: 'user',
   task_tags: 'task_tags',
-  tasks: 'tasks',
+  task: 'task',
   tag_set: 'tag_set',
   tag: 'tag',
   status_set: 'status_set',
   status_definition: 'status_definition',
   project_tag_sets: 'project_tag_sets',
   project_status_sets: 'project_status_sets',
-  projects: 'projects',
+  project: 'project',
   local_changes: 'local_changes',
   entity_dependencies: 'entity_dependencies',
   comments: 'comments'

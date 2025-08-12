@@ -29,9 +29,6 @@
         "default": "active",
         "getter": false,
         "setter": false,
-        "columnTypes": [
-          "projects_status_enum"
-        ],
         "array": false,
         "runtimeType": "string"
       },
@@ -117,9 +114,9 @@
     "toJsonParams": [],
     "extends": "BaseDomainEntity",
     "useCache": true,
-    "collection": "projects"
+    "collection": "project"
   },
   "origin": "./src/entities/Project.ts",
-  "hash": "ead492634b88020cc48ec79865aba7d6",
+  "hash": "f6e48d3e70685e6e9ef6941816f249fa",
   "version": "6.4.16"
 }

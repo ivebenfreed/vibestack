@@ -132,6 +132,51 @@ apiApp.get('/db/health', async (c) => {
   }
 });
 
+// Kysely database debug endpoint
+apiApp.get('/db/kysely-test', async (c) => {
+  try {
+    const { Kysely } = await import('kysely');
+    const { NeonHTTPDialectV1 } = await import('./lib/kysely-neon-v1-adapter');
+    
+    const url = c.env.DATABASE_URL;
+    if (!url) {
+      return c.json({
+        success: false,
+        error: 'DATABASE_URL not set'
+      }, 503);
+    }
+    
+    // Create Kysely instance
+    const db = new Kysely<any>({
+      dialect: new NeonHTTPDialectV1({ connectionString: url })
+    });
+    
+    // Test query - list tables
+    const result = await db
+      .selectFrom('user')
+      .select(['id', 'email', 'name'])
+      .limit(5)
+      .execute();
+    
+    return c.json({
+      success: true,
+      data: {
+        message: 'Kysely connection successful',
+        databaseUrl: url.substring(0, 50) + '...',
+        userCount: result.length,
+        users: result
+      }
+    });
+  } catch (error) {
+    console.error('Kysely test error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500);
+  }
+});
+
 // Mount Drizzle test router BEFORE auth middleware (unprotected for testing)
 // Drizzle test route removed - using generic API instead
 

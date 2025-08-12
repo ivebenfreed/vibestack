@@ -35,20 +35,20 @@ export class TaskDexieService {
       clientId: crypto.randomUUID(),
     } as Task;
     
-    await db.tasks.add(record);
+    await db.task.add(record);
     return id;
   }
 
   async findById(id: string): Promise<Task | undefined> {
-    return await db.tasks.get(id);
+    return await db.task.get(id);
   }
 
   async findAll(): Promise<Task[]> {
-    return await db.tasks.where('deleted').equals(0).toArray();
+    return await db.task.where('deleted').equals(0).toArray();
   }
 
   async update(id: string, updates: TaskUpdateInput): Promise<void> {
-    await db.tasks.update(id, {
+    await db.task.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
@@ -56,14 +56,14 @@ export class TaskDexieService {
 
   async delete(id: string): Promise<void> {
     // Soft delete for domain entities
-    await db.tasks.update(id, {
+    await db.task.update(id, {
       deleted: true,
       updatedAt: new Date(),
     });
   }
 
   async deleteAll(): Promise<void> {
-    await db.tasks.clear();
+    await db.task.clear();
   }
 }
 

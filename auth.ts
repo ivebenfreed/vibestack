@@ -28,12 +28,12 @@ export const auth = betterAuth({
   secret: requiredEnvVars.BETTER_AUTH_SECRET as string,
   baseUrl: requiredEnvVars.BETTER_AUTH_URL as string,
   emailAndPassword: { enabled: true },
-  // Configure table names and fields
+  // Use singular table names to match Better Auth defaults and our schema
   user: {
-    modelName: "users",
+    modelName: "user",
     fields: {
       id: "id",
-      name: "name",
+      name: "name", 
       email: "email",
       emailVerified: "email_verified",
       image: "image",
@@ -42,7 +42,7 @@ export const auth = betterAuth({
     }
   },
   session: {
-    modelName: "sessions",
+    modelName: "session",
     fields: {
       id: "id",
       userId: "user_id",
@@ -55,7 +55,7 @@ export const auth = betterAuth({
     }
   },
   account: {
-    modelName: "accounts",
+    modelName: "account",
     fields: {
       id: "id",
       userId: "user_id",
@@ -73,7 +73,7 @@ export const auth = betterAuth({
     }
   },
   verification: {
-    modelName: "verifications",
+    modelName: "verification",
     fields: {
       id: "id",
       identifier: "identifier",

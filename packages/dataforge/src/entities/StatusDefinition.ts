@@ -40,7 +40,7 @@ export class StatusDefinition extends BaseDomainEntity {
   @Property({ type: 'integer', nullable: true })
   autoTransitionDays?: number;
 
-  @Property({ type: 'json', default: {} })
+  @Property({ type: 'json', default: '{}' })
   metadata!: Record<string, any>;
 
   @ManyToOne(() => StatusSet, { fieldName: 'status_set_id' })

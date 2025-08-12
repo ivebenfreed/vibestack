@@ -26,31 +26,31 @@ export class UserDexieService {
       updatedAt: now,
     } as User;
     
-    await db.users.add(record);
+    await db.user.add(record);
     return id;
   }
 
   async findById(id: string): Promise<User | undefined> {
-    return await db.users.get(id);
+    return await db.user.get(id);
   }
 
   async findAll(): Promise<User[]> {
-    return await db.users.toArray();
+    return await db.user.toArray();
   }
 
   async update(id: string, updates: UserUpdateInput): Promise<void> {
-    await db.users.update(id, {
+    await db.user.update(id, {
       ...updates,
       updatedAt: new Date(),
     });
   }
 
   async delete(id: string): Promise<void> {
-    await db.users.delete(id);
+    await db.user.delete(id);
   }
 
   async deleteAll(): Promise<void> {
-    await db.users.clear();
+    await db.user.clear();
   }
 }
 

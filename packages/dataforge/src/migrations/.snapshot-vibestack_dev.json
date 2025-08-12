@@ -128,11 +128,11 @@
           "mappedType": "string"
         }
       },
-      "name": "accounts",
+      "name": "account",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "accounts_pkey",
+          "keyName": "account_pkey",
           "columnNames": [
             "id"
           ],
@@ -664,11 +664,11 @@
           "mappedType": "uuid"
         }
       },
-      "name": "sessions",
+      "name": "session",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "sessions_pkey",
+          "keyName": "session_pkey",
           "columnNames": [
             "id"
           ],
@@ -680,16 +680,16 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "sessions_account_id_foreign": {
-          "constraintName": "sessions_account_id_foreign",
+        "session_account_id_foreign": {
+          "constraintName": "session_account_id_foreign",
           "columnNames": [
             "account_id"
           ],
-          "localTableName": "public.sessions",
+          "localTableName": "public.session",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.accounts",
+          "referencedTableName": "public.account",
           "updateRule": "cascade"
         }
       },
@@ -805,7 +805,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "default": "[object Object]",
+          "default": "'{}'",
           "mappedType": "json"
         },
         "metadata": {
@@ -815,7 +815,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "default": "[object Object]",
+          "default": "'{}'",
           "mappedType": "json"
         }
       },
@@ -1004,7 +1004,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "default": "[object Object]",
+          "default": "'{}'",
           "mappedType": "json"
         },
         "status_set_id": {
@@ -1208,7 +1208,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "default": "[object Object]",
+          "default": "'{}'",
           "mappedType": "json"
         }
       },
@@ -1381,7 +1381,7 @@
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "default": "[object Object]",
+          "default": "'{}'",
           "mappedType": "json"
         },
         "tag_set_id": {
@@ -1572,7 +1572,7 @@
           "mappedType": "uuid"
         }
       },
-      "name": "users",
+      "name": "user",
       "schema": "public",
       "indexes": [
         {
@@ -1580,13 +1580,13 @@
             "email"
           ],
           "composite": false,
-          "keyName": "users_email_unique",
+          "keyName": "user_email_unique",
           "constraint": true,
           "primary": false,
           "unique": true
         },
         {
-          "keyName": "users_pkey",
+          "keyName": "user_pkey",
           "columnNames": [
             "id"
           ],
@@ -1598,16 +1598,16 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "users_account_id_foreign": {
-          "constraintName": "users_account_id_foreign",
+        "user_account_id_foreign": {
+          "constraintName": "user_account_id_foreign",
           "columnNames": [
             "account_id"
           ],
-          "localTableName": "public.users",
+          "localTableName": "public.user",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.accounts",
+          "referencedTableName": "public.account",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1678,13 +1678,14 @@
         },
         "status": {
           "name": "status",
-          "type": "projects_status_enum",
+          "type": "varchar(255)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
+          "length": 255,
           "default": "'active'",
-          "mappedType": "unknown"
+          "mappedType": "string"
         },
         "owner_id": {
           "name": "owner_id",
@@ -1696,11 +1697,11 @@
           "mappedType": "uuid"
         }
       },
-      "name": "projects",
+      "name": "project",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "projects_pkey",
+          "keyName": "project_pkey",
           "columnNames": [
             "id"
           ],
@@ -1712,16 +1713,16 @@
       ],
       "checks": [],
       "foreignKeys": {
-        "projects_owner_id_foreign": {
-          "constraintName": "projects_owner_id_foreign",
+        "project_owner_id_foreign": {
+          "constraintName": "project_owner_id_foreign",
           "columnNames": [
             "owner_id"
           ],
-          "localTableName": "public.projects",
+          "localTableName": "public.project",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.users",
+          "referencedTableName": "public.user",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1792,22 +1793,24 @@
         },
         "legacy_status": {
           "name": "legacy_status",
-          "type": "tasks_legacy_status_enum",
+          "type": "varchar(255)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": true,
-          "mappedType": "unknown"
+          "length": 255,
+          "mappedType": "string"
         },
         "priority": {
           "name": "priority",
-          "type": "tasks_priority_enum",
+          "type": "varchar(255)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
+          "length": 255,
           "default": "'medium'",
-          "mappedType": "unknown"
+          "mappedType": "string"
         },
         "due_date": {
           "name": "due_date",
@@ -1886,11 +1889,11 @@
           "mappedType": "uuid"
         }
       },
-      "name": "tasks",
+      "name": "task",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "tasks_pkey",
+          "keyName": "task_pkey",
           "columnNames": [
             "id"
           ],
@@ -1902,35 +1905,35 @@
       ],
       "checks": [
         {
-          "name": "tasks_check",
+          "name": "task_check",
           "expression": "start_date IS NULL OR due_date IS NULL OR start_date <= due_date",
           "definition": "check ((start_date IS NULL OR due_date IS NULL OR start_date <= due_date))"
         }
       ],
       "foreignKeys": {
-        "tasks_project_id_foreign": {
-          "constraintName": "tasks_project_id_foreign",
+        "task_project_id_foreign": {
+          "constraintName": "task_project_id_foreign",
           "columnNames": [
             "project_id"
           ],
-          "localTableName": "public.tasks",
+          "localTableName": "public.task",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.projects",
+          "referencedTableName": "public.project",
           "deleteRule": "set null",
           "updateRule": "cascade"
         },
-        "tasks_assignee_id_foreign": {
-          "constraintName": "tasks_assignee_id_foreign",
+        "task_assignee_id_foreign": {
+          "constraintName": "task_assignee_id_foreign",
           "columnNames": [
             "assignee_id"
           ],
-          "localTableName": "public.tasks",
+          "localTableName": "public.task",
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.users",
+          "referencedTableName": "public.user",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -1984,7 +1987,7 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.tasks",
+          "referencedTableName": "public.task",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
@@ -2051,7 +2054,7 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.projects",
+          "referencedTableName": "public.project",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
@@ -2118,7 +2121,7 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.projects",
+          "referencedTableName": "public.project",
           "deleteRule": "cascade",
           "updateRule": "cascade"
         },
@@ -2234,7 +2237,7 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.tasks",
+          "referencedTableName": "public.task",
           "updateRule": "cascade"
         },
         "comments_author_id_foreign": {
@@ -2246,7 +2249,7 @@
           "referencedColumnNames": [
             "id"
           ],
-          "referencedTableName": "public.users",
+          "referencedTableName": "public.user",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }
@@ -2316,11 +2319,11 @@
           "mappedType": "date"
         }
       },
-      "name": "verifications",
+      "name": "verification",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "verifications_pkey",
+          "keyName": "verification_pkey",
           "columnNames": [
             "id"
           ],
