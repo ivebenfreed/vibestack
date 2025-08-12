@@ -38,6 +38,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use `&` or `nohup` for background processes (use tmux instead)
 - Kill processes with `pkill` (use `./scripts/bg-stop.sh`)
 
+## CRITICAL: Neon Proxy Requirements
+
+**⚠️ IMPORTANT**: The local Neon HTTP proxy requires a special system table to function properly. If you ever drop/recreate the database, you MUST recreate this table:
+
+```sql
+-- Required by the local Neon proxy (ghcr.io/timowilhelm/local-neon-http-proxy)
+CREATE SCHEMA IF NOT EXISTS neon_control_plane;
+CREATE TABLE neon_control_plane.endpoints (
+    endpoint_id VARCHAR(255) PRIMARY KEY,
+    allowed_ips VARCHAR(255)
+);
+```
+
+Without this table, all Kysely/Neon connections will fail with "Console request failed" errors.
+
 ## Database Synchronization
 
 ### Initialize Local Database from Remote
