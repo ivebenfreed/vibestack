@@ -1,0 +1,231 @@
+{
+  "data": {
+    "_id": 59000,
+    "properties": {
+      "threadType": {
+        "name": "threadType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "thread_type"
+        ],
+        "array": false,
+        "runtimeType": "\"chat\" | \"conversation\" | \"support_ticket\" | \"collaboration\" | \"notification\" | \"broadcast\"",
+        "optional": true
+      },
+      "channelId": {
+        "name": "channelId",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "channel_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "messageCount": {
+        "name": "messageCount",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "message_count"
+        ],
+        "array": false,
+        "runtimeType": "number"
+      },
+      "starterMessageId": {
+        "name": "starterMessageId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "starter_message_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "lastMessageId": {
+        "name": "lastMessageId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_message_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "lastReadAt": {
+        "name": "lastReadAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_read_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "threadSettings": {
+        "name": "threadSettings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "thread_settings"
+        ],
+        "array": false,
+        "runtimeType": "{ allowReplies?: boolean; allowReactions?: boolean; allowFileSharing?: boolean; allowForwarding?: boolean; allowEditing?: boolean; allowDeletion?: boolean; messageRetention?: number; maxMessageLength?: number; slowMode?: boolean; slowModeDelay?: number; requireApproval?: boolean; allowBots?: boolean; allowExternalLinks?: boolean; }",
+        "optional": true
+      },
+      "messages": {
+        "name": "messages",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ id: string; authorId: string; content: string; messageType: \"text\" | \"image\" | \"file\" | \"video\" | \"audio\" | \"link\" | \"system\" | \"bot\"; timestamp: Date; editedAt?: Date; deletedAt?: Date; replyToMessageId?: string; forwardedFrom?: { threadId: string; messageId: string; originalAuthor: string; }; attachments?: { id: string; filename: string; size: number; mimeType: string; url: string; thumbnailUrl?: string; }>; mentions?: Array<{ userId: string; displayName: string; type: \"user\" | \"everyone\" | \"here\" | \"role\"; }>; reactions?: Array<{ emoji: string; users: Array<{ userId: string; timestamp: Date; }>; count: number; }>; readBy?: Array<{ userId: string; readAt: Date; }>; deliveryStatus?: \"sent\" | \"delivered\" | \"read\" | \"failed\"; priority?: \"low\" | \"normal\" | \"high\" | \"urgent\"; metadata?: Record<string, any; }",
+        "optional": true
+      },
+      "readStates": {
+        "name": "readStates",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "read_states"
+        ],
+        "array": true,
+        "runtimeType": "{ userId: string; lastReadMessageId: string; lastReadAt: Date; unreadCount: number; mentionCount: number; }[]",
+        "optional": true
+      },
+      "typingIndicators": {
+        "name": "typingIndicators",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "typing_indicators"
+        ],
+        "array": true,
+        "runtimeType": "{ userId: string; startedAt: Date; expiresAt: Date; }[]",
+        "optional": true
+      },
+      "messageSearch": {
+        "name": "messageSearch",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "message_search"
+        ],
+        "array": true,
+        "runtimeType": "{ indexedMessages: number; lastIndexed: Date; searchableContent: string; popularTerms: { term: string; frequency: number; }; }[]",
+        "optional": true
+      },
+      "threadAnalytics": {
+        "name": "threadAnalytics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "thread_analytics"
+        ],
+        "array": true,
+        "runtimeType": "{ messageFrequency: Record<string, number>; activeTimeframes: { start: Date; end: Date; messageCount: number; participantCount: number; }>; responsePatterns: { averageResponseTime: number; quickResponses: number; mediumResponses: number; slowResponses: number; }; participantEngagement: Array<{ userId: string; messageCount: number; reactionCount: number; mentionCount: number; lastActive: Date; engagementScore: number; }>; contentAnalysis: { avgMessageLength: number; mediaShareCount: number; linkShareCount: number; questionCount: number; exclamationCount: number; sentimentTrend: Array<{ date: Date; sentiment: \"positive\" | \"neutral\" | \"negative\"; confidence: number; }; }; }",
+        "optional": true
+      },
+      "automationRules": {
+        "name": "automationRules",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "automation_rules"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; name: string; trigger: \"message_received\" | \"user_joined\" | \"keyword_detected\" | \"time_based\" | \"reaction_added\"; conditions: { field: string; operator: \"equals\" | \"contains\" | \"starts_with\" | \"regex\" | \"greater_than\"; value: any; }>; actions: Array<{ type: \"send_message\" | \"add_reaction\" | \"notify_moderator\" | \"archive_thread\" | \"forward_message\"; parameters: Record<string, any>; }; enabled: boolean; createdBy: string; createdAt: Date; lastTriggered?: Date; triggerCount: number; }",
+        "optional": true
+      },
+      "integrationData": {
+        "name": "integrationData",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "integration_data"
+        ],
+        "array": false,
+        "runtimeType": "{ slack?: { channelId: string; teamId: string; synced: boolean; lastSync: Date; webhook?: string; }; teams?: { channelId: string; teamId: string; synced: boolean; webhook?: string; }; discord?: { channelId: string; guildId: string; synced: boolean; webhook?: string; }; email?: { threadId: string; subject: string; participants: string[]; lastEmailSync: Date; }; jira?: { issueKey: string; projectKey: string; linked: boolean; autoUpdate: boolean; }; }",
+        "optional": true
+      },
+      "securitySettings": {
+        "name": "securitySettings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "security_settings"
+        ],
+        "array": true,
+        "runtimeType": "{ encryptionEnabled: boolean; endToEndEncryption: boolean; messageRetentionPolicy: \"forever\" | \"days\" | \"months\" | \"years\"; retentionPeriod?: number; autoDeleteEnabled: boolean; allowScreenshots: boolean; allowCopyPaste: boolean; watermarkMessages: boolean; auditLogEnabled: boolean; complianceMode: boolean; dlpRules?: { pattern: string; action: \"warn\" | \"block\" | \"redact\"; description: string; }; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Thread",
+    "path": "./src/entities/discussions/Thread.ts",
+    "collection": "thread",
+    "name": "Thread",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "DiscussionArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/discussions/Thread.ts",
+  "hash": "34a9e3e46225cbe39534fe5e92580878",
+  "version": "6.4.16"
+}

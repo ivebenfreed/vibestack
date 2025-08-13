@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { organization } from "better-auth/plugins";
 import { Pool } from 'pg';
 import { config } from "dotenv";
 import { resolve } from "path";
@@ -28,7 +29,44 @@ export const auth = betterAuth({
   secret: requiredEnvVars.BETTER_AUTH_SECRET as string,
   baseUrl: requiredEnvVars.BETTER_AUTH_URL as string,
   emailAndPassword: { enabled: true },
-  // Use singular table names to match Better Auth defaults and our schema
+  advanced: {
+    database: {
+      generateId: false  // Let database generate UUIDs instead of Better Auth text IDs
+    }
+  },
+  plugins: [
+    // Better Auth organization plugin for multi-tenant user management
+    organization({
+      // Allow users to create organizations (can be restricted based on plan)
+      allowUserToCreateOrganization: async (user) => {
+        // For now, allow all users to create organizations
+        // In the future, can restrict based on subscription plan
+        return true;
+      },
+      // Custom invitation email handling
+      sendInvitationEmail: async (data) => {
+        // For development, log invitation details
+        // In production, integrate with email service
+        console.log('📧 Organization invitation:', {
+          email: data.email,
+          organizationName: data.organization.name,
+          inviterName: data.inviter.user.name,
+          inviterEmail: data.inviter.user.email,
+          invitationId: data.id
+        });
+        
+        // TODO: Replace with actual email service integration
+        // const inviteLink = `${process.env.BETTER_AUTH_URL}/accept-invitation/${data.id}`;
+        // await sendEmail({
+        //   to: data.email,
+        //   subject: `You're invited to join ${data.organization.name}`,
+        //   template: 'organization-invitation',
+        //   data: { inviteLink, organizationName: data.organization.name }
+        // });
+      }
+    })
+  ],
+  // Use singular table names with consistent snake_case field mapping
   user: {
     modelName: "user",
     fields: {

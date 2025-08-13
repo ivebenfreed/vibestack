@@ -74,6 +74,7 @@
     "@mikro-orm/migrations": "^6.4.0",
     "@mikro-orm/postgresql": "^6.4.0",
     "@mikro-orm/reflection": "^6.4.0",
+    "@mikro-orm/sqlite": "^6.4.16",
     "dexie": "^4.0.10",
     "drizzle-orm": "^0.38.0",
     "postgres": "^3.4.0",

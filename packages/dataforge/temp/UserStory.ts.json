@@ -1,0 +1,212 @@
+{
+  "data": {
+    "_id": 38000,
+    "properties": {
+      "acceptanceCriteria": {
+        "name": "acceptanceCriteria",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "acceptance_criteria"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "storyPoints": {
+        "name": "storyPoints",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "story_points"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "epicId": {
+        "name": "epicId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "epic_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "userPersona": {
+        "name": "userPersona",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "user_persona"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "userGoal": {
+        "name": "userGoal",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "user_goal"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "businessValue": {
+        "name": "businessValue",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "business_value"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "testCases": {
+        "name": "testCases",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ scenario: string; given: string; when: string; then: string; status?: \"pending\" | \"passed\" | \"failed\"; }",
+        "optional": true
+      },
+      "sprintId": {
+        "name": "sprintId",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "sprint_id"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "dependencies": {
+        "name": "dependencies",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ storyId: string; type: \"blocks\" | \"depends_on\" | \"relates_to\"; description?: string; }",
+        "optional": true
+      },
+      "definitionOfDone": {
+        "name": "definitionOfDone",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "definition_of_done"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "storyType": {
+        "name": "storyType",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "story_type"
+        ],
+        "type": "\"feature\" | \"bug_fix\" | \"enhancement\" | \"technical_debt\" | \"spike\"",
+        "array": false,
+        "runtimeType": "\"feature\" | \"bug_fix\" | \"enhancement\" | \"technical_debt\" | \"spike\"",
+        "optional": true
+      },
+      "wireframes": {
+        "name": "wireframes",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ name: string; url: string; type: \"mockup\" | \"wireframe\" | \"prototype\"; }",
+        "optional": true
+      },
+      "apiRequirements": {
+        "name": "apiRequirements",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "api_requirements"
+        ],
+        "array": true,
+        "runtimeType": "{ endpoint: string; method: \"GET\" | \"POST\" | \"PUT\" | \"DELETE\" | \"PATCH\"; description: string; requestSchema?: any; responseSchema?: any; }",
+        "optional": true
+      },
+      "uiComponents": {
+        "name": "uiComponents",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "ui_components"
+        ],
+        "type": "string[]",
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "UserStory",
+    "path": "./src/entities/tasks/UserStory.ts",
+    "collection": "user_story",
+    "name": "UserStory",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "TaskArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/tasks/UserStory.ts",
+  "hash": "3fb9d890d4499a61b6f01cfaf4f80501",
+  "version": "6.4.16"
+}

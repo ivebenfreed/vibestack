@@ -1,0 +1,402 @@
+{
+  "data": {
+    "_id": 53000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "description": {
+        "name": "description",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "activityType": {
+        "name": "activityType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "activity_type"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "status": {
+        "name": "status",
+        "kind": "scalar",
+        "type": "string",
+        "default": "pending",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "priority": {
+        "name": "priority",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "\"low\" | \"medium\" | \"high\" | \"urgent\"",
+        "optional": true
+      },
+      "assignedTo": {
+        "name": "assignedTo",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "assigned_to"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "initiatedBy": {
+        "name": "initiatedBy",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "initiated_by"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "scheduledAt": {
+        "name": "scheduledAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "scheduled_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "startedAt": {
+        "name": "startedAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "started_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "completedAt": {
+        "name": "completedAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "completed_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "dueDate": {
+        "name": "dueDate",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "due_date"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "estimatedDuration": {
+        "name": "estimatedDuration",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "estimated_duration"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "actualDuration": {
+        "name": "actualDuration",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "actual_duration"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "parentActivity": {
+        "name": "parentActivity",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "parent_activity_id"
+        ],
+        "type": "ActivityArchetype",
+        "array": false,
+        "runtimeType": "ActivityArchetype",
+        "optional": true
+      },
+      "metadata": {
+        "name": "metadata",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>",
+        "optional": true
+      },
+      "tags": {
+        "name": "tags",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "executionContext": {
+        "name": "executionContext",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "execution_context"
+        ],
+        "array": false,
+        "runtimeType": "{ environment?: \"development\" | \"staging\" | \"production\" | \"testing\"; platform?: string; version?: string; branch?: string; commit?: string; triggeredBy?: string; automated?: boolean; }",
+        "optional": true
+      },
+      "dependencies": {
+        "name": "dependencies",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "dependencies"
+        ],
+        "array": true,
+        "runtimeType": "{ activityId: string; activityName: string; dependencyType: \"blocks\" | \"triggers\" | \"requires\" | \"follows\"; status: \"satisfied\" | \"pending\" | \"failed\"; description?: string; }",
+        "optional": true
+      },
+      "successCriteria": {
+        "name": "successCriteria",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "success_criteria"
+        ],
+        "array": true,
+        "runtimeType": "{ criterion: string; type: \"manual\" | \"automated\" | \"metric\"; threshold?: number; unit?: string; status: \"pending\" | \"passed\" | \"failed\"; actualValue?: number; checkedAt?: Date; checkedBy?: string; notes?: string; }",
+        "optional": true
+      },
+      "executionSteps": {
+        "name": "executionSteps",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "execution_steps"
+        ],
+        "array": true,
+        "runtimeType": "{ stepNumber: number; name: string; description?: string; status: \"pending\" | \"running\" | \"completed\" | \"failed\" | \"skipped\"; startedAt?: Date; completedAt?: Date; duration?: number; output?: string; errorMessage?: string; automated?: boolean; executedBy?: string; }",
+        "optional": true
+      },
+      "approvalWorkflow": {
+        "name": "approvalWorkflow",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "approval_workflow"
+        ],
+        "array": true,
+        "runtimeType": "{ required: boolean; approvers: { userId: string; role: string; status: \"pending\" | \"approved\" | \"rejected\"; timestamp?: Date; notes?: string; }; requiredApprovals?: number; currentApprovals?: number; }",
+        "optional": true
+      },
+      "riskAssessment": {
+        "name": "riskAssessment",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "risk_assessment"
+        ],
+        "array": true,
+        "runtimeType": "{ overallRisk: \"low\" | \"medium\" | \"high\" | \"critical\"; riskFactors: { factor: string; impact: \"low\" | \"medium\" | \"high\"; likelihood: \"low\" | \"medium\" | \"high\"; mitigation?: string; status: \"identified\" | \"mitigated\" | \"accepted\"; }; mitigationPlan?: string; rollbackPlan?: string; assessedBy?: string; assessedAt?: Date; }",
+        "optional": true
+      },
+      "performanceMetrics": {
+        "name": "performanceMetrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "performance_metrics"
+        ],
+        "array": false,
+        "runtimeType": "{ throughput?: number; latency?: number; errorRate?: number; successRate?: number; resourceUsage?: { cpu?: number; memory?: number; disk?: number; network?: number; }; customMetrics?: Record<string, number>; collectedAt?: Date; }",
+        "optional": true
+      },
+      "notifications": {
+        "name": "notifications",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "notifications"
+        ],
+        "array": true,
+        "runtimeType": "{ recipient: string; method: \"email\" | \"slack\" | \"webhook\" | \"sms\"; trigger: \"start\" | \"complete\" | \"fail\" | \"approve\" | \"schedule\"; template?: string; sent: boolean; sentAt?: Date; response?: string; }",
+        "optional": true
+      },
+      "relatedEntities": {
+        "name": "relatedEntities",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "related_entities"
+        ],
+        "array": true,
+        "runtimeType": "{ entityType: string; entityId: string; relationship: \"processes\" | \"affects\" | \"depends_on\" | \"triggers\" | \"validates\"; description?: string; }",
+        "optional": true
+      },
+      "auditTrail": {
+        "name": "auditTrail",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "audit_trail"
+        ],
+        "array": true,
+        "runtimeType": "{ timestamp: Date; userId: string; action: string; details: string; previousValue?: any; newValue?: any; ipAddress?: string; userAgent?: string; }[]",
+        "optional": true
+      },
+      "retryConfig": {
+        "name": "retryConfig",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "retry_config"
+        ],
+        "array": false,
+        "runtimeType": "{ maxRetries: number; currentRetries: number; retryDelay: number; exponentialBackoff: boolean; retryConditions: string[]; lastRetryAt?: Date; nextRetryAt?: Date; }",
+        "optional": true
+      },
+      "archetype": {
+        "name": "archetype",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      },
+      "containerType": {
+        "name": "containerType",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "ActivityArchetype",
+    "path": "./src/entities/archetypes/ActivityArchetype.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/archetypes/ActivityArchetype.ts",
+  "hash": "00ea383ce12c0c395309883c66fa7b3a",
+  "version": "6.4.16"
+}

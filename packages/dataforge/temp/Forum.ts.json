@@ -1,0 +1,227 @@
+{
+  "data": {
+    "_id": 58000,
+    "properties": {
+      "forumCategory": {
+        "name": "forumCategory",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "forum_category"
+        ],
+        "array": false,
+        "runtimeType": "\"general\" | \"technical\" | \"support\" | \"announcements\" | \"feedback\" | \"off_topic\" | \"showcase\" | \"qa\"",
+        "optional": true
+      },
+      "topicType": {
+        "name": "topicType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "topic_type"
+        ],
+        "array": false,
+        "runtimeType": "\"question\" | \"tutorial\" | \"showcase\" | \"discussion\" | \"poll\" | \"announcement\" | \"help_request\"",
+        "optional": true
+      },
+      "postCount": {
+        "name": "postCount",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "post_count"
+        ],
+        "array": false,
+        "runtimeType": "number"
+      },
+      "viewCount": {
+        "name": "viewCount",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "view_count"
+        ],
+        "array": false,
+        "runtimeType": "number"
+      },
+      "lastPosterId": {
+        "name": "lastPosterId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_poster_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "lastPostAt": {
+        "name": "lastPostAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_post_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "forumSettings": {
+        "name": "forumSettings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "forum_settings"
+        ],
+        "array": false,
+        "runtimeType": "{ allowPolls?: boolean; allowAttachments?: boolean; requireModeration?: boolean; allowAnonymousPosts?: boolean; allowGuestViewing?: boolean; enableVoting?: boolean; enableBestAnswer?: boolean; autoCloseAfterDays?: number; maxPostsPerUser?: number; slowModeSeconds?: number; }",
+        "optional": true
+      },
+      "posts": {
+        "name": "posts",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ id: string; authorId: string; content: string; postNumber: number; createdAt: Date; editedAt?: Date; editedBy?: string; deletedAt?: Date; deletedBy?: string; parentPostId?: string; reactions?: { type: string; userId: string; timestamp: Date; }>; attachments?: Array<{ fileId: string; filename: string; size: number; mimeType: string; }; mentions?: string[]; quoted?: boolean; quotedPostId?: string; moderationStatus?: \"approved\" | \"pending\" | \"rejected\" | \"flagged\"; }",
+        "optional": true
+      },
+      "polls": {
+        "name": "polls",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ id: string; question: string; options: { id: string; text: string; votes: number; voters: string[]; }; allowMultipleChoice: boolean; allowAddOptions: boolean; anonymous: boolean; endDate?: Date; createdBy: string; createdAt: Date; totalVotes: number; }[]",
+        "optional": true
+      },
+      "bestAnswer": {
+        "name": "bestAnswer",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "best_answer"
+        ],
+        "array": false,
+        "runtimeType": "{ postId: string; authorId: string; markedBy: string; markedAt: Date; votes: number; }",
+        "optional": true
+      },
+      "topicLabels": {
+        "name": "topicLabels",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "topic_labels"
+        ],
+        "array": true,
+        "runtimeType": "{ label: string; color: string; category: \"status\" | \"priority\" | \"type\" | \"custom\"; addedBy: string; addedAt: Date; }",
+        "optional": true
+      },
+      "subscriptionInfo": {
+        "name": "subscriptionInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "subscription_info"
+        ],
+        "array": true,
+        "runtimeType": "{ subscribers: { userId: string; subscribedAt: Date; notificationLevel: \"all\" | \"mentions_only\" | \"first_post_only\" | \"none\"; }; totalSubscribers: number; emailDigestEnabled: boolean; digestFrequency: \"immediate\" | \"hourly\" | \"daily\" | \"weekly\"; }",
+        "optional": true
+      },
+      "moderationQueue": {
+        "name": "moderationQueue",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "moderation_queue"
+        ],
+        "array": true,
+        "runtimeType": "{ postId: string; reason: \"spam\" | \"inappropriate\" | \"off_topic\" | \"violation\" | \"reported\"; reportedBy?: string; reportedAt: Date; status: \"pending\" | \"approved\" | \"rejected\"; moderatedBy?: string; moderatedAt?: Date; notes?: string; }",
+        "optional": true
+      },
+      "analytics": {
+        "name": "analytics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "analytics"
+        ],
+        "array": true,
+        "runtimeType": "{ dailyViews: Record<string, number>; dailyPosts: Record<string, number>; popularPosts: { postId: string; views: number; reactions: number; replies: number; score: number; }>; activeUsers: Array<{ userId: string; postCount: number; lastActive: Date; reputation: number; }>; peakHours: Record<string, number; averageResponseTime: number; resolutionRate: number; }[]",
+        "optional": true
+      },
+      "seoOptimization": {
+        "name": "seoOptimization",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "seo_optimization"
+        ],
+        "array": false,
+        "runtimeType": "{ slug: string; metaTitle: string; metaDescription: string; canonicalUrl?: string; ogImage?: string; structuredData: boolean; searchRanking: number; indexedBySearch: boolean; lastCrawled?: Date; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Forum",
+    "path": "./src/entities/discussions/Forum.ts",
+    "collection": "forum",
+    "name": "Forum",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "DiscussionArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/discussions/Forum.ts",
+  "hash": "132050b493dec7043545619b23d6b051",
+  "version": "6.4.16"
+}

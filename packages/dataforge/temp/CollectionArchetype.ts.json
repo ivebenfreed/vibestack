@@ -1,0 +1,321 @@
+{
+  "data": {
+    "_id": 61000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "description": {
+        "name": "description",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "collectionType": {
+        "name": "collectionType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "collection_type"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "status": {
+        "name": "status",
+        "kind": "scalar",
+        "type": "string",
+        "default": "active",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "visibility": {
+        "name": "visibility",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "\"public\" | \"private\" | \"restricted\" | \"internal\"",
+        "optional": true
+      },
+      "ownerId": {
+        "name": "ownerId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "owner_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "curatorId": {
+        "name": "curatorId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "curator_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "itemCount": {
+        "name": "itemCount",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "item_count"
+        ],
+        "array": false,
+        "runtimeType": "number"
+      },
+      "itemLimit": {
+        "name": "itemLimit",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "item_limit"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "lastUpdated": {
+        "name": "lastUpdated",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_updated"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "parentCollection": {
+        "name": "parentCollection",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "parent_collection_id"
+        ],
+        "type": "CollectionArchetype",
+        "array": false,
+        "runtimeType": "CollectionArchetype",
+        "optional": true
+      },
+      "metadata": {
+        "name": "metadata",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>",
+        "optional": true
+      },
+      "tags": {
+        "name": "tags",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "collectionItems": {
+        "name": "collectionItems",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "collection_items"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; entityType: string; entityId: string; itemType?: string; addedAt: Date; addedBy: string; position?: number; weight?: number; metadata?: Record<string, any>; relationships?: { relatedItemId: string; relationship: \"depends_on\" | \"related_to\" | \"part_of\" | \"similar_to\" | \"conflicts_with\"; strength: number; }>; customFields?: Record<string, any; status?: \"active\" | \"inactive\" | \"pending\" | \"archived\"; }",
+        "optional": true
+      },
+      "collectionRules": {
+        "name": "collectionRules",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "collection_rules"
+        ],
+        "array": true,
+        "runtimeType": "{ autoAddRules?: { id: string; name: string; enabled: boolean; conditions: Array<{ field: string; operator: \"equals\" | \"contains\" | \"starts_with\" | \"greater_than\" | \"less_than\" | \"in\" | \"not_in\"; value: any; entityType?: string; }>; actions: Array<{ type: \"add_item\" | \"set_metadata\" | \"assign_position\" | \"notify\" | \"trigger_workflow\"; parameters: Record<string, any>; }>; createdBy: string; createdAt: Date; lastTriggered?: Date; triggerCount: number; }>; sortRules?: { defaultSort: \"added_date\" | \"name\" | \"priority\" | \"position\" | \"weight\" | \"custom\"; direction: \"asc\" | \"desc\"; customSortField?: string; groupBy?: string; secondarySort?: string; }; validationRules?: Array<{ rule: \"max_items\" | \"unique_items\" | \"required_fields\" | \"allowed_types\" | \"custom\"; parameters: Record<string, any>; errorMessage: string; }>; accessRules?: Array<{ action: \"view\" | \"add\" | \"remove\" | \"modify\" | \"curate\"; userIds?: string[]; roles?: string[]; conditions?: Array<{ field: string; operator: string; value: any; }>; }; }",
+        "optional": true
+      },
+      "aggregationData": {
+        "name": "aggregationData",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "aggregation_data"
+        ],
+        "array": false,
+        "runtimeType": "{ itemsByType: Record<string, number>; itemsByStatus: Record<string, number>; totalSize?: number; averageScore?: number; completionRate?: number; lastAggregated: Date; trends: { daily: Record<string, number>; weekly: Record<string, number>; monthly: Record<string, number>; }; performance: { viewCount: number; downloadCount: number; shareCount: number; collaboratorCount: number; activityScore: number; }; }",
+        "optional": true
+      },
+      "crossArchetypeAnalysis": {
+        "name": "crossArchetypeAnalysis",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "cross_archetype_analysis"
+        ],
+        "array": true,
+        "runtimeType": "{ archetypeDistribution: Record<string, number>; relationshipMap: { fromItem: string; toItem: string; fromType: string; toType: string; relationship: string; strength: number; }>; clusterAnalysis: Array<{ clusterId: string; items: string[]; commonAttributes: Record<string, any>; clusterScore: number; clusterType: \"functional\" | \"temporal\" | \"user_based\" | \"content_based\"; }>; dependencies: Array<{ itemId: string; dependsOn: string[]; dependents: string[]; criticalityScore: number; }>; gaps: Array<{ description: string; missingArchetype: string; suggestedItems: string[]; priority: \"low\" | \"medium\" | \"high\"; }; }",
+        "optional": true
+      },
+      "collaborationSettings": {
+        "name": "collaborationSettings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "collaboration_settings"
+        ],
+        "array": true,
+        "runtimeType": "{ allowCollaborators: boolean; maxCollaborators?: number; collaboratorRoles: { role: \"viewer\" | \"contributor\" | \"editor\" | \"curator\" | \"admin\"; permissions: string[]; userIds: string[]; }; sharingSettings: { allowPublicSharing: boolean; allowLinkSharing: boolean; allowEmbedding: boolean; requireAuthentication: boolean; expirationDate?: Date; }; workflowSettings: { requireApproval: boolean; approvers?: string[]; notificationChannels: string[]; versionControl: boolean; changeTracking: boolean; }; }",
+        "optional": true
+      },
+      "synchronization": {
+        "name": "synchronization",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "synchronization"
+        ],
+        "array": true,
+        "runtimeType": "{ syncEnabled: boolean; syncSources: { sourceId: string; sourceType: \"database\" | \"api\" | \"file\" | \"webhook\" | \"schedule\"; sourceUrl?: string; syncFrequency: \"realtime\" | \"hourly\" | \"daily\" | \"weekly\" | \"manual\"; lastSync?: Date; nextSync?: Date; syncStatus: \"active\" | \"paused\" | \"error\" | \"completed\"; errorCount: number; lastError?: string; mapping: Record<string, string>; }>; conflictResolution: { strategy: \"source_wins\" | \"target_wins\" | \"merge\" | \"manual\"; conflictLog: Array<{ timestamp: Date; conflictType: string; resolution: string; resolvedBy: string; }; }; }",
+        "optional": true
+      },
+      "exportOptions": {
+        "name": "exportOptions",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "export_options"
+        ],
+        "array": true,
+        "runtimeType": "{ availableFormats: string[]; exportHistory: { exportId: string; format: string; exportedBy: string; exportedAt: Date; itemCount: number; fileSize?: number; downloadCount: number; expiresAt?: Date; }>; scheduledExports: Array<{ scheduleId: string; format: string; frequency: \"daily\" | \"weekly\" | \"monthly\"; recipients: string[]; filters?: Record<string, any>; lastExport?: Date; nextExport: Date; active: boolean; }; }",
+        "optional": true
+      },
+      "analyticsDashboard": {
+        "name": "analyticsDashboard",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "analytics_dashboard"
+        ],
+        "array": true,
+        "runtimeType": "{ widgets: { widgetId: string; type: \"chart\" | \"metric\" | \"list\" | \"table\" | \"gauge\" | \"map\"; title: string; position: { x: number; y: number; width: number; height: number; }; configuration: Record<string, any>; dataSource: string; refreshInterval: number; lastRefresh?: Date; }>; layout: \"grid\" | \"flow\" | \"tabs\" | \"accordion\"; permissions: Record<string, string[]>; customMetrics: Array<{ metricId: string; name: string; formula: string; unit?: string; description?: string; }; }",
+        "optional": true
+      },
+      "aiInsights": {
+        "name": "aiInsights",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "ai_insights"
+        ],
+        "array": true,
+        "runtimeType": "{ enabled: boolean; lastAnalysis?: Date; insights: { type: \"pattern\" | \"anomaly\" | \"recommendation\" | \"prediction\" | \"optimization\"; title: string; description: string; confidence: number; impact: \"low\" | \"medium\" | \"high\"; actionable: boolean; suggestedActions?: string[]; relevantItems?: string[]; metadata?: Record<string, any>; generatedAt: Date; }; modelConfig: { enabledModels: string[]; analysisFrequency: \"realtime\" | \"hourly\" | \"daily\" | \"weekly\"; confidenceThreshold: number; maxInsights: number; }; trainingData: { useCollectionData: boolean; includeUserBehavior: boolean; includeExternalData: boolean; lastTraining?: Date; dataPoints: number; }; }",
+        "optional": true
+      },
+      "containerType": {
+        "name": "containerType",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "CollectionArchetype",
+    "path": "./src/entities/archetypes/CollectionArchetype.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/archetypes/CollectionArchetype.ts",
+  "hash": "f70ed6f63359791a26fa5403e8000a67",
+  "version": "6.4.16"
+}

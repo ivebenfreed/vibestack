@@ -1,0 +1,229 @@
+{
+  "data": {
+    "_id": 42000,
+    "properties": {
+      "meetingDate": {
+        "name": "meetingDate",
+        "kind": "scalar",
+        "type": "date",
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "meeting_date"
+        ],
+        "array": false,
+        "runtimeType": "Date"
+      },
+      "durationMinutes": {
+        "name": "durationMinutes",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "duration_minutes"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "location": {
+        "name": "location",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "meetingType": {
+        "name": "meetingType",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "meeting_type"
+        ],
+        "type": "\"client\" | \"team\" | \"standup\" | \"retrospective\" | \"planning\" | \"review\" | \"one_on_one\" | \"board\"",
+        "array": false,
+        "runtimeType": "\"client\" | \"team\" | \"standup\" | \"retrospective\" | \"planning\" | \"review\" | \"one_on_one\" | \"board\"",
+        "optional": true
+      },
+      "attendees": {
+        "name": "attendees",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ userId: string; name: string; role?: string; status: \"present\" | \"absent\" | \"late\" | \"left_early\"; joinTime?: Date; leaveTime?: Date; }",
+        "optional": true
+      },
+      "agenda": {
+        "name": "agenda",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ item: string; duration?: number; owner?: string; status?: \"not_started\" | \"in_progress\" | \"completed\" | \"deferred\"; notes?: string; }",
+        "optional": true
+      },
+      "actionItems": {
+        "name": "actionItems",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "action_items"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; description: string; assignee: string; dueDate?: Date; priority?: \"low\" | \"medium\" | \"high\" | \"critical\"; status: \"open\" | \"in_progress\" | \"completed\" | \"cancelled\"; createdAt: Date; completedAt?: Date; notes?: string; }",
+        "optional": true
+      },
+      "decisions": {
+        "name": "decisions",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ description: string; rationale?: string; alternatives?: string[]; decisionMaker: string; impact?: \"low\" | \"medium\" | \"high\"; followUpRequired?: boolean; }",
+        "optional": true
+      },
+      "issues": {
+        "name": "issues",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ description: string; severity?: \"low\" | \"medium\" | \"high\" | \"critical\"; owner?: string; resolution?: string; status: \"open\" | \"in_progress\" | \"resolved\" | \"escalated\"; }",
+        "optional": true
+      },
+      "nextSteps": {
+        "name": "nextSteps",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "next_steps"
+        ],
+        "array": true,
+        "runtimeType": "{ description: string; owner?: string; timeline?: string; }[]",
+        "optional": true
+      },
+      "meetingLead": {
+        "name": "meetingLead",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "meeting_lead"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "noteTaker": {
+        "name": "noteTaker",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "note_taker"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "recurringMeeting": {
+        "name": "recurringMeeting",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "recurring_meeting"
+        ],
+        "array": false,
+        "runtimeType": "{ isRecurring: boolean; frequency?: \"daily\" | \"weekly\" | \"biweekly\" | \"monthly\" | \"quarterly\"; seriesId?: string; previousMeetingId?: string; nextMeetingId?: string; }",
+        "optional": true
+      },
+      "attachments": {
+        "name": "attachments",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ name: string; type: \"document\" | \"presentation\" | \"spreadsheet\" | \"image\" | \"other\"; url: string; description?: string; }",
+        "optional": true
+      },
+      "keyTakeaways": {
+        "name": "keyTakeaways",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "key_takeaways"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "parkingLot": {
+        "name": "parkingLot",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "parking_lot"
+        ],
+        "array": true,
+        "runtimeType": "{ item: string; addedBy: string; priority?: \"low\" | \"medium\" | \"high\"; followUpNeeded?: boolean; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "MeetingNotes",
+    "path": "./src/entities/records/MeetingNotes.ts",
+    "collection": "meeting_notes",
+    "name": "MeetingNotes",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "RecordArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/records/MeetingNotes.ts",
+  "hash": "cd2b76991bce3bb5d1229c6c50a910a6",
+  "version": "6.4.16"
+}

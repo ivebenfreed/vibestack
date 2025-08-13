@@ -6,34 +6,28 @@
         "name": "id",
         "kind": "scalar",
         "primary": true,
-        "type": "text",
-        "defaultRaw": "gen_random_uuid()::text",
+        "type": "uuid",
+        "defaultRaw": "generate_uuidv7()",
         "array": false,
         "runtimeType": "string"
       },
-      "createdAt": {
-        "name": "createdAt",
+      "created_at": {
+        "name": "created_at",
         "kind": "scalar",
         "type": "timestamptz",
         "defaultRaw": "now()",
         "getter": false,
         "setter": false,
-        "fieldNames": [
-          "createdAt"
-        ],
         "array": false,
         "runtimeType": "Date"
       },
-      "updatedAt": {
-        "name": "updatedAt",
+      "updated_at": {
+        "name": "updated_at",
         "kind": "scalar",
         "type": "timestamptz",
         "defaultRaw": "now()",
         "getter": false,
         "setter": false,
-        "fieldNames": [
-          "updatedAt"
-        ],
         "array": false,
         "runtimeType": "Date"
       }
@@ -56,6 +50,6 @@
     "simplePK": true
   },
   "origin": "./src/entities/BaseAuthEntity.ts",
-  "hash": "f985f12eb46ec01b3de1da0f83da9282",
+  "hash": "5caf4fe7f3d300ff78f4020b7fff3aa0",
   "version": "6.4.16"
 }

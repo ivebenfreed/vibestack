@@ -1,0 +1,154 @@
+{
+  "data": {
+    "_id": 35000,
+    "properties": {
+      "targetAudience": {
+        "name": "targetAudience",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "target_audience"
+        ],
+        "array": false,
+        "runtimeType": "{ demographics?: { ageRange?: string; gender?: string; income?: string; location?: string[]; }; interests?: string[]; behaviors?: string[]; segments?: string[]; }",
+        "optional": true
+      },
+      "channels": {
+        "name": "channels",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "{ digital?: string[]; traditional?: string[]; owned?: string[]; earned?: string[]; }",
+        "optional": true
+      },
+      "conversionGoals": {
+        "name": "conversionGoals",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "conversion_goals"
+        ],
+        "array": true,
+        "runtimeType": "{ primary?: { type: \"leads\" | \"sales\" | \"awareness\" | \"engagement\" | \"traffic\"; target: number; current?: number; }; secondary?: { type: \"leads\" | \"sales\" | \"awareness\" | \"engagement\" | \"traffic\"; target: number; current?: number; }; }",
+        "optional": true
+      },
+      "metrics": {
+        "name": "metrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "{ impressions?: number; clicks?: number; conversions?: number; cost?: number; revenue?: number; roas?: number; cpa?: number; ctr?: number; lastUpdated?: Date; }",
+        "optional": true
+      },
+      "campaignType": {
+        "name": "campaignType",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "campaign_type"
+        ],
+        "type": "\"awareness\" | \"consideration\" | \"conversion\" | \"retention\" | \"advocacy\"",
+        "array": false,
+        "runtimeType": "\"awareness\" | \"consideration\" | \"conversion\" | \"retention\" | \"advocacy\"",
+        "optional": true
+      },
+      "theme": {
+        "name": "theme",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "creative": {
+        "name": "creative",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "{ messaging?: string[]; visualStyle?: string; brandGuidelines?: string[]; assets?: string[]; }",
+        "optional": true
+      },
+      "schedule": {
+        "name": "schedule",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ phases?: { name: string; startDate: Date; endDate: Date; activities: string[]; }>; milestones?: Array<{ name: string; date: Date; deliverables: string[]; }; }[]",
+        "optional": true
+      },
+      "costPerAcquisitionTarget": {
+        "name": "costPerAcquisitionTarget",
+        "kind": "scalar",
+        "type": "decimal",
+        "precision": 10,
+        "scale": 2,
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "cost_per_acquisition_target"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "roasTarget": {
+        "name": "roasTarget",
+        "kind": "scalar",
+        "type": "decimal",
+        "precision": 5,
+        "scale": 2,
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "roas_target"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "MarketingCampaign",
+    "path": "./src/entities/projects/MarketingCampaign.ts",
+    "collection": "marketing_campaign",
+    "name": "MarketingCampaign",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "ProjectArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/projects/MarketingCampaign.ts",
+  "hash": "e67446b9c25cbb6ea11a365c8043cc54",
+  "version": "6.4.16"
+}

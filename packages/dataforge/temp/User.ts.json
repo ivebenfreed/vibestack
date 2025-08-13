@@ -22,16 +22,13 @@
         "runtimeType": "string",
         "optional": true
       },
-      "emailVerified": {
-        "name": "emailVerified",
+      "email_verified": {
+        "name": "email_verified",
         "kind": "scalar",
         "type": "boolean",
         "default": false,
         "getter": false,
         "setter": false,
-        "fieldNames": [
-          "email_verified"
-        ],
         "array": false,
         "runtimeType": "boolean"
       },
@@ -46,16 +43,13 @@
         "runtimeType": "string",
         "optional": true
       },
-      "isSuperAdmin": {
-        "name": "isSuperAdmin",
+      "is_super_admin": {
+        "name": "is_super_admin",
         "kind": "scalar",
         "type": "boolean",
         "default": false,
         "getter": false,
         "setter": false,
-        "fieldNames": [
-          "is_super_admin"
-        ],
         "array": false,
         "runtimeType": "boolean"
       },
@@ -146,6 +140,6 @@
     "collection": "user"
   },
   "origin": "./src/entities/User.ts",
-  "hash": "465cfd1150dd4cc604e8410ac86784a6",
+  "hash": "796dc96983d47e7ff1519491df33f197",
   "version": "6.4.16"
 }

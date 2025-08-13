@@ -1,0 +1,179 @@
+{
+  "data": {
+    "_id": 62000,
+    "properties": {
+      "dashboardType": {
+        "name": "dashboardType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "dashboard_type"
+        ],
+        "array": false,
+        "runtimeType": "\"system\" | \"operational\" | \"executive\" | \"analytical\" | \"personal\" | \"team\" | \"project\"",
+        "optional": true
+      },
+      "refreshFrequency": {
+        "name": "refreshFrequency",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "refresh_frequency"
+        ],
+        "array": false,
+        "runtimeType": "\"manual\" | \"realtime\" | \"1min\" | \"5min\" | \"15min\" | \"1hour\" | \"1day\"",
+        "optional": true
+      },
+      "layoutConfig": {
+        "name": "layoutConfig",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "layout_config"
+        ],
+        "array": false,
+        "runtimeType": "{ type: \"grid\" | \"masonry\" | \"flow\" | \"tabs\" | \"accordion\"; columns: number; rowHeight: number; gap: number; responsive: boolean; breakpoints?: Record<string, { columns: number; gap: number; }>; customCSS?: string; }",
+        "optional": true
+      },
+      "widgetDefinitions": {
+        "name": "widgetDefinitions",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "widget_definitions"
+        ],
+        "array": true,
+        "runtimeType": "{ widgetId: string; title: string; type: \"metric\" | \"chart\" | \"table\" | \"list\" | \"progress\" | \"status\" | \"activity\" | \"custom\"; position: { x: number; y: number; width: number; height: number; }; dataSource: { archetype: \"project\" | \"task\" | \"file\" | \"activity\" | \"discussion\" | \"record\" | \"document\" | \"collection\"; entityIds?: string[]; query?: { filters: Record<string, any>; aggregations: { field: string; operation: \"count\" | \"sum\" | \"avg\" | \"min\" | \"max\" | \"distinct\"; groupBy?: string; }>; sorting?: Array<{ field: string; direction: \"asc\" | \"desc\"; }>; limit?: number; }; refreshInterval: number; }; visualization: { chartType?: \"line\" | \"bar\" | \"pie\" | \"donut\" | \"area\" | \"scatter\" | \"gauge\" | \"table\" | \"kanban\"; options?: Record<string, any>; formatting?: { numberFormat?: string; dateFormat?: string; colorScheme?: string[]; thresholds?: Array<{ value: number; color: string; label?: string; }>; }; }; interactions?: { clickable: boolean; drillDown?: { enabled: boolean; target: \"modal\" | \"page\" | \"sidebar\"; url?: string; }; filters?: Array<{ field: string; type: \"dropdown\" | \"range\" | \"date\" | \"search\"; options?: any[]; }; }; permissions?: { viewRoles: string[]; editRoles: string[]; hideWhenEmpty: boolean; }; caching?: { enabled: boolean; ttl: number; invalidateOn: string[]; }; }",
+        "optional": true
+      },
+      "realtimeConfig": {
+        "name": "realtimeConfig",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "realtime_config"
+        ],
+        "array": true,
+        "runtimeType": "{ enabled: boolean; websocketEndpoint?: string; eventTypes: string[]; subscriptions: { archetype: string; entityIds: string[]; events: string[]; widgetIds: string[]; }; reconnectSettings: { maxRetries: number; retryDelay: number; exponentialBackoff: boolean; }; heartbeat: { enabled: boolean; interval: number; }; }[]",
+        "optional": true
+      },
+      "performanceMonitoring": {
+        "name": "performanceMonitoring",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "performance_monitoring"
+        ],
+        "array": true,
+        "runtimeType": "{ enabled: boolean; metrics: { loadTime: number; renderTime: number; dataFetchTime: number; memoryUsage: number; widgetPerformance: Record<string, { avgLoadTime: number; errorCount: number; lastError?: string; cacheHitRate: number; }>; }; alerts: { metric: \"loadTime\" | \"renderTime\" | \"dataFetchTime\" | \"memoryUsage\" | \"errorCount\"; threshold: number; operator: \"gt\" | \"lt\" | \"eq\"; action: \"log\" | \"notify\" | \"disable_widget\"; recipients?: string[]; enabled: boolean; }; optimization: { autoOptimize: boolean; lazyLoading: boolean; virtualScrolling: boolean; dataCompression: boolean; widgetPooling: boolean; }; }",
+        "optional": true
+      },
+      "userPersonalization": {
+        "name": "userPersonalization",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "user_personalization"
+        ],
+        "array": true,
+        "runtimeType": "Record<string, { layout?: any; widgetSettings?: Record<string, any>; filters?: Record<string, any>; preferences?: { theme: \"light\" | \"dark\" | \"auto\"; animations: boolean; notifications: boolean; autoRefresh: boolean; defaultView: string; }; bookmarks?: { name: string; filters: Record<string, any>; view: string; createdAt: Date; }>; recentActivity?: Array<{ action: string; widgetId: string; timestamp: Date; details: Record<string, any>; }>; }",
+        "optional": true
+      },
+      "alertSystem": {
+        "name": "alertSystem",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "alert_system"
+        ],
+        "array": true,
+        "runtimeType": "{ enabled: boolean; globalAlerts: { id: string; name: string; description: string; condition: { archetype: string; field: string; operator: \"gt\" | \"lt\" | \"eq\" | \"ne\" | \"in\" | \"not_in\" | \"contains\" | \"regex\"; value: any; aggregation?: \"count\" | \"sum\" | \"avg\" | \"min\" | \"max\"; }; severity: \"info\" | \"warning\" | \"error\" | \"critical\"; notifications: { channels: Array<\"email\" | \"slack\" | \"webhook\" | \"in_app\" | \"sms\">; recipients: string[]; template?: string; throttling: { enabled: boolean; interval: number; maxPerInterval: number; }; }; enabled: boolean; createdBy: string; createdAt: Date; lastTriggered?: Date; triggerCount: number; }>; alertHistory: Array<{ alertId: string; triggeredAt: Date; value: any; recipients: string[]; resolved?: boolean; resolvedAt?: Date; resolvedBy?: string; notes?: string; }; }",
+        "optional": true
+      },
+      "automationWorkflows": {
+        "name": "automationWorkflows",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "automation_workflows"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; name: string; description: string; trigger: { type: \"schedule\" | \"data_change\" | \"threshold\" | \"event\"; configuration: Record<string, any>; }; conditions: { archetype: string; field: string; operator: string; value: any; }>; actions: Array<{ type: \"update_widget\" | \"send_notification\" | \"create_task\" | \"update_collection\" | \"export_data\"; parameters: Record<string, any>; delay?: number; }; enabled: boolean; createdBy: string; createdAt: Date; lastExecuted?: Date; executionCount: number; successRate: number; }",
+        "optional": true
+      },
+      "dataSources": {
+        "name": "dataSources",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "data_sources"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; name: string; type: \"internal\" | \"api\" | \"database\" | \"file\" | \"webhook\"; configuration: { endpoint?: string; authentication?: { type: \"none\" | \"api_key\" | \"oauth\" | \"basic\"; credentials?: Record<string, any>; }; connection?: { host?: string; port?: number; database?: string; ssl?: boolean; }; polling?: { enabled: boolean; interval: number; timeout: number; }; }; schema: { fields: { name: string; type: \"string\" | \"number\" | \"boolean\" | \"date\" | \"array\" | \"object\"; description?: string; nullable: boolean; }>; relationships?: Array<{ field: string; relatedSource: string; relatedField: string; }; }; status: \"active\" | \"inactive\" | \"error\" | \"testing\"; lastSync?: Date; nextSync?: Date; errorCount: number; lastError?: string; performance: { avgResponseTime: number; successRate: number; dataVolume: number; }; }",
+        "optional": true
+      },
+      "crossArchetypeInsights": {
+        "name": "crossArchetypeInsights",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "cross_archetype_insights"
+        ],
+        "array": true,
+        "runtimeType": "{ correlationAnalysis: { archetype1: string; archetype2: string; metric1: string; metric2: string; correlation: number; pValue: number; significance: \"high\" | \"medium\" | \"low\" | \"none\"; insights: string[]; }>; trendAnalysis: Array<{ archetype: string; metric: string; trend: \"increasing\" | \"decreasing\" | \"stable\" | \"volatile\"; changeRate: number; confidence: number; predictions: Array<{ period: string; value: number; confidence: number; }>; }>; impactAnalysis: Array<{ sourceArchetype: string; sourceMetric: string; targetArchetype: string; targetMetric: string; impactStrength: number; delayDays: number; description: string; }>; anomalies: Array<{ archetype: string; entityId: string; metric: string; expectedValue: number; actualValue: number; deviation: number; severity: \"low\" | \"medium\" | \"high\"; detectedAt: Date; resolved: boolean; possibleCauses: string[]; }>; recommendations: Array<{ type: \"optimization\" | \"integration\" | \"automation\" | \"monitoring\"; title: string; description: string; priority: \"low\" | \"medium\" | \"high\"; effort: \"low\" | \"medium\" | \"high\"; expectedImpact: string; actionItems: string[]; relatedArchetypes: string[]; }; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Dashboard",
+    "path": "./src/entities/collections/Dashboard.ts",
+    "collection": "dashboard",
+    "name": "Dashboard",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "CollectionArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/collections/Dashboard.ts",
+  "hash": "ccbc36bd5d1ce03ff27b0598b9bb50ad",
+  "version": "6.4.16"
+}

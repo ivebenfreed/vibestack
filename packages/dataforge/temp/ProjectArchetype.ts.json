@@ -1,0 +1,164 @@
+{
+  "data": {
+    "_id": 33000,
+    "properties": {
+      "name": {
+        "name": "name",
+        "kind": "scalar",
+        "getter": false,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      },
+      "description": {
+        "name": "description",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "startDate": {
+        "name": "startDate",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "endDate": {
+        "name": "endDate",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "budget": {
+        "name": "budget",
+        "kind": "scalar",
+        "type": "decimal",
+        "precision": 12,
+        "scale": 2,
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "currency": {
+        "name": "currency",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "status": {
+        "name": "status",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "progressPercentage": {
+        "name": "progressPercentage",
+        "kind": "scalar",
+        "type": "decimal",
+        "precision": 5,
+        "scale": 2,
+        "nullable": true,
+        "default": 0,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "parentProject": {
+        "name": "parentProject",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "parent_project_id"
+        ],
+        "type": "ProjectArchetype",
+        "array": false,
+        "runtimeType": "ProjectArchetype",
+        "optional": true
+      },
+      "projectManagerId": {
+        "name": "projectManagerId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "project_manager_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "archetype": {
+        "name": "archetype",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      },
+      "containerType": {
+        "name": "containerType",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "ProjectArchetype",
+    "path": "./src/entities/archetypes/ProjectArchetype.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/archetypes/ProjectArchetype.ts",
+  "hash": "2f4559b2bffcf1633750c530b9914177",
+  "version": "6.4.16"
+}
