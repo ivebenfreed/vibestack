@@ -41,6 +41,23 @@ tmux attach -t poc-server
 tmux kill-session -t poc-server
 ```
 
+### Server-Only Development:
+For working on server-only DataForge development without the webapp:
+```bash
+# Create dedicated tmux session for server-only development
+tmux new-session -d -s server-only "cd apps/server && pnpm dev --port 8787"
+
+# Check server logs
+tmux attach -t server-only
+
+# API testing workflow
+curl -X GET http://localhost:8787/health
+psql postgres://localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
+
+# Kill session when done
+tmux kill-session -t server-only
+```
+
 ### How It Works:
 1. PreToolUse hook intercepts all Bash commands
 2. Development commands are automatically wrapped with `./scripts/tmux-bg.sh`
