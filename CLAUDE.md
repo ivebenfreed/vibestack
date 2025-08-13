@@ -25,6 +25,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
 - `yarn dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
 - `wrangler dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+- `npx wrangler dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+
+### POC Server Management:
+For running POC servers (like Function Factory POCs) that need persistent background execution, create simple tmux sessions manually:
+```bash
+# Create dedicated tmux session for POC servers
+tmux new-session -d -s poc-server "cd /path/to/poc && npx wrangler dev --port 8789"
+
+# Attach to view logs
+tmux attach -t poc-server
+
+# Detach while keeping running: Ctrl+B, then D
+# Kill session when done
+tmux kill-session -t poc-server
+```
 
 ### How It Works:
 1. PreToolUse hook intercepts all Bash commands

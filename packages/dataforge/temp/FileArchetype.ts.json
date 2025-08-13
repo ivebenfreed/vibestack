@@ -1,0 +1,406 @@
+{
+  "data": {
+    "_id": 49000,
+    "properties": {
+      "filename": {
+        "name": "filename",
+        "kind": "scalar",
+        "type": "string",
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string"
+      },
+      "originalName": {
+        "name": "originalName",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "mimeType": {
+        "name": "mimeType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "size": {
+        "name": "size",
+        "kind": "scalar",
+        "type": "bigint",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "path": {
+        "name": "path",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "url": {
+        "name": "url",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "checksum": {
+        "name": "checksum",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "encoding": {
+        "name": "encoding",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "fileType": {
+        "name": "fileType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "file_type"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "extension": {
+        "name": "extension",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "category": {
+        "name": "category",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "version": {
+        "name": "version",
+        "kind": "scalar",
+        "type": "integer",
+        "default": 1,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "number"
+      },
+      "status": {
+        "name": "status",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "uploadedBy": {
+        "name": "uploadedBy",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "uploaded_by"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "uploadedAt": {
+        "name": "uploadedAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "uploaded_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "modifiedBy": {
+        "name": "modifiedBy",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "modified_by"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "lastAccessed": {
+        "name": "lastAccessed",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_accessed"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "expiresAt": {
+        "name": "expiresAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "expires_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "parentFile": {
+        "name": "parentFile",
+        "kind": "m:1",
+        "cascade": [
+          "persist"
+        ],
+        "nullable": true,
+        "owner": true,
+        "fieldNames": [
+          "parent_file_id"
+        ],
+        "type": "FileArchetype",
+        "array": false,
+        "runtimeType": "FileArchetype",
+        "optional": true
+      },
+      "metadata": {
+        "name": "metadata",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "Record<string, any>",
+        "optional": true
+      },
+      "tags": {
+        "name": "tags",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "accessControl": {
+        "name": "accessControl",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "access_control"
+        ],
+        "array": false,
+        "runtimeType": "{ visibility: \"public\" | \"private\" | \"restricted\"; allowedUsers?: string[]; allowedRoles?: string[]; downloadable?: boolean; expiresAt?: Date; }",
+        "optional": true
+      },
+      "virusScan": {
+        "name": "virusScan",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "virus_scan"
+        ],
+        "array": false,
+        "runtimeType": "{ scanned: boolean; scannedAt?: Date; clean: boolean; engine?: string; threats?: string[]; }",
+        "optional": true
+      },
+      "backupInfo": {
+        "name": "backupInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "backup_info"
+        ],
+        "array": false,
+        "runtimeType": "{ backedUp: boolean; backupLocation?: string; lastBackup?: Date; backupSize?: number; checksum?: string; }",
+        "optional": true
+      },
+      "compressionInfo": {
+        "name": "compressionInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "compression_info"
+        ],
+        "array": false,
+        "runtimeType": "{ compressed: boolean; originalSize?: number; compressionRatio?: number; algorithm?: string; }",
+        "optional": true
+      },
+      "relatedFiles": {
+        "name": "relatedFiles",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "related_files"
+        ],
+        "array": true,
+        "runtimeType": "{ fileId: string; relationship: \"dependency\" | \"source\" | \"compiled\" | \"patch\" | \"thumbnail\" | \"preview\"; description?: string; }",
+        "optional": true
+      },
+      "versionHistory": {
+        "name": "versionHistory",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "version_history"
+        ],
+        "array": true,
+        "runtimeType": "{ version: number; uploadedBy: string; uploadedAt: Date; changes: string; size: number; checksum?: string; url?: string; }[]",
+        "optional": true
+      },
+      "downloadStats": {
+        "name": "downloadStats",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "download_stats"
+        ],
+        "array": true,
+        "runtimeType": "{ totalDownloads: number; uniqueDownloads: number; lastDownload?: Date; popularTimes?: Record<string, number>; downloadHistory?: { userId: string; downloadedAt: Date; ipAddress?: string; userAgent?: string; }; }[]",
+        "optional": true
+      },
+      "processingInfo": {
+        "name": "processingInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "processing_info"
+        ],
+        "array": false,
+        "runtimeType": "{ processed: boolean; processedAt?: Date; processor?: string; status?: \"queued\" | \"processing\" | \"completed\" | \"failed\"; results?: Record<string, any>; errors?: string[]; }",
+        "optional": true
+      },
+      "archetype": {
+        "name": "archetype",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      },
+      "containerType": {
+        "name": "containerType",
+        "kind": "scalar",
+        "persist": false,
+        "getter": true,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string"
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "FileArchetype",
+    "path": "./src/entities/archetypes/FileArchetype.ts",
+    "abstract": true,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "BaseDomainEntity",
+    "useCache": true
+  },
+  "origin": "./src/entities/archetypes/FileArchetype.ts",
+  "hash": "fc4bc31f5cf2386caa9720b63ad88f88",
+  "version": "6.4.16"
+}

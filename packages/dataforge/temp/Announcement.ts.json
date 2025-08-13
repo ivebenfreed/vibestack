@@ -1,0 +1,265 @@
+{
+  "data": {
+    "_id": 60000,
+    "properties": {
+      "announcementType": {
+        "name": "announcementType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "announcement_type"
+        ],
+        "array": false,
+        "runtimeType": "\"urgent\" | \"general\" | \"maintenance\" | \"policy\" | \"event\" | \"release\" | \"system\" | \"emergency\"",
+        "optional": true
+      },
+      "severity": {
+        "name": "severity",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "\"low\" | \"medium\" | \"high\" | \"critical\"",
+        "optional": true
+      },
+      "publishedAt": {
+        "name": "publishedAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "published_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "expiresAt": {
+        "name": "expiresAt",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "expires_at"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "effectiveFrom": {
+        "name": "effectiveFrom",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "effective_from"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "urgent": {
+        "name": "urgent",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "sticky": {
+        "name": "sticky",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "requiresAcknowledgment": {
+        "name": "requiresAcknowledgment",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "requires_acknowledgment"
+        ],
+        "array": false,
+        "runtimeType": "boolean"
+      },
+      "targetAudience": {
+        "name": "targetAudience",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "target_audience"
+        ],
+        "array": true,
+        "runtimeType": "{ includeAll?: boolean; departments?: string[]; roles?: string[]; locations?: string[]; userIds?: string[]; excludeUsers?: string[]; excludeRoles?: string[]; conditions?: { field: \"department\" | \"role\" | \"location\" | \"tenure\" | \"status\"; operator: \"equals\" | \"in\" | \"not_in\" | \"greater_than\" | \"less_than\"; value: any; }; }",
+        "optional": true
+      },
+      "deliverySettings": {
+        "name": "deliverySettings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "delivery_settings"
+        ],
+        "array": true,
+        "runtimeType": "{ channels: \"email\" | \"push\" | \"sms\" | \"slack\" | \"teams\" | \"in_app\" | \"desktop\">; scheduling?: { immediate: boolean; scheduledFor?: Date; timezone?: string; respectQuietHours?: boolean; batchDelivery?: boolean; batchSize?: number; batchInterval?: number; }; retryPolicy?: { maxRetries: number; retryInterval: number; exponentialBackoff: boolean; }; deliveryWindows?: Array<{ day: \"monday\" | \"tuesday\" | \"wednesday\" | \"thursday\" | \"friday\" | \"saturday\" | \"sunday\"; startHour: number; endHour: number; timezone?: string; }; }",
+        "optional": true
+      },
+      "contentVariants": {
+        "name": "contentVariants",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "content_variants"
+        ],
+        "array": true,
+        "runtimeType": "{ variant: \"full\" | \"summary\" | \"mobile\" | \"email\" | \"sms\" | \"push\"; subject?: string; title: string; content: string; attachments?: { fileId: string; filename: string; required: boolean; }; callToAction?: { text: string; url?: string; action?: \"acknowledge\" | \"redirect\" | \"download\" | \"custom\"; }; }",
+        "optional": true
+      },
+      "acknowledgmentTracking": {
+        "name": "acknowledgmentTracking",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "acknowledgment_tracking"
+        ],
+        "array": true,
+        "runtimeType": "{ totalRequired: number; totalAcknowledged: number; acknowledgmentRate: number; acknowledgedUsers: { userId: string; acknowledgedAt: Date; channel: string; ipAddress?: string; userAgent?: string; }>; pendingUsers: string[]; reminders: Array<{ sentAt: Date; recipientCount: number; channel: string; }>; deadline?: Date; escalationRules?: Array<{ triggerAfter: number; action: \"remind\" | \"escalate\" | \"report\"; recipients: string[]; message?: string; }; }",
+        "optional": true
+      },
+      "deliveryTracking": {
+        "name": "deliveryTracking",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "delivery_tracking"
+        ],
+        "array": true,
+        "runtimeType": "{ totalRecipients: number; deliveryStatuses: { sent: number; delivered: number; read: number; failed: number; bounced: number; unsubscribed: number; }; deliveryDetails: { userId: string; channel: string; status: \"queued\" | \"sent\" | \"delivered\" | \"read\" | \"failed\" | \"bounced\"; sentAt?: Date; deliveredAt?: Date; readAt?: Date; failureReason?: string; retryCount: number; lastRetryAt?: Date; }>; channelPerformance: Record<string, { sent: number; delivered: number; read: number; failed: number; deliveryRate: number; readRate: number; }; }",
+        "optional": true
+      },
+      "engagementMetrics": {
+        "name": "engagementMetrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "engagement_metrics"
+        ],
+        "array": true,
+        "runtimeType": "{ opens: number; clicks: number; shares: number; downloads: number; timeSpent: number; averageReadTime: number; deviceBreakdown: Record<string, number>; locationBreakdown: Record<string, number>; timezonBreakdown: Record<string, number>; peakEngagementHours: Record<string, number>; engagementTrend: { date: Date; opens: number; clicks: number; newReaders: number; }; }[]",
+        "optional": true
+      },
+      "feedbackCollection": {
+        "name": "feedbackCollection",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "feedback_collection"
+        ],
+        "array": true,
+        "runtimeType": "{ enabled: boolean; allowComments: boolean; allowRatings: boolean; allowSuggestions: boolean; feedbackItems: { userId: string; type: \"comment\" | \"rating\" | \"suggestion\" | \"question\"; content?: string; rating?: number; category?: string; submittedAt: Date; status: \"new\" | \"reviewed\" | \"responded\" | \"resolved\"; response?: { responderId: string; content: string; respondedAt: Date; }; }>; overallRating?: number; totalFeedback: number; categories: Record<string, number; }",
+        "optional": true
+      },
+      "complianceTracking": {
+        "name": "complianceTracking",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "compliance_tracking"
+        ],
+        "array": true,
+        "runtimeType": "{ regulationTypes: string[]; auditTrail: { action: \"created\" | \"published\" | \"modified\" | \"viewed\" | \"acknowledged\" | \"archived\"; userId: string; timestamp: Date; details: string; ipAddress?: string; userAgent?: string; }>; retentionPolicy: { retainFor: number; deleteAfter?: Date; archiveLocation?: string; }; accessLog: Array<{ userId: string; accessedAt: Date; ipAddress?: string; country?: string; duration?: number; }>; dataProcessingConsent?: { required: boolean; obtained: Array<{ userId: string; consentedAt: Date; consentType: \"explicit\" | \"implicit\"; withdrawnAt?: Date; }; }; }",
+        "optional": true
+      },
+      "automationConfig": {
+        "name": "automationConfig",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "automation_config"
+        ],
+        "array": true,
+        "runtimeType": "{ autoPublish?: { enabled: boolean; conditions: { field: string; operator: string; value: any; }>; }; autoReminders?: { enabled: boolean; intervals: number[]; maxReminders: number; template?: string; }; autoArchive?: { enabled: boolean; archiveAfter: number; notifyBeforeArchive: boolean; }; escalationWorkflow?: Array<{ triggerCondition: string; delayHours: number; actions: Array<{ type: \"notify\" | \"reassign\" | \"escalate\"; recipients: string[]; template?: string; }>; }; }",
+        "optional": true
+      },
+      "localization": {
+        "name": "localization",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "localization"
+        ],
+        "array": false,
+        "runtimeType": "{ defaultLanguage: string; availableLanguages: string[]; translations: Record<string, { title: string; content: string; subject?: string; callToAction?: string; translatedBy?: string; translatedAt?: Date; verified: boolean; }>; autoTranslation?: { enabled: boolean; service: \"google\" | \"azure\" | \"aws\" | \"manual\"; confidence: number; }; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Announcement",
+    "path": "./src/entities/discussions/Announcement.ts",
+    "collection": "announcement",
+    "name": "Announcement",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "DiscussionArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/discussions/Announcement.ts",
+  "hash": "0b2b86e8008a329916c092daada11598",
+  "version": "6.4.16"
+}

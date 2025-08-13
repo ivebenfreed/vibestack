@@ -1,0 +1,23 @@
+{
+  "name": "function-factory-poc",
+  "version": "0.1.0",
+  "description": "Function Factory POC - Pure runtime entity system",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.js",
+    "dev:wrangler": "wrangler dev src/index.ts --port 8788",
+    "test": "node test-poc.js",
+    "build": "tsc",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "@hono/node-server": "^1.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "wrangler": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

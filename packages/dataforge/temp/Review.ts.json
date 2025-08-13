@@ -1,0 +1,243 @@
+{
+  "data": {
+    "_id": 56000,
+    "properties": {
+      "reviewType": {
+        "name": "reviewType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "review_type"
+        ],
+        "array": false,
+        "runtimeType": "\"peer_review\" | \"code_review\" | \"design_review\" | \"security_review\" | \"architecture_review\" | \"documentation_review\" | \"compliance_review\"",
+        "optional": true
+      },
+      "reviewScope": {
+        "name": "reviewScope",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "review_scope"
+        ],
+        "array": false,
+        "runtimeType": "\"system\" | \"document\" | \"file\" | \"feature\" | \"module\" | \"application\" | \"process\"",
+        "optional": true
+      },
+      "reviewCriteria": {
+        "name": "reviewCriteria",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "review_criteria"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "authorId": {
+        "name": "authorId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "author_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "reviewers": {
+        "name": "reviewers",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ userId: string; role: \"primary\" | \"secondary\" | \"optional\" | \"domain_expert\" | \"security_expert\" | \"architect\"; expertise?: string[]; assigned: boolean; status: \"pending\" | \"in_progress\" | \"completed\" | \"declined\"; assignedAt?: Date; startedAt?: Date; completedAt?: Date; timeSpent?: number; }",
+        "optional": true
+      },
+      "reviewItems": {
+        "name": "reviewItems",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "review_items"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; type: \"file\" | \"section\" | \"function\" | \"class\" | \"component\" | \"document\" | \"process\"; name: string; path?: string; description?: string; priority: \"low\" | \"medium\" | \"high\" | \"critical\"; status: \"pending\" | \"in_review\" | \"approved\" | \"needs_changes\" | \"rejected\"; linesOfCode?: number; complexity?: number; changeType?: \"addition\" | \"modification\" | \"deletion\" | \"refactor\" | \"bugfix\"; }",
+        "optional": true
+      },
+      "comments": {
+        "name": "comments",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ id: string; reviewerId: string; itemId?: string; type: \"suggestion\" | \"issue\" | \"question\" | \"compliment\" | \"blocking\" | \"non_blocking\"; severity: \"info\" | \"minor\" | \"major\" | \"critical\"; category?: \"logic\" | \"performance\" | \"security\" | \"style\" | \"documentation\" | \"testing\" | \"architecture\"; line?: number; column?: number; content: string; code?: string; suggestion?: string; resolved: boolean; resolvedBy?: string; resolvedAt?: Date; createdAt: Date; thread?: { userId: string; content: string; createdAt: Date; }; }",
+        "optional": true
+      },
+      "reviewMetrics": {
+        "name": "reviewMetrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "review_metrics"
+        ],
+        "array": false,
+        "runtimeType": "{ totalReviewers: number; completedReviewers: number; reviewCompletionRate: number; averageReviewTime: number; totalComments: number; blockers: number; suggestions: number; issues: number; linesReviewed: number; reviewEfficiency: number; thoroughness: number; }",
+        "optional": true
+      },
+      "qualityAssessment": {
+        "name": "qualityAssessment",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "quality_assessment"
+        ],
+        "array": true,
+        "runtimeType": "{ overallScore: number; categories: { codeQuality?: number; maintainability?: number; performance?: number; security?: number; testability?: number; documentation?: number; architecture?: number; }; strengths?: string[]; weaknesses?: string[]; risks?: { description: string; severity: \"low\" | \"medium\" | \"high\" | \"critical\"; likelihood: \"low\" | \"medium\" | \"high\"; mitigation?: string; }; recommendations?: string[]; }",
+        "optional": true
+      },
+      "checklistItems": {
+        "name": "checklistItems",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "checklist_items"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; category: string; description: string; required: boolean; checked: boolean; checkedBy?: string; checkedAt?: Date; notes?: string; notApplicable?: boolean; }[]",
+        "optional": true
+      },
+      "approvalStatus": {
+        "name": "approvalStatus",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "approval_status"
+        ],
+        "array": false,
+        "runtimeType": "{ required: number; approved: number; rejected: number; pending: number; finalDecision?: \"approved\" | \"rejected\" | \"needs_revision\"; decisionMadeAt?: Date; decisionMadeBy?: string; consensus?: boolean; unanimity?: boolean; }",
+        "optional": true
+      },
+      "changeImpact": {
+        "name": "changeImpact",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "change_impact"
+        ],
+        "array": true,
+        "runtimeType": "{ scope: \"local\" | \"module\" | \"system\" | \"external\"; riskLevel: \"low\" | \"medium\" | \"high\" | \"critical\"; backwardCompatibility: boolean; performanceImpact: \"positive\" | \"neutral\" | \"negative\" | \"unknown\"; securityImpact: \"improves\" | \"neutral\" | \"degrades\" | \"unknown\"; dependencies: { type: \"upstream\" | \"downstream\" | \"peer\"; component: string; impactLevel: \"none\" | \"minor\" | \"major\" | \"breaking\"; }; rollbackComplexity: \"simple\" | \"moderate\" | \"complex\" | \"risky\"; }",
+        "optional": true
+      },
+      "reviewTools": {
+        "name": "reviewTools",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "review_tools"
+        ],
+        "array": true,
+        "runtimeType": "{ platform?: string; staticAnalysis?: { tool: string; version?: string; rulesProfile?: string; findings?: number; criticalFindings?: number; }>; codeFormatting?: { tool?: string; compliant: boolean; violations?: number; }; securityScanning?: Array<{ tool: string; vulnerabilities: number; severity: { critical?: number; high?: number; medium?: number; low?: number; }; }; }[]",
+        "optional": true
+      },
+      "followUpActions": {
+        "name": "followUpActions",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "follow_up_actions"
+        ],
+        "array": true,
+        "runtimeType": "{ id: string; type: \"fix\" | \"refactor\" | \"test\" | \"document\" | \"investigate\" | \"discuss\"; description: string; priority: \"low\" | \"medium\" | \"high\" | \"critical\"; assignee?: string; dueDate?: Date; status: \"pending\" | \"in_progress\" | \"completed\" | \"cancelled\"; createdBy: string; createdAt: Date; completedAt?: Date; relatedCommentId?: string; }",
+        "optional": true
+      },
+      "knowledgeTransfer": {
+        "name": "knowledgeTransfer",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "knowledge_transfer"
+        ],
+        "array": false,
+        "runtimeType": "{ domainKnowledgeShared: boolean; newPatterns?: string[]; lessonsLearned?: string[]; bestPractices?: string[]; antiPatterns?: string[]; documentationUpdated?: boolean; trainingNeeded?: boolean; mentoring?: { provided: boolean; receiverId?: string; topics?: string[]; }; }",
+        "optional": true
+      },
+      "reviewerFeedback": {
+        "name": "reviewerFeedback",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "reviewer_feedback"
+        ],
+        "array": true,
+        "runtimeType": "{ reviewerId: string; overallSatisfaction: number; clarityOfRequirements: number; codeReadability: number; completenessOfInformation: number; responseToFeedback: number; timeToReview: \"too_short\" | \"adequate\" | \"too_long\"; wouldReviewAgain: boolean; comments?: string; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "Review",
+    "path": "./src/entities/activities/Review.ts",
+    "collection": "review",
+    "name": "Review",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "ActivityArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/activities/Review.ts",
+  "hash": "bae18c2ce535d663578df1018b6f4082",
+  "version": "6.4.16"
+}

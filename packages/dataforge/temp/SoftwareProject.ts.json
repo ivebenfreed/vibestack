@@ -1,0 +1,153 @@
+{
+  "data": {
+    "_id": 34000,
+    "properties": {
+      "repository": {
+        "name": "repository",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "techStack": {
+        "name": "techStack",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "{ frontend?: string[]; backend?: string[]; database?: string[]; infrastructure?: string[]; tools?: string[]; }",
+        "optional": true
+      },
+      "deploymentUrl": {
+        "name": "deploymentUrl",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "deployment_url"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "stagingUrl": {
+        "name": "stagingUrl",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "staging_url"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "codeQualityMetrics": {
+        "name": "codeQualityMetrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "code_quality_metrics"
+        ],
+        "array": false,
+        "runtimeType": "{ coverage?: number; complexity?: number; duplicateLines?: number; vulnerabilities?: number; lastAnalyzed?: Date; }",
+        "optional": true
+      },
+      "methodology": {
+        "name": "methodology",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "\"agile\" | \"waterfall\" | \"kanban\" | \"scrum\" | \"lean\"",
+        "array": false,
+        "runtimeType": "\"agile\" | \"waterfall\" | \"kanban\" | \"scrum\" | \"lean\"",
+        "optional": true
+      },
+      "sprintDuration": {
+        "name": "sprintDuration",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "sprint_duration"
+        ],
+        "type": "number",
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "environments": {
+        "name": "environments",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "{ development?: string; staging?: string; production?: string; }",
+        "optional": true
+      },
+      "licenseType": {
+        "name": "licenseType",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "license_type"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "isOpenSource": {
+        "name": "isOpenSource",
+        "kind": "scalar",
+        "type": "boolean",
+        "default": false,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "is_open_source"
+        ],
+        "array": false,
+        "runtimeType": "boolean",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "SoftwareProject",
+    "path": "./src/entities/projects/SoftwareProject.ts",
+    "collection": "software_project",
+    "name": "SoftwareProject",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "ProjectArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/projects/SoftwareProject.ts",
+  "hash": "3162b2230adbe8b5f8bd787c652b0c34",
+  "version": "6.4.16"
+}

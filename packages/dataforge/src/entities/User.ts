@@ -15,14 +15,14 @@ export class User extends BaseAuthEntity {
   @Unique()
   email?: string;
 
-  @Property({ type: 'boolean', default: false, fieldName: 'email_verified' })
-  emailVerified!: boolean;
+  @Property({ type: 'boolean', default: false })
+  email_verified!: boolean;
 
   @Property({ type: 'string', nullable: true })
   image?: string;
 
-  @Property({ type: 'boolean', default: false, fieldName: 'is_super_admin' })
-  isSuperAdmin!: boolean;
+  @Property({ type: 'boolean', default: false })
+  is_super_admin!: boolean;
   
   @Property({ type: 'string', default: 'member' })
   role!: string;

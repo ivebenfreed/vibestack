@@ -1,0 +1,10 @@
+
+          function validate(data) {
+            const errors = [];
+            if (data.repositoryUrl && !data.repositoryUrl.includes('github.com/other/')) {
+              errors.push('Repository must be in other GitHub organization');
+            }
+            return { valid: errors.length === 0, errors: errors };
+          }
+          return validate(data);
+        

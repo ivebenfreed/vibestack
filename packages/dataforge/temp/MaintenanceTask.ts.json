@@ -1,0 +1,303 @@
+{
+  "data": {
+    "_id": 40000,
+    "properties": {
+      "frequency": {
+        "name": "frequency",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "type": "\"quarterly\" | \"monthly\" | \"daily\" | \"weekly\" | \"annually\" | \"as_needed\" | \"condition_based\"",
+        "array": false,
+        "runtimeType": "\"quarterly\" | \"monthly\" | \"daily\" | \"weekly\" | \"annually\" | \"as_needed\" | \"condition_based\"",
+        "optional": true
+      },
+      "lastCompleted": {
+        "name": "lastCompleted",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "last_completed"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "nextDue": {
+        "name": "nextDue",
+        "kind": "scalar",
+        "type": "date",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "next_due"
+        ],
+        "array": false,
+        "runtimeType": "Date",
+        "optional": true
+      },
+      "equipmentId": {
+        "name": "equipmentId",
+        "kind": "scalar",
+        "type": "uuid",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "equipment_id"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "equipmentName": {
+        "name": "equipmentName",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "equipment_name"
+        ],
+        "type": "string",
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "maintenanceType": {
+        "name": "maintenanceType",
+        "kind": "scalar",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "maintenance_type"
+        ],
+        "type": "\"emergency\" | \"preventive\" | \"corrective\" | \"predictive\" | \"routine\" | \"shutdown\"",
+        "array": false,
+        "runtimeType": "\"emergency\" | \"preventive\" | \"corrective\" | \"predictive\" | \"routine\" | \"shutdown\"",
+        "optional": true
+      },
+      "procedures": {
+        "name": "procedures",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ step: number; description: string; estimatedTime?: number; requiredTools?: string[]; safetyNotes?: string; completed?: boolean; }[]",
+        "optional": true
+      },
+      "requiredParts": {
+        "name": "requiredParts",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "required_parts"
+        ],
+        "array": true,
+        "runtimeType": "{ partNumber: string; description: string; quantity: number; unit: string; cost?: number; supplier?: string; }[]",
+        "optional": true
+      },
+      "requiredTools": {
+        "name": "requiredTools",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "required_tools"
+        ],
+        "array": true,
+        "runtimeType": "string[]",
+        "optional": true
+      },
+      "safetyRequirements": {
+        "name": "safetyRequirements",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "safety_requirements"
+        ],
+        "array": false,
+        "runtimeType": "{ ppe?: string[]; lockoutTagout?: boolean; specialPrecautions?: string[]; riskLevel?: \"low\" | \"medium\" | \"high\" | \"critical\"; }",
+        "optional": true
+      },
+      "completionChecklist": {
+        "name": "completionChecklist",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "completion_checklist"
+        ],
+        "array": true,
+        "runtimeType": "{ item: string; required: boolean; completed?: boolean; notes?: string; }[]",
+        "optional": true
+      },
+      "conditionMonitoring": {
+        "name": "conditionMonitoring",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "condition_monitoring"
+        ],
+        "array": true,
+        "runtimeType": "{ parameters?: { name: string; currentValue?: number; targetValue?: number; unit: string; status?: \"good\" | \"warning\" | \"critical\"; }; lastInspection?: Date; nextInspection?: Date; }",
+        "optional": true
+      },
+      "estimatedCost": {
+        "name": "estimatedCost",
+        "kind": "scalar",
+        "type": "decimal",
+        "precision": 10,
+        "scale": 2,
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "estimated_cost"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "actualCost": {
+        "name": "actualCost",
+        "kind": "scalar",
+        "type": "decimal",
+        "precision": 10,
+        "scale": 2,
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "actual_cost"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "estimatedDowntime": {
+        "name": "estimatedDowntime",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "estimated_downtime"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "actualDowntime": {
+        "name": "actualDowntime",
+        "kind": "scalar",
+        "type": "integer",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "actual_downtime"
+        ],
+        "array": false,
+        "runtimeType": "number",
+        "optional": true
+      },
+      "workOrder": {
+        "name": "workOrder",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "work_order"
+        ],
+        "array": false,
+        "runtimeType": "{ number: string; type: string; requestedBy?: string; approvedBy?: string; scheduledDate?: Date; }",
+        "optional": true
+      },
+      "complianceRequirements": {
+        "name": "complianceRequirements",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "compliance_requirements"
+        ],
+        "array": false,
+        "runtimeType": "{ regulations?: string[]; certifications?: string[]; inspectionRequired?: boolean; documentationRequired?: boolean; }",
+        "optional": true
+      },
+      "completionNotes": {
+        "name": "completionNotes",
+        "kind": "scalar",
+        "type": "text",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "completion_notes"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "findings": {
+        "name": "findings",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "findings"
+        ],
+        "array": true,
+        "runtimeType": "{ type: \"wear\" | \"damage\" | \"replacement_needed\" | \"adjustment_made\" | \"normal\"; description: string; severity?: \"low\" | \"medium\" | \"high\" | \"critical\"; actionRequired?: string; followUpTask?: string; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "MaintenanceTask",
+    "path": "./src/entities/tasks/MaintenanceTask.ts",
+    "collection": "maintenance_task",
+    "name": "MaintenanceTask",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "TaskArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/tasks/MaintenanceTask.ts",
+  "hash": "2a26b0d5dd5873cf9bb0820770f18a8a",
+  "version": "6.4.16"
+}

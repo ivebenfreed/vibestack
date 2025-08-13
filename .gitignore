@@ -84,3 +84,5 @@ packages/cli/node_modules
 worktrees/vibestack-env-*.tar.gz
 # Worktree-specific Docker configs
 .docker/
+
+/marketing

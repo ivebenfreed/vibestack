@@ -1,0 +1,243 @@
+{
+  "data": {
+    "_id": 50000,
+    "properties": {
+      "programmingLanguage": {
+        "name": "programmingLanguage",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "programming_language"
+        ],
+        "array": false,
+        "runtimeType": "\"other\" | \"javascript\" | \"typescript\" | \"python\" | \"java\" | \"cpp\" | \"csharp\" | \"go\" | \"rust\" | \"php\" | \"ruby\" | \"swift\" | \"kotlin\" | \"scala\"",
+        "optional": true
+      },
+      "codeType": {
+        "name": "codeType",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "code_type"
+        ],
+        "array": false,
+        "runtimeType": "\"source\" | \"documentation\" | \"test\" | \"config\" | \"build\" | \"deployment\" | \"migration\"",
+        "optional": true
+      },
+      "moduleName": {
+        "name": "moduleName",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "module_name"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "packageName": {
+        "name": "packageName",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "package_name"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "className": {
+        "name": "className",
+        "kind": "scalar",
+        "type": "string",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "class_name"
+        ],
+        "array": false,
+        "runtimeType": "string",
+        "optional": true
+      },
+      "codeMetrics": {
+        "name": "codeMetrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "code_metrics"
+        ],
+        "array": false,
+        "runtimeType": "{ linesOfCode?: number; linesOfComments?: number; complexity?: number; maintainabilityIndex?: number; technicalDebt?: number; codeSmells?: number; duplicatedLines?: number; testCoverage?: number; }",
+        "optional": true
+      },
+      "dependencies": {
+        "name": "dependencies",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": true,
+        "runtimeType": "{ name: string; version?: string; type: \"import\" | \"require\" | \"include\" | \"reference\"; scope: \"internal\" | \"external\" | \"system\"; required: boolean; }",
+        "optional": true
+      },
+      "codeQuality": {
+        "name": "codeQuality",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "code_quality"
+        ],
+        "array": true,
+        "runtimeType": "{ score?: number; issues?: { type: \"error\" | \"warning\" | \"info\"; severity: \"low\" | \"medium\" | \"high\" | \"critical\"; rule: string; message: string; line?: number; column?: number; suggestion?: string; }; lastAnalyzed?: Date; analyzer?: string; }",
+        "optional": true
+      },
+      "testInfo": {
+        "name": "testInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "test_info"
+        ],
+        "array": false,
+        "runtimeType": "{ hasTests: boolean; testFiles?: string[]; testCoverage?: number; testCount?: number; passingTests?: number; failingTests?: number; lastTestRun?: Date; }",
+        "optional": true
+      },
+      "documentation": {
+        "name": "documentation",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "array": false,
+        "runtimeType": "{ hasDocumentation: boolean; docFormat?: \"jsdoc\" | \"pydoc\" | \"javadoc\" | \"rustdoc\" | \"godoc\" | \"other\"; apiDocumentation?: string; readme?: string; examples?: string[]; completeness?: number; }",
+        "optional": true
+      },
+      "buildInfo": {
+        "name": "buildInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "build_info"
+        ],
+        "array": false,
+        "runtimeType": "{ buildable: boolean; buildTool?: string; buildConfig?: string; outputFiles?: string[]; lastBuild?: Date; buildStatus?: \"success\" | \"failed\" | \"pending\"; buildErrors?: string[]; }",
+        "optional": true
+      },
+      "securityScan": {
+        "name": "securityScan",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "security_scan"
+        ],
+        "array": true,
+        "runtimeType": "{ scanned: boolean; scannedAt?: Date; vulnerabilities?: { severity: \"low\" | \"medium\" | \"high\" | \"critical\"; type: string; description: string; line?: number; cwe?: string; recommendation?: string; }; securityScore?: number; }",
+        "optional": true
+      },
+      "gitInfo": {
+        "name": "gitInfo",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "git_info"
+        ],
+        "array": false,
+        "runtimeType": "{ repository?: string; branch?: string; commit?: string; author?: string; lastCommit?: Date; commitMessage?: string; changedLines?: number; additions?: number; deletions?: number; }",
+        "optional": true
+      },
+      "codeReviews": {
+        "name": "codeReviews",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "code_reviews"
+        ],
+        "array": true,
+        "runtimeType": "{ reviewId: string; reviewer: string; status: \"pending\" | \"approved\" | \"changes_requested\" | \"rejected\"; comments?: { line: number; comment: string; type: \"suggestion\" | \"issue\" | \"compliment\"; }; reviewedAt?: Date; }",
+        "optional": true
+      },
+      "performanceMetrics": {
+        "name": "performanceMetrics",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "performance_metrics"
+        ],
+        "array": true,
+        "runtimeType": "{ executionTime?: number; memoryUsage?: number; cpuUsage?: number; benchmarks?: { name: string; value: number; unit: string; timestamp: Date; }; }[]",
+        "optional": true
+      },
+      "refactoringSuggestions": {
+        "name": "refactoringSuggestions",
+        "kind": "scalar",
+        "type": "json",
+        "nullable": true,
+        "getter": false,
+        "setter": false,
+        "fieldNames": [
+          "refactoring_suggestions"
+        ],
+        "array": true,
+        "runtimeType": "{ type: \"extract_method\" | \"rename\" | \"move_class\" | \"inline\" | \"extract_constant\"; description: string; startLine: number; endLine: number; priority: \"low\" | \"medium\" | \"high\"; estimatedEffort: string; }",
+        "optional": true
+      }
+    },
+    "primaryKeys": [],
+    "filters": {},
+    "hooks": {},
+    "indexes": [],
+    "uniques": [],
+    "className": "SourceCode",
+    "path": "./src/entities/files/SourceCode.ts",
+    "collection": "source_code",
+    "name": "SourceCode",
+    "abstract": false,
+    "internal": true,
+    "constructorParams": [],
+    "toJsonParams": [],
+    "extends": "FileArchetype",
+    "useCache": true
+  },
+  "origin": "./src/entities/files/SourceCode.ts",
+  "hash": "08db1101bd1074c1811b9e4aaf0f02f0",
+  "version": "6.4.16"
+}
