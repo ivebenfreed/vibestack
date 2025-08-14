@@ -7,8 +7,10 @@
 
 import { Hono, Context } from 'hono';
 import type { Kysely } from 'kysely';
-import type { Database, TableName } from '@repo/dataforge/kysely-types';
-import type { KyselyQueryService } from '../../lib/kysely-query-service';
+// TODO: Replace with server-only types when DataForge is moved  
+// import type { Database, TableName } from '@repo/dataforge/kysely-types';
+type Database = any;
+type TableName = string;
 import type { ApiEnv } from '../../types/api';
 import {
   ServiceErrorType,
@@ -31,7 +33,7 @@ export class KyselyGenericApiAdapter {
   
   constructor(
     private tableName: TableName,
-    private kyselyService: KyselyQueryService,
+    private kysely: Kysely<Database>,
     private entityMethods: KyselyEntityMethods = {}
   ) {
     this.router = new Hono<ApiEnv>();
@@ -89,7 +91,7 @@ export class KyselyGenericApiAdapter {
       const limitNum = Math.min(parseInt(limit), 100);
       const offset = (pageNum - 1) * limitNum;
 
-      let query = this.kyselyService.db
+      let query = this.kysely
         .selectFrom(this.tableName)
         .selectAll()
         .limit(limitNum)
@@ -113,7 +115,7 @@ export class KyselyGenericApiAdapter {
       const results = await query.execute();
 
       // Get total count for pagination
-      const countResult = await this.kyselyService.db
+      const countResult = await this.kysely
         .selectFrom(this.tableName)
         .select((eb) => eb.fn.count('id').as('count'))
         .executeTakeFirst();
@@ -144,7 +146,7 @@ export class KyselyGenericApiAdapter {
     try {
       const id = c.req.param('id');
       
-      const result = await this.kyselyService.db
+      const result = await this.kysely
         .selectFrom(this.tableName)
         .selectAll()
         .where('id', '=', id)
@@ -171,7 +173,7 @@ export class KyselyGenericApiAdapter {
     try {
       const data = await c.req.json();
 
-      const result = await this.kyselyService.db
+      const result = await this.kysely
         .insertInto(this.tableName)
         .values(data)
         .returningAll()
@@ -195,7 +197,7 @@ export class KyselyGenericApiAdapter {
       // Remove id from update data if present
       delete data.id;
 
-      const result = await this.kyselyService.db
+      const result = await this.kysely
         .updateTable(this.tableName)
         .set({
           ...data,
@@ -226,7 +228,7 @@ export class KyselyGenericApiAdapter {
     try {
       const id = c.req.param('id');
 
-      const result = await this.kyselyService.db
+      const result = await this.kysely
         .deleteFrom(this.tableName)
         .where('id', '=', id)
         .returningAll()
@@ -253,7 +255,7 @@ export class KyselyGenericApiAdapter {
     try {
       const filters = c.req.query();
 
-      let query = this.kyselyService.db
+      let query = this.kysely
         .selectFrom(this.tableName)
         .select((eb) => eb.fn.count('id').as('count'));
 
@@ -290,7 +292,7 @@ export class KyselyGenericApiAdapter {
       }
 
       const params = await c.req.json();
-      const result = await method(params, this.kyselyService.db);
+      const result = await method(params, this.kysely);
 
       return c.json(createSuccessResponse(result));
     } catch (error) {

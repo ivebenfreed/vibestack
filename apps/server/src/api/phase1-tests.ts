@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { kysely } from '../lib/kysely.js';
+import { db } from '../lib/kysely.js';
 import { AppContext } from '../types/hono.js';
 
 export const phase1TestRouter = new Hono<AppContext>();
@@ -7,7 +7,7 @@ export const phase1TestRouter = new Hono<AppContext>();
 // Test UUIDv7 generation
 phase1TestRouter.post('/uuidv7-generation', async (c) => {
   try {
-    const result = await kysely
+    const result = await db(c.env)
       .selectFrom('(SELECT generate_uuidv7() as uuid) as subquery')
       .select(['uuid'])
       .execute();
@@ -15,7 +15,7 @@ phase1TestRouter.post('/uuidv7-generation', async (c) => {
     // Generate 5 UUIDs to test ordering
     const uuids = [];
     for (let i = 0; i < 5; i++) {
-      const uuidResult = await kysely.selectNoFrom(
+      const uuidResult = await db(c.env).selectNoFrom(
         (eb) => eb.fn('generate_uuidv7').as('uuid')
       ).executeTakeFirst();
       if (uuidResult?.uuid) {
@@ -33,7 +33,7 @@ phase1TestRouter.post('/uuidv7-generation', async (c) => {
 phase1TestRouter.post('/create-test-entity', async (c) => {
   try {
     // Create a test user to verify UUIDv7 generation
-    const result = await kysely
+    const result = await db(c.env)
       .insertInto('user')
       .values({
         name: 'Test User',

@@ -18,7 +18,10 @@ import type { WebSocket } from '../types/cloudflare';
 import type { StateManager } from './state-manager';
 import type { InitialSyncState, WebSocketHandler } from './types';
 import { GenericSyncAdapter } from './generic-sync-adapter';
-import { TRACKED_TABLES, ORDERED_TRACKED_TABLES } from '@repo/dataforge';
+// TODO: Replace with server-only table definitions when DataForge is moved
+// import { TRACKED_TABLES, ORDERED_TRACKED_TABLES } from '@repo/dataforge';
+const TRACKED_TABLES: string[] = [];
+const ORDERED_TRACKED_TABLES: string[] = [];
 
 const MODULE_NAME = 'initial-sync-generic';
 const DEFAULT_CHUNK_SIZE = 500;

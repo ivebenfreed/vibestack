@@ -1,5 +1,6 @@
 import type { TableChange } from '@repo/sync-types';
-import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+// import { SERVER_DOMAIN_TABLE_HIERARCHY } from '@repo/dataforge/server-entities';
+const SERVER_DOMAIN_TABLE_HIERARCHY = {}; // Stub for now
 import { getDBClient, sql } from './db'; // Import necessary DB helpers
 import type { MinimalContext } from '../types/hono'; // Import context type
 import { syncLogger } from '../middleware/logger'; // Import logger

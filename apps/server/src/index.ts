@@ -14,11 +14,16 @@ import type { AppBindings } from './types/hono';
 import type { Env, ExecutionContext } from './types/env';
 import { SyncDO } from './sync/SyncDO';
 import { ReplicationDO } from './replication/ReplicationDO';
+import { OrgSchemaDO } from './dataforge/durable-objects/OrgSchemaDO';
+import { SuperAdminDO } from './dataforge/durable-objects/SuperAdminDO';
+import { OrgAdminDO } from './dataforge/durable-objects/OrgAdminDO';
+import { OrgOpsDO } from './dataforge/durable-objects/OrgOpsDO';
 import { getAuth, AuthType, initializeAuth } from './lib/auth';
 import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
 import authRouter from './api/auth';
 import bootstrapRouter from './api/bootstrap'; // Adjust path if necessary
+import { mountProtectedRoutes } from './routes/protected-routes';
 
 // Remove temporary auth instance
 
@@ -148,7 +153,7 @@ apiApp.get('/db/kysely-test', async (c) => {
     // Use the centralized Kysely instance
     const kysely = db(c.env);
     
-    // Test query - list users
+    // Test query - list users (Better Auth uses singular table names)
     const result = await kysely
       .selectFrom('user')
       .select(['id', 'email', 'name'])
@@ -183,6 +188,13 @@ apiApp.use('*', authMiddleware);
 
 // Mount the auth router (which will be protected by authMiddleware)
 apiApp.route('/auth', authRouter);
+
+// Mount admin routes (platform orchestration)
+import { adminRouter } from './routes/admin.js';
+apiApp.route('/admin', adminRouter);
+
+// Mount protected routes with mandatory context validation
+mountProtectedRoutes(apiApp);
 
 // Mount OTHER public API routes (which will also be protected by authMiddleware)
 apiApp.route('/', api);
@@ -437,5 +449,5 @@ const worker = {
   }
 };
 
-export { SyncDO, ReplicationDO };
+export { SyncDO, ReplicationDO, OrgSchemaDO, SuperAdminDO, OrgAdminDO, OrgOpsDO };
 export default worker; 

@@ -1,5 +1,7 @@
 import { Client } from '@neondatabase/serverless';
-import { ClientMigration } from "@repo/dataforge/server-entities";
+// TODO: Replace with server-only types when DataForge is moved
+// import { ClientMigration } from "@repo/dataforge/server-entities";
+type ClientMigration = any;
 
 // Type definitions
 type ClientMigrationType = typeof ClientMigration;

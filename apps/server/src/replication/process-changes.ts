@@ -9,12 +9,20 @@ import type { WebSocketHandler } from '../sync/types';
 type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
 import { sql, getDBClient } from '../lib/db';
 import { StateManager } from './state-manager';
-import { 
-  SERVER_DOMAIN_TABLES, 
-  SERVER_DOMAIN_TABLE_HIERARCHY,
-  SERVER_TRACKED_TABLES,
-  SERVER_JUNCTION_TABLE_MAPPING
-} from '@repo/dataforge/server-entities';
+// import { 
+//   SERVER_DOMAIN_TABLES, 
+//   SERVER_DOMAIN_TABLE_HIERARCHY,
+//   SERVER_TRACKED_TABLES,
+//   SERVER_JUNCTION_TABLE_MAPPING
+// } from '@repo/dataforge/server-entities';
+
+// DEPRECATED: Hardcoded stubs replaced by dynamic discovery
+// const SERVER_DOMAIN_TABLES = ['projects', 'tasks', 'users', 'comments'];
+// const SERVER_DOMAIN_TABLE_HIERARCHY = {};
+// const SERVER_TRACKED_TABLES = ['projects', 'tasks', 'users', 'comments'];
+// const SERVER_JUNCTION_TABLE_MAPPING = {};
+
+import { DynamicTableDiscovery } from './dynamic-table-discovery';
 import type { Env } from '../types/env';
 import { Kysely } from 'kysely';
 import { NeonHTTPDialect } from '@repo/kysely-neon-http';
@@ -29,15 +37,24 @@ type TableName = keyof typeof SERVER_DOMAIN_TABLE_HIERARCHY;
 // ====== Constants ======
 const DEFAULT_STORE_BATCH_SIZE = 500;
 
-// Create a Set of tracked tables for O(1) lookup performance
-// ✨ NEW: Now includes both domain tables and junction tables
-const TRACKED_TABLES_SET = new Set(SERVER_TRACKED_TABLES);
+// Dynamic table discovery instance (initialized per operation)
+let tableDiscovery: DynamicTableDiscovery | null = null;
 
 // ====== Helper Functions ======
 
-// ✨ NEW: Junction table detection and transformation
+// Initialize dynamic table discovery
+async function getTableDiscovery(env: Env): Promise<DynamicTableDiscovery> {
+  if (!tableDiscovery) {
+    const db = getDBClient(env);
+    tableDiscovery = new DynamicTableDiscovery(db, env);
+  }
+  return tableDiscovery;
+}
+
+// ✨ UPDATED: Junction table detection (simplified for now)
 function isJunctionTable(tableName: string): boolean {
-  return Object.prototype.hasOwnProperty.call(SERVER_JUNCTION_TABLE_MAPPING, tableName);
+  // TODO: Implement junction table detection via dynamic discovery
+  return tableName.includes('_to_') || tableName.endsWith('_junction');
 }
 
 function extractColumnValue(change: WALChangeRecord, columnName: string): string | null {
@@ -243,25 +260,54 @@ async function transformJunctionTableChange(
   }
 }
 
-export function shouldTrackTable(tableName: string): boolean {
-  // Remove special case check for change_history as it's not in TRACKED_TABLES_SET anyway
-  
-  // Normalize the table name (add quotes if missing)
-  const normalizedTableName = tableName.startsWith('"') ? tableName : `"${tableName}"`;
-  
-  // Check if the normalized table name is in our domain tables list using O(1) Set lookup
-  return TRACKED_TABLES_SET.has(normalizedTableName as any);
+// Async version for dynamic table discovery
+export async function shouldTrackTable(tableName: string, env: Env): Promise<boolean> {
+  try {
+    const discovery = await getTableDiscovery(env);
+    
+    // Remove quotes for consistency
+    const normalizedTableName = tableName.replace(/"/g, '');
+    
+    return await discovery.isTrackableTable(normalizedTableName);
+  } catch (error) {
+    replicationLogger.error('Failed to check if table should be tracked', {
+      tableName,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    // Fallback: track if it looks like an org table or base table
+    const normalizedTableName = tableName.replace(/"/g, '');
+    return (
+      normalizedTableName.match(/^org_[a-fA-F0-9\-]+_[a-zA-Z_][a-zA-Z0-9_]*$/) !== null || // Org table
+      ['users', 'organization', 'organization_member', 'session'].includes(normalizedTableName) // Base tables
+    );
+  }
 }
 
-// Static list of tracked tables to be logged once on module initialization
-// ✨ NEW: Now includes both domain tables and junction tables
-const TRACKED_TABLES = SERVER_TRACKED_TABLES.join(', ');
-const junctionTableCount = Object.keys(SERVER_JUNCTION_TABLE_MAPPING).length;
-replicationLogger.info('Replication tracking tables', { 
-  count: SERVER_TRACKED_TABLES.length,
-  tables: TRACKED_TABLES,
-  domainTableCount: SERVER_DOMAIN_TABLES.length - junctionTableCount,
-  junctionTableCount: junctionTableCount
+// Synchronous version for compatibility (uses heuristics)
+export function shouldTrackTableSync(tableName: string): boolean {
+  const normalizedTableName = tableName.replace(/"/g, '');
+  
+  // System tables - never track
+  const systemTables = ['change_history', 'sync_statistics', 'system_logs', 'replication_slot_status'];
+  if (systemTables.includes(normalizedTableName) || normalizedTableName.startsWith('pg_')) {
+    return false;
+  }
+  
+  // Base tables - always track
+  const baseTables = ['users', 'organization', 'organization_member', 'session', 'account', 'verification'];
+  if (baseTables.includes(normalizedTableName)) {
+    return true;
+  }
+  
+  // Organization-specific tables - track if matches pattern
+  return normalizedTableName.match(/^org_[a-fA-F0-9\-]+_[a-zA-Z_][a-zA-Z0-9_]*$/) !== null;
+}
+
+// Dynamic table discovery replaces static tracking
+replicationLogger.info('Dynamic replication tracking initialized', { 
+  mode: 'dynamic-discovery',
+  note: 'Tables will be discovered dynamically from database and organization configurations'
 }, MODULE_NAME);
 
 /**
@@ -372,8 +418,8 @@ export async function transformWALChanges(
           continue;
         }
         
-        // Early table tracking check
-        if (!shouldTrackTable(change.table)) {
+        // Early table tracking check (use sync version for performance)
+        if (!shouldTrackTableSync(change.table)) {
           addFilterReason(filteredReasons, `Table ${change.table} not in tracked tables`);
           continue;
         }

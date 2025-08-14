@@ -4,9 +4,32 @@
  */
 
 import React from 'react';
-import { AccessControlClient } from '@vibestack/livestore/client/AccessControlClient';
-import { OrganizationDataSynchronizer } from '@vibestack/livestore/sync/OrganizationDataSynchronizer';
-import { RealTimePermissionUpdater } from '@vibestack/livestore/permissions/RealTimePermissionUpdater';
+
+// Mock implementations for POC
+class AccessControlClient {
+  constructor(config: any) {}
+  async initialize() {}
+  addEventListener(event: string, handler: Function) {}
+  disconnect() {}
+  getUserContext() { return { organizationId: 'poc-org', userId: 'poc-user' }; }
+  async hasPermissions(perms: any[]) { return perms.reduce((acc, p) => ({ ...acc, [`${p.resource}.${p.action}`]: true }), {}); }
+}
+
+class OrganizationDataSynchronizer {
+  async initializeOrganizationSync(orgId: string) {}
+  async createSyncOperation(action: string, type: string, id: string, orgId: string, userId: string, data: any, metadata: any) {
+    return { id: `sync-${Date.now()}` };
+  }
+  getSyncStatus(orgId: string) {
+    return { isOnline: false, lastSyncTime: null, pendingOperations: 0, conflicts: 0, metrics: { totalOperations: 0, successfulOperations: 0, failedOperations: 0, averageSyncTime: 0 } };
+  }
+}
+
+class RealTimePermissionUpdater {
+  async createPermissionUpdate(type: string, orgId: string, data: any, metadata: any, source: string, description: string) {
+    return { id: `perm-${Date.now()}` };
+  }
+}
 
 // Simple POC configuration
 interface LiveStorePOCConfig {

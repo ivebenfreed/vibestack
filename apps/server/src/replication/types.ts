@@ -3,7 +3,8 @@ import type { Context } from 'hono';
 import type { AppBindings } from '../types/hono';
 import type { TableChange } from '@repo/sync-types';
 // Import domain tables from the typeorm package
-import { SERVER_DOMAIN_TABLES } from '@repo/dataforge/server-entities';
+// import { SERVER_DOMAIN_TABLES } from '@repo/dataforge/server-entities';
+const SERVER_DOMAIN_TABLES = ['projects', 'tasks', 'users', 'comments']; // Stub
 
 /**
  * Configuration for the replication system

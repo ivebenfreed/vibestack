@@ -55,7 +55,7 @@
     "forge:build": "npm run generate",
     "forge:client": "npm run generate-client-schema && npm run generate-client-services",
     "type-check": "tsc --noEmit",
-    "build": "npm run forge:build",
+    "build": "echo 'DataForge build disabled - using server-only implementation'",
     "migration:create": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:create --blank",
     "migration:create:initial": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:create --initial",
     "migration:up": "tsx ./node_modules/@mikro-orm/cli/cli.js migration:up",

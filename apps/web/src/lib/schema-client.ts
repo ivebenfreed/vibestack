@@ -1,0 +1,333 @@
+/**
+ * Client-Side Schema Loading
+ * 
+ * Loads organization-specific entity schemas from the server API.
+ * Provides caching and real-time updates for dynamic entity schemas.
+ */
+
+export interface OrgEntitySchema {
+  orgId: string;
+  entities: Record<string, EntityDefinition>;
+  version: string;
+}
+
+export interface EntityDefinition {
+  extends: string;
+  tableName: string;
+  syncableFields: Record<string, FieldDefinition>;
+}
+
+export interface FieldDefinition {
+  type: string;
+  required?: boolean;
+  syncable?: boolean;
+  enum?: string[];
+  validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+  };
+}
+
+export interface SchemaLoadResult {
+  success: boolean;
+  schema?: OrgEntitySchema;
+  error?: string;
+  cached?: boolean;
+}
+
+export class OrgSchemaClient {
+  private cache = new Map<string, { schema: OrgEntitySchema; timestamp: number }>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly BASE_URL = '/api/dataforge';
+
+  /**
+   * Load schema for an organization with caching
+   */
+  async loadOrgSchema(orgId: string): Promise<SchemaLoadResult> {
+    try {
+      // Check cache first
+      const cached = this.getCachedSchema(orgId);
+      if (cached) {
+        return {
+          success: true,
+          schema: cached,
+          cached: true
+        };
+      }
+
+      // Fetch from server
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/schema`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Schema loading failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error loading schema'
+        };
+      }
+
+      const schema = result.schema as OrgEntitySchema;
+      
+      // Cache the schema
+      this.cacheSchema(orgId, schema);
+
+      return {
+        success: true,
+        schema: schema,
+        cached: false
+      };
+    } catch (error) {
+      console.error('Failed to load org schema:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Get schema for specific entity
+   */
+  async getEntitySchema(orgId: string, entityName: string): Promise<EntityDefinition | null> {
+    const result = await this.loadOrgSchema(orgId);
+    if (!result.success || !result.schema) {
+      return null;
+    }
+
+    return result.schema.entities[entityName] || null;
+  }
+
+  /**
+   * Get all syncable fields for an entity
+   */
+  async getSyncableFields(orgId: string, entityName: string): Promise<Record<string, FieldDefinition> | null> {
+    const entitySchema = await this.getEntitySchema(orgId, entityName);
+    if (!entitySchema) {
+      return null;
+    }
+
+    // Filter only syncable fields
+    const syncableFields: Record<string, FieldDefinition> = {};
+    for (const [fieldName, fieldDef] of Object.entries(entitySchema.syncableFields)) {
+      if (fieldDef.syncable !== false) {
+        syncableFields[fieldName] = fieldDef;
+      }
+    }
+
+    return syncableFields;
+  }
+
+  /**
+   * Generate form fields from entity schema
+   */
+  async generateFormFields(orgId: string, entityName: string): Promise<FormFieldConfig[]> {
+    const syncableFields = await this.getSyncableFields(orgId, entityName);
+    if (!syncableFields) {
+      return [];
+    }
+
+    const formFields: FormFieldConfig[] = [];
+
+    for (const [fieldName, fieldDef] of Object.entries(syncableFields)) {
+      const formField: FormFieldConfig = {
+        name: fieldName,
+        label: this.generateFieldLabel(fieldName),
+        type: this.mapFieldTypeToInputType(fieldDef.type),
+        required: fieldDef.required || false,
+        validation: fieldDef.validation
+      };
+
+      // Add enum options if available
+      if (fieldDef.enum) {
+        formField.options = fieldDef.enum.map(value => ({
+          value,
+          label: this.generateOptionLabel(value)
+        }));
+      }
+
+      formFields.push(formField);
+    }
+
+    return formFields;
+  }
+
+  /**
+   * Validate data against entity schema
+   */
+  async validateEntityData(orgId: string, entityName: string, data: any): Promise<ValidationResult> {
+    const entitySchema = await this.getEntitySchema(orgId, entityName);
+    if (!entitySchema) {
+      return {
+        valid: false,
+        errors: [`Entity schema not found: ${entityName}`]
+      };
+    }
+
+    const errors: string[] = [];
+    const syncableFields = entitySchema.syncableFields;
+
+    // Validate required fields
+    for (const [fieldName, fieldDef] of Object.entries(syncableFields)) {
+      if (fieldDef.required && (data[fieldName] === undefined || data[fieldName] === null || data[fieldName] === '')) {
+        errors.push(`Field ${fieldName} is required`);
+      }
+
+      // Validate field types
+      if (data[fieldName] !== undefined && data[fieldName] !== null) {
+        const typeError = this.validateFieldType(fieldName, data[fieldName], fieldDef);
+        if (typeError) {
+          errors.push(typeError);
+        }
+      }
+
+      // Validate enums
+      if (fieldDef.enum && data[fieldName] && !fieldDef.enum.includes(data[fieldName])) {
+        errors.push(`Field ${fieldName} must be one of: ${fieldDef.enum.join(', ')}`);
+      }
+
+      // Validate patterns
+      if (fieldDef.validation?.pattern && data[fieldName]) {
+        const regex = new RegExp(fieldDef.validation.pattern);
+        if (!regex.test(data[fieldName])) {
+          errors.push(`Field ${fieldName} does not match required pattern`);
+        }
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors: errors
+    };
+  }
+
+  /**
+   * Clear cache for organization
+   */
+  clearCache(orgId?: string): void {
+    if (orgId) {
+      this.cache.delete(orgId);
+    } else {
+      this.cache.clear();
+    }
+  }
+
+  /**
+   * Preload schemas for multiple organizations
+   */
+  async preloadSchemas(orgIds: string[]): Promise<void> {
+    await Promise.all(orgIds.map(orgId => this.loadOrgSchema(orgId)));
+  }
+
+  // Private helper methods
+
+  private getCachedSchema(orgId: string): OrgEntitySchema | null {
+    const cached = this.cache.get(orgId);
+    if (!cached) {
+      return null;
+    }
+
+    // Check if cache is still valid
+    const now = Date.now();
+    if (now - cached.timestamp > this.CACHE_TTL) {
+      this.cache.delete(orgId);
+      return null;
+    }
+
+    return cached.schema;
+  }
+
+  private cacheSchema(orgId: string, schema: OrgEntitySchema): void {
+    this.cache.set(orgId, {
+      schema,
+      timestamp: Date.now()
+    });
+  }
+
+  private generateFieldLabel(fieldName: string): string {
+    // Convert camelCase to Title Case
+    return fieldName
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  }
+
+  private generateOptionLabel(value: string): string {
+    // Convert kebab-case or snake_case to Title Case
+    return value
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  private mapFieldTypeToInputType(fieldType: string): string {
+    switch (fieldType) {
+      case 'string': return 'text';
+      case 'number': return 'number';
+      case 'boolean': return 'checkbox';
+      case 'text': return 'textarea';
+      case 'array': return 'select';
+      default: return 'text';
+    }
+  }
+
+  private validateFieldType(fieldName: string, value: any, fieldDef: FieldDefinition): string | null {
+    switch (fieldDef.type) {
+      case 'string':
+        if (typeof value !== 'string') {
+          return `Field ${fieldName} must be a string`;
+        }
+        break;
+      case 'number':
+        if (typeof value !== 'number' && !isNaN(Number(value))) {
+          return `Field ${fieldName} must be a number`;
+        }
+        break;
+      case 'boolean':
+        if (typeof value !== 'boolean') {
+          return `Field ${fieldName} must be a boolean`;
+        }
+        break;
+      case 'array':
+        if (!Array.isArray(value)) {
+          return `Field ${fieldName} must be an array`;
+        }
+        break;
+    }
+    return null;
+  }
+}
+
+// Types for form generation
+export interface FormFieldConfig {
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+  };
+  options?: Array<{
+    value: string;
+    label: string;
+  }>;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+// Singleton instance
+export const orgSchemaClient = new OrgSchemaClient();

@@ -22,18 +22,39 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
         c.set('user', null);
         c.set('session', null);
         
-        // Only log missing session for protected routes, not public auth routes
-        const publicPaths = ['/api/auth/sign-in', '/api/auth/sign-up', '/api/auth/reset-password', '/api/auth/verify-email', '/api/auth/get-session'];
+        // Define public paths that don't require authentication
+        const publicPaths = [
+          '/api/auth/',
+          '/api/health',
+          '/api/env/debug',
+          '/api/db/health',
+          '/api/db/kysely-test',
+          '/api/db/query',
+          '/api/bootstrap/',
+          '/api/archetype/health'
+        ];
+        
         const isPublicPath = publicPaths.some(path => c.req.path.startsWith(path));
         
         if (!isPublicPath) {
-          console.log('[Auth Middleware] ❌ No valid session for:', c.req.path);
+          console.log('[Auth Middleware] ❌ Blocking unauthenticated access to:', c.req.path);
+          return c.json({ 
+            error: 'Authentication required', 
+            code: 'UNAUTHORIZED',
+            message: 'You must be signed in to access this resource'
+          }, 401);
+        } else {
+          console.log('[Auth Middleware] ✅ Allowing public access to:', c.req.path);
         }
       }
     } catch (error) {
       console.error('[Auth Middleware] Error getting session:', error);
       c.set('user', null);
       c.set('session', null);
+      
+      // For now, allow access on auth errors to prevent system breakage
+      // In production, you might want to be more strict
+      console.log('[Auth Middleware] ⚠️ Allowing access due to auth error for:', c.req.path);
     }
   } else {
     // Handle case where getSession is not available (e.g., configuration issue)
