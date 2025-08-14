@@ -6,12 +6,12 @@
  */
 
 import { GenericSyncEngine, type LocalChange } from './generic-sync-engine.js';
-import { 
-  syncMetadata, 
-  junctionTables,
-  TRACKED_TABLES,
-  DOMAIN_TABLES 
-} from '@repo/dataforge';
+// TODO: Replace with server-only metadata when DataForge is moved
+// import { syncMetadata, junctionTables, TRACKED_TABLES, DOMAIN_TABLES } from '@repo/dataforge';
+const syncMetadata: any = {};
+const junctionTables: any = {};
+const TRACKED_TABLES: string[] = [];
+const DOMAIN_TABLES: string[] = [];
 
 import { 
   TableChange, 

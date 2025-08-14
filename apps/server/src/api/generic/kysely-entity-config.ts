@@ -4,7 +4,9 @@
  * Maps entity names to their table names and optional business methods
  */
 
-import type { TableName } from '@repo/dataforge/kysely-types';
+// TODO: Replace with server-only types when DataForge is moved
+// import type { TableName } from '@repo/dataforge/kysely-types';
+type TableName = string;
 import type { KyselyEntityConfig } from './KyselyGenericApiAdapter';
 
 // Entity-specific business logic methods can be defined here

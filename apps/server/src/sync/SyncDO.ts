@@ -17,6 +17,7 @@ import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebS
 import { ClientRegistryManager, type ClientRegistryManagerContext } from './client-registry-manager';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
 import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
+import { OrgAwareSyncManager, type SyncConnection } from './org-aware-sync-manager';
 
 import type { 
   ServerMessage, 
@@ -50,6 +51,10 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   private ctx: DurableObjectState;
   private clientId: string = '';
   private syncId: string;
+  
+  // Organization-aware sync context
+  private syncConnection: SyncConnection | null = null;
+  private orgAwareSyncManager!: OrgAwareSyncManager;
   
   // Service modules
   private stateManager: SyncStateManager;
@@ -88,6 +93,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }
     };
     this.stateManager = new SyncStateManager(context, state as any);
+    
+    // Initialize organization-aware sync manager
+    this.orgAwareSyncManager = new OrgAwareSyncManager(this.env, context);
     
     // Initialize service modules
     this.initializeServices();
@@ -192,62 +200,237 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   }
 
   /**
-   * Handle WebSocket upgrade requests
+   * Handle WebSocket upgrade requests with organization validation
    */
   private async handleWebSocketUpgrade(request: Request): Promise<Response> {
+    // 1. Extract client parameters
+    const clientId = getQueryParam(request, 'clientId');
+    const organizationSlug = getQueryParam(request, 'org') || getQueryParam(request, 'organization');
+    const rawLSN = getQueryParam(request, 'lsn');
+    const clientLSN = rawLSN || '0/0';
+    
+    if (!clientId) {
+      syncLogger.error('WebSocket upgrade rejected - missing clientId', {
+        url: request.url
+      }, MODULE_NAME);
+      return new Response('Missing clientId parameter', { status: 400 });
+    }
+
+    // 2. Validate organization access BEFORE WebSocket upgrade
+    const validation = await this.orgAwareSyncManager.validateSyncConnection(
+      request,
+      clientId,
+      organizationSlug
+    );
+
+    if (!validation.isValid) {
+      syncLogger.error('WebSocket upgrade rejected - organization validation failed', {
+        clientId,
+        organizationSlug,
+        error: validation.error
+      }, MODULE_NAME);
+      return new Response(validation.error || 'Organization access denied', { status: 403 });
+    }
+
+    // 3. Store validated connection context
+    this.syncConnection = validation.connection!;
+    this.clientId = clientId;
+
+    syncLogger.info('WebSocket connection validated for organization', {
+      clientId,
+      userId: this.syncConnection.userId,
+      organizationId: this.syncConnection.organizationId,
+      organizationSlug: this.syncConnection.organizationSlug,
+      userRole: this.syncConnection.userRole,
+      rawLSN,
+      clientLSN,
+      defaultedTo0: !rawLSN
+    }, MODULE_NAME);
+
+    // 4. Proceed with WebSocket upgrade
     const response = await this.webSocketManager.handleWebSocketUpgrade(request);
     
     if (response.status === 101) {
-      // WebSocket upgrade successful, extract client info and start sync
-      const clientId = getQueryParam(request, 'clientId');
-      const rawLSN = getQueryParam(request, 'lsn');
-      const clientLSN = rawLSN || '0/0';
+      // WebSocket upgrade successful - register handlers and start sync
+      this.registerMessageHandlers();
       
-      syncLogger.info('WebSocket connection params', {
-        clientId,
-        rawLSN,
-        clientLSN,
-        defaultedTo0: !rawLSN,
-        url: request.url,
-        queryString: new URL(request.url).search
-      }, MODULE_NAME);
-      
-      if (clientId) {
-        this.clientId = clientId;
-        
-        // Register message handlers
-        this.registerMessageHandlers();
-        
-        // Start sync process after connection is established
-        this.state.waitUntil(this.startSyncProcess(clientId, clientLSN));
-      }
+      // Start org-aware sync process
+      this.state.waitUntil(this.startOrgAwareSyncProcess(clientId, clientLSN));
+    } else {
+      // WebSocket upgrade failed - clear connection context
+      this.syncConnection = null;
+      this.clientId = '';
     }
     
     return response;
   }
 
   /**
-   * Start sync process after WebSocket connection is established
+   * Start organization-aware sync process after WebSocket connection is established
    */
-  private async startSyncProcess(clientId: string, clientLSN: string): Promise<void> {
+  private async startOrgAwareSyncProcess(clientId: string, clientLSN: string): Promise<void> {
     try {
+      if (!this.syncConnection) {
+        throw new Error('No validated sync connection available');
+      }
+
+      syncLogger.info('Starting org-aware sync process', {
+        clientId,
+        userId: this.syncConnection.userId,
+        organizationId: this.syncConnection.organizationId,
+        clientLSN
+      }, MODULE_NAME);
+
       // Wait for WebSocket connection to be established
       await this.webSocketManager.waitForConnection();
       
       // Ensure replication is active
       await this.ensureReplicationActive();
       
-      // Determine sync strategy and perform sync
+      // Determine sync strategy and perform org-aware sync
       const { strategy, serverLSN } = await this.syncStrategyAnalyzer.determineSyncStrategy(clientId, clientLSN);
-      await this.syncStrategyAnalyzer.performSync({ strategy, serverLSN }, clientId, clientLSN);
+      await this.performOrgAwareSync(strategy, serverLSN, clientId, clientLSN);
       
     } catch (error) {
-      syncLogger.error('WebSocket sync error', {
+      syncLogger.error('Organization-aware sync error', {
         clientId,
+        userId: this.syncConnection?.userId,
+        organizationId: this.syncConnection?.organizationId,
         lsn: clientLSN,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
+
+      // Send error to client
+      if (this.syncConnection) {
+        await this.send({
+          type: 'sync-error',
+          error: 'Organization sync failed',
+          details: error instanceof Error ? error.message : String(error)
+        } as any);
+      }
     }
+  }
+
+  /**
+   * Perform organization-aware sync with permission filtering
+   */
+  private async performOrgAwareSync(
+    strategy: SyncStrategy,
+    serverLSN: string,
+    clientId: string,
+    clientLSN: string
+  ): Promise<void> {
+    if (!this.syncConnection) {
+      throw new Error('No validated sync connection for org-aware sync');
+    }
+
+    try {
+      switch (strategy) {
+        case SyncStrategy.INITIAL_SYNC:
+          await this.performOrgAwareInitialSync(clientId, serverLSN);
+          break;
+        case SyncStrategy.CATCHUP_SYNC:
+          await this.performOrgAwareCatchupSync(clientId, clientLSN, serverLSN);
+          break;
+        case SyncStrategy.LIVE_SYNC:
+          await this.startOrgAwareLiveSync(clientId);
+          break;
+        default:
+          throw new Error(`Unknown sync strategy: ${strategy}`);
+      }
+    } catch (error) {
+      syncLogger.error('Org-aware sync strategy failed', {
+        strategy,
+        clientId,
+        userId: this.syncConnection.userId,
+        organizationId: this.syncConnection.organizationId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform organization-aware initial sync
+   */
+  private async performOrgAwareInitialSync(clientId: string, serverLSN: string): Promise<void> {
+    if (!this.syncConnection) return;
+
+    syncLogger.info('Starting org-aware initial sync', {
+      clientId,
+      userId: this.syncConnection.userId,
+      organizationId: this.syncConnection.organizationId,
+      serverLSN
+    }, MODULE_NAME);
+
+    // Use existing initial sync but with org-aware filtering
+    // The performInitialSync function will need to be enhanced to accept org context
+    await performInitialSync(
+      this.getContext(),
+      clientId,
+      this,
+      serverLSN,
+      {
+        organizationId: this.syncConnection.organizationId,
+        userId: this.syncConnection.userId,
+        syncConnection: this.syncConnection
+      }
+    );
+
+    syncLogger.info('Org-aware initial sync completed', {
+      clientId,
+      userId: this.syncConnection.userId,
+      organizationId: this.syncConnection.organizationId
+    }, MODULE_NAME);
+  }
+
+  /**
+   * Perform organization-aware catchup sync
+   */
+  private async performOrgAwareCatchupSync(
+    clientId: string,
+    clientLSN: string,
+    serverLSN: string
+  ): Promise<void> {
+    if (!this.syncConnection) return;
+
+    syncLogger.info('Starting org-aware catchup sync', {
+      clientId,
+      userId: this.syncConnection.userId,
+      organizationId: this.syncConnection.organizationId,
+      clientLSN,
+      serverLSN
+    }, MODULE_NAME);
+
+    // Perform catchup sync with organization filtering
+    // This will need to query changes between clientLSN and serverLSN
+    // but filter only tables belonging to the user's organization
+    await this.syncStrategyAnalyzer.performSync(
+      { strategy: SyncStrategy.CATCHUP_SYNC, serverLSN },
+      clientId,
+      clientLSN
+    );
+  }
+
+  /**
+   * Start organization-aware live sync
+   */
+  private async startOrgAwareLiveSync(clientId: string): Promise<void> {
+    if (!this.syncConnection) return;
+
+    syncLogger.info('Starting org-aware live sync', {
+      clientId,
+      userId: this.syncConnection.userId,
+      organizationId: this.syncConnection.organizationId
+    }, MODULE_NAME);
+
+    // Live sync is already handled by the message handlers
+    // The filtering will happen in sendLiveChangesWithLSN
+    await this.send({
+      type: 'sync-ready',
+      organizationId: this.syncConnection.organizationId,
+      userId: this.syncConnection.userId
+    } as any);
   }
 
   /**
@@ -295,19 +478,24 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         providedLSN: providedLSN || 'none'
       }, MODULE_NAME);
 
+      // Apply organization-aware filtering to changes
+      const orgFilteredChanges = await this.filterChangesForOrganization(changes);
+
       // Process the changes based on type
       if (isConflictResolution) {
         // Conflict resolution - send directly to client without anti-echo
-        await this.sendLiveChangesWithLSN(changes, clientId, true, providedLSN);
+        await this.sendLiveChangesWithLSN(orgFilteredChanges, clientId, true, providedLSN);
       } else if (directBroadcast) {
         // Direct broadcast from another SyncDO - apply anti-echo if needed
-        const filteredChanges = originClientId === clientId ? [] : changes;
-        if (filteredChanges.length > 0) {
-          await this.sendLiveChangesWithLSN(filteredChanges, clientId, false, providedLSN);
+        const antiEchoFiltered = originClientId === clientId ? [] : orgFilteredChanges;
+        if (antiEchoFiltered.length > 0) {
+          await this.sendLiveChangesWithLSN(antiEchoFiltered, clientId, false, providedLSN);
         }
       } else {
-        // Changes from ReplicationDO - normal processing
-        await this.sendLiveChangesWithLSN(changes, clientId, false, providedLSN);
+        // Changes from ReplicationDO - normal processing with org filtering
+        if (orgFilteredChanges.length > 0) {
+          await this.sendLiveChangesWithLSN(orgFilteredChanges, clientId, false, providedLSN);
+        }
       }
 
       return new Response('OK', { status: 200 });
@@ -351,17 +539,66 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   }
 
   /**
-   * Send live changes to client with optional LSN
+   * Filter changes by organization access and permissions
+   */
+  private async filterChangesForOrganization(changes: TableChange[]): Promise<TableChange[]> {
+    if (!this.syncConnection) {
+      // No org context - block all changes for security
+      syncLogger.warn('No organization context - blocking all changes', {
+        changeCount: changes.length
+      }, MODULE_NAME);
+      return [];
+    }
+
+    try {
+      // Use OrgAwareSyncManager to filter changes
+      const filteredChanges = await this.orgAwareSyncManager.filterChangesByOrg(
+        changes,
+        this.syncConnection,
+        'read' // Live changes are read operations
+      );
+
+      if (filteredChanges.length < changes.length) {
+        syncLogger.debug('Changes filtered by organization', {
+          userId: this.syncConnection.userId,
+          organizationId: this.syncConnection.organizationId,
+          originalCount: changes.length,
+          filteredCount: filteredChanges.length
+        }, MODULE_NAME);
+      }
+
+      return filteredChanges;
+    } catch (error) {
+      syncLogger.error('Failed to filter changes for organization', {
+        userId: this.syncConnection?.userId,
+        organizationId: this.syncConnection?.organizationId,
+        changeCount: changes.length,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+
+      // Return empty array on error for security
+      return [];
+    }
+  }
+
+  /**
+   * Send live changes to client with optional LSN and organization filtering
    */
   private async sendLiveChangesWithLSN(changes: TableChange[], clientId: string, skipAntiEcho: boolean, providedLSN?: string | null): Promise<void> {
     // Use queue if currently processing client changes to avoid conflicts
     if (this.isProcessingClientChanges && !skipAntiEcho) {
       this.pendingLiveUpdates.push(async () => {
-        await sendLiveChanges(this.getContext(), clientId, changes, this, providedLSN || undefined);
+        // Apply organization filtering before sending
+        const filteredChanges = await this.filterChangesForOrganization(changes);
+        if (filteredChanges.length > 0) {
+          await sendLiveChanges(this.getContext(), clientId, filteredChanges, this, providedLSN || undefined);
+        }
       });
       
       syncLogger.debug('Queued live changes due to processing lock', {
         clientId,
+        userId: this.syncConnection?.userId,
+        organizationId: this.syncConnection?.organizationId,
         changeCount: changes.length,
         queueLength: this.pendingLiveUpdates.length,
         providedLSN: providedLSN || 'none'
@@ -370,8 +607,11 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       return;
     }
     
-    // Send changes immediately
-    await sendLiveChanges(this.getContext(), clientId, changes, this, providedLSN || undefined);
+    // Apply organization filtering and send changes immediately
+    const filteredChanges = await this.filterChangesForOrganization(changes);
+    if (filteredChanges.length > 0) {
+      await sendLiveChanges(this.getContext(), clientId, filteredChanges, this, providedLSN || undefined);
+    }
   }
 
   /**
@@ -492,6 +732,44 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         props: undefined
       }
     };
+  }
+
+  /**
+   * Get organization context for sync operations
+   */
+  getOrganizationContext(): SyncConnection | null {
+    return this.syncConnection;
+  }
+
+  /**
+   * Check if connection is valid and refresh if needed
+   */
+  private async validateConnection(): Promise<boolean> {
+    if (!this.syncConnection) {
+      return false;
+    }
+
+    // Check if connection needs refresh
+    if (!this.orgAwareSyncManager.isConnectionValid(this.syncConnection)) {
+      syncLogger.info('Refreshing expired sync connection', {
+        userId: this.syncConnection.userId,
+        organizationId: this.syncConnection.organizationId,
+        age: Date.now() - this.syncConnection.validatedAt.getTime()
+      }, MODULE_NAME);
+
+      const refreshed = await this.orgAwareSyncManager.refreshConnectionValidation(this.syncConnection);
+      
+      if (refreshed) {
+        this.syncConnection = refreshed;
+        return true;
+      } else {
+        // Connection refresh failed - clear connection
+        this.syncConnection = null;
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // WebSocketHandler implementation

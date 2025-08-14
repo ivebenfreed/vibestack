@@ -2,7 +2,7 @@ services:
   postgres:
     container_name: vibestack-postgres
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile.postgres
     command: >
       postgres

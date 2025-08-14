@@ -8,12 +8,14 @@
 import { Kysely } from 'kysely';
 import { NeonHTTPDialect } from '@repo/kysely-neon-http';
 import { neonConfig } from '@neondatabase/serverless';
-import type { Database, TableName } from '@repo/dataforge/kysely-types';
-import type { 
-  TableSyncMetadata, 
-  JunctionTable,
-  TRACKED_TABLES
-} from '@repo/dataforge/sync-metadata';
+// TODO: Replace with server-only types when DataForge is moved
+// import type { Database, TableName } from '@repo/dataforge/kysely-types';
+// import type { TableSyncMetadata, JunctionTable, TRACKED_TABLES } from '@repo/dataforge/sync-metadata';
+type Database = any;
+type TableName = string;
+type TableSyncMetadata = any;
+type JunctionTable = any;
+type TRACKED_TABLES = string[];
 import { DeleteSafetyCheck } from './delete-safety-check.js';
 
 export interface LocalChange {

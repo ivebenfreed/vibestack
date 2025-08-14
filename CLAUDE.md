@@ -11,21 +11,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## MANDATORY: Automatic tmux Integration
+## Development Server Management
 
-**IMPORTANT**: Claude Code is configured to automatically redirect all long-running development commands to tmux background sessions. This happens transparently via PreToolUse hooks.
+**IMPORTANT**: Claude Code now has native support for background processes. Use the `run_in_background` parameter with the Bash tool for long-running commands.
 
-### Commands Automatically Redirected to tmux:
-- `pnpm dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `pnpm dev:local` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `pnpm dev:server` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `pnpm dev:web` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `pnpm build --watch` → Runs in `vibestack-build-issue-{N}` tmux session (worktree-specific)
-- `pnpm test --watch` → Runs in `vibestack-test-issue-{N}` tmux session (worktree-specific)
-- `npm run dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `yarn dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `wrangler dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
-- `npx wrangler dev` → Runs in `vibestack-dev-issue-{N}` tmux session (worktree-specific)
+### Running Development Servers in Background:
+```bash
+# Use native Claude Code background support
+Bash(command="pnpm dev", run_in_background=true)
+Bash(command="pnpm dev:local", run_in_background=true)
+Bash(command="pnpm dev:server", run_in_background=true)
+Bash(command="pnpm dev:web", run_in_background=true)
+Bash(command="pnpm build --watch", run_in_background=true)
+Bash(command="pnpm test --watch", run_in_background=true)
+```
+
+### Monitoring Background Processes:
+- Use `BashOutput` tool to check logs from background processes
+- Use `KillBash` tool to stop background processes
+- Background processes continue running even if Claude disconnects
 
 ### POC Server Management:
 For running POC servers (like Function Factory POCs) that need persistent background execution, create simple tmux sessions manually:
@@ -44,31 +48,24 @@ tmux kill-session -t poc-server
 ### Server-Only Development:
 For working on server-only DataForge development without the webapp:
 ```bash
-# Create dedicated tmux session for server-only development
-tmux new-session -d -s server-only "cd apps/server && pnpm dev --port 8787"
-
-# Check server logs
-tmux attach -t server-only
+# Use regular dev start - webapp won't interfere with server testing
+./scripts/dev-start.sh
 
 # API testing workflow
 curl -X GET http://localhost:8787/health
 psql postgres://localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
-
-# Kill session when done
-tmux kill-session -t server-only
 ```
 
-### How It Works:
-1. PreToolUse hook intercepts all Bash commands
-2. Development commands are automatically wrapped with `./scripts/tmux-bg.sh`
-3. Commands run in background without blocking Claude Code
-4. Use `./scripts/bg-status.sh` to check running processes
-5. Use `./scripts/bg-logs.sh <session>` to view logs
+### Alternative: tmux-based Management (if preferred):
+If you prefer using tmux scripts instead of native background support:
+1. Use `./scripts/tmux-bg.sh <session-name> <command>` to start processes in tmux
+2. Use `./scripts/bg-status.sh` to check running processes
+3. Use `./scripts/bg-logs.sh <session>` to view logs
+4. Use `./scripts/bg-stop.sh <session>` to stop processes
 
 ### DO NOT:
-- Run dev servers directly (they will be redirected automatically)
-- Use `&` or `nohup` for background processes (use tmux instead)
-- Kill processes with `pkill` (use `./scripts/bg-stop.sh`)
+- Use `&` or `nohup` for background processes (use native background or tmux)
+- Kill processes with `pkill` (use `KillBash` or `./scripts/bg-stop.sh`)
 
 ## CRITICAL: Neon Proxy Requirements
 

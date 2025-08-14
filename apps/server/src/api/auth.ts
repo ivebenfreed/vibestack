@@ -59,6 +59,60 @@ const adminAuthMiddleware = async (c: any, next: any) => {
   await next();
 };
 
+// Test database connection - TEMPORARY DEBUG ENDPOINT
+authRouter.post("/test-signup", async (c) => {
+  try {
+    const body = await c.req.json();
+    const authInstance = getAuth(c);
+    
+    console.log('[Test Signup] Attempting programmatic signup with:', body);
+    
+    // Try using the programmatic API directly
+    try {
+      const result = await authInstance.api.signUpEmail({
+        body: {
+          email: body.email,
+          password: body.password,
+          name: body.name
+        },
+        asResponse: false
+      });
+      
+      console.log('[Test Signup] Success:', result);
+      return c.json({ 
+        success: true,
+        result: result
+      });
+    } catch (apiError) {
+      console.error('[Test Signup] API Error:', apiError);
+      console.error('[Test Signup] API Error Stack:', apiError instanceof Error ? apiError.stack : 'No stack');
+      console.error('[Test Signup] API Error Details:', JSON.stringify(apiError, null, 2));
+      
+      // Try to get more details about the error
+      if (apiError instanceof Error) {
+        return c.json({ 
+          error: 'Signup API failed',
+          message: apiError.message,
+          name: apiError.name,
+          stack: apiError.stack,
+          details: JSON.stringify(apiError)
+        }, 400);
+      }
+      
+      return c.json({ 
+        error: 'Signup API failed',
+        details: apiError
+      }, 400);
+    }
+  } catch (error) {
+    console.error('[Test Signup] Outer Error:', error);
+    return c.json({ 
+      error: 'Test signup failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
 // List all users (admin only)
 authRouter.get("/admin/users", adminAuthMiddleware, async (c) => {
   try {
@@ -556,101 +610,72 @@ authRouter.post("/admin/users/invite", adminAuthMiddleware, async (c) => {
 // Handle only POST and GET for other better-auth routes (sign-in, session, etc.)
 // This should come AFTER specific routes like /admin/users
 authRouter.on(["POST", "GET"], "/*", async (c) => {
-  const origin = c.req.header('Origin');
-  console.log(`[Auth Router] Handling path: ${c.req.path}, Method: ${c.req.method}, Origin: ${origin}`);
-  
-  // Add specific logging for OTP endpoints
-  if (c.req.path.includes('email-otp') || c.req.path.includes('otp')) {
-    console.log('[Auth Router] OTP endpoint detected');
-    if (c.req.method === 'POST') {
-      try {
-        const body = await c.req.text();
-        const parsed = JSON.parse(body);
-        console.log('[Auth Router] OTP request:', {
-          email: parsed.email,
-          otpLength: parsed.otp?.length,
-          endpoint: c.req.path
-        });
-        // Create new request with the body we just read
-        const request = new Request(c.req.raw.url, {
-          method: c.req.method,
-          headers: c.req.raw.headers,
-          body: body
-        });
-        c.req.raw = request;
-      } catch (e) {
-        console.log('[Auth Router] Could not parse OTP request body');
-      }
-    }
-  }
-
-  // Sanitized logging for auth requests (no sensitive data)
-  if (c.req.path.startsWith('/api/auth/') && c.req.method === 'POST') {
-    try {
-      const bodyText = await c.req.text();
-      const sanitizedLog = sanitizeAuthRequest(c.req.path, bodyText);
-      console.log('[Auth Router] Request info:', sanitizedLog);
-      // Create new request with the body we just read
-      const request = new Request(c.req.raw.url, {
-        method: c.req.method,
-        headers: c.req.raw.headers,
-        body: bodyText
-      });
-      c.req.raw = request;
-    } catch (e) {
-      console.log('[Auth Router] Could not parse auth request body:', e);
-    }
-  }
-
-  const authInstance = getAuth(c);
-  
-  // Debug: Check if authInstance has database config
-  console.log('[Auth Router] Auth instance debug:', {
-    hasHandler: !!authInstance.handler,
-    hasDatabase: !!authInstance.options?.database,
-    databaseType: authInstance.options?.database?.type || 'unknown',
-    baseUrl: authInstance.options?.baseURL || authInstance.options?.baseUrl || 'not set',
-    environment: c.env.ENVIRONMENT,
-    databaseUrlExists: !!c.env.DATABASE_URL,
-    requestUrl: c.req.raw.url
-  });
+  console.log(`[Auth Router] Handling path: ${c.req.path}, Method: ${c.req.method}`);
   
   try {
-    // Better Auth expects the raw request directly
-    // It will handle the path routing internally
-    const response = await authInstance.handler(c.req.raw);
-    console.log(`[Auth Router] Handler returned response with status: ${response.status}`);
-    
-    // Log error responses (without sensitive data)
-    if (response.status >= 400) {
-      console.log(`[Auth Router] Error response for ${c.req.path}: ${response.status} ${response.statusText}`);
+    // Add more debugging for sign-up requests
+    if (c.req.path.includes('sign-up')) {
+      console.log(`[Auth Router DEBUG] Processing sign-up request`);
+      console.log(`[Auth Router DEBUG] Request URL:`, c.req.url);
+      console.log(`[Auth Router DEBUG] Request method:`, c.req.method);
       
-      // Try to get error details from response
+      // Try to log the request body
       try {
-        const responseText = await response.clone().text();
-        if (responseText) {
-          console.log(`[Auth Router] Error details:`, responseText.substring(0, 500));
+        const bodyText = await c.req.text();
+        console.log(`[Auth Router DEBUG] Request body:`, bodyText);
+        
+        // Re-create the request with the body
+        const newRequest = new Request(c.req.raw.url, {
+          method: c.req.raw.method,
+          headers: c.req.raw.headers,
+          body: bodyText
+        });
+        
+        // Get auth instance and pass the new request
+        const authInstance = getAuth(c);
+        const result = await authInstance.handler(newRequest);
+        
+        // Log the response for debugging
+        if (result.status !== 200) {
+          const responseText = await result.text();
+          console.log(`[Auth Router] Signup failed with status ${result.status}:`, responseText);
+          
+          // Try to parse the response
+          try {
+            const errorData = JSON.parse(responseText);
+            console.log(`[Auth Router ERROR] Error details:`, JSON.stringify(errorData, null, 2));
+          } catch (e) {
+            console.log(`[Auth Router ERROR] Could not parse error response:`, responseText);
+          }
+          
+          // Create a new response since we consumed the original
+          return new Response(responseText, {
+            status: result.status,
+            headers: result.headers
+          });
         }
-      } catch (e) {
-        // Ignore if we can't read response
+        
+        return result;
+      } catch (bodyError) {
+        console.error(`[Auth Router] Error reading request body:`, bodyError);
+        throw bodyError;
       }
     }
-
-    return response;
-
-  } catch (error) {
-    console.error("[Auth Router] Error in Better Auth handler:", error);
-    console.error("[Auth Router] Error stack:", error instanceof Error ? error.stack : 'No stack');
     
-    // Return a simple error response
-    const errorResponse = new Response(JSON.stringify({ 
-      error: "Internal Auth Error",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-    return errorResponse;
+    // For non-signup routes, handle normally
+    const authInstance = getAuth(c);
+    const result = await authInstance.handler(c.req.raw);
+    return result;
+    
+  } catch (error) {
+    console.error(`[Auth Router] CAUGHT ERROR in ${c.req.path}:`, error);
+    console.error(`[Auth Router] Error message:`, error instanceof Error ? error.message : 'Unknown');
+    console.error(`[Auth Router] Error stack:`, error instanceof Error ? error.stack : 'No stack');
+    console.error(`[Auth Router] Error details:`, JSON.stringify(error, null, 2));
+    return c.json({ 
+      error: 'Authentication service error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
   }
 });
 

@@ -3,8 +3,9 @@ import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Env } from '../types/env';
 import { dbLogger } from '../middleware/logger';
 
-// Import the generated Kysely types
-import type { Database } from '@repo/dataforge/kysely-types';
+// TODO: Replace with server-only schema when DataForge is moved
+// import type { Database } from '@repo/dataforge/kysely-types';
+type Database = any; // Temporary stub
 
 let kyselyInstance: Kysely<Database> | null = null;
 
@@ -31,12 +32,15 @@ export function getKysely(env: Env): Kysely<Database> {
     }),
     log: (event) => {
       if (event.level === 'query') {
+        console.log('🔍 KYSELY QUERY:', event.query.sql);
+        console.log('📝 PARAMETERS:', event.query.parameters);
         dbLogger.debug('Kysely Query', {
           sql: event.query.sql,
           parameters: event.query.parameters,
           duration: event.queryDurationMillis
         }, 'kysely');
       } else if (event.level === 'error') {
+        console.log('❌ KYSELY ERROR:', event.error);
         dbLogger.error('Kysely Error', event.error, undefined, 'kysely');
       }
     }

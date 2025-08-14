@@ -50,6 +50,7 @@ import { Route as AuthenticatedDebugVibeganttTestImport } from './routes/_authen
 import { Route as AuthenticatedDebugVibeganttImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
+import { Route as AuthenticatedDebugLivestorePocImport } from './routes/_authenticated/debug/livestore-poc'
 import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugJunctionTablesImport } from './routes/_authenticated/debug/junction-tables'
 import { Route as AuthenticatedDebugGanttTestDataImport } from './routes/_authenticated/debug/gantt-test-data'
@@ -336,6 +337,13 @@ const AuthenticatedDebugReactflowPositioningRoute =
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
 
+const AuthenticatedDebugLivestorePocRoute =
+  AuthenticatedDebugLivestorePocImport.update({
+    id: '/livestore-poc',
+    path: '/livestore-poc',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+
 const AuthenticatedDebugKanbanRoute = AuthenticatedDebugKanbanImport.update({
   id: '/kanban',
   path: '/kanban',
@@ -521,6 +529,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugKanbanImport
       parentRoute: typeof AuthenticatedDebugRouteImport
     }
+    '/_authenticated/debug/livestore-poc': {
+      id: '/_authenticated/debug/livestore-poc'
+      path: '/livestore-poc'
+      fullPath: '/debug/livestore-poc'
+      preLoaderRoute: typeof AuthenticatedDebugLivestorePocImport
+      parentRoute: typeof AuthenticatedDebugRouteImport
+    }
     '/_authenticated/debug/reactflow-positioning': {
       id: '/_authenticated/debug/reactflow-positioning'
       path: '/reactflow-positioning'
@@ -684,6 +699,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
   AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
+  AuthenticatedDebugLivestorePocRoute: typeof AuthenticatedDebugLivestorePocRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
@@ -700,6 +716,7 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugJunctionTablesRoute:
       AuthenticatedDebugJunctionTablesRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
+    AuthenticatedDebugLivestorePocRoute: AuthenticatedDebugLivestorePocRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
@@ -796,6 +813,7 @@ export interface FileRoutesByFullPath {
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
@@ -840,6 +858,7 @@ export interface FileRoutesByTo {
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
@@ -888,6 +907,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/_authenticated/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
@@ -937,6 +957,7 @@ export interface FileRouteTypes {
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
+    | '/debug/livestore-poc'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
@@ -980,6 +1001,7 @@ export interface FileRouteTypes {
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
+    | '/debug/livestore-poc'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
@@ -1026,6 +1048,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/gantt-test-data'
     | '/_authenticated/debug/junction-tables'
     | '/_authenticated/debug/kanban'
+    | '/_authenticated/debug/livestore-poc'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/vibegantt'
@@ -1140,6 +1163,7 @@ export const routeTree = rootRoute
         "/_authenticated/debug/gantt-test-data",
         "/_authenticated/debug/junction-tables",
         "/_authenticated/debug/kanban",
+        "/_authenticated/debug/livestore-poc",
         "/_authenticated/debug/reactflow-positioning",
         "/_authenticated/debug/state-machine-test",
         "/_authenticated/debug/vibegantt",
@@ -1221,6 +1245,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/debug/kanban": {
       "filePath": "_authenticated/debug/kanban.tsx",
+      "parent": "/_authenticated/debug"
+    },
+    "/_authenticated/debug/livestore-poc": {
+      "filePath": "_authenticated/debug/livestore-poc.tsx",
       "parent": "/_authenticated/debug"
     },
     "/_authenticated/debug/reactflow-positioning": {

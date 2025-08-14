@@ -12,7 +12,6 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "dependencies": {
-    "@repo/dataforge": "workspace:*",
     "commander": "^12.0.0",
     "dotenv": "^16.4.5",
     "inquirer": "^9.2.20",

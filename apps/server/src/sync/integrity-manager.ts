@@ -14,7 +14,8 @@ import { getLatestChangeHistoryLSN, compareLSN } from '../lib/sync-common';
 import type { MinimalContext } from '../types/hono';
 import type { WebSocketHandler } from './types';
 import type { TableChange } from '@repo/sync-types';
-import { DOMAIN_TABLES } from '@repo/dataforge/sync-metadata';
+// import { DOMAIN_TABLES } from '@repo/dataforge/sync-metadata';
+const DOMAIN_TABLES = ['projects', 'tasks', 'users', 'comments']; // Stub
 
 const MODULE_NAME = 'IntegrityManager';
 

@@ -50,10 +50,26 @@ class_name = "SyncDO"
 name = "REPLICATION"
 class_name = "ReplicationDO"
 
+[[durable_objects.bindings]]
+name = "ORG_SCHEMA"
+class_name = "OrgSchemaDO"
+
+[[durable_objects.bindings]]
+name = "SUPER_ADMIN"
+class_name = "SuperAdminDO"
+
+[[durable_objects.bindings]]
+name = "ORG_ADMIN"
+class_name = "OrgAdminDO"
+
+[[durable_objects.bindings]]
+name = "ORG_OPS"
+class_name = "OrgOpsDO"
+
 # Durable Objects migrations (for free plan compatibility)
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["SyncDO", "ReplicationDO"]
+new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrgSchemaDO", "SuperAdminDO", "OrgAdminDO", "OrgOpsDO"]
 
 # Cron triggers
 [triggers]
@@ -82,6 +98,22 @@ class_name = "SyncDO"
 name = "REPLICATION"
 class_name = "ReplicationDO"
 
+[[env.staging.durable_objects.bindings]]
+name = "ORG_SCHEMA"
+class_name = "OrgSchemaDO"
+
+[[env.staging.durable_objects.bindings]]
+name = "SUPER_ADMIN"
+class_name = "SuperAdminDO"
+
+[[env.staging.durable_objects.bindings]]
+name = "ORG_ADMIN"
+class_name = "OrgAdminDO"
+
+[[env.staging.durable_objects.bindings]]
+name = "ORG_OPS"
+class_name = "OrgOpsDO"
+
 [env.staging.vars]
 ENVIRONMENT = "staging"
 NODE_ENV = "staging"
@@ -106,6 +138,22 @@ class_name = "SyncDO"
 [[env.production.durable_objects.bindings]]
 name = "REPLICATION"
 class_name = "ReplicationDO"
+
+[[env.production.durable_objects.bindings]]
+name = "ORG_SCHEMA"
+class_name = "OrgSchemaDO"
+
+[[env.production.durable_objects.bindings]]
+name = "SUPER_ADMIN"
+class_name = "SuperAdminDO"
+
+[[env.production.durable_objects.bindings]]
+name = "ORG_ADMIN"
+class_name = "OrgAdminDO"
+
+[[env.production.durable_objects.bindings]]
+name = "ORG_OPS"
+class_name = "OrgOpsDO"
 
 [env.production.vars]
 ENVIRONMENT = "production"

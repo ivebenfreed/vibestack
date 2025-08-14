@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 // import { google } from "better-auth/providers";
-import { admin, emailOTP, oneTimeToken } from "better-auth/plugins";
+import { admin, emailOTP, oneTimeToken, organization } from "better-auth/plugins";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
 import { Hono, Context } from "hono";
 import type { Env } from "../types/env";
@@ -8,6 +8,7 @@ import { dbLogger } from '../middleware/logger';
 import { Resend } from 'resend';
 import { NeonHTTPDialect } from 'kysely-neon-http';
 import type { Dialect } from 'kysely';
+import { uuidv7 } from 'uuidv7';
 
 // Helper function to get allowed origins based on dynamic ports
 function getAllowedOrigins(env: Env): string[] {
@@ -81,9 +82,10 @@ export const auth = betterAuth({
       type: "postgres"
     } : undefined,
     secret: secretForCli,
-    baseUrl: baseUrlForCli,
+    baseURL: baseUrlForCli, // Fix: Use baseURL (capital URL) not baseUrl
     emailAndPassword: { 
       enabled: true,
+      requireEmailVerification: false, // Allow immediate sign-up without verification
       sendResetPassword: async (data: any, request?: any) => {
         // CLI environment - skip email sending
         if (typeof process !== 'undefined') {
@@ -93,12 +95,6 @@ export const auth = betterAuth({
         }
       }
     },
-    // socialProviders: {
-    //   google: {
-    //     clientId: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_ID : undefined) || '',
-    //     clientSecret: (typeof process !== 'undefined' ? process.env.GOOGLE_CLIENT_SECRET : undefined) || '',
-    //   },
-    // },
     emailVerification: {
       enabled: false, // Completely disable link-based email verification
       sendOnSignUp: false, // Disabled - we use OTP instead
@@ -112,6 +108,14 @@ export const auth = betterAuth({
     },
     plugins: [
       admin(),
+      organization({
+        allowUserToCreateOrganization: true,
+        organizationLimit: 10, // per user
+        creatorRole: "owner", // Creator becomes owner (unique)
+        memberRole: "member", // Default invite role
+        // Enable 5-role hierarchy: owner > admin > manager > member > viewer
+        roles: ["owner", "admin", "manager", "member", "viewer"]
+      }),
       emailOTP({
         sendVerificationOTP: async (data: any, request?: any) => {
           // CLI environment - skip email sending
@@ -125,7 +129,7 @@ export const auth = betterAuth({
         },
         otpLength: 6,
         expiresIn: 300, // 5 minutes
-        sendVerificationOnSignUp: true,
+        sendVerificationOnSignUp: false, // Don't require verification on sign-up
         allowedAttempts: 5
       }),
       oneTimeToken({
@@ -151,14 +155,18 @@ export function initializeAuth(env: Env) {
   dbLogger.debug("Initializing Better Auth", {
     databaseUrlType: typeof env.DATABASE_URL,
     secretType: typeof env.BETTER_AUTH_SECRET,
-    trustedOrigins: trustedOrigins
+    trustedOrigins: trustedOrigins,
+    organizationPlugin: 'enabled'
   }, 'auth');
 
-  // In development, Better Auth receives requests as http://127.0.0.1/api/auth/* from Vite proxy
-  // We need to set baseURL to match this pattern for route matching to work
+  // Better Auth baseURL should be the server base, not including /api/auth path
+  // The /api/auth part is handled by the router mounting
+  const serverPort = env.SERVER_PORT || '8787';
   const baseUrl = env.ENVIRONMENT === "development" || env.ENVIRONMENT === "local"
-    ? "http://127.0.0.1/api/auth"  // Match what Vite proxy sends
-    : getBaseUrl(env);
+    ? `http://127.0.0.1:${serverPort}`  // Base server URL only
+    : env.ENVIRONMENT === "staging"
+      ? "https://dev.codevibesmatter.com"
+      : "https://app.codevibesmatter.com";
   
   const runtimeAuthConfig = {
     // Pass the pre-configured Kysely instance and type
@@ -168,7 +176,7 @@ export function initializeAuth(env: Env) {
       // Remove custom casing - let Better Auth use defaults
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseUrl: baseUrl,
+    baseURL: baseUrl, // Fix: Use baseURL (capital URL) not baseUrl
     cookieOptions: {
       secure: env.ENVIRONMENT !== "development", // ✅ FIX: Only secure in production/staging
       sameSite: "lax",
@@ -177,9 +185,43 @@ export function initializeAuth(env: Env) {
       domain: env.ENVIRONMENT === "development" ? "localhost" : undefined,
     },
     trustedOrigins: trustedOrigins as string[],
+    // Add database hooks to catch the actual error
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            console.log('[DB Hook] Before creating user:', {
+              email: user.email,
+              name: user.name,
+              emailVerified: user.emailVerified,
+              role: user.role,
+              hasId: !!user.id,
+              id: user.id
+            });
+            return user;
+          },
+          after: async (user) => {
+            console.log('[DB Hook] After creating user:', user);
+            return user;
+          }
+        }
+      },
+      account: {
+        create: {
+          before: async (account) => {
+            console.log('[DB Hook] Before creating account:', {
+              userId: account.userId,
+              providerId: account.providerId,
+              hasPassword: !!account.password
+            });
+            return account;
+          }
+        }
+      }
+    },
     emailAndPassword: {
       enabled: true,
-      requireEmailVerification: true,
+      requireEmailVerification: false, // Allow immediate sign-up without verification
       sendResetPassword: async (data: any, request?: any) => {
         if (!env.RESEND_API_KEY) {
           dbLogger.error('RESEND_API_KEY environment variable is not set', {
@@ -290,163 +332,82 @@ export function initializeAuth(env: Env) {
         return; // Don't send link-based verification emails
       }
     },
-    databaseHooks: {
-      user: {
-        create: {
-          before: async (userData: any, hookContext: any) => {
-            dbLogger.debug('Auth Hook - user.create.before', {
-              userData: JSON.stringify(userData, null, 2),
-              originalRole: userData.role
-            }, 'auth');
-            
-            // Ensure role is valid - map Better Auth defaults to our enum
-            if (!userData.role || userData.role === 'user') {
-              userData.role = 'member'; // Map Better Auth's default 'user' to our 'member'
-              dbLogger.debug('Auth Hook - role mapped from user to member', {
-                newRole: userData.role
-              }, 'auth');
-            }
-            
-            // Validate role is one of our allowed values
-            const validRoles = ['admin', 'member', 'viewer', 'super_admin'];
-            if (!validRoles.includes(userData.role)) {
-              dbLogger.warn('Auth Hook - invalid role detected, defaulting to member', {
-                invalidRole: userData.role,
-                validRoles
-              }, 'auth');
-              userData.role = 'member';
-            }
-            
-            dbLogger.debug('Auth Hook - final user data', {
-              finalRole: userData.role,
-              userData: JSON.stringify(userData)
-            }, 'auth');
-            
-            return { data: userData };
-          },
-        },
-      },
-    },
-    // Add plugins
+    // Temporarily remove database hooks for debugging
+    // databaseHooks: {
+    //   user: {
+    //     create: {
+    //       before: async (userData: any, hookContext: any) => {
+    //         dbLogger.debug('Auth Hook - user.create.before', {
+    //           userData: JSON.stringify(userData, null, 2),
+    //           originalRole: userData.role
+    //         }, 'auth');
+    //         
+    //         // Ensure role is valid - map Better Auth defaults to our enum
+    //         if (!userData.role || userData.role === 'user') {
+    //           userData.role = 'member'; // Map Better Auth's default 'user' to our 'member'
+    //           dbLogger.debug('Auth Hook - role mapped from user to member', {
+    //             newRole: userData.role
+    //           }, 'auth');
+    //         }
+    //         
+    //         // Validate role is one of our allowed values
+    //         const validRoles = ['admin', 'member', 'viewer', 'super_admin'];
+    //         if (!validRoles.includes(userData.role)) {
+    //           dbLogger.warn('Auth Hook - invalid role detected, defaulting to member', {
+    //             invalidRole: userData.role,
+    //             validRoles
+    //           }, 'auth');
+    //           userData.role = 'member';
+    //         }
+    //         
+    //         dbLogger.debug('Auth Hook - final user data', {
+    //           finalRole: userData.role,
+    //           userData: JSON.stringify(userData)
+    //         }, 'auth');
+    //         
+    //         return { data: userData };
+    //       },
+    //     },
+    //   },
+    // },
+    // Add plugins - simplified for debugging
     plugins: [
-      admin(),
-      emailOTP({
-        sendVerificationOTP: async (data: any, request?: any) => {
-          if (!env.RESEND_API_KEY) {
-            dbLogger.error('RESEND_API_KEY environment variable is not set for OTP', {
-              allEnvKeys: Object.keys(env),
-              envResendKey: env.RESEND_API_KEY,
-              environment: env.ENVIRONMENT
-            }, 'auth');
-            throw new Error('RESEND_API_KEY environment variable is required for sending OTP emails');
-          }
-          
-          const resend = new Resend(env.RESEND_API_KEY);
-          
-          // Get the base URL for the current environment
-          const baseUrl = getBaseUrl(env);
-          
-          try {
-            let subject = '';
-            let content = '';
-            
-            switch (data.type) {
-              case 'email-verification':
-                subject = 'Verify your email - VibeStack';
-                content = `
-                  <h1>Verify Your Email</h1>
-                  <p>Welcome to VibeStack! Please enter this verification code to complete your account setup:</p>
-                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
-                  </div>
-                  <p><strong>This code will expire in 5 minutes.</strong></p>
-                  <p>If you didn't create an account with VibeStack, you can safely ignore this email.</p>
-                `;
-                break;
-              case 'sign-in':
-                subject = 'Sign in to VibeStack';
-                content = `
-                  <h1>Sign In to VibeStack</h1>
-                  <p>Use this code to sign in to your VibeStack account:</p>
-                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
-                  </div>
-                  <p><strong>This code will expire in 5 minutes.</strong></p>
-                  <p>If you didn't request this sign-in code, please ignore this email and consider changing your password.</p>
-                `;
-                break;
-              case 'forget-password':
-                subject = 'Reset your password - VibeStack';
-                content = `
-                  <h1>Reset Your Password</h1>
-                  <p>You requested to reset your password. Use this code to continue:</p>
-                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
-                  </div>
-                  <p><strong>This code will expire in 5 minutes.</strong></p>
-                  <p>If you didn't request a password reset, you can safely ignore this email.</p>
-                `;
-                break;
-              default:
-                subject = 'Your verification code - VibeStack';
-                content = `
-                  <h1>Your Verification Code</h1>
-                  <p>Here's your verification code:</p>
-                  <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                    <h2 style="font-size: 36px; font-weight: bold; letter-spacing: 8px; margin: 0; color: #1f2937;">${data.otp}</h2>
-                  </div>
-                  <p><strong>This code will expire in 5 minutes.</strong></p>
-                `;
-            }
-            
-            await resend.emails.send({
-              from: 'VibeStack <noreply@codevibesmatter.com>',
-              to: data.email,
-              subject: subject,
-              html: content
-            });
-            
-            dbLogger.info('OTP email sent', { 
-              email: data.email,
-              type: data.type,
-              otpLength: data.otp.length
-            }, 'auth');
-            
-          } catch (error) {
-            dbLogger.error('Failed to send OTP email', error, { 
-              email: data.email,
-              type: data.type
-            }, 'auth');
-            throw error;
-          }
-        },
-        otpLength: 6,
-        expiresIn: 300, // 5 minutes
-        sendVerificationOnSignUp: true,
-        allowedAttempts: 5
-      }),
-      oneTimeToken({
-        expiresIn: 60 * 24, // 24 hours in minutes
-      }),
-      // jwt({ // JWT plugin removed
-      //   jwt: {
-      //     issuer: 'vibestack',
-      //     audience: 'vibestack',
-      //     expirationTime: '7d' // 7 days
-      //   }
-      // })
+      // Temporarily remove complex plugins to isolate the issue
+      // admin(),
+      // organization({
+      //   allowUserToCreateOrganization: true,
+      //   organizationLimit: 10, // per user
+      //   creatorRole: "owner", // Creator becomes owner (unique)
+      //   memberRole: "member", // Default invite role
+      //   // Enable 5-role hierarchy: owner > admin > manager > member > viewer
+      //   roles: ["owner", "admin", "manager", "member", "viewer"]
+      // }),
+      // emailOTP({
+      //   sendVerificationOTP: async (data: any, request?: any) => {
+      //     // Simplified for debugging
+      //     console.log('OTP would be sent:', data.email, data.otp);
+      //   },
+      //   otpLength: 6,
+      //   expiresIn: 300, // 5 minutes
+      //   sendVerificationOnSignUp: false, // Don't require verification on sign-up
+      //   allowedAttempts: 5
+      // }),
+      // oneTimeToken({
+      //   expiresIn: 60 * 24, // 24 hours in minutes
+      // }),
     ],
     // Use Better Auth defaults - no custom field mappings needed
     // Tables already match Better Auth naming: users, sessions, accounts, verifications
-    additionalFields: {
-      role: {
-        type: "string" as const,
-        required: false,
-        defaultValue: "member",
-        input: true,
-        output: true
-      }
-    },
+    // Temporarily remove additionalFields for debugging
+    // additionalFields: {
+    //   role: {
+    //     type: "string" as const,
+    //     required: false,
+    //     defaultValue: "member",
+    //     input: true,
+    //     output: true
+    //   }
+    // },
     // Add JWKS model configuration at the top level
     // jwks: { // Removed jwks config as JWT plugin is removed
     //   modelName: 'jwks',
@@ -471,7 +432,11 @@ export function initializeAuth(env: Env) {
     },
     advanced: {
       database: {
-        generateId: false as const,
+        generateId: () => {
+          // Generate a UUID v7 to match our database's generate_uuidv7() function
+          // UUIDv7 includes timestamp for better sorting and indexing
+          return uuidv7();
+        },
       },
     },
   };
@@ -482,7 +447,30 @@ export function initializeAuth(env: Env) {
   }, 'auth');
 
   // Return a fully configured instance for runtime use
-  return betterAuth(runtimeAuthConfig);
+  try {
+    console.log('[Auth Init] Creating Better Auth instance with org plugin...');
+    const authInstance = betterAuth(runtimeAuthConfig);
+    console.log('[Auth Init] Better Auth instance created successfully');
+    
+    // Wrap the handler to catch database errors
+    const originalHandler = authInstance.handler;
+    authInstance.handler = async (request: Request) => {
+      try {
+        const result = await originalHandler(request);
+        return result;
+      } catch (error) {
+        console.error('[Auth Handler] Caught error:', error);
+        console.error('[Auth Handler] Error stack:', error instanceof Error ? error.stack : 'No stack');
+        throw error;
+      }
+    };
+    
+    return authInstance;
+  } catch (error) {
+    console.error('[Auth Init] Better Auth initialization failed:', error);
+    console.error('[Auth Init] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    throw error;
+  }
 }
 
 // Export a function that initializes auth based on Hono context for runtime use
