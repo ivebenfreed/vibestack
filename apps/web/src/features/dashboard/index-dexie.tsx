@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ContentContainer } from '@/components/layout/content-container'
 import { TopNav } from '@/components/layout/top-nav'
 import { RecentTasksEnhanced } from './components/recent-tasks-enhanced-dexie'
-import { db } from '@repo/dataforge/dexie-schema'
+import { db } from '@/db/dexie-schema'
 import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
 
 const topNav = [

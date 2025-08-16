@@ -148,7 +148,12 @@ export interface UpdateUserInput extends Partial<CreateUserInput> {
 }
 
 // Additional type definitions for all domain services
-export type ProjectStatus = 'active' | 'inactive' | 'completed' | 'archived';
+export enum ProjectStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive', 
+  COMPLETED = 'completed',
+  ARCHIVED = 'archived'
+}
 
 export interface CreateCommentInput {
   content: string;

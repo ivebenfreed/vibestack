@@ -2,6 +2,9 @@ import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-
 import { useEffect } from 'react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
+import { PostAuthOrganizationSetup } from '@/features/auth/components/PostAuthOrganizationSetup'
+import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
+import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@repo/dataforge/client-entities'
 import { getDefaultStore } from 'jotai'
@@ -77,6 +80,21 @@ export const Route = createFileRoute('/_authenticated')({
         search: { redirect: location.pathname },
         replace: true
       })
+    }
+
+    // Check if we're in organization setup phase - allow access but don't check system readiness yet
+    const isInOrgSetup = finalAuthSnapshot.matches('authenticated.loadingOrganizations') ||
+                         finalAuthSnapshot.matches('authenticated.needsOrganizationSetup') ||
+                         finalAuthSnapshot.matches('authenticated.needsOrganizationSelection') ||
+                         finalAuthSnapshot.matches('authenticated.creatingOrganization') ||
+                         finalAuthSnapshot.matches('authenticated.selectingOrganization') ||
+                         finalAuthSnapshot.matches('authenticated.loadingBilling') ||
+                         finalAuthSnapshot.matches('authenticated.trialExpiredSetup') ||
+                         finalAuthSnapshot.matches('authenticated.upgradingSubscription');
+
+    if (isInOrgSetup) {
+      console.log('[AuthenticatedRoute] In organization setup phase, skipping system readiness check')
+      return
     }
     
     // Only check system ready once per session (after sign-in)
@@ -162,6 +180,31 @@ function RouteComponent() {
 }
 
 function AuthenticatedContent() {
+  const { 
+    isCheckingAuth,
+    needsOrganizationSetup, 
+    needsOrganizationSelection,
+    isLoadingOrganizations,
+    isAuthenticatedAndReady,
+    organizationSetupComplete 
+  } = useAuth();
+
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return <UnifiedLoadingScreen message="Checking authentication..." />;
+  }
+
+  // Show organization setup if needed
+  if (needsOrganizationSetup || needsOrganizationSelection || isLoadingOrganizations) {
+    return <PostAuthOrganizationSetup />;
+  }
+
+  // Show loading until fully ready
+  if (!isAuthenticatedAndReady || !organizationSetupComplete) {
+    return <UnifiedLoadingScreen message="Setting up your workspace..." />;
+  }
+
+  // Render the main app
   return (
     <div data-testid="authenticated-content">
       {/* <SkipToMain /> - Disabled: phantom component issue */}

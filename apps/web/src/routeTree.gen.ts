@@ -10,788 +10,316 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 
-// Import Routes
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as errors503RouteImport } from './routes/(errors)/503'
+import { Route as errors500RouteImport } from './routes/(errors)/500'
+import { Route as errors404RouteImport } from './routes/(errors)/404'
+import { Route as errors403RouteImport } from './routes/(errors)/403'
+import { Route as errors401RouteImport } from './routes/(errors)/401'
+import { Route as authVerifyEmailRouteImport } from './routes/(auth)/verify-email'
+import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
+import { Route as authSignIn2RouteImport } from './routes/(auth)/sign-in-2'
+import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
+import { Route as authResetPasswordRouteImport } from './routes/(auth)/reset-password'
+import { Route as authOtpVerifyRouteImport } from './routes/(auth)/otp-verify'
+import { Route as authOtpRouteImport } from './routes/(auth)/otp'
+import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
+import { Route as authCompleteRegistrationRouteImport } from './routes/(auth)/complete-registration'
+import { Route as authCheckEmailRouteImport } from './routes/(auth)/check-email'
+import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
+import { Route as AuthenticatedDebugRouteRouteImport } from './routes/_authenticated/debug/route'
+import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
+import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authenticated/projects/index'
+import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedDebugIndexRouteImport } from './routes/_authenticated/debug/index'
+import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
+import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
+import { Route as AuthenticatedTasksTimelineRouteImport } from './routes/_authenticated/tasks/timeline'
+import { Route as AuthenticatedTasksKanbanRouteImport } from './routes/_authenticated/tasks/kanban'
+import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
+import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
+import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
+import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_authenticated/debug/vibegantt-test'
+import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authenticated/debug/vibegantt'
+import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
+import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
+import { Route as AuthenticatedDebugLivestorePocRouteImport } from './routes/_authenticated/debug/livestore-poc'
+import { Route as AuthenticatedDebugKanbanRouteImport } from './routes/_authenticated/debug/kanban'
+import { Route as AuthenticatedDebugJunctionTablesRouteImport } from './routes/_authenticated/debug/junction-tables'
+import { Route as AuthenticatedDebugGanttTestDataRouteImport } from './routes/_authenticated/debug/gantt-test-data'
+import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
-import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
-import { Route as errors503Import } from './routes/(errors)/503'
-import { Route as errors500Import } from './routes/(errors)/500'
-import { Route as errors404Import } from './routes/(errors)/404'
-import { Route as errors403Import } from './routes/(errors)/403'
-import { Route as errors401Import } from './routes/(errors)/401'
-import { Route as authVerifyEmailImport } from './routes/(auth)/verify-email'
-import { Route as authSignUpImport } from './routes/(auth)/sign-up'
-import { Route as authSignIn2Import } from './routes/(auth)/sign-in-2'
-import { Route as authSignInImport } from './routes/(auth)/sign-in'
-import { Route as authResetPasswordImport } from './routes/(auth)/reset-password'
-import { Route as authOtpVerifyImport } from './routes/(auth)/otp-verify'
-import { Route as authOtpImport } from './routes/(auth)/otp'
-import { Route as authForgotPasswordImport } from './routes/(auth)/forgot-password'
-import { Route as authCompleteRegistrationImport } from './routes/(auth)/complete-registration'
-import { Route as authCheckEmailImport } from './routes/(auth)/check-email'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings/route'
-import { Route as AuthenticatedDebugRouteImport } from './routes/_authenticated/debug/route'
-import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/tasks/index'
-import { Route as AuthenticatedSettingsIndexImport } from './routes/_authenticated/settings/index'
-import { Route as AuthenticatedProjectsIndexImport } from './routes/_authenticated/projects/index'
-import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authenticated/help-center/index'
-import { Route as AuthenticatedDebugIndexImport } from './routes/_authenticated/debug/index'
-import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
-import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
-import { Route as AuthenticatedTasksTimelineImport } from './routes/_authenticated/tasks/timeline'
-import { Route as AuthenticatedTasksKanbanImport } from './routes/_authenticated/tasks/kanban'
-import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
-import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
-import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
-import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
-import { Route as AuthenticatedProjectsProjectIdImport } from './routes/_authenticated/projects/$projectId'
-import { Route as AuthenticatedDebugVibeganttTestImport } from './routes/_authenticated/debug/vibegantt-test'
-import { Route as AuthenticatedDebugVibeganttImport } from './routes/_authenticated/debug/vibegantt'
-import { Route as AuthenticatedDebugStateMachineTestImport } from './routes/_authenticated/debug/state-machine-test'
-import { Route as AuthenticatedDebugReactflowPositioningImport } from './routes/_authenticated/debug/reactflow-positioning'
-import { Route as AuthenticatedDebugLivestorePocImport } from './routes/_authenticated/debug/livestore-poc'
-import { Route as AuthenticatedDebugKanbanImport } from './routes/_authenticated/debug/kanban'
-import { Route as AuthenticatedDebugJunctionTablesImport } from './routes/_authenticated/debug/junction-tables'
-import { Route as AuthenticatedDebugGanttTestDataImport } from './routes/_authenticated/debug/gantt-test-data'
-import { Route as AuthenticatedSettingsAdminUsersImport } from './routes/_authenticated/settings/admin.users'
-
-// Create Virtual Routes
-
-const AuthenticatedDebugSyncLazyImport = createFileRoute(
+const AuthenticatedDebugSyncLazyRouteImport = createFileRoute(
   '/_authenticated/debug/sync',
 )()
-const AuthenticatedDebugIntegrityLazyImport = createFileRoute(
+const AuthenticatedDebugIntegrityLazyRouteImport = createFileRoute(
   '/_authenticated/debug/integrity',
 )()
-const AuthenticatedDebugDatabaseLazyImport = createFileRoute(
+const AuthenticatedDebugDatabaseLazyRouteImport = createFileRoute(
   '/_authenticated/debug/database',
 )()
 
-// Create/Update Routes
-
-const AuthenticatedRouteRoute = AuthenticatedRouteImport.update({
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const errors503Route = errors503Import.update({
+const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
   path: '/503',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors500Route = errors500Import.update({
+const errors500Route = errors500RouteImport.update({
   id: '/(errors)/500',
   path: '/500',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors404Route = errors404Import.update({
+const errors404Route = errors404RouteImport.update({
   id: '/(errors)/404',
   path: '/404',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors403Route = errors403Import.update({
+const errors403Route = errors403RouteImport.update({
   id: '/(errors)/403',
   path: '/403',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors401Route = errors401Import.update({
+const errors401Route = errors401RouteImport.update({
   id: '/(errors)/401',
   path: '/401',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authVerifyEmailRoute = authVerifyEmailImport.update({
+const authVerifyEmailRoute = authVerifyEmailRouteImport.update({
   id: '/(auth)/verify-email',
   path: '/verify-email',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSignUpRoute = authSignUpImport.update({
+const authSignUpRoute = authSignUpRouteImport.update({
   id: '/(auth)/sign-up',
   path: '/sign-up',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSignIn2Route = authSignIn2Import.update({
+const authSignIn2Route = authSignIn2RouteImport.update({
   id: '/(auth)/sign-in-2',
   path: '/sign-in-2',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSignInRoute = authSignInImport.update({
+const authSignInRoute = authSignInRouteImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authResetPasswordRoute = authResetPasswordImport.update({
+const authResetPasswordRoute = authResetPasswordRouteImport.update({
   id: '/(auth)/reset-password',
   path: '/reset-password',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authOtpVerifyRoute = authOtpVerifyImport.update({
+const authOtpVerifyRoute = authOtpVerifyRouteImport.update({
   id: '/(auth)/otp-verify',
   path: '/otp-verify',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authOtpRoute = authOtpImport.update({
+const authOtpRoute = authOtpRouteImport.update({
   id: '/(auth)/otp',
   path: '/otp',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authForgotPasswordRoute = authForgotPasswordImport.update({
+const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
   id: '/(auth)/forgot-password',
   path: '/forgot-password',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authCompleteRegistrationRoute = authCompleteRegistrationImport.update({
-  id: '/(auth)/complete-registration',
-  path: '/complete-registration',
-  getParentRoute: () => rootRoute,
-} as any)
-
-const authCheckEmailRoute = authCheckEmailImport.update({
+const authCompleteRegistrationRoute =
+  authCompleteRegistrationRouteImport.update({
+    id: '/(auth)/complete-registration',
+    path: '/complete-registration',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const authCheckEmailRoute = authCheckEmailRouteImport.update({
   id: '/(auth)/check-email',
   path: '/check-email',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedSettingsRouteRoute = AuthenticatedSettingsRouteImport.update(
-  {
+const AuthenticatedSettingsRouteRoute =
+  AuthenticatedSettingsRouteRouteImport.update({
     id: '/settings',
     path: '/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-)
-
-const AuthenticatedDebugRouteRoute = AuthenticatedDebugRouteImport.update({
+  } as any)
+const AuthenticatedDebugRouteRoute = AuthenticatedDebugRouteRouteImport.update({
   id: '/debug',
   path: '/debug',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexImport.update({
+const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedSettingsIndexRoute = AuthenticatedSettingsIndexImport.update(
-  {
+const AuthenticatedSettingsIndexRoute =
+  AuthenticatedSettingsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any,
-)
-
-const AuthenticatedProjectsIndexRoute = AuthenticatedProjectsIndexImport.update(
-  {
+  } as any)
+const AuthenticatedProjectsIndexRoute =
+  AuthenticatedProjectsIndexRouteImport.update({
     id: '/projects/',
     path: '/projects/',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-)
-
+  } as any)
 const AuthenticatedHelpCenterIndexRoute =
-  AuthenticatedHelpCenterIndexImport.update({
+  AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-
-const AuthenticatedDebugIndexRoute = AuthenticatedDebugIndexImport.update({
+const AuthenticatedDebugIndexRoute = AuthenticatedDebugIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedDebugRouteRoute,
 } as any)
-
-const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexImport.update({
+const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
   id: '/chats/',
   path: '/chats/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexImport.update({
+const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedDebugSyncLazyRoute = AuthenticatedDebugSyncLazyImport.update(
-  {
+const AuthenticatedDebugSyncLazyRoute =
+  AuthenticatedDebugSyncLazyRouteImport.update({
     id: '/sync',
     path: '/sync',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any,
-).lazy(() =>
-  import('./routes/_authenticated/debug/sync.lazy').then((d) => d.Route),
-)
-
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/sync.lazy').then((d) => d.Route),
+  )
 const AuthenticatedDebugIntegrityLazyRoute =
-  AuthenticatedDebugIntegrityLazyImport.update({
+  AuthenticatedDebugIntegrityLazyRouteImport.update({
     id: '/integrity',
     path: '/integrity',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/debug/integrity.lazy').then((d) => d.Route),
   )
-
 const AuthenticatedDebugDatabaseLazyRoute =
-  AuthenticatedDebugDatabaseLazyImport.update({
+  AuthenticatedDebugDatabaseLazyRouteImport.update({
     id: '/database',
     path: '/database',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/debug/database.lazy').then((d) => d.Route),
   )
-
-const AuthenticatedTasksTimelineRoute = AuthenticatedTasksTimelineImport.update(
-  {
+const AuthenticatedTasksTimelineRoute =
+  AuthenticatedTasksTimelineRouteImport.update({
     id: '/tasks/timeline',
     path: '/tasks/timeline',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-)
-
-const AuthenticatedTasksKanbanRoute = AuthenticatedTasksKanbanImport.update({
-  id: '/tasks/kanban',
-  path: '/tasks/kanban',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-
+  } as any)
+const AuthenticatedTasksKanbanRoute =
+  AuthenticatedTasksKanbanRouteImport.update({
+    id: '/tasks/kanban',
+    path: '/tasks/kanban',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsNotificationsRoute =
-  AuthenticatedSettingsNotificationsImport.update({
+  AuthenticatedSettingsNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedSettingsDisplayRoute =
-  AuthenticatedSettingsDisplayImport.update({
+  AuthenticatedSettingsDisplayRouteImport.update({
     id: '/display',
     path: '/display',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedSettingsAppearanceRoute =
-  AuthenticatedSettingsAppearanceImport.update({
+  AuthenticatedSettingsAppearanceRouteImport.update({
     id: '/appearance',
     path: '/appearance',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedSettingsAccountRoute =
-  AuthenticatedSettingsAccountImport.update({
+  AuthenticatedSettingsAccountRouteImport.update({
     id: '/account',
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedProjectsProjectIdRoute =
-  AuthenticatedProjectsProjectIdImport.update({
+  AuthenticatedProjectsProjectIdRouteImport.update({
     id: '/projects/$projectId',
     path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-
 const AuthenticatedDebugVibeganttTestRoute =
-  AuthenticatedDebugVibeganttTestImport.update({
+  AuthenticatedDebugVibeganttTestRouteImport.update({
     id: '/vibegantt-test',
     path: '/vibegantt-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
 const AuthenticatedDebugVibeganttRoute =
-  AuthenticatedDebugVibeganttImport.update({
+  AuthenticatedDebugVibeganttRouteImport.update({
     id: '/vibegantt',
     path: '/vibegantt',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
 const AuthenticatedDebugStateMachineTestRoute =
-  AuthenticatedDebugStateMachineTestImport.update({
+  AuthenticatedDebugStateMachineTestRouteImport.update({
     id: '/state-machine-test',
     path: '/state-machine-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
 const AuthenticatedDebugReactflowPositioningRoute =
-  AuthenticatedDebugReactflowPositioningImport.update({
+  AuthenticatedDebugReactflowPositioningRouteImport.update({
     id: '/reactflow-positioning',
     path: '/reactflow-positioning',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
 const AuthenticatedDebugLivestorePocRoute =
-  AuthenticatedDebugLivestorePocImport.update({
+  AuthenticatedDebugLivestorePocRouteImport.update({
     id: '/livestore-poc',
     path: '/livestore-poc',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
-const AuthenticatedDebugKanbanRoute = AuthenticatedDebugKanbanImport.update({
-  id: '/kanban',
-  path: '/kanban',
-  getParentRoute: () => AuthenticatedDebugRouteRoute,
-} as any)
-
+const AuthenticatedDebugKanbanRoute =
+  AuthenticatedDebugKanbanRouteImport.update({
+    id: '/kanban',
+    path: '/kanban',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugJunctionTablesRoute =
-  AuthenticatedDebugJunctionTablesImport.update({
+  AuthenticatedDebugJunctionTablesRouteImport.update({
     id: '/junction-tables',
     path: '/junction-tables',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
 const AuthenticatedDebugGanttTestDataRoute =
-  AuthenticatedDebugGanttTestDataImport.update({
+  AuthenticatedDebugGanttTestDataRouteImport.update({
     id: '/gantt-test-data',
     path: '/gantt-test-data',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-
 const AuthenticatedSettingsAdminUsersRoute =
-  AuthenticatedSettingsAdminUsersImport.update({
+  AuthenticatedSettingsAdminUsersRouteImport.update({
     id: '/admin/users',
     path: '/admin/users',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
 
-// Populate the FileRoutesByPath interface
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRoute
-    }
-    '/_authenticated/debug': {
-      id: '/_authenticated/debug'
-      path: '/debug'
-      fullPath: '/debug'
-      preLoaderRoute: typeof AuthenticatedDebugRouteImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/(auth)/check-email': {
-      id: '/(auth)/check-email'
-      path: '/check-email'
-      fullPath: '/check-email'
-      preLoaderRoute: typeof authCheckEmailImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/complete-registration': {
-      id: '/(auth)/complete-registration'
-      path: '/complete-registration'
-      fullPath: '/complete-registration'
-      preLoaderRoute: typeof authCompleteRegistrationImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/forgot-password': {
-      id: '/(auth)/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof authForgotPasswordImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/otp': {
-      id: '/(auth)/otp'
-      path: '/otp'
-      fullPath: '/otp'
-      preLoaderRoute: typeof authOtpImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/otp-verify': {
-      id: '/(auth)/otp-verify'
-      path: '/otp-verify'
-      fullPath: '/otp-verify'
-      preLoaderRoute: typeof authOtpVerifyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/reset-password': {
-      id: '/(auth)/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof authResetPasswordImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-in': {
-      id: '/(auth)/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof authSignInImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-in-2': {
-      id: '/(auth)/sign-in-2'
-      path: '/sign-in-2'
-      fullPath: '/sign-in-2'
-      preLoaderRoute: typeof authSignIn2Import
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-up': {
-      id: '/(auth)/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof authSignUpImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/verify-email': {
-      id: '/(auth)/verify-email'
-      path: '/verify-email'
-      fullPath: '/verify-email'
-      preLoaderRoute: typeof authVerifyEmailImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/401': {
-      id: '/(errors)/401'
-      path: '/401'
-      fullPath: '/401'
-      preLoaderRoute: typeof errors401Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/403': {
-      id: '/(errors)/403'
-      path: '/403'
-      fullPath: '/403'
-      preLoaderRoute: typeof errors403Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/404': {
-      id: '/(errors)/404'
-      path: '/404'
-      fullPath: '/404'
-      preLoaderRoute: typeof errors404Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/500': {
-      id: '/(errors)/500'
-      path: '/500'
-      fullPath: '/500'
-      preLoaderRoute: typeof errors500Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/503': {
-      id: '/(errors)/503'
-      path: '/503'
-      fullPath: '/503'
-      preLoaderRoute: typeof errors503Import
-      parentRoute: typeof rootRoute
-    }
-    '/_authenticated/': {
-      id: '/_authenticated/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/debug/gantt-test-data': {
-      id: '/_authenticated/debug/gantt-test-data'
-      path: '/gantt-test-data'
-      fullPath: '/debug/gantt-test-data'
-      preLoaderRoute: typeof AuthenticatedDebugGanttTestDataImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/junction-tables': {
-      id: '/_authenticated/debug/junction-tables'
-      path: '/junction-tables'
-      fullPath: '/debug/junction-tables'
-      preLoaderRoute: typeof AuthenticatedDebugJunctionTablesImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/kanban': {
-      id: '/_authenticated/debug/kanban'
-      path: '/kanban'
-      fullPath: '/debug/kanban'
-      preLoaderRoute: typeof AuthenticatedDebugKanbanImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/livestore-poc': {
-      id: '/_authenticated/debug/livestore-poc'
-      path: '/livestore-poc'
-      fullPath: '/debug/livestore-poc'
-      preLoaderRoute: typeof AuthenticatedDebugLivestorePocImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/reactflow-positioning': {
-      id: '/_authenticated/debug/reactflow-positioning'
-      path: '/reactflow-positioning'
-      fullPath: '/debug/reactflow-positioning'
-      preLoaderRoute: typeof AuthenticatedDebugReactflowPositioningImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/state-machine-test': {
-      id: '/_authenticated/debug/state-machine-test'
-      path: '/state-machine-test'
-      fullPath: '/debug/state-machine-test'
-      preLoaderRoute: typeof AuthenticatedDebugStateMachineTestImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/vibegantt': {
-      id: '/_authenticated/debug/vibegantt'
-      path: '/vibegantt'
-      fullPath: '/debug/vibegantt'
-      preLoaderRoute: typeof AuthenticatedDebugVibeganttImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/vibegantt-test': {
-      id: '/_authenticated/debug/vibegantt-test'
-      path: '/vibegantt-test'
-      fullPath: '/debug/vibegantt-test'
-      preLoaderRoute: typeof AuthenticatedDebugVibeganttTestImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/projects/$projectId': {
-      id: '/_authenticated/projects/$projectId'
-      path: '/projects/$projectId'
-      fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof AuthenticatedProjectsProjectIdImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/settings/account': {
-      id: '/_authenticated/settings/account'
-      path: '/account'
-      fullPath: '/settings/account'
-      preLoaderRoute: typeof AuthenticatedSettingsAccountImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-    '/_authenticated/settings/appearance': {
-      id: '/_authenticated/settings/appearance'
-      path: '/appearance'
-      fullPath: '/settings/appearance'
-      preLoaderRoute: typeof AuthenticatedSettingsAppearanceImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-    '/_authenticated/settings/display': {
-      id: '/_authenticated/settings/display'
-      path: '/display'
-      fullPath: '/settings/display'
-      preLoaderRoute: typeof AuthenticatedSettingsDisplayImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-    '/_authenticated/settings/notifications': {
-      id: '/_authenticated/settings/notifications'
-      path: '/notifications'
-      fullPath: '/settings/notifications'
-      preLoaderRoute: typeof AuthenticatedSettingsNotificationsImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-    '/_authenticated/tasks/kanban': {
-      id: '/_authenticated/tasks/kanban'
-      path: '/tasks/kanban'
-      fullPath: '/tasks/kanban'
-      preLoaderRoute: typeof AuthenticatedTasksKanbanImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/tasks/timeline': {
-      id: '/_authenticated/tasks/timeline'
-      path: '/tasks/timeline'
-      fullPath: '/tasks/timeline'
-      preLoaderRoute: typeof AuthenticatedTasksTimelineImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/debug/database': {
-      id: '/_authenticated/debug/database'
-      path: '/database'
-      fullPath: '/debug/database'
-      preLoaderRoute: typeof AuthenticatedDebugDatabaseLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/integrity': {
-      id: '/_authenticated/debug/integrity'
-      path: '/integrity'
-      fullPath: '/debug/integrity'
-      preLoaderRoute: typeof AuthenticatedDebugIntegrityLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/debug/sync': {
-      id: '/_authenticated/debug/sync'
-      path: '/sync'
-      fullPath: '/debug/sync'
-      preLoaderRoute: typeof AuthenticatedDebugSyncLazyImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/apps/': {
-      id: '/_authenticated/apps/'
-      path: '/apps'
-      fullPath: '/apps'
-      preLoaderRoute: typeof AuthenticatedAppsIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/chats/': {
-      id: '/_authenticated/chats/'
-      path: '/chats'
-      fullPath: '/chats'
-      preLoaderRoute: typeof AuthenticatedChatsIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/debug/': {
-      id: '/_authenticated/debug/'
-      path: '/'
-      fullPath: '/debug/'
-      preLoaderRoute: typeof AuthenticatedDebugIndexImport
-      parentRoute: typeof AuthenticatedDebugRouteImport
-    }
-    '/_authenticated/help-center/': {
-      id: '/_authenticated/help-center/'
-      path: '/help-center'
-      fullPath: '/help-center'
-      preLoaderRoute: typeof AuthenticatedHelpCenterIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/projects/': {
-      id: '/_authenticated/projects/'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof AuthenticatedProjectsIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/settings/': {
-      id: '/_authenticated/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof AuthenticatedSettingsIndexImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-    '/_authenticated/tasks/': {
-      id: '/_authenticated/tasks/'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof AuthenticatedTasksIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/settings/admin/users': {
-      id: '/_authenticated/settings/admin/users'
-      path: '/admin/users'
-      fullPath: '/settings/admin/users'
-      preLoaderRoute: typeof AuthenticatedSettingsAdminUsersImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
-    }
-  }
-}
-
-// Create and export the route tree
-
-interface AuthenticatedDebugRouteRouteChildren {
-  AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
-  AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
-  AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
-  AuthenticatedDebugLivestorePocRoute: typeof AuthenticatedDebugLivestorePocRoute
-  AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
-  AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
-  AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
-  AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
-  AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
-  AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
-  AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
-  AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
-}
-
-const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
-  {
-    AuthenticatedDebugGanttTestDataRoute: AuthenticatedDebugGanttTestDataRoute,
-    AuthenticatedDebugJunctionTablesRoute:
-      AuthenticatedDebugJunctionTablesRoute,
-    AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
-    AuthenticatedDebugLivestorePocRoute: AuthenticatedDebugLivestorePocRoute,
-    AuthenticatedDebugReactflowPositioningRoute:
-      AuthenticatedDebugReactflowPositioningRoute,
-    AuthenticatedDebugStateMachineTestRoute:
-      AuthenticatedDebugStateMachineTestRoute,
-    AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
-    AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
-    AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
-    AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
-    AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
-    AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
-  }
-
-const AuthenticatedDebugRouteRouteWithChildren =
-  AuthenticatedDebugRouteRoute._addFileChildren(
-    AuthenticatedDebugRouteRouteChildren,
-  )
-
-interface AuthenticatedSettingsRouteRouteChildren {
-  AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
-  AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
-  AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
-  AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
-  AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
-  AuthenticatedSettingsAdminUsersRoute: typeof AuthenticatedSettingsAdminUsersRoute
-}
-
-const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
-  {
-    AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
-    AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
-    AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
-    AuthenticatedSettingsNotificationsRoute:
-      AuthenticatedSettingsNotificationsRoute,
-    AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
-    AuthenticatedSettingsAdminUsersRoute: AuthenticatedSettingsAdminUsersRoute,
-  }
-
-const AuthenticatedSettingsRouteRouteWithChildren =
-  AuthenticatedSettingsRouteRoute._addFileChildren(
-    AuthenticatedSettingsRouteRouteChildren,
-  )
-
-interface AuthenticatedRouteRouteChildren {
-  AuthenticatedDebugRouteRoute: typeof AuthenticatedDebugRouteRouteWithChildren
-  AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
-  AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
-  AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
-  AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
-  AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
-  AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
-  AuthenticatedProjectsIndexRoute: typeof AuthenticatedProjectsIndexRoute
-  AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
-}
-
-const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedDebugRouteRoute: AuthenticatedDebugRouteRouteWithChildren,
-  AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
-  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
-  AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
-  AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
-  AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
-  AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
-  AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
-  AuthenticatedProjectsIndexRoute: AuthenticatedProjectsIndexRoute,
-  AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
-}
-
-const AuthenticatedRouteRouteWithChildren =
-  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
-
 export interface FileRoutesByFullPath {
-  '': typeof AuthenticatedRouteRouteWithChildren
   '/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/check-email': typeof authCheckEmailRoute
@@ -837,7 +365,6 @@ export interface FileRoutesByFullPath {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
-
 export interface FileRoutesByTo {
   '/check-email': typeof authCheckEmailRoute
   '/complete-registration': typeof authCompleteRegistrationRoute
@@ -882,9 +409,8 @@ export interface FileRoutesByTo {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
-
 export interface FileRoutesById {
-  __root__: typeof rootRoute
+  __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/_authenticated/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
@@ -931,11 +457,9 @@ export interface FileRoutesById {
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
-
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | ''
     | '/debug'
     | '/settings'
     | '/check-email'
@@ -1073,7 +597,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/admin/users'
   fileRoutesById: FileRoutesById
 }
-
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   authCheckEmailRoute: typeof authCheckEmailRoute
@@ -1093,6 +616,421 @@ export interface RootRouteChildren {
   errors503Route: typeof errors503Route
 }
 
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/': {
+      id: '/_authenticated/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/(errors)/503': {
+      id: '/(errors)/503'
+      path: '/503'
+      fullPath: '/503'
+      preLoaderRoute: typeof errors503RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/500': {
+      id: '/(errors)/500'
+      path: '/500'
+      fullPath: '/500'
+      preLoaderRoute: typeof errors500RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/404': {
+      id: '/(errors)/404'
+      path: '/404'
+      fullPath: '/404'
+      preLoaderRoute: typeof errors404RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/403': {
+      id: '/(errors)/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof errors403RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(errors)/401': {
+      id: '/(errors)/401'
+      path: '/401'
+      fullPath: '/401'
+      preLoaderRoute: typeof errors401RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/verify-email': {
+      id: '/(auth)/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof authVerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-up': {
+      id: '/(auth)/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof authSignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-in-2': {
+      id: '/(auth)/sign-in-2'
+      path: '/sign-in-2'
+      fullPath: '/sign-in-2'
+      preLoaderRoute: typeof authSignIn2RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-in': {
+      id: '/(auth)/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof authSignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/reset-password': {
+      id: '/(auth)/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof authResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/otp-verify': {
+      id: '/(auth)/otp-verify'
+      path: '/otp-verify'
+      fullPath: '/otp-verify'
+      preLoaderRoute: typeof authOtpVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/otp': {
+      id: '/(auth)/otp'
+      path: '/otp'
+      fullPath: '/otp'
+      preLoaderRoute: typeof authOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/forgot-password': {
+      id: '/(auth)/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof authForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/complete-registration': {
+      id: '/(auth)/complete-registration'
+      path: '/complete-registration'
+      fullPath: '/complete-registration'
+      preLoaderRoute: typeof authCompleteRegistrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/check-email': {
+      id: '/(auth)/check-email'
+      path: '/check-email'
+      fullPath: '/check-email'
+      preLoaderRoute: typeof authCheckEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/debug': {
+      id: '/_authenticated/debug'
+      path: '/debug'
+      fullPath: '/debug'
+      preLoaderRoute: typeof AuthenticatedDebugRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tasks/': {
+      id: '/_authenticated/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthenticatedTasksIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings/': {
+      id: '/_authenticated/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/projects/': {
+      id: '/_authenticated/projects/'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthenticatedProjectsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/help-center/': {
+      id: '/_authenticated/help-center/'
+      path: '/help-center'
+      fullPath: '/help-center'
+      preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/debug/': {
+      id: '/_authenticated/debug/'
+      path: '/'
+      fullPath: '/debug/'
+      preLoaderRoute: typeof AuthenticatedDebugIndexRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/chats/': {
+      id: '/_authenticated/chats/'
+      path: '/chats'
+      fullPath: '/chats'
+      preLoaderRoute: typeof AuthenticatedChatsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/apps/': {
+      id: '/_authenticated/apps/'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof AuthenticatedAppsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/debug/sync': {
+      id: '/_authenticated/debug/sync'
+      path: '/sync'
+      fullPath: '/debug/sync'
+      preLoaderRoute: typeof AuthenticatedDebugSyncLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/integrity': {
+      id: '/_authenticated/debug/integrity'
+      path: '/integrity'
+      fullPath: '/debug/integrity'
+      preLoaderRoute: typeof AuthenticatedDebugIntegrityLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/database': {
+      id: '/_authenticated/debug/database'
+      path: '/database'
+      fullPath: '/debug/database'
+      preLoaderRoute: typeof AuthenticatedDebugDatabaseLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/tasks/timeline': {
+      id: '/_authenticated/tasks/timeline'
+      path: '/tasks/timeline'
+      fullPath: '/tasks/timeline'
+      preLoaderRoute: typeof AuthenticatedTasksTimelineRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tasks/kanban': {
+      id: '/_authenticated/tasks/kanban'
+      path: '/tasks/kanban'
+      fullPath: '/tasks/kanban'
+      preLoaderRoute: typeof AuthenticatedTasksKanbanRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings/notifications': {
+      id: '/_authenticated/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/display': {
+      id: '/_authenticated/settings/display'
+      path: '/display'
+      fullPath: '/settings/display'
+      preLoaderRoute: typeof AuthenticatedSettingsDisplayRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/appearance': {
+      id: '/_authenticated/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof AuthenticatedSettingsAppearanceRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/account': {
+      id: '/_authenticated/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/projects/$projectId': {
+      id: '/_authenticated/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/debug/vibegantt-test': {
+      id: '/_authenticated/debug/vibegantt-test'
+      path: '/vibegantt-test'
+      fullPath: '/debug/vibegantt-test'
+      preLoaderRoute: typeof AuthenticatedDebugVibeganttTestRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/vibegantt': {
+      id: '/_authenticated/debug/vibegantt'
+      path: '/vibegantt'
+      fullPath: '/debug/vibegantt'
+      preLoaderRoute: typeof AuthenticatedDebugVibeganttRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/state-machine-test': {
+      id: '/_authenticated/debug/state-machine-test'
+      path: '/state-machine-test'
+      fullPath: '/debug/state-machine-test'
+      preLoaderRoute: typeof AuthenticatedDebugStateMachineTestRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/reactflow-positioning': {
+      id: '/_authenticated/debug/reactflow-positioning'
+      path: '/reactflow-positioning'
+      fullPath: '/debug/reactflow-positioning'
+      preLoaderRoute: typeof AuthenticatedDebugReactflowPositioningRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/livestore-poc': {
+      id: '/_authenticated/debug/livestore-poc'
+      path: '/livestore-poc'
+      fullPath: '/debug/livestore-poc'
+      preLoaderRoute: typeof AuthenticatedDebugLivestorePocRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/kanban': {
+      id: '/_authenticated/debug/kanban'
+      path: '/kanban'
+      fullPath: '/debug/kanban'
+      preLoaderRoute: typeof AuthenticatedDebugKanbanRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/junction-tables': {
+      id: '/_authenticated/debug/junction-tables'
+      path: '/junction-tables'
+      fullPath: '/debug/junction-tables'
+      preLoaderRoute: typeof AuthenticatedDebugJunctionTablesRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/gantt-test-data': {
+      id: '/_authenticated/debug/gantt-test-data'
+      path: '/gantt-test-data'
+      fullPath: '/debug/gantt-test-data'
+      preLoaderRoute: typeof AuthenticatedDebugGanttTestDataRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/settings/admin/users': {
+      id: '/_authenticated/settings/admin/users'
+      path: '/admin/users'
+      fullPath: '/settings/admin/users'
+      preLoaderRoute: typeof AuthenticatedSettingsAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+  }
+}
+
+interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
+  AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
+  AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
+  AuthenticatedDebugLivestorePocRoute: typeof AuthenticatedDebugLivestorePocRoute
+  AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
+  AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
+  AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
+  AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
+  AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
+  AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
+  AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
+  AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
+}
+
+const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
+  {
+    AuthenticatedDebugGanttTestDataRoute: AuthenticatedDebugGanttTestDataRoute,
+    AuthenticatedDebugJunctionTablesRoute:
+      AuthenticatedDebugJunctionTablesRoute,
+    AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
+    AuthenticatedDebugLivestorePocRoute: AuthenticatedDebugLivestorePocRoute,
+    AuthenticatedDebugReactflowPositioningRoute:
+      AuthenticatedDebugReactflowPositioningRoute,
+    AuthenticatedDebugStateMachineTestRoute:
+      AuthenticatedDebugStateMachineTestRoute,
+    AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
+    AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
+    AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
+    AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
+    AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
+    AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
+  }
+
+const AuthenticatedDebugRouteRouteWithChildren =
+  AuthenticatedDebugRouteRoute._addFileChildren(
+    AuthenticatedDebugRouteRouteChildren,
+  )
+
+interface AuthenticatedSettingsRouteRouteChildren {
+  AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
+  AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
+  AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
+  AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
+  AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
+  AuthenticatedSettingsAdminUsersRoute: typeof AuthenticatedSettingsAdminUsersRoute
+}
+
+const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteChildren =
+  {
+    AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
+    AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
+    AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
+    AuthenticatedSettingsNotificationsRoute:
+      AuthenticatedSettingsNotificationsRoute,
+    AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
+    AuthenticatedSettingsAdminUsersRoute: AuthenticatedSettingsAdminUsersRoute,
+  }
+
+const AuthenticatedSettingsRouteRouteWithChildren =
+  AuthenticatedSettingsRouteRoute._addFileChildren(
+    AuthenticatedSettingsRouteRouteChildren,
+  )
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDebugRouteRoute: typeof AuthenticatedDebugRouteRouteWithChildren
+  AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
+  AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
+  AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
+  AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
+  AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+  AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
+  AuthenticatedProjectsIndexRoute: typeof AuthenticatedProjectsIndexRoute
+  AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDebugRouteRoute: AuthenticatedDebugRouteRouteWithChildren,
+  AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
+  AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
+  AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,
+  AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
+  AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
+  AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
+  AuthenticatedProjectsIndexRoute: AuthenticatedProjectsIndexRoute,
+  AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   authCheckEmailRoute: authCheckEmailRoute,
@@ -1111,234 +1049,6 @@ const rootRouteChildren: RootRouteChildren = {
   errors500Route: errors500Route,
   errors503Route: errors503Route,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "__root.tsx",
-      "children": [
-        "/_authenticated",
-        "/(auth)/check-email",
-        "/(auth)/complete-registration",
-        "/(auth)/forgot-password",
-        "/(auth)/otp",
-        "/(auth)/otp-verify",
-        "/(auth)/reset-password",
-        "/(auth)/sign-in",
-        "/(auth)/sign-in-2",
-        "/(auth)/sign-up",
-        "/(auth)/verify-email",
-        "/(errors)/401",
-        "/(errors)/403",
-        "/(errors)/404",
-        "/(errors)/500",
-        "/(errors)/503"
-      ]
-    },
-    "/_authenticated": {
-      "filePath": "_authenticated/route.tsx",
-      "children": [
-        "/_authenticated/debug",
-        "/_authenticated/settings",
-        "/_authenticated/",
-        "/_authenticated/projects/$projectId",
-        "/_authenticated/tasks/kanban",
-        "/_authenticated/tasks/timeline",
-        "/_authenticated/apps/",
-        "/_authenticated/chats/",
-        "/_authenticated/help-center/",
-        "/_authenticated/projects/",
-        "/_authenticated/tasks/"
-      ]
-    },
-    "/_authenticated/debug": {
-      "filePath": "_authenticated/debug/route.tsx",
-      "parent": "/_authenticated",
-      "children": [
-        "/_authenticated/debug/gantt-test-data",
-        "/_authenticated/debug/junction-tables",
-        "/_authenticated/debug/kanban",
-        "/_authenticated/debug/livestore-poc",
-        "/_authenticated/debug/reactflow-positioning",
-        "/_authenticated/debug/state-machine-test",
-        "/_authenticated/debug/vibegantt",
-        "/_authenticated/debug/vibegantt-test",
-        "/_authenticated/debug/database",
-        "/_authenticated/debug/integrity",
-        "/_authenticated/debug/sync",
-        "/_authenticated/debug/"
-      ]
-    },
-    "/_authenticated/settings": {
-      "filePath": "_authenticated/settings/route.tsx",
-      "parent": "/_authenticated",
-      "children": [
-        "/_authenticated/settings/account",
-        "/_authenticated/settings/appearance",
-        "/_authenticated/settings/display",
-        "/_authenticated/settings/notifications",
-        "/_authenticated/settings/",
-        "/_authenticated/settings/admin/users"
-      ]
-    },
-    "/(auth)/check-email": {
-      "filePath": "(auth)/check-email.tsx"
-    },
-    "/(auth)/complete-registration": {
-      "filePath": "(auth)/complete-registration.tsx"
-    },
-    "/(auth)/forgot-password": {
-      "filePath": "(auth)/forgot-password.tsx"
-    },
-    "/(auth)/otp": {
-      "filePath": "(auth)/otp.tsx"
-    },
-    "/(auth)/otp-verify": {
-      "filePath": "(auth)/otp-verify.tsx"
-    },
-    "/(auth)/reset-password": {
-      "filePath": "(auth)/reset-password.tsx"
-    },
-    "/(auth)/sign-in": {
-      "filePath": "(auth)/sign-in.tsx"
-    },
-    "/(auth)/sign-in-2": {
-      "filePath": "(auth)/sign-in-2.tsx"
-    },
-    "/(auth)/sign-up": {
-      "filePath": "(auth)/sign-up.tsx"
-    },
-    "/(auth)/verify-email": {
-      "filePath": "(auth)/verify-email.tsx"
-    },
-    "/(errors)/401": {
-      "filePath": "(errors)/401.tsx"
-    },
-    "/(errors)/403": {
-      "filePath": "(errors)/403.tsx"
-    },
-    "/(errors)/404": {
-      "filePath": "(errors)/404.tsx"
-    },
-    "/(errors)/500": {
-      "filePath": "(errors)/500.tsx"
-    },
-    "/(errors)/503": {
-      "filePath": "(errors)/503.tsx"
-    },
-    "/_authenticated/": {
-      "filePath": "_authenticated/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/debug/gantt-test-data": {
-      "filePath": "_authenticated/debug/gantt-test-data.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/junction-tables": {
-      "filePath": "_authenticated/debug/junction-tables.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/kanban": {
-      "filePath": "_authenticated/debug/kanban.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/livestore-poc": {
-      "filePath": "_authenticated/debug/livestore-poc.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/reactflow-positioning": {
-      "filePath": "_authenticated/debug/reactflow-positioning.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/state-machine-test": {
-      "filePath": "_authenticated/debug/state-machine-test.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/vibegantt": {
-      "filePath": "_authenticated/debug/vibegantt.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/vibegantt-test": {
-      "filePath": "_authenticated/debug/vibegantt-test.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/projects/$projectId": {
-      "filePath": "_authenticated/projects/$projectId.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/account": {
-      "filePath": "_authenticated/settings/account.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/appearance": {
-      "filePath": "_authenticated/settings/appearance.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/display": {
-      "filePath": "_authenticated/settings/display.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/notifications": {
-      "filePath": "_authenticated/settings/notifications.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/tasks/kanban": {
-      "filePath": "_authenticated/tasks/kanban.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/tasks/timeline": {
-      "filePath": "_authenticated/tasks/timeline.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/debug/database": {
-      "filePath": "_authenticated/debug/database.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/integrity": {
-      "filePath": "_authenticated/debug/integrity.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/debug/sync": {
-      "filePath": "_authenticated/debug/sync.lazy.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/apps/": {
-      "filePath": "_authenticated/apps/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/chats/": {
-      "filePath": "_authenticated/chats/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/debug/": {
-      "filePath": "_authenticated/debug/index.tsx",
-      "parent": "/_authenticated/debug"
-    },
-    "/_authenticated/help-center/": {
-      "filePath": "_authenticated/help-center/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/projects/": {
-      "filePath": "_authenticated/projects/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/": {
-      "filePath": "_authenticated/settings/index.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/tasks/": {
-      "filePath": "_authenticated/tasks/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/admin/users": {
-      "filePath": "_authenticated/settings/admin.users.tsx",
-      "parent": "/_authenticated/settings"
-    }
-  }
-}
-ROUTE_MANIFEST_END */
