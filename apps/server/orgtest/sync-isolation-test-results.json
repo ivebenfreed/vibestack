@@ -1,0 +1,124 @@
+{
+  "timestamp": "2025-08-15T19:10:48.189Z",
+  "test_data_created": {
+    "change_history_entries": 5
+  },
+  "rls_test": "FAILED - Data leakage detected",
+  "verification": {
+    "techflow_changes": 3,
+    "isolation_changes": 2,
+    "total_system_changes": 10,
+    "rls_isolation": false
+  },
+  "techflow_data": [
+    {
+      "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "table_name": "tasks",
+      "operation": "update",
+      "name": null,
+      "title": "TechFlow Task Alpha - Updated"
+    },
+    {
+      "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "table_name": "tasks",
+      "operation": "insert",
+      "name": null,
+      "title": "TechFlow Task Alpha"
+    },
+    {
+      "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "table_name": "projects",
+      "operation": "insert",
+      "name": "TechFlow Project Alpha",
+      "title": null
+    }
+  ],
+  "isolation_data": [
+    {
+      "organization_id": "01234567-89ab-cdef-0123-456789abcdef",
+      "table_name": "tasks",
+      "operation": "insert",
+      "name": null,
+      "title": "Isolation Test Task"
+    },
+    {
+      "organization_id": "01234567-89ab-cdef-0123-456789abcdef",
+      "table_name": "projects",
+      "operation": "insert",
+      "name": "Isolation Test Project",
+      "title": null
+    }
+  ],
+  "system_view_sample": [
+    {
+      "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "table_name": "tasks",
+      "operation": "update",
+      "name": null,
+      "title": "TechFlow Task Alpha - Updated"
+    },
+    {
+      "organization_id": "01234567-89ab-cdef-0123-456789abcdef",
+      "table_name": "tasks",
+      "operation": "insert",
+      "name": null,
+      "title": "Isolation Test Task"
+    },
+    {
+      "organization_id": "01234567-89ab-cdef-0123-456789abcdef",
+      "table_name": "projects",
+      "operation": "insert",
+      "name": "Isolation Test Project",
+      "title": null
+    },
+    {
+      "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "table_name": "tasks",
+      "operation": "insert",
+      "name": null,
+      "title": "TechFlow Task Alpha"
+    },
+    {
+      "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "table_name": "projects",
+      "operation": "insert",
+      "name": "TechFlow Project Alpha",
+      "title": null
+    },
+    {
+      "organization_id": "550e8400-e29b-41d4-a716-446655440001",
+      "table_name": "org_550e8400_e29b_41d4_a716_446655440001_project",
+      "operation": "insert",
+      "name": "Test Organization-Aware Project",
+      "title": null
+    },
+    {
+      "organization_id": "123e4567-e89b-12d3-a456-426614174000",
+      "table_name": "webhooks_table",
+      "operation": "update",
+      "name": null,
+      "title": null
+    },
+    {
+      "organization_id": "987fcdeb-51a2-43d7-8293-123456789abc",
+      "table_name": "org_tasks",
+      "operation": "insert",
+      "name": null,
+      "title": "Org 2 Task"
+    },
+    {
+      "organization_id": "123e4567-e89b-12d3-a456-426614174000",
+      "table_name": "org_projects",
+      "operation": "insert",
+      "name": "Org 1 Project",
+      "title": null
+    },
+    {
+      "organization_id": "123e4567-e89b-12d3-a456-426614174000",
+      "table_name": "test_stats",
+      "operation": "insert",
+      "name": null,
+      "title": null
+    }
+  ]
+}

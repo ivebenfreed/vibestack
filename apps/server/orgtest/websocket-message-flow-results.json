@@ -1,0 +1,82 @@
+{
+  "timestamp": "2025-08-15T18:54:27.710Z",
+  "organization": {
+    "id": "934fd0a8-f306-4f13-a544-094282f047eb",
+    "name": "TechFlow Solutions",
+    "slug": "techflow-solutions-final"
+  },
+  "client_id": "message-flow-test-1755284054363",
+  "websocket_url": "ws://localhost:8787/api/sync?clientId=message-flow-test-1755284054363&lsn=0/0&org=techflow-solutions-final",
+  "test_results": {
+    "success": true,
+    "connectionStatus": "connected",
+    "messagesSent": 2,
+    "messagesReceived": [
+      {
+        "type": "sync-error",
+        "timestamp": "2025-08-15T18:54:18.916Z",
+        "summary": "Sync error: Organization sync failed"
+      },
+      {
+        "type": "srv_changes_received",
+        "timestamp": "2025-08-15T18:54:19.005Z",
+        "summary": "Server acknowledged 1 changes received",
+        "messageId": "srv_1755284058996_received"
+      },
+      {
+        "type": "srv_error",
+        "timestamp": "2025-08-15T18:54:19.006Z",
+        "summary": "Unknown message",
+        "messageId": "srv_1755284058999_error"
+      },
+      {
+        "type": "srv_heartbeat",
+        "timestamp": "2025-08-15T18:54:21.849Z",
+        "summary": "Server heartbeat",
+        "messageId": "hb_1755284061840_pve2djvzc"
+      },
+      {
+        "type": "srv_state_change",
+        "timestamp": "2025-08-15T18:54:21.851Z",
+        "summary": "Unknown message",
+        "messageId": "initial_1755284061842_0oqt7lwlj"
+      },
+      {
+        "type": "srv_init_start",
+        "timestamp": "2025-08-15T18:54:22.403Z",
+        "summary": "Unknown message"
+      },
+      {
+        "type": "srv_init_complete",
+        "timestamp": "2025-08-15T18:54:22.883Z",
+        "summary": "Unknown message"
+      }
+    ],
+    "acknowledgments": 1,
+    "error": null
+  },
+  "message_acknowledgment_system": {
+    "description": "Complete bidirectional message flow with acknowledgments",
+    "client_to_server_messages": [
+      "clt_send_changes - Client sends data changes",
+      "clt_heartbeat - Client sends periodic heartbeat",
+      "clt_changes_received - Client acknowledges server messages",
+      "clt_changes_applied - Client confirms changes applied"
+    ],
+    "server_to_client_messages": [
+      "srv_changes_received - Server acknowledges client changes received",
+      "srv_changes_applied - Server confirms changes applied to database",
+      "srv_send_changes - Server sends changes to client",
+      "srv_heartbeat - Server sends periodic heartbeat"
+    ],
+    "flow_pattern": [
+      "1. Client connects with: clientId + lsn + org",
+      "2. Client sends: clt_send_changes with TableChange[]",
+      "3. Server responds: srv_changes_received (immediate ack)",
+      "4. Server processes changes to database",
+      "5. Server responds: srv_changes_applied (confirmation)",
+      "6. Server broadcasts to other clients: srv_send_changes",
+      "7. Clients respond: clt_changes_received + clt_changes_applied"
+    ]
+  }
+}

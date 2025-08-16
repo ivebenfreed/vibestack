@@ -1,0 +1,51 @@
+{
+  "timestamp": "2025-08-15T18:40:02.617Z",
+  "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+  "tests": {
+    "api_tests": [
+      {
+        "test": "Sync health check",
+        "endpoint": "/api/sync/health",
+        "method": "GET",
+        "status": 200,
+        "success": true,
+        "data": {
+          "success": true,
+          "status": "healthy",
+          "timestamp": "2025-08-15T18:40:03.652Z",
+          "message": "Generic sync engine v2 operational"
+        }
+      },
+      {
+        "test": "Replication status",
+        "endpoint": "/api/replication/status",
+        "method": "GET",
+        "status": 200,
+        "success": true,
+        "data": {
+          "success": true,
+          "slotStatus": {
+            "exists": true,
+            "lsn": "0/2408240"
+          },
+          "currentLSN": "0/25CC508",
+          "polling": {
+            "active": true,
+            "hasCompletedFirstPoll": true,
+            "count": 32,
+            "duration": "0 minutes (32 polls)"
+          }
+        }
+      }
+    ],
+    "websocket_tests": [
+      {
+        "test": "Authenticated WebSocket Connection",
+        "success": false,
+        "error": "Unexpected server response: 403",
+        "authentication_method": "session_cookies"
+      }
+    ],
+    "real_time_scenarios": []
+  }
+}

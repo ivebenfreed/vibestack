@@ -1,0 +1,96 @@
+{
+  "timestamp": "2025-08-15T18:14:36.468Z",
+  "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+  "sync_tests": [
+    {
+      "test_name": "Sync health check",
+      "endpoint": "/api/sync/health",
+      "status": 200,
+      "success": true,
+      "data": {
+        "success": true,
+        "status": "healthy",
+        "timestamp": "2025-08-15T18:14:37.230Z",
+        "message": "Generic sync engine v2 operational"
+      }
+    },
+    {
+      "test_name": "Sync metrics",
+      "endpoint": "/api/sync/metrics",
+      "status": 404,
+      "success": false,
+      "data": "404 Not Found"
+    },
+    {
+      "test_name": "Sync V2 health check",
+      "endpoint": "/api/sync-v2/health",
+      "status": 404,
+      "success": false,
+      "data": "404 Not Found"
+    },
+    {
+      "test_name": "Get initial sync data (v1)",
+      "endpoint": "/api/sync/initial?clientId=techflow-test-client-1755281678468",
+      "status": 200,
+      "success": true,
+      "data": "Initial data received"
+    },
+    {
+      "test_name": "Get initial sync data (v2)",
+      "endpoint": "/api/sync-v2/initial?clientId=techflow-test-client-1755281678468",
+      "status": 404,
+      "success": false,
+      "data": "404 Not Found"
+    },
+    {
+      "test_name": "Sync change submission",
+      "endpoint": "/api/sync-v2/sync",
+      "status": 404,
+      "success": false,
+      "data": "404 Not Found"
+    },
+    {
+      "test_name": "Organization-scoped initial sync",
+      "endpoint": "/api/sync-v2/initial?clientId=techflow-test-client-1755281678468&orgId=934fd0a8-f306-4f13-a544-094282f047eb",
+      "method": "GET",
+      "status": 404,
+      "success": false,
+      "data": "404 Not Found"
+    },
+    {
+      "test_name": "Organization-scoped change query",
+      "endpoint": "/api/sync-v2/changes",
+      "method": "POST",
+      "status": 404,
+      "success": false,
+      "data": "404 Not Found"
+    },
+    {
+      "test_name": "Replication health check",
+      "endpoint": "/api/replication/health",
+      "status": 404,
+      "success": false,
+      "data": "Not found"
+    },
+    {
+      "test_name": "Replication status",
+      "endpoint": "/api/replication/status",
+      "status": 200,
+      "success": true,
+      "data": {
+        "success": true,
+        "slotStatus": {
+          "exists": true,
+          "lsn": "0/2408240"
+        },
+        "currentLSN": "0/0",
+        "polling": {
+          "active": false,
+          "hasCompletedFirstPoll": false,
+          "count": 0,
+          "duration": "inactive"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "timestamp": "2025-08-15T18:20:17.373Z",
+  "organization_id": "934fd0a8-f306-4f13-a544-094282f047eb",
+  "tests": {
+    "api_tests": [
+      {
+        "test": "Sync health check",
+        "endpoint": "/api/sync/health",
+        "method": "GET",
+        "status": 200,
+        "success": true,
+        "data": "Available"
+      },
+      {
+        "test": "Sync metrics",
+        "endpoint": "/api/sync/metrics",
+        "method": "GET",
+        "status": 404,
+        "success": false,
+        "data": "404 Not Found"
+      },
+      {
+        "test": "Sync V2 health",
+        "endpoint": "/api/sync-v2/health",
+        "method": "GET",
+        "status": 404,
+        "success": false,
+        "data": "404 Not Found"
+      },
+      {
+        "test": "Initial sync data",
+        "endpoint": "/api/sync-v2/initial?clientId=test-client-1",
+        "method": "GET",
+        "status": 404,
+        "success": false,
+        "data": "404 Not Found"
+      },
+      {
+        "test": "Sync changes",
+        "endpoint": "/api/sync-v2/sync",
+        "method": "POST",
+        "status": 404,
+        "success": false,
+        "data": "404 Not Found"
+      },
+      {
+        "test": "Replication health",
+        "endpoint": "/api/replication/health",
+        "method": "GET",
+        "status": 404,
+        "success": false,
+        "data": "Not found"
+      },
+      {
+        "test": "Replication status",
+        "endpoint": "/api/replication/status",
+        "method": "GET",
+        "status": 200,
+        "success": true,
+        "data": "Available"
+      },
+      {
+        "test": "Replication metrics",
+        "endpoint": "/api/replication/metrics",
+        "method": "GET",
+        "status": 404,
+        "success": false,
+        "data": "Not found"
+      }
+    ],
+    "websocket_tests": [
+      {
+        "test": "Basic WebSocket Connection",
+        "success": false,
+        "error": "Unexpected server response: 401"
+      },
+      {
+        "test": "Multi-client WebSocket",
+        "client_id": "sarah-client",
+        "success": false,
+        "error": "Unexpected server response: 401"
+      },
+      {
+        "test": "Multi-client WebSocket",
+        "client_id": "michael-client",
+        "success": false,
+        "error": "Unexpected server response: 401"
+      },
+      {
+        "test": "Multi-client WebSocket",
+        "client_id": "emily-client",
+        "success": false,
+        "error": "Unexpected server response: 401"
+      }
+    ],
+    "sync_scenarios": [
+      {
+        "scenario": "Task Collaboration",
+        "task_id": "task-1755282028442",
+        "participants": 0,
+        "events_sent": 0,
+        "success": true,
+        "description": "Multiple users working on the same task"
+      },
+      {
+        "scenario": "Organization Isolation",
+        "techflow_events": 1,
+        "external_events": 1,
+        "total_clients": 0,
+        "success": true,
+        "description": "Test that sync respects organization boundaries"
+      }
+    ],
+    "organization_isolation": []
+  }
+}

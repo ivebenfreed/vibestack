@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-08-15T20:08:44.510Z",
+  "user_creation": {
+    "success": true,
+    "user": {
+      "id": "0198af59-5b46-7a2d-bb4e-588da4d5a0b9",
+      "email": "complete-sync-1755288524511@techflow.solutions",
+      "name": "Complete Sync Test User",
+      "image": null,
+      "emailVerified": false,
+      "createdAt": "2025-08-15T20:08:45.638Z",
+      "updatedAt": "2025-08-15T20:08:45.638Z"
+    }
+  },
+  "organization_setup": {
+    "success": true,
+    "organization": {
+      "id": "934fd0a8-f306-4f13-a544-094282f047eb",
+      "name": "TechFlow Solutions"
+    }
+  },
+  "authentication": {
+    "success": true,
+    "method": "test_session",
+    "sessionCookie": "better-auth.session_token=test-session-1755288527181",
+    "note": "Using test session - may not work with actual auth validation"
+  },
+  "websocket_sync": {
+    "connected": false,
+    "error": "Unexpected server response: 401",
+    "auth_error": true,
+    "messages_received": 0
+  },
+  "data_isolation": {
+    "isolated": false,
+    "reason": "WebSocket connection failed - cannot validate isolation"
+  }
+}
