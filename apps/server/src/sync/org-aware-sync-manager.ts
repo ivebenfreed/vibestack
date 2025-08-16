@@ -10,7 +10,7 @@ import type { Env } from '../types/env';
 import type { MinimalContext } from '../types/hono';
 import { initializeAuth } from '../lib/auth';
 import { OrgAccessService } from '../services/org-access-service';
-import { getDBClient } from '../lib/db';
+import { getKysely } from '../lib/kysely';
 import type { TableChange } from '@repo/sync-types';
 import { syncLogger } from '../middleware/logger';
 
@@ -47,7 +47,7 @@ export class OrgAwareSyncManager {
     private env: Env,
     private context: MinimalContext
   ) {
-    const kysely = getDBClient(env);
+    const kysely = getKysely(env);
     this.orgAccessService = new OrgAccessService(kysely, env);
   }
 
