@@ -38,12 +38,28 @@ export interface Env {
   GOOGLE_CLIENT_SECRET: string;
   RESEND_API_KEY: string;
   
+  // Polar billing variables
+  POLAR_ACCESS_TOKEN: string;
+  POLAR_WEBHOOK_SECRET: string;
+  POLAR_ENVIRONMENT: string;
+  
   // Durable Object bindings (from wrangler.toml)
   SYNC: DurableObjectNamespace; 
   REPLICATION: DurableObjectNamespace;
   
   // KV namespace bindings (from wrangler.toml)
   CLIENT_REGISTRY: KVNamespace;
+
+  // Rate limiting bindings (from wrangler.toml)
+  auth_rate_limit?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>
+  };
+  api_rate_limit?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>
+  };
+  signup_rate_limit?: {
+    limit(options: { key: string }): Promise<{ success: boolean }>
+  };
 
   // Required for Hono compatibility
   [key: string]: unknown;

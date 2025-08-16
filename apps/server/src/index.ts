@@ -23,7 +23,10 @@ import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
 import authRouter from './api/auth';
 import bootstrapRouter from './api/bootstrap'; // Adjust path if necessary
+import polarWebhooksRouter from './api/polar-webhooks';
+import debugBillingRouter from './api/debug-billing';
 import { mountProtectedRoutes } from './routes/protected-routes';
+import { cloudflareSecurityStack } from './middleware/cloudflare-security';
 
 // Remove temporary auth instance
 
@@ -71,6 +74,11 @@ apiApp.use('*', cors({
 
 // Use our structured logger middleware
 apiApp.use('*', createStructuredLogger());
+
+// Add Cloudflare security middleware stack after CORS and logging
+cloudflareSecurityStack.forEach(middleware => {
+  apiApp.use('*', middleware);
+});
 
 // Mount the bootstrap router BEFORE authMiddleware
 // This ensures it's not protected by standard authentication
@@ -181,6 +189,12 @@ apiApp.get('/db/kysely-test', async (c) => {
 
 // Mount Drizzle test router BEFORE auth middleware (unprotected for testing)
 // Drizzle test route removed - using generic API instead
+
+// Mount Polar webhook endpoints BEFORE auth middleware (webhooks must be public)
+apiApp.route('/', polarWebhooksRouter);
+
+// Mount debug endpoints BEFORE auth middleware (for testing)
+apiApp.route('/', debugBillingRouter);
 
 // Apply the authentication middleware to check session status on all requests
 // for routes mounted AFTER this middleware.
