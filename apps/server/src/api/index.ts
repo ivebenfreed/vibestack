@@ -1,20 +1,24 @@
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import type { ApiEnv } from '../types/api'
+import { enforceTrialLimits } from '../middleware/trial-limits'
 import syncV2Router from './sync-v2'
 import replication from './replication'
 import { migrations } from './migrations'
 import authRouter from './auth'
+import organizationsRouter from './organizations'
 import { phase1TestRouter } from './phase1-tests.js'
 import { dataforgeTestRouter } from '../routes/dataforge-test.js'
 import { universalArchetypeRouter } from '../routes/universal-archetype-api.js'
 import { testDbRouter } from '../routes/test-db.js'
+// Custom organization routes removed - using Better Auth endpoints instead
 
 // Create API router
 const api = new Hono<ApiEnv>()
 
 // Global middleware
 api.use('*', logger())
+api.use('*', enforceTrialLimits)
 
 // REMOVE path-specific CORS middleware here - it will be handled in src/index.ts
 // api.use('/auth/*', cors({...}))
@@ -25,6 +29,7 @@ api.route('/replication', replication)
 api.route('/migrations', migrations)
 // api.route('/db', db) // TypeORM-based
 api.route('/auth', authRouter)
+api.route('/organizations', organizationsRouter)
 api.route('/test', phase1TestRouter)
 api.route('/dataforge', dataforgeTestRouter)
 api.route('/archetype', universalArchetypeRouter)

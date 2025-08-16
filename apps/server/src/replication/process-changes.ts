@@ -4,6 +4,7 @@ import type { MinimalContext } from '../types/hono';
 import type { WALData, PostgresWALMessage } from '../types/wal';
 import { parsePostgreSQLValue } from '../lib/postgresql-type-parser';
 import type { WebSocketHandler } from '../sync/types';
+import { transformWALChangesWithOrg } from './org-aware-process-changes';
 
 // Helper type for WAL change records
 type WALChangeRecord = NonNullable<PostgresWALMessage['change']>[number];
@@ -278,7 +279,7 @@ export async function shouldTrackTable(tableName: string, env: Env): Promise<boo
     // Fallback: track if it looks like an org table or base table
     const normalizedTableName = tableName.replace(/"/g, '');
     return (
-      normalizedTableName.match(/^org_[a-fA-F0-9\-]+_[a-zA-Z_][a-zA-Z0-9_]*$/) !== null || // Org table
+      normalizedTableName.match(/^org_[0-9a-fA-F]{8}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{12}_[a-zA-Z_][a-zA-Z0-9_]*$/) !== null || // Org table with UUIDv7
       ['users', 'organization', 'organization_member', 'session'].includes(normalizedTableName) // Base tables
     );
   }
@@ -300,8 +301,8 @@ export function shouldTrackTableSync(tableName: string): boolean {
     return true;
   }
   
-  // Organization-specific tables - track if matches pattern
-  return normalizedTableName.match(/^org_[a-fA-F0-9\-]+_[a-zA-Z_][a-zA-Z0-9_]*$/) !== null;
+  // Organization-specific tables - track if matches UUIDv7 pattern
+  return normalizedTableName.match(/^org_[0-9a-fA-F]{8}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{4}_[0-9a-fA-F]{12}_[a-zA-Z_][a-zA-Z0-9_]*$/) !== null;
 }
 
 // Dynamic table discovery replaces static tracking
@@ -665,7 +666,7 @@ function createKyselyDb(context: MinimalContext): Kysely<Database> {
 
 export async function storeChangesInHistory(
   context: MinimalContext, 
-  changes: TableChange[],
+  changes: (TableChange & { organizationId?: string })[],
   storeBatchSize: number = DEFAULT_STORE_BATCH_SIZE
 ): Promise<boolean> {
   if (changes.length === 0) {
@@ -696,13 +697,15 @@ export async function storeChangesInHistory(
     // Use Kysely for database operations
     const db = createKyselyDb(context);
     
-    // Convert TableChange[] to change_history records
+    // Convert TableChange[] to change_history records with organization context
     const changeHistoryEntries = changes.map(change => ({
       lsn: change.lsn || '',
+      organization_id: change.organizationId || null,
       table_name: change.table,
       operation: change.operation,
       data: JSON.stringify(change.data),
-      timestamp: new Date()
+      client_id: change.clientId || null,
+      created_at: new Date()
     }));
     
     // Insert in batches for better performance
@@ -750,10 +753,10 @@ export async function storeChangesInHistory(
       for (let i = 0; i < changes.length; i += storeBatchSize) {
         const batch = changes.slice(i, i + storeBatchSize);
         
-        // Create a multi-row insert with parameterized values
+        // Create a multi-row insert with parameterized values for organization-aware change_history
         const valueRows = batch.map((_, idx) => {
-          const base = idx * 5;
-          return `($${base + 1}, $${base + 2}, $${base + 3}::jsonb, $${base + 4}::pg_lsn, $${base + 5}::timestamptz)`;
+          const base = idx * 7;
+          return `($${base + 1}::pg_lsn, $${base + 2}::uuid, $${base + 3}, $${base + 4}, $${base + 5}::jsonb, $${base + 6}, $${base + 7}::timestamptz)`;
         }).join(',\n');
         
         const params: any[] = [];
@@ -762,18 +765,20 @@ export async function storeChangesInHistory(
           const timestamp = change.updatedAt || new Date().toISOString();
           
           params.push(
+            change.lsn,
+            change.organizationId || null,
             change.table,
             change.operation,
             JSON.stringify(change.data), // This now contains camelCase data
-            change.lsn,
+            change.clientId || null,
             timestamp
           );
         });
         
-        // Execute the multi-row insert in a single query
+        // Execute the multi-row insert in a single query with organization context
         const query = `
           INSERT INTO change_history 
-            (table_name, operation, data, lsn, timestamp) 
+            (lsn, organization_id, table_name, operation, data, client_id, created_at) 
           VALUES 
             ${valueRows};
         `;
@@ -849,10 +854,18 @@ export async function processChanges(
   const startTime = Date.now();
 
   try {
-    // Step 1: Transform WAL changes (includes clientId filtering for dual-path sync)
-    replicationLogger.debug(`Processing ${changes.length} WAL entries`, {}, MODULE_NAME);
-    const { tableChanges, filteredReasons } = await transformWALChanges(changes, context);
+    // Step 1: Transform WAL changes with organization awareness (includes clientId filtering for dual-path sync)
+    replicationLogger.debug(`Processing ${changes.length} WAL entries with organization context`, {}, MODULE_NAME);
+    const { tableChanges, filteredReasons, organizationStats } = await transformWALChangesWithOrg(changes, context);
     const filteredCount = Object.values(filteredReasons).reduce((sum, count) => sum + count, 0);
+    
+    // Log organization statistics for monitoring
+    if (organizationStats && Object.keys(organizationStats).length > 0) {
+      replicationLogger.debug('Organization change distribution', {
+        organizations: organizationStats,
+        totalOrganizations: Object.keys(organizationStats).length
+      }, MODULE_NAME);
+    }
     
     // Only log filtering info if there are actual changes or non-expected filters
     const hasImportantFilters = Object.keys(filteredReasons).some(r => 

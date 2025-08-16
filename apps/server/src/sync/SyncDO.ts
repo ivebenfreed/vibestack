@@ -15,6 +15,7 @@ import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProces
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';
 import { ClientRegistryManager, type ClientRegistryManagerContext } from './client-registry-manager';
+import { OrgAwareClientRegistryManager } from './org-aware-client-registry';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
 import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
 import { OrgAwareSyncManager, type SyncConnection } from './org-aware-sync-manager';
@@ -61,6 +62,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   private messageHandlerRegistry!: MessageHandlerRegistry;
   private webSocketManager!: WebSocketManager;
   private clientRegistryManager!: ClientRegistryManager;
+  private orgAwareClientRegistry!: OrgAwareClientRegistryManager;
   private broadcastManager!: BroadcastManager;
   private syncStrategyAnalyzer!: SyncStrategyAnalyzer;
 
@@ -112,6 +114,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     };
     this.clientRegistryManager = new ClientRegistryManager(registryContext);
 
+    // Organization-Aware Client Registry Manager
+    this.orgAwareClientRegistry = new OrgAwareClientRegistryManager(this.env);
+
     // WebSocket Manager
     const wsContext: WebSocketManagerContext = {
       ctx: this.ctx,
@@ -134,6 +139,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       env: this.env,
       clientId: this.clientId,
       clientRegistryManager: this.clientRegistryManager,
+      orgAwareClientRegistry: this.orgAwareClientRegistry,
+      getOrganizationContext: () => this.syncConnection ? { organizationId: this.syncConnection.organizationId } : null,
       getContext: () => this.getContext()
     };
     this.broadcastManager = new BroadcastManager(broadcastContext);
@@ -281,6 +288,21 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         clientLSN
       }, MODULE_NAME);
 
+      // Register client with organization-aware registry for proper broadcasting isolation
+      await this.orgAwareClientRegistry.registerClient({
+        clientId,
+        organizationId: this.syncConnection.organizationId,
+        organizationSlug: this.syncConnection.organizationSlug,
+        userId: this.syncConnection.userId,
+        userRole: this.syncConnection.userRole
+      });
+      
+      syncLogger.debug('Client registered with organization-aware registry', {
+        clientId,
+        organizationId: this.syncConnection.organizationId,
+        organizationSlug: this.syncConnection.organizationSlug
+      }, MODULE_NAME);
+
       // Wait for WebSocket connection to be established
       await this.webSocketManager.waitForConnection();
       
@@ -326,13 +348,13 @@ export class SyncDO implements DurableObject, WebSocketHandler {
 
     try {
       switch (strategy) {
-        case SyncStrategy.INITIAL_SYNC:
+        case SyncStrategy.INITIAL:
           await this.performOrgAwareInitialSync(clientId, serverLSN);
           break;
-        case SyncStrategy.CATCHUP_SYNC:
+        case SyncStrategy.CATCHUP:
           await this.performOrgAwareCatchupSync(clientId, clientLSN, serverLSN);
           break;
-        case SyncStrategy.LIVE_SYNC:
+        case SyncStrategy.LIVE:
           await this.startOrgAwareLiveSync(clientId);
           break;
         default:
@@ -363,18 +385,14 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       serverLSN
     }, MODULE_NAME);
 
-    // Use existing initial sync but with org-aware filtering
-    // The performInitialSync function will need to be enhanced to accept org context
+    // Use existing initial sync but with user-scoped filtering
     await performInitialSync(
-      this.getContext(),
-      clientId,
-      this,
-      serverLSN,
-      {
-        organizationId: this.syncConnection.organizationId,
-        userId: this.syncConnection.userId,
-        syncConnection: this.syncConnection
-      }
+      this, // WebSocketHandler 
+      this.getContext(), // MinimalContext
+      clientId, // string
+      this.stateManager, // StateManager (optional)
+      this.syncConnection.organizationId, // Organization ID for scoping
+      this.syncConnection.userId // User ID for container permission filtering
     );
 
     syncLogger.info('Org-aware initial sync completed', {
@@ -915,8 +933,16 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
     await this.webSocketManager.handleWebSocketClose(ws, code, reason, wasClean);
     
-    // Mark client as inactive in KV - don't wait for completion
+    // Cleanup from both registries - don't wait for completion
     this.state.waitUntil(this.stateManager.cleanupConnection());
+    
+    // Remove from organization-aware registry if we have context
+    if (this.clientId && this.syncConnection) {
+      this.state.waitUntil(this.orgAwareClientRegistry.removeClient(
+        this.clientId,
+        this.syncConnection.organizationId
+      ));
+    }
   }
 
   async webSocketError(ws: WebSocket, error: Error): Promise<void> {

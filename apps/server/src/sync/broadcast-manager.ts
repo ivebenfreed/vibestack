@@ -9,6 +9,7 @@ import type { TableChange } from '@repo/sync-types';
 import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
 import type { ClientRegistryManager } from './client-registry-manager';
+import type { OrgAwareClientRegistryManager } from './org-aware-client-registry';
 import { getLatestChangeHistoryLSN } from '../lib/sync-common';
 import type { MinimalContext } from '../types/hono';
 
@@ -18,6 +19,8 @@ export interface BroadcastManagerContext {
   env: Env;
   clientId: string;
   clientRegistryManager: ClientRegistryManager;
+  orgAwareClientRegistry?: OrgAwareClientRegistryManager;
+  getOrganizationContext?: () => { organizationId: string } | null;
   getContext: () => MinimalContext;
 }
 
@@ -31,16 +34,37 @@ export class BroadcastManager {
   /**
    * Broadcast changes directly to other SyncDO instances via KV registry
    * Primary path for low-latency client-to-client sync with anti-echo filtering
+   * ORGANIZATION-AWARE: Only broadcasts to clients within the same organization
    */
   async broadcastChangesToOtherSyncDOs(changes: TableChange[], originClientId: string): Promise<void> {
     try {
-      syncLogger.debug('Starting SyncDO broadcast', {
+      syncLogger.debug('Starting organization-aware SyncDO broadcast', {
         changeCount: changes.length,
         originClientId
       }, MODULE_NAME);
 
-      // Get all registered clients from KV registry with optimized lookup
-      const activeClients = await this.context.clientRegistryManager.getActiveClients();
+      // Get organization context for filtering
+      const orgContext = this.context.getOrganizationContext?.();
+      let activeClients: string[] = [];
+
+      if (orgContext && this.context.orgAwareClientRegistry) {
+        // Organization-aware: Only get clients from the same organization
+        activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(orgContext.organizationId);
+        
+        syncLogger.debug('Using organization-aware client lookup', {
+          originClientId,
+          organizationId: orgContext.organizationId,
+          orgClientCount: activeClients.length
+        }, MODULE_NAME);
+      } else {
+        // Fallback: Use global client registry (backwards compatibility)
+        activeClients = await this.context.clientRegistryManager.getActiveClients();
+        
+        syncLogger.warn('Using global client registry - no organization context available', {
+          originClientId,
+          globalClientCount: activeClients.length
+        }, MODULE_NAME);
+      }
       
       syncLogger.debug('Active clients found for broadcast', {
         originClientId,

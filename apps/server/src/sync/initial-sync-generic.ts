@@ -18,10 +18,12 @@ import type { WebSocket } from '../types/cloudflare';
 import type { StateManager } from './state-manager';
 import type { InitialSyncState, WebSocketHandler } from './types';
 import { GenericSyncAdapter } from './generic-sync-adapter';
-// TODO: Replace with server-only table definitions when DataForge is moved
-// import { TRACKED_TABLES, ORDERED_TRACKED_TABLES } from '@repo/dataforge';
-const TRACKED_TABLES: string[] = [];
-const ORDERED_TRACKED_TABLES: string[] = [];
+// Import sync table registry for dynamic table discovery
+import { getSyncTableRegistry } from './sync-table-registry';
+
+// These will be populated dynamically by the registry
+let TRACKED_TABLES: string[] = [];
+let ORDERED_TRACKED_TABLES: string[] = [];
 
 const MODULE_NAME = 'initial-sync-generic';
 const DEFAULT_CHUNK_SIZE = 500;
@@ -34,10 +36,38 @@ export async function performInitialSync(
   messageHandler: WebSocketHandler,
   context: MinimalContext,
   clientId: string,
-  stateManager?: StateManager
+  stateManager?: StateManager,
+  organizationId?: string,
+  userId?: string
 ): Promise<{ startLSN: string; endLSN: string }> {
   try {
     syncLogger.info(`Starting initial sync for client ${clientId}`, { clientId }, MODULE_NAME);
+
+    // Get tracked tables from the centralized registry with user/organization scoping
+    const tableRegistry = await getSyncTableRegistry(context.env);
+    
+    if (organizationId) {
+      // Organization-scoped sync: only include base tables + this org's tables
+      TRACKED_TABLES = await tableRegistry.getTablesForOrganization(organizationId);
+      console.log(`DEBUG: FINAL TRACKED_TABLES for org ${organizationId}:`, TRACKED_TABLES);
+      
+      syncLogger.info(`Using ${TRACKED_TABLES.length} organization-scoped tables`, {
+        clientId,
+        organizationId,
+        tables: TRACKED_TABLES
+      }, MODULE_NAME);
+    } else {
+      // Fallback: all tables (for system-level operations)
+      TRACKED_TABLES = await tableRegistry.getAllTrackableTables();
+      console.log(`DEBUG: FINAL TRACKED_TABLES (no org):`, TRACKED_TABLES);
+      
+      syncLogger.warn(`No organization context, using all ${TRACKED_TABLES.length} trackable tables`, {
+        clientId,
+        tables: TRACKED_TABLES
+      }, MODULE_NAME);
+    }
+    
+    ORDERED_TRACKED_TABLES = [...TRACKED_TABLES];
 
     // Check for existing sync progress (resume capability)
     let syncProgress: InitialSyncState | null = null;
@@ -74,12 +104,14 @@ export async function performInitialSync(
     
     await messageHandler.send(startMessage);
 
-    // Create generic sync adapter
+    // Create generic sync adapter with organization and user context
     console.log('DEBUG: Creating GenericSyncAdapter...');
     const syncAdapter = new GenericSyncAdapter(
       context.env.DATABASE_URL,
       messageHandler,
-      context.env
+      context.env,
+      organizationId, // Pass organization ID for scoping
+      userId // Pass user ID for record-level filtering
     );
     console.log('DEBUG: GenericSyncAdapter created successfully');
 

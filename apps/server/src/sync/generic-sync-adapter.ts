@@ -6,12 +6,12 @@
  */
 
 import { GenericSyncEngine, type LocalChange } from './generic-sync-engine.js';
+// Import sync table registry for dynamic table discovery
+import { getSyncTableRegistry } from './sync-table-registry';
+
 // TODO: Replace with server-only metadata when DataForge is moved
-// import { syncMetadata, junctionTables, TRACKED_TABLES, DOMAIN_TABLES } from '@repo/dataforge';
 const syncMetadata: any = {};
 const junctionTables: any = {};
-const TRACKED_TABLES: string[] = [];
-const DOMAIN_TABLES: string[] = [];
 
 import { 
   TableChange, 
@@ -49,7 +49,9 @@ export class GenericSyncAdapter {
   constructor(
     databaseUrl: string,
     private messageHandler: WebSocketHandler,
-    private env: { DATABASE_URL: string; NODE_ENV?: string }
+    private env: { DATABASE_URL: string; NODE_ENV?: string },
+    private organizationId?: string,
+    private userId?: string
   ) {
     console.log('DEBUG: GenericSyncAdapter constructor called');
     console.log('DEBUG: Database URL provided:', !!databaseUrl);
@@ -103,9 +105,15 @@ export class GenericSyncAdapter {
     console.log('DEBUG: getServerChanges called for client:', clientId);
     syncLogger.info(`${MODULE_NAME}: Getting server changes for client ${clientId} since ${lastSyncTimestamp?.toISOString()}`);
     
+    // Get tracked tables from registry with organization scoping
+    const tableRegistry = await getSyncTableRegistry(this.env);
+    const trackedTables = this.organizationId 
+      ? await tableRegistry.getTablesForOrganization(this.organizationId)
+      : await tableRegistry.getAllTrackableTables();
+    
     const timestamp = lastSyncTimestamp || new Date(0);
-    console.log('DEBUG: Calling syncEngine.getChangesForClient with TRACKED_TABLES:', TRACKED_TABLES);
-    const changes = await this.syncEngine.getChangesForClient(timestamp, TRACKED_TABLES as unknown as string[]);
+    console.log('DEBUG: Calling syncEngine.getChangesForClient with tracked tables:', trackedTables);
+    const changes = await this.syncEngine.getChangesForClient(timestamp, trackedTables);
     console.log('DEBUG: getChangesForClient returned successfully');
     
     syncLogger.info(`${MODULE_NAME}: Found changes in ${Object.keys(changes).length} tables for client ${clientId}`);
@@ -119,8 +127,24 @@ export class GenericSyncAdapter {
   async getTableData(tableName: string, lastSyncTimestamp?: Date): Promise<any[]> {
     syncLogger.debug(`${MODULE_NAME}: Getting data for table ${tableName}`);
     
+    // Verify table is trackable and allowed for this organization
+    const tableRegistry = await getSyncTableRegistry(this.env);
+    const allowedTables = this.organizationId 
+      ? await tableRegistry.getTablesForOrganization(this.organizationId)
+      : await tableRegistry.getAllTrackableTables();
+    
+    if (!allowedTables.includes(tableName)) {
+      syncLogger.warn(`${MODULE_NAME}: Table ${tableName} not allowed for organization ${this.organizationId}, skipping`);
+      return [];
+    }
+    
     const timestamp = lastSyncTimestamp || new Date(0);
-    const changes = await this.syncEngine.getChangesForClient(timestamp, [tableName]);
+    const changes = await this.syncEngine.getChangesForClient(
+      timestamp, 
+      [tableName], 
+      this.userId, 
+      this.organizationId
+    );
     
     return changes[tableName] || [];
   }
