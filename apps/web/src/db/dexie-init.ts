@@ -6,7 +6,7 @@
  * and dispatch events for the app-init-machine.
  */
 
-import { db } from '@repo/dataforge/dexie-schema';
+import { db } from './dexie-schema';
 import Dexie from 'dexie';
 
 /**

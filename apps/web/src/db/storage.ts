@@ -5,7 +5,7 @@
  */
 
 import { getDatabase, clearDatabaseStorage, Results } from './db';
-import { CLIENT_DOMAIN_TABLES, CLIENT_DOMAIN_TABLE_HIERARCHY, CLIENT_JUNCTION_TABLES } from '@repo/dataforge/client-entities';
+import { CLIENT_DOMAIN_TABLES, CLIENT_DOMAIN_TABLE_HIERARCHY, CLIENT_JUNCTION_TABLES } from './client-entities';
 
 /**
  * Entity configuration for database operations

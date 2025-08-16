@@ -5,16 +5,16 @@
  * Uses the Project entity type from DataForge for full type safety.
  */
 
-import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
-import { db } from '@repo/dataforge/dexie-schema';
-import { projectDexieService } from '@repo/dataforge/dexie-domain';
-import type { CreateProjectInput, UpdateProjectInput } from '@repo/dataforge/project-operations';
+import { Project, ProjectStatus } from '../db/client-entities';
+import { db } from '../db/dexie-schema';
+// import { projectDexieService } from '@repo/dataforge/dexie-domain'; // TODO: Replace with local implementation
+import type { CreateProjectInput, UpdateProjectInput } from '../db/client-entities';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
 import { trackOutgoingChange } from '@/db/dexie-change-tracking';
 
-// Re-export types from DataForge
-export type { CreateProjectInput, UpdateProjectInput } from '@repo/dataforge/project-operations';
+// Re-export types from client entities
+export type { CreateProjectInput, UpdateProjectInput } from '../db/client-entities';
 
 // ============================================================================
 // Project Domain Service Implementation

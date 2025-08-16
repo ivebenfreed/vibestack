@@ -5,7 +5,7 @@
  * replacing the PGLite-based storage utilities with Dexie equivalents.
  */
 
-import { db, CLIENT_DOMAIN_TABLES, ENTITY_TABLES, JUNCTION_TABLES, SYSTEM_TABLES } from '@repo/dataforge/dexie-schema';
+import { db, CLIENT_DOMAIN_TABLES, ENTITY_TABLES, JUNCTION_TABLES, SYSTEM_TABLES } from './dexie-schema';
 import type { Table } from 'dexie';
 
 /**

@@ -80,7 +80,7 @@ export { TagSetDomainService } from './tagset-service';
 export { StatusSetDomainService } from './statusset-service';
 export { BaseDomainService } from './base-domain-service';
 
-// Re-export types from dataforge for convenience
+// Re-export types from client entities for convenience
 export type {
   Task,
   Project,
@@ -92,11 +92,10 @@ export type {
   TagSet,
   TaskStatus,
   TaskPriority,
-  ProjectStatus,
-} from '@repo/dataforge/client-entities';
+} from '../db/client-entities';
 
 // Re-export Dexie database instance
-export { db } from '@repo/dataforge/dexie-schema';
+export { db } from '../db/dexie-schema';
 
 // ============================================================================
 // Usage Examples

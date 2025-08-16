@@ -6,9 +6,9 @@
  * create, update, and delete operations.
  */
 
-import { db } from '@repo/dataforge/dexie-schema';
+import { db } from './dexie-schema';
 import { nanoid } from 'nanoid';
-import type { LocalChanges } from '@repo/dataforge/client-entities';
+import type { LocalChanges } from './client-entities';
 
 let currentClientId = 'default-client';
 let currentUserId = 'default-user';

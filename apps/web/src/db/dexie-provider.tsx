@@ -7,7 +7,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initializeDexieDatabase, setupDexieDatabaseListeners } from './dexie-init';
-import { db } from '@repo/dataforge/dexie-schema';
+import { db } from './dexie-schema';
 
 // Create context with Dexie database access
 interface DexieContextValue {
