@@ -613,16 +613,109 @@ authRouter.on(["POST", "GET"], "/*", async (c) => {
   console.log(`[Auth Router] Handling path: ${c.req.path}, Method: ${c.req.method}`);
   
   try {
-    // Add more debugging for sign-up requests
+    // Add password validation and debugging for sign-up requests
     if (c.req.path.includes('sign-up')) {
       console.log(`[Auth Router DEBUG] Processing sign-up request`);
       console.log(`[Auth Router DEBUG] Request URL:`, c.req.url);
       console.log(`[Auth Router DEBUG] Request method:`, c.req.method);
       
-      // Try to log the request body
+      // Try to log the request body and validate password
       try {
         const bodyText = await c.req.text();
         console.log(`[Auth Router DEBUG] Request body:`, bodyText);
+        
+        // Parse body for password validation
+        const body = JSON.parse(bodyText);
+        
+        // Validate password if present
+        if (body.password) {
+          const password = body.password;
+          const email = body.email;
+          const errors: string[] = [];
+          
+          console.log(`[Password Validation] Checking password for: ${email}`);
+          
+          // Length validation (must come first)
+          if (password.length < 8) {
+            errors.push('Password must be at least 8 characters long');
+          }
+          
+          if (password.length > 128) {
+            errors.push('Password must not exceed 128 characters');
+          }
+          
+          // B2B Security Password Requirements
+          if (!/[A-Z]/.test(password)) {
+            errors.push('Password must contain at least one uppercase letter');
+          }
+          
+          if (!/[a-z]/.test(password)) {
+            errors.push('Password must contain at least one lowercase letter');
+          }
+          
+          if (!/\d/.test(password)) {
+            errors.push('Password must contain at least one number');
+          }
+          
+          if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\?]/.test(password)) {
+            errors.push('Password must contain at least one special character (!@#$%^&*()_+-=[]{};\':"\\|,.<>?)');
+          }
+          
+          // Check against common passwords (only exact matches)
+          const commonPasswords = [
+            'password', 'password123', '12345678', 'qwerty', 'abc123',
+            'password1', '123456789', 'welcome', 'admin123', 'letmein'
+          ];
+          
+          if (commonPasswords.includes(password.toLowerCase())) {
+            errors.push('Password is too common and not secure');
+          }
+          
+          // Check similarity to email (only if password is mostly the email)
+          if (email) {
+            const emailPrefix = email.split('@')[0].toLowerCase();
+            const passwordLower = password.toLowerCase();
+            
+            console.log(`[Password Validation] Email similarity check: "${passwordLower}" vs "${emailPrefix}"`);
+            
+            // Only fail if password is very similar (90%+ match) to email prefix
+            if (emailPrefix.length >= 4 && passwordLower === emailPrefix) {
+              errors.push('Password cannot be identical to your email username');
+            }
+          }
+          
+          // Check for excessive sequential characters (4+ in a row only)
+          const hasSequential = /1234|2345|3456|4567|5678|6789|7890|abcd|bcde|cdef/.test(password.toLowerCase());
+          if (hasSequential) {
+            errors.push('Password must not contain 4+ sequential characters');
+          }
+          
+          // Check for repeated characters (more than 2 in a row)
+          if (/(.)\1{2,}/.test(password)) {
+            errors.push('Password must not contain more than 2 repeated characters in a row');
+          }
+          
+          if (errors.length > 0) {
+            dbLogger.warn('Password validation failed', {
+              email: email,
+              errors: errors,
+              endpoint: c.req.path
+            }, 'auth');
+            
+            console.log(`[Password Validation] FAILED for ${email}: ${errors.join('; ')}`);
+            
+            return c.json({
+              code: 'WEAK_PASSWORD',
+              message: errors.join('; ')
+            }, 400);
+          }
+          
+          console.log(`[Password Validation] PASSED for ${email}`);
+          dbLogger.info('Password validation passed', {
+            email: email,
+            endpoint: c.req.path
+          }, 'auth');
+        }
         
         // Re-create the request with the body
         const newRequest = new Request(c.req.raw.url, {
@@ -679,6 +772,186 @@ authRouter.on(["POST", "GET"], "/*", async (c) => {
   }
 });
 
+
+// Enable TOTP 2FA for current user
+authRouter.post("/enable-totp", async (c) => {
+  try {
+    const user = c.var.user;
+    const session = c.var.session;
+
+    if (!user || !session) {
+      return c.json({ error: "Unauthorized: Please sign in first." }, 401);
+    }
+
+    const authInstance = getAuth(c);
+    
+    // Generate TOTP secret and get QR code URI
+    const totpResult = await authInstance.api.generateTOTP({
+      headers: c.req.raw.headers
+    });
+
+    if (!totpResult || !totpResult.totpSecret) {
+      dbLogger.error('Failed to generate TOTP secret', { userId: user.id });
+      return c.json({ error: "Failed to generate TOTP setup" }, 500);
+    }
+
+    const qrCodeUri = `otpauth://totp/VibeStack:${encodeURIComponent(user.email)}?secret=${totpResult.totpSecret}&issuer=VibeStack&algorithm=SHA1&digits=6&period=30`;
+
+    dbLogger.info('TOTP setup initiated', { 
+      userId: user.id, 
+      email: user.email 
+    });
+
+    return c.json({
+      message: "TOTP setup initiated. Please scan the QR code with your authenticator app.",
+      totpSecret: totpResult.totpSecret,
+      qrCodeUri: qrCodeUri,
+      manualEntryKey: totpResult.totpSecret,
+      backupCodes: totpResult.backupCodes || []
+    });
+
+  } catch (error) {
+    dbLogger.error('Error enabling TOTP', error);
+    return c.json({ error: "Failed to enable two-factor authentication." }, 500);
+  }
+});
+
+// Verify and activate TOTP 2FA
+authRouter.post("/verify-totp-setup", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { code } = body;
+    const user = c.var.user;
+    const session = c.var.session;
+
+    if (!user || !session) {
+      return c.json({ error: "Unauthorized: Please sign in first." }, 401);
+    }
+
+    if (!code) {
+      return c.json({ error: "Missing TOTP verification code." }, 400);
+    }
+
+    const authInstance = getAuth(c);
+    
+    // Verify the TOTP code and activate 2FA
+    const verificationResult = await authInstance.api.verifyTOTPSetup({
+      body: { code },
+      headers: c.req.raw.headers
+    });
+
+    if (!verificationResult || !verificationResult.user) {
+      return c.json({ error: "Invalid TOTP code. Please try again." }, 400);
+    }
+
+    dbLogger.info('TOTP successfully enabled', { 
+      userId: user.id, 
+      email: user.email 
+    });
+
+    return c.json({
+      message: "Two-factor authentication enabled successfully!",
+      backupCodes: verificationResult.backupCodes || [],
+      user: {
+        id: verificationResult.user.id,
+        email: verificationResult.user.email,
+        twoFactorEnabled: true
+      }
+    });
+
+  } catch (error) {
+    dbLogger.error('Error verifying TOTP setup', error);
+    return c.json({ error: "Failed to verify TOTP setup." }, 500);
+  }
+});
+
+// Disable TOTP 2FA for current user
+authRouter.post("/disable-totp", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { password } = body;
+    const user = c.var.user;
+    const session = c.var.session;
+
+    if (!user || !session) {
+      return c.json({ error: "Unauthorized: Please sign in first." }, 401);
+    }
+
+    if (!password) {
+      return c.json({ error: "Password required to disable two-factor authentication." }, 400);
+    }
+
+    const authInstance = getAuth(c);
+    
+    // Disable TOTP 2FA
+    const disableResult = await authInstance.api.disableTwoFactor({
+      body: { password },
+      headers: c.req.raw.headers
+    });
+
+    if (!disableResult || !disableResult.user) {
+      return c.json({ error: "Invalid password or failed to disable 2FA." }, 400);
+    }
+
+    dbLogger.info('TOTP disabled', { 
+      userId: user.id, 
+      email: user.email 
+    });
+
+    return c.json({
+      message: "Two-factor authentication disabled successfully.",
+      user: {
+        id: disableResult.user.id,
+        email: disableResult.user.email,
+        twoFactorEnabled: false
+      }
+    });
+
+  } catch (error) {
+    dbLogger.error('Error disabling TOTP', error);
+    return c.json({ error: "Failed to disable two-factor authentication." }, 500);
+  }
+});
+
+// Generate new backup codes
+authRouter.post("/generate-backup-codes", async (c) => {
+  try {
+    const user = c.var.user;
+    const session = c.var.session;
+
+    if (!user || !session) {
+      return c.json({ error: "Unauthorized: Please sign in first." }, 401);
+    }
+
+    const authInstance = getAuth(c);
+    
+    // Generate new backup codes
+    const backupResult = await authInstance.api.generateBackupCodes({
+      headers: c.req.raw.headers
+    });
+
+    if (!backupResult || !backupResult.backupCodes) {
+      dbLogger.error('Failed to generate backup codes', { userId: user.id });
+      return c.json({ error: "Failed to generate backup codes" }, 500);
+    }
+
+    dbLogger.info('New backup codes generated', { 
+      userId: user.id, 
+      email: user.email,
+      codeCount: backupResult.backupCodes.length 
+    });
+
+    return c.json({
+      message: "New backup codes generated successfully.",
+      backupCodes: backupResult.backupCodes,
+      warning: "Store these codes securely. Each code can only be used once."
+    });
+
+  } catch (error) {
+    dbLogger.error('Error generating backup codes', error);
+    return c.json({ error: "Failed to generate backup codes." }, 500);
+  }
+});
 
 // Verify email change with OTP (user endpoint)
 authRouter.post("/verify-email-change", async (c) => {

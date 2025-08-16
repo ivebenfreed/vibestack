@@ -44,10 +44,9 @@ export class OrgAccessService {
     try {
       // 1. Get organization ID from PostgreSQL (always fresh)
       const org = await this.kysely
-        .selectFrom('organization as o')
-        .select(['o.id', 'o.name', 'o.slug', 'o.status'])
+        .selectFrom('organizations as o')
+        .select(['o.id', 'o.name', 'o.slug'])
         .where('o.slug', '=', orgSlug)
-        .where('o.status', '=', 'active')
         .executeTakeFirst();
 
       if (!org) {
@@ -85,13 +84,13 @@ export class OrgAccessService {
 
       // 3. Fallback to PostgreSQL truth
       const member = await this.kysely
-        .selectFrom('member as m')
-        .innerJoin('users as u', 'u.id', 'm.user_id')
+        .selectFrom('organization_members as m')
+        .innerJoin('user as u', 'u.id', 'm.user_id')
         .select([
           'm.id',
-          'm.user_id',
+          'm.user_id as userId',
           'm.role',
-          'm.created_at',
+          'm.created_at as createdAt',
           'u.name as user_name',
           'u.email as user_email'
         ])
@@ -107,14 +106,14 @@ export class OrgAccessService {
 
       // 4. Sync cache with current data
       const allMembers = await this.kysely
-        .selectFrom('member as m')
-        .innerJoin('users as u', 'u.id', 'm.user_id')
+        .selectFrom('organization_members as m')
+        .innerJoin('user as u', 'u.id', 'm.user_id')
         .select([
           'm.id',
-          'm.organization_id',
-          'm.user_id',
+          'm.organization_id as organizationId',
+          'm.user_id as userId',
           'm.role',
-          'm.created_at',
+          'm.created_at as createdAt',
           'u.name as user_name',
           'u.email as user_email'
         ])
@@ -152,20 +151,18 @@ export class OrgAccessService {
     try {
       // Get from PostgreSQL (source of truth)
       const results = await this.kysely
-        .selectFrom('organization as o')
-        .innerJoin('member as m', 'm.organization_id', 'o.id')
+        .selectFrom('organizations as o')
+        .innerJoin('organization_members as m', 'm.organization_id', 'o.id')
         .select([
           'o.id as org_id',
           'o.name as org_name', 
           'o.slug as org_slug',
-          'o.status as org_status',
           'o.created_at as org_created_at',
           'm.id as member_id',
           'm.role as member_role',
           'm.created_at as member_created_at'
         ])
         .where('m.user_id', '=', userId)
-        .where('o.status', '=', 'active')
         .execute();
 
       const organizations = results.map(row => ({
@@ -217,7 +214,7 @@ export class OrgAccessService {
           id: orgId,
           name: data.name,
           slug: data.slug,
-          created_at: now
+          createdAt: now
         })
         .execute();
 
@@ -227,10 +224,10 @@ export class OrgAccessService {
         .insertInto('member')
         .values({
           id: memberId,
-          organization_id: orgId,
-          user_id: data.ownerId,
+          organizationId: orgId,
+          userId: data.ownerId,
           role: 'owner', // Creator gets owner role
-          created_at: now
+          createdAt: now
         })
         .execute();
 
@@ -243,17 +240,17 @@ export class OrgAccessService {
 
       const members = await this.kysely
         .selectFrom('member as m')
-        .innerJoin('users as u', 'u.id', 'm.user_id')
+        .innerJoin('user as u', 'u.id', 'm.userId')
         .select([
           'm.id',
-          'm.organization_id',
-          'm.user_id',
+          'm.organizationId',
+          'm.userId',
           'm.role',
           'm.created_at',
           'u.name as user_name',
           'u.email as user_email'
         ])
-        .where('m.organization_id', '=', orgId)
+        .where('m.organizationId', '=', orgId)
         .execute();
 
       // 4. Sync cache immediately
@@ -287,10 +284,10 @@ export class OrgAccessService {
         .insertInto('member')
         .values({
           id: memberId,
-          organization_id: orgId,
-          user_id: userId,
+          organizationId: orgId,
+          userId: userId,
           role,
-          created_at: new Date()
+          createdAt: new Date()
         })
         .execute();
 
@@ -315,8 +312,8 @@ export class OrgAccessService {
       // 1. Remove from PostgreSQL truth
       await this.kysely
         .deleteFrom('member')
-        .where('organization_id', '=', orgId)
-        .where('user_id', '=', userId)
+        .where('organizationId', '=', orgId)
+        .where('userId', '=', userId)
         .execute();
 
       // 2. Invalidate cache for immediate re-sync
@@ -377,7 +374,7 @@ export class OrgAccessService {
 
       const members = await this.kysely
         .selectFrom('member as m')
-        .innerJoin('users as u', 'u.id', 'm.user_id')
+        .innerJoin('user as u', 'u.id', 'm.userId')
         .select([
           'm.id',
           'm.organization_id', 
@@ -387,7 +384,7 @@ export class OrgAccessService {
           'u.name as user_name',
           'u.email as user_email'
         ])
-        .where('m.organization_id', '=', orgId)
+        .where('m.organizationId', '=', orgId)
         .execute();
 
       await this.syncOrgCache(orgId, { organization, members });

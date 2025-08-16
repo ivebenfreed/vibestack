@@ -17,6 +17,7 @@ type TableSyncMetadata = any;
 type JunctionTable = any;
 type TRACKED_TABLES = string[];
 import { DeleteSafetyCheck } from './delete-safety-check.js';
+import { ContainerPermissionService } from './container-permission-service';
 
 export interface LocalChange {
   id: string;
@@ -32,6 +33,7 @@ export class GenericSyncEngine {
   private db: Kysely<Database>;
   private syncMetadata: Record<string, TableSyncMetadata>;
   private junctionTables: JunctionTable[];
+  private containerPermissionService: ContainerPermissionService;
 
   constructor(
     databaseUrl: string,
@@ -54,6 +56,7 @@ export class GenericSyncEngine {
     });
     this.syncMetadata = syncMetadata;
     this.junctionTables = junctionTables;
+    this.containerPermissionService = new ContainerPermissionService(this.db);
   }
 
   /**
@@ -362,19 +365,27 @@ export class GenericSyncEngine {
 
   /**
    * Get all changes that need to be synced to a client
-   * For initial sync, this returns ALL records from all tables
+   * For initial sync, this returns records filtered by user permissions
    * (LSN-based sync happens elsewhere in the system)
    */
   async getChangesForClient(
     lastSyncTimestamp: Date,
-    tables: string[] = []
+    tables: string[] = [],
+    userId?: string,
+    organizationId?: string
   ): Promise<Record<string, any[]>> {
-    console.log('DEBUG: getChangesForClient called');
+    console.log('DEBUG: getChangesForClient called with tables:', tables);
     const changes: Record<string, any[]> = {};
     
-    // Use provided tables (should be TRACKED_TABLES)
-    const tablesToSync = tables.length > 0 ? tables : this.getTrackedTables();
-    console.log('DEBUG: Tables to sync:', tablesToSync);
+    // CRITICAL: Only use provided tables - never fall back to getTrackedTables()
+    // The caller is responsible for providing the correct organization-scoped tables
+    if (tables.length === 0) {
+      console.warn('DEBUG: No tables provided to getChangesForClient - returning empty results');
+      return {};
+    }
+    
+    const tablesToSync = tables;
+    console.log('DEBUG: Tables to sync (organization-scoped):', tablesToSync);
     
     for (const tableName of tablesToSync) {
       console.log('DEBUG: Processing table:', tableName);
@@ -390,7 +401,19 @@ export class GenericSyncEngine {
         console.log(`DEBUG: Found ${records.length} records in ${tableName}`);
         
         if (records.length > 0) {
-          changes[tableName] = records;
+          // Apply user-based record filtering if userId is provided
+          if (userId && organizationId) {
+            const filteredRecords = await this.filterRecordsForUser(
+              records, 
+              tableName, 
+              userId, 
+              organizationId
+            );
+            console.log(`DEBUG: After user filtering: ${filteredRecords.length}/${records.length} records allowed for user ${userId}`);
+            changes[tableName] = filteredRecords;
+          } else {
+            changes[tableName] = records;
+          }
         }
       } catch (error) {
         console.log(`DEBUG: Error querying table ${tableName}:`, error);
@@ -398,6 +421,132 @@ export class GenericSyncEngine {
     }
     
     return changes;
+  }
+
+  /**
+   * Filter records based on user's container permissions
+   */
+  private async filterRecordsForUser(
+    records: any[],
+    tableName: string,
+    userId: string,
+    organizationId: string
+  ): Promise<any[]> {
+    if (!records || records.length === 0) {
+      return records;
+    }
+
+    console.log(`DEBUG: Filtering ${records.length} records from ${tableName} for user ${userId}`);
+
+    // Get user's container permissions
+    const userPermissions = await this.containerPermissionService.getUserContainerPermissions(
+      userId,
+      organizationId
+    );
+
+    console.log(`DEBUG: User has ${userPermissions.length} container permissions`);
+
+    const filteredRecords = [];
+
+    for (const record of records) {
+      const hasAccess = await this.checkRecordAccess(
+        record,
+        tableName,
+        userId,
+        organizationId,
+        userPermissions
+      );
+
+      if (hasAccess) {
+        filteredRecords.push(record);
+      }
+    }
+
+    console.log(`DEBUG: Filtered to ${filteredRecords.length} records for user ${userId}`);
+    return filteredRecords;
+  }
+
+  /**
+   * Check if a user has access to a specific record
+   */
+  private async checkRecordAccess(
+    record: any,
+    tableName: string,
+    userId: string,
+    organizationId: string,
+    userPermissions: any[]
+  ): Promise<boolean> {
+    // Owner role has access to everything
+    const hasOwnerRole = userPermissions.some(p => 
+      p.containerType === 'organization' && 
+      p.containerId === organizationId && 
+      p.role === 'owner'
+    );
+
+    if (hasOwnerRole) {
+      return true;
+    }
+
+    // Check if user created or is assigned to this record
+    if (record.created_by === userId || record.assigned_to === userId) {
+      return true;
+    }
+
+    // For project tables, check if user has project-level permissions
+    if (tableName.includes('_project') && record.id) {
+      const hasProjectPermission = userPermissions.some(p =>
+        p.containerType === 'project' && 
+        p.containerId === record.id &&
+        p.canRead
+      );
+      if (hasProjectPermission) {
+        return true;
+      }
+    }
+
+    // For task tables, check project permissions via project_id
+    if (tableName.includes('_task') && record.project_id) {
+      const hasProjectPermission = userPermissions.some(p =>
+        p.containerType === 'project' && 
+        p.containerId === record.project_id &&
+        p.canRead
+      );
+      if (hasProjectPermission) {
+        return true;
+      }
+    }
+
+    // For time_entry tables, check task permissions via task_id
+    if (tableName.includes('_time_entry') && record.task_id) {
+      // First, we'd need to get the task to check its project
+      // For now, allow if user created or is assigned to the time entry
+      return record.created_by === userId || record.user_id === userId;
+    }
+
+    // Admin role gets broad access within organization
+    const hasAdminRole = userPermissions.some(p => 
+      p.containerType === 'organization' && 
+      p.containerId === organizationId && 
+      p.role === 'admin'
+    );
+
+    if (hasAdminRole) {
+      return true;
+    }
+
+    // Manager role gets read access to most organization data
+    const hasManagerRole = userPermissions.some(p => 
+      p.containerType === 'organization' && 
+      p.containerId === organizationId && 
+      p.role === 'manager'
+    );
+
+    if (hasManagerRole && ['project', 'task'].some(type => tableName.includes(`_${type}`))) {
+      return true;
+    }
+
+    // Default deny
+    return false;
   }
 
   /**

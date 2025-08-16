@@ -31,7 +31,8 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
           '/api/db/kysely-test',
           '/api/db/query',
           '/api/bootstrap/',
-          '/api/archetype/health'
+          '/api/archetype/health',
+          '/api/sync/connect/'  // WebSocket connections have custom auth logic in index.ts
         ];
         
         const isPublicPath = publicPaths.some(path => c.req.path.startsWith(path));
