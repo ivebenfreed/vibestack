@@ -8,7 +8,7 @@
  */
 
 import { TableChange } from '@repo/sync-types';
-import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '@repo/dataforge/client-entities';
+import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '../db/client-entities';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;

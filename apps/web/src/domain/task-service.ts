@@ -5,16 +5,16 @@
  * Uses the Task entity type from DataForge for full type safety.
  */
 
-import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities';
-import { db } from '@repo/dataforge/dexie-schema';
-import { taskDexieService } from '@repo/dataforge/dexie-domain';
-import type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
+import { Task, TaskStatus, TaskPriority } from '../db/client-entities';
+import { db } from '../db/dexie-schema';
+// import { taskDexieService } from '@repo/dataforge/dexie-domain'; // TODO: Replace with local implementation
+import type { CreateTaskInput, UpdateTaskInput } from '../db/client-entities';
 import { nanoid } from 'nanoid';
 import { BaseDomainService } from './base-domain-service';
 // trackOutgoingChange no longer needed - automatic hooks handle change tracking
 
-// Re-export types from DataForge
-export type { CreateTaskInput, UpdateTaskInput } from '@repo/dataforge/task-operations';
+// Re-export types from client entities
+export type { CreateTaskInput, UpdateTaskInput } from '../db/client-entities';
 
 // ============================================================================
 // Task Domain Service Implementation

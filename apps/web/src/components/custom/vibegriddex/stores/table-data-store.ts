@@ -1,5 +1,5 @@
 import { fromStore } from '@xstate/store';
-import { db } from '@repo/dataforge/dexie-schema';
+import { db } from '../../../../db/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import { 

@@ -14,8 +14,8 @@ import {
   clearProcessedChanges,
   setChangeProcessor
 } from '../db/dexie-change-tracking';
-import { db } from '@repo/dataforge/dexie-schema';
-import type { LocalChanges } from '@repo/dataforge/client-entities';
+import { db } from '../db/dexie-schema';
+import type { LocalChanges } from '../db/client-entities';
 
 export interface DexieOutgoingChangeServiceConfig {
   clientId: string;

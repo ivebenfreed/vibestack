@@ -11,7 +11,7 @@
  * - Dexie-based fingerprint generation
  */
 
-import { db, CLIENT_DOMAIN_TABLES, DEXIE_TO_DB_TABLE_MAP } from '@repo/dataforge/dexie-schema';
+import { db, CLIENT_DOMAIN_TABLES, DEXIE_TO_DB_TABLE_MAP } from '../../db/dexie-schema';
 import type { IMessageSender } from '../interfaces';
 import type { Table } from 'dexie';
 import { 
