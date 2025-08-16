@@ -60,7 +60,6 @@
     "eslint-plugin-import": "^2.32.0",
     "pg": "^8.16.3",
     "prettier": "^3.6.2",
-    "turbo": "^2.5.6",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.39.1"
   },
@@ -86,6 +85,8 @@
     "@types/bcryptjs": "^3.0.0",
     "bcryptjs": "^3.0.2",
     "cloudflared": "^0.7.1",
-    "playwright": "^1.54.2"
+    "optional": "^0.1.4",
+    "playwright": "^1.54.2",
+    "turbo": "^2.5.6"
   }
 }
