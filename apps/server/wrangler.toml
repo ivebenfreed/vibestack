@@ -75,6 +75,19 @@ new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrgSchemaDO", "SuperAdminDO", 
 [triggers]
 crons = ["0 0 * * *"]  # Run once daily at midnight UTC
 
+# Rate limiting configuration (FREE Cloudflare feature)
+[[ratelimits]]
+name = "auth_rate_limit"
+simple = { limit = 5, period = 900 } # 5 requests per 15 minutes for auth endpoints
+
+[[ratelimits]]
+name = "api_rate_limit"
+simple = { limit = 100, period = 60 } # 100 requests per minute for API endpoints
+
+[[ratelimits]]
+name = "signup_rate_limit"
+simple = { limit = 3, period = 3600 } # 3 signups per hour per IP
+
 # KV namespace configuration
 # Development uses a local namespace
 [[kv_namespaces]]
@@ -119,6 +132,19 @@ ENVIRONMENT = "staging"
 NODE_ENV = "staging"
 TYPEORM_LOGGING = true
 
+# Rate limiting for staging
+[[env.staging.ratelimits]]
+name = "auth_rate_limit"
+simple = { limit = 5, period = 900 }
+
+[[env.staging.ratelimits]]
+name = "api_rate_limit"
+simple = { limit = 100, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "signup_rate_limit"
+simple = { limit = 3, period = 3600 }
+
 [[env.staging.kv_namespaces]]
 binding = "CLIENT_REGISTRY"
 id = "a794cee3a313416993643848fc738281"
@@ -159,6 +185,19 @@ class_name = "OrgOpsDO"
 ENVIRONMENT = "production"
 NODE_ENV = "production"
 TYPEORM_LOGGING = false
+
+# Rate limiting for production
+[[env.production.ratelimits]]
+name = "auth_rate_limit"
+simple = { limit = 5, period = 900 }
+
+[[env.production.ratelimits]]
+name = "api_rate_limit"
+simple = { limit = 100, period = 60 }
+
+[[env.production.ratelimits]]
+name = "signup_rate_limit"
+simple = { limit = 3, period = 3600 }
 
 [[env.production.kv_namespaces]]
 binding = "CLIENT_REGISTRY"
