@@ -1,0 +1,104 @@
+{
+  "timestamp": "2025-08-15T17:55:28.065Z",
+  "test_type": "authentication_flows",
+  "users_tested": 3,
+  "results": [
+    {
+      "user": {
+        "id": "0198aedd-1a09-7364-96c6-49c476b359e9",
+        "email": "sarah.chen.techflow.001@gmail.com",
+        "name": "Sarah Chen",
+        "image": null,
+        "emailVerified": false,
+        "createdAt": "2025-08-15T17:53:02.472Z",
+        "updatedAt": "2025-08-15T17:53:02.472Z"
+      },
+      "tests": {
+        "sign_in_unverified": {
+          "status": "expected_failure",
+          "error": {
+            "code": "EMAIL_NOT_VERIFIED",
+            "message": "Email not verified"
+          }
+        },
+        "password_reset": {
+          "status": "failure",
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid body parameters"
+          }
+        },
+        "session_unauth": {
+          "status": "expected_failure",
+          "error": ""
+        }
+      }
+    },
+    {
+      "user": {
+        "id": "0198aedd-2660-714e-8f17-3b615cbd46a0",
+        "email": "michael.rodriguez.techflow.001@gmail.com",
+        "name": "Michael Rodriguez",
+        "image": null,
+        "emailVerified": false,
+        "createdAt": "2025-08-15T17:53:05.632Z",
+        "updatedAt": "2025-08-15T17:53:05.632Z"
+      },
+      "tests": {
+        "sign_in_unverified": {
+          "status": "expected_failure",
+          "error": {
+            "code": "EMAIL_NOT_VERIFIED",
+            "message": "Email not verified"
+          }
+        },
+        "password_reset": {
+          "status": "failure",
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid body parameters"
+          }
+        },
+        "session_unauth": {
+          "status": "expected_failure",
+          "error": ""
+        }
+      }
+    },
+    {
+      "user": {
+        "id": "0198aedd-313b-7abc-a36c-9bd2d88b4ae2",
+        "email": "emily.watson.techflow.001@gmail.com",
+        "name": "Emily Watson",
+        "image": null,
+        "emailVerified": false,
+        "createdAt": "2025-08-15T17:53:08.410Z",
+        "updatedAt": "2025-08-15T17:53:08.410Z"
+      },
+      "tests": {
+        "sign_in_unverified": {
+          "status": "expected_failure",
+          "error": {
+            "code": "EMAIL_NOT_VERIFIED",
+            "message": "Email not verified"
+          }
+        },
+        "password_reset": {
+          "status": "failure",
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid body parameters"
+          }
+        },
+        "session_unauth": {
+          "status": "expected_failure",
+          "error": ""
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total_tests": 9,
+    "tests_completed": 9
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-08-15T20:13:13.494Z",
+  "user_verification": {
+    "success": true,
+    "user": {
+      "id": "0198aed6-cc0b-783b-b414-c5fb8a81f227",
+      "email": "admin@techflow.solutions",
+      "name": "TechFlow Admin",
+      "emailVerified": true,
+      "role": "owner",
+      "orgName": "TechFlow Solutions",
+      "orgId": "934fd0a8-f306-4f13-a544-094282f047eb"
+    }
+  },
+  "authentication": {
+    "success": true,
+    "method": "test_bypass",
+    "sessionCookie": null,
+    "note": "Using test approach - WebSocket may still require real auth"
+  },
+  "websocket_sync": {
+    "connected": false,
+    "error": "Unexpected server response: 401",
+    "auth_error": true,
+    "messages_received": 0
+  },
+  "final_status": {
+    "sync_working": false,
+    "isolation_status": "UNKNOWN",
+    "issues": [
+      "WebSocket authentication required (security working correctly)"
+    ],
+    "components_working": {
+      "user_verification": true,
+      "authentication": true,
+      "websocket_sync": false
+    },
+    "recommendation": "Complete authentication integration to enable WebSocket connections"
+  }
+}
