@@ -395,7 +395,7 @@ export class IncomingChangeService {
       const entitiesData = changes.map(change => change.data);
       
       // Perform bulk insert - change tracking is managed at sync phase level
-      const { db } = await import('@repo/dataforge/dexie-schema');
+      const { db } = await import('../db/dexie-schema');
       
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
@@ -497,7 +497,7 @@ export class IncomingChangeService {
       const entitiesData = changes.map(change => change.data);
       
       // Perform bulk update - change tracking is managed at sync phase level
-      const { db } = await import('@repo/dataforge/dexie-schema');
+      const { db } = await import('../db/dexie-schema');
       
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
@@ -702,7 +702,7 @@ export class IncomingChangeService {
    * @param isLiveSync - If true, uses SYNC_TRANSACTION flag; if false, assumes tracking is already disabled
    */
   private async applyDomainTableChange(change: TableChange, isLiveSync: boolean = false): Promise<void> {
-    const { db } = await import('@repo/dataforge/dexie-schema');
+    const { db } = await import('../db/dexie-schema');
     // Use table name directly - Dexie tables use snake_case
     const dexieTable = (db as any)[change.table];
     
@@ -817,9 +817,9 @@ export class IncomingChangeService {
       return;
     }
     
-    const { db } = await import('@repo/dataforge/dexie-schema');
+    const { db } = await import('../db/dexie-schema');
     const { RelationshipSyncHelper } = await import('./RelationshipSyncHelper');
-    const { CLIENT_JUNCTION_TABLE_MAPPING } = await import('@repo/dataforge/client-entities');
+    const { CLIENT_JUNCTION_TABLE_MAPPING } = await import('../db/client-entities');
     
     for (const update of change.relationshipUpdates) {
       // Find the junction table configuration with flexible matching
@@ -882,7 +882,7 @@ export class IncomingChangeService {
    * Apply junction table changes using Dexie only
    */
   private async applyJunctionTableChange(change: TableChange): Promise<void> {
-    const { db } = await import('@repo/dataforge/dexie-schema');
+    const { db } = await import('../db/dexie-schema');
     const table = change.table;
     
     // Convert snake_case field names to camelCase for Dexie

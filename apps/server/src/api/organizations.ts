@@ -72,20 +72,30 @@ organizationsRouter.post('/', requireAuth, async (c) => {
     const user = c.var.user;
     const body = await c.req.json();
 
+    // Generate slug from name if not provided
+    const generateSlug = (name: string): string => {
+      return name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/-+/g, '-') // Replace multiple hyphens with single
+        .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+    };
+
     const data: CreateOrganizationInput = {
       name: body.name,
-      slug: body.slug,
-      description: body.description,
-      industry: body.industry,
-      company_size: body.company_size,
-      website_url: body.website_url,
-      country: body.country,
-      timezone: body.timezone,
-      subscription_tier: body.subscription_tier,
-      billing_email: body.billing_email,
-      settings: body.settings,
-      allowed_domains: body.allowed_domains,
-      logo_url: body.logo_url
+      slug: body.slug || generateSlug(body.name),
+      description: body.description || null,
+      industry: body.industry || null,
+      company_size: body.company_size || null,
+      website_url: body.website_url || null,
+      country: body.country || null,
+      timezone: body.timezone || null,
+      subscription_tier: body.subscription_tier || 'trial',
+      billing_email: body.billing_email || null,
+      settings: body.settings || {},
+      allowed_domains: body.domain ? [body.domain] : [],
+      logo_url: body.logo_url || null
     };
 
     const orgService = new OrganizationService(c);

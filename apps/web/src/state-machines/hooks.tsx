@@ -15,6 +15,7 @@ export function useAuth() {
   // Safety check: only proceed if authActor exists
   if (!authActor) {
     return {
+      // Auth properties
       user: null,
       authError: null,
       lastActivity: Date.now(),
@@ -36,9 +37,29 @@ export function useAuth() {
       displayUser: null,
       isLoading: false,
       error: null,
+      
+      // Organization properties
+      currentOrganization: null,
+      userOrganizations: [],
+      organizationError: null,
+      isLoadingOrganizations: false,
+      needsOrganizationSetup: false,
+      needsOrganizationSelection: false,
+      isAuthenticatedAndReady: false,
+      organizationSetupComplete: false,
+      hasMultipleOrganizations: false,
+      organizationName: 'No Organization',
+      
+      // Auth actions
       signIn: () => console.error('[useAuth] AuthMachine not available'),
       signOut: () => console.error('[useAuth] AuthMachine not available'),
       refreshAuth: () => console.error('[useAuth] AuthMachine not available'),
+      
+      // Organization actions
+      createOrganization: () => console.error('[useAuth] AuthMachine not available'),
+      selectOrganization: () => console.error('[useAuth] AuthMachine not available'),
+      switchOrganization: () => console.error('[useAuth] AuthMachine not available'),
+      reloadOrganizations: () => console.error('[useAuth] AuthMachine not available'),
     };
   }
   
@@ -66,6 +87,34 @@ export function useAuth() {
   );
   const errorRetryCount = useSelector(authActor, (state) => 
     state?.context?.errorRetryCount || 0
+  );
+
+  // Organization selectors
+  const currentOrganization = useSelector(authActor, (state) => 
+    state?.context?.currentOrganization || null
+  );
+  const userOrganizations = useSelector(authActor, (state) => 
+    state?.context?.userOrganizations || []
+  );
+  const organizationError = useSelector(authActor, (state) => 
+    state?.context?.organizationError || null
+  );
+  const isLoadingOrganizations = useSelector(authActor, (state) => 
+    state?.context?.isLoadingOrganizations || false
+  );
+  const organizationSetupComplete = useSelector(authActor, (state) => 
+    state?.context?.organizationSetupComplete || false
+  );
+  
+  // Organization state checks
+  const needsOrganizationSetup = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('authenticated.needsOrganizationSetup') : false
+  );
+  const needsOrganizationSelection = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('authenticated.needsOrganizationSelection') : false
+  );
+  const isAuthenticatedAndReady = useSelector(authActor, (state) => 
+    state?.matches ? state.matches('authenticated.ready') : false
   );
 
   const signIn = useMemo(() => (credentials: { email: string; password: string }) => {
@@ -119,10 +168,39 @@ export function useAuth() {
 
   const refreshAuth = useMemo(() => () => {
     if (authActor) {
-      console.log('[useAuth] Sending REFRESH_AUTH directly to AuthMachine');
-      authActor.send({ type: 'REFRESH_AUTH' });
+      console.log('[useAuth] Sending CHECK_AUTH directly to AuthMachine');
+      authActor.send({ type: 'CHECK_AUTH' });
     } else {
       console.error('[useAuth] AuthMachine actor not available');
+    }
+  }, [authActor]);
+
+  // Organization actions
+  const createOrganization = useMemo(() => (organizationData: { name: string; domain?: string }) => {
+    if (authActor) {
+      console.log('[useAuth] Creating organization:', organizationData);
+      authActor.send({ type: 'CREATE_ORGANIZATION', organizationData });
+    }
+  }, [authActor]);
+
+  const selectOrganization = useMemo(() => (organizationId: string) => {
+    if (authActor) {
+      console.log('[useAuth] Selecting organization:', organizationId);
+      authActor.send({ type: 'SELECT_ORGANIZATION', organizationId });
+    }
+  }, [authActor]);
+
+  const switchOrganization = useMemo(() => (organizationId: string) => {
+    if (authActor) {
+      console.log('[useAuth] Switching organization:', organizationId);
+      authActor.send({ type: 'SWITCH_ORGANIZATION', organizationId });
+    }
+  }, [authActor]);
+
+  const reloadOrganizations = useMemo(() => () => {
+    if (authActor) {
+      console.log('[useAuth] Reloading organizations');
+      authActor.send({ type: 'REFRESH_ORGANIZATIONS' });
     }
   }, [authActor]);
 
@@ -137,6 +215,11 @@ export function useAuth() {
   const displayName = user?.name || user?.displayName || user?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
   
+  // Organization computed values
+  const hasMultipleOrganizations = userOrganizations.length > 1;
+  const organizationName = currentOrganization?.name || 'No Organization';
+  const effectiveUserRole = currentOrganization?.role || user?.role || null;
+
   // Additional computed properties for compatibility
   const displayUser = user; // Alias for useSimpleAuth compatibility
   const isLoading = isSigningIn; // Alias for useSimpleAuth compatibility
@@ -167,6 +250,19 @@ export function useAuth() {
     displayName,
     initials,
     
+    // Organization data
+    currentOrganization,
+    userOrganizations,
+    organizationError,
+    isLoadingOrganizations,
+    needsOrganizationSetup,
+    needsOrganizationSelection,
+    isAuthenticatedAndReady,
+    organizationSetupComplete,
+    hasMultipleOrganizations,
+    organizationName,
+    effectiveUserRole,
+    
     // Compatibility aliases
     displayUser,
     isLoading,
@@ -176,6 +272,12 @@ export function useAuth() {
     signIn,
     signOut,
     refreshAuth,
+    
+    // Organization actions
+    createOrganization,
+    selectOrganization,
+    switchOrganization,
+    reloadOrganizations,
   };
 }
 

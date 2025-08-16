@@ -1,6 +1,7 @@
 import { setup, assign } from 'xstate';
 import { checkAuthActor, signInActor, signOutActor } from '../auth-actors';
-import type { UserInfo } from '../types';
+import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor } from '../organization-actors';
+import type { UserInfo, OrganizationInfo, CreateOrganizationInput } from '../types';
 
 export interface AuthContext {
   user: UserInfo | null;
@@ -9,6 +10,23 @@ export interface AuthContext {
   sessionExpiry: string | null;
   lastActivity: number;
   errorRetryCount?: number;
+  
+  // Organization context
+  currentOrganization: OrganizationInfo | null;
+  userOrganizations: OrganizationInfo[];
+  organizationError: string | null;
+  isLoadingOrganizations: boolean;
+  organizationSetupComplete: boolean;
+  needsOrganizationSetup: boolean;
+  
+  // Billing context
+  subscriptionInfo: any | null;
+  billingError: string | null;
+  isLoadingBilling: boolean;
+  trialStatus: any | null;
+  usageStats: any | null;
+  isTrialExpired: boolean;
+  needsBillingSetup: boolean;
 }
 
 export type AuthEvent =
@@ -17,7 +35,24 @@ export type AuthEvent =
   | { type: 'CHECK_AUTH' }
   | { type: 'CLEAR_ERROR' }
   | { type: 'RESTORED_SESSION' }
-  | { type: 'RETRY_AUTH' };
+  | { type: 'RETRY_AUTH' }
+  
+  // Organization events
+  | { type: 'LOAD_ORGANIZATIONS' }
+  | { type: 'SELECT_ORGANIZATION'; organizationId: string }
+  | { type: 'CREATE_ORGANIZATION'; organizationData: CreateOrganizationInput }
+  | { type: 'SKIP_ORGANIZATION_SETUP' }
+  | { type: 'REFRESH_ORGANIZATIONS' }
+  | { type: 'SWITCH_ORGANIZATION'; organizationId: string }
+  | { type: 'RETRY_LOAD_ORGANIZATIONS' }
+  
+  // Billing events
+  | { type: 'LOAD_BILLING' }
+  | { type: 'UPGRADE_SUBSCRIPTION'; upgradeData: any }
+  | { type: 'CONTINUE_WITH_LIMITS' }
+  | { type: 'REFRESH_BILLING' }
+  | { type: 'START_TRIAL' }
+  | { type: 'SETUP_BILLING' };
 
 export const authMachine = setup({
   types: {
@@ -29,6 +64,11 @@ export const authMachine = setup({
     checkAuth: checkAuthActor,
     signIn: signInActor,
     signOut: signOutActor,
+    loadOrganizations: loadOrganizationsActor,
+    createOrganization: createOrganizationActor,
+    selectOrganization: selectOrganizationActor,
+    loadBilling: loadBillingActor,
+    upgradeSubscription: upgradeSubscriptionActor,
   },
   
   actions: {
@@ -67,7 +107,9 @@ export const authMachine = setup({
           user: context.user,
           authToken: context.authToken,
           sessionExpiry: context.sessionExpiry,
-          lastActivity: context.lastActivity
+          lastActivity: context.lastActivity,
+          currentOrganization: context.currentOrganization,
+          organizationSetupComplete: context.organizationSetupComplete
         },
         value: 'authenticated'
       };
@@ -78,6 +120,82 @@ export const authMachine = setup({
       } catch (error) {
         console.error('[AuthMachine] Failed to persist auth state:', error);
       }
+    },
+
+    // Organization actions
+    setLoadingOrganizations: assign({
+      isLoadingOrganizations: true,
+      organizationError: null,
+    }),
+
+    clearLoadingOrganizations: assign({
+      isLoadingOrganizations: false,
+    }),
+
+    setUserOrganizations: assign({
+      userOrganizations: ({ event }) => event.output?.organizations || [],
+      organizationError: event => event.output?.error || null,
+    }),
+
+    setCurrentOrganization: assign({
+      currentOrganization: ({ event }) => event.output?.organization || null,
+      organizationSetupComplete: true,
+    }),
+
+    setOrganizationError: assign({
+      organizationError: ({ event }) => event.output?.error || 'Organization operation failed',
+      isLoadingOrganizations: false,
+    }),
+
+    markSetupComplete: assign({
+      organizationSetupComplete: true,
+      needsOrganizationSetup: false,
+    }),
+
+    // Billing actions
+    setLoadingBilling: assign({
+      isLoadingBilling: true,
+      billingError: null,
+    }),
+
+    clearLoadingBilling: assign({
+      isLoadingBilling: false,
+    }),
+
+    setBillingInfo: assign({
+      subscriptionInfo: ({ event }) => event.output?.billingInfo || null,
+      trialStatus: ({ event }) => event.output?.trialInfo || null,
+      usageStats: ({ event }) => event.output?.usage || null,
+      isTrialExpired: ({ event, context }) => {
+        const trialInfo = event.output?.trialInfo;
+        if (!trialInfo || !trialInfo.trialEndsAt) return false;
+        return new Date(trialInfo.trialEndsAt) < new Date();
+      },
+      needsBillingSetup: ({ event }) => event.output?.needsSetup || false,
+      billingError: null,
+    }),
+
+    setBillingError: assign({
+      billingError: ({ event }) => event.output?.error || 'Billing operation failed',
+      isLoadingBilling: false,
+    }),
+  },
+
+  guards: {
+    hasNoOrganizations: ({ context }) => {
+      return !context.userOrganizations || context.userOrganizations.length === 0;
+    },
+
+    hasNoCurrentOrganization: ({ context }) => {
+      return !context.currentOrganization;
+    },
+
+    isTrialExpiredAndNeedsUpgrade: ({ context }) => {
+      return context.isTrialExpired && context.needsBillingSetup;
+    },
+
+    hasValidCurrentOrganization: ({ context }) => {
+      return !!context.currentOrganization && context.organizationSetupComplete;
     },
   },
 }).createMachine({
@@ -112,6 +230,24 @@ export const authMachine = setup({
     authError: null,
     sessionExpiry: input?.sessionExpiry || null,
     lastActivity: Date.now(),
+    errorRetryCount: 0,
+    
+    // Organization context
+    currentOrganization: null,
+    userOrganizations: [],
+    organizationError: null,
+    isLoadingOrganizations: false,
+    organizationSetupComplete: false,
+    needsOrganizationSetup: false,
+    
+    // Billing context
+    subscriptionInfo: null,
+    billingError: null,
+    isLoadingBilling: false,
+    trialStatus: null,
+    usageStats: null,
+    isTrialExpired: false,
+    needsBillingSetup: false,
   }),
   
   states: {
@@ -263,7 +399,7 @@ export const authMachine = setup({
     
     authenticated: {
       entry: ({ context }) => {
-        console.log('[AuthMachine] User authenticated');
+        console.log('[AuthMachine] User authenticated, checking organization setup');
         // Always dispatch auth state change when entering authenticated state
         setTimeout(() => {
           const event = new CustomEvent('auth:state-changed', {
@@ -275,6 +411,201 @@ export const authMachine = setup({
           });
           window.dispatchEvent(event);
         }, 0);
+      },
+
+      initial: 'loadingOrganizations',
+      
+      states: {
+        loadingOrganizations: {
+          entry: 'setLoadingOrganizations',
+          invoke: {
+            src: 'loadOrganizations',
+            onDone: {
+              target: 'loadingBilling',
+              actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+            },
+            onError: {
+              target: 'checkingOrganizationSetup',
+              actions: ['setOrganizationError']
+            }
+          }
+        },
+
+        loadingBilling: {
+          entry: 'setLoadingBilling',
+          always: [
+            {
+              target: 'checkingOrganizationSetup',
+              guard: ({ context }) => !context.currentOrganization,
+              actions: ['clearLoadingBilling']
+            },
+            {
+              target: 'loadingBillingData'
+            }
+          ]
+        },
+
+        loadingBillingData: {
+          invoke: {
+            src: 'loadBilling',
+            input: ({ context }) => ({ organizationId: context.currentOrganization?.id }),
+            onDone: {
+              target: 'checkingOrganizationSetup',
+              actions: ['setBillingInfo', 'clearLoadingBilling']
+            },
+            onError: {
+              target: 'checkingOrganizationSetup',
+              actions: ['setBillingError', 'clearLoadingBilling']
+            }
+          }
+        },
+
+        checkingOrganizationSetup: {
+          always: [
+            {
+              target: 'needsOrganizationSetup',
+              guard: 'hasNoOrganizations'
+            },
+            {
+              target: 'needsOrganizationSelection',
+              guard: 'hasNoCurrentOrganization'
+            },
+            {
+              target: 'trialExpiredSetup',
+              guard: 'isTrialExpiredAndNeedsUpgrade'
+            },
+            {
+              target: 'ready',
+              actions: 'markSetupComplete'
+            }
+          ]
+        },
+
+        needsOrganizationSetup: {
+          on: {
+            CREATE_ORGANIZATION: {
+              target: 'creatingOrganization'
+            },
+            SKIP_ORGANIZATION_SETUP: {
+              target: 'ready',
+              actions: 'markSetupComplete'
+            }
+          }
+        },
+
+        needsOrganizationSelection: {
+          on: {
+            SELECT_ORGANIZATION: {
+              target: 'selectingOrganization'
+            },
+            CREATE_ORGANIZATION: {
+              target: 'creatingOrganization'
+            },
+            RETRY_LOAD_ORGANIZATIONS: {
+              target: 'loadingOrganizations'
+            }
+          }
+        },
+
+        creatingOrganization: {
+          invoke: {
+            src: 'createOrganization',
+            input: ({ event }) => event.organizationData,
+            onDone: {
+              target: 'ready',
+              actions: ['setCurrentOrganization', 'markSetupComplete']
+            },
+            onError: {
+              target: 'needsOrganizationSetup',
+              actions: 'setOrganizationError'
+            }
+          }
+        },
+
+        selectingOrganization: {
+          invoke: {
+            src: 'selectOrganization',
+            input: ({ event }) => {
+              const orgId = event.type === 'SELECT_ORGANIZATION' ? event.organizationId : 
+                            event.type === 'SWITCH_ORGANIZATION' ? event.organizationId : null;
+              return { organizationId: orgId };
+            },
+            onDone: {
+              target: 'loadingBilling',
+              actions: ['setCurrentOrganization']
+            },
+            onError: {
+              target: 'needsOrganizationSelection',
+              actions: 'setOrganizationError'
+            }
+          }
+        },
+
+        trialExpiredSetup: {
+          on: {
+            UPGRADE_SUBSCRIPTION: {
+              target: 'upgradingSubscription'
+            },
+            CONTINUE_WITH_LIMITS: {
+              target: 'ready',
+              actions: 'markSetupComplete'
+            },
+            SELECT_ORGANIZATION: {
+              target: 'selectingOrganization'
+            }
+          }
+        },
+
+        upgradingSubscription: {
+          invoke: {
+            src: 'upgradeSubscription',
+            input: ({ event, context }) => ({
+              organizationId: context.currentOrganization?.id,
+              planType: event.upgradeData?.planType || 'starter',
+              paymentData: event.upgradeData?.paymentData
+            }),
+            onDone: {
+              target: 'ready',
+              actions: ['setBillingInfo', 'markSetupComplete']
+            },
+            onError: {
+              target: 'trialExpiredSetup',
+              actions: 'setBillingError'
+            }
+          }
+        },
+
+        ready: {
+          entry: ({ context }) => {
+            console.log('[AuthMachine] Organization setup complete, user ready');
+            // Dispatch event that the full auth + org flow is complete
+            window.dispatchEvent(new CustomEvent('auth:ready', {
+              detail: {
+                user: context.user,
+                organization: context.currentOrganization,
+                setupComplete: true
+              }
+            }));
+          },
+          
+          on: {
+            REFRESH_ORGANIZATIONS: {
+              target: 'loadingOrganizations'
+            },
+            REFRESH_BILLING: {
+              target: 'loadingBilling'
+            },
+            SELECT_ORGANIZATION: {
+              target: 'selectingOrganization'
+            },
+            SWITCH_ORGANIZATION: {
+              target: 'selectingOrganization'
+            },
+            UPGRADE_SUBSCRIPTION: {
+              target: 'upgradingSubscription'
+            }
+          }
+        }
       },
       
       on: {

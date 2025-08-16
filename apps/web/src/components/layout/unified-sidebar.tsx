@@ -6,6 +6,7 @@
 import * as React from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { useAuth } from '@/state-machines'
+import { OrganizationSwitcher } from './OrganizationSwitcher'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -14,7 +15,7 @@ import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { Project, ProjectStatus } from '@repo/dataforge/client-entities'
+import { Project, ProjectStatus } from '@/db/client-entities'
 import { 
   Home, 
   FolderKanban, 
@@ -123,6 +124,13 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
       {/* Scrollable Content */}
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <div className="px-3 py-4">
+          {/* Organization Switcher */}
+          {!isCollapsed && (
+            <div className="mb-6">
+              <OrganizationSwitcher />
+            </div>
+          )}
+          
           {/* Main Navigation */}
           <div className="space-y-1 mb-6">
             {mainNavigation.map((item) => (
@@ -326,16 +334,16 @@ function ProjectNavigation({ isCollapsed, onNavigate }: {
   
   // TODO: Replace with Dexie queries
   const activeProjects: any[] = []
-  const inProgressProjects: any[] = []
-  const onHoldProjects: any[] = []
+  const inactiveProjects: any[] = []
+  const archivedProjects: any[] = []
   const completedProjects: any[] = []
   const totalProjects = 0
 
   // Group for easy iteration (no new object creation in selector)
   const projectsByStatus = {
     [ProjectStatus.ACTIVE]: activeProjects,
-    [ProjectStatus.IN_PROGRESS]: inProgressProjects,
-    [ProjectStatus.ON_HOLD]: onHoldProjects,
+    [ProjectStatus.INACTIVE]: inactiveProjects,
+    [ProjectStatus.ARCHIVED]: archivedProjects,
     [ProjectStatus.COMPLETED]: completedProjects
   }
 
@@ -344,12 +352,12 @@ function ProjectNavigation({ isCollapsed, onNavigate }: {
     switch (status) {
       case ProjectStatus.ACTIVE:
         return 'bg-green-500'
-      case ProjectStatus.IN_PROGRESS:
-        return 'bg-blue-500'
-      case ProjectStatus.ON_HOLD:
+      case ProjectStatus.INACTIVE:
         return 'bg-yellow-500'
-      case ProjectStatus.COMPLETED:
+      case ProjectStatus.ARCHIVED:
         return 'bg-gray-500'
+      case ProjectStatus.COMPLETED:
+        return 'bg-blue-500'
       default:
         return 'bg-gray-400'
     }
@@ -363,14 +371,14 @@ function ProjectNavigation({ isCollapsed, onNavigate }: {
       projects: activeProjects 
     },
     { 
-      status: ProjectStatus.IN_PROGRESS, 
-      label: 'In Progress', 
-      projects: inProgressProjects 
+      status: ProjectStatus.INACTIVE, 
+      label: 'Inactive', 
+      projects: inactiveProjects 
     },
     { 
-      status: ProjectStatus.ON_HOLD, 
-      label: 'On Hold', 
-      projects: onHoldProjects 
+      status: ProjectStatus.ARCHIVED, 
+      label: 'Archived', 
+      projects: archivedProjects 
     },
     { 
       status: ProjectStatus.COMPLETED, 

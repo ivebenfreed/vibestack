@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from '@/components/ui/badge'
 import { List } from 'lucide-react'
-import { db } from '@repo/dataforge/dexie-schema'
-import type { Task } from '@repo/dataforge/client-entities'
+import { db } from '@/db/dexie-schema'
+import type { Task } from '@/db/client-entities'
 
 /**
  * Enhanced Recent Tasks with Dexie

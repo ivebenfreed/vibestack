@@ -11,6 +11,29 @@ export interface UserInfo {
   image?: string | null;
 }
 
+// ===== ORGANIZATION TYPES =====
+
+export interface OrganizationInfo {
+  id: string;
+  name: string;
+  domain?: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  status: 'active' | 'inactive' | 'trial_expired';
+  subscriptionTier: 'trial' | 'starter' | 'pro' | 'enterprise';
+  subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'canceled';
+  trialEndsAt?: string;
+  memberCount?: number;
+  maxMembers?: number;
+  settings?: Record<string, any>;
+}
+
+export interface CreateOrganizationInput {
+  name: string;
+  domain?: string;
+  subscriptionTier?: 'trial' | 'starter' | 'pro' | 'enterprise';
+  billingEmail?: string;
+}
+
 // ===== CONTEXT TYPES =====
 
 export interface AppContext {
