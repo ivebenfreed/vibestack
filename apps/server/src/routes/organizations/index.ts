@@ -215,7 +215,20 @@ app.get('/:id', async (c) => {
     const organizationId = c.req.param('id');
 
     // Check user access to organization
-    const member = await getOrganizationMember(organizationId, user.id);
+    // Admin and super_admin users have implicit access to all organizations
+    let member = null;
+    if (user.role === 'admin' || user.role === 'super_admin') {
+      console.log(`[GET /organizations/:id] Admin user ${user.id} has implicit access to org ${organizationId}`);
+      member = {
+        user_id: user.id,
+        organization_id: organizationId,
+        role: 'admin',
+        is_implicit: true
+      };
+    } else {
+      member = await getOrganizationMember(organizationId, user.id);
+    }
+    
     if (!member) {
       return c.json({
         success: false,
@@ -532,7 +545,9 @@ async function getOrganizationById(id: string): Promise<any> {
 }
 
 async function getOrganizationMember(orgId: string, userId: string): Promise<any> {
-  // Implementation would fetch member info
+  // TODO: Implement database lookup for explicit organization membership
+  // For now, return null to rely on the admin check in the calling function
+  console.log(`[getOrganizationMember] Checking explicit membership for user ${userId} in org ${orgId} - TODO: implement database lookup`);
   return null;
 }
 

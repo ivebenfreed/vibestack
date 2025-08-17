@@ -138,7 +138,50 @@ export const authMachine = setup({
     }),
 
     setCurrentOrganization: assign({
-      currentOrganization: ({ event }) => event.output?.organization || null,
+      currentOrganization: ({ event }) => {
+        const organization = event.output?.organization || null;
+        // Save the selected organization preference
+        if (organization) {
+          console.log(`[AuthMachine] Saving organization preference: ${organization.name}`);
+          localStorage.setItem('vibestack-last-organization-id', organization.id);
+        }
+        return organization;
+      },
+      organizationSetupComplete: true,
+    }),
+    
+    autoSelectOrganization: assign({
+      currentOrganization: ({ context }) => {
+        // Auto-select logic: prefer single org, then last used, then first
+        if (!context.userOrganizations || context.userOrganizations.length === 0) {
+          return null;
+        }
+        
+        // If exactly one org, select it
+        if (context.userOrganizations.length === 1) {
+          const selectedOrg = context.userOrganizations[0];
+          console.log(`[AuthMachine] Auto-selecting single organization: ${selectedOrg.name}`);
+          // Save this preference
+          localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
+          return selectedOrg;
+        }
+        
+        // Check for last used organization
+        const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
+        if (lastOrgId) {
+          const foundOrg = context.userOrganizations.find(org => org.id === lastOrgId);
+          if (foundOrg) {
+            console.log(`[AuthMachine] Auto-selecting last used organization: ${foundOrg.name}`);
+            return foundOrg;
+          }
+        }
+        
+        // Fallback: select first organization and save preference
+        const selectedOrg = context.userOrganizations[0];
+        console.log(`[AuthMachine] Auto-selecting first organization: ${selectedOrg.name}`);
+        localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
+        return selectedOrg;
+      },
       organizationSetupComplete: true,
     }),
 
@@ -187,7 +230,27 @@ export const authMachine = setup({
     },
 
     hasNoCurrentOrganization: ({ context }) => {
-      return !context.currentOrganization;
+      // Check if we have a current organization OR if we can auto-select one
+      if (context.currentOrganization) {
+        return false; // We have one, no need for selection
+      }
+      
+      // If we have exactly one organization, we can auto-select it
+      if (context.userOrganizations && context.userOrganizations.length === 1) {
+        return false; // We can auto-select, no need for manual selection
+      }
+      
+      // If we have a persisted preference and that org is still available, auto-select
+      const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
+      if (lastOrgId && context.userOrganizations) {
+        const foundOrg = context.userOrganizations.find(org => org.id === lastOrgId);
+        if (foundOrg) {
+          return false; // We can auto-select the last used org
+        }
+      }
+      
+      // Multiple orgs and no clear preference - need manual selection
+      return true;
     },
 
     isTrialExpiredAndNeedsUpgrade: ({ context }) => {
@@ -469,6 +532,15 @@ export const authMachine = setup({
             {
               target: 'needsOrganizationSelection',
               guard: 'hasNoCurrentOrganization'
+            },
+            {
+              target: 'ready',
+              guard: ({ context }) => !!context.currentOrganization,
+              actions: ['persistAuthState']
+            },
+            {
+              target: 'ready',
+              actions: ['autoSelectOrganization', 'persistAuthState']
             },
             {
               target: 'trialExpiredSetup',

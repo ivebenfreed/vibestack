@@ -26,6 +26,20 @@ export default defineConfig({
   // See: https://github.com/vitejs/vite/discussions/15547
   base: './',
   plugins: [
+    // WASM support plugin for LiveStore SQLite
+    {
+      name: 'wasm-content-type-plugin',
+      configureServer(server) {
+        server.middlewares.use('/node_modules/@livestore', (req, res, next) => {
+          if (req.url?.endsWith('.wasm')) {
+            res.setHeader('Content-Type', 'application/wasm');
+            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+          }
+          next();
+        });
+      }
+    },
     // Conditionally include VitePWA only in production
     ...(process.env.NODE_ENV === 'production' ? [
       VitePWA({
@@ -109,8 +123,10 @@ export default defineConfig({
   ],
   optimizeDeps: {
     include: ['reflect-metadata', 'class-transformer', 'class-validator', 'typeorm', 'typeorm/browser'],
-    exclude: ['@electric-sql/pglite']
+    exclude: ['@electric-sql/pglite', '@livestore/wa-sqlite']
   },
+  // Add WASM support for LiveStore SQLite
+  assetsInclude: ['**/*.wasm'],
   esbuild: {
     supported: {
       'decorators': true
@@ -154,6 +170,10 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp'
+    },
+    // Add WASM MIME type support for LiveStore SQLite
+    fs: {
+      strict: false
     },
     // Merge default config with dynamic config
     ...(dynamicServerConfig.port ? { port: dynamicServerConfig.port } : {}),

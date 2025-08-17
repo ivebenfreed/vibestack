@@ -1,0 +1,109 @@
+{
+  "features": [
+    {
+      "feature": "Smart Templates",
+      "elevra": {
+        "status": "check",
+        "text": "8 archetypes + custom"
+      },
+      "competitors": {
+        "Airtable": {
+          "status": "cross",
+          "text": "Basic templates"
+        },
+        "Notion": {
+          "status": "cross",
+          "text": "Rigid templates"
+        },
+        "Monday.com": {
+          "status": "cross",
+          "text": "Board templates"
+        }
+      }
+    },
+    {
+      "feature": "Works Offline",
+      "elevra": {
+        "status": "check",
+        "text": "Full functionality"
+      },
+      "competitors": {
+        "Airtable": {
+          "status": "cross",
+          "text": "Read-only"
+        },
+        "Notion": {
+          "status": "cross",
+          "text": "Limited"
+        },
+        "Monday.com": {
+          "status": "cross",
+          "text": "No"
+        }
+      }
+    },
+    {
+      "feature": "Table Relationships",
+      "elevra": {
+        "status": "check",
+        "text": "Unlimited & instant"
+      },
+      "competitors": {
+        "Airtable": {
+          "status": "cross",
+          "text": "Limited & slow"
+        },
+        "Notion": {
+          "status": "cross",
+          "text": "Basic linking"
+        },
+        "Monday.com": {
+          "status": "cross",
+          "text": "Broken connections"
+        }
+      }
+    },
+    {
+      "feature": "Real Database",
+      "elevra": {
+        "status": "check",
+        "text": "PostgreSQL power"
+      },
+      "competitors": {
+        "Airtable": {
+          "status": "cross",
+          "text": "Proprietary"
+        },
+        "Notion": {
+          "status": "cross",
+          "text": "Document store"
+        },
+        "Monday.com": {
+          "status": "cross",
+          "text": "Not a database"
+        }
+      }
+    },
+    {
+      "feature": "Instant Sync",
+      "elevra": {
+        "status": "check",
+        "text": "Real-time always"
+      },
+      "competitors": {
+        "Airtable": {
+          "status": "cross",
+          "text": "Sometimes delayed"
+        },
+        "Notion": {
+          "status": "cross",
+          "text": "Sync conflicts"
+        },
+        "Monday.com": {
+          "status": "cross",
+          "text": "Manual refresh"
+        }
+      }
+    }
+  ]
+}

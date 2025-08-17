@@ -1,0 +1,178 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+
+// Get the benefits section content
+const benefitsEntry = await getEntry('sections', 'benefits');
+const benefits = benefitsEntry.data;
+
+// Get all feature cards sorted by order
+const features = await getCollection('features');
+const sortedFeatures = features.sort((a, b) => a.data.order - b.data.order);
+---
+
+<section class="pain-points">
+    <div class="container">
+        <h2 class="section-title">{benefits.title}</h2>
+        <p class="section-subtitle">{benefits.subtitle}</p>
+        
+        <div class="pain-grid">
+            {sortedFeatures.map(async (feature) => {
+                const { Content } = await feature.render();
+                return (
+                    <div class="pain-card">
+                        <div class="pain-icon">{feature.data.icon}</div>
+                        <h3>{feature.data.title}</h3>
+                        <div class="pain-content">
+                            <Content />
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+</section>
+
+<style>
+    .pain-points {
+        padding: 100px 0;
+        background: linear-gradient(180deg, #f8f9fa 0%, #ffffff 100%);
+        position: relative;
+    }
+    
+    .pain-points::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.2), transparent);
+    }
+
+    .section-title {
+        text-align: center;
+        font-size: 48px;
+        font-weight: 900;
+        margin-bottom: 24px;
+        color: var(--dark);
+        letter-spacing: -2px;
+        position: relative;
+        animation: fadeInUp 0.8s ease-out;
+    }
+    
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 4px;
+        background: linear-gradient(90deg, #0EA5E9, #10B981);
+        border-radius: 2px;
+    }
+
+    .section-subtitle {
+        text-align: center;
+        font-size: 20px;
+        color: var(--gray);
+        margin-bottom: 60px;
+    }
+
+    .pain-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+    }
+
+    .pain-card {
+        background: white;
+        padding: 40px;
+        border-radius: 20px;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .pain-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #0EA5E9, #10B981, #38BDF8);
+        transform: scaleX(0);
+        transition: transform 0.4s ease;
+    }
+
+    .pain-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+        border-color: rgba(14, 165, 233, 0.2);
+    }
+    
+    .pain-card:hover::before {
+        transform: scaleX(1);
+    }
+    
+    .pain-card:nth-child(1) { animation: fadeInUp 0.6s ease-out 0.1s both; }
+    .pain-card:nth-child(2) { animation: fadeInUp 0.6s ease-out 0.2s both; }
+    .pain-card:nth-child(3) { animation: fadeInUp 0.6s ease-out 0.3s both; }
+    .pain-card:nth-child(4) { animation: fadeInUp 0.6s ease-out 0.4s both; }
+
+    .pain-icon {
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%);
+        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
+        transition: all 0.3s ease;
+    }
+    
+    .pain-card:hover .pain-icon {
+        transform: scale(1.1);
+        box-shadow: 0 12px 30px rgba(14, 165, 233, 0.35);
+    }
+    
+    .pain-icon {
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+    }
+
+    .pain-card h3 {
+        font-size: 20px;
+        margin-bottom: 10px;
+        color: var(--dark);
+    }
+
+    .pain-card p {
+        color: var(--gray);
+        line-height: 1.6;
+    }
+    
+    .pain-content {
+        color: var(--gray);
+        line-height: 1.6;
+    }
+    
+    .pain-content p {
+        margin: 0;
+    }
+    
+    @media (max-width: 1024px) {
+        .pain-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 640px) {
+        .pain-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

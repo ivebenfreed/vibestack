@@ -4,12 +4,12 @@
  */
 
 import React from 'react';
-import { AccessControlClient } from '@vibestack/livestore/client/AccessControlClient';
-import type { 
-  AccessControlClientConfig,
-  AccessControlEvent,
-  PermissionCheckResult 
-} from '@vibestack/livestore/client/AccessControlClient';
+// import { AccessControlClient } from '../../../../packages/livestore/src/client/AccessControlClient';
+// import type { 
+//   AccessControlClientConfig,
+//   AccessControlEvent,
+//   PermissionCheckResult 
+// } from '@vibestack/livestore/client/AccessControlClient';
 
 // Client configuration
 interface LiveStoreClientConfig {
@@ -19,6 +19,18 @@ interface LiveStoreClientConfig {
   enableOfflineMode: boolean;
   debug: boolean;
 }
+
+// Mock type for testing purposes
+type AccessControlClient = {
+  insert: (tableName: string, data: any) => Promise<void>;
+  update: (tableName: string, id: string, data: any) => Promise<void>;
+  delete: (tableName: string, id: string) => Promise<void>;
+  query: (sql: string, params?: any[]) => Promise<any[]>;
+  ready: () => Promise<void>;
+  hasPermission: (entity: string, action: string) => Promise<any>;
+  addEventListener: (event: string, handler: (event: any) => void) => void;
+  removeEventListener: (event: string, handler: (event: any) => void) => void;
+};
 
 // Global LiveStore client instance
 let liveStoreClient: AccessControlClient | null = null;
@@ -135,7 +147,7 @@ export async function initializeLiveStore(config?: Partial<LiveStoreClientConfig
  */
 function setupLiveStoreEventListeners(client: AccessControlClient): void {
   // Listen for permission changes
-  client.addEventListener('permission_change', (event: AccessControlEvent) => {
+  client.addEventListener('permission_change', (event: any) => {
     console.log('🔐 Permission change received:', event);
     
     // Notify other parts of the app about permission changes
@@ -145,7 +157,7 @@ function setupLiveStoreEventListeners(client: AccessControlClient): void {
   });
 
   // Listen for context updates
-  client.addEventListener('context_update', (event: AccessControlEvent) => {
+  client.addEventListener('context_update', (event: any) => {
     console.log('📝 Context update received:', event);
     
     // Update local user context if needed
@@ -155,7 +167,7 @@ function setupLiveStoreEventListeners(client: AccessControlClient): void {
   });
 
   // Listen for access denied events
-  client.addEventListener('access_denied', (event: AccessControlEvent) => {
+  client.addEventListener('access_denied', (event: any) => {
     console.warn('🚫 Access denied:', event);
     
     // Show user notification or handle access denial
@@ -367,7 +379,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Export types for use in other files
-export type { AccessControlClient, AccessControlEvent, PermissionCheckResult };
+export type { AccessControlClient };
 
 // Default export
 export default {

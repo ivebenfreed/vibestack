@@ -1,14 +1,24 @@
 #!/bin/bash
 
-# worktree-start.sh - Start container for specific worktree issue
+# worktree-start.sh - Start container for specific worktree issue with secure secrets
 # Usage: ./scripts/worktree-start.sh <issue-number>
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 ISSUE_NUMBER="$1"
 CONTAINER_NAME="vibestack-issue-${ISSUE_NUMBER}"
 
 echo "🚀 Starting worktree container for Issue #${ISSUE_NUMBER}..."
+
+# Setup secure secrets first
+echo "🔐 Setting up secure secrets..."
+if ! "${SCRIPT_DIR}/setup-master-password.sh"; then
+    echo "❌ Failed to setup secure secrets"
+    exit 1
+fi
 
 # Calculate external ports
 EXTERNAL_WEB_PORT=$((6000 + ISSUE_NUMBER))
@@ -29,7 +39,13 @@ docker run --rm \
 
 echo "🎯 Starting container with ports ${EXTERNAL_WEB_PORT}, ${EXTERNAL_API_PORT}, ${EXTERNAL_DB_PORT}..."
 
-# Start container with git-synced database  
+# Pass master password to container via environment
+MASTER_PASSWORD=""
+if [[ -f "${PROJECT_ROOT}/.env.local" ]]; then
+    MASTER_PASSWORD=$(grep "^VIBESTACK_MASTER_PASSWORD=" "${PROJECT_ROOT}/.env.local" | cut -d'=' -f2- || true)
+fi
+
+# Start container with git-synced database and secure secrets  
 docker run -d \
   --name "$CONTAINER_NAME" \
   -p "${EXTERNAL_WEB_PORT}:5173" \
@@ -39,10 +55,22 @@ docker run -d \
   -v "${PWD}:/app" \
   -w /app \
   --env-file .env.local \
+  -e "VIBESTACK_MASTER_PASSWORD=${MASTER_PASSWORD}" \
   node:18-slim \
   /bin/bash -c "
     apt-get update && apt-get install -y postgresql-14 supervisor && \
     service postgresql start && \
+    
+    # Wait for PostgreSQL to be ready
+    until pg_isready -h localhost -p 5432; do
+      echo 'Waiting for PostgreSQL to be ready...'
+      sleep 2
+    done
+    
+    # Load encrypted secrets into environment
+    echo '🔐 Loading encrypted secrets...'
+    source /app/scripts/load-secrets.sh --source || echo 'Warning: Could not load secrets'
+    
     npm install -g pnpm && \
     pnpm install && \
     pnpm dev

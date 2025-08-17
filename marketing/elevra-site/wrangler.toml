@@ -1,0 +1,36 @@
+name = "getelevra"
+main = "dist/_worker.js/index.js"
+compatibility_date = "2025-01-27"
+compatibility_flags = ["nodejs_compat"]
+
+# Assets configuration for serving static files (CSS, JS, images)
+[assets]
+directory = "dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Build configuration  
+[build]
+command = "npm run build && echo '_worker.js' > dist/.assetsignore"
+
+# Observability
+[observability]
+enabled = true
+
+# Production environment (main branch)
+[env.production]
+name = "getelevra-production"
+routes = [
+  { pattern = "getelevra.com/*", zone_name = "getelevra.com" },
+  { pattern = "www.getelevra.com/*", zone_name = "getelevra.com" }
+]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+# Staging environment (staging branch)
+[env.staging]
+name = "getelevra-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"

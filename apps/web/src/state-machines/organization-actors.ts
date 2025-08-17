@@ -21,7 +21,9 @@ class OrganizationAPI {
       throw new Error(`Failed to load organizations: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    // Server returns {success: true, data: {organizations: [...]}} format
+    return result.data?.organizations || result;
   }
 
   async createOrganization(data: CreateOrganizationInput): Promise<OrganizationInfo> {
@@ -49,7 +51,9 @@ class OrganizationAPI {
       throw new Error(`Failed to load organization: ${response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    // Server returns {success: true, data: {organization: {...}}} format
+    return result.data?.organization || result;
   }
 
   async getBillingInfo(organizationId: string): Promise<any> {

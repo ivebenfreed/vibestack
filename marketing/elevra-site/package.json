@@ -1,0 +1,27 @@
+{
+  "name": "elevra-site",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "NODE_ENV=development astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/cloudflare": "^12.6.0",
+    "@astrojs/react": "^4.3.0",
+    "@astrojs/sitemap": "^3.4.2",
+    "astro": "^5.12.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "resend": "^4.7.0",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "wrangler": "^4.26.0"
+  }
+}

@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elevra - Database Relationships That Actually Work at Spreadsheet Speeds</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #5B4FFF;
+            --primary-dark: #4339E6;
+            --secondary: #FF6B35;
+            --dark: #0F0F1E;
+            --gray: #6B7280;
+            --light-gray: #F3F4F6;
+            --white: #FFFFFF;
+            --success: #10B981;
+            --warning: #F59E0B;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            padding: 20px 0;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--gray);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .cta-button {
+            background: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .cta-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(91, 79, 255, 0.3);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 140px 0 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%23ffffff" fill-opacity="0.05"><path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/></g></g></svg>') repeat;
+            animation: float 20s linear infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-60px, -60px); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 56px;
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 20px;
+            letter-spacing: -2px;
+        }
+
+        .hero .subheading {
+            font-size: 24px;
+            font-weight: 300;
+            margin-bottom: 40px;
+            opacity: 0.95;
+        }
+
+        .performance-badges {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-icon {
+            width: 20px;
+            height: 20px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Lead Capture Form */
+        .lead-capture {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            margin: 0 auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .lead-capture h2 {
+            color: var(--dark);
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .lead-capture .offer {
+            color: var(--gray);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--dark);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--light-gray);
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .submit-button {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .submit-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(91, 79, 255, 0.3);
+        }
+
+        .privacy-note {
+            text-align: center;
+            color: var(--gray);
+            font-size: 12px;
+            margin-top: 15px;
+        }
+
+        /* Pain Points Section */
+        .pain-points {
+            padding: 80px 0;
+            background: var(--light-gray);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: var(--gray);
+            margin-bottom: 60px;
+        }
+
+        .pain-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        .pain-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .pain-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .pain-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .pain-card h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+
+        .pain-card p {
+            color: var(--gray);
+            line-height: 1.6;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 80px 0;
+            background: white;
+        }
+
+        .feature-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            margin-bottom: 80px;
+        }
+
+        .feature-row:nth-child(even) {
+            direction: rtl;
+        }
+
+        .feature-row:nth-child(even) .feature-content {
+            direction: ltr;
+        }
+
+        .feature-content h3 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+
+        .feature-content p {
+            color: var(--gray);
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .feature-list li::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .feature-visual {
+            background: linear-gradient(135deg, var(--light-gray) 0%, #E5E7EB 100%);
+            border-radius: 16px;
+            padding: 40px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: var(--primary);
+        }
+
+        /* Comparison Section */
+        .comparison {
+            padding: 80px 0;
+            background: var(--light-gray);
+        }
+
+        .comparison-table {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .comparison-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th {
+            background: var(--dark);
+            color: white;
+            padding: 20px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .comparison-table th.highlight {
+            background: var(--primary);
+        }
+
+        .comparison-table td {
+            padding: 20px;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .check {
+            color: var(--success);
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .cross {
+            color: #EF4444;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        /* CTA Section */
+        .final-cta {
+            padding: 100px 0;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            text-align: center;
+            color: white;
+        }
+
+        .final-cta h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .final-cta p {
+            font-size: 20px;
+            margin-bottom: 40px;
+            opacity: 0.95;
+        }
+
+        .cta-button-large {
+            background: white;
+            color: var(--primary);
+            padding: 18px 40px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 20px;
+            font-weight: 700;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+
+        .cta-button-large:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            background: var(--dark);
+            color: white;
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+
+        .footer-links a {
+            color: var(--gray);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 36px;
+            }
+
+            .hero .subheading {
+                font-size: 18px;
+            }
+
+            .feature-row {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-row:nth-child(even) {
+                direction: ltr;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .comparison-table {
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav class="container">
+            <div class="logo">Elevra</div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#comparison">Compare</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#" class="cta-button">Get Early Access</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Database Relationships<br>That Actually Work</h1>
+                <p class="subheading">Stop waiting 30+ seconds for Airtable to load. Get instant queries with true database power.</p>
+                
+                <div class="performance-badges">
+                    <div class="badge">
+                        <div class="badge-icon">⚡</div>
+                        <100ms Relationship Queries
+                    </div>
+                    <div class="badge">
+                        <div class="badge-icon">🚀</div>
+                        10x Faster than Airtable
+                    </div>
+                    <div class="badge">
+                        <div class="badge-icon">♾️</div>
+                        Unlimited Scale
+                    </div>
+                </div>
+
+                <!-- Lead Capture Form -->
+                <div class="lead-capture">
+                    <h2>Join the Speed Revolution</h2>
+                    <p class="offer">Get 3 months free when we launch + lifetime early adopter pricing</p>
+                    
+                    <form id="leadForm">
+                        <div class="form-group">
+                            <label for="email">Work Email</label>
+                            <input type="email" id="email" name="email" placeholder="you@company.com" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="company">Company Name</label>
+                            <input type="text" id="company" name="company" placeholder="Acme Inc." required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="pain">What's your biggest database pain? (Optional)</label>
+                            <input type="text" id="pain" name="pain" placeholder="e.g., Airtable takes forever to load linked records">
+                        </div>
+                        
+                        <button type="submit" class="submit-button">Get Early Access →</button>
+                    </form>
+                    
+                    <p class="privacy-note">We'll never spam. Unsubscribe anytime.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pain Points Section -->
+    <section class="pain-points">
+        <div class="container">
+            <h2 class="section-title">Your Database Nightmares, Solved</h2>
+            <p class="section-subtitle">We built Elevra because we've felt your pain. Every. Single. Day.</p>
+            
+            <div class="pain-grid">
+                <div class="pain-card">
+                    <div class="pain-icon">⏱️</div>
+                    <h3>30+ Second Load Times</h3>
+                    <p>Monday.com boards crawling with multiple Connect Boards? Airtable taking 2-3 minutes to access linked records? Not anymore.</p>
+                </div>
+                
+                <div class="pain-card">
+                    <div class="pain-icon">🔗</div>
+                    <h3>Broken Relationships</h3>
+                    <p>Linked records disappearing. Rollups not updating. References limited to 15. We fixed all of it with true database architecture.</p>
+                </div>
+                
+                <div class="pain-card">
+                    <div class="pain-icon">📊</div>
+                    <h3>Scale = Failure</h3>
+                    <p>Hit 10,000 records and watch your "database" grind to a halt. Elevra handles millions without breaking a sweat.</p>
+                </div>
+                
+                <div class="pain-card">
+                    <div class="pain-icon">💸</div>
+                    <h3>Per-User Prison</h3>
+                    <p>$20/user/month adds up fast. Pay $300/month for 15 users? With Elevra, pay $19 for unlimited users. Period.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title">Built Different. Built Better.</h2>
+            <p class="section-subtitle">Local-first architecture means zero latency. Always.</p>
+            
+            <div class="feature-row">
+                <div class="feature-content">
+                    <h3>Lightning-Fast Relationships</h3>
+                    <p>Every query runs locally in your browser. No round-trips to servers. No waiting. Just instant results, every single time.</p>
+                    <ul class="feature-list">
+                        <li>One-to-one, one-to-many, many-to-many support</li>
+                        <li>Instant rollup calculations across relationships</li>
+                        <li>Navigate deep relationships without lag</li>
+                        <li>Bulk relationship operations in milliseconds</li>
+                    </ul>
+                </div>
+                <div class="feature-visual">⚡</div>
+            </div>
+            
+            <div class="feature-row">
+                <div class="feature-content">
+                    <h3>Works Offline, Syncs Online</h3>
+                    <p>Keep working on the plane, in the basement, anywhere. Your data syncs seamlessly when you're back online.</p>
+                    <ul class="feature-list">
+                        <li>Full functionality without internet</li>
+                        <li>Automatic conflict resolution</li>
+                        <li>Real-time collaboration when connected</li>
+                        <li>Your data, always accessible</li>
+                    </ul>
+                </div>
+                <div class="feature-visual">🌐</div>
+            </div>
+            
+            <div class="feature-row">
+                <div class="feature-content">
+                    <h3>Spreadsheet Simple, Database Powerful</h3>
+                    <p>If you can use Excel, you can use Elevra. But underneath that familiar interface? Pure database performance.</p>
+                    <ul class="feature-list">
+                        <li>Click-to-edit cells, just like spreadsheets</li>
+                        <li>Copy/paste from Excel with formatting</li>
+                        <li>But with true referential integrity</li>
+                        <li>And guaranteed ACID compliance</li>
+                    </ul>
+                </div>
+                <div class="feature-visual">📊</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="comparison" id="comparison">
+        <div class="container">
+            <h2 class="section-title">See the Difference</h2>
+            <p class="section-subtitle">Real benchmarks. Real performance. Really.</p>
+            
+            <div class="comparison-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th class="highlight">Elevra</th>
+                            <th>Airtable</th>
+                            <th>Notion</th>
+                            <th>Monday.com</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Relationship Query Speed</td>
+                            <td><span class="check">✓</span> <100ms</td>
+                            <td><span class="cross">✗</span> 2-3 seconds</td>
+                            <td><span class="cross">✗</span> 5+ seconds</td>
+                            <td><span class="cross">✗</span> 30+ seconds</td>
+                        </tr>
+                        <tr>
+                            <td>Works Offline</td>
+                            <td><span class="check">✓</span> Full functionality</td>
+                            <td><span class="cross">✗</span> Read-only</td>
+                            <td><span class="cross">✗</span> Limited</td>
+                            <td><span class="cross">✗</span> No</td>
+                        </tr>
+                        <tr>
+                            <td>Pricing Model</td>
+                            <td><span class="check">✓</span> $19/workspace</td>
+                            <td><span class="cross">✗</span> $20/user</td>
+                            <td><span class="cross">✗</span> $10/user</td>
+                            <td><span class="cross">✗</span> $24/user</td>
+                        </tr>
+                        <tr>
+                            <td>Performance at Scale</td>
+                            <td><span class="check">✓</span> No degradation</td>
+                            <td><span class="cross">✗</span> Slows >10k records</td>
+                            <td><span class="cross">✗</span> Slows >5k records</td>
+                            <td><span class="cross">✗</span> Slows >1k records</td>
+                        </tr>
+                        <tr>
+                            <td>True Database</td>
+                            <td><span class="check">✓</span> PostgreSQL</td>
+                            <td><span class="cross">✗</span> Proprietary</td>
+                            <td><span class="cross">✗</span> Document store</td>
+                            <td><span class="cross">✗</span> Board-based</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <div class="container">
+            <h2>Ready to Feel the Speed?</h2>
+            <p>Join 500+ teams ditching slow databases for instant performance</p>
+            <a href="#" class="cta-button-large" onclick="document.getElementById('email').focus(); return false;">Get Early Access</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Security</a>
+                <a href="#">Contact</a>
+            </div>
+            <p>&copy; 2024 Elevra. Built with ❤️ for speed demons.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Simple form handler
+        document.getElementById('leadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                email: document.getElementById('email').value,
+                company: document.getElementById('company').value,
+                pain: document.getElementById('pain').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            // For MVP, just log to console
+            // In production, send to your backend
+            console.log('Lead captured:', formData);
+            
+            // Show success message
+            const form = document.getElementById('leadForm');
+            form.innerHTML = `
+                <div style="text-align: center; padding: 40px 0;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+                    <h3 style="color: var(--dark); margin-bottom: 10px;">You're in!</h3>
+                    <p style="color: var(--gray);">We'll email you when early access opens.</p>
+                    <p style="color: var(--gray); margin-top: 20px; font-size: 14px;">Expected launch: Q1 2024</p>
+                </div>
+            `;
+            
+            // Optional: Send to your backend
+            // fetch('/api/leads', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify(formData)
+            // });
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                const href = this.getAttribute('href');
+                if (href !== '#') {
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

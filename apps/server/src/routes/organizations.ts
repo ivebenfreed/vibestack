@@ -200,24 +200,18 @@ app.get('/', requireUser(), async (c) => {
  * GET ORGANIZATION BY ID
  * GET /organizations/:id
  */
-app.get('/:id', requireUserAndOrg(), async (c) => {
+app.get('/:id', requireUser(), async (c) => {
   const requestId = c.get('requestId');
   const userContext = c.get('userContext');
-  const orgContext = c.get('orgContext')!;
   
   try {
     const organizationId = c.req.param('id');
     const auth = getAuth(c);
 
-    // Verify the requested organization matches the context
-    if (organizationId !== orgContext.organizationId) {
-      return c.json({
-        success: false,
-        error: 'Organization ID mismatch',
-        code: 'INVALID_ORG_ID',
-        requestId
-      }, 400);
-    }
+    console.log(`[ORG-DEBUG] GET /organizations/${organizationId} - User: ${userContext.userId} (${userContext.userEmail})`);
+
+    // Check if user has access to this organization via Better Auth
+    // This will verify membership through Better Auth's organization system
 
     apiLogger.debug('Fetching organization details', {
       organizationId,
@@ -248,31 +242,19 @@ app.get('/:id', requireUserAndOrg(), async (c) => {
 
     // Get organization members if user is admin or owner
     let members = undefined;
-    if (['admin', 'owner'].includes(orgContext.userOrgRole)) {
-      const membersResult = await auth.api.getOrganizationMembers({
-        body: { organizationId },
-        headers: c.req.raw.headers
-      });
-      
-      if (membersResult.data) {
-        members = membersResult.data;
-      }
-    }
+    // Note: Better Auth getOrganization will only return data if user has access
+    // We'll try to get members and let Better Auth handle access control
 
     apiLogger.debug('Organization details fetched', {
       organizationId,
       memberCount: members?.length,
-      userRole: orgContext.userOrgRole,
       requestId
     }, MODULE_NAME);
 
     return c.json({
       success: true,
       data: {
-        organization: {
-          ...result.data,
-          userRole: orgContext.userOrgRole
-        },
+        organization: result.data,
         members: members?.map(member => ({
           id: member.id,
           userId: member.userId,

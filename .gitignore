@@ -56,9 +56,10 @@ next-env.d.ts
 *.sqlite3
 *.db
 
-# PostgreSQL data - track live volume, ignore copies
+# PostgreSQL data - track live volume and container, ignore copies
 data/*
 !data/postgres-live/
+!data/container-main.tar
 
 # Logs
 logs
@@ -89,4 +90,4 @@ worktrees/vibestack-env-*.tar.gz
 # Worktree-specific Docker configs
 .docker/
 
-/marketing
+/marketingdata/container-main.tar

@@ -1,6 +1,7 @@
 import React from 'react'
 // import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
 import { VibestackDexieProvider } from '../../db/dexie-provider'
+import { LiveStoreProvider } from './LiveStoreProvider'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 // 🔥 UPDATED: Use V2 orchestrator hooks
@@ -23,9 +24,11 @@ export function AuthAwareProviders({ children }: { children: React.ReactNode }) 
   if (isAuthenticated && !isCheckingAuth && !isSigningOut) {
     return (
       <VibestackDexieProvider>
-        <AbilityProvider>
-          <AppLayout>{children}</AppLayout>
-        </AbilityProvider>
+        <LiveStoreProvider>
+          <AbilityProvider>
+            <AppLayout>{children}</AppLayout>
+          </AbilityProvider>
+        </LiveStoreProvider>
       </VibestackDexieProvider>
     )
   }

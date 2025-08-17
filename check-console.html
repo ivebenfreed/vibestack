@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head><title>Console Check</title></head>
+<body>
+<script>
+// Capture and log all console errors
+const originalError = console.error;
+const originalLog = console.log;
+const originalWarn = console.warn;
+
+const errors = [];
+const logs = [];
+
+console.error = function(...args) {
+    errors.push(args.join(' '));
+    originalError.apply(console, args);
+};
+
+console.log = function(...args) {
+    logs.push(args.join(' '));
+    originalLog.apply(console, args);
+};
+
+console.warn = function(...args) {
+    logs.push('WARN: ' + args.join(' '));
+    originalWarn.apply(console, args);
+};
+
+// Check the main app
+setTimeout(() => {
+    fetch('http://localhost:5173')
+        .then(response => response.text())
+        .then(html => {
+            document.body.innerHTML = '<h1>Console Errors Found:</h1>' + 
+                '<div>' + errors.join('<br>') + '</div>' +
+                '<h1>Console Logs:</h1>' +
+                '<div>' + logs.slice(-10).join('<br>') + '</div>';
+        });
+}, 1000);
+</script>
+</body>
+</html>

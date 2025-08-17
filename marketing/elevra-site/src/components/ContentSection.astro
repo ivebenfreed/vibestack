@@ -1,0 +1,50 @@
+---
+// Generic content section template that can be used with markdown content
+export interface Props {
+    title?: string;
+    subtitle?: string;
+    content?: string;
+    className?: string;
+    id?: string;
+}
+
+const { title, subtitle, content, className = '', id } = Astro.props;
+---
+
+<section class={`content-section ${className}`} id={id}>
+    <div class="container">
+        {title && <h2 class="section-title">{title}</h2>}
+        {subtitle && <p class="section-subtitle">{subtitle}</p>}
+        {content && <div class="section-content" set:html={content} />}
+        <slot />
+    </div>
+</section>
+
+<style>
+    .content-section {
+        padding: 80px 0;
+    }
+
+    .section-title {
+        text-align: center;
+        font-size: 48px;
+        font-weight: 900;
+        margin-bottom: 24px;
+        color: var(--dark);
+        letter-spacing: -2px;
+    }
+
+    .section-subtitle {
+        text-align: center;
+        font-size: 20px;
+        color: var(--gray);
+        margin-bottom: 60px;
+    }
+
+    .section-content {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    /* Specific styles can be added via className prop */
+</style>

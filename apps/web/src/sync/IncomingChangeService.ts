@@ -9,6 +9,7 @@
 
 import { TableChange } from '@repo/sync-types';
 import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '../db/client-entities';
+import { getLiveStoreClient } from '../lib/livestore-client';
 
 export interface IncomingChangeServiceConfig {
   clientId: string;
@@ -602,6 +603,9 @@ export class IncomingChangeService {
 
       console.log(`[IncomingChangeService] Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
       
+      // Bridge to LiveStore tables
+      await this.bridgeToLiveStore(change);
+      
       // Process relationship updates if present
       if (change.relationshipUpdates && change.relationshipUpdates.length > 0) {
         console.log(`[IncomingChangeService] Processing ${change.relationshipUpdates.length} relationship updates for ${change.table}:${change.data.id}`);
@@ -656,6 +660,9 @@ export class IncomingChangeService {
       }
 
       console.log(`[IncomingChangeService] ✅ Live sync: Successfully applied ${change.operation} to ${change.table} for record ${change.data.id}`);
+      
+      // Bridge to LiveStore tables
+      await this.bridgeToLiveStore(change);
       
       // Process relationship updates if present
       if (change.relationshipUpdates && change.relationshipUpdates.length > 0) {
@@ -920,6 +927,85 @@ export class IncomingChangeService {
       
       default:
         throw new Error(`Unknown junction table operation: ${change.operation}`);
+    }
+  }
+
+  /**
+   * Bridge incoming changes to LiveStore tables
+   * This populates LiveStore tables when sync messages are received
+   */
+  private async bridgeToLiveStore(change: TableChange): Promise<void> {
+    try {
+      const liveStoreClient = getLiveStoreClient();
+      if (!liveStoreClient) {
+        // LiveStore not available - this is fine, just skip
+        return;
+      }
+
+      // Map table names to LiveStore entity types
+      const tableToEntityMapping: Record<string, string> = {
+        'project': 'project',
+        'task': 'task', 
+        'comment': 'comment',
+        'user': 'user',
+        'client': 'client',
+        'timesheet': 'timesheet',
+        'skill': 'skill'
+      };
+
+      const entityType = tableToEntityMapping[change.table];
+      if (!entityType) {
+        // Table not mapped to LiveStore - skip
+        console.log(`[IncomingChangeService] 📡 Skipping LiveStore bridge for unmapped table: ${change.table}`);
+        return;
+      }
+
+      // Get organization ID from the data
+      const organizationId = change.data.organizationId || change.data.organization_id;
+      if (!organizationId) {
+        console.warn(`[IncomingChangeService] 📡 No organization ID found for LiveStore bridge: ${change.table}:${change.data.id}`);
+        return;
+      }
+
+      // Apply change to LiveStore table
+      const liveStoreTableName = `org_${organizationId.replace(/-/g, '_')}_${entityType}`;
+      
+      console.log(`[IncomingChangeService] 📡 Bridging ${change.operation} to LiveStore table: ${liveStoreTableName}`);
+
+      switch (change.operation.toLowerCase()) {
+        case 'insert':
+          await liveStoreClient.insert(liveStoreTableName, change.data);
+          console.log(`[IncomingChangeService] ✅ LiveStore: Inserted ${entityType} ${change.data.id}`);
+          break;
+          
+        case 'update':
+          await liveStoreClient.update(liveStoreTableName, change.data.id, change.data);
+          console.log(`[IncomingChangeService] ✅ LiveStore: Updated ${entityType} ${change.data.id}`);
+          break;
+          
+        case 'delete':
+          await liveStoreClient.delete(liveStoreTableName, change.data.id);
+          console.log(`[IncomingChangeService] ✅ LiveStore: Deleted ${entityType} ${change.data.id}`);
+          break;
+          
+        default:
+          console.warn(`[IncomingChangeService] 📡 Unknown operation for LiveStore bridge: ${change.operation}`);
+      }
+
+      // Emit event for debug/monitoring
+      window.dispatchEvent(new CustomEvent('livestore:sync:bridged', {
+        detail: {
+          table: liveStoreTableName,
+          operation: change.operation,
+          entityId: change.data.id,
+          entityType,
+          organizationId
+        }
+      }));
+
+    } catch (error) {
+      // Don't fail the entire sync process if LiveStore bridge fails
+      console.error(`[IncomingChangeService] ⚠️ LiveStore bridge failed for ${change.table}:${change.data.id}:`, error);
     }
   }
 
