@@ -56,6 +56,10 @@ next-env.d.ts
 *.sqlite3
 *.db
 
+# PostgreSQL data - track live volume, ignore copies
+data/*
+!data/postgres-live/
+
 # Logs
 logs
 *.log
