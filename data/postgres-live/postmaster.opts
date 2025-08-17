@@ -1,0 +1,1 @@
+/usr/lib/postgresql/17/bin/postgres "-c" "wal_level=logical" "-c" "max_wal_senders=3" "-c" "max_replication_slots=3" "-c" "max_logical_replication_workers=3" "-c" "log_statement=all" "-c" "log_replication_commands=on" "-c" "logging_collector=on" "-c" "log_destination=stderr"
