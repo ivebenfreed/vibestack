@@ -338,9 +338,11 @@ export class LiveStoreDynamicSchemaGenerator {
     }
 
     // Add indexes for enum fields
-    for (const [fieldName, fieldDef] of Object.entries(customFields)) {
-      if (fieldDef.type === 'enum' && fieldDef.syncable !== false) {
-        indexes.push(['organization_id', fieldName]);
+    if (customFields) {
+      for (const [fieldName, fieldDef] of Object.entries(customFields)) {
+        if (fieldDef.type === 'enum' && fieldDef.syncable !== false) {
+          indexes.push(['organization_id', fieldName]);
+        }
       }
     }
 
@@ -514,9 +516,11 @@ export class LiveStoreDynamicSchemaGenerator {
   private getEventFieldsFromEntity(syncableFields: Record<string, FieldDefinition>): Record<string, string> {
     const eventFields: Record<string, string> = {};
 
-    for (const [fieldName, fieldDef] of Object.entries(syncableFields)) {
-      if (fieldDef.syncable !== false) {
-        eventFields[fieldName] = this.mapFieldTypeToEventType(fieldDef.type);
+    if (syncableFields) {
+      for (const [fieldName, fieldDef] of Object.entries(syncableFields)) {
+        if (fieldDef.syncable !== false) {
+          eventFields[fieldName] = this.mapFieldTypeToEventType(fieldDef.type);
+        }
       }
     }
 

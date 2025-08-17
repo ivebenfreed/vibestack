@@ -11,6 +11,7 @@ import { phase1TestRouter } from './phase1-tests.js'
 import { dataforgeTestRouter } from '../routes/dataforge-test.js'
 import { universalArchetypeRouter } from '../routes/universal-archetype-api.js'
 import { testDbRouter } from '../routes/test-db.js'
+import debugTableDataRouter from './debug/table-data'
 // Custom organization routes removed - using Better Auth endpoints instead
 
 // Create API router
@@ -34,6 +35,7 @@ api.route('/test', phase1TestRouter)
 api.route('/dataforge', dataforgeTestRouter)
 api.route('/archetype', universalArchetypeRouter)
 api.route('/db', testDbRouter)
+api.route('/debug', debugTableDataRouter)
 
 // Import and mount Kysely-based generic API
 import { genericKysely } from './generic-kysely'

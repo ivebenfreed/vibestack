@@ -150,7 +150,7 @@ export class LiveStoreChangeTrackingTester {
   private mockDexieImport(): void {
     // Override the dynamic import for testing
     const originalImport = (globalThis as any).__originalImport;
-    (globalThis as any).__originalImport = originalImport || import;
+    (globalThis as any).__originalImport = originalImport || ((globalThis as any).import || eval('import'));
     
     // Mock dynamic import
     global.import = async (path: string) => {
