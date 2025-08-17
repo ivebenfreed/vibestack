@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "title": "Elevra - Custom Data Tables with Real Relationships That Work",
+    "description": "Custom tables that match your business perfectly. Real database relationships that actually work. Lightning fast, always synced."
+  },
+  "hero": {
+    "badge": "🚀 LAUNCHING SOON",
+    "headline": {
+      "line1": "Relationship Problems?",
+      "line2": "Meet",
+      "highlight": "Elevra"
+    },
+    "subheading": {
+      "words": ["Custom", "tables", "that", "match", "your", "business", "perfectly."],
+      "accent": "real database relationships",
+      "suffix": "that actually work."
+    },
+    "badges": [
+      { "icon": "⚡", "text": "Instant Tables" },
+      { "icon": "🚀", "text": "Lightning Fast" },
+      { "icon": "🔄", "text": "Always Synced" }
+    ],
+    "cta": {
+      "title": "Finally, Tables That Match Your Business",
+      "subtitle": "Early access to custom data tables with real database power",
+      "privacy": "We'll never spam. Unsubscribe anytime."
+    }
+  },
+  "benefits": {
+    "title": "Tables Built for YOUR Business",
+    "subtitle": "Not generic templates. Not rigid structures. Your exact needs.",
+    "cards": [
+      {
+        "icon": "🎯",
+        "title": "Perfect-Fit Tables",
+        "description": "Create tables that match your exact workflow. Projects, inventory, customers - designed your way, not ours."
+      },
+      {
+        "icon": "✨",
+        "title": "Customize Everything",
+        "description": "Add your exact fields - text, numbers, dates, dropdowns. Link tables together. Build exactly what you need."
+      },
+      {
+        "icon": "🔗",
+        "title": "Database Relationships That Work",
+        "description": "Link customers to orders to invoices. Connect projects to tasks to documents. Real database power, no broken links."
+      },
+      {
+        "icon": "⚡",
+        "title": "Lightning Fast",
+        "description": "Instant table creation. Instant queries. Instant sync. Everything happens in real-time, even with millions of records."
+      }
+    ]
+  },
+  "howItWorks": {
+    "title": "Simple as 1-2-3",
+    "subtitle": "Create custom data tables in seconds, not weeks",
+    "steps": [
+      {
+        "number": "1",
+        "title": "Design Your Table",
+        "description": "Name it exactly what you need - 'Customer Orders', 'Project Milestones', 'Equipment Inventory' - anything.",
+        "features": [
+          "Projects, tasks, documents",
+          "Customers, orders, invoices",
+          "Inventory, assets, equipment",
+          "Or create something totally custom"
+        ]
+      },
+      {
+        "number": "2",
+        "title": "Connect Everything",
+        "description": "Link your tables together with real database relationships. Customers → Orders → Payments. It all just works.",
+        "features": [
+          "Add custom fields instantly",
+          "Link projects to tasks to documents",
+          "Create dependencies and hierarchies",
+          "All relationships work perfectly"
+        ]
+      },
+      {
+        "number": "3",
+        "title": "Start Using It",
+        "description": "That's it! Your custom table is ready. Add data, share with your team, and watch everything sync in real-time.",
+        "features": [
+          "Instant data entry forms",
+          "Beautiful table views",
+          "Real-time collaboration",
+          "Works on any device"
+        ]
+      }
+    ]
+  },
+  "comparison": {
+    "title": "The Difference is Clear",
+    "subtitle": "Custom tables with real relationships vs. generic templates",
+    "headers": ["Feature", "Elevra", "Airtable", "Notion", "Monday.com"],
+    "rows": [
+      {
+        "feature": "Custom Tables",
+        "elevra": { "status": "check", "text": "Design exactly what you need" },
+        "airtable": { "status": "cross", "text": "Force-fit into bases" },
+        "notion": { "status": "cross", "text": "Generic databases" },
+        "monday": { "status": "cross", "text": "Just boards" }
+      },
+      {
+        "feature": "Works Offline",
+        "elevra": { "status": "check", "text": "Full functionality" },
+        "airtable": { "status": "cross", "text": "Read-only" },
+        "notion": { "status": "cross", "text": "Limited" },
+        "monday": { "status": "cross", "text": "No" }
+      },
+      {
+        "feature": "Real DB Relationships",
+        "elevra": { "status": "check", "text": "Link anything to anything" },
+        "airtable": { "status": "cross", "text": "15 linked records max" },
+        "notion": { "status": "cross", "text": "Relations break" },
+        "monday": { "status": "cross", "text": "30+ second loads" }
+      },
+      {
+        "feature": "Performance at Scale",
+        "elevra": { "status": "check", "text": "No degradation" },
+        "airtable": { "status": "cross", "text": "Slows >10k records" },
+        "notion": { "status": "cross", "text": "Slows >5k records" },
+        "monday": { "status": "cross", "text": "Slows >1k records" }
+      },
+      {
+        "feature": "True Database",
+        "elevra": { "status": "check", "text": "PostgreSQL" },
+        "airtable": { "status": "cross", "text": "Proprietary" },
+        "notion": { "status": "cross", "text": "Document store" },
+        "monday": { "status": "cross", "text": "Board-based" }
+      }
+    ]
+  },
+  "finalCTA": {
+    "title": "Your Business. Your Tables. Real Database Power.",
+    "subtitle": "Stop forcing your data into someone else's structure",
+    "buttonText": "GET EARLY ACCESS"
+  },
+  "footer": {
+    "links": [
+      { "text": "Privacy Policy", "href": "/privacy" },
+      { "text": "Terms of Service", "href": "/terms" },
+      { "text": "Security", "href": "/security" },
+      { "text": "Contact", "href": "/contact" }
+    ],
+    "copyright": "© 2024 Elevra. Built with ❤️ for speed demons."
+  }
+}

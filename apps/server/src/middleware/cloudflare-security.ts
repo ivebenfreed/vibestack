@@ -26,6 +26,12 @@ interface RateLimitEntry {
 class LocalRateLimiter {
   private store = new Map<string, RateLimitEntry>()
   
+  // Clear all rate limits (useful for development)
+  clear(): void {
+    this.store.clear()
+    console.log('[RATE LIMIT] Cleared all rate limit entries')
+  }
+  
   async limit(key: string, limit: number, windowMs: number): Promise<{ success: boolean }> {
     const now = Date.now()
     const windowStart = now - windowMs
@@ -65,7 +71,7 @@ export const cloudflareRateLimit = createMiddleware<{ Bindings: CloudflareEnv }>
   const method = c.req.method
   
   try {
-    // Auth endpoint rate limiting (5 requests per 15 minutes)
+    // Auth endpoint rate limiting (5 requests per 15 minutes in production, 100 per minute in development)
     if (path.includes('/api/auth/sign-in') || path.includes('/api/auth/sign-up')) {
       let success = true
       
@@ -74,8 +80,11 @@ export const cloudflareRateLimit = createMiddleware<{ Bindings: CloudflareEnv }>
         const result = await c.env.auth_rate_limit.limit({ key: ip })
         success = result.success
       } else {
-        // Use local rate limiting in development
-        const result = await localRateLimiter.limit(`auth:${ip}`, 5, 15 * 60 * 1000)
+        // Use local rate limiting - much more permissive in development
+        const isDevelopment = c.env.ENVIRONMENT === 'development' || c.env.ENVIRONMENT === 'local'
+        const limit = isDevelopment ? 100 : 5  // 100 attempts per minute in dev, 5 per 15 min in production
+        const windowMs = isDevelopment ? 60 * 1000 : 15 * 60 * 1000  // 1 minute in dev, 15 minutes in production
+        const result = await localRateLimiter.limit(`auth:${ip}`, limit, windowMs)
         success = result.success
       }
       
@@ -89,7 +98,7 @@ export const cloudflareRateLimit = createMiddleware<{ Bindings: CloudflareEnv }>
       }
     }
     
-    // Sign-up specific rate limiting (3 per hour)
+    // Sign-up specific rate limiting (3 per hour in production, 50 per minute in development)
     if (path.includes('/api/auth/sign-up') && method === 'POST') {
       let success = true
       
@@ -98,8 +107,11 @@ export const cloudflareRateLimit = createMiddleware<{ Bindings: CloudflareEnv }>
         const result = await c.env.signup_rate_limit.limit({ key: ip })
         success = result.success
       } else {
-        // Use local rate limiting in development
-        const result = await localRateLimiter.limit(`signup:${ip}`, 3, 60 * 60 * 1000)
+        // Use local rate limiting - much more permissive in development
+        const isDevelopment = c.env.ENVIRONMENT === 'development' || c.env.ENVIRONMENT === 'local'
+        const limit = isDevelopment ? 50 : 3  // 50 signups per minute in dev, 3 per hour in production
+        const windowMs = isDevelopment ? 60 * 1000 : 60 * 60 * 1000  // 1 minute in dev, 1 hour in production
+        const result = await localRateLimiter.limit(`signup:${ip}`, limit, windowMs)
         success = result.success
       }
       

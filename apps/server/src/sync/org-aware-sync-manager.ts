@@ -79,7 +79,7 @@ export class OrgAwareSyncManager {
         
         if (!targetOrgSlug) {
           // Get user's first organization as default
-          const userOrgs = await this.orgAccessService.getUserOrganizations(sessionData.user.id);
+          const userOrgs = await this.orgAccessService.getUserOrganizations(sessionData.user.id, sessionData.user.role);
           if (userOrgs.length === 0) {
             return {
               isValid: false,

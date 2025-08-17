@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Synced Records</title>
+</head>
+<body>
+    <h1>Synced Records Check</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        // Simple check of what's in IndexedDB
+        async function checkSyncedRecords() {
+            const results = document.getElementById('results');
+            
+            try {
+                // Open IndexedDB
+                const dbRequest = indexedDB.open('vibestack_client_db');
+                
+                dbRequest.onsuccess = async function(event) {
+                    const db = event.target.result;
+                    const objectStoreNames = Array.from(db.objectStoreNames);
+                    
+                    let html = '<h2>Available Object Stores:</h2><ul>';
+                    objectStoreNames.forEach(name => {
+                        html += `<li>${name}</li>`;
+                    });
+                    html += '</ul>';
+                    
+                    // Check record counts for main entities
+                    const entities = ['project', 'client', 'timesheet', 'skill'];
+                    html += '<h2>Record Counts:</h2><ul>';
+                    
+                    for (const entity of entities) {
+                        try {
+                            const transaction = db.transaction([entity], 'readonly');
+                            const store = transaction.objectStore(entity);
+                            const countRequest = store.count();
+                            
+                            await new Promise((resolve, reject) => {
+                                countRequest.onsuccess = () => {
+                                    html += `<li><strong>${entity}:</strong> ${countRequest.result} records</li>`;
+                                    resolve();
+                                };
+                                countRequest.onerror = () => reject(countRequest.error);
+                            });
+                        } catch (error) {
+                            html += `<li><strong>${entity}:</strong> Error - ${error.message}</li>`;
+                        }
+                    }
+                    
+                    html += '</ul>';
+                    results.innerHTML = html;
+                };
+                
+                dbRequest.onerror = function() {
+                    results.innerHTML = '<p>Error opening IndexedDB</p>';
+                };
+                
+            } catch (error) {
+                results.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run the check
+        checkSyncedRecords();
+    </script>
+</body>
+</html>

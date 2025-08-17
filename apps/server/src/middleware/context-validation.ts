@@ -44,12 +44,13 @@ declare module 'hono' {
 }
 
 /**
- * Extract organization slug from request
+ * Extract organization slug or ID from request
  * Supports multiple patterns:
  * - Header: X-Organization-Slug
  * - Query param: ?org=slug
  * - Subdomain: slug.domain.com
  * - Path prefix: /org/slug/...
+ * - Path ID pattern: /api/organizations/:id
  */
 function extractOrganizationSlug(c: Context): string | null {
   // 1. Check header (most reliable for API calls)
@@ -75,6 +76,14 @@ function extractOrganizationSlug(c: Context): string | null {
   const orgPathMatch = path.match(/^\/org\/([^\/]+)/);
   if (orgPathMatch) {
     return orgPathMatch[1];
+  }
+
+  // 5. Check organization ID in path: /api/organizations/:id
+  const orgIdMatch = path.match(/^\/api\/organizations\/([^\/]+)$/);
+  if (orgIdMatch) {
+    const orgId = orgIdMatch[1];
+    console.log(`[CONTEXT-VALIDATION] Extracted organization ID from path: ${orgId}`);
+    return orgId; // Return ID as if it were a slug - we'll handle the lookup differently
   }
 
   return null;
@@ -186,29 +195,71 @@ export async function requireOrganization() {
         }, 400);
       }
 
-      // Validate user has access to this organization
-      const kysely = getKysely(c.env);
-      const orgAccessService = new OrgAccessService(kysely, c.env);
-      
-      const orgAccess = await orgAccessService.checkUserOrgAccess(
-        userContext.userId,
-        organizationSlug
-      );
-
-      if (!orgAccess.hasAccess) {
-        apiLogger.warn('User lacks organization access', {
+      // Global admin bypass - admin and super_admin users have access to all organizations
+      let orgAccess;
+      if (userContext.userRole === 'admin' || userContext.userRole === 'super_admin') {
+        apiLogger.info('Admin user bypassing organization access check', {
           userId: userContext.userId,
+          userRole: userContext.userRole,
           organizationSlug,
-          requestId,
-          fromCache: orgAccess.fromCache
+          requestId
         }, MODULE_NAME);
 
-        return c.json({ 
-          error: 'Organization access denied',
-          code: 'ORG_ACCESS_DENIED',
-          requestId,
+        // For admin users, we need to fetch the organization data directly
+        const kysely = getKysely(c.env);
+        const organization = await kysely
+          .selectFrom('organizations')
+          .select(['id', 'slug', 'name'])
+          .where('slug', '=', organizationSlug)
+          .executeTakeFirst();
+
+        if (!organization) {
+          apiLogger.warn('Organization not found', {
+            organizationSlug,
+            requestId
+          }, MODULE_NAME);
+
+          return c.json({ 
+            error: 'Organization not found',
+            code: 'ORG_NOT_FOUND',
+            requestId,
+            organizationSlug
+          }, 404);
+        }
+
+        // Create synthetic orgAccess for admin users
+        orgAccess = {
+          hasAccess: true,
+          organization: organization,
+          role: 'admin', // Grant admin role
+          permissions: ['*'], // Grant all permissions
+          fromCache: false
+        };
+      } else {
+        // Regular user access check
+        const kysely = getKysely(c.env);
+        const orgAccessService = new OrgAccessService(kysely, c.env);
+        
+        orgAccess = await orgAccessService.checkUserOrgAccess(
+          userContext.userId,
           organizationSlug
-        }, 403);
+        );
+
+        if (!orgAccess.hasAccess) {
+          apiLogger.warn('User lacks organization access', {
+            userId: userContext.userId,
+            organizationSlug,
+            requestId,
+            fromCache: orgAccess.fromCache
+          }, MODULE_NAME);
+
+          return c.json({ 
+            error: 'Organization access denied',
+            code: 'ORG_ACCESS_DENIED',
+            requestId,
+            organizationSlug
+          }, 403);
+        }
       }
 
       // Create organization context

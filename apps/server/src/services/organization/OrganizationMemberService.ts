@@ -402,7 +402,6 @@ export class OrganizationMemberService {
         .select(['role'])
         .where('organization_id', '=', organizationId)
         .where('user_id', '=', userId)
-        .where('status', '=', 'active')
         .executeTakeFirst();
 
       return member?.role as OrganizationRole || null;

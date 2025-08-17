@@ -1,0 +1,160 @@
+---
+import { getEntry } from 'astro:content';
+
+// Get the comparison section content
+const comparisonEntry = await getEntry('sections', 'comparison');
+const comparison = comparisonEntry.data;
+
+// Get competitor comparison data
+const competitorsEntry = await getEntry('comparisons', 'competitors');
+const competitorsData = competitorsEntry.data;
+
+// Extract unique competitor names from the first feature
+const competitorNames = Object.keys(competitorsData.features[0].competitors);
+---
+
+<section class="comparison" id="comparison">
+    <div class="container">
+        <h2 class="section-title">{comparison.title}</h2>
+        <p class="section-subtitle">{comparison.subtitle}</p>
+        
+        <div class="comparison-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th class="highlight">Elevra</th>
+                        {competitorNames.map(name => (
+                            <th>{name}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {competitorsData.features.map(feature => (
+                        <tr>
+                            <td>{feature.feature}</td>
+                            <td>
+                                <span class={feature.elevra.status === 'check' ? 'check' : 'cross'}>
+                                    {feature.elevra.status === 'check' ? '✓' : '✗'}
+                                </span> {feature.elevra.text}
+                            </td>
+                            {competitorNames.map(name => (
+                                <td>
+                                    <span class={feature.competitors[name].status === 'check' ? 'check' : 'cross'}>
+                                        {feature.competitors[name].status === 'check' ? '✓' : '✗'}
+                                    </span> {feature.competitors[name].text}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<style>
+    .comparison {
+        padding: 80px 0;
+        background: var(--light-gray);
+    }
+
+    .section-title {
+        text-align: center;
+        font-size: 42px;
+        font-weight: 900;
+        margin-bottom: 20px;
+        color: var(--dark);
+    }
+
+    .section-subtitle {
+        text-align: center;
+        font-size: 20px;
+        color: var(--gray);
+        margin-bottom: 60px;
+    }
+
+    .comparison-table {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .comparison-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .comparison-table th {
+        background: var(--dark);
+        color: white;
+        padding: 20px;
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .comparison-table th.highlight {
+        background: #0EA5E9;
+    }
+
+    .comparison-table td {
+        padding: 20px;
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .comparison-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .check {
+        color: var(--success);
+        font-weight: bold;
+        font-size: 20px;
+        display: inline-block;
+        animation: checkMark 0.5s ease-out;
+        text-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+    }
+    
+    @keyframes checkMark {
+        from {
+            transform: scale(0) rotate(-180deg);
+        }
+        to {
+            transform: scale(1) rotate(0);
+        }
+    }
+
+    .cross {
+        color: #EF4444;
+        font-weight: bold;
+        font-size: 20px;
+        opacity: 0.8;
+    }
+    
+    tbody tr td { 
+        animation: fadeInLeft 0.6s ease-out both; 
+    }
+    tbody tr:nth-child(1) td { animation-delay: 0.1s; }
+    tbody tr:nth-child(2) td { animation-delay: 0.2s; }
+    tbody tr:nth-child(3) td { animation-delay: 0.3s; }
+    tbody tr:nth-child(4) td { animation-delay: 0.4s; }
+    tbody tr:nth-child(5) td { animation-delay: 0.5s; }
+    
+    @keyframes fadeInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .comparison-table {
+            overflow-x: auto;
+        }
+    }
+</style>

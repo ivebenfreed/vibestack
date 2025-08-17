@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import HeroSection from '../components/HeroSection.astro';
+import PainPointsSection from '../components/PainPointsSection.astro';
+import FeaturesSection from '../components/FeaturesSection.astro';
+import ComparisonSection from '../components/ComparisonSection.astro';
+import Footer from '../components/Footer.astro';
+import '../assets/styles/global.css';
+import siteContent from '../content/site-content.json';
+
+const { title, description } = siteContent.metadata;
+---
+
+<BaseLayout title={title} description={description}>
+    <Header />
+    <HeroSection />
+    <PainPointsSection />
+    <FeaturesSection />
+    <ComparisonSection />
+    
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <div class="container">
+            <h2>{siteContent.finalCTA.title}</h2>
+            <p>{siteContent.finalCTA.subtitle}</p>
+            <a href="#" class="btn btn-white btn-large" onclick="document.getElementById('email').focus(); return false;">{siteContent.finalCTA.buttonText}</a>
+        </div>
+    </section>
+    
+    <Footer />
+    
+    <!-- Smooth scroll script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Smooth scroll for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const href = (this as HTMLAnchorElement).getAttribute('href');
+                    if (href !== '#') {
+                        e.preventDefault();
+                        const target = document.querySelector(href);
+                        if (target) {
+                            target.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</BaseLayout>
+
+<style>
+    .final-cta {
+        padding: 100px 0;
+        background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+        text-align: center;
+        color: white;
+    }
+
+    .final-cta h2 {
+        font-size: 48px;
+        margin-bottom: 20px;
+    }
+
+    .final-cta p {
+        font-size: 20px;
+        margin-bottom: 40px;
+        opacity: 0.95;
+    }
+</style>

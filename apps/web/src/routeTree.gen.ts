@@ -11,6 +11,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as DebugPublicRouteImport } from './routes/debug-public'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
@@ -66,6 +67,11 @@ const AuthenticatedDebugDatabaseLazyRouteImport = createFileRoute(
   '/_authenticated/debug/database',
 )()
 
+const DebugPublicRoute = DebugPublicRouteImport.update({
+  id: '/debug-public',
+  path: '/debug-public',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -334,6 +340,7 @@ const AuthenticatedSettingsAdminUsersRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/debug-public': typeof DebugPublicRoute
   '/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/check-email': typeof authCheckEmailRoute
@@ -382,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
 }
 export interface FileRoutesByTo {
+  '/debug-public': typeof DebugPublicRoute
   '/check-email': typeof authCheckEmailRoute
   '/complete-registration': typeof authCompleteRegistrationRoute
   '/forgot-password': typeof authForgotPasswordRoute
@@ -430,6 +438,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/debug-public': typeof DebugPublicRoute
   '/_authenticated/debug': typeof AuthenticatedDebugRouteRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/(auth)/check-email': typeof authCheckEmailRoute
@@ -480,6 +489,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/debug-public'
     | '/debug'
     | '/settings'
     | '/check-email'
@@ -528,6 +538,7 @@ export interface FileRouteTypes {
     | '/settings/admin/users'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/debug-public'
     | '/check-email'
     | '/complete-registration'
     | '/forgot-password'
@@ -575,6 +586,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/debug-public'
     | '/_authenticated/debug'
     | '/_authenticated/settings'
     | '/(auth)/check-email'
@@ -625,6 +637,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  DebugPublicRoute: typeof DebugPublicRoute
   authCheckEmailRoute: typeof authCheckEmailRoute
   authCompleteRegistrationRoute: typeof authCompleteRegistrationRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
@@ -644,6 +657,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/debug-public': {
+      id: '/debug-public'
+      path: '/debug-public'
+      fullPath: '/debug-public'
+      preLoaderRoute: typeof DebugPublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -1078,6 +1098,7 @@ const AuthenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  DebugPublicRoute: DebugPublicRoute,
   authCheckEmailRoute: authCheckEmailRoute,
   authCompleteRegistrationRoute: authCompleteRegistrationRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,

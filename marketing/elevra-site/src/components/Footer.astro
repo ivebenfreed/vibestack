@@ -1,0 +1,51 @@
+---
+import { getEntry } from 'astro:content';
+
+// Get the footer content
+const footerEntry = await getEntry('sections', 'footer');
+const footer = footerEntry.data;
+---
+
+<footer>
+    <div class="container">
+        <div class="footer-links">
+            {footer.links.map(link => (
+                <a href={link.href}>{link.text}</a>
+            ))}
+        </div>
+        <p>{footer.copyright}</p>
+    </div>
+</footer>
+
+<style>
+    footer {
+        padding: 40px 0;
+        background: var(--dark);
+        color: white;
+        text-align: center;
+    }
+
+    .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin-bottom: 20px;
+    }
+
+    .footer-links a {
+        color: #94A3B8;
+        text-decoration: none;
+        transition: color 0.3s;
+    }
+
+    .footer-links a:hover {
+        color: #38BDF8;
+    }
+
+    @media (max-width: 768px) {
+        .footer-links {
+            flex-direction: column;
+            gap: 15px;
+        }
+    }
+</style>

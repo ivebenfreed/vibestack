@@ -143,7 +143,7 @@ export class OrgAccessService {
   /**
    * Get user's organizations with caching
    */
-  async getUserOrganizations(userId: string): Promise<Array<{
+  async getUserOrganizations(userId: string, userRole?: string): Promise<Array<{
     organization: any;
     member: any;
     role: string;

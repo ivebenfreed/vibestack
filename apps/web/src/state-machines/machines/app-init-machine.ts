@@ -16,6 +16,10 @@ export interface AppInitContext {
   syncError: string | null;
   liveChangesStatus: 'idle' | 'connecting' | 'connected' | 'error';
   
+  // LiveStore state
+  isLiveStoreReady: boolean;
+  liveStoreError: string | null;
+  
   // System ready state derived from machine state (not persisted)
   // All detailed sync state now managed by independent sync machine
   
@@ -35,6 +39,8 @@ export type AppInitEvent =
   | { type: 'CONNECTION_OFFLINE' }
   | { type: 'SYNC_LIVE' }
   | { type: 'SYNC_ERROR'; error: string }
+  | { type: 'LIVESTORE_READY' }
+  | { type: 'LIVESTORE_ERROR'; error: string }
   | { type: 'LIVE_CHANGES_ACTIVE' }
   | { type: 'LIVE_CHANGES_ERROR'; error: string };
 
@@ -71,6 +77,38 @@ const waitForDatabaseActor = fromPromise(async () => {
   });
 });
 
+// Actor for waiting for LiveStore ready event
+const waitForLiveStoreActor = fromPromise(async () => {
+  console.log('[AppInitMachine] Waiting for LiveStore initialization...');
+  
+  return new Promise((resolve, reject) => {
+    const handleReady = (event: CustomEvent) => {
+      cleanup();
+      console.log('[AppInitMachine] LiveStore ready event received');
+      resolve({ success: true });
+    };
+    
+    const handleError = (event: CustomEvent) => {
+      cleanup();
+      console.error('[AppInitMachine] LiveStore error event received:', event.detail);
+      reject(new Error(event.detail.error || 'LiveStore initialization failed'));
+    };
+    
+    const cleanup = () => {
+      window.removeEventListener('livestore:ready', handleReady as EventListener);
+      window.removeEventListener('livestore:error', handleError as EventListener);
+    };
+    
+    window.addEventListener('livestore:ready', handleReady as EventListener);
+    window.addEventListener('livestore:error', handleError as EventListener);
+    
+    // Trigger LiveStore initialization
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('livestore:init'));
+    }, 100);
+  });
+});
+
 export const appInitMachine = setup({
   types: {
     context: {} as AppInitContext,
@@ -79,6 +117,7 @@ export const appInitMachine = setup({
   
   actors: {
     waitForDatabase: waitForDatabaseActor,
+    waitForLiveStore: waitForLiveStoreActor,
   },
   
   actions: {
@@ -106,6 +145,18 @@ export const appInitMachine = setup({
       lastActivity: () => Date.now(),
     }),
     
+    markLiveStoreReady: assign({
+      isLiveStoreReady: true,
+      liveStoreError: null,
+      lastActivity: () => Date.now(),
+    }),
+    
+    storeLiveStoreError: assign({
+      liveStoreError: ({ event }) => 
+        event.type === 'LIVESTORE_ERROR' ? event.error : 'LiveStore initialization failed',
+      lastActivity: () => Date.now(),
+    }),
+    
     markOnline: assign({
       isOnline: true,
       connectionStatus: () => 'connected' as const,
@@ -128,6 +179,8 @@ export const appInitMachine = setup({
       databaseError: null,
       isSyncReady: false,
       syncError: null,
+      isLiveStoreReady: false,
+      liveStoreError: null,
       lastActivity: () => Date.now(),
     }),
     
@@ -143,6 +196,12 @@ export const appInitMachine = setup({
       } else {
         console.warn('[AppInitMachine] Sync machine actor not available')
       }
+    },
+    
+    startLiveStore: () => {
+      console.log('[AppInitMachine] Starting LiveStore initialization');
+      // Dispatch event to trigger LiveStore initialization
+      window.dispatchEvent(new CustomEvent('livestore:init'));
     },
     
     startLiveChanges: () => {
@@ -163,6 +222,8 @@ export const appInitMachine = setup({
     connectionStatus: 'disconnected' as const,
     isSyncReady: false,
     syncError: null,
+    isLiveStoreReady: false,
+    liveStoreError: null,
     liveChangesStatus: 'idle' as const,
     initStartTime: Date.now(),
     lastActivity: Date.now(),
@@ -250,17 +311,61 @@ export const appInitMachine = setup({
       
       on: {
         SYNC_LIVE: {
-          // Skip live_changes state (TypeORM disabled) and go directly to ready
-          target: 'ready',
+          // Move to LiveStore initialization
+          target: 'livestore',
           actions: [
             'markSyncReady',
-            'markSystemReady',
-            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine - skipping live changes (TypeORM disabled)')
+            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine - proceeding to LiveStore')
           ]
         },
         SYNC_ERROR: {
           target: 'error',
           actions: 'storeSyncError'
+        },
+        RETRY_INIT: {
+          target: 'idle',
+          actions: 'resetSystem'
+        },
+        RESET: {
+          target: 'idle',
+          actions: ['resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
+        }
+      }
+    },
+    
+    livestore: {
+      entry: () => console.log('[AppInitMachine] Starting LiveStore initialization'),
+      
+      invoke: {
+        src: 'waitForLiveStore',
+        onDone: {
+          target: 'ready',
+          actions: [
+            'markLiveStoreReady',
+            'markSystemReady',
+            () => console.log('[AppInitMachine] LiveStore initialization completed - system fully ready')
+          ]
+        },
+        onError: {
+          target: 'error',
+          actions: assign({
+            liveStoreError: ({ event }) => (event.error as Error)?.message || 'LiveStore initialization failed'
+          })
+        }
+      },
+      
+      on: {
+        LIVESTORE_READY: {
+          target: 'ready',
+          actions: [
+            'markLiveStoreReady',
+            'markSystemReady',
+            () => console.log('[AppInitMachine] Received LIVESTORE_READY event - system fully ready')
+          ]
+        },
+        LIVESTORE_ERROR: {
+          target: 'error',
+          actions: 'storeLiveStoreError'
         },
         RETRY_INIT: {
           target: 'idle',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '@repo/dataforge/dexie-schema';
+import { db } from '@/domain';
 import { getAllChanges, clearProcessedChanges, getPendingChangeCount } from '@/db/dexie-change-tracking';
 
 interface LocalChange {
@@ -62,7 +62,7 @@ export function LocalChangesInspector() {
     
     setLoading(true);
     try {
-      await db.localChanges.clear();
+      await db.local_changes.clear();
       await loadChanges();
       alert('All local changes cleared');
     } catch (error) {
@@ -78,7 +78,7 @@ export function LocalChangesInspector() {
     
     setLoading(true);
     try {
-      await db.localChanges
+      await db.local_changes
         .where('id')
         .anyOf(changeIds)
         .modify({ processedSync: 1 });
@@ -97,7 +97,7 @@ export function LocalChangesInspector() {
     
     setLoading(true);
     try {
-      await db.localChanges
+      await db.local_changes
         .where('id')
         .anyOf(changeIds)
         .delete();
