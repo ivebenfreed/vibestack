@@ -5,13 +5,15 @@
  */
 
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useLiveStoreInstance, useLiveStoreSchema } from '@/lib/livestore-schema-client';
-import { useLiveStoreOperations } from '@/lib/livestore-operations';
-import { useAuth } from '@/hooks/use-auth';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { liveStoreSchemaClient } from '@/lib/livestore-schema-client';
+import { domainServices, devUtils } from '@/domain';
+import { useAuth } from '../../../state-machines/hooks';
 
 export const Route = createFileRoute('/_authenticated/debug/livestore-test')({
   component: LiveStoreDebugPage,
@@ -24,19 +26,65 @@ interface TestResult {
   duration?: number;
 }
 
+interface TableData {
+  tableName: string;
+  displayName: string;
+  data: any[];
+  columns: string[];
+  loading: boolean;
+  error?: string;
+}
+
 function LiveStoreDebugPage() {
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const { user } = useAuth();
   
-  // Test with a fixed org for debugging
-  const testOrgId = 'test-org-debug';
+  // Use current organization from localStorage
+  const orgId = localStorage.getItem('vibestack-last-organization-id') || '01920000-1000-7000-8000-000000000001';
   const clientId = `debug-client-${Date.now()}`;
   
-  // LiveStore hooks
-  const { schema, loading: schemaLoading, error: schemaError } = useLiveStoreSchema(testOrgId);
-  const { instance, loading: instanceLoading, error: instanceError } = useLiveStoreInstance(testOrgId, clientId);
-  const operations = useLiveStoreOperations(instance, testOrgId);
+  // Set up global access for testing
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Expose LiveStore domain services globally for testing
+      (window as any).liveStoreDomain = {
+        services: domainServices,
+        devUtils,
+        schemaClient: liveStoreSchemaClient,
+        
+        // Quick access functions
+        async info() {
+          return await devUtils.getLiveStoreInfo();
+        },
+        
+        async test() {
+          return await devUtils.testFullLiveStore();
+        },
+        
+        syncStatus() {
+          const currentOrgId = localStorage.getItem('vibestack-last-organization-id');
+          return currentOrgId ? liveStoreSchemaClient.getSyncStatus(currentOrgId) : null;
+        }
+      };
+      
+      // Also expose the test functions for compatibility
+      (window as any).testLiveStoreEventSync = {
+        async testLiveStoreEventSync() {
+          return await devUtils.testFullLiveStore();
+        },
+        
+        async runAllTests() {
+          return await devUtils.testFullLiveStore();
+        }
+      };
+      
+      // Make schema client available
+      (window as any).liveStoreSchemaClient = liveStoreSchemaClient;
+      
+      console.log('🚀 LiveStore domain services exposed globally for testing');
+    }
+  }, []);
 
   const updateTestResult = (test: string, status: TestResult['status'], message?: string, duration?: number) => {
     setTestResults(prev => {
@@ -67,99 +115,77 @@ function LiveStoreDebugPage() {
     setTestResults([]);
     
     try {
-      // Test 1: Browser Imports
-      await runTest('Browser Imports', async () => {
-        const { Store, createStore, Schema } = await import('@livestore/livestore');
-        const { makePersistedAdapter } = await import('@livestore/adapter-web');
+      // Test 1: Domain Services Available
+      await runTest('Domain Services Available', async () => {
+        if (!domainServices || !domainServices.project || !domainServices.task) {
+          throw new Error('LiveStore domain services not available');
+        }
+        console.log('Available services:', Object.keys(domainServices));
+      });
+
+      // Test 2: Schema Client Available
+      await runTest('Schema Client Available', async () => {
+        if (!liveStoreSchemaClient) {
+          throw new Error('LiveStore schema client not available');
+        }
         
-        if (typeof Store !== 'function' || typeof createStore !== 'function' || 
-            typeof Schema !== 'object' || typeof makePersistedAdapter !== 'function') {
-          throw new Error('LiveStore imports not available');
+        const currentOrgId = localStorage.getItem('vibestack-last-organization-id');
+        if (currentOrgId) {
+          const instance = liveStoreSchemaClient.getLiveStoreInstance(currentOrgId);
+          console.log('LiveStore instance available:', !!instance);
         }
       });
 
-      // Test 2: Schema Generation
-      await runTest('Schema Generation', async () => {
-        const { liveStoreSchemaManager } = await import('@/lib/livestore-dynamic-schema');
-        
-        const mockOrgSchema = {
-          orgId: testOrgId,
-          entities: {
-            DebugProject: {
-              extends: 'base_projects',
-              tableName: `${testOrgId}_debug_projects`,
-              syncableFields: {
-                debugField: { type: 'string', syncable: true },
-                testValue: { type: 'number', syncable: true }
-              }
-            }
-          },
-          version: '1.0.0'
-        };
-
-        const { schema, events } = await liveStoreSchemaManager.loadOrgLiveStoreSchema(testOrgId, mockOrgSchema);
-        
-        if (!schema || !events || Object.keys(schema).length === 0) {
-          throw new Error('Schema generation failed');
+      // Test 3: LiveStore Info
+      await runTest('LiveStore Info', async () => {
+        const info = await devUtils.getLiveStoreInfo();
+        if (info.error) {
+          throw new Error(info.error);
         }
+        console.log('LiveStore info:', info);
       });
 
-      // Test 3: LiveStore Instance Creation
-      await runTest('Instance Creation', async () => {
-        if (!instance) {
-          throw new Error('LiveStore instance not created');
-        }
-        
-        await instance.ready();
-      });
-
-      // Test 4: Database Query
-      await runTest('Database Query', async () => {
-        if (!instance) {
-          throw new Error('No LiveStore instance available');
-        }
-        
-        const tables = await instance.query('SELECT name FROM sqlite_master WHERE type=?', ['table']);
-        console.log('Available tables:', tables);
-      });
-
-      // Test 5: Operations Manager
-      await runTest('Operations Manager', async () => {
-        if (!operations) {
-          throw new Error('Operations manager not available');
-        }
-        
-        // Test insert
-        const result = await operations.insert({
-          organizationId: testOrgId,
-          tableName: `${testOrgId}_debug_projects`,
-          data: {
-            name: 'Debug Test Project',
-            debugField: 'test-value',
-            testValue: 42
-          }
+      // Test 4: Domain Operations
+      await runTest('Domain Operations', async () => {
+        // Test project creation
+        const project = await domainServices.project.create({
+          name: `Test Project ${Date.now()}`,
+          description: 'LiveStore domain test project',
+          status: 'active'
         });
         
-        if (!result.success) {
-          throw new Error(result.error || 'Insert operation failed');
-        }
-      });
-
-      // Test 6: Change Tracking
-      await runTest('Change Tracking', async () => {
-        const { testLiveStoreChangeTracking } = await import('@/lib/test-livestore-change-tracking');
+        console.log('Created project:', project.id);
         
-        // This will run our mock-based tests
-        await testLiveStoreChangeTracking();
+        // Test task creation
+        const task = await domainServices.task.create({
+          title: `Test Task ${Date.now()}`,
+          description: 'LiveStore domain test task',
+          projectId: project.id,
+          status: 'todo'
+        });
+        
+        console.log('Created task:', task.id);
+        
+        // Test update
+        await domainServices.task.update(task.id, { status: 'in_progress' });
+        console.log('Updated task status');
       });
 
-      // Test 7: Browser Integration Test
-      await runTest('Browser Integration', async () => {
-        if (typeof window.testLiveStoreInBrowser === 'function') {
-          await window.testLiveStoreInBrowser();
-        } else {
-          throw new Error('Browser test function not available');
+      // Test 5: Event Sync Status
+      await runTest('Event Sync Status', async () => {
+        const currentOrgId = localStorage.getItem('vibestack-last-organization-id');
+        if (!currentOrgId) {
+          throw new Error('No organization selected');
         }
+        
+        const syncStatus = liveStoreSchemaClient.getSyncStatus(currentOrgId);
+        console.log('Sync status:', syncStatus);
+      });
+
+      // Test 6: Full LiveStore Test
+      await runTest('Full LiveStore Test', async () => {
+        const result = await devUtils.testFullLiveStore();
+        console.log('Full test result:', result);
       });
 
     } finally {
@@ -213,27 +239,33 @@ function LiveStoreDebugPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Schema Status</CardTitle>
+            <CardTitle className="text-sm">Domain Services</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm">
-              {schemaLoading ? '⏳ Loading...' : 
-               schemaError ? `❌ Error: ${schemaError}` :
-               schema ? '✅ Schema loaded' : '⚠️ No schema'}
+              {domainServices ? '✅ LiveStore domain loaded' : '❌ Not available'}
             </p>
+            {domainServices && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Services: {Object.keys(domainServices).join(', ')}
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Instance Status</CardTitle>
+            <CardTitle className="text-sm">Schema Client</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm">
-              {instanceLoading ? '⏳ Loading...' :
-               instanceError ? `❌ Error: ${instanceError}` :
-               instance ? '✅ Instance ready' : '⚠️ No instance'}
+              {liveStoreSchemaClient ? '✅ Schema client ready' : '❌ Not available'}
             </p>
+            {orgId && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Org: {orgId.substring(0, 8)}...
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -276,11 +308,11 @@ function LiveStoreDebugPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2 text-sm">
-            <p><strong>Test Org ID:</strong> {testOrgId}</p>
+            <p><strong>Organization ID:</strong> {orgId}</p>
             <p><strong>Client ID:</strong> {clientId}</p>
             <p><strong>User ID:</strong> {user?.id || 'Not available'}</p>
-            <p><strong>Schema Tables:</strong> {schema ? Object.keys(schema).length : 'N/A'}</p>
-            <p><strong>Operations Available:</strong> {operations ? 'Yes' : 'No'}</p>
+            <p><strong>Domain Services:</strong> {domainServices ? Object.keys(domainServices).length : 'N/A'}</p>
+            <p><strong>Schema Client:</strong> {liveStoreSchemaClient ? 'Available' : 'Not available'}</p>
           </div>
         </CardContent>
       </Card>
@@ -295,37 +327,79 @@ function LiveStoreDebugPage() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => runTest('Manual Schema Test', async () => {
-                if (!schema) throw new Error('No schema available');
-                console.log('Schema:', schema);
+              onClick={() => runTest('LiveStore Info Test', async () => {
+                const info = await devUtils.getLiveStoreInfo();
+                if (info.error) throw new Error(info.error);
+                console.log('LiveStore info:', info);
               })}
             >
-              Test Schema
+              Test LiveStore Info
             </Button>
             
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => runTest('Manual Instance Test', async () => {
-                if (!instance) throw new Error('No instance available');
-                await instance.ready();
-                console.log('Instance ready');
+              onClick={() => runTest('Domain Services Test', async () => {
+                if (!domainServices) throw new Error('Domain services not available');
+                console.log('Available services:', Object.keys(domainServices));
+                
+                // Test basic operations
+                const projects = await domainServices.project.findAll();
+                console.log(`Found ${projects.length} projects`);
               })}
             >
-              Test Instance
+              Test Domain Services
             </Button>
             
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => runTest('Manual Operations Test', async () => {
-                if (!operations) throw new Error('No operations available');
-                const result = await operations.query('SELECT name FROM sqlite_master WHERE type=?', ['table']);
-                console.log('Query result:', result);
+              onClick={() => runTest('Sync Status Test', async () => {
+                const currentOrgId = localStorage.getItem('vibestack-last-organization-id');
+                if (!currentOrgId) throw new Error('No organization selected');
+                
+                const syncStatus = liveStoreSchemaClient.getSyncStatus(currentOrgId);
+                console.log('Sync status:', syncStatus);
               })}
             >
-              Test Operations
+              Test Sync Status
             </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => runTest('Create Operations Test', async () => {
+                // Test creating project and task
+                const project = await domainServices.project.create({
+                  name: `Test Project ${Date.now()}`,
+                  description: 'LiveStore test project',
+                  status: 'active'
+                });
+                
+                const task = await domainServices.task.create({
+                  title: `Test Task ${Date.now()}`,
+                  description: 'LiveStore test task',
+                  projectId: project.id,
+                  status: 'todo'
+                });
+                
+                console.log('Created project:', project.id, 'and task:', task.id);
+              })}
+            >
+              Test Create Operations
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => runTest('Full LiveStore Test', async () => {
+                const result = await devUtils.testFullLiveStore();
+                console.log('Full test completed:', result);
+              })}
+            >
+              🔬 Full LiveStore Test
+            </Button>
+            
           </div>
         </CardContent>
       </Card>

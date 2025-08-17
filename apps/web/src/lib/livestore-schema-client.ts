@@ -11,6 +11,11 @@ import {
   type LiveStoreSchema, 
   LiveStoreDynamicSchemaGenerator 
 } from './livestore-dynamic-schema';
+import { 
+  LiveStoreEventSyncService, 
+  createLiveStoreEventSync 
+} from './livestore-event-sync-service';
+import type { TableChange } from '@repo/sync-types';
 
 export interface LiveStoreSchemaResult {
   success: boolean;
@@ -22,9 +27,13 @@ export interface LiveStoreSchemaResult {
 }
 
 // Real LiveStore imports
-import { Store, createStore, type CreateStoreOptions } from '@livestore/livestore';
-import { makePersistedAdapter } from '@livestore/adapter-web';
+import { Store, createStorePromise, type CreateStoreOptions } from '@livestore/livestore';
+import { makePersistedAdapter, makeInMemoryAdapter } from '@livestore/adapter-web';
 import type { Schema } from '@livestore/livestore';
+
+// LiveStore worker imports
+import LiveStoreWorker from '../livestore/livestore.worker.ts?worker';
+import LiveStoreSharedWorker from '../livestore/livestore.shared-worker.ts?sharedworker';
 
 export interface LiveStoreInstance {
   store: Store;
@@ -42,6 +51,7 @@ export interface LiveStoreInstance {
  */
 export class LiveStoreSchemaClient {
   private liveStoreInstances = new Map<string, LiveStoreInstance>();
+  private eventSyncServices = new Map<string, LiveStoreEventSyncService>();
   private initializingOrgs = new Set<string>();
 
   /**
@@ -129,6 +139,9 @@ export class LiveStoreSchemaClient {
       // Cache the instance
       this.liveStoreInstances.set(orgId, liveStoreInstance);
 
+      // Initialize LiveStore event sync (replaces Dexie sync)
+      await this.initializeEventSync(orgId, clientId, liveStoreInstance);
+
       console.log(`✅ LiveStore initialized for organization: ${orgId}`);
       
       // Dispatch ready event
@@ -178,6 +191,14 @@ export class LiveStoreSchemaClient {
    * Close LiveStore instance for organization
    */
   async closeLiveStore(orgId: string): Promise<void> {
+    // Stop event sync first
+    const eventSync = this.eventSyncServices.get(orgId);
+    if (eventSync) {
+      eventSync.stopEventSync();
+      this.eventSyncServices.delete(orgId);
+      console.log(`🔌 Stopped event sync for organization: ${orgId}`);
+    }
+
     const instance = this.liveStoreInstances.get(orgId);
     if (instance) {
       try {
@@ -221,6 +242,13 @@ export class LiveStoreSchemaClient {
   async cleanup(): Promise<void> {
     console.log('🧹 Cleaning up all LiveStore instances');
 
+    // Stop all event sync services
+    for (const [orgId, eventSync] of this.eventSyncServices) {
+      eventSync.stopEventSync();
+      console.log(`🔌 Stopped event sync for org: ${orgId}`);
+    }
+    this.eventSyncServices.clear();
+
     // Close all instances
     const closePromises = Array.from(this.liveStoreInstances.keys()).map(orgId => 
       this.closeLiveStore(orgId)
@@ -253,6 +281,56 @@ export class LiveStoreSchemaClient {
   // Private methods
 
   /**
+   * Initialize event sync for organization
+   */
+  private async initializeEventSync(
+    orgId: string, 
+    clientId: string, 
+    liveStoreInstance: LiveStoreInstance
+  ): Promise<void> {
+    try {
+      console.log(`🔄 Initializing event sync for org: ${orgId}`);
+      
+      // Create mock WebSocket sender for now (replace with real one)
+      const webSocketSender = this.createWebSocketSender();
+      
+      const eventSync = await createLiveStoreEventSync({
+        orgId,
+        liveStoreInstance,
+        webSocketSender,
+        clientId,
+        autoStart: true
+      });
+      
+      this.eventSyncServices.set(orgId, eventSync);
+      
+      console.log(`✅ Event sync initialized for org: ${orgId}`);
+      
+    } catch (error) {
+      console.error(`❌ Failed to initialize event sync for org ${orgId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create WebSocket sender (mock for now)
+   */
+  private createWebSocketSender() {
+    return {
+      async send(message: TableChange): Promise<void> {
+        console.log('📤 [LiveStore→WebSocket] Sending:', {
+          table: message.table,
+          operation: message.operation,
+          orgId: message.orgId,
+          entityId: message.data?.id
+        });
+        // TODO: Replace with real WebSocket sender from existing sync infrastructure
+        // This will integrate with your existing WebSocket/sync system
+      }
+    };
+  }
+
+  /**
    * Create LiveStore instance with real LiveStore
    */
   private async createLiveStoreInstance(
@@ -270,24 +348,22 @@ export class LiveStoreSchemaClient {
       // Convert our schema to LiveStore format
       const storeConfig = createOrgStoreConfig(orgId, schema, events);
       
-      // Create web adapter
+      // Create persistent OPFS adapter with workers
       const adapter = makePersistedAdapter({
-        // Configure for organization
-        databaseName: storeConfig.databaseName,
+        storage: { type: 'opfs' },
+        worker: LiveStoreWorker,
+        sharedWorker: LiveStoreSharedWorker,
         // Add sync configuration when available
         // sync: { backend: makeCfSync({ url: syncUrl }) }
       });
       
       // Create LiveStore instance
-      const store = await createStore({
+      const store = await createStorePromise({
         schema: storeConfig.schema,
         adapter: adapter,
         // Add sync events when available
         // events: storeConfig.events
       });
-      
-      // Wait for store to be ready
-      await store.ready();
       
       const instance: LiveStoreInstance = {
         store,
@@ -295,7 +371,7 @@ export class LiveStoreSchemaClient {
         events,
         
         async ready(): Promise<void> {
-          await store.ready();
+          // Store is already ready when createStorePromise resolves
           console.log(`✅ LiveStore ready for org: ${orgId}`);
         },
         
@@ -341,6 +417,35 @@ export class LiveStoreSchemaClient {
       console.error(`❌ Failed to create LiveStore instance for org ${orgId}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Get event sync service for organization
+   */
+  getEventSyncService(orgId: string): LiveStoreEventSyncService | null {
+    return this.eventSyncServices.get(orgId) || null;
+  }
+
+  /**
+   * Get sync status for organization
+   */
+  getSyncStatus(orgId: string) {
+    const eventSync = this.eventSyncServices.get(orgId);
+    if (!eventSync) {
+      return { running: false, orgId, error: 'No event sync service' };
+    }
+    return eventSync.getStatus();
+  }
+
+  /**
+   * Get sync status for all organizations
+   */
+  getAllSyncStatuses() {
+    const statuses: Record<string, any> = {};
+    for (const [orgId, eventSync] of this.eventSyncServices) {
+      statuses[orgId] = eventSync.getStatus();
+    }
+    return statuses;
   }
 
   /**
