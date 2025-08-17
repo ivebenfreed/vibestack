@@ -18,7 +18,11 @@ export type SrvMessageType =
   | 'srv_live_start'      // Renamed: For confirming client is up-to-date and live sync starts
   | 'srv_sync_stats'      // Server sends sync statistics
   | 'srv_integrity_reset' // Server sends integrity reset command
-  | 'srv_integrity_validation_response'; // Server responds to integrity validation
+  | 'srv_integrity_validation_response' // Server responds to integrity validation
+  | 'srv_schema_updated'   // Server notifies schema change
+  | 'srv_schema_migration' // Server notifies schema migration
+  | 'srv_schema_validated' // Server validates schema change
+  | 'srv_schema_error';    // Server schema error
 
 export type CltMessageType =
   | 'clt_sync_request'      // Client requests sync
@@ -32,7 +36,11 @@ export type CltMessageType =
   | 'clt_catchup_received' // Client acknowledges receipt of catchup sync chunk
   | 'clt_integrity_validation' // Client requests integrity validation
   | 'clt_integrity_baseline_validation' // Client requests baseline integrity validation
-  | 'clt_integrity_reset_ack'; // Client acknowledges integrity reset
+  | 'clt_integrity_reset_ack' // Client acknowledges integrity reset
+  | 'clt_schema_request'    // Client requests schema
+  | 'clt_schema_received'   // Client acknowledges schema receipt
+  | 'clt_schema_applied'    // Client confirms schema applied
+  | 'clt_schema_error';     // Client schema error
 
 // Base message interface for all messages
 export interface BaseMessage {
@@ -336,5 +344,8 @@ export type Message =
   | ClientMessage
   | ClientIntegrityValidationMessage
   | ClientIntegrityResetAckMessage;
+
+// Re-export schema messages
+export * from './schema-messages';
 
 // No need for named exports since these are already exported at declaration

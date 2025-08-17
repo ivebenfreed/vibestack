@@ -48,6 +48,8 @@ import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_a
 import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
+import { Route as AuthenticatedDebugLivestoreTestSimpleRouteImport } from './routes/_authenticated/debug/livestore-test-simple'
+import { Route as AuthenticatedDebugLivestoreTestRouteImport } from './routes/_authenticated/debug/livestore-test'
 import { Route as AuthenticatedDebugLivestorePocRouteImport } from './routes/_authenticated/debug/livestore-poc'
 import { Route as AuthenticatedDebugKanbanRouteImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugJunctionTablesRouteImport } from './routes/_authenticated/debug/junction-tables'
@@ -288,6 +290,18 @@ const AuthenticatedDebugReactflowPositioningRoute =
     path: '/reactflow-positioning',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugLivestoreTestSimpleRoute =
+  AuthenticatedDebugLivestoreTestSimpleRouteImport.update({
+    id: '/livestore-test-simple',
+    path: '/livestore-test-simple',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLivestoreTestRoute =
+  AuthenticatedDebugLivestoreTestRouteImport.update({
+    id: '/livestore-test',
+    path: '/livestore-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugLivestorePocRoute =
   AuthenticatedDebugLivestorePocRouteImport.update({
     id: '/livestore-poc',
@@ -342,6 +356,8 @@ export interface FileRoutesByFullPath {
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
+  '/debug/livestore-test': typeof AuthenticatedDebugLivestoreTestRoute
+  '/debug/livestore-test-simple': typeof AuthenticatedDebugLivestoreTestSimpleRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
@@ -386,6 +402,8 @@ export interface FileRoutesByTo {
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
+  '/debug/livestore-test': typeof AuthenticatedDebugLivestoreTestRoute
+  '/debug/livestore-test-simple': typeof AuthenticatedDebugLivestoreTestSimpleRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
@@ -434,6 +452,8 @@ export interface FileRoutesById {
   '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/_authenticated/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
+  '/_authenticated/debug/livestore-test': typeof AuthenticatedDebugLivestoreTestRoute
+  '/_authenticated/debug/livestore-test-simple': typeof AuthenticatedDebugLivestoreTestSimpleRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
@@ -482,6 +502,8 @@ export interface FileRouteTypes {
     | '/debug/junction-tables'
     | '/debug/kanban'
     | '/debug/livestore-poc'
+    | '/debug/livestore-test'
+    | '/debug/livestore-test-simple'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
@@ -526,6 +548,8 @@ export interface FileRouteTypes {
     | '/debug/junction-tables'
     | '/debug/kanban'
     | '/debug/livestore-poc'
+    | '/debug/livestore-test'
+    | '/debug/livestore-test-simple'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
@@ -573,6 +597,8 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/junction-tables'
     | '/_authenticated/debug/kanban'
     | '/_authenticated/debug/livestore-poc'
+    | '/_authenticated/debug/livestore-test'
+    | '/_authenticated/debug/livestore-test-simple'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/vibegantt'
@@ -898,6 +924,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugReactflowPositioningRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/livestore-test-simple': {
+      id: '/_authenticated/debug/livestore-test-simple'
+      path: '/livestore-test-simple'
+      fullPath: '/debug/livestore-test-simple'
+      preLoaderRoute: typeof AuthenticatedDebugLivestoreTestSimpleRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/livestore-test': {
+      id: '/_authenticated/debug/livestore-test'
+      path: '/livestore-test'
+      fullPath: '/debug/livestore-test'
+      preLoaderRoute: typeof AuthenticatedDebugLivestoreTestRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/livestore-poc': {
       id: '/_authenticated/debug/livestore-poc'
       path: '/livestore-poc'
@@ -941,6 +981,8 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
   AuthenticatedDebugLivestorePocRoute: typeof AuthenticatedDebugLivestorePocRoute
+  AuthenticatedDebugLivestoreTestRoute: typeof AuthenticatedDebugLivestoreTestRoute
+  AuthenticatedDebugLivestoreTestSimpleRoute: typeof AuthenticatedDebugLivestoreTestSimpleRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
   AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
@@ -958,6 +1000,9 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugJunctionTablesRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
     AuthenticatedDebugLivestorePocRoute: AuthenticatedDebugLivestorePocRoute,
+    AuthenticatedDebugLivestoreTestRoute: AuthenticatedDebugLivestoreTestRoute,
+    AuthenticatedDebugLivestoreTestSimpleRoute:
+      AuthenticatedDebugLivestoreTestSimpleRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
