@@ -31,7 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
-import { Task, TaskStatus } from '@repo/dataforge/client-entities'
+import { Task, TaskStatus } from '@/db/client-entities'
 
 // Column configuration
 type ColumnId = 'open' | 'in_progress' | 'completed'

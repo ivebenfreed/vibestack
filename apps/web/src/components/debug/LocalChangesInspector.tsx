@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '@/domain';
+import { db } from '@/db/dexie-schema';
 import { getAllChanges, clearProcessedChanges, getPendingChangeCount } from '@/db/dexie-change-tracking';
 
 interface LocalChange {

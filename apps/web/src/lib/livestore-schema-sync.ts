@@ -20,7 +20,7 @@ import type {
   ClientSchemaReceivedMessage,
   ClientSchemaAppliedMessage,
   LiveStoreSchemaUpdate
-} from '@repo/sync-types';
+} from '@/types/sync';
 
 /**
  * Schema Sync Service

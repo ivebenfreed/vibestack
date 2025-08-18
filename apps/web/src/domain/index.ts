@@ -1,67 +1,130 @@
 /**
- * LiveStore Domain Layer - Complete Replacement for Dexie
+ * LiveStore Dynamic Domain Layer - Greenfield Implementation
  * 
- * This is the new domain layer that uses LiveStore exclusively for all operations.
- * It replaces the previous Dexie-based implementation with event-driven architecture.
+ * Schema-aware domain services that adapt to organization-specific entity definitions.
+ * Built for greenfield applications with dynamic, multi-tenant schemas.
  * 
  * Key Benefits:
- * - Native event streaming sync (no manual change tracking)
+ * - Dynamic schema validation and field mapping
  * - Multi-tenant organization isolation  
- * - Offline-first with OPFS persistence
- * - No sync loops (LiveStore handles this natively)
+ * - Real-time schema adaptation (no restart needed)
  * - Type-safe operations with organization schemas
+ * - Native LiveStore event streaming sync
  */
 
-// Import Simple LiveStore domain services for testing
 import {
-  simpleLiveStoreDomainServices,
-  simpleDevUtils,
-  simpleLiveStoreSchemaClient
-} from './simple-livestore-domain';
+  dynamicLiveStoreDomainService,
+  createDynamicEntityService,
+  type DynamicEntity,
+  type DynamicEntityData,
+  type MutationResult
+} from './dynamic-livestore-domain';
+
+// Simple mock for development/testing
+import { simpleDevUtils, simpleLiveStoreSchemaClient } from './simple-livestore-domain';
 
 // ============================================================================
 // Main Domain Services Export (LiveStore-based)
 // ============================================================================
 
 /**
- * Simple LiveStore services for testing migration
+ * Dynamic Domain Services - Greenfield Implementation
+ * 
+ * Schema-aware services that adapt to organization entity definitions.
+ * This is the primary interface for all domain operations.
  */
-export const domainServices = simpleLiveStoreDomainServices;
+export class DomainServices {
+  /**
+   * Create a dynamic entity service for a specific organization and entity type
+   */
+  createEntityService(orgId: string, entityName: string) {
+    return createDynamicEntityService(orgId, entityName);
+  }
+
+  /**
+   * Get current organization ID from context
+   */
+  getCurrentOrgId(): string | null {
+    return localStorage.getItem('vibestack-last-organization-id');
+  }
+
+  /**
+   * Create entity service for current organization
+   */
+  forCurrentOrg(entityName: string) {
+    const orgId = this.getCurrentOrgId();
+    if (!orgId) {
+      throw new Error('No organization selected. Please select an organization first.');
+    }
+    return this.createEntityService(orgId, entityName);
+  }
+
+  /**
+   * Convenience methods for common entity types (using current organization)
+   * These adapt to whatever entity schemas the current organization has defined
+   */
+  get project() {
+    return this.forCurrentOrg('SoftwareProject');
+  }
+
+  get task() {
+    return this.forCurrentOrg('DevelopmentTask');
+  }
+
+  get client() {
+    return this.forCurrentOrg('BusinessClient');
+  }
+
+  get timesheet() {
+    return this.forCurrentOrg('TimeEntry');
+  }
+
+  get skill() {
+    return this.forCurrentOrg('TechnicalSkill');
+  }
+
+  /**
+   * Access the underlying dynamic service for advanced operations
+   */
+  get core() {
+    return dynamicLiveStoreDomainService;
+  }
+}
 
 /**
- * Get domain service by entity type  
+ * Main domain services instance - schema-aware and dynamic
+ */
+export const domainServices = new DomainServices();
+
+/**
+ * Get domain service for entity type in current organization
  */
 export const getDomainService = (entityType: string) => {
-  const service = domainServices[entityType as keyof typeof domainServices];
-  if (!service) {
-    throw new Error(`No domain service found for entity type: ${entityType}`);
-  }
-  return service;
+  return domainServices.forCurrentOrg(entityType);
 };
 
 /**
- * Check if entity has domain service
+ * Create domain service for specific organization and entity
  */
-export const hasDomainService = (entityType: string): boolean => {
-  return entityType in domainServices;
-};
-
-/**
- * Get available entity types
- */
-export const getAvailableEntityTypes = (): string[] => {
-  return Object.keys(domainServices);
+export const createDomainService = (orgId: string, entityType: string) => {
+  return domainServices.createEntityService(orgId, entityType);
 };
 
 // ============================================================================
 // Service Classes Export
 // ============================================================================
 
-// Export simple services for testing
-export { 
-  simpleLiveStoreDomainServices,
-  simpleDevUtils,
-  simpleLiveStoreSchemaClient 
+// Export core dynamic services
+export {
+  dynamicLiveStoreDomainService,
+  createDynamicEntityService
+};
+
+// Export types
+export type {
+  DynamicEntity,
+  DynamicEntityData,
+  MutationResult
 };
 
 // ============================================================================
@@ -142,64 +205,72 @@ export const devUtils = simpleDevUtils;
 // ============================================================================
 
 /**
- * BASIC USAGE (same interface as before, but LiveStore-powered):
+ * BASIC USAGE - Dynamic Schema-Aware Services:
  * 
  * ```typescript
  * import { domainServices } from '@/domain';
  * 
- * // Create operations (triggers LiveStore events & sync automatically)
+ * // Create operations that adapt to organization schemas
  * const project = await domainServices.project.create({
  *   name: 'New Project',
+ *   repositoryUrl: 'https://github.com/example/repo', // Custom field from org schema
+ *   techStack: ['React', 'TypeScript'], // Another custom field  
+ *   budget: 50000,
  *   status: 'active'
  * });
  * 
- * const task = await domainServices.task.create({
- *   title: 'New Task',
- *   projectId: project.id,
- *   status: 'todo'
- * });
- * 
- * // Updates trigger sync events automatically
- * await domainServices.task.update(task.id, {
- *   status: 'completed'
+ * const skill = await domainServices.skill.create({
+ *   name: 'TypeScript',
+ *   category: 'technical',
+ *   level: 'expert'
  * });
  * ```
  * 
- * ADVANCED QUERIES:
+ * CUSTOM ENTITY TYPES:
  * 
  * ```typescript
- * // Custom SQL queries on LiveStore
- * const recentTasks = await domainServices.task.query(`
- *   SELECT t.*, p.name as project_name 
- *   FROM org_123_tasks t
- *   LEFT JOIN org_123_projects p ON t.project_id = p.id
- *   WHERE t.created_at > ?
- *   ORDER BY t.created_at DESC
- * `, [lastWeek]);
+ * // Create service for any entity type defined in organization schema
+ * const customEntityService = domainServices.forCurrentOrg('CustomEntity');
+ * const entity = await customEntityService.create({
+ *   customField1: 'value',
+ *   customField2: 123
+ * });
+ * 
+ * // Advanced: Create service for specific organization and entity
+ * const service = domainServices.createEntityService('org-123', 'SoftwareProject');
  * ```
  * 
- * SYNC MONITORING:
+ * VALIDATION & ERROR HANDLING:
  * 
  * ```typescript
- * // Check sync status
- * const syncStatus = liveStoreSchemaClient.getSyncStatus(orgId);
- * console.log('Sync status:', syncStatus);
+ * // Validation happens automatically based on organization schema
+ * const result = await domainServices.project.create({
+ *   name: 'Test Project',
+ *   invalidField: 'will be filtered out',
+ *   requiredField: 'validates against schema'
+ * });
  * 
- * // Get all organization sync statuses
- * const allStatuses = liveStoreSchemaClient.getAllSyncStatuses();
+ * if (!result.success) {
+ *   console.log('Validation errors:', result.validationErrors);
+ *   console.log('Error:', result.error);
+ * }
  * ```
  * 
- * TESTING & DEVELOPMENT:
+ * QUERIES & UPDATES:
  * 
  * ```typescript
- * // Test operations
- * await devUtils.testFullLiveStore();
+ * // Find operations
+ * const projects = await domainServices.project.findAll();
+ * const project = await domainServices.project.findById('project-123');
  * 
- * // Get database info
- * const info = await devUtils.getLiveStoreInfo();
+ * // Custom queries with filters
+ * const activeProjects = await domainServices.project.find({ status: 'active' });
  * 
- * // Performance testing
- * await devUtils.runPerformanceTest();
+ * // Updates
+ * const updated = await domainServices.project.update('project-123', {
+ *   status: 'completed',
+ *   completedAt: new Date().toISOString()
+ * });
  * ```
  */
 
@@ -208,19 +279,63 @@ export const devUtils = simpleDevUtils;
 // ============================================================================
 
 if (typeof window !== 'undefined') {
-  // Make everything available globally for debugging
+  // Make dynamic domain services available globally for debugging
   (window as any).liveStoreDomain = {
     services: domainServices,
-    devUtils,
     schemaClient: simpleLiveStoreSchemaClient,
     
     // Quick access functions
     async info() {
-      return await devUtils.getLiveStoreInfo();
+      return await simpleDevUtils.getLiveStoreInfo();
     },
     
     async test() {
-      return await devUtils.testFullLiveStore();
+      const orgId = localStorage.getItem('vibestack-last-organization-id');
+      if (!orgId) {
+        return { error: 'No organization selected' };
+      }
+      
+      console.log('🧪 Testing dynamic domain services...');
+      
+      try {
+        // Test dynamic project creation
+        const projectResult = await domainServices.project.create({
+          name: 'Dynamic Test Project',
+          description: 'Testing dynamic schema-aware operations',
+          status: 'active'
+        });
+        
+        if (!projectResult.success) {
+          throw new Error(projectResult.error || 'Project creation failed');
+        }
+        
+        console.log('✅ Dynamic project created:', projectResult.data?.id);
+        
+        // Test dynamic skill creation
+        const skillResult = await domainServices.skill.create({
+          name: 'Dynamic Schema Testing',
+          category: 'technical',
+          level: 'expert'
+        });
+        
+        if (!skillResult.success) {
+          throw new Error(skillResult.error || 'Skill creation failed');
+        }
+        
+        console.log('✅ Dynamic skill created:', skillResult.data?.id);
+        
+        return {
+          success: true,
+          project: projectResult.data,
+          skill: skillResult.data
+        };
+        
+      } catch (error) {
+        console.error('❌ Dynamic test failed:', error);
+        return {
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
     },
     
     syncStatus() {
@@ -229,22 +344,12 @@ if (typeof window !== 'undefined') {
     }
   };
 
-  // Also expose the test functions for compatibility
-  (window as any).testLiveStoreEventSync = {
-    async testLiveStoreEventSync() {
-      return await devUtils.testFullLiveStore();
-    },
-    
-    async runAllTests() {
-      return await devUtils.testFullLiveStore();
-    }
-  };
-  
   // Make schema client available
   (window as any).liveStoreSchemaClient = simpleLiveStoreSchemaClient;
   
-  console.log('🚀 Simple LiveStore Domain Layer loaded! Try:');
-  console.log('  - window.liveStoreDomain.info()');
-  console.log('  - window.liveStoreDomain.test()');
-  console.log('  - window.liveStoreDomain.syncStatus()');
+  console.log('🚀 LiveStore Dynamic Domain Layer loaded! Try:');
+  console.log('  - window.liveStoreDomain.info() - Get LiveStore info');
+  console.log('  - window.liveStoreDomain.test() - Test dynamic services');
+  console.log('  - window.liveStoreDomain.services.project.create(...) - Create with org schema');
+  console.log('  - window.liveStoreDomain.syncStatus() - Check sync status');
 }

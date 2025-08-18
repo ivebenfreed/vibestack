@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
-import { Task, TaskStatus, TaskPriority } from '@repo/dataforge/client-entities'
+import { Task, TaskStatus, TaskPriority } from '@/db/client-entities'
 import { domainServices } from '@/domain'
 
 type TasksDialogType = 'create' | 'update' | 'delete' | 'import'
