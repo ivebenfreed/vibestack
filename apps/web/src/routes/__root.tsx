@@ -7,7 +7,7 @@ import NotFoundError from '@/features/errors/not-found-error'
 import { useEffect, useState } from 'react'
 import { InitializationErrorBoundary } from '@/components/error-boundary'
 import { AuthAwareProviders } from '@/components/providers/AuthAwareProviders'
-import { Task, Project, User } from '@repo/dataforge/client-entities'
+import { Task, Project, User } from '@/db/client-entities'
 // import { useAuth } from '@/state-machines' // 🔥 REPLACED with V2 orchestrator hook
 import { authClient } from '@/lib/auth'
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'

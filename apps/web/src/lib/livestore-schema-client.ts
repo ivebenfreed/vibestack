@@ -15,7 +15,7 @@ import {
   LiveStoreEventSyncService, 
   createLiveStoreEventSync 
 } from './livestore-event-sync-service';
-import type { TableChange } from '@repo/sync-types';
+import type { TableChange } from '@/types/sync';
 
 export interface LiveStoreSchemaResult {
   success: boolean;

@@ -1,5 +1,22 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { Project, ProjectStatus } from '@repo/dataforge/client-entities';
+// Define types locally since @repo/dataforge packages were deprecated
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  status: ProjectStatus;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+enum ProjectStatus {
+  PLANNING = 'planning',
+  ACTIVE = 'active',
+  ON_HOLD = 'on_hold',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled'
+}
 import { domainServices } from '@/domain';
 
 interface ProjectContextType {

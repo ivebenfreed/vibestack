@@ -6,9 +6,9 @@ import {
   globalSidebarData,
   type GlobalSidebarSection 
 } from '@/components/layout/data/sidebar-data'
-import { Project } from '@repo/dataforge/client-entities'
+import { Project } from '@/db/client-entities'
 // Dexie handles all database operations
-import { Project as ProjectEntity, Task, User } from '@repo/dataforge/client-entities'
+import { Project as ProjectEntity, Task, User } from '@/db/client-entities'
 import { useMemo, useEffect, useRef } from 'react'
 import { shallowEqual } from '@xstate/store'
 

@@ -5,8 +5,8 @@
  * and provides utilities for working with them without hardcoding.
  */
 
-import * as clientEntities from '@repo/dataforge/client-entities';
-import { CLIENT_DOMAIN_TABLES } from '@repo/dataforge/client-entities';
+import * as clientEntities from '@/db/client-entities';
+import { CLIENT_DOMAIN_TABLES } from '@/db/client-entities';
 
 // Cache for entity metadata
 let _entityMetadata: Map<string, EntityMetadata> | null = null;

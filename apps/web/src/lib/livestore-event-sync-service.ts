@@ -11,7 +11,7 @@
  */
 
 import type { LiveStoreInstance } from './livestore-schema-client';
-import type { TableChange } from '@repo/sync-types';
+import type { TableChange } from '@/types/sync';
 
 // LiveStore event type (based on TypeScript definitions)
 interface LiveStoreEvent {

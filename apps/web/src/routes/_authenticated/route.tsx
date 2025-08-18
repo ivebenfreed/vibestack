@@ -6,7 +6,7 @@ import { PostAuthOrganizationSetup } from '@/features/auth/components/PostAuthOr
 import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen'
 import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
-import { Project, Task, User } from '@repo/dataforge/client-entities'
+import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
 
 // Track if we've verified system readiness in this session
