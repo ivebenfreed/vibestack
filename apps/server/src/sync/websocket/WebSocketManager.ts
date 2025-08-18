@@ -57,16 +57,22 @@ export class WebSocketManager {
     // Extract parameters
     let clientId = this.getQueryParam(request, 'clientId');
     let clientLSN = this.getQueryParam(request, 'lsn');
+    let organizationId = this.getQueryParam(request, 'organizationId');
     
     // Log request parameters
     syncLogger.debug('WebSocket connection request', {
       clientId,
-      lsn: clientLSN
+      lsn: clientLSN,
+      organizationId
     }, MODULE_NAME);
     
-    // Basic validation
+    // CRITICAL: Require all essential parameters for security
     if (!clientId) {
       return new Response('Missing clientId parameter', { status: 400 });
+    }
+    
+    if (!organizationId) {
+      return new Response('Missing organizationId parameter - organization context is required for all sync operations', { status: 400 });
     }
     
     // Validate LSN if provided
