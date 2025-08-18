@@ -13,6 +13,7 @@ import { performInitialSync } from './initial-sync-generic';
 import { sendLiveChanges } from './server-changes-generic';
 import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
+import crypto from 'crypto';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';
 import { ClientRegistryManager, type ClientRegistryManagerContext } from './client-registry-manager';
 import { OrgAwareClientRegistryManager } from './org-aware-client-registry';
@@ -213,8 +214,17 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // 1. Extract client parameters
     const clientId = getQueryParam(request, 'clientId');
     const organizationSlug = getQueryParam(request, 'org') || getQueryParam(request, 'organization');
+    const organizationId = getQueryParam(request, 'organizationId'); // Separate param for org ID
     const rawLSN = getQueryParam(request, 'lsn');
     const clientLSN = rawLSN || '0/0';
+    
+    syncLogger.info('WebSocket upgrade request parameters', {
+      clientId,
+      organizationSlug,
+      organizationId,
+      rawLSN,
+      url: request.url
+    }, MODULE_NAME);
     
     if (!clientId) {
       syncLogger.error('WebSocket upgrade rejected - missing clientId', {
@@ -227,7 +237,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     const validation = await this.orgAwareSyncManager.validateSyncConnection(
       request,
       clientId,
-      organizationSlug
+      organizationSlug,
+      organizationId
     );
 
     if (!validation.isValid) {
@@ -258,10 +269,11 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     const response = await this.webSocketManager.handleWebSocketUpgrade(request);
     
     if (response.status === 101) {
-      // WebSocket upgrade successful - register handlers and start sync
+      // WebSocket upgrade successful - register handlers  
       this.registerMessageHandlers();
       
-      // Start org-aware sync process
+      // CRITICAL FIX: Restore automatic sync trigger from working version
+      // The organization-aware sync needs to be triggered automatically after connection
       this.state.waitUntil(this.startOrgAwareSyncProcess(clientId, clientLSN));
     } else {
       // WebSocket upgrade failed - clear connection context
@@ -272,6 +284,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     return response;
   }
 
+
   /**
    * Start organization-aware sync process after WebSocket connection is established
    */
@@ -280,6 +293,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       if (!this.syncConnection) {
         throw new Error('No validated sync connection available');
       }
+
+      // Wait for WebSocket connection to be established (from working version)
+      await this.webSocketManager.waitForConnection();
 
       syncLogger.info('Starting org-aware sync process', {
         clientId,
@@ -303,8 +319,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         organizationSlug: this.syncConnection.organizationSlug
       }, MODULE_NAME);
 
-      // Wait for WebSocket connection to be established
-      await this.webSocketManager.waitForConnection();
+      // Note: WebSocket is ready after successful upgrade in hibernation API
       
       // Ensure replication is active
       await this.ensureReplicationActive();
@@ -349,13 +364,33 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     try {
       switch (strategy) {
         case SyncStrategy.INITIAL:
-          await this.performOrgAwareInitialSync(clientId, serverLSN);
+          // Use original sync system with org awareness
+          await performInitialSync(
+            this, // WebSocketHandler
+            this.getContext(), // MinimalContext  
+            clientId,
+            undefined, // stateManager (optional)
+            this.syncConnection?.organizationId, // organizationId for filtering
+            this.syncConnection?.userId // userId for permissions
+          );
           break;
         case SyncStrategy.CATCHUP:
           await this.performOrgAwareCatchupSync(clientId, clientLSN, serverLSN);
           break;
         case SyncStrategy.LIVE:
-          await this.startOrgAwareLiveSync(clientId);
+          // Client is up to date - send srv_live_start directly
+          syncLogger.info('Client up to date - starting live sync directly', {
+            clientId,
+            organizationId: this.syncConnection?.organizationId
+          }, MODULE_NAME);
+          
+          await this.send({
+            type: 'srv_live_start',
+            clientId,
+            requestId: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            messageId: crypto.randomUUID()
+          });
           break;
         default:
           throw new Error(`Unknown sync strategy: ${strategy}`);
@@ -444,11 +479,35 @@ export class SyncDO implements DurableObject, WebSocketHandler {
 
     // Live sync is already handled by the message handlers
     // The filtering will happen in sendLiveChangesWithLSN
-    await this.send({
-      type: 'sync-ready',
-      organizationId: this.syncConnection.organizationId,
-      userId: this.syncConnection.userId
-    } as any);
+    try {
+      syncLogger.info('Sending srv_live_start message to client', {
+        clientId,
+        messageType: 'srv_live_start',
+        organizationId: this.syncConnection.organizationId,
+        userId: this.syncConnection.userId
+      }, MODULE_NAME);
+
+      await this.send({
+        type: 'srv_live_start',
+        clientId,
+        requestId: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        messageId: crypto.randomUUID()
+      } as any);
+
+      syncLogger.info('Successfully sent srv_live_start message to client', {
+        clientId,
+        messageType: 'srv_live_start'
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Failed to send sync-ready message to client', {
+        clientId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      }, MODULE_NAME);
+      throw error; // Re-throw to be caught by outer error handler
+    }
   }
 
   /**

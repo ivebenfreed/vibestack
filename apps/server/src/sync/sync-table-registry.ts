@@ -11,20 +11,23 @@ import { ContainerPermissionService } from './container-permission-service';
 
 const MODULE_NAME = 'sync-table-registry';
 
-// Base system tables (always tracked)
+// Base system tables (always tracked) - excluding sensitive auth/session data
 const BASE_TRACKED_TABLES = [
-  'organization',
-  'session',
-  'account',
-  'verification'
+  'organization'  // Only organization data is safe to sync to clients
+  // Removed: 'session', 'account', 'verification' - these should never be synced to clients
 ];
 
-// System tables (never tracked)
+// System tables (never tracked) - includes sensitive auth/session data
 const SYSTEM_TABLES = [
   'change_history',
   'sync_statistics', 
   'system_logs',
-  'replication_slot_status'
+  'replication_slot_status',
+  // Authentication/session tables - never sync these to clients
+  'session',
+  'account', 
+  'verification',
+  'user'  // User data should also not be bulk synced
 ];
 
 export interface SyncTableRegistry {
@@ -55,6 +58,8 @@ class SyncTableRegistryImpl implements SyncTableRegistry {
 
   /**
    * Get all trackable tables (base + all org-specific tables)
+   * WARNING: This should only be used for system-level operations
+   * For organization-specific operations, use getTablesForOrganization()
    */
   async getAllTrackableTables(): Promise<string[]> {
     if (this.tableCache && Date.now() < this.cacheExpiry) {
@@ -92,20 +97,43 @@ class SyncTableRegistryImpl implements SyncTableRegistry {
 
   /**
    * Get organization-specific tables for a specific org
+   * CRITICAL: This method NEVER uses global cache - it queries directly for the org
    */
   async getOrgSpecificTables(organizationId: string): Promise<string[]> {
-    const allTables = await this.getAllTrackableTables();
-    
+    if (!organizationId) {
+      throw new Error('Organization ID is required for sync operations');
+    }
+
     // Convert org ID to table prefix format
     const tablePrefix = `org_${organizationId.replace(/-/g, '_')}_`;
     
     console.log(`DEBUG: Looking for tables with prefix: ${tablePrefix}`);
-    console.log('DEBUG: All discovered tables:', allTables);
-    
-    const orgTables = allTables.filter(table => table.startsWith(tablePrefix));
-    console.log('DEBUG: Filtered org tables:', orgTables);
-    
-    return orgTables;
+
+    try {
+      if (!this.kyselyDb) {
+        console.warn('DEBUG: No Kysely database available, cannot discover org tables');
+        return [];
+      }
+
+      // Query database DIRECTLY for this organization's tables only
+      const result = await this.kyselyDb
+        .selectFrom('information_schema.tables')
+        .select('table_name')
+        .where('table_schema', '=', 'public')
+        .where('table_name', 'like', `${tablePrefix}%`)
+        .orderBy('table_name')
+        .execute();
+      
+      const orgTables = result.map(row => row.table_name);
+      
+      console.log(`DEBUG: Found ${orgTables.length} tables for org ${organizationId}:`, orgTables);
+      
+      return orgTables;
+      
+    } catch (error) {
+      console.error(`DEBUG: Error discovering tables for org ${organizationId}:`, error);
+      return [];
+    }
   }
 
   /**

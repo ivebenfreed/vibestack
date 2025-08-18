@@ -604,3 +604,27 @@ git worktree list
 ```
 
 All completed issues (38, 53, 57) have been cleaned up.
+
+## Test User Credentials
+
+**IMPORTANT**: Use Wide Corp test users for all tests unless otherwise prompted.
+
+Complete test user credentials are documented in:
+📋 **[planning/active/testing-infrastructure/test-org-central/credentials/COMPLETE_ROLE_CREDENTIALS.md](planning/active/testing-infrastructure/test-org-central/credentials/COMPLETE_ROLE_CREDENTIALS.md)**
+
+### Quick Reference - Wide Corp Solutions
+**Organization ID:** `01920000-1000-7000-8000-000000000001`
+
+| Role | Email | Password | Description |
+|------|-------|----------|-------------|
+| **Owner** | ceo@widecorp.com | WideCorp2024!CEO | Full org access (Alice CEO) |
+| **Admin** | cto@widecorp.com | WideCorp2024!CTO | Tech admin (Bob CTO) |
+| **Manager** | pm1@widecorp.com | WideCorp2024!PM1 | Project management (Carol PM) |
+| **Member** | dev1@widecorp.com | WideCorp2024!DEV1 | Developer access (Eve Developer) |
+
+### WebSocket Sync Testing
+For testing WebSocket connection and sync functionality:
+- Use **Alice CEO** (Owner role) for comprehensive access
+- Organization ID: `01920000-1000-7000-8000-000000000001` 
+- 12 business entity tables available for sync testing
+- Login at: `http://localhost:5173/sign-in`
