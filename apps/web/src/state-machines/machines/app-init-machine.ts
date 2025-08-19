@@ -1,6 +1,7 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
 import { getDomainEntityNames } from '@/lib/entity-registry';
+import { checkLocalLiveStoreData, shouldUseLocalDataImmediately, createLocalSchemaObject } from '@/lib/livestore-local-introspection';
 
 export interface AppInitContext {
   // Database state
@@ -13,6 +14,11 @@ export interface AppInitContext {
   
   // Organization context
   organizationId: string | null;
+  
+  // Local data state
+  hasLocalData: boolean;
+  localDataChecked: boolean;
+  localSchemaAvailable: boolean;
   
   // Simplified sync coordination (keep only what's needed for startup sequence)
   isSyncReady: boolean;
@@ -33,9 +39,12 @@ export interface AppInitContext {
 
 export type AppInitEvent =
   | { type: 'START_INIT'; organizationId?: string }
+  | { type: 'UPDATE_ORGANIZATION'; organizationId: string }
   | { type: 'RETRY_INIT' }
   | { type: 'RESTART_SYNC' }
   | { type: 'RESET' }
+  | { type: 'SCHEMA_READY' }
+  | { type: 'SCHEMA_ERROR'; error: string }
   | { type: 'DATABASE_READY' }
   | { type: 'DATABASE_ERROR'; error: string }
   | { type: 'CONNECTION_ONLINE' }
@@ -48,6 +57,55 @@ export type AppInitEvent =
   | { type: 'LIVE_CHANGES_ERROR'; error: string };
 
 // No auth-aware reset needed - machine will start fresh each login through events
+
+// Actor for checking local LiveStore data
+const checkLocalDataActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
+  console.log('[AppInitMachine] 🔍 Checking for local LiveStore data...');
+  
+  if (!input.organizationId) {
+    throw new Error('Organization ID required for local data check');
+  }
+
+  const localData = await checkLocalLiveStoreData(input.organizationId);
+  const shouldUseLocal = shouldUseLocalDataImmediately(localData);
+  
+  console.log(`[AppInitMachine] 📊 Local data summary:`, {
+    hasData: localData.hasLocalData,
+    tables: localData.schema.entityCount,
+    shouldUseLocal,
+    organizationId: input.organizationId
+  });
+
+  // If we have usable local data, create a local schema object and dispatch it
+  if (shouldUseLocal) {
+    const localSchema = createLocalSchemaObject(localData);
+    console.log(`[AppInitMachine] ✅ Using local schema immediately - ${localData.schema.entityCount} entities available`);
+    
+    // Dispatch local schema ready event so components can use it
+    window.dispatchEvent(new CustomEvent('schema:local-ready', {
+      detail: { 
+        schema: localSchema,
+        localData,
+        source: 'local-cache'
+      }
+    }));
+    
+    return {
+      hasLocalData: true,
+      localSchema,
+      localDataSummary: localData,
+      shouldUseLocal: true
+    };
+  } else {
+    console.log(`[AppInitMachine] ⏳ No usable local data found, will need to wait for API schema`);
+    return {
+      hasLocalData: false,
+      localSchema: null,
+      localDataSummary: localData,
+      shouldUseLocal: false
+    };
+  }
+});
 
 // Real actor for waiting for database ready event
 const waitForDatabaseActor = fromPromise(async () => {
@@ -119,6 +177,7 @@ export const appInitMachine = setup({
   },
   
   actors: {
+    checkLocalData: checkLocalDataActor,
     waitForDatabase: waitForDatabaseActor,
     waitForLiveStore: waitForLiveStoreActor,
   },
@@ -177,9 +236,19 @@ export const appInitMachine = setup({
       lastActivity: () => Date.now(),
     }),
     
+    markLocalDataChecked: assign({
+      localDataChecked: true,
+      hasLocalData: ({ event }) => event.output?.hasLocalData || false,
+      localSchemaAvailable: ({ event }) => event.output?.shouldUseLocal || false,
+      lastActivity: () => Date.now(),
+    }),
+
     resetSystem: assign({
       isDatabaseInitialized: false,
       databaseError: null,
+      hasLocalData: false,
+      localDataChecked: false,
+      localSchemaAvailable: false,
       isSyncReady: false,
       syncError: null,
       isLiveStoreReady: false,
@@ -215,6 +284,14 @@ export const appInitMachine = setup({
       }
     }),
     
+    updateOrganizationId: assign({
+      organizationId: ({ event }: { event: AppInitEvent }) => {
+        const orgId = (event as any).organizationId
+        console.log('[AppInitMachine] Updating organization ID:', orgId)
+        return orgId
+      }
+    }),
+    
     startLiveStore: () => {
       console.log('[AppInitMachine] Starting LiveStore initialization');
       // Dispatch event to trigger LiveStore initialization
@@ -224,6 +301,60 @@ export const appInitMachine = setup({
     startLiveChanges: () => {
       // Live changes handled by Dexie
       console.log('[AppInitMachine] Live changes handled by Dexie');
+    },
+
+    loadOrgSchemaIfNeeded: async ({ context }) => {
+      if (!context.organizationId) {
+        console.log('[AppInitMachine] 🚫 No organization ID - cannot load schema');
+        return;
+      }
+
+      try {
+        console.log('[AppInitMachine] 📋 Loading organization schema...', context.organizationId);
+        
+        // Import the schema client dynamically to avoid import cycles
+        const { orgSchemaClient } = await import('@/lib/schema-client');
+        
+        // Load schema - this will trigger the SCHEMA_READY event notification
+        const result = await orgSchemaClient.loadOrgSchema(context.organizationId);
+        
+        if (!result.success) {
+          console.error('[AppInitMachine] ❌ Schema loading failed:', result.error);
+          // The schema client should have already dispatched SCHEMA_ERROR event
+        } else {
+          console.log('[AppInitMachine] ✅ Schema loading initiated for org:', context.organizationId);
+        }
+      } catch (error) {
+        console.error('[AppInitMachine] ❌ Schema loading error:', error);
+        // Dispatch error event if schema client didn't handle it
+        const appInitActor = (window as any).appInitActor;
+        if (appInitActor) {
+          appInitActor.send({ type: 'SCHEMA_ERROR', error: 'Schema loading failed' });
+        }
+      }
+    },
+    
+    startBackgroundInitialization: ({ context }) => {
+      console.log('[AppInitMachine] 🚀 Starting background processes (DB + Sync) in parallel');
+      
+      // Start database initialization in background
+      setTimeout(() => {
+        console.log('[AppInitMachine] 📊 Background: Starting database initialization');
+        window.dispatchEvent(new CustomEvent('database:init'));
+      }, 0);
+      
+      // Start sync after a brief delay to allow database to begin
+      setTimeout(() => {
+        console.log('[AppInitMachine] 🔄 Background: Starting sync with org context');
+        const pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor;
+        if (pureLiveStoreSyncMachineActor && context.organizationId) {
+          pureLiveStoreSyncMachineActor.send({ 
+            type: 'CONNECT', 
+            organizationId: context.organizationId,
+            userId: 'current-user-id' // TODO: Get from auth context
+          });
+        }
+      }, 100);
     },
   },
 }).createMachine({
@@ -238,6 +369,9 @@ export const appInitMachine = setup({
     isOnline: navigator.onLine,
     connectionStatus: 'disconnected' as const,
     organizationId: null,
+    hasLocalData: false,
+    localDataChecked: false,
+    localSchemaAvailable: false,
     isSyncReady: false,
     syncError: null,
     isLiveStoreReady: false,
@@ -271,6 +405,10 @@ export const appInitMachine = setup({
     CONNECTION_OFFLINE: {
       actions: 'markOffline'
     },
+    
+    UPDATE_ORGANIZATION: {
+      actions: 'updateOrganizationId'
+    },
   },
   
   states: {
@@ -278,7 +416,7 @@ export const appInitMachine = setup({
       entry: () => console.log('[AppInitMachine] Waiting for initialization trigger'),
       on: {
         START_INIT: {
-          target: 'database',
+          target: 'checkingLocalData',
           actions: 'setOrganizationId'
         },
         RESET: {
@@ -286,71 +424,64 @@ export const appInitMachine = setup({
         }
       }
     },
-    
-    database: {
-      entry: () => console.log('[AppInitMachine] Waiting for database initialization'),
-      
+
+    checkingLocalData: {
+      entry: () => console.log('[AppInitMachine] 🔍 Checking for local LiveStore data...'),
       invoke: {
-        src: 'waitForDatabase',
-        onDone: {
-          target: 'sync',
-          actions: 'markDatabaseReady'
-        },
+        src: 'checkLocalData',
+        input: ({ context }) => ({ organizationId: context.organizationId! }),
+        onDone: [
+          {
+            // Local data available - go to ready immediately
+            target: 'ready',
+            guard: ({ event }) => event.output?.shouldUseLocal === true,
+            actions: [
+              'markLocalDataChecked',
+              () => console.log('[AppInitMachine] 🚀 Local data available! Dashboard ready immediately'),
+              'startBackgroundInitialization',
+              'markSystemReady'
+            ]
+          },
+          {
+            // No local data - need to wait for API schema
+            target: 'waitingForSchema',
+            actions: [
+              'markLocalDataChecked',
+              () => console.log('[AppInitMachine] ⏳ No local data, waiting for API schema...')
+            ]
+          }
+        ],
         onError: {
-          target: 'error',
-          actions: assign({
-            databaseError: ({ event }) => (event.error as Error)?.message || 'Database initialization failed'
-          })
-        }
-      },
-      
-      on: {
-        DATABASE_READY: {
-          target: 'sync',
-          actions: 'markDatabaseReady'
-        },
-        DATABASE_ERROR: {
-          target: 'error',
-          actions: 'storeDatabaseError'
-        },
-        RETRY_INIT: {
-          target: 'idle',
-          actions: 'resetSystem'
-        },
-        RESET: {
-          target: 'idle',
-          actions: ['stopChildMachines', 'resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
+          // Error checking local data - fallback to API schema
+          target: 'waitingForSchema',
+          actions: [
+            () => console.warn('[AppInitMachine] ⚠️ Error checking local data, falling back to API schema'),
+            assign({
+              localDataChecked: true,
+              hasLocalData: false,
+              localSchemaAvailable: false
+            })
+          ]
         }
       }
     },
-    
-    sync: {
-      entry: [
-        () => console.log('[AppInitMachine] Starting sync machine'),
-        'startSync'
-      ],
-      
+
+    waitingForSchema: {
+      entry: ['loadOrgSchemaIfNeeded', () => console.log('[AppInitMachine] 📋 Loading API schema...')],
       on: {
-        SYNC_LIVE: {
-          // System is fully ready - database (LiveStore) was initialized before sync started
+        SCHEMA_READY: {
           target: 'ready',
           actions: [
-            'markSyncReady',
-            'markSystemReady',
-            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine - system fully ready')
+            () => console.log('[AppInitMachine] ✅ API schema loaded - starting background initialization'),
+            'startBackgroundInitialization',
+            'markSystemReady'
           ]
         },
-        SYNC_ERROR: {
+        SCHEMA_ERROR: {
           target: 'error',
-          actions: 'storeSyncError'
-        },
-        RETRY_INIT: {
-          target: 'idle',
-          actions: 'resetSystem'
-        },
-        RESET: {
-          target: 'idle',
-          actions: ['resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
+          actions: assign({
+            syncError: ({ event }) => event.error || 'Schema loading failed - cannot proceed'
+          })
         }
       }
     },
@@ -429,17 +560,39 @@ export const appInitMachine = setup({
     },
     
     ready: {
-      entry: () => console.log('[AppInitMachine] System fully ready'),
+      entry: () => console.log('[AppInitMachine] 🎉 System ready! Dashboard can show with loading states for background processes'),
       
       on: {
-        RESTART_SYNC: 'sync',
+        // Background processes can complete at any time
+        DATABASE_READY: {
+          actions: ['markDatabaseReady', () => console.log('[AppInitMachine] 📊 Background: Database ready')]
+        },
+        DATABASE_ERROR: {
+          actions: ['storeDatabaseError', () => console.log('[AppInitMachine] ⚠️ Background: Database error (continuing with cached data)')]
+        },
+        SYNC_LIVE: {
+          actions: ['markSyncReady', () => console.log('[AppInitMachine] 🔄 Background: Sync live')]
+        },
+        SYNC_ERROR: {
+          actions: ['storeSyncError', () => console.log('[AppInitMachine] ⚠️ Background: Sync error (showing offline mode)')]
+        },
+        LIVESTORE_READY: {
+          actions: ['markLiveStoreReady', () => console.log('[AppInitMachine] 📦 Background: LiveStore ready')]
+        },
+        LIVESTORE_ERROR: {
+          actions: ['storeLiveStoreError', () => console.log('[AppInitMachine] ⚠️ Background: LiveStore error')]
+        },
+        
+        RESTART_SYNC: {
+          actions: ['startSync', () => console.log('[AppInitMachine] 🔄 Restarting sync in background')]
+        },
         RETRY_INIT: {
           target: 'idle',
           actions: 'resetSystem'
         },
         RESET: {
           target: 'idle',
-          actions: ['stopChildMachines', 'resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
+          actions: ['resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
         }
       }
     },
@@ -452,10 +605,13 @@ export const appInitMachine = setup({
           target: 'idle',
           actions: 'resetSystem'
         },
-        START_INIT: 'database',
+        START_INIT: {
+          target: 'checkingLocalData',
+          actions: 'setOrganizationId'
+        },
         RESET: {
           target: 'idle',
-          actions: ['stopChildMachines', 'resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
+          actions: ['resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
         }
       }
     }
