@@ -176,9 +176,20 @@ export const authMachine = setup({
           }
         }
         
-        // Fallback: select first organization and save preference
-        const selectedOrg = context.userOrganizations[0];
-        console.log(`[AuthMachine] Auto-selecting first organization: ${selectedOrg.name}`);
+        // Fallback: prefer Wide Corp Solutions for CEO user, otherwise select first organization
+        let selectedOrg = context.userOrganizations[0];
+        
+        // For CEO user, prefer Wide Corp Solutions as default
+        const wideCorp = context.userOrganizations.find(org => 
+          org.name === 'Wide Corp Solutions' || org.slug === 'wide-corp'
+        );
+        if (wideCorp) {
+          selectedOrg = wideCorp;
+          console.log(`[AuthMachine] Auto-selecting Wide Corp Solutions as default for CEO`);
+        } else {
+          console.log(`[AuthMachine] Auto-selecting first organization: ${selectedOrg.name}`);
+        }
+        
         localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
         return selectedOrg;
       },
@@ -230,27 +241,33 @@ export const authMachine = setup({
     },
 
     hasNoCurrentOrganization: ({ context }) => {
-      // Check if we have a current organization OR if we can auto-select one
+      // Only return true if we truly need manual organization selection
+      // This guard should be restrictive - only trigger selection UI when absolutely necessary
+      
       if (context.currentOrganization) {
-        return false; // We have one, no need for selection
+        return false; // We already have a current organization
       }
       
-      // If we have exactly one organization, we can auto-select it
-      if (context.userOrganizations && context.userOrganizations.length === 1) {
-        return false; // We can auto-select, no need for manual selection
+      if (!context.userOrganizations || context.userOrganizations.length === 0) {
+        return false; // No organizations available - handled by hasNoOrganizations guard
       }
       
-      // If we have a persisted preference and that org is still available, auto-select
+      // Single organization - always auto-selectable, no manual selection needed
+      if (context.userOrganizations.length === 1) {
+        return false;
+      }
+      
+      // Multiple organizations - check if we have a clear preference to auto-select
       const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
-      if (lastOrgId && context.userOrganizations) {
+      if (lastOrgId) {
         const foundOrg = context.userOrganizations.find(org => org.id === lastOrgId);
         if (foundOrg) {
-          return false; // We can auto-select the last used org
+          return false; // We can auto-select the preferred org
         }
       }
       
-      // Multiple orgs and no clear preference - need manual selection
-      return true;
+      // Multiple orgs with no saved preference - auto-select first organization (usually the one created first)
+      return false; // Allow auto-selection of first organization
     },
 
     isTrialExpiredAndNeedsUpgrade: ({ context }) => {
@@ -287,31 +304,50 @@ export const authMachine = setup({
     console.log('[AuthMachine] No valid persisted session, checking auth');
   },
   
-  context: ({ input }: { input?: { user?: UserInfo; authToken?: string; sessionExpiry?: string } }) => ({
-    user: input?.user || null,
-    authToken: input?.authToken || null,
-    authError: null,
-    sessionExpiry: input?.sessionExpiry || null,
-    lastActivity: Date.now(),
-    errorRetryCount: 0,
+  context: ({ input }: { input?: { user?: UserInfo; authToken?: string; sessionExpiry?: string } }) => {
+    // Try to load persisted state first
+    let persistedContext = null;
+    try {
+      const stored = localStorage.getItem('auth-machine-state');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.context) {
+          console.log('[AuthMachine] Loading persisted context from localStorage');
+          persistedContext = parsed.context;
+        }
+      }
+    } catch (error) {
+      console.warn('[AuthMachine] Failed to load persisted context:', error);
+      localStorage.removeItem('auth-machine-state');
+    }
     
-    // Organization context
-    currentOrganization: null,
-    userOrganizations: [],
-    organizationError: null,
-    isLoadingOrganizations: false,
-    organizationSetupComplete: false,
-    needsOrganizationSetup: false,
-    
-    // Billing context
-    subscriptionInfo: null,
-    billingError: null,
-    isLoadingBilling: false,
-    trialStatus: null,
-    usageStats: null,
-    isTrialExpired: false,
-    needsBillingSetup: false,
-  }),
+    // Use persisted context if available, otherwise use input or defaults
+    return {
+      user: persistedContext?.user || input?.user || null,
+      authToken: persistedContext?.authToken || input?.authToken || null,
+      authError: null,
+      sessionExpiry: persistedContext?.sessionExpiry || input?.sessionExpiry || null,
+      lastActivity: persistedContext?.lastActivity || Date.now(),
+      errorRetryCount: 0,
+      
+      // Organization context from persisted state
+      currentOrganization: persistedContext?.currentOrganization || null,
+      userOrganizations: persistedContext?.userOrganizations || [],
+      organizationError: null,
+      isLoadingOrganizations: false,
+      organizationSetupComplete: persistedContext?.organizationSetupComplete || false,
+      needsOrganizationSetup: false,
+      
+      // Billing context (reset on startup)
+      subscriptionInfo: null,
+      billingError: null,
+      isLoadingBilling: false,
+      trialStatus: null,
+      usageStats: null,
+      isTrialExpired: false,
+      needsBillingSetup: false,
+    };
+  },
   
   states: {
     checking: {
@@ -485,11 +521,11 @@ export const authMachine = setup({
             src: 'loadOrganizations',
             onDone: {
               target: 'loadingBilling',
-              actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+              actions: ['setUserOrganizations', 'clearLoadingOrganizations', 'persistAuthState']
             },
             onError: {
               target: 'checkingOrganizationSetup',
-              actions: ['setOrganizationError']
+              actions: ['setOrganizationError', 'persistAuthState']
             }
           }
         },
@@ -514,11 +550,11 @@ export const authMachine = setup({
             input: ({ context }) => ({ organizationId: context.currentOrganization?.id }),
             onDone: {
               target: 'checkingOrganizationSetup',
-              actions: ['setBillingInfo', 'clearLoadingBilling']
+              actions: ['setBillingInfo', 'clearLoadingBilling', 'persistAuthState']
             },
             onError: {
               target: 'checkingOrganizationSetup',
-              actions: ['setBillingError', 'clearLoadingBilling']
+              actions: ['setBillingError', 'clearLoadingBilling', 'persistAuthState']
             }
           }
         },
@@ -539,16 +575,9 @@ export const authMachine = setup({
               actions: ['persistAuthState']
             },
             {
+              // Auto-select organization and go to ready - this is the fast path
               target: 'ready',
               actions: ['autoSelectOrganization', 'persistAuthState']
-            },
-            {
-              target: 'trialExpiredSetup',
-              guard: 'isTrialExpiredAndNeedsUpgrade'
-            },
-            {
-              target: 'ready',
-              actions: 'markSetupComplete'
             }
           ]
         },
@@ -566,6 +595,7 @@ export const authMachine = setup({
         },
 
         needsOrganizationSelection: {
+          entry: 'persistAuthState', // Persist state even when waiting for org selection
           on: {
             SELECT_ORGANIZATION: {
               target: 'selectingOrganization'
@@ -585,11 +615,11 @@ export const authMachine = setup({
             input: ({ event }) => event.organizationData,
             onDone: {
               target: 'ready',
-              actions: ['setCurrentOrganization', 'markSetupComplete']
+              actions: ['setCurrentOrganization', 'markSetupComplete', 'persistAuthState']
             },
             onError: {
               target: 'needsOrganizationSetup',
-              actions: 'setOrganizationError'
+              actions: ['setOrganizationError', 'persistAuthState']
             }
           }
         },
@@ -604,11 +634,11 @@ export const authMachine = setup({
             },
             onDone: {
               target: 'loadingBilling',
-              actions: ['setCurrentOrganization']
+              actions: ['setCurrentOrganization', 'persistAuthState']
             },
             onError: {
               target: 'needsOrganizationSelection',
-              actions: 'setOrganizationError'
+              actions: ['setOrganizationError', 'persistAuthState']
             }
           }
         },

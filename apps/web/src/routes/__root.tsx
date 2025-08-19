@@ -65,57 +65,8 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
   console.log('[XSTATE] 🔥 HMR: Actors restored successfully')
 }
 
-// 🔥 AUTH PERSISTENCE: Load and save AuthMachine state
-const AUTH_STORAGE_KEY = 'auth-machine-state'
-
-// 🔥 SYNC PERSISTENCE: Removed - SyncMachine handles its own persistence internally
-
-const loadPersistedAuthState = () => {
-  try {
-    const stored = localStorage.getItem(AUTH_STORAGE_KEY)
-    if (stored) {
-      const persistedSnapshot = JSON.parse(stored)
-      
-      // Basic validation - XState 5 will handle format validation
-      if (!persistedSnapshot) {
-        console.log('[AuthMachine] No valid persisted state found')
-        localStorage.removeItem(AUTH_STORAGE_KEY)
-        return null
-      }
-      
-      console.log('[AuthMachine] Loading persisted auth state')
-      return persistedSnapshot
-    }
-  } catch (error) {
-    console.warn('[AuthMachine] Failed to parse persisted state:', error)
-    localStorage.removeItem(AUTH_STORAGE_KEY)
-  }
-  return null
-}
-
-const saveAuthState = (actor: any) => {
-  try {
-    const snapshot = actor.getSnapshot()
-    // Only persist if user is authenticated
-    if (snapshot.context.user && snapshot.matches('authenticated')) {
-      // XState 5: Use getPersistedSnapshot() for proper snapshot format
-      const persistedSnapshot = actor.getPersistedSnapshot()
-      
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(persistedSnapshot))
-      console.log('[AuthMachine] Persisted auth state using XState 5 format:', snapshot.value)
-    } else {
-      // Clear persisted state if not authenticated
-      localStorage.removeItem(AUTH_STORAGE_KEY)
-    }
-  } catch (error) {
-    console.warn('[AuthMachine] Failed to persist auth state:', error)
-  }
-}
-
-// SyncMachine persistence is handled internally by the machine itself
-
-// XState 5: Proper snapshot persistence
-const persistedAuthSnapshot = loadPersistedAuthState()
+// 🔥 AUTH PERSISTENCE: Auth machine handles its own persistence internally
+// No manual persistence needed - the auth machine's persistAuthState action handles this
 
 // Create AuthMachine actor (only if not already exists from HMR)
 let authMachineActor = (window as any).authMachineActor
@@ -133,21 +84,16 @@ if (!authMachineActor) {
     id: 'auth-machine'
   })
   
-  // XState 5: Start with snapshot if available
-  if (persistedAuthSnapshot) {
-    console.log('[AuthMachine] Starting with persisted snapshot')
-    authMachineActor.start(persistedAuthSnapshot)
-  } else {
-    console.log('[AuthMachine] Starting fresh')
-    authMachineActor.start()
-  }
+  // XState 5: Auth machine handles its own persistence - just start normally
+  console.log('[AuthMachine] Starting (persistence handled by auth machine internally)')
+  authMachineActor.start()
   
   // Store globally
   ;(window as any).authMachineActor = authMachineActor
   
   // Set up subscriptions for new actor
   authMachineActor.subscribe((snapshot) => {
-    saveAuthState(authMachineActor)
+    // Auth machine handles its own persistence via persistAuthState action
     
     const authenticated = snapshot.matches('authenticated')
     const reason = snapshot.value === 'authenticated' ? 'authenticated' : 
@@ -156,35 +102,58 @@ if (!authMachineActor) {
     
     console.log('[AuthMachine] State changed:', { authenticated, reason })
     
-    // 🔥 DIRECT FLOW: When auth completes, directly start initialization
+    // 🚀 ULTRA-FAST INITIALIZATION: Start local data checking immediately when auth completes
     if (authenticated && snapshot.matches('authenticated')) {
-      console.log('[AuthMachine] ✅ Authentication complete - checking for organization...')
+      console.log('[AuthMachine] ✅ Authentication complete - starting ultra-fast initialization')
       
       const currentOrganization = snapshot.context.currentOrganization
       const hasOrganization = !!currentOrganization?.id
       
-      // Only proceed if we have an organization loaded (not just localStorage fallback)
-      if (hasOrganization) {
-        console.log('[AuthMachine] 🏢 Organization loaded - starting app initialization')
-        
-        const currentAppInitActor = (window as any).appInitActor
-        if (currentAppInitActor) {
-          console.log('[AuthMachine] Sending START_INIT to app init machine with org context:', {
-            organizationId: currentOrganization.id,
-            organizationName: currentOrganization.name
-          })
+      const currentAppInitActor = (window as any).appInitActor
+      if (currentAppInitActor) {
+        if (hasOrganization) {
+          console.log('[AuthMachine] 🏢 Organization ready - starting local data check for ultra-fast loading')
+          // Start with organization context for local data introspection
           currentAppInitActor.send({ 
             type: 'START_INIT',
             organizationId: currentOrganization.id 
           })
-          
-          // Note: Sync machine will be started by app init machine after database is ready
-          console.log('[AuthMachine] App init machine will coordinate sync startup after database ready')
         } else {
-          console.warn('[AuthMachine] App init actor not found - START_INIT not sent')
+          console.log('[AuthMachine] ⚡ No organization yet - will trigger after organization selection')
+          // Don't start yet - wait for organization to be available
+          // The app init will be triggered when organization context is updated
         }
       } else {
-        console.log('[AuthMachine] ⏳ Organization not loaded yet, waiting...')
+        console.warn('[AuthMachine] App init actor not found - START_INIT not sent')
+      }
+    }
+    
+    // Handle organization updates during initialization  
+    if (authenticated && snapshot.matches('authenticated.ready')) {
+      const currentOrganization = snapshot.context.currentOrganization
+      if (currentOrganization?.id) {
+        console.log('[AuthMachine] 🏢 Organization now available - starting ultra-fast initialization')
+        const currentAppInitActor = (window as any).appInitActor
+        if (currentAppInitActor) {
+          const appInitSnapshot = currentAppInitActor.getSnapshot()
+          
+          // If app init is still idle and organization just became available, start initialization
+          if (appInitSnapshot.value === 'idle') {
+            console.log('[AuthMachine] 🚀 Starting app initialization with organization:', currentOrganization.name)
+            currentAppInitActor.send({ 
+              type: 'START_INIT',
+              organizationId: currentOrganization.id 
+            })
+          } 
+          // If already running but with different organization, update it
+          else if (appInitSnapshot.context.organizationId !== currentOrganization.id) {
+            console.log('[AuthMachine] Updating app init with organization:', currentOrganization.name)
+            currentAppInitActor.send({ 
+              type: 'UPDATE_ORGANIZATION',
+              organizationId: currentOrganization.id 
+            })
+          }
+        }
       }
     }
     
@@ -295,10 +264,9 @@ if (import.meta.hot) {
   })
 }
 
-// Clear auth state and reset app init on sign-out
+// Reset app init and sync machines on sign-out (auth machine handles its own cleanup)
 window.addEventListener('auth:signout', () => {
-  console.log('[XSTATE] Clearing auth state on sign-out')
-  localStorage.removeItem(AUTH_STORAGE_KEY)
+  console.log('[XSTATE] Resetting machines on sign-out (auth machine handles its own persistence cleanup)')
   // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
   
   // Reset pure LiveStore sync machine to idle state for fresh initialization on next sign-in

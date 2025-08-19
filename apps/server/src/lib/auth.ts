@@ -490,7 +490,7 @@ export function initializeAuth(env: Env) {
               { productId: "9bd1d779-3f8a-45b1-b072-0591b8325a02", slug: "pro-monthly" },
               { productId: "dedff847-c566-4ba7-b2d9-7d8690312151", slug: "pro-annual" },
               { productId: "6e13296d-fcbf-4d7f-9027-bb47e7c6e25f", slug: "enterprise-monthly" },
-              { productId: "68a1eb14-5bf9-40cf-a827-1f37bf30d1d9", slug: "enterprise-annual" }
+              { productId: "68a1eb14-5bf9-a827-1f37bf30d1d9", slug: "enterprise-annual" }
             ],
             successUrl: "/billing/success?checkout_id={CHECKOUT_ID}",
             authenticatedUsersOnly: true
