@@ -275,30 +275,53 @@ universalArchetypeRouter.get('/orgs/:orgId/data/:entityName', async (c) => {
       return c.json({ error: `Entity ${entityName} not found` }, 404);
     }
     
-    // Query all data using direct client
+    // Check if this is a count-only request
+    const countOnly = c.req.query('count') === 'true';
+    
+    // Query data using direct client
     await client.connect();
     try {
-      const querySQL = `
-        SELECT * FROM ${entityDef.tableName}
-        WHERE organization_id = $1
-      `;
+      let querySQL: string;
+      let results: any[];
+      let count: number;
       
-      const result = await client.query(querySQL, [orgId]);
-      var results = result.rows;
+      if (countOnly) {
+        // For count-only requests, use COUNT() for better performance
+        querySQL = `
+          SELECT COUNT(*) as count FROM ${entityDef.tableName}
+          WHERE organization_id = $1
+        `;
+        
+        const result = await client.query(querySQL, [orgId]);
+        count = parseInt(result.rows[0]?.count || '0');
+        results = [];
+      } else {
+        // For full data requests, get all data
+        querySQL = `
+          SELECT * FROM ${entityDef.tableName}
+          WHERE organization_id = $1
+        `;
+        
+        const result = await client.query(querySQL, [orgId]);
+        results = result.rows;
+        count = results.length;
+      }
+      
+      return c.json({
+        success: true,
+        data: results,
+        archetype: entityDef.definition.archetype,
+        count: count,
+        countOnly: countOnly,
+        queriedBy: {
+          userId: user?.id,
+          userEmail: user?.email
+        }
+      });
+      
     } finally {
       await client.end();
     }
-    
-    return c.json({
-      success: true,
-      data: results,
-      archetype: entityDef.definition.archetype,
-      count: results.length,
-      queriedBy: {
-        userId: user?.id,
-        userEmail: user?.email
-      }
-    });
     
   } catch (error) {
     console.error('Universal archetype data query error:', error);
