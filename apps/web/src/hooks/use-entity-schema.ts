@@ -55,9 +55,28 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
         setSchema(result.schema);
         setCached(result.cached || false);
         setError(null);
+        
+        // 🎯 OPTIMIZATION: Notify app init that schema is ready for fast dashboard loading
+        console.log('[Schema] ✅ Organization schema loaded - triggering app initialization');
+        const appInitActor = (window as any).appInitActor;
+        if (appInitActor) {
+          appInitActor.send({ type: 'SCHEMA_READY' });
+        } else {
+          // Fallback: dispatch window event
+          window.dispatchEvent(new CustomEvent('schema:ready', {
+            detail: { orgId, entityCount: Object.keys(result.schema.entities).length }
+          }));
+        }
       } else {
         setSchema(null);
         setError(result.error || 'Failed to load schema');
+        
+        // Notify app init about schema loading failure
+        console.error('[Schema] ❌ Schema loading failed:', result.error);
+        const appInitActor = (window as any).appInitActor;
+        if (appInitActor) {
+          appInitActor.send({ type: 'SCHEMA_ERROR', error: result.error || 'Failed to load schema' });
+        }
       }
     } catch (err) {
       setSchema(null);
@@ -71,6 +90,25 @@ export function useOrgSchema(orgId: string | null): Omit<UseEntitySchemaResult, 
   useEffect(() => {
     loadSchema();
   }, [loadSchema]);
+
+  // Listen for local schema ready events (from app init machine)
+  useEffect(() => {
+    const handleLocalSchemaReady = (event: CustomEvent) => {
+      const { schema, source } = event.detail;
+      if (schema && schema.orgId === orgId) {
+        console.log('[useOrgSchema] 🚀 Using local schema immediately from:', source);
+        setSchema(schema);
+        setCached(true);
+        setError(null);
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener('schema:local-ready', handleLocalSchemaReady as EventListener);
+    return () => {
+      window.removeEventListener('schema:local-ready', handleLocalSchemaReady as EventListener);
+    };
+  }, [orgId]);
 
   const clearCache = useCallback(() => {
     if (orgId) {

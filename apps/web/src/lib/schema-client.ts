@@ -41,6 +41,7 @@ export class OrgSchemaClient {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
   private readonly BASE_URL = '/api/archetype';
 
+
   /**
    * Load schema for an organization with caching
    */
@@ -56,13 +57,10 @@ export class OrgSchemaClient {
         };
       }
 
-      // Fetch from server
+      // Load schema from PostgreSQL-native Universal Archetype API (same as POC)
       const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/schema`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include' // Include session cookies for authentication
+        credentials: 'include'
       });
 
       if (!response.ok) {
@@ -85,6 +83,16 @@ export class OrgSchemaClient {
       
       // Cache the schema
       this.cacheSchema(orgId, schema);
+      
+      // 🎯 CRITICAL: Notify app init that schema is ready for ultra-fast initialization
+      console.log('[Schema] ✅ Organization schema loaded - triggering app initialization');
+      const appInitActor = (window as any).appInitActor;
+      if (appInitActor) {
+        appInitActor.send({ type: 'SCHEMA_READY' });
+        console.log('[Schema] 📤 Sent SCHEMA_READY event to app init machine');
+      } else {
+        console.warn('[Schema] ⚠️ App init actor not found - cannot trigger initialization');
+      }
 
       return {
         success: true,
