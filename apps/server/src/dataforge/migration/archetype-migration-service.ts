@@ -7,7 +7,7 @@
  */
 
 import type { Kysely } from 'kysely';
-import { FoundationEntityRegistry, type FieldDefinition } from '../foundation-entity-registry';
+import { FoundationEntityRegistry, type FieldDefinition } from '../entities/foundation';
 
 interface ArchetypeMigration {
   id: string;

@@ -1,5 +1,6 @@
 import { fromStore } from '@xstate/store';
-import { db } from '@repo/dataforge/dexie-schema';
+// NOTE: @repo/dataforge/dexie-schema was deprecated - commenting out until replacement is implemented
+// import { db } from '@repo/dataforge/dexie-schema';
 import { liveQuery } from 'dexie';
 import type { Subscription } from 'dexie';
 import { 

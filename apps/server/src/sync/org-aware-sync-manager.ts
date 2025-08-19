@@ -57,7 +57,8 @@ export class OrgAwareSyncManager {
   async validateSyncConnection(
     request: Request,
     clientId: string,
-    organizationSlug?: string
+    organizationSlug?: string,
+    organizationId?: string
   ): Promise<OrgSyncValidation> {
     try {
       // 1. Extract session from request (cookie or Authorization header)
@@ -77,6 +78,26 @@ export class OrgAwareSyncManager {
         const url = new URL(request.url);
         targetOrgSlug = url.searchParams.get('org') || url.searchParams.get('organization');
         
+        // Check if organizationId is provided and convert to slug
+        if (!targetOrgSlug && organizationId) {
+          // Look up organization slug by ID
+          const orgByID = await this.orgAccessService.getOrganizationById(organizationId);
+          if (orgByID) {
+            targetOrgSlug = orgByID.slug;
+            syncLogger.info('Resolved organization ID to slug', {
+              organizationId,
+              slug: targetOrgSlug,
+              orgName: orgByID.name,
+              resolvedOrgId: orgByID.id
+            }, MODULE_NAME);
+          } else {
+            return {
+              isValid: false,
+              error: `Organization not found for ID: ${organizationId}`
+            };
+          }
+        }
+        
         if (!targetOrgSlug) {
           // Get user's first organization as default
           const userOrgs = await this.orgAccessService.getUserOrganizations(sessionData.user.id, sessionData.user.role);
@@ -91,10 +112,25 @@ export class OrgAwareSyncManager {
       }
 
       // 3. Validate user access to organization
+      syncLogger.info('Checking user access to organization', {
+        userId: sessionData.user.id,
+        targetOrgSlug,
+        providedOrganizationId: organizationId
+      }, MODULE_NAME);
+      
       const orgAccess = await this.orgAccessService.checkUserOrgAccess(
         sessionData.user.id,
         targetOrgSlug
       );
+      
+      syncLogger.info('Organization access check result', {
+        hasAccess: orgAccess.hasAccess,
+        returnedOrgId: orgAccess.organization?.id,
+        returnedOrgSlug: orgAccess.organization?.slug,
+        returnedOrgName: orgAccess.organization?.name,
+        userRole: orgAccess.role,
+        fromCache: orgAccess.fromCache
+      }, MODULE_NAME);
 
       if (!orgAccess.hasAccess) {
         return {

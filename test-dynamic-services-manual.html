@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dynamic LiveStore Domain Services</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Dynamic LiveStore Domain Services Test</h1>
+    
+    <div class="test-section info">
+        <h3>Instructions</h3>
+        <p>1. Make sure you're logged in as Wide Corp CEO</p>
+        <p>2. Open browser console (F12) to see detailed logs</p>
+        <p>3. Click the test buttons below to verify dynamic domain services</p>
+        <p>4. Check that operations adapt to Wide Corp's organization schema</p>
+    </div>
+
+    <div class="test-section">
+        <h3>🔗 Navigation Links</h3>
+        <button onclick="window.open('http://localhost:5174/_authenticated/debug/livestore-test', '_blank')">
+            Open LiveStore Debug Page
+        </button>
+        <button onclick="window.open('http://localhost:5174', '_blank')">
+            Open Main App
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h3>📋 Manual Test Script</h3>
+        <p>Copy and paste these commands into the browser console on the LiveStore debug page:</p>
+        
+        <h4>1. Check Dynamic Services Available:</h4>
+        <pre>console.log('🔍 Checking dynamic services...', {
+  available: !!window.liveStoreDomain,
+  services: !!window.liveStoreDomain?.services,
+  orgId: localStorage.getItem('vibestack-last-organization-id')
+});</pre>
+
+        <h4>2. Test Dynamic Project Creation:</h4>
+        <pre>window.liveStoreDomain.services.project.create({
+  name: 'Manual Test Project',
+  description: 'Testing dynamic schema adaptation',
+  status: 'active',
+  priority: 'high',
+  budget: 85000
+}).then(result => {
+  console.log('📦 Project creation result:', result);
+  if (result.success) {
+    console.log('✅ Dynamic project created successfully!');
+  } else {
+    console.log('❌ Project creation failed:', result.error);
+    console.log('🔍 Validation errors:', result.validationErrors);
+  }
+});</pre>
+
+        <h4>3. Test Dynamic Skill Creation:</h4>
+        <pre>window.liveStoreDomain.services.skill.create({
+  name: 'Manual Testing',
+  category: 'technical',
+  level: 'expert',
+  description: 'Manual testing of dynamic LiveStore services'
+}).then(result => {
+  console.log('🎯 Skill creation result:', result);
+  if (result.success) {
+    console.log('✅ Dynamic skill created successfully!');
+  } else {
+    console.log('❌ Skill creation failed:', result.error);
+  }
+});</pre>
+
+        <h4>4. Test Schema Validation:</h4>
+        <pre>window.liveStoreDomain.services.project.create({
+  // Missing required 'name' field to test validation
+  description: 'This should fail validation',
+  invalidField: 'This should be filtered out'
+}).then(result => {
+  console.log('🔍 Validation test result:', result);
+  if (!result.success && result.validationErrors) {
+    console.log('✅ Schema validation working correctly!');
+  } else {
+    console.log('⚠️ Validation may not be working as expected');
+  }
+});</pre>
+
+        <h4>5. Test Custom Entity Service:</h4>
+        <pre>try {
+  const customService = window.liveStoreDomain.services.forCurrentOrg('CustomEntity');
+  console.log('🔧 Custom entity service created:', !!customService);
+  console.log('🔧 Available methods:', Object.keys(customService));
+} catch (error) {
+  console.log('⚠️ Custom entity service error:', error.message);
+}</pre>
+
+        <h4>6. Run Full Integration Test:</h4>
+        <pre>window.liveStoreDomain.test().then(result => {
+  console.log('🚀 Full integration test result:', result);
+  if (!result.error) {
+    console.log('✅ All dynamic services working!');
+  } else {
+    console.log('❌ Integration test failed:', result.error);
+  }
+});</pre>
+
+        <h4>7. Check Sync Status:</h4>
+        <pre>const syncStatus = window.liveStoreDomain.syncStatus();
+console.log('🔄 Sync status:', syncStatus);</pre>
+    </div>
+
+    <div class="test-section">
+        <h3>✅ Expected Results</h3>
+        <ul>
+            <li><strong>Dynamic Services Available:</strong> Should show services object and current org ID</li>
+            <li><strong>Project Creation:</strong> Should create with Wide Corp's project schema fields</li>
+            <li><strong>Skill Creation:</strong> Should create with Wide Corp's skill schema fields</li>
+            <li><strong>Validation:</strong> Should fail when required fields are missing</li>
+            <li><strong>Custom Entities:</strong> Should create services for any org-defined entity</li>
+            <li><strong>Integration Test:</strong> Should complete without errors</li>
+            <li><strong>Sync Status:</strong> Should show connected status</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🎯 Key Features Being Tested</h3>
+        <ul>
+            <li><strong>Schema Adaptation:</strong> Services adapt to Wide Corp's custom entity schemas</li>
+            <li><strong>Field Validation:</strong> Data validated against organization-specific field definitions</li>
+            <li><strong>Type Conversion:</strong> Automatic conversion of field types (string→number, JSON→object)</li>
+            <li><strong>Dynamic Entity Creation:</strong> Support for any entity type defined in org schema</li>
+            <li><strong>Error Handling:</strong> Proper error messages and validation feedback</li>
+            <li><strong>Organization Isolation:</strong> Operations scoped to current organization</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('🚀 Dynamic LiveStore Domain Services Test Page Loaded');
+        console.log('📋 Follow the manual test instructions above');
+        console.log('🔗 Navigate to: http://localhost:5174/_authenticated/debug/livestore-test');
+    </script>
+</body>
+</html>

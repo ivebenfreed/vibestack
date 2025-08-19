@@ -263,21 +263,53 @@ export class EntityManager {
    * Get org schema (syncable fields only)
    */
   async getOrgSyncSchema(orgId: string): Promise<any> {
-    if (this.config.env?.ORG_SCHEMA) {
-      try {
-        const doId = this.config.env.ORG_SCHEMA.idFromName(orgId);
-        const doStub = this.config.env.ORG_SCHEMA.get(doId);
-        
-        const response = await doStub.fetch(new Request('http://localhost/schema/syncable'));
-        if (response.ok) {
-          return await response.json();
-        }
-      } catch (error) {
-        console.warn('Failed to get syncable schema from DO:', error);
+    try {
+      // Use PostgreSQL as the single source of truth for entity schemas
+      const entities = await this.config.kysely
+        .selectFrom('entity_schemas')
+        .select([
+          'entity_name',
+          'table_name', 
+          'archetype',
+          'business_metadata'
+        ])
+        .where('org_id', '=', orgId)
+        .execute();
+
+      if (entities.length === 0) {
+        console.warn(`No entities found in entity_schemas for org ${orgId}`);
+        return null;
       }
+
+      // Build the schema response in the expected format
+      const syncableEntities: Record<string, any> = {};
+      
+      for (const entity of entities) {
+        const metadata = entity.business_metadata as any || {};
+        
+        syncableEntities[entity.entity_name] = {
+          extends: `base_${entity.archetype}s`, // e.g., "base_projects"
+          tableName: entity.table_name,
+          archetype: entity.archetype,
+          syncableFields: metadata.fields || {},
+          description: metadata.description || '',
+          syncable: metadata.syncable !== false
+        };
+      }
+
+      console.log(`[EntityManager] Loaded ${entities.length} entities from PostgreSQL for org ${orgId}:`, Object.keys(syncableEntities));
+
+      return {
+        orgId: orgId,
+        entities: syncableEntities,
+        version: '1.0.0',
+        source: 'postgresql'
+      };
+
+    } catch (error) {
+      console.error('Failed to get syncable schema from PostgreSQL:', error);
+      return null;
     }
-    
-    return null;
   }
 
   /**

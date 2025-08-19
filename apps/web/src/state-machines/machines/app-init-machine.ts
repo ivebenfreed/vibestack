@@ -11,6 +11,9 @@ export interface AppInitContext {
   isOnline: boolean;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   
+  // Organization context
+  organizationId: string | null;
+  
   // Simplified sync coordination (keep only what's needed for startup sequence)
   isSyncReady: boolean;
   syncError: string | null;
@@ -29,7 +32,7 @@ export interface AppInitContext {
 }
 
 export type AppInitEvent =
-  | { type: 'START_INIT' }
+  | { type: 'START_INIT'; organizationId?: string }
   | { type: 'RETRY_INIT' }
   | { type: 'RESTART_SYNC' }
   | { type: 'RESET' }
@@ -188,15 +191,29 @@ export const appInitMachine = setup({
 
     // No longer needed - using event-driven initialization
     
-    startSync: () => {
-      console.log('[AppInitMachine] Starting global sync machine')
-      const syncMachineActor = (window as any).syncMachineActor
-      if (syncMachineActor) {
-        syncMachineActor.send({ type: 'CONNECT' })
+    startSync: ({ context }: { context: AppInitContext }) => {
+      console.log('[AppInitMachine] Starting pure LiveStore sync machine with org context:', {
+        organizationId: context.organizationId
+      })
+      const pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
+      if (pureLiveStoreSyncMachineActor) {
+        pureLiveStoreSyncMachineActor.send({ 
+          type: 'CONNECT', 
+          organizationId: context.organizationId,
+          userId: 'current-user-id' // TODO: Get from auth context
+        })
       } else {
-        console.warn('[AppInitMachine] Sync machine actor not available')
+        console.warn('[AppInitMachine] Pure LiveStore sync machine actor not available')
       }
     },
+    
+    setOrganizationId: assign({
+      organizationId: ({ event }: { event: AppInitEvent }) => {
+        const orgId = (event as any).organizationId || null
+        console.log('[AppInitMachine] Setting organization ID:', orgId)
+        return orgId
+      }
+    }),
     
     startLiveStore: () => {
       console.log('[AppInitMachine] Starting LiveStore initialization');
@@ -220,6 +237,7 @@ export const appInitMachine = setup({
     databaseError: null,
     isOnline: navigator.onLine,
     connectionStatus: 'disconnected' as const,
+    organizationId: null,
     isSyncReady: false,
     syncError: null,
     isLiveStoreReady: false,
@@ -259,7 +277,10 @@ export const appInitMachine = setup({
     idle: {
       entry: () => console.log('[AppInitMachine] Waiting for initialization trigger'),
       on: {
-        START_INIT: 'database',
+        START_INIT: {
+          target: 'database',
+          actions: 'setOrganizationId'
+        },
         RESET: {
           actions: ['resetSystem', () => console.log('[AppInitMachine] 🔄 System reset to idle state')]
         }
@@ -311,11 +332,12 @@ export const appInitMachine = setup({
       
       on: {
         SYNC_LIVE: {
-          // Move to LiveStore initialization
-          target: 'livestore',
+          // System is fully ready - database (LiveStore) was initialized before sync started
+          target: 'ready',
           actions: [
             'markSyncReady',
-            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine - proceeding to LiveStore')
+            'markSystemReady',
+            () => console.log('[AppInitMachine] Received SYNC_LIVE from sync machine - system fully ready')
           ]
         },
         SYNC_ERROR: {

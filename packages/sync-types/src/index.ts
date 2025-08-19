@@ -119,4 +119,28 @@ export function isTableChange(payload: unknown): payload is TableChange {
 
 export function isClientMessageType(type: string): type is CltMessageType {
   return type.startsWith('clt_');
-} 
+}
+
+// Export schema message types and interfaces
+export type {
+  SchemaMessageType,
+  SchemaChangeType,
+  FieldChange,
+  EntityChange,
+  SchemaChangePayload,
+  SchemaMessage,
+  ServerSchemaUpdatedMessage,
+  ServerSchemaMigrationMessage,
+  ServerSchemaValidatedMessage,
+  ServerSchemaErrorMessage,
+  ClientSchemaRequestMessage,
+  ClientSchemaReceivedMessage,
+  ClientSchemaAppliedMessage,
+  ClientSchemaErrorMessage,
+  SchemaServerMessage,
+  SchemaClientMessage,
+  AllSchemaMessages,
+  LiveStoreSchemaUpdate,
+  SchemaUpdateEvent,
+  SchemaUpdateHandler
+} from './schema-messages';

@@ -61,7 +61,9 @@ export default defineConfig({
   ],
   testIgnore: [
     '**/_broken*/**',
-    '**/_legacy/**'
+    '**/_legacy/**',
+    '**/apps/server/**/*.test.ts',
+    '**/apps/server/**/*.spec.ts'
   ],
   fullyParallel: false, // Run tests serially to avoid conflicts
   forbidOnly: !!process.env.CI,

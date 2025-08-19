@@ -309,6 +309,195 @@ universalArchetypeRouter.get('/orgs/:orgId/data/:entityName', async (c) => {
   }
 });
 
+// Delete entity and its table
+universalArchetypeRouter.delete('/orgs/:orgId/entities/:entityName', async (c) => {
+  try {
+    const orgId = c.req.param('orgId');
+    const entityName = c.req.param('entityName');
+    
+    // Get authenticated user from auth middleware
+    const user = c.get('user');
+    
+    console.log(`[Universal Archetype] User ${user?.email || 'anonymous'} deleting entity ${entityName} in org ${orgId}`);
+    
+    if (!entityName) {
+      return c.json({ error: 'entityName is required' }, 400);
+    }
+
+    // Check access control
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
+    
+    const kysely = getKysely(c.env);
+    const accessService = new ArchetypeAccessService(kysely);
+    
+    const accessResult = await accessService.canDelete(user?.id || '', orgId, entityName);
+    if (!accessResult.allowed) {
+      return c.json({
+        error: 'Access denied',
+        code: 'FORBIDDEN',
+        message: accessResult.reason
+      }, 403);
+    }
+
+    // Use ArchetypeEntityManager for proper deletion
+    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
+    const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
+    const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
+
+    const rulesEngine = new JsonRulesEngine();
+    const schemaManager = new OrgSchemaManager();
+    const schemaGenerator = new RuntimeSchemaGenerator();
+
+    const entityManager = new ArchetypeEntityManager({
+      kysely,
+      rulesEngine,
+      schemaGenerator,
+      schemaManager,
+      env: c.env
+    });
+
+    // First get the entity definition to find the table name
+    const entityDef = await getEntityDefinition(c, orgId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+
+    // For immediate execution: delete table and remove from entity_schemas
+    const { sql } = await import('kysely');
+    
+    try {
+      // 1. Drop the table immediately 
+      await sql`DROP TABLE IF EXISTS ${sql.raw(entityDef.tableName)}`.execute(kysely);
+      console.log(`Dropped table: ${entityDef.tableName}`);
+      
+      // 2. Remove from entity_schemas table
+      await sql`DELETE FROM entity_schemas 
+        WHERE org_id = ${orgId} AND entity_name = ${entityName}`.execute(kysely);
+      console.log(`Removed entity from entity_schemas: ${orgId}/${entityName}`);
+      
+      return c.json({
+        success: true,
+        entityName,
+        tableName: entityDef.tableName,
+        message: `Entity ${entityName} deleted successfully (immediate execution)`
+      });
+      
+    } catch (error) {
+      console.error('Entity deletion error:', error);
+      return c.json({ 
+        error: 'Failed to delete entity', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      }, 500);
+    }
+    
+  } catch (error) {
+    console.error('Entity deletion error:', error);
+    return c.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Get organization schema (for debugging)
+universalArchetypeRouter.get('/orgs/:orgId/schema', async (c) => {
+  try {
+    const orgId = c.req.param('orgId');
+    
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
+    const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
+    const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
+
+    const kysely = getKysely(c.env);
+    const rulesEngine = new JsonRulesEngine();
+    const schemaManager = new OrgSchemaManager();
+    const schemaGenerator = new RuntimeSchemaGenerator();
+
+    const entityManager = new ArchetypeEntityManager({
+      kysely,
+      rulesEngine,
+      schemaGenerator,
+      schemaManager,
+      env: c.env
+    });
+
+    const schema = await entityManager.getOrgSyncSchema(orgId);
+    
+    if (!schema) {
+      return c.json({ error: `No schema found for org ${orgId}` }, 404);
+    }
+
+    return c.json({
+      success: true,
+      schema: schema
+    });
+  } catch (error) {
+    console.error('Schema retrieval error:', error);
+    return c.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Validate data without saving (for testing)
+universalArchetypeRouter.post('/orgs/:orgId/validate/:entityName', async (c) => {
+  try {
+    const orgId = c.req.param('orgId');
+    const entityName = c.req.param('entityName');
+    const data = await c.req.json();
+
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
+    const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
+    const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
+
+    const kysely = getKysely(c.env);
+    const rulesEngine = new JsonRulesEngine();
+    const schemaManager = new OrgSchemaManager();
+    const schemaGenerator = new RuntimeSchemaGenerator();
+
+    const entityManager = new ArchetypeEntityManager({
+      kysely,
+      rulesEngine,
+      schemaGenerator,
+      schemaManager,
+      env: c.env
+    });
+
+    // Get entity config
+    const config = await entityManager.getEntityConfig(orgId, entityName);
+    if (!config) {
+      return c.json({ error: `Entity ${entityName} not found for org ${orgId}` }, 404);
+    }
+
+    // Validate only
+    const validation = rulesEngine.validate(data, config);
+
+    return c.json({
+      valid: validation.valid,
+      errors: validation.errors,
+      processedData: validation.data,
+      syncableData: validation.syncableData
+    });
+  } catch (error) {
+    console.error('Validation error:', error);
+    return c.json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Migration status endpoints removed - now using immediate execution
+// All table creation and schema registration happens immediately in entity creation endpoint
+// No debounced migrations needed with immediate execution architecture
+
 // Health check
 universalArchetypeRouter.get('/health', async (c) => {
   return c.json({
@@ -324,7 +513,8 @@ universalArchetypeRouter.get('/health', async (c) => {
 function generateTableName(orgId: string, entityName: string): string {
   const cleanOrgId = orgId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
   const cleanEntityName = entityName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-  return `${cleanOrgId}_${cleanEntityName}s`;
+  // PostgreSQL table names cannot start with numbers, so prefix with 'org_'
+  return `org_${cleanOrgId}_${cleanEntityName}s`;
 }
 
 function convertToTableDefinition(entityName: string, definition: UniversalArchetypeDefinition, tableName: string) {
@@ -468,26 +658,35 @@ async function storeEntityDefinition(c: any, orgId: string, entityName: string, 
     const { sql } = await import('kysely');
     const kysely = getKysely(c.env);
 
-    // Create registry table using Kysely
-    await sql`CREATE TABLE IF NOT EXISTS universal_entity_registry (
-      org_id TEXT,
-      entity_name TEXT,
-      table_name TEXT,
-      definition JSONB,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (org_id, entity_name)
-    )`.execute(kysely);
+    // Store in PostgreSQL-native entity_schemas table (replaces universal_entity_registry)
+    const businessMetadata = {
+      fields: definition.fields.reduce((acc: any, field) => {
+        acc[field.name] = {
+          type: field.type,
+          required: field.required || false,
+          syncable: field.syncable !== false,
+          serverOnly: field.serverOnly || false,
+          defaultValue: field.defaultValue
+        };
+        return acc;
+      }, {}),
+      description: `Entity created via Universal Archetype API`,
+      syncable: definition.syncable !== false,
+      createdAt: new Date().toISOString()
+    };
 
-    // Insert entity definition
-    await sql`INSERT INTO universal_entity_registry (org_id, entity_name, table_name, definition)
-      VALUES (${orgId}, ${entityName}, ${tableName}, ${JSON.stringify(definition)})
+    // Insert into entity_schemas table (immediate execution, no debouncing)
+    await sql`INSERT INTO entity_schemas (org_id, entity_name, table_name, archetype, business_metadata)
+      VALUES (${orgId}, ${entityName}, ${tableName}, ${definition.archetype}, ${JSON.stringify(businessMetadata)})
       ON CONFLICT (org_id, entity_name) DO UPDATE SET
         table_name = EXCLUDED.table_name,
-        definition = EXCLUDED.definition`.execute(kysely);
+        archetype = EXCLUDED.archetype,
+        business_metadata = EXCLUDED.business_metadata,
+        updated_at = CURRENT_TIMESTAMP`.execute(kysely);
 
-    console.log(`Stored entity definition for ${orgId}/${entityName} -> ${tableName}`);
+    console.log(`Stored entity definition in entity_schemas: ${orgId}/${entityName} -> ${tableName} (archetype: ${definition.archetype})`);
   } catch (error) {
-    console.error('Error storing entity definition:', error);
+    console.error('Error storing entity definition in entity_schemas:', error);
     throw error;
   }
 }
@@ -498,20 +697,39 @@ async function getEntityDefinition(c: any, orgId: string, entityName: string) {
     const { sql } = await import('kysely');
     const kysely = getKysely(c.env);
     
-    const result = await sql`SELECT table_name, definition FROM universal_entity_registry 
+    // Query from PostgreSQL-native entity_schemas table
+    const result = await sql`SELECT table_name, archetype, business_metadata FROM entity_schemas 
       WHERE org_id = ${orgId} AND entity_name = ${entityName}`.execute(kysely);
       
     if (result.rows && result.rows.length > 0) {
       const row = result.rows[0] as any;
+      const businessMetadata = typeof row.business_metadata === 'string' 
+        ? JSON.parse(row.business_metadata) 
+        : row.business_metadata;
+      
+      // Convert back to UniversalArchetypeDefinition format for compatibility
+      const definition = {
+        archetype: row.archetype,
+        fields: Object.entries(businessMetadata.fields || {}).map(([name, config]: [string, any]) => ({
+          name,
+          type: config.type,
+          required: config.required || false,
+          syncable: config.syncable !== false,
+          serverOnly: config.serverOnly || false,
+          defaultValue: config.defaultValue
+        })),
+        syncable: businessMetadata.syncable !== false
+      };
+      
       return {
         tableName: row.table_name,
-        definition: typeof row.definition === 'string' ? JSON.parse(row.definition) : row.definition
+        definition
       };
     }
     
     return null;
   } catch (error) {
-    console.error('Error getting entity definition:', error);
+    console.error('Error getting entity definition from entity_schemas:', error);
     return null;
   }
 }

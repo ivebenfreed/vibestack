@@ -8,7 +8,6 @@ import { migrations } from './migrations'
 import authRouter from './auth'
 import organizationsRouter from './organizations'
 import { phase1TestRouter } from './phase1-tests.js'
-import { dataforgeTestRouter } from '../routes/dataforge-test.js'
 import { universalArchetypeRouter } from '../routes/universal-archetype-api.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
@@ -32,7 +31,6 @@ api.route('/migrations', migrations)
 api.route('/auth', authRouter)
 api.route('/organizations', organizationsRouter)
 api.route('/test', phase1TestRouter)
-api.route('/dataforge', dataforgeTestRouter)
 api.route('/archetype', universalArchetypeRouter)
 api.route('/db', testDbRouter)
 api.route('/debug', debugTableDataRouter)

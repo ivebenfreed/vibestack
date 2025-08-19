@@ -141,6 +141,24 @@ export class OrgAccessService {
   }
 
   /**
+   * Get organization by ID
+   */
+  async getOrganizationById(organizationId: string): Promise<{ id: string; name: string; slug: string } | null> {
+    try {
+      const org = await this.kysely
+        .selectFrom('organizations as o')
+        .select(['o.id', 'o.name', 'o.slug'])
+        .where('o.id', '=', organizationId)
+        .executeTakeFirst();
+
+      return org || null;
+    } catch (error) {
+      console.error('Failed to get organization by ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get user's organizations with caching
    */
   async getUserOrganizations(userId: string, userRole?: string): Promise<Array<{
@@ -365,7 +383,7 @@ export class OrgAccessService {
   private async syncOrgCacheAsync(orgId: string): Promise<void> {
     try {
       const organization = await this.kysely
-        .selectFrom('organization')
+        .selectFrom('organizations')
         .selectAll()
         .where('id', '=', orgId)
         .executeTakeFirst();
@@ -373,8 +391,8 @@ export class OrgAccessService {
       if (!organization) return;
 
       const members = await this.kysely
-        .selectFrom('member as m')
-        .innerJoin('user as u', 'u.id', 'm.userId')
+        .selectFrom('organization_members as m')
+        .innerJoin('user as u', 'u.id', 'm.user_id')
         .select([
           'm.id',
           'm.organization_id', 
@@ -384,7 +402,7 @@ export class OrgAccessService {
           'u.name as user_name',
           'u.email as user_email'
         ])
-        .where('m.organizationId', '=', orgId)
+        .where('m.organization_id', '=', orgId)
         .execute();
 
       await this.syncOrgCache(orgId, { organization, members });

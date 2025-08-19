@@ -4,19 +4,119 @@
  * Basic entity definitions for client-side use
  */
 
-// Re-export types from dexie-schema
-export type {
-  Task,
-  Project, 
-  User,
-  Comment,
-  EntityDependency,
-  LocalChanges,
-  StatusDefinition,
-  Tag,
-  TagSet,
-  StatusSet
-} from './dexie-schema';
+// Entity type definitions (moved from dexie-schema for LiveStore compatibility)
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  project_id?: string;
+  assigned_to?: string;
+  due_date?: string;
+  priority?: 'low' | 'medium' | 'high';
+  status?: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  status?: string;
+  owner_id?: string;
+  start_date?: string;
+  end_date?: string;
+  budget?: number;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  updated_by?: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string;
+  role?: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  entity_type: string;
+  entity_id: string;
+  author_id: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntityDependency {
+  id: string;
+  dependent_entity_type: string;
+  dependent_entity_id: string;
+  dependency_entity_type: string;
+  dependency_entity_id: string;
+  organization_id: string;
+  created_at: string;
+}
+
+export interface LocalChanges {
+  id: string;
+  table_name: string;
+  entity_id: string;
+  operation: 'insert' | 'update' | 'delete';
+  changes: any;
+  organization_id: string;
+  created_at: string;
+  synced: boolean;
+  client_id: string;
+  user_id: string;
+}
+
+export interface StatusDefinition {
+  id: string;
+  name: string;
+  color: string;
+  entity_type: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TagSet {
+  id: string;
+  name: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StatusSet {
+  id: string;
+  name: string;
+  organization_id: string;
+  created_at: string;
+  updated_at: string;
+}
 
 // Entity type constants
 export const ENTITY_TYPES = {
@@ -80,6 +180,57 @@ export const CLIENT_DOMAIN_TABLES = [
   'tag_sets',
   'status_sets'
 ] as const;
+
+// Organization-specific table patterns
+// e.g., org_01920000_1000_7000_8000_000000000001_client -> client
+const ORG_TABLE_PATTERNS = {
+  client: 'users',      // org_*_client maps to users
+  project: 'projects',  // org_*_project maps to projects
+  skill: 'tags',        // org_*_skill maps to tags
+  timesheet: 'tasks',   // org_*_timesheet maps to tasks
+  activity: 'tasks',    // org_*_activity maps to tasks
+  deal: 'projects',     // org_*_deal maps to projects
+  ticket: 'tasks'       // org_*_ticket maps to tasks
+} as const;
+
+/**
+ * Check if a table name is a CLIENT_DOMAIN_TABLE or organization-specific table
+ */
+export function isClientDomainTable(tableName: string): boolean {
+  // Check direct match first
+  if (CLIENT_DOMAIN_TABLES.includes(tableName as any)) {
+    return true;
+  }
+  
+  // Check organization table pattern: org_<orgId>_<entityType>
+  const orgTableMatch = tableName.match(/^org_[0-9a-f_]+_([a-z_]+)$/i);
+  if (orgTableMatch) {
+    const entityType = orgTableMatch[1];
+    return entityType in ORG_TABLE_PATTERNS;
+  }
+  
+  return false;
+}
+
+/**
+ * Get the base entity type for an organization table
+ * e.g., org_01920000_1000_7000_8000_000000000001_client -> users
+ */
+export function getBaseEntityType(tableName: string): string | null {
+  // Direct match
+  if (CLIENT_DOMAIN_TABLES.includes(tableName as any)) {
+    return tableName;
+  }
+  
+  // Organization table pattern
+  const orgTableMatch = tableName.match(/^org_[0-9a-f_]+_([a-z_]+)$/i);
+  if (orgTableMatch) {
+    const entityType = orgTableMatch[1];
+    return ORG_TABLE_PATTERNS[entityType as keyof typeof ORG_TABLE_PATTERNS] || null;
+  }
+  
+  return null;
+}
 
 export const ENTITY_TABLES = CLIENT_DOMAIN_TABLES;
 export const JUNCTION_TABLES: string[] = [];

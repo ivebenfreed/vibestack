@@ -25,17 +25,10 @@ EXTERNAL_WEB_PORT=$((6000 + ISSUE_NUMBER))
 EXTERNAL_API_PORT=$((6100 + ISSUE_NUMBER))
 EXTERNAL_DB_PORT=$((6400 + ISSUE_NUMBER))
 
-echo "📋 Copying database from git-tracked live data..."
+echo "📋 Preparing database from git-tracked SQL dump..."
 
-# Create container volume from git-tracked postgres data
+# Create container volume for database
 docker volume create "vibestack-db-issue-${ISSUE_NUMBER}" >/dev/null 2>&1 || true
-
-# Copy git-tracked live postgres data to container volume
-docker run --rm \
-  -v "${PWD}/data/postgres-live:/source:ro" \
-  -v "vibestack-db-issue-${ISSUE_NUMBER}:/target" \
-  alpine:latest \
-  sh -c "cp -a /source/. /target/"
 
 echo "🎯 Starting container with ports ${EXTERNAL_WEB_PORT}, ${EXTERNAL_API_PORT}, ${EXTERNAL_DB_PORT}..."
 
@@ -66,6 +59,16 @@ docker run -d \
       echo 'Waiting for PostgreSQL to be ready...'
       sleep 2
     done
+    
+    # Initialize database from SQL dump
+    echo '📊 Restoring database from SQL dump...'
+    createdb vibestack_dev || echo 'Database already exists'
+    if [[ -f /app/data/database-seed.sql ]]; then
+      psql vibestack_dev < /app/data/database-seed.sql
+      echo '✅ Database restored from SQL dump'
+    else
+      echo '⚠️ No SQL dump found, using empty database'
+    fi
     
     # Load encrypted secrets into environment
     echo '🔐 Loading encrypted secrets...'

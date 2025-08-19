@@ -362,6 +362,7 @@ export async function runComprehensiveSyncTest(): Promise<{
       const postgresVerification = await fetch('/api/debug/table-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           tableName: `${WIDE_CORP_TABLE_PREFIX}_project`,
           organizationId: WIDE_CORP_ORG_ID,
@@ -398,6 +399,7 @@ export async function runComprehensiveSyncTest(): Promise<{
       const clientPostgresCheck = await fetch('/api/debug/table-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           tableName: `${WIDE_CORP_TABLE_PREFIX}_client`,
           organizationId: WIDE_CORP_ORG_ID,
@@ -425,6 +427,7 @@ export async function runComprehensiveSyncTest(): Promise<{
       const timesheetPostgresCheck = await fetch('/api/debug/table-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           tableName: `${WIDE_CORP_TABLE_PREFIX}_timesheet`,
           organizationId: WIDE_CORP_ORG_ID,

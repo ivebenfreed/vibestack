@@ -44,7 +44,7 @@ export function SyncDebugPanel() {
     
     try {
       // Access sync machine directly from window (matches useSync hook pattern)
-      const syncMachine = (window as any).syncMachineActor;
+      const syncMachine = (window as any).pureLiveStoreSyncMachineActor || (window as any).syncMachineActor;
       if (syncMachine) {
         syncMachine.send({
           type: 'FORCE_RECONNECT'
@@ -90,7 +90,7 @@ export function SyncDebugPanel() {
     
     try {
       // Access sync machine directly from window
-      const syncMachine = (window as any).syncMachineActor;
+      const syncMachine = (window as any).pureLiveStoreSyncMachineActor || (window as any).syncMachineActor;
       if (syncMachine) {
         syncMachine.send({ type: 'RESET' });
         

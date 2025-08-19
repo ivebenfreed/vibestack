@@ -14,6 +14,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DebugPublicRouteImport } from './routes/debug-public'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedDynamicSchemaTestRouteImport } from './routes/_authenticated/dynamic-schema-test'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -81,6 +82,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDynamicSchemaTestRoute =
+  AuthenticatedDynamicSchemaTestRouteImport.update({
+    id: '/dynamic-schema-test',
+    path: '/dynamic-schema-test',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
   path: '/503',
@@ -358,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
@@ -405,6 +413,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
@@ -456,6 +465,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404Route
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
+  '/_authenticated/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
@@ -507,6 +517,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/dynamic-schema-test'
     | '/'
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
@@ -554,6 +565,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/dynamic-schema-test'
     | '/'
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
@@ -604,6 +616,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/dynamic-schema-test'
     | '/_authenticated/'
     | '/_authenticated/debug/gantt-test-data'
     | '/_authenticated/debug/junction-tables'
@@ -676,6 +689,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dynamic-schema-test': {
+      id: '/_authenticated/dynamic-schema-test'
+      path: '/dynamic-schema-test'
+      fullPath: '/dynamic-schema-test'
+      preLoaderRoute: typeof AuthenticatedDynamicSchemaTestRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/(errors)/503': {
@@ -1068,6 +1088,7 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDebugRouteRoute: typeof AuthenticatedDebugRouteRouteWithChildren
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
+  AuthenticatedDynamicSchemaTestRoute: typeof AuthenticatedDynamicSchemaTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
   AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
@@ -1082,6 +1103,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDebugRouteRoute: AuthenticatedDebugRouteRouteWithChildren,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
+  AuthenticatedDynamicSchemaTestRoute: AuthenticatedDynamicSchemaTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
   AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,

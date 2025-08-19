@@ -15,7 +15,7 @@ export const syncActors = {
    * Initialize services using ServiceCoordinator
    */
   initializeServices: fromPromise(async ({ input }: {
-    input: { serverUrl: string; clientId: string; currentLSN: string }
+    input: { serverUrl: string; clientId: string; currentLSN: string; organizationId: string | null }
   }): Promise<{ serviceCoordinator: ServiceCoordinator; services: Services }> => {
     syncLogger.info('service', 'Phase 3: Initializing services with ServiceCoordinator...', input);
     
@@ -23,6 +23,7 @@ export const syncActors = {
       clientId: input.clientId,
       currentLSN: input.currentLSN,
       serverUrl: input.serverUrl,
+      organizationId: input.organizationId,
       inputType: typeof input.currentLSN
     });
     
@@ -32,6 +33,7 @@ export const syncActors = {
       clientId: input.clientId,
       currentLSN: input.currentLSN,
       serverUrl: input.serverUrl,
+      organizationId: input.organizationId,
       autoResetOnFailure: true, // Enable auto-reset for integrity failures
       enableDexieSync: true // Enable parallel Dexie sync
     };

@@ -138,22 +138,25 @@ class SyncTableRegistryImpl implements SyncTableRegistry {
 
   /**
    * Get all tables that an organization should see (only their org-specific business tables)
+   * Returns tables in dependency order for safe initial sync
    */
   async getTablesForOrganization(organizationId: string): Promise<string[]> {
     const orgTables = await this.getOrgSpecificTables(organizationId);
     
-    // Only return organization-specific business tables
-    // Base system tables (organization, session, account, verification) are server-only
+    // Order tables by dependencies (parent entities first, junction tables last)
+    const orderedTables = this.orderTablesByDependencies(orgTables, organizationId);
+    
     console.log(`DEBUG: Found ${orgTables.length} business tables for organization ${organizationId}:`);
-    console.log('DEBUG: Business tables only:', orgTables);  
+    console.log('DEBUG: Dependency-ordered tables:', orderedTables);  
     
     syncLogger.debug(`Found ${orgTables.length} business tables for organization`, {
       organizationId,
       businessTables: orgTables.length,
-      tables: orgTables
+      tables: orderedTables,
+      originalOrder: orgTables
     }, MODULE_NAME);
     
-    return orgTables;
+    return orderedTables;
   }
 
   /**
@@ -262,6 +265,74 @@ class SyncTableRegistryImpl implements SyncTableRegistry {
       console.log('DEBUG: Falling back to hardcoded tables');
       return this.getHardcodedOrgTables();
     }
+  }
+
+  /**
+   * Order tables by dependencies to prevent foreign key constraint violations
+   * during initial sync. Parent entities must be synced before child entities.
+   */
+  private orderTablesByDependencies(tables: string[], organizationId: string): string[] {
+    const orgPrefix = `org_${organizationId.replace(/-/g, '_')}_`;
+    
+    // Define dependency levels (lower number = sync first)
+    const dependencyLevels: Record<string, number> = {
+      // Level 1: Base entities (no foreign keys)
+      'client': 1,
+      'resource': 1, 
+      'skill': 1,
+      
+      // Level 2: Project-related (depends on client)
+      'project': 2,
+      'contract': 2,
+      'proposal': 2,
+      
+      // Level 3: Time tracking (depends on project)
+      'timesheet': 3,
+      'expense': 3,
+      
+      // Level 4: Deliverables (depends on project)
+      'invoice': 4,
+      'document': 4,
+      'meeting': 4,
+      
+      // Level 5: Junction tables (depends on multiple entities)
+      'certification': 5, // resource + skill
+      'task_dependencies': 5,
+      'project_members': 5,
+      'client_contacts': 5,
+    };
+    
+    // Extract entity name from full table name and assign levels
+    const tableWithLevels = tables.map(fullTableName => {
+      const entityName = fullTableName.startsWith(orgPrefix) 
+        ? fullTableName.substring(orgPrefix.length)
+        : fullTableName;
+      
+      const level = dependencyLevels[entityName] || 999; // Unknown tables go last
+      
+      return {
+        fullTableName,
+        entityName,
+        level
+      };
+    });
+    
+    // Sort by dependency level, then alphabetically within same level
+    const sorted = tableWithLevels.sort((a, b) => {
+      if (a.level !== b.level) {
+        return a.level - b.level;
+      }
+      return a.entityName.localeCompare(b.entityName);
+    });
+    
+    const orderedTables = sorted.map(item => item.fullTableName);
+    
+    console.log(`DEBUG: Dependency ordering for org ${organizationId}:`);
+    sorted.forEach(item => {
+      console.log(`DEBUG:   Level ${item.level}: ${item.entityName} → ${item.fullTableName}`);
+    });
+    
+    return orderedTables;
   }
 
   /**

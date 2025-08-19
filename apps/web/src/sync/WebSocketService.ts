@@ -13,6 +13,7 @@ export interface WebSocketServiceConfig {
   serverUrl?: string;
   clientId: string;
   lsn: string;
+  organizationId?: string;
   enableHeartbeat?: boolean;
   heartbeatInterval?: number;
   reconnectDelay?: number;
@@ -70,9 +71,37 @@ export class WebSocketService {
       const wsUrl = new URL(url);
       wsUrl.searchParams.set('clientId', this.config.clientId);
       
-      // Validate LSN before using it
+      // Add organization ID if provided
+      if (this.config.organizationId) {
+        wsUrl.searchParams.set('organizationId', this.config.organizationId);
+      }
+      
+      // Validate LSN before using it - use current LSN from sync machine context
       const lsnRegex = /^[0-9A-Fa-f]+\/[0-9A-Fa-f]+$/;
       let validLsn = this.config.lsn;
+      
+      // Get current LSN from sync machine context (proper XState pattern)
+      try {
+        const syncMachine = (window as any).pureLiveStoreSyncMachineActor;
+        if (syncMachine) {
+          const snapshot = syncMachine.getSnapshot();
+          const currentLSN = snapshot?.context?.currentLSN;
+          console.log('[WebSocketService] Sync machine state check:', {
+            machineExists: !!syncMachine,
+            snapshotExists: !!snapshot,
+            context: snapshot?.context,
+            currentLSN,
+            lsnValid: currentLSN && lsnRegex.test(currentLSN),
+            isZero: currentLSN === '0/0'
+          });
+          if (currentLSN && lsnRegex.test(currentLSN) && currentLSN !== '0/0') {
+            validLsn = currentLSN;
+            console.log('[WebSocketService] Using current LSN from sync machine:', validLsn);
+          }
+        }
+      } catch (error) {
+        console.log('[WebSocketService] Failed to get current LSN from sync machine, using config value');
+      }
       
       console.log('[WebSocketService] LSN validation:', {
         configLsn: this.config.lsn,
@@ -103,6 +132,7 @@ export class WebSocketService {
       wsUrl.searchParams.set('lsn', validLsn);
       console.log('[WebSocketService] Final WebSocket URL params:', {
         clientId: wsUrl.searchParams.get('clientId'),
+        organizationId: wsUrl.searchParams.get('organizationId'),
         lsn: wsUrl.searchParams.get('lsn'),
         fullUrl: wsUrl.toString()
       });
@@ -282,17 +312,18 @@ export class WebSocketService {
       // CRITICAL FIX: Get current LSN from sync machine state instead of stale config
       let currentLSN = this.config.lsn;
       
-      // Try to get the current LSN from the global sync state
+      // Get current LSN from sync machine context (proper XState pattern)
       try {
-        const stored = localStorage.getItem('sync-machine-state');
-        if (stored) {
-          const parsedState = JSON.parse(stored);
-          if (parsedState.currentLSN) {
-            currentLSN = parsedState.currentLSN;
+        const syncMachine = (window as any).pureLiveStoreSyncMachineActor;
+        if (syncMachine) {
+          const snapshot = syncMachine.getSnapshot();
+          const machineLSN = snapshot?.context?.currentLSN;
+          if (machineLSN && machineLSN !== '0/0') {
+            currentLSN = machineLSN;
           }
         }
       } catch (error) {
-        syncLogger.warn('connection', 'Failed to get current LSN from sync state, using config value', error);
+        syncLogger.warn('connection', 'Failed to get current LSN from sync machine, using config value', error);
       }
       
       // Use info level instead of debug to ensure visibility

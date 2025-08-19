@@ -1,10 +1,8 @@
 import React from 'react'
-// import { useAuth } from '@/hooks/useSimpleAuth' // 🔥 REPLACED with V2 orchestrator hook
-import { VibestackDexieProvider } from '../../db/dexie-provider'
+// Pure LiveStore providers only - no Dexie dependencies
 import { LiveStoreProvider } from './LiveStoreProvider'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
-// 🔥 UPDATED: Use V2 orchestrator hooks
 import { useAuth } from '@/state-machines'
 
 // Auth-aware wrapper component for database and sync services
@@ -23,13 +21,11 @@ export function AuthAwareProviders({ children }: { children: React.ReactNode }) 
   // Simple rule: mount database when authenticated and not checking or signing out
   if (isAuthenticated && !isCheckingAuth && !isSigningOut) {
     return (
-      <VibestackDexieProvider>
-        <LiveStoreProvider>
-          <AbilityProvider>
-            <AppLayout>{children}</AppLayout>
-          </AbilityProvider>
-        </LiveStoreProvider>
-      </VibestackDexieProvider>
+      <LiveStoreProvider>
+        <AbilityProvider>
+          <AppLayout>{children}</AppLayout>
+        </AbilityProvider>
+      </LiveStoreProvider>
     )
   }
   

@@ -29,27 +29,33 @@ import type {
 export class LiveStoreSchemaSync implements SchemaUpdateHandler {
   private generator = new LiveStoreDynamicSchemaGenerator();
   private currentOrgId: string | null = null;
+  private currentClientId: string | null = null;
   private listeners = new Set<(event: SchemaUpdateEvent) => void>();
   private pendingUpdates = new Map<string, SchemaUpdateEvent>();
 
   constructor(private webSocketService?: any) {
-    this.setupWebSocketHandlers();
+    // Don't setup handlers in constructor - will be called by ServiceCoordinator
   }
 
   /**
    * Initialize schema sync for organization
    */
   async initialize(orgId: string, clientId: string): Promise<void> {
-    console.log(`🔄 Initializing schema sync for org: ${orgId}`);
+    console.log(`🔄 Initializing schema sync for org: ${orgId} (org-wide schema)`);
     
     this.currentOrgId = orgId;
+    this.currentClientId = clientId; // Just for message identification
     
-    // Request current schema from server if needed
-    await this.requestSchemaUpdate(orgId);
+    // Setup handlers now that we have org context
+    this.setupWebSocketHandlers();
+    
+    // For now, just mark as ready - schema discovery happens via existing table sync
+    console.log('✅ Schema sync initialized - org schema discovery via existing sync process');
   }
 
   /**
    * Setup WebSocket message handlers for schema updates
+   * Called during initialization, not in constructor
    */
   private setupWebSocketHandlers(): void {
     if (!this.webSocketService) {
@@ -57,20 +63,20 @@ export class LiveStoreSchemaSync implements SchemaUpdateHandler {
       return;
     }
 
-    // Handle server schema update messages
-    this.webSocketService.onMessage('srv_schema_updated', (message: ServerSchemaUpdatedMessage) => {
-      this.handleSchemaUpdated(message);
-    });
+    console.log('✅ Schema sync handlers ready - will be called by ServiceCoordinator message routing');
+  }
 
-    this.webSocketService.onMessage('srv_schema_migration', (message: ServerSchemaMigrationMessage) => {
-      this.handleSchemaMigration(message);
-    });
-
-    this.webSocketService.onMessage('srv_schema_error', (message: ServerSchemaErrorMessage) => {
-      this.handleSchemaError(message);
-    });
-
-    console.log('✅ Schema sync WebSocket handlers registered');
+  /**
+   * Handle incoming WebSocket message (called by ServiceCoordinator)
+   */
+  handleWebSocketMessage(message: any): void {
+    if (message.type === 'srv_schema_updated') {
+      this.handleSchemaUpdated(message as ServerSchemaUpdatedMessage);
+    } else if (message.type === 'srv_schema_migration') {
+      this.handleSchemaMigration(message as ServerSchemaMigrationMessage);
+    } else if (message.type === 'srv_schema_error') {
+      this.handleSchemaError(message as ServerSchemaErrorMessage);
+    }
   }
 
   /**
@@ -425,6 +431,7 @@ export class LiveStoreSchemaSync implements SchemaUpdateHandler {
     this.listeners.clear();
     this.pendingUpdates.clear();
     this.currentOrgId = null;
+    this.currentClientId = null;
   }
 
   // Utility methods
@@ -433,8 +440,8 @@ export class LiveStoreSchemaSync implements SchemaUpdateHandler {
   }
 
   private getClientId(): string {
-    // Get from WebSocket service or generate
-    return this.webSocketService?.getClientId() || 'unknown-client';
+    // Use stored clientId from initialization
+    return this.currentClientId || `schema_client_${Date.now()}`;
   }
 }
 

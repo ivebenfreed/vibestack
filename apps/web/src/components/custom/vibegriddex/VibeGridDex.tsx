@@ -29,7 +29,7 @@ import * as dexieDomains from '@/domain';
 
 // Import provider utilities
 import type { RelationshipOptionsProvider } from './types';
-import { createGenericRelationshipProvider } from './providers/generic-relationship-provider-dexie';
+import { createGenericRelationshipProvider } from './providers/generic-relationship-provider';
 // Entity type for VibeGrid
 type VibeGridXEntityType = 'task' | 'project' | 'user' | 'comment';
 import { applyColumnDefaults } from './column-defaults';
