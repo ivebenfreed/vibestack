@@ -23,4 +23,16 @@ export interface TableChange {
   table: string;
   operation: 'insert' | 'update' | 'delete';
   data: Record<string, any>;
-} 
+}
+
+// Re-export schema types from shared package
+export type {
+  SchemaUpdateEvent,
+  SchemaUpdateHandler,
+  ServerSchemaUpdatedMessage,
+  ServerSchemaMigrationMessage,
+  ServerSchemaErrorMessage,
+  ClientSchemaReceivedMessage,
+  ClientSchemaAppliedMessage,
+  LiveStoreSchemaUpdate
+} from '@repo/sync-types';

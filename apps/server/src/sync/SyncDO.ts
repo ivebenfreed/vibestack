@@ -146,12 +146,18 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     };
     this.broadcastManager = new BroadcastManager(broadcastContext);
 
-    // Sync Strategy Analyzer
+    // Sync Strategy Analyzer - organization context is resolved dynamically
     const strategyContext: SyncStrategyContext = {
       clientId: this.clientId,
       stateManager: this.stateManager,
       getContext: () => this.getContext(),
-      webSocketHandler: this
+      webSocketHandler: this,
+      organizationId: this.syncConnection?.organizationId, // Fallback for backward compatibility
+      userId: this.syncConnection?.userId,
+      getOrganizationContext: () => this.syncConnection ? {
+        organizationId: this.syncConnection.organizationId,
+        userId: this.syncConnection.userId
+      } : null
     };
     this.syncStrategyAnalyzer = new SyncStrategyAnalyzer(strategyContext);
 
@@ -167,10 +173,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       ensureReplicationActive: () => this.ensureReplicationActive(),
       notifyClientChangesComplete: (messageId: string) => this.notifyClientChangesComplete(messageId),
       stateManager: this.stateManager,
-      triggerInitialSyncFromHeartbeat: (clientId: string, serverLSN: string) => 
-        this.syncStrategyAnalyzer.triggerInitialSyncFromHeartbeat(clientId, serverLSN),
-      triggerCatchupFromHeartbeat: (clientId: string, clientLSN: string, serverLSN: string) => 
-        this.syncStrategyAnalyzer.triggerCatchupFromHeartbeat(clientId, clientLSN, serverLSN),
+      // NOTE: Removed heartbeat-triggered sync methods - organization context is required
+      // Initial and catchup sync should only be triggered through proper org-aware WebSocket connection
       analyzeLSNGap: (clientLSN: string, serverLSN: string) => 
         this.syncStrategyAnalyzer.analyzeLSNGap(clientLSN, serverLSN),
       state: this.state
@@ -364,13 +368,18 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     try {
       switch (strategy) {
         case SyncStrategy.INITIAL:
+          // SECURITY: Ensure organization context is available
+          if (!this.syncConnection?.organizationId) {
+            throw new Error(`Cannot perform initial sync: organization context required`);
+          }
+          
           // Use original sync system with org awareness
           await performInitialSync(
             this, // WebSocketHandler
             this.getContext(), // MinimalContext  
             clientId,
-            undefined, // stateManager (optional)
-            this.syncConnection?.organizationId, // organizationId for filtering
+            this.stateManager, // StateManager for proper LSN tracking
+            this.syncConnection.organizationId, // organizationId for filtering (required)
             this.syncConnection?.userId // userId for permissions
           );
           break;
@@ -411,7 +420,9 @@ export class SyncDO implements DurableObject, WebSocketHandler {
    * Perform organization-aware initial sync
    */
   private async performOrgAwareInitialSync(clientId: string, serverLSN: string): Promise<void> {
-    if (!this.syncConnection) return;
+    if (!this.syncConnection?.organizationId) {
+      throw new Error(`Cannot perform org-aware initial sync: organization context required`);
+    }
 
     syncLogger.info('Starting org-aware initial sync', {
       clientId,

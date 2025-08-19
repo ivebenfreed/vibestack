@@ -13,59 +13,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Server Management
 
-**IMPORTANT**: Claude Code now has native support for background processes. Use the `run_in_background` parameter with the Bash tool for long-running commands.
+**IMPORTANT**: Use Claude Code's native background support for all development servers.
 
-### Running Development Servers in Background:
+### Running Development Servers:
 ```bash
-# Use native Claude Code background support
+# Start main development servers (web + API)
 Bash(command="pnpm dev", run_in_background=true)
-Bash(command="pnpm dev:local", run_in_background=true)
-Bash(command="pnpm dev:server", run_in_background=true)
-Bash(command="pnpm dev:web", run_in_background=true)
+
+# Or start specific services
+Bash(command="pnpm dev:web", run_in_background=true)    # Web app only
+Bash(command="pnpm dev:server", run_in_background=true) # API server only
+
+# Build processes
 Bash(command="pnpm build --watch", run_in_background=true)
 Bash(command="pnpm test --watch", run_in_background=true)
 ```
 
-### Monitoring Background Processes:
-- Use `BashOutput` tool to check logs from background processes
-- Use `KillBash` tool to stop background processes
-- Background processes continue running even if Claude disconnects
-
-### POC Server Management:
-For running POC servers (like Function Factory POCs) that need persistent background execution, create simple tmux sessions manually:
-```bash
-# Create dedicated tmux session for POC servers
-tmux new-session -d -s poc-server "cd /path/to/poc && npx wrangler dev --port 8789"
-
-# Attach to view logs
-tmux attach -t poc-server
-
-# Detach while keeping running: Ctrl+B, then D
-# Kill session when done
-tmux kill-session -t poc-server
-```
+### Managing Background Processes:
+- **Monitor logs**: Use `BashOutput(bash_id="...")` tool to check logs
+- **Stop processes**: Use `KillBash(shell_id="...")` tool to stop servers
+- **Background processes persist** even if Claude disconnects
 
 ### Server-Only Development:
-For working on server-only DataForge development without the webapp:
 ```bash
-# Use regular dev start - webapp won't interfere with server testing
-./scripts/dev-start.sh
+# API server only for backend development  
+Bash(command="pnpm dev:server", run_in_background=true)
 
-# API testing workflow
+# Test API directly
 curl -X GET http://localhost:8787/health
 psql postgres://localhost:5432/vibestack_dev -c "SELECT * FROM organizations;"
 ```
-
-### Alternative: tmux-based Management (if preferred):
-If you prefer using tmux scripts instead of native background support:
-1. Use `./scripts/tmux-bg.sh <session-name> <command>` to start processes in tmux
-2. Use `./scripts/bg-status.sh` to check running processes
-3. Use `./scripts/bg-logs.sh <session>` to view logs
-4. Use `./scripts/bg-stop.sh <session>` to stop processes
-
-### DO NOT:
-- Use `&` or `nohup` for background processes (use native background or tmux)
-- Kill processes with `pkill` (use `KillBash` or `./scripts/bg-stop.sh`)
 
 ## CRITICAL: Neon Proxy Requirements
 
@@ -139,7 +116,6 @@ For debugging and fixing type errors systematically, use the focused type check 
 - **`./scripts/type-check-focused/type-check-all.sh`** - Runs focused checks on all packages with summary
 - **`./scripts/type-check-focused/type-check-server.sh`** - Server-only type check (faster than full monorepo check)
 - **`./scripts/type-check-focused/type-check-web.sh`** - Web app type check
-- **`./scripts/type-check-focused/type-check-dataforge.sh`** - DataForge package type check
 
 These scripts are particularly useful when:
 - Full `pnpm type-check` hangs or is slow
@@ -176,7 +152,7 @@ pnpm type-check
 ### Before Committing
 1. Run `pnpm check` to ensure no type or lint errors
 2. Fix any issues before pushing
-3. Generated files in `packages/dataforge/src/generated/` are ignored
+3. Build artifacts and generated files are ignored
 4. Run essential baseline tests (see Testing section below)
 
 ## Playwright Testing with Persistent Browser Profiles
@@ -337,10 +313,7 @@ When testing merge-ready branches or working on the main/staging branch, use:
 
 ```bash
 # Start dev server with default main/staging ports (5173, 8787, 5432)
-./scripts/dev-main.sh
-
-# Or manually with MAIN_MODE flag
-MAIN_MODE=true ./scripts/tmux-bg.sh vibestack-dev-main "pnpm dev:local"
+Bash(command="pnpm dev", run_in_background=true)
 ```
 
 This bypasses the automatic issue number detection and uses the default ports:
@@ -370,8 +343,8 @@ This configuration:
 
 ### Method 2: Manual Environment Override
 ```bash
-# Set explicit environment variables for staging-like testing
-SERVER_PORT=8787 WEB_PORT=5173 DB_PORT=5432 pnpm dev:local
+# Set explicit environment variables for staging-like testing  
+SERVER_PORT=8787 WEB_PORT=5173 DB_PORT=5432 Bash(command="pnpm dev", run_in_background=true)
 ```
 
 ### When to Use Staging Mocking
@@ -387,83 +360,6 @@ The staging mock uses the main `vibestack_dev` database, so:
 - ⚠️ **Caution**: Changes affect the main development database
 - 💡 **Tip**: Use database migrations to test schema changes safely
 
-## Background Process Management
-
-### tmux-based Background Processes
-
-We use tmux to manage long-running background processes without blocking Claude Code. This is especially useful for development servers and build processes.
-
-#### Core Scripts
-
-- **`./scripts/tmux-bg.sh <session-name> <command>`** - Start any command in a background tmux session
-  ```bash
-  ./scripts/tmux-bg.sh dev-servers "pnpm dev:local"
-  ./scripts/tmux-bg.sh build-watch "pnpm build --watch"
-  ```
-
-- **`./scripts/bg-status.sh [session-name]`** - Check status of background processes
-  ```bash
-  ./scripts/bg-status.sh                # List all sessions
-  ./scripts/bg-status.sh dev-servers    # Check specific session
-  ```
-
-- **`./scripts/bg-logs.sh <session-name> [lines]`** - View logs from background processes
-  ```bash
-  ./scripts/bg-logs.sh dev-servers 100  # Last 100 lines
-  ./scripts/bg-logs.sh dev-servers      # Last 50 lines (default)
-  ```
-
-- **`./scripts/bg-stop.sh <session-name>`** - Stop background processes cleanly
-  ```bash
-  ./scripts/bg-stop.sh dev-servers
-  ```
-
-#### Development Server Shortcuts
-
-- **`./scripts/dev-start.sh`** - Start development servers (web + API) in background
-- **`./scripts/dev-logs.sh [lines]`** - Quick access to development server logs
-
-#### Standard Session Names
-
-**All session names are worktree-specific:**
-
-- `vibestack-dev-issue-{N}` - Main development servers (`pnpm dev:local`)
-- `vibestack-build-issue-{N}` - Build processes
-- `vibestack-test-issue-{N}` - Test runners
-- `vibestack-migrate-issue-{N}` - Database migrations
-
-Where `{N}` is the issue number (e.g., `vibestack-dev-issue-24` for Issue #24)
-
-#### Usage Patterns
-
-1. **Starting development servers:**
-   ```bash
-   ./scripts/dev-start.sh  # Starts servers in background
-   # Continue working while servers start up
-   ```
-
-2. **Checking if servers are running:**
-   ```bash
-   ./scripts/bg-status.sh vibestack-dev-issue-24  # For Issue #24
-   ```
-
-3. **Viewing server logs while working:**
-   ```bash
-   ./scripts/dev-logs.sh 50  # View last 50 lines (auto-detects issue number)
-   ```
-
-4. **Stopping servers when done:**
-   ```bash
-   ./scripts/bg-stop.sh vibestack-dev-issue-24  # For Issue #24
-   ```
-
-#### Benefits
-
-- **Non-blocking**: Start long-running processes without waiting
-- **Process safety**: Prevents duplicate server instances
-- **Log access**: View real-time logs from any background process
-- **Clean shutdown**: Graceful process termination with Ctrl-C then force kill
-- **Session persistence**: Processes continue running even if Claude disconnects
 
 ## Interaction Protocol Memorization
 
@@ -523,8 +419,8 @@ git checkout -b issue-42-clean
 git cherry-pick <commit1> <commit2>...
 # OR use range: git cherry-pick <first>^..<last>
 
-# Regenerate everything fresh
-cd packages/dataforge && pnpm forge:build
+# Rebuild and run type checks
+pnpm build && pnpm type-check
 
 # Force push to replace messy branch
 git push --force-with-lease origin issue-42-clean:issue-42
@@ -542,9 +438,8 @@ git rebase origin/staging
 
 #### Before Creating PR - Always Do:
 ```bash
-# 1. Commit generated files
-cd packages/dataforge && pnpm forge:build
-git add src/generated/ && git commit -m "chore: commit generated files"
+# 1. Ensure clean build
+pnpm build && pnpm type-check
 
 # 2. Create migrations if entities changed
 pnpm migration:generate:server -- src/migrations/server/DescriptiveName
@@ -570,8 +465,8 @@ Clean up specific completed issues:
 # 1. Close the GitHub issue
 gh issue close 57 --comment "Completed: Description of what was accomplished"
 
-# 2. Stop any running tmux sessions
-./scripts/bg-stop.sh vibestack-dev-issue-57
+# 2. Stop any running background processes
+# Use KillBash tool in Claude Code
 
 # 3. Clean up Docker resources  
 ./scripts/cleanup-pr-docker.sh 57
@@ -593,7 +488,7 @@ git branch -D issue-57
 - **Keep active issues**: Only clean up completed/merged issues
 - **Preserve issue-60**: Currently in progress, should not be cleaned
 - **Close GitHub issues first**: This maintains the paper trail
-- **Verify before cleanup**: Check `git worktree list` and `./scripts/bg-status.sh`
+- **Verify before cleanup**: Check `git worktree list` and active background processes
 
 ### Current Active Worktrees
 After recent cleanup, only active issues remain:

@@ -437,19 +437,6 @@ export class ArchetypeEntityManager extends EntityManager {
            oldField.required !== newField.required;
   }
 
-  /**
-   * Get archetype entity metadata (for schema evolution)
-   */
-  private async getArchetypeMetadata(
-    orgId: string, 
-    tableName: string
-  ): Promise<{ archetype: string; customFields: Record<string, FieldDefinition> } | null> {
-    // This would typically query a metadata table or configuration
-    // For now, return null to indicate metadata not found
-    // In a full implementation, this would query the entity registry or metadata store
-    console.log(`[ArchetypeEntityManager] Looking up metadata for ${orgId}.${tableName}`);
-    return null;
-  }
 
   /**
    * Save data to archetype entity with validation

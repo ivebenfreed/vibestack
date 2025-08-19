@@ -37,7 +37,7 @@ export async function performInitialSync(
   context: MinimalContext,
   clientId: string,
   stateManager?: StateManager,
-  organizationId?: string,
+  organizationId: string,  // REQUIRED: No sync without organization context
   userId?: string
 ): Promise<{ startLSN: string; endLSN: string }> {
   try {
@@ -46,26 +46,22 @@ export async function performInitialSync(
     // Get tracked tables from the centralized registry with user/organization scoping
     const tableRegistry = await getSyncTableRegistry(context.env);
     
-    if (organizationId) {
-      // Organization-scoped sync: only include base tables + this org's tables
-      TRACKED_TABLES = await tableRegistry.getTablesForOrganization(organizationId);
-      console.log(`DEBUG: FINAL TRACKED_TABLES for org ${organizationId}:`, TRACKED_TABLES);
-      
-      syncLogger.info(`Using ${TRACKED_TABLES.length} organization-scoped tables`, {
-        clientId,
-        organizationId,
-        tables: TRACKED_TABLES
-      }, MODULE_NAME);
-    } else {
-      // Fallback: all tables (for system-level operations)
-      TRACKED_TABLES = await tableRegistry.getAllTrackableTables();
-      console.log(`DEBUG: FINAL TRACKED_TABLES (no org):`, TRACKED_TABLES);
-      
-      syncLogger.warn(`No organization context, using all ${TRACKED_TABLES.length} trackable tables`, {
-        clientId,
-        tables: TRACKED_TABLES
-      }, MODULE_NAME);
+    if (!organizationId) {
+      // SECURITY: Never sync without organization context
+      const error = `Initial sync requires organization context - cannot sync without organizationId`;
+      syncLogger.error(error, { clientId }, MODULE_NAME);
+      throw new Error(error);
     }
+
+    // Organization-scoped sync: only include this org's tables
+    TRACKED_TABLES = await tableRegistry.getTablesForOrganization(organizationId);
+    console.log(`DEBUG: FINAL TRACKED_TABLES for org ${organizationId}:`, TRACKED_TABLES);
+    
+    syncLogger.info(`Using ${TRACKED_TABLES.length} organization-scoped tables`, {
+      clientId,
+      organizationId,
+      tables: TRACKED_TABLES
+    }, MODULE_NAME);
     
     ORDERED_TRACKED_TABLES = [...TRACKED_TABLES];
 
@@ -156,13 +152,14 @@ export async function performInitialSync(
       
       console.log(`DEBUG: Processing table ${tableName} with ${tableData.length} records`);
       
-      // Convert to TableChange format for this table
+      // Convert to TableChange format for this table (match sync-types interface)
       const tableChanges: TableChange[] = tableData.map(record => ({
         table: tableName,
-        operation: 'INSERT' as const,
-        data: record,
-        sequenceNumber: 0,
-        timestamp: record.updated_at || record.created_at || new Date().toISOString()
+        operation: 'insert' as const,  // lowercase to match sync-types
+        data: record,                  // data contains the full record including ID
+        updatedAt: record.updated_at || record.created_at || new Date().toISOString(),
+        lsn: '0',                     // Initial sync uses LSN 0
+        clientId: undefined           // Server-generated changes have no clientId
       }));
       
       // Send this table's data in chunks

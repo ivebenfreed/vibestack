@@ -30,8 +30,7 @@ export interface MessageHandlerContext {
   ensureReplicationActive: () => Promise<void>;
   notifyClientChangesComplete: (messageId: string) => Promise<void>;
   stateManager: any; // StateManager type
-  triggerInitialSyncFromHeartbeat: (clientId: string, serverLSN: string) => Promise<void>;
-  triggerCatchupFromHeartbeat: (clientId: string, clientLSN: string, serverLSN: string) => Promise<void>;
+  // NOTE: Removed heartbeat-triggered sync methods - organization context is required
   analyzeLSNGap: (clientLSN: string, serverLSN: string) => { shouldTriggerCatchup: boolean; gapSize: number; threshold: number };
   state: DurableObjectState;
 }
@@ -300,40 +299,35 @@ export class MessageHandlerRegistry {
           timestamp: Date.now()
         } as any); // Type assertion since ServerHeartbeatMessage doesn't exist yet
         
-        // Check for LSN gap and handle accordingly
+        // Check for LSN gap and handle accordingly - organization-aware heartbeat
         if (heartbeatMessage.lsn && heartbeatMessage.lsn !== serverLSN) {
-          // Special case: If client has LSN 0/0, always trigger initial sync
+          // NOTE: Removed automatic initial sync triggering from heartbeat
+          // Initial sync should only be triggered through proper organization-aware WebSocket connection
           if (heartbeatMessage.lsn === '0/0') {
-            syncLogger.warn('Client LSN is 0/0 in heartbeat - triggering initial sync', {
+            syncLogger.info('Client LSN is 0/0 in heartbeat - client needs initial sync but heartbeat will not trigger it', {
               clientId: heartbeatMessage.clientId || this.context.clientId,
               clientLSN: heartbeatMessage.lsn,
-              serverLSN
+              serverLSN,
+              note: 'Initial sync should be triggered through proper org-aware WebSocket connection'
             }, MODULE_NAME);
-            
-            // Trigger initial sync for LSN 0/0 (integrity reset scenario)
-            this.context.state.waitUntil(this.context.triggerInitialSyncFromHeartbeat(
-              heartbeatMessage.clientId || this.context.clientId,
-              serverLSN
-            ));
+            // Do not trigger initial sync from heartbeat - organization context is required
           } else {
             // Normal LSN gap analysis for non-zero LSNs
             const lsnGapResult = this.context.analyzeLSNGap(heartbeatMessage.lsn, serverLSN);
             
             if (lsnGapResult.shouldTriggerCatchup) {
-              syncLogger.warn('Large LSN gap detected in heartbeat - triggering catchup sync', {
+              syncLogger.info('Large LSN gap detected in heartbeat - organization-aware sync required', {
                 clientId: heartbeatMessage.clientId || this.context.clientId,
                 clientLSN: heartbeatMessage.lsn,
                 serverLSN,
                 gapSize: lsnGapResult.gapSize,
-                threshold: lsnGapResult.threshold
+                threshold: lsnGapResult.threshold,
+                note: 'Catchup sync should be triggered through proper org-aware WebSocket connection'
               }, MODULE_NAME);
               
-              // Trigger catchup sync for large gaps
-              this.context.state.waitUntil(this.context.triggerCatchupFromHeartbeat(
-                heartbeatMessage.clientId || this.context.clientId,
-                heartbeatMessage.lsn,
-                serverLSN
-              ));
+              // NOTE: Removed automatic catchup sync triggering from heartbeat
+              // Catchup sync should only be triggered through proper organization-aware sync flow
+              // The client should reconnect through WebSocket with organization context
             } else {
               syncLogger.debug('Normal LSN gap in heartbeat - no action needed', {
                 clientId: heartbeatMessage.clientId || this.context.clientId,

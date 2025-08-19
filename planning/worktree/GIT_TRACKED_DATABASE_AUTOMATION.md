@@ -31,40 +31,41 @@ We've implemented an automated system that tracks PostgreSQL database state in g
   - Schema validation
   - Sync drift detection
 
-#### 3. Git-Tracked Database Storage
-- **Directory**: `data/postgres-live/`
-- **Purpose**: Store PostgreSQL data files in git repository
+#### 3. Git-Tracked Database Storage (SQL Dump Approach)
+- **Files**: `data/database-seed.sql`, `data/database-schema.sql`
+- **Purpose**: Store database structure and data as SQL dumps
+- **Size**: 316KB (vs 86MB binary files - 99.6% reduction)
 - **Benefits**:
-  - Version controlled database state
-  - Cross-machine data synchronization
-  - Instant environment setup
+  - Git-friendly file sizes
+  - Version controlled database changes
+  - Cross-platform compatibility  
+  - Diff-able database changes
+  - Faster git operations
 
 #### 4. Container Database Integration
-- **Implementation**: Docker volume mounting with git-tracked data
+- **Implementation**: SQL dump restoration in container startup
 - **Workflow**: 
   ```bash
-  # Copy git-tracked data to container volume
-  docker run --rm \
-    -v "${PWD}/data/postgres-live:/source:ro" \
-    -v "vibestack-db-issue-${ISSUE_NUMBER}:/target" \
-    alpine:latest \
-    sh -c "cp -a /source/. /target/"
+  # Restore database from SQL dump (in container startup)
+  createdb vibestack_dev
+  psql vibestack_dev < /app/data/database-seed.sql
   ```
 
 ## Architecture
 
 ### Data Flow
 ```
-Remote Neon DB → sync scripts → Local PostgreSQL → Git tracking → Container volumes
-     ↓                           ↓                    ↓              ↓
-Production data → Local dev DB → Git repository → Worktree containers
+Remote Neon DB → sync scripts → Local PostgreSQL → SQL dump → Git repository → Container restoration
+     ↓                           ↓                    ↓           ↓                ↓
+Production data → Local dev DB → SQL export → Git tracking → Container databases
 ```
 
 ### Synchronization Model
 1. **Remote Source**: Neon production database with live data
 2. **Local Mirror**: PostgreSQL instance with synchronized data  
-3. **Git Storage**: Committed database files for version control
-4. **Container Distribution**: Volume mounting for worktree isolation
+3. **SQL Export**: Compact SQL dumps exported for git storage
+4. **Git Storage**: Committed SQL dump files for version control
+5. **Container Distribution**: SQL restoration for worktree isolation
 
 ## Current Implementation in Worktree Startup
 

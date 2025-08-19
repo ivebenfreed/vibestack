@@ -1,0 +1,113 @@
+name: Database Export
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'apps/server/src/migrations/**'
+      - 'packages/dataforge/src/entities/**'
+      - 'data/database-schema.sql'
+  pull_request:
+    branches: [main, staging]
+    paths:
+      - 'apps/server/src/migrations/**'
+      - 'packages/dataforge/src/entities/**'
+      - 'data/database-schema.sql'
+  workflow_dispatch:
+
+jobs:
+  export-database:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: vibestack_dev
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install project dependencies
+        run: pnpm install
+
+      - name: Setup database
+        run: |
+          # Apply schema if it exists
+          if [ -f "data/database-schema.sql" ]; then
+            psql postgres://postgres:postgres@localhost:5432/vibestack_dev -f data/database-schema.sql
+          fi
+          
+          # Run migrations if they exist
+          if [ -d "apps/server/src/migrations" ]; then
+            cd apps/server
+            pnpm run migrate || echo "No migrations to run or migrate command not available"
+          fi
+
+      - name: Export database
+        run: |
+          # Export schema
+          pg_dump --schema-only --no-owner --no-privileges \
+            postgres://postgres:postgres@localhost:5432/vibestack_dev \
+            > data/database-schema.sql
+          
+          # Export seed data (excluding sensitive tables)
+          pg_dump --data-only --no-owner --no-privileges \
+            --exclude-table=sessions \
+            --exclude-table=verification_tokens \
+            --exclude-table=accounts \
+            postgres://postgres:postgres@localhost:5432/vibestack_dev \
+            > data/database-seed.sql
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add data/database-schema.sql data/database-seed.sql
+          if git diff --cached --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -m "feat: update database exports
+          
+          🤖 Generated with Database Export Action
+          
+          Co-Authored-By: GitHub Action <action@github.com>" || exit 0
+
+      - name: Push changes
+        if: steps.changes.outputs.changed == 'true'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}

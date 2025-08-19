@@ -382,9 +382,9 @@ export function useSystem() {
 
 // Sync hook - directly from SyncMachine
 export function useSync() {
-  // Get sync machine from global actor
+  // Get sync machine from global actor - updated for pure LiveStore sync machine
   const syncMachine = useMemo(() => {
-    return (window as any).syncMachineActor || null;
+    return (window as any).pureLiveStoreSyncMachineActor || (window as any).syncMachineActor || null;
   }, []);
 
   // Safety check: only proceed if syncMachine exists

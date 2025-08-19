@@ -28,6 +28,9 @@ export interface SyncStrategyContext {
   stateManager: any; // StateManager type
   getContext: () => MinimalContext;
   webSocketHandler: WebSocketHandler;
+  organizationId?: string;
+  userId?: string;
+  getOrganizationContext?: () => { organizationId?: string; userId?: string } | null;
 }
 
 export class SyncStrategyAnalyzer {
@@ -275,12 +278,24 @@ export class SyncStrategyAnalyzer {
     // Update sync state
     await this.context.stateManager.updateClientSyncState(clientId, 'initial');
     
-    // Perform initial sync and get the LSNs
+    // SECURITY: Get current organization context (may be dynamic)
+    const orgContext = this.context.getOrganizationContext ? this.context.getOrganizationContext() : {
+      organizationId: this.context.organizationId,
+      userId: this.context.userId
+    };
+
+    if (!orgContext?.organizationId) {
+      throw new Error(`Cannot perform initial sync: organization context required for SyncStrategyAnalyzer`);
+    }
+
+    // Perform initial sync and get the LSNs with organization context
     const { startLSN, endLSN } = await performInitialSync(
       this.context.webSocketHandler,
       context,
       clientId,
-      this.context.stateManager
+      this.context.stateManager,
+      orgContext.organizationId,
+      orgContext.userId
     );
     
     syncLogger.info('Initial sync completed, checking if catchup sync is needed', {

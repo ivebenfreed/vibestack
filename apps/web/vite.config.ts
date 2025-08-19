@@ -122,7 +122,17 @@ export default defineConfig({
     tailwindcss(),
   ],
   optimizeDeps: {
-    include: ['reflect-metadata', 'class-transformer', 'class-validator', 'typeorm', 'typeorm/browser'],
+    include: [
+      'reflect-metadata', 
+      'class-transformer', 
+      'class-validator', 
+      'typeorm', 
+      'typeorm/browser',
+      // LiveStore packages need to be included for proper bundling
+      '@livestore/livestore',
+      '@livestore/adapter-web',
+      '@livestore/react'
+    ],
     exclude: ['@electric-sql/pglite', '@livestore/wa-sqlite']
   },
   // Add WASM support for LiveStore SQLite

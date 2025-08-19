@@ -1,8 +1,7 @@
 import type { RelationshipOptionsProvider, RelationshipContext, EnumOption, Column } from '../types';
 
 /**
- * @deprecated This atom-based provider is deprecated. Use generic-relationship-provider-dexie.ts instead.
- * VibeGridDex is now pure Dexie-based and no longer supports atoms.
+ * Generic relationship provider for VibeGridDex components.
  */
 export function createGenericRelationshipProvider(
   column: Column,

@@ -12,7 +12,7 @@
 // ============================================================================
 
 export type ConnectionEvents =
-  | { type: 'CONNECT' }
+  | { type: 'CONNECT'; organizationId?: string }
   | { type: 'DISCONNECT' }
   | { type: 'RECONNECT' }
   | { type: 'WS_CONNECTED'; serverLSN: string }

@@ -16,7 +16,7 @@ import { IntegrityMonitor } from '@/components/IntegrityMonitor'
 import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
 import { appInitMachine } from '@/state-machines/machines/app-init-machine'
-import { syncMachineV3 } from '@/state-machines/machines/sync-machine-v3'
+import { pureLiveStoreSyncMachine } from '@/state-machines/machines/pure-livestore-sync-machine'
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
 import { useAuth, useSystem } from '@/state-machines'
 import React from 'react'
@@ -54,12 +54,12 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
   
   // Restore preserved actors
   ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
-  ;(window as any).syncMachineActor = import.meta.hot.data.syncMachineActor
+  ;(window as any).pureLiveStoreSyncMachineActor = import.meta.hot.data.pureLiveStoreSyncMachineActor
   ;(window as any).appInitActor = import.meta.hot.data.appInitActor
   
   // Clear from hot data
   import.meta.hot.data.authMachineActor = null
-  import.meta.hot.data.syncMachineActor = null
+  import.meta.hot.data.pureLiveStoreSyncMachineActor = null
   import.meta.hot.data.appInitActor = null
   
   console.log('[XSTATE] 🔥 HMR: Actors restored successfully')
@@ -157,11 +157,34 @@ if (!authMachineActor) {
     console.log('[AuthMachine] State changed:', { authenticated, reason })
     
     // 🔥 DIRECT FLOW: When auth completes, directly start initialization
-    if (authenticated && snapshot.value === 'authenticated') {
-      console.log('[AuthMachine] ✅ Authentication complete - starting app initialization')
-      const currentAppInitActor = (window as any).appInitActor
-      if (currentAppInitActor) {
-        currentAppInitActor.send({ type: 'START_INIT' })
+    if (authenticated && snapshot.matches('authenticated')) {
+      console.log('[AuthMachine] ✅ Authentication complete - checking for organization...')
+      
+      const currentOrganization = snapshot.context.currentOrganization
+      const hasOrganization = !!currentOrganization?.id
+      
+      // Only proceed if we have an organization loaded (not just localStorage fallback)
+      if (hasOrganization) {
+        console.log('[AuthMachine] 🏢 Organization loaded - starting app initialization')
+        
+        const currentAppInitActor = (window as any).appInitActor
+        if (currentAppInitActor) {
+          console.log('[AuthMachine] Sending START_INIT to app init machine with org context:', {
+            organizationId: currentOrganization.id,
+            organizationName: currentOrganization.name
+          })
+          currentAppInitActor.send({ 
+            type: 'START_INIT',
+            organizationId: currentOrganization.id 
+          })
+          
+          // Note: Sync machine will be started by app init machine after database is ready
+          console.log('[AuthMachine] App init machine will coordinate sync startup after database ready')
+        } else {
+          console.warn('[AuthMachine] App init actor not found - START_INIT not sent')
+        }
+      } else {
+        console.log('[AuthMachine] ⏳ Organization not loaded yet, waiting...')
       }
     }
     
@@ -174,33 +197,33 @@ if (!authMachineActor) {
   console.log('[AuthMachine] 🔥 HMR: Using existing auth machine actor')
 }
 
-// Create SyncMachine actor (only if not already exists from HMR)
-let syncMachineActor = (window as any).syncMachineActor
+// Create Pure LiveStore Sync Machine actor (only if not already exists from HMR)
+let pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
 
-if (!syncMachineActor) {
-  console.log('[SyncMachine] Creating new sync machine actor')
+if (!pureLiveStoreSyncMachineActor) {
+  console.log('[PureLiveStoreSyncMachine] Creating new pure LiveStore sync machine actor')
   
   // Add inspection in test/dev mode
   const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
     ? { inspect: xstateTestInspector.inspect }
     : {};
   
-  syncMachineActor = createActor(syncMachineV3, {
+  pureLiveStoreSyncMachineActor = createActor(pureLiveStoreSyncMachine, {
     ...inspectOptions,
-    id: 'sync-machine-v3'
+    id: 'pure-livestore-sync-machine'
   })
   
-  // SyncMachine handles its own persistence internally
-  console.log('[SyncMachine] Starting (state persistence handled internally)')
-  syncMachineActor.start()
+  // Pure LiveStore SyncMachine handles its own persistence internally
+  console.log('[PureLiveStoreSyncMachine] Starting (state persistence handled internally)')
+  pureLiveStoreSyncMachineActor.start()
   
   // Store globally
-  ;(window as any).syncMachineActor = syncMachineActor
+  ;(window as any).pureLiveStoreSyncMachineActor = pureLiveStoreSyncMachineActor
   
   // Set up subscriptions for new actor
   let wasLiveSync = false
   
-  syncMachineActor.subscribe((snapshot) => {
+  pureLiveStoreSyncMachineActor.subscribe((snapshot) => {
     // Send SYNC_READY to app-init when sync machine enters live sync
     if (snapshot.value === 'live_sync' && !wasLiveSync) {
       wasLiveSync = true
@@ -259,7 +282,7 @@ if (import.meta.hot) {
     
     // Store actor references in hot data to preserve across HMR
     import.meta.hot.data.authMachineActor = (window as any).authMachineActor
-    import.meta.hot.data.syncMachineActor = (window as any).syncMachineActor
+    import.meta.hot.data.pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
     import.meta.hot.data.appInitActor = (window as any).appInitActor
     
     // Don't stop actors - let them continue running
@@ -278,11 +301,11 @@ window.addEventListener('auth:signout', () => {
   localStorage.removeItem(AUTH_STORAGE_KEY)
   // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
   
-  // Reset sync machine to idle state for fresh initialization on next sign-in
-  const syncMachineActor = (window as any).syncMachineActor
-  if (syncMachineActor) {
-    console.log('[XSTATE] Resetting sync machine on sign-out')
-    syncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
+  // Reset pure LiveStore sync machine to idle state for fresh initialization on next sign-in
+  const pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
+  if (pureLiveStoreSyncMachineActor) {
+    console.log('[XSTATE] Resetting pure LiveStore sync machine on sign-out')
+    pureLiveStoreSyncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
   }
   
   // Reset app init machine to idle state for fresh initialization on next sign-in

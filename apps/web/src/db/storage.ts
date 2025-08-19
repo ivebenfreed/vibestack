@@ -17,8 +17,8 @@ const ENTITY_CONFIG = {
     return CLIENT_DOMAIN_TABLES.map(table => table.replace(/"/g, ''));
   },
   
-  // System tables that should be handled separately (should be imported from dataforge)
-  systemTables: ['local_changes'] as const, // TODO: Import from @repo/dataforge/dexie-schema SYSTEM_TABLES
+  // System tables that should be handled separately
+  systemTables: ['local_changes'] as const,
   
   // Junction/relationship tables from centralized dataforge configuration (without quotes)
   get junctionTables() {
@@ -124,7 +124,9 @@ async function getTableCount(db: any, tableName: string): Promise<number> {
 export async function loadServerData(endpoint: string): Promise<any> {
   try {
     console.log(`Loading data from server: ${endpoint}`);
-    const response = await fetch(`/api/${endpoint}`);
+    const response = await fetch(`/api/${endpoint}`, {
+      credentials: 'include' // Include session cookies for authentication
+    });
     
     if (!response.ok) {
       throw new Error(`Server returned ${response.status}: ${response.statusText}`);

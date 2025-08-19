@@ -6,7 +6,7 @@
  */
 
 import { getLiveStoreClient } from './livestore-client';
-import { trackOutgoingChange } from '../db/dexie-change-tracking';
+// Note: Dexie change tracking import removed - replaced with pure LiveStore sync
 import { db } from '../domain';
 import { nanoid } from 'nanoid';
 

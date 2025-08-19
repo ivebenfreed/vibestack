@@ -12,6 +12,11 @@ node_modules
 # Worktree management files
 .worktree-package-backup.json
 worktrees/
+
+# Database files - use SQL dumps instead
+data/postgres-live/
+data/postgres-*/
+*.pgdata
 !.env.*.d.ts
 !.env.*.example
 
@@ -60,6 +65,35 @@ next-env.d.ts
 data/*
 !data/postgres-live/
 !data/container-main.tar
+!data/database-schema.sql
+!data/database-seed.sql
+
+# PostgreSQL binary files - never track these
+**/pg_wal/
+**/pg_xlog/
+**/pg_log/
+**/pg_stat_tmp/
+**/pg_subtrans/
+**/pg_clog/
+**/pg_multixact/
+**/pg_notify/
+**/pg_serial/
+**/pg_snapshots/
+**/pg_tblspc/
+**/pg_twophase/
+**/pg_replslot/
+**/pg_commit_ts/
+**/pg_logical/
+**/base/
+**/global/
+**/*.pid
+**/*.lock
+**/postmaster.pid
+**/postgresql.auto.conf
+**/recovery.conf
+**/recovery.done
+**/backup_label*
+**/tablespace_map
 
 # Logs
 logs

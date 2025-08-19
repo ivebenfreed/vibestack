@@ -39,7 +39,7 @@ export interface SchemaLoadResult {
 export class OrgSchemaClient {
   private cache = new Map<string, { schema: OrgEntitySchema; timestamp: number }>();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly BASE_URL = '/api/dataforge';
+  private readonly BASE_URL = '/api/archetype';
 
   /**
    * Load schema for an organization with caching
@@ -61,7 +61,8 @@ export class OrgSchemaClient {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        credentials: 'include' // Include session cookies for authentication
       });
 
       if (!response.ok) {
@@ -69,6 +70,8 @@ export class OrgSchemaClient {
       }
 
       const result = await response.json();
+      
+      console.log('🔍 Schema client raw response:', result);
       
       if (!result.success) {
         return {
@@ -78,6 +81,7 @@ export class OrgSchemaClient {
       }
 
       const schema = result.schema as OrgEntitySchema;
+      console.log('🔍 Schema client processed schema:', schema);
       
       // Cache the schema
       this.cacheSchema(orgId, schema);

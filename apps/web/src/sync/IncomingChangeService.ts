@@ -8,7 +8,7 @@
  */
 
 import { TableChange } from '@repo/sync-types';
-import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING } from '../db/client-entities';
+import { CLIENT_DOMAIN_TABLES, CLIENT_JUNCTION_TABLE_MAPPING, isClientDomainTable, getBaseEntityType } from '../db/client-entities';
 import { getLiveStoreClient } from '../lib/livestore-client';
 
 export interface IncomingChangeServiceConfig {
@@ -396,7 +396,7 @@ export class IncomingChangeService {
       const entitiesData = changes.map(change => change.data);
       
       // Perform bulk insert - change tracking is managed at sync phase level
-      const { db } = await import('../db/dexie-schema');
+      // Note: Dexie schema import removed - replaced with LiveStore
       
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
@@ -498,7 +498,7 @@ export class IncomingChangeService {
       const entitiesData = changes.map(change => change.data);
       
       // Perform bulk update - change tracking is managed at sync phase level
-      const { db } = await import('../db/dexie-schema');
+      // Note: Dexie schema import removed - replaced with LiveStore
       
       // Check if it's a domain table
       const tableWithQuotes = `"${table}"`;
@@ -586,11 +586,15 @@ export class IncomingChangeService {
 
       console.log(`[IncomingChangeService] Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
-      // Check if it's a domain table
-      // CLIENT_DOMAIN_TABLES contains table names without quotes
+      // Check if it's a standard domain table
       if (CLIENT_DOMAIN_TABLES.includes(change.table)) {
         await this.applyDomainTableChange(change, false); // false = not live sync
-      } 
+      }
+      // Check if it's an organization-specific table (LiveStore only)
+      else if (isClientDomainTable(change.table)) {
+        console.log(`[IncomingChangeService] 🏢 Organization table ${change.table} - skipping Dexie, going directly to LiveStore`);
+        // Skip Dexie - organization tables go directly to LiveStore
+      }
       // Check if it's a junction table
       else if (CLIENT_JUNCTION_TABLE_MAPPING[change.table]) {
         console.log(`[IncomingChangeService] 🔧 Processing junction table ${change.table} with data:`, change.data);
@@ -644,11 +648,15 @@ export class IncomingChangeService {
 
       console.log(`[IncomingChangeService] 🔄 Live sync: Applying ${change.operation} to ${change.table} for record ${change.data.id}`);
       
-      // Check if it's a domain table
-      // CLIENT_DOMAIN_TABLES contains table names without quotes
+      // Check if it's a standard domain table
       if (CLIENT_DOMAIN_TABLES.includes(change.table)) {
         await this.applyDomainTableChange(change, true); // true = live sync
-      } 
+      }
+      // Check if it's an organization-specific table (LiveStore only)
+      else if (isClientDomainTable(change.table)) {
+        console.log(`[IncomingChangeService] 🏢 Organization table ${change.table} - skipping Dexie, going directly to LiveStore`);
+        // Skip Dexie - organization tables go directly to LiveStore
+      }
       // Check if it's a junction table
       else if (CLIENT_JUNCTION_TABLE_MAPPING[change.table]) {
         console.log(`[IncomingChangeService] 🔧 Processing junction table ${change.table} with data:`, change.data);
@@ -710,16 +718,21 @@ export class IncomingChangeService {
    */
   private async applyDomainTableChange(change: TableChange, isLiveSync: boolean = false): Promise<void> {
     const { db } = await import('../db/dexie-schema');
-    // Use table name directly - Dexie tables use snake_case
-    const dexieTable = (db as any)[change.table];
+    
+    // For organization tables, map to base entity type
+    const baseEntityType = getBaseEntityType(change.table);
+    const dexieTableName = baseEntityType || change.table;
+    const dexieTable = (db as any)[dexieTableName];
     
     if (!dexieTable) {
-      throw new Error(`Dexie table not found for: ${change.table}`);
+      throw new Error(`Dexie table not found for: ${change.table} (mapped to: ${dexieTableName})`);
     }
+    
+    console.log(`[IncomingChangeService] 📋 Mapping table ${change.table} -> ${dexieTableName}`);
     
     if (isLiveSync) {
       // LIVE SYNC: Use SYNC_TRANSACTION flag for individual operations
-      const { SYNC_TRANSACTION } = await import('../db/dexie-change-tracking');
+      // Note: Dexie change tracking import removed - replaced with LiveStore
       
       await db.transaction('rw', dexieTable, async (trans) => {
         (trans as any)[SYNC_TRANSACTION] = true;
@@ -953,7 +966,18 @@ export class IncomingChangeService {
         'skill': 'skill'
       };
 
-      const entityType = tableToEntityMapping[change.table];
+      // For organization tables, extract the entity type  
+      let entityType = tableToEntityMapping[change.table];
+      if (!entityType) {
+        // Check if it's an organization table: org_<orgId>_<entityType>
+        const orgTableMatch = change.table.match(/^org_[0-9a-f_]+_([a-z_]+)$/i);
+        if (orgTableMatch) {
+          const orgEntityType = orgTableMatch[1];
+          entityType = tableToEntityMapping[orgEntityType];
+          console.log(`[IncomingChangeService] 📡 Extracted entity type '${orgEntityType}' -> '${entityType}' from org table: ${change.table}`);
+        }
+      }
+      
       if (!entityType) {
         // Table not mapped to LiveStore - skip
         console.log(`[IncomingChangeService] 📡 Skipping LiveStore bridge for unmapped table: ${change.table}`);

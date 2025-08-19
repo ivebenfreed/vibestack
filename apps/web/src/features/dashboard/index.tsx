@@ -1,7 +1,4 @@
-import { useState, useMemo } from 'react';
-import { useSelector } from '@xstate/store/react'
-import { shallowEqual } from '@xstate/store'
-import { useStableEntityArray, useStableEntityArraySorted } from '@/hooks/useStableEntityArray'
+import { useState, useEffect } from 'react';
 import { usePlaywrightReady } from '@/hooks/use-playwright-ready'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,11 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ContentContainer } from '@/components/layout/content-container'
 import { TopNav } from '@/components/layout/top-nav'
-// ProfileDropdown is now in the main Header
-// Search, ThemeSwitch, and SyncStatusIcon are now in the main Header
-import { RecentTasksEnhanced } from './components/recent-tasks-enhanced'
-import { SyncVisualizer } from '../sync/components/SyncVisualizer'
-// SyncStatusIcon is now in the main Header
+import { domainServices } from '@/domain'
 
 const topNav = [
   {
@@ -48,43 +41,78 @@ const topNav = [
 ]
 
 export default function Dashboard() {
-  // Signal that the Dashboard is ready for Playwright tests
-  usePlaywrightReady('[PLAYWRIGHT_READY] Dashboard loaded');
-  
   const [activeTab, setActiveTab] = useState('overview');
-  
-  // 🎯 XSTATE REACTIVITY: Stable sorted array that only changes when data changes
-  const allTasks = useStableEntityArraySorted(tasksAtom, 'updatedAt', 'desc')
-  
-  // Get entity counts directly from atoms using stable arrays
-  const allProjects = useStableEntityArray(projectsAtom)
-  const allUsers = useStableEntityArray(usersAtom)
-  const allComments = useStableEntityArray(commentsAtom)
-  const allStatusDefinitions = useStableEntityArray(statusDefinitionsAtom)
-  const allStatusSets = useStableEntityArray(statusSetsAtom)
-  const allTags = useStableEntityArray(tagsAtom)
-  const allTagSets = useStableEntityArray(tagSetsAtom)
-  
-  // Calculate dashboard data from XState stores
-  const dashboardData = useMemo(() => {
-    const recentTasks = allTasks.slice(0, 5) // Already sorted above
-    
-    return {
-      tableCounts: {
-        users: allUsers.length,
-        projects: allProjects.length,
-        tasks: allTasks.length,
-        comments: allComments.length,
-        statusDefinitions: allStatusDefinitions.length,
-        statusSets: allStatusSets.length,
-        tags: allTags.length,
-        tagSets: allTagSets.length
-      },
-      recentTasks
-    }
-  }, [allTasks, allProjects, allUsers, allComments, allStatusDefinitions, allStatusSets, allTags, allTagSets])
+  const [entityCounts, setEntityCounts] = useState({
+    projects: 0,
+    tasks: 0,
+    clients: 0,
+    timesheets: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  // 🎯 TEMPORARILY REDUCED LOGGING to isolate double render
+  // Signal that the Dashboard is ready for Playwright tests
+  usePlaywrightReady(loading ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
+
+  // Load entity counts using LiveStore domain services
+  useEffect(() => {
+    async function loadEntityCounts() {
+      try {
+        const orgId = domainServices.getCurrentOrgId();
+        if (!orgId) {
+          console.log('[Dashboard] No organization selected');
+          setLoading(false);
+          return;
+        }
+
+        console.log('[Dashboard] Loading entity counts for organization:', orgId);
+        
+        // Get counts from LiveStore domain services
+        const [projects, tasks, clients, timesheets] = await Promise.allSettled([
+          domainServices.project.findAll(),
+          domainServices.task.findAll(), 
+          domainServices.client.findAll(),
+          domainServices.timesheet.findAll()
+        ]);
+
+        setEntityCounts({
+          projects: projects.status === 'fulfilled' && projects.value.success ? projects.value.data?.length || 0 : 0,
+          tasks: tasks.status === 'fulfilled' && tasks.value.success ? tasks.value.data?.length || 0 : 0,
+          clients: clients.status === 'fulfilled' && clients.value.success ? clients.value.data?.length || 0 : 0,
+          timesheets: timesheets.status === 'fulfilled' && timesheets.value.success ? timesheets.value.data?.length || 0 : 0
+        });
+
+        console.log('[Dashboard] Entity counts loaded:', {
+          projects: projects.status === 'fulfilled' && projects.value.success ? projects.value.data?.length || 0 : 0,
+          tasks: tasks.status === 'fulfilled' && tasks.value.success ? tasks.value.data?.length || 0 : 0,
+          clients: clients.status === 'fulfilled' && clients.value.success ? clients.value.data?.length || 0 : 0,
+          timesheets: timesheets.status === 'fulfilled' && timesheets.value.success ? timesheets.value.data?.length || 0 : 0
+        });
+
+      } catch (error) {
+        console.error('[Dashboard] Error loading entity counts:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadEntityCounts();
+  }, []);
+
+  if (loading) {
+    return (
+      <ContentContainer>
+        <div className='mb-2 flex items-center justify-between space-y-2'>
+          <div>
+            <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
+            <TopNav links={topNav} className="mt-2" />
+          </div>
+        </div>
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </ContentContainer>
+    );
+  }
 
   return (
     <ContentContainer>
@@ -122,7 +150,7 @@ export default function Dashboard() {
             <Card>
               <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
                 <CardTitle className='text-sm font-medium'>
-                  Users Table
+                  Clients
                 </CardTitle>
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
@@ -140,9 +168,9 @@ export default function Dashboard() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.users}</div>
+                <div className='text-2xl font-bold'>{entityCounts.clients}</div>
                 <p className='text-muted-foreground text-xs'>
-                  Total user records
+                  Business clients
                 </p>
               </CardContent>
             </Card>
@@ -166,7 +194,7 @@ export default function Dashboard() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.projects}</div>
+                <div className='text-2xl font-bold'>{entityCounts.projects}</div>
                 <p className='text-muted-foreground text-xs'>
                   Total project records
                 </p>
@@ -189,7 +217,7 @@ export default function Dashboard() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.tasks}</div>
+                <div className='text-2xl font-bold'>{entityCounts.tasks}</div>
                 <p className='text-muted-foreground text-xs'>
                   Total task records
                 </p>
@@ -198,7 +226,7 @@ export default function Dashboard() {
             <Card>
               <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
                 <CardTitle className='text-sm font-medium'>
-                  Comments Table
+                  Timesheets
                 </CardTitle>
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
@@ -214,137 +242,14 @@ export default function Dashboard() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.comments}</div>
+                <div className='text-2xl font-bold'>{entityCounts.timesheets}</div>
                 <p className='text-muted-foreground text-xs'>
-                  Total comment records
+                  Time entries
                 </p>
               </CardContent>
             </Card>
-          </div>
-          <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4'>
-            <Card>
-              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                <CardTitle className='text-sm font-medium'>
-                  Status Definitions
-                </CardTitle>
-                <svg
-                  xmlns='http://www.w3.org/2000/svg'
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  className='text-muted-foreground h-4 w-4'
-                >
-                  <circle cx='12' cy='12' r='3' />
-                  <path d='M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24' />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.statusDefinitions}</div>
-                <p className='text-muted-foreground text-xs'>
-                  Status definition records
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                <CardTitle className='text-sm font-medium'>
-                  Status Sets
-                </CardTitle>
-                <svg
-                  xmlns='http://www.w3.org/2000/svg'
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  className='text-muted-foreground h-4 w-4'
-                >
-                  <rect x='3' y='4' width='18' height='18' rx='2' ry='2' />
-                  <line x1='16' y1='2' x2='16' y2='6' />
-                  <line x1='8' y1='2' x2='8' y2='6' />
-                  <line x1='3' y1='10' x2='21' y2='10' />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.statusSets}</div>
-                <p className='text-muted-foreground text-xs'>
-                  Status set records
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                <CardTitle className='text-sm font-medium'>
-                  Tags
-                </CardTitle>
-                <svg
-                  xmlns='http://www.w3.org/2000/svg'
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  className='text-muted-foreground h-4 w-4'
-                >
-                  <path d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z' />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.tags}</div>
-                <p className='text-muted-foreground text-xs'>
-                  Tag records
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                <CardTitle className='text-sm font-medium'>
-                  Tag Sets
-                </CardTitle>
-                <svg
-                  xmlns='http://www.w3.org/2000/svg'
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  className='text-muted-foreground h-4 w-4'
-                >
-                  <path d='M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z' />
-                  <line x1='7' y1='7' x2='7.01' y2='7' />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className='text-2xl font-bold'>{dashboardData.tableCounts.tagSets}</div>
-                <p className='text-muted-foreground text-xs'>
-                  Tag set records
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-          <div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
-            <Card className='col-span-1 lg:col-span-1'>
-              <CardHeader>
-                <CardTitle>Recent Tasks</CardTitle>
-                <CardDescription>
-                  Latest updated tasks.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RecentTasksEnhanced />
-              </CardContent>
-            </Card>
-            {/* 🎯 TEMPORARILY DISABLED: Testing if SyncVisualizer causes performance issues */}
-            {/* <SyncVisualizer className='col-span-1 lg:col-span-1' /> */}
           </div>
         </TabsContent>
-        
       </Tabs>
     </ContentContainer>
   )
