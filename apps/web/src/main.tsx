@@ -11,6 +11,9 @@ if (process.env.NODE_ENV === 'development') {
 
 // Dexie uses native IndexedDB for local persistence
 
+// Setup global LiveStore initialization - independent from sync, initialized by app init machine
+import './lib/livestore-global-init';
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'

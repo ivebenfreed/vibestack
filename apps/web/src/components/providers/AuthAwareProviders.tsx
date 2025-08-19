@@ -1,31 +1,24 @@
 import React from 'react'
-// Pure LiveStore providers only - no Dexie dependencies
-import { LiveStoreProvider } from './LiveStoreProvider'
 import { AbilityProvider } from '@/contexts/AbilityContext'
 import { NavigationProgress } from '@/components/navigation-progress'
 import { useAuth } from '@/state-machines'
 
-// Auth-aware wrapper component for database and sync services
+// Auth-aware wrapper component - LiveStore is initialized globally by app init machine
 export function AuthAwareProviders({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isCheckingAuth, isSigningOut } = useAuth()
   
-  // 🔥 SIMPLIFIED: Just check auth state - no triple checking with orchestrator
-  // When auth completes, it directly triggers init via event
   console.log('[AuthAwareProviders] Auth state:', { 
     isAuthenticated, 
     isCheckingAuth,
-    isSigningOut,
-    shouldMountDatabase: isAuthenticated && !isCheckingAuth && !isSigningOut
+    isSigningOut
   });
   
-  // Simple rule: mount database when authenticated and not checking or signing out
+  // Simple rule: render app layout when authenticated and not checking or signing out
   if (isAuthenticated && !isCheckingAuth && !isSigningOut) {
     return (
-      <LiveStoreProvider>
-        <AbilityProvider>
-          <AppLayout>{children}</AppLayout>
-        </AbilityProvider>
-      </LiveStoreProvider>
+      <AbilityProvider>
+        <AppLayout>{children}</AppLayout>
+      </AbilityProvider>
     )
   }
   
