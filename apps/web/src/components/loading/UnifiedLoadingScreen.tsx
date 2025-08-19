@@ -17,9 +17,9 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
     isReady 
   } = useAppInit();
   
-  // Simple reactive loading - no timeouts or complex state management
-  // TEMPORARY: Disable blocking overlay during org setup development
-  const shouldShow = false; // !isSystemReady;
+  // 🎯 OPTIMIZED: Only show loading for essential steps, allow progressive loading
+  // Now we show dashboard faster and load data progressively in the background
+  const shouldShow = !isSystemReady && (isCheckingAuth || isSigningIn);
 
   // Debug logging in development - log every render
   if (import.meta.env.MODE === 'development') {
