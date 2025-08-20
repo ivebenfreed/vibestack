@@ -335,11 +335,11 @@ export class PollingManager {
 
   private async sendTableChangeNotification(organizationId: string, tables: string[], lsn: string): Promise<number> {
     try {
-      // Use the existing broadcast system - get active clients for org and notify them directly
-      const { OrgAwareClientRegistryManager } = await import('../sync/org-aware-client-registry');
+      // Use the unified client registry system - get active clients for org and notify them directly
+      const { UnifiedClientRegistry } = await import('../sync/unified-client-registry');
       
-      const orgRegistry = new OrgAwareClientRegistryManager(this.env);
-      const clientIds = await orgRegistry.getOrgActiveClients(organizationId);
+      const unifiedRegistry = new UnifiedClientRegistry(this.env);
+      const clientIds = await unifiedRegistry.getOrgActiveClients(organizationId);
       
       if (clientIds.length === 0) {
         replicationLogger.debug('No active clients for organization', {

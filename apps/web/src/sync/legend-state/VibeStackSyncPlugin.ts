@@ -45,6 +45,11 @@ export interface TableSyncConfig {
   enableRealTimeSync: boolean
   enablePersistence: boolean
   conflictResolution: 'server-wins' | 'client-wins' | 'last-write-wins'
+  // Legend State sync options for differential sync
+  fieldUpdatedAt?: string
+  fieldDeleted?: string
+  changesSince?: 'last-sync' | number | string
+  includeDeleted?: boolean
 }
 
 class VibeStackSyncPlugin {
@@ -115,7 +120,7 @@ class VibeStackSyncPlugin {
   private createPersistencePlugin(): ObservablePersistPlugin {
     const dbName = `${this.config.indexedDbName}_org_${this.config.organizationId}`
     
-    return ObservablePersistIndexedDB({
+    return new ObservablePersistIndexedDB({
       databaseName: dbName,
       version: this.config.indexedDbVersion,
       tableNames: ['vibestack_entities', 'vibestack_metadata', 'vibestack_sync_state']
@@ -192,6 +197,122 @@ class VibeStackSyncPlugin {
   }
   
   /**
+   * Create Legend State sync configuration for a table with differential sync support
+   */
+  public createLegendStateSyncConfig(tableName: string) {
+    const tableConfig = this.tableConfigs.get(tableName)
+    
+    if (!tableConfig) {
+      throw new Error(`Table ${tableName} not registered for sync`)
+    }
+    
+    const syncUrl = `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/sync/${tableName}`
+    
+    return {
+      list: {
+        url: syncUrl,
+        // Enable differential sync with changesSince parameter
+        urlQuery: (params: any) => {
+          const query: Record<string, string> = {}
+          
+          // Add differential sync parameters
+          if (params.changesSince) {
+            query.changesSince = typeof params.changesSince === 'number' 
+              ? new Date(params.changesSince).toISOString()
+              : params.changesSince
+          }
+          
+          if (tableConfig.includeDeleted) {
+            query.includeDeleted = 'true'
+          }
+          
+          if (params.limit) {
+            query.limit = String(params.limit)
+          }
+          
+          if (params.offset) {
+            query.offset = String(params.offset)
+          }
+          
+          return query
+        },
+        // Transform server response to extract data array
+        transform: {
+          load: (response: any) => {
+            if (response.success && response.data) {
+              // Store sync metadata for next request
+              if (response.syncInfo?.nextChangesSince) {
+                localStorage.setItem(
+                  `vibestack_sync_${tableName}_lastSync`, 
+                  String(response.syncInfo.nextChangesSince)
+                )
+              }
+              return response.data
+            }
+            return []
+          }
+        }
+      },
+      create: {
+        url: `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/data/${tableName}`,
+        transform: {
+          save: (item: any) => {
+            // Remove Legend State metadata before sending to server
+            const { __id, __metadata, ...cleanItem } = item
+            return cleanItem
+          },
+          load: (response: any) => response.saved || response.data
+        }
+      },
+      update: {
+        url: (item: any) => `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/data/${tableName}/${item[tableConfig.primaryKey]}`,
+        transform: {
+          save: (item: any) => {
+            // Remove Legend State metadata before sending to server
+            const { __id, __metadata, ...cleanItem } = item
+            return cleanItem
+          },
+          load: (response: any) => response.updated || response.data
+        }
+      },
+      delete: {
+        url: (item: any) => `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/data/${tableName}/${item[tableConfig.primaryKey]}`,
+        transform: {
+          save: () => ({ deleted: true, deleted_at: new Date().toISOString() })
+        }
+      },
+      // Configure differential sync fields
+      fieldUpdatedAt: tableConfig.fieldUpdatedAt || 'updated_at',
+      fieldDeleted: tableConfig.fieldDeleted || 'deleted',
+      changesSince: tableConfig.changesSince || 'last-sync',
+      
+      // Persistence configuration
+      persist: tableConfig.enablePersistence ? {
+        name: `vibestack_${tableName}`,
+        plugin: this.persistencePlugin
+      } : undefined,
+      
+      // Real-time sync via WebSocket notifications
+      realtime: tableConfig.enableRealTimeSync
+    }
+  }
+  
+  /**
+   * Get the last sync timestamp for a table
+   */
+  public getLastSyncTimestamp(tableName: string): number | null {
+    const stored = localStorage.getItem(`vibestack_sync_${tableName}_lastSync`)
+    return stored ? parseInt(stored) : null
+  }
+  
+  /**
+   * Get the persistence plugin instance
+   */
+  public getPersistencePlugin() {
+    return this.persistencePlugin
+  }
+  
+  /**
    * Get sync statistics and status
    */
   public getSyncStatus() {
@@ -244,6 +365,46 @@ export function createDefaultSyncConfig(organizationId: string, userId: string):
     retryDelayMs: 1000,
     debugMode: true
   }
+}
+
+/**
+ * Default table sync configuration with differential sync enabled
+ */
+export function createDefaultTableConfig(tableName: string): TableSyncConfig {
+  return {
+    tableName,
+    apiEndpoint: `/api/universal-archetype/orgs/{orgId}/sync/${tableName}`,
+    primaryKey: 'id',
+    enableRealTimeSync: true,
+    enablePersistence: true,
+    conflictResolution: 'server-wins',
+    // Differential sync configuration
+    fieldUpdatedAt: 'updated_at',
+    fieldDeleted: 'deleted',
+    changesSince: 'last-sync',
+    includeDeleted: false
+  }
+}
+
+/**
+ * Register all business entity tables for sync with differential sync enabled
+ */
+export function registerBusinessEntityTables(syncPlugin: VibeStackSyncPlugin): void {
+  // Wide Corp business entities
+  const businessEntities = [
+    'project', 'client', 'contract', 'document', 'expense',
+    'invoice', 'meeting', 'proposal', 'resource', 'skill',
+    'timesheet', 'certification'
+  ]
+  
+  businessEntities.forEach(entityName => {
+    const config = createDefaultTableConfig(entityName)
+    syncPlugin.registerTable(config)
+  })
+  
+  syncLogger.info('legend-state', `Registered ${businessEntities.length} business entities for differential sync`, {
+    entities: businessEntities
+  })
 }
 
 export { VibeStackSyncPlugin }

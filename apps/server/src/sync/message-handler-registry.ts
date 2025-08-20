@@ -33,6 +33,9 @@ export interface MessageHandlerContext {
   // NOTE: Removed heartbeat-triggered sync methods - organization context is required
   analyzeLSNGap: (clientLSN: string, serverLSN: string) => { shouldTriggerCatchup: boolean; gapSize: number; threshold: number };
   state: DurableObjectState;
+  // Unified client registry and organization context access
+  unifiedClientRegistry: any; // UnifiedClientRegistry type
+  getOrganizationContext: () => { organizationId: string } | null;
 }
 
 export class MessageHandlerRegistry {
@@ -230,56 +233,39 @@ export class MessageHandlerRegistry {
         }
         
         if (clientId) {
-          const key = `client:${clientId}`;
+          // Update unified client registry with organization context
+          const orgContext = this.context.getOrganizationContext();
           
-          try {
-            const existingData = await this.context.env.CLIENT_REGISTRY.get(key);
-            
-            if (existingData) {
-              const data = JSON.parse(existingData);
-              await this.context.env.CLIENT_REGISTRY.put(
-                key,
-                JSON.stringify({
-                  ...data,
-                  active: true,
-                  lastSeen: Date.now()
-                }),
+          if (orgContext) {
+            try {
+              // Update activity in unified registry (this refreshes TTL)
+              await this.context.unifiedClientRegistry.updateClientActivity(
+                clientId, 
+                orgContext.organizationId,
                 {
-                  // Refresh TTL on heartbeat - 2 hours
-                  expirationTtl: 2 * 60 * 60
+                  lsn: heartbeatMessage.lsn,
+                  state: heartbeatMessage.state,
+                  active: heartbeatMessage.active
                 }
               );
               
-              syncLogger.debug('Updated client active status on heartbeat', {
+              syncLogger.debug('Updated client activity in unified registry on heartbeat', {
                 clientId,
-                active: true,
+                organizationId: orgContext.organizationId,
+                active: heartbeatMessage.active,
                 lastSeen: new Date().toISOString()
               }, MODULE_NAME);
-            } else {
-              syncLogger.warn('Client not found in registry during heartbeat - creating new entry', {
-                clientId
-              }, MODULE_NAME);
               
-              // Create new entry if client doesn't exist
-              await this.context.env.CLIENT_REGISTRY.put(
-                key,
-                JSON.stringify({
-                  active: true,
-                  lastSeen: Date.now()
-                }),
-                {
-                  expirationTtl: 2 * 60 * 60
-                }
-              );
-              
-              syncLogger.debug('Created new client registry entry on heartbeat', {
-                clientId
+            } catch (registryError) {
+              syncLogger.error('Error updating unified client registry on heartbeat', {
+                clientId,
+                organizationId: orgContext.organizationId,
+                error: registryError instanceof Error ? registryError.message : String(registryError)
               }, MODULE_NAME);
             }
-          } catch (kvError) {
-            syncLogger.error('Failed to update client registry on heartbeat', {
-              clientId,
-              error: kvError instanceof Error ? kvError.message : String(kvError)
+          } else {
+            syncLogger.warn('No organization context available for heartbeat - cannot update unified registry', {
+              clientId
             }, MODULE_NAME);
           }
         }

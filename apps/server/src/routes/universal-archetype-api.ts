@@ -322,6 +322,148 @@ universalArchetypeRouter.put('/orgs/:orgId/data/:entityName/:id', async (c) => {
   }
 });
 
+// Query data with changesSince support for Legend State differential sync
+universalArchetypeRouter.get('/orgs/:orgId/sync/:entityName', async (c) => {
+  try {
+    const orgId = c.req.param('orgId');
+    const entityName = c.req.param('entityName');
+    
+    // Get query parameters for differential sync
+    const changesSince = c.req.query('changesSince'); // ISO timestamp
+    const includeDeleted = c.req.query('includeDeleted') === 'true';
+    const limit = parseInt(c.req.query('limit') || '1000');
+    const offset = parseInt(c.req.query('offset') || '0');
+    
+    // Get authenticated user from auth middleware
+    const user = c.get('user');
+    const session = c.get('session');
+    
+    console.log(`[Sync API] User ${user?.email || 'anonymous'} syncing ${entityName} in org ${orgId}`, {
+      changesSince,
+      includeDeleted,
+      limit,
+      offset
+    });
+
+    // Check ContainerPermission access control
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
+    
+    const kysely = getKysely(c.env);
+    const accessService = new ArchetypeAccessService(kysely);
+    
+    const accessResult = await accessService.canQueryData(user?.id || '', orgId, entityName);
+    if (!accessResult.allowed) {
+      console.log(`[Sync API] Access denied for ${user?.email}: ${accessResult.reason}`);
+      return c.json({
+        error: 'Access denied',
+        code: 'FORBIDDEN',
+        message: accessResult.reason,
+        requiredRole: accessResult.requiredRole,
+        userRole: accessResult.userRole
+      }, 403);
+    }
+    
+    console.log(`[Sync API] Access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    
+    const { getDBClient } = await import('../lib/db');
+    const client = getDBClient(c);
+    
+    // Get entity definition
+    const entityDef = await getEntityDefinition(c, orgId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+    
+    // Build differential sync query
+    await client.connect();
+    try {
+      let whereClause = `organization_id = '${orgId}'`;
+      const queryParams: any[] = [];
+      let paramCount = 0;
+      
+      // Add changesSince filter if provided
+      if (changesSince) {
+        paramCount++;
+        whereClause += ` AND updated_at > $${paramCount}`;
+        queryParams.push(new Date(changesSince));
+      }
+      
+      // Include or exclude deleted records
+      if (!includeDeleted) {
+        whereClause += ` AND (deleted IS NULL OR deleted = false)`;
+      }
+      
+      // Build the query
+      const syncQuery = `
+        SELECT *,
+               EXTRACT(EPOCH FROM updated_at) * 1000 as updated_at_ms
+        FROM ${entityDef.tableName}
+        WHERE ${whereClause}
+        ORDER BY updated_at ASC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+      
+      // Get total count for pagination
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM ${entityDef.tableName}
+        WHERE ${whereClause}
+      `;
+      
+      console.log(`[Sync API] Executing sync query:`, syncQuery, queryParams);
+      
+      const [dataResult, countResult] = await Promise.all([
+        client.query(syncQuery, queryParams),
+        client.query(countQuery, queryParams)
+      ]);
+      
+      const results = dataResult.rows;
+      const totalCount = parseInt(countResult.rows[0].total);
+      
+      // Calculate max updated_at for next sync
+      const maxUpdatedAt = results.length > 0
+        ? Math.max(...results.map(r => r.updated_at_ms))
+        : changesSince 
+          ? new Date(changesSince).getTime()
+          : Date.now();
+      
+      console.log(`[Sync API] Returning ${results.length} records, maxUpdatedAt: ${maxUpdatedAt}`);
+      
+      return c.json({
+        success: true,
+        data: results,
+        metadata: {
+          archetype: entityDef.definition.archetype,
+          totalCount,
+          returnedCount: results.length,
+          hasMore: (offset + results.length) < totalCount,
+          maxUpdatedAt,
+          changesSince,
+          includeDeleted,
+          limit,
+          offset
+        },
+        syncInfo: {
+          fieldUpdatedAt: 'updated_at',
+          fieldDeleted: 'deleted',
+          nextChangesSince: maxUpdatedAt
+        }
+      });
+      
+    } finally {
+      await client.end();
+    }
+    
+  } catch (error) {
+    console.error('Sync API query error:', error);
+    return c.json({ 
+      error: 'Failed to sync data', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
 // Query data from universal archetype entity
 universalArchetypeRouter.get('/orgs/:orgId/data/:entityName', async (c) => {
   try {

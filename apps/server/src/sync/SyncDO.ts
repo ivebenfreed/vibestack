@@ -15,7 +15,7 @@ import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProces
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
 import crypto from 'crypto';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';
-import { OrgAwareClientRegistryManager } from './org-aware-client-registry';
+import { UnifiedClientRegistry } from './unified-client-registry';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
 import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
 import { OrgAwareSyncManager, type SyncConnection } from './org-aware-sync-manager';
@@ -62,7 +62,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   private stateManager: SyncStateManager;
   private messageHandlerRegistry!: MessageHandlerRegistry;
   private webSocketManager!: WebSocketManager;
-  private orgAwareClientRegistry!: OrgAwareClientRegistryManager;
+  private unifiedClientRegistry!: UnifiedClientRegistry;
   private broadcastManager!: BroadcastManager;
   private syncStrategyAnalyzer!: SyncStrategyAnalyzer;
 
@@ -107,8 +107,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
    * Initialize all service modules with proper dependency injection
    */
   private initializeServices(): void {
-    // Organization-Aware Client Registry Manager
-    this.orgAwareClientRegistry = new OrgAwareClientRegistryManager(this.env);
+    // Unified Client Registry
+    this.unifiedClientRegistry = new UnifiedClientRegistry(this.env);
 
     // WebSocket Manager
     const wsContext: WebSocketManagerContext = {
@@ -131,7 +131,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     const broadcastContext: BroadcastManagerContext = {
       env: this.env,
       clientId: this.clientId,
-      orgAwareClientRegistry: this.orgAwareClientRegistry,
+      unifiedClientRegistry: this.unifiedClientRegistry,
       getOrganizationContext: () => this.syncConnection ? { organizationId: this.syncConnection.organizationId } : null,
       getContext: () => this.getContext()
     };
@@ -168,7 +168,10 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       // Initial and catchup sync should only be triggered through proper org-aware WebSocket connection
       analyzeLSNGap: (clientLSN: string, serverLSN: string) => 
         this.syncStrategyAnalyzer.analyzeLSNGap(clientLSN, serverLSN),
-      state: this.state
+      state: this.state,
+      // Unified client registry and organization context access
+      unifiedClientRegistry: this.unifiedClientRegistry,
+      getOrganizationContext: () => this.syncConnection ? { organizationId: this.syncConnection.organizationId } : null
     };
     this.messageHandlerRegistry = new MessageHandlerRegistry(handlerContext, this);
   }
@@ -264,10 +267,14 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       defaultedTo0: !rawLSN
     }, MODULE_NAME);
 
-    // 4. Proceed with WebSocket upgrade
+    // 4. Store connection context in persistent storage for hibernation recovery
+    await this.storeSyncConnection(this.syncConnection, clientLSN);
+
+    // 5. Proceed with WebSocket upgrade
     const response = await this.webSocketManager.handleWebSocketUpgrade(request);
     
     if (response.status === 101) {
+      
       // WebSocket upgrade successful - register handlers  
       this.registerMessageHandlers();
       
@@ -303,13 +310,15 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         clientLSN
       }, MODULE_NAME);
 
-      // Register client with organization-aware registry
-      await this.orgAwareClientRegistry.registerClient({
+      // Register client with unified registry
+      await this.unifiedClientRegistry.registerClient({
         clientId,
         organizationId: this.syncConnection.organizationId,
         organizationSlug: this.syncConnection.organizationSlug,
         userId: this.syncConnection.userId,
-        userRole: this.syncConnection.userRole
+        userRole: this.syncConnection.userRole,
+        userEmail: this.syncConnection.userEmail,
+        userName: this.syncConnection.userName
       });
       
       syncLogger.debug('Client registered with organization-aware registry', {
@@ -1181,9 +1190,32 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): Promise<void> {
     // Register handlers if they aren't registered (DO just woke up from hibernation)
     if (!this.isHandlerRegistered) {
-      syncLogger.debug('DO woke from hibernation, registering message handlers', {
+      syncLogger.debug('DO woke from hibernation, attempting context restoration', {
         clientId: this.clientId,
       }, MODULE_NAME);
+      
+      // Restore context from persistent storage instead of WebSocket attachment
+      await this.restoreSyncConnection();
+      
+      // Re-register client with unified registry after hibernation
+      if (this.clientId && this.syncConnection) {
+        await this.unifiedClientRegistry.registerClient({
+          clientId: this.clientId,
+          organizationId: this.syncConnection.organizationId,
+          organizationSlug: this.syncConnection.organizationSlug,
+          userId: this.syncConnection.userId,
+          userRole: this.syncConnection.userRole,
+          userEmail: this.syncConnection.userEmail,
+          userName: this.syncConnection.userName
+        });
+        
+        syncLogger.info('Re-registered client with unified registry after hibernation', {
+          clientId: this.clientId,
+          organizationId: this.syncConnection.organizationId,
+          userId: this.syncConnection.userId
+        }, MODULE_NAME);
+      }
+      
       this.registerMessageHandlers();
     }
     
@@ -1247,16 +1279,114 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // Cleanup from both registries - don't wait for completion
     this.state.waitUntil(this.stateManager.cleanupConnection());
     
-    // Remove from organization-aware registry
+    // Remove from unified registry
     if (this.clientId && this.syncConnection) {
-      this.state.waitUntil(this.orgAwareClientRegistry.removeClient(
+      this.state.waitUntil(this.unifiedClientRegistry.removeClient(
         this.clientId,
         this.syncConnection.organizationId
       ));
     }
+
+    // Clean up stored sync connection context
+    this.state.waitUntil(this.clearSyncConnection());
   }
 
   async webSocketError(ws: WebSocket, error: Error): Promise<void> {
     return this.webSocketManager.handleWebSocketError(ws, error);
+  }
+
+  /**
+   * Store sync connection context in persistent storage for hibernation recovery
+   */
+  private async storeSyncConnection(connection: SyncConnection, clientLSN: string): Promise<void> {
+    try {
+      const contextData = {
+        clientId: this.clientId,
+        syncConnection: {
+          userId: connection.userId,
+          organizationId: connection.organizationId,
+          organizationSlug: connection.organizationSlug,
+          userRole: connection.userRole,
+          userEmail: connection.userEmail,
+          userName: connection.userName
+        },
+        clientLSN,
+        timestamp: Date.now()
+      };
+
+      await this.state.storage.put('syncConnection', contextData);
+      
+      syncLogger.info('Stored sync connection context in persistent storage', {
+        clientId: this.clientId,
+        organizationId: connection.organizationId,
+        userId: connection.userId
+      }, MODULE_NAME);
+    } catch (error) {
+      syncLogger.error('Failed to store sync connection context', {
+        clientId: this.clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * Restore sync connection context from persistent storage after hibernation
+   */
+  private async restoreSyncConnection(): Promise<void> {
+    try {
+      const contextData = await this.state.storage.get('syncConnection') as any;
+      
+      if (contextData && contextData.syncConnection) {
+        // Restore client ID and sync connection from storage
+        this.clientId = contextData.clientId || '';
+        this.syncConnection = contextData.syncConnection;
+        
+        // Also update the StateManager's user context
+        const userContext = {
+          userId: this.syncConnection.userId,
+          userRole: this.syncConnection.userRole,
+          userEmail: this.syncConnection.userEmail,
+          userName: this.syncConnection.userName,
+          timestamp: contextData.timestamp || Date.now()
+        };
+        this.stateManager.setUserContext(userContext);
+        
+        syncLogger.info('Successfully restored sync connection from persistent storage', {
+          clientId: this.clientId,
+          organizationId: this.syncConnection.organizationId,
+          userId: this.syncConnection.userId,
+          userRole: this.syncConnection.userRole,
+          storedAt: new Date(contextData.timestamp || 0).toISOString()
+        }, MODULE_NAME);
+      } else {
+        syncLogger.warn('No sync connection context found in persistent storage after hibernation', {
+          clientId: this.clientId,
+          hasContextData: !!contextData
+        }, MODULE_NAME);
+      }
+    } catch (error) {
+      syncLogger.error('Failed to restore sync connection from persistent storage', {
+        clientId: this.clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * Clear sync connection context from persistent storage
+   */
+  private async clearSyncConnection(): Promise<void> {
+    try {
+      await this.state.storage.delete('syncConnection');
+      
+      syncLogger.debug('Cleared sync connection context from persistent storage', {
+        clientId: this.clientId
+      }, MODULE_NAME);
+    } catch (error) {
+      syncLogger.error('Failed to clear sync connection context', {
+        clientId: this.clientId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
   }
 }

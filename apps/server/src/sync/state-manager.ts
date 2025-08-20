@@ -44,6 +44,7 @@ export interface StateManager {
   
   // User context methods
   getUserContext(): Promise<UserContext | null>;
+  setUserContext(userContext: UserContext | null): void;
   getUserRole(): Promise<string | null>;
   getUserId(): Promise<string | null>;
 }
@@ -520,6 +521,13 @@ export class SyncStateManager implements StateManager {
    */
   async getUserContext(): Promise<UserContext | null> {
     return this.userContext;
+  }
+
+  /**
+   * Set user context (used during hibernation recovery)
+   */
+  setUserContext(userContext: UserContext | null): void {
+    this.userContext = userContext;
   }
 
   /**

@@ -1,7 +1,7 @@
 import type { TableChange } from '@repo/sync-types';
 import type { Env } from '../types/env';
 import { replicationLogger } from '../middleware/logger';
-import { OrgAwareClientRegistryManager } from '../sync/org-aware-client-registry';
+import { UnifiedClientRegistry } from '../sync/unified-client-registry';
 
 const MODULE_NAME = 'org-aware-broadcasting';
 
@@ -18,8 +18,8 @@ interface BroadcastResult {
  */
 async function getOrganizationClientIds(env: Env, organizationId: string): Promise<string[]> {
   try {
-    const orgAwareRegistry = new OrgAwareClientRegistryManager(env);
-    return await orgAwareRegistry.getOrgActiveClients(organizationId);
+    const unifiedRegistry = new UnifiedClientRegistry({ env });
+    return await unifiedRegistry.getOrgActiveClients(organizationId);
   } catch (error) {
     replicationLogger.error('Failed to get organization client IDs', {
       organizationId,
@@ -142,13 +142,13 @@ export async function broadcastChangesToOrganizations(
 
 async function getAllActiveClientIds(env: Env): Promise<string[]> {
   try {
-    const orgAwareRegistry = new OrgAwareClientRegistryManager(env);
-    const stats = await orgAwareRegistry.getRegistryStats();
+    const unifiedRegistry = new UnifiedClientRegistry({ env });
+    const stats = await unifiedRegistry.getRegistryStats();
     
     // Get all active clients from all organizations
     const allClientIds: string[] = [];
     for (const [orgId] of Object.entries(stats.organizationClients)) {
-      const orgClients = await orgAwareRegistry.getOrgActiveClients(orgId);
+      const orgClients = await unifiedRegistry.getOrgActiveClients(orgId);
       allClientIds.push(...orgClients);
     }
     

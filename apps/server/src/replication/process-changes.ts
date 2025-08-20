@@ -317,14 +317,14 @@ replicationLogger.info('Dynamic replication tracking initialized', {
  */
 export async function getAllClientIds(env: Env, timeout = 10 * 60 * 1000): Promise<string[]> {
   try {
-    const { OrgAwareClientRegistryManager } = await import('../sync/org-aware-client-registry');
-    const orgAwareRegistry = new OrgAwareClientRegistryManager(env);
-    const stats = await orgAwareRegistry.getRegistryStats();
+    const { UnifiedClientRegistry } = await import('../sync/unified-client-registry');
+    const unifiedRegistry = new UnifiedClientRegistry({ env });
+    const stats = await unifiedRegistry.getRegistryStats();
     
     // Get all active clients from all organizations
     const allClientIds: string[] = [];
     for (const [orgId] of Object.entries(stats.organizationClients)) {
-      const orgClients = await orgAwareRegistry.getOrgActiveClients(orgId);
+      const orgClients = await unifiedRegistry.getOrgActiveClients(orgId);
       allClientIds.push(...orgClients);
       
       replicationLogger.debug('Retrieved clients for organization', {

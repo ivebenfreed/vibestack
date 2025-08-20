@@ -92,14 +92,17 @@ export const simpleNotificationSyncMachine = setup({
   },
   
   actions: {
-    setupWebSocketListeners: ({ context }) => {
+    setupWebSocketListeners: ({ context, self }) => {
       if (!context.webSocket) return
       
       context.webSocket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
           
-          // Handle table change notifications
+          // Send message to the XState machine for proper state management
+          self.send({ type: 'WS_MESSAGE', message })
+          
+          // Handle table change notifications immediately for Legend State
           if (message.type === 'srv_table_change_notification') {
             syncLogger.info('notification-sync', `🔔 Table notification: ${JSON.stringify(message.tables)}`)
             console.log('🔔 [SimpleNotificationSync] TABLE CHANGE NOTIFICATION:', {
@@ -137,11 +140,12 @@ export const simpleNotificationSyncMachine = setup({
       
       context.webSocket.onclose = () => {
         syncLogger.warn('notification-sync', 'WebSocket disconnected')
-        // The machine will handle reconnection
+        self.send({ type: 'WS_DISCONNECTED', reason: 'WebSocket closed' })
       }
       
       context.webSocket.onerror = (error) => {
         syncLogger.error('notification-sync', `WebSocket error: ${error}`)
+        self.send({ type: 'WS_ERROR', error })
       }
     },
     
@@ -231,7 +235,18 @@ export const simpleNotificationSyncMachine = setup({
             assign({
               organizationId: ({ event }) => event.organizationId,
               userId: ({ event }) => event.userId,
-              clientId: () => `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+              clientId: ({ context }) => {
+                // Use persistent client ID to maintain connection across reconnects
+                let persistentClientId = localStorage.getItem('vibestack_websocket_client_id')
+                if (!persistentClientId) {
+                  persistentClientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+                  localStorage.setItem('vibestack_websocket_client_id', persistentClientId)
+                  console.log('🆔 [SimpleNotificationSync] Generated new persistent client ID:', persistentClientId)
+                } else {
+                  console.log('🆔 [SimpleNotificationSync] Using existing persistent client ID:', persistentClientId)
+                }
+                return persistentClientId
+              },
               serverUrl: () => getSyncWebSocketUrl()
             })
           ]

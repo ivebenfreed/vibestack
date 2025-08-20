@@ -8,7 +8,7 @@
 import type { TableChange } from '@repo/sync-types';
 import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
-import type { OrgAwareClientRegistryManager } from './org-aware-client-registry';
+import type { UnifiedClientRegistry } from './unified-client-registry';
 import { getLatestChangeHistoryLSN } from '../lib/sync-common';
 import type { MinimalContext } from '../types/hono';
 
@@ -17,7 +17,7 @@ const MODULE_NAME = 'BroadcastManager';
 export interface BroadcastManagerContext {
   env: Env;
   clientId: string;
-  orgAwareClientRegistry: OrgAwareClientRegistryManager;
+  unifiedClientRegistry: UnifiedClientRegistry;
   getOrganizationContext: () => { organizationId: string } | null;
   getContext: () => MinimalContext;
 }
@@ -47,7 +47,7 @@ export class BroadcastManager {
 
       if (orgContext) {
         // Get clients from the same organization only
-        activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(orgContext.organizationId);
+        activeClients = await this.context.unifiedClientRegistry.getOrgActiveClients(orgContext.organizationId);
         
         syncLogger.debug('Broadcasting to organization clients', {
           originClientId,
@@ -146,7 +146,7 @@ export class BroadcastManager {
         return;
       }
       
-      const activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(orgContext.organizationId);
+      const activeClients = await this.context.unifiedClientRegistry.getOrgActiveClients(orgContext.organizationId);
       
       if (activeClients.length === 0) {
         syncLogger.debug('No active clients for conflict resolution broadcast', { originClientId }, MODULE_NAME);
@@ -259,7 +259,7 @@ export class BroadcastManager {
       }, MODULE_NAME);
       
       // Mark the failed client as inactive using "mark inactive on fail" approach
-      await this.context.orgAwareClientRegistry.markClientsInactive([targetClientId]);
+      await this.context.unifiedClientRegistry.markClientsInactive([targetClientId]);
       
       throw error;
     }
@@ -308,7 +308,7 @@ export class BroadcastManager {
       }, MODULE_NAME);
       
       // Mark the failed client as inactive using "mark inactive on fail" approach
-      await this.context.orgAwareClientRegistry.markClientsInactive([targetClientId]);
+      await this.context.unifiedClientRegistry.markClientsInactive([targetClientId]);
       
       throw error;
     }
@@ -357,7 +357,7 @@ export class BroadcastManager {
       }, MODULE_NAME);
       
       // Mark the failed client as inactive
-      await this.context.clientRegistryManager.markClientsInactive([targetClientId]);
+      await this.context.unifiedClientRegistry.markClientsInactive([targetClientId]);
       
       throw error;
     }
@@ -376,15 +376,15 @@ export class BroadcastManager {
       }, MODULE_NAME);
 
       // Get organization-aware client list
-      if (!this.context.orgAwareClientRegistry) {
-        syncLogger.warn('Organization-aware client registry not available', {
+      if (!this.context.unifiedClientRegistry) {
+        syncLogger.warn('Unified client registry not available', {
           organizationId,
           messageType: message.type
         }, MODULE_NAME);
         return;
       }
 
-      const activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(organizationId);
+      const activeClients = await this.context.unifiedClientRegistry.getOrgActiveClients(organizationId);
       
       if (activeClients.length === 0) {
         syncLogger.debug('No active clients in organization for broadcast', {
@@ -414,7 +414,7 @@ export class BroadcastManager {
           }, MODULE_NAME);
           
           // Mark failed client as inactive
-          await this.context.orgAwareClientRegistry.markClientsInactive([clientId]);
+          await this.context.unifiedClientRegistry.markClientsInactive([clientId]);
         }
       });
 
@@ -472,7 +472,7 @@ export class BroadcastManager {
     canBroadcast: boolean;
   }> {
     try {
-      const stats = await this.context.orgAwareClientRegistry.getRegistryStats();
+      const stats = await this.context.unifiedClientRegistry.getRegistryStats();
       
       return {
         activeClientCount: stats.totalClients,
