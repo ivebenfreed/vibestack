@@ -81,6 +81,7 @@ export type {
   ServerHeartbeatMessage,
   ServerIntegrityResetMessage,
   ServerIntegrityValidationResponseMessage,
+  ServerTableChangeNotificationMessage,
   ClientMessage,
   ClientChangesMessage,
   ClientHeartbeatMessage,

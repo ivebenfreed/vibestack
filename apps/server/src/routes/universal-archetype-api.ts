@@ -193,7 +193,7 @@ universalArchetypeRouter.post('/orgs/:orgId/data/:entityName', async (c) => {
       ...validationResult.data,
       id: crypto.randomUUID(),
       organization_id: orgId,
-      created_by_id: user?.id || null,
+      created_by: user?.id || null,
       created_at: new Date(),
       updated_at: new Date()
     };
@@ -227,6 +227,96 @@ universalArchetypeRouter.post('/orgs/:orgId/data/:entityName', async (c) => {
     console.error('Universal archetype data save error:', error);
     return c.json({ 
       error: 'Failed to save data', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Update data in universal archetype entity
+universalArchetypeRouter.put('/orgs/:orgId/data/:entityName/:id', async (c) => {
+  try {
+    const orgId = c.req.param('orgId');
+    const entityName = c.req.param('entityName');
+    const recordId = c.req.param('id');
+    const updateData = await c.req.json();
+    
+    // Get authenticated user from auth middleware
+    const user = c.get('user');
+    const session = c.get('session');
+    
+    console.log(`[Universal Archetype] User ${user?.email || 'anonymous'} updating ${entityName}/${recordId} in org ${orgId}`);
+
+    // Check ContainerPermission access control
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
+    
+    const kysely = getKysely(c.env);
+    const accessService = new ArchetypeAccessService(kysely);
+    
+    const accessResult = await accessService.canSaveData(user?.id || '', orgId, entityName);
+    if (!accessResult.allowed) {
+      console.log(`[Universal Archetype] Update access denied for ${user?.email}: ${accessResult.reason}`);
+      return c.json({
+        error: 'Access denied',
+        code: 'FORBIDDEN',
+        message: accessResult.reason,
+        requiredRole: accessResult.requiredRole,
+        userRole: accessResult.userRole
+      }, 403);
+    }
+    
+    console.log(`[Universal Archetype] Update access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    
+    const { getDBClient } = await import('../lib/db');
+    const client = getDBClient(c);
+    
+    // Get entity definition
+    const entityDef = await getEntityDefinition(c, orgId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+    
+    // Add system fields for update
+    const saveData = {
+      ...updateData,
+      updated_at: new Date()
+    };
+    
+    // Update in database using direct client
+    await client.connect();
+    try {
+      const updateColumns = Object.keys(saveData);
+      const updateValues = Object.values(saveData);
+      const setClause = updateColumns.map((col, i) => `${col} = $${i + 2}`).join(', ');
+      
+      const updateSQL = `
+        UPDATE ${entityDef.tableName} 
+        SET ${setClause}
+        WHERE id = $1 AND organization_id = '${orgId}'
+        RETURNING *
+      `;
+      
+      const result = await client.query(updateSQL, [recordId, ...updateValues]);
+      
+      if (result.rows.length === 0) {
+        return c.json({ error: 'Record not found or access denied' }, 404);
+      }
+      
+      var updatedRow = result.rows[0];
+    } finally {
+      await client.end();
+    }
+    
+    return c.json({
+      success: true,
+      updated: updatedRow,
+      archetype: entityDef.definition.archetype
+    });
+    
+  } catch (error) {
+    console.error('Universal archetype data update error:', error);
+    return c.json({ 
+      error: 'Failed to update data', 
       details: error instanceof Error ? error.message : 'Unknown error' 
     }, 500);
   }
@@ -296,10 +386,11 @@ universalArchetypeRouter.get('/orgs/:orgId/data/:entityName', async (c) => {
         count = parseInt(result.rows[0]?.count || '0');
         results = [];
       } else {
-        // For full data requests, get all data
+        // For full data requests, get all data sorted by updated_at DESC (most recent first)
         querySQL = `
           SELECT * FROM ${entityDef.tableName}
           WHERE organization_id = $1
+          ORDER BY updated_at DESC, created_at DESC
         `;
         
         const result = await client.query(querySQL, [orgId]);

@@ -382,9 +382,11 @@ export function useSystem() {
 
 // Sync hook - directly from SyncMachine
 export function useSync() {
-  // Get sync machine from global actor - updated for pure LiveStore sync machine
+  // Get sync machine from global actor - updated for simple notification sync machine
   const syncMachine = useMemo(() => {
-    return (window as any).pureLiveStoreSyncMachineActor || (window as any).syncMachineActor || null;
+    const machine = (window as any).simpleNotificationSyncMachineActor || (window as any).syncMachineActor || null;
+    console.log('[useSync] Found sync machine:', !!machine, machine ? 'type: simpleNotificationSyncMachine' : 'no machine');
+    return machine;
   }, []);
 
   // Safety check: only proceed if syncMachine exists
@@ -417,30 +419,23 @@ export function useSync() {
   // Convert complex state object to string for easier checking
   const stateString = typeof state === 'string' ? state : JSON.stringify(state);
   
-  // Determine connection status based on actual sync machine states
-  const isConnected = stateString.includes('live_sync') || 
-                     stateString.includes('initial_sync') || 
-                     stateString.includes('catchup_sync') ||
-                     stateString.includes('determining_sync_phase') ||
-                     stateString.includes('services_ready');
+  // Determine connection status based on simple notification sync machine states
+  const isConnected = stateString === 'connected' || context.isConnected === true;
+  const isError = stateString === 'error' || !!context.error;
+  const isConnecting = stateString === 'connecting';
+  const isIdle = stateString === 'disconnected';
   
-  const isError = stateString.includes('error') || !!context.error;
-  const isConnecting = stateString.includes('connecting') || stateString.includes('initialization');
-  const isIdle = stateString === 'idle' || stateString.includes('disconnected');
-  
-  // Determine sync phases
-  const isInitialSync = context.syncPhase === 'initial' || stateString.includes('initial_sync');
-  const isCatchupSync = context.syncPhase === 'catchup' || stateString.includes('catchup_sync');
-  const isLiveSync = context.syncPhase === 'live' || stateString.includes('live_sync');
+  // Simple notification sync machine doesn't have complex sync phases
+  const isInitialSync = false; // No initial sync phase in simple notification sync
+  const isCatchupSync = false; // No catchup sync phase in simple notification sync  
+  const isLiveSync = isConnected; // Connected state means we're receiving notifications
   
   const isActive = isConnected && !isError;
   
-  // Generate human-readable status text
-  const statusText = isError ? 'Error' :
+  // Generate human-readable status text for simple notification sync
+  const statusText = isError ? `Error${context.error ? `: ${context.error}` : ''}` :
                     isConnecting ? 'Connecting...' :
-                    isInitialSync ? 'Initial Sync' :
-                    isCatchupSync ? 'Catchup Sync' :
-                    isLiveSync ? 'Live' :
+                    isConnected ? 'Connected (Live Notifications)' :
                     isIdle ? 'Disconnected' :
                     'Unknown';
 

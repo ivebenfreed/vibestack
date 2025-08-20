@@ -19,6 +19,8 @@ export interface ClientRegistryData {
   userRole?: string;
   userEmail?: string;
   userName?: string;
+  organizationId?: string;
+  organizationSlug?: string;
 }
 
 export interface ClientRegistryManagerContext {

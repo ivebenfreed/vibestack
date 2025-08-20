@@ -1,7 +1,8 @@
 import { setup, assign, fromPromise, sendTo } from 'xstate';
 import { getSyncWebSocketUrl } from '../../sync/config';
 import { getDomainEntityNames } from '@/lib/entity-registry';
-import { checkLocalLiveStoreData, shouldUseLocalDataImmediately, createLocalSchemaObject } from '@/lib/livestore-local-introspection';
+// TODO: Replace with Legend State local data checking
+// import { checkLocalLiveStoreData, shouldUseLocalDataImmediately, createLocalSchemaObject } from '@/lib/livestore-local-introspection';
 
 export interface AppInitContext {
   // Database state
@@ -66,26 +67,28 @@ const checkLocalDataActor = fromPromise(async ({ input }: { input: { organizatio
     throw new Error('Organization ID required for local data check');
   }
 
-  const localData = await checkLocalLiveStoreData(input.organizationId);
-  const shouldUseLocal = shouldUseLocalDataImmediately(localData);
+  // TODO: Replace with Legend State local data checking
+  console.log(`[AppInitMachine] 📊 Skipping local data check - LiveStore removed, transitioning to Legend State`);
   
-  console.log(`[AppInitMachine] 📊 Local data summary:`, {
-    hasData: localData.hasLocalData,
-    tables: localData.schema.entityCount,
-    shouldUseLocal,
-    organizationId: input.organizationId
-  });
+  // Create placeholder local data object for compatibility
+  const localData = {
+    hasLocalData: false,
+    schema: { entityCount: 0, tables: [], exists: false, lastModified: null, storeVersion: null }
+  };
+  
+  // For now, always indicate no local data (we'll implement Legend State local cache later)
+  const shouldUseLocal = false;
 
-  // If we have usable local data, create a local schema object and dispatch it
+  // Skip local schema dispatch since we're removing LiveStore
   if (shouldUseLocal) {
-    const localSchema = createLocalSchemaObject(localData);
-    console.log(`[AppInitMachine] ✅ Using local schema immediately - ${localData.schema.entityCount} entities available`);
+    // TODO: Implement Legend State local schema
+    console.log(`[AppInitMachine] ✅ Using local schema immediately`);
     
     // Dispatch local schema ready event so components can use it
     window.dispatchEvent(new CustomEvent('schema:local-ready', {
       detail: { 
-        schema: localSchema,
-        localData,
+        schema: null, // TODO: Replace with Legend State schema
+        localData: null, // TODO: Replace with Legend State data
         source: 'local-cache'
       }
     }));
@@ -264,15 +267,32 @@ export const appInitMachine = setup({
       console.log('[AppInitMachine] Starting pure LiveStore sync machine with org context:', {
         organizationId: context.organizationId
       })
-      const pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
-      if (pureLiveStoreSyncMachineActor) {
-        pureLiveStoreSyncMachineActor.send({ 
+      
+      // Get user ID from auth machine
+      const authMachineActor = (window as any).authMachineActor
+      let userId = 'current-user-id' // fallback
+      
+      if (authMachineActor) {
+        const authSnapshot = authMachineActor.getSnapshot()
+        userId = authSnapshot?.context?.user?.id || userId
+        console.log('[AppInitMachine] Got user ID from auth machine:', userId)
+      } else {
+        console.warn('[AppInitMachine] Auth machine actor not available, using fallback user ID')
+      }
+      
+      const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
+      if (simpleNotificationSyncMachineActor) {
+        console.log('[AppInitMachine] 🔗 Sending CONNECT event to simple notification sync machine', {
+          organizationId: context.organizationId,
+          userId: userId
+        })
+        simpleNotificationSyncMachineActor.send({ 
           type: 'CONNECT', 
           organizationId: context.organizationId,
-          userId: 'current-user-id' // TODO: Get from auth context
+          userId: userId
         })
       } else {
-        console.warn('[AppInitMachine] Pure LiveStore sync machine actor not available')
+        console.warn('[AppInitMachine] Simple notification sync machine actor not available')
       }
     },
     
@@ -346,12 +366,27 @@ export const appInitMachine = setup({
       // Start sync after a brief delay to allow database to begin
       setTimeout(() => {
         console.log('[AppInitMachine] 🔄 Background: Starting sync with org context');
-        const pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor;
-        if (pureLiveStoreSyncMachineActor && context.organizationId) {
-          pureLiveStoreSyncMachineActor.send({ 
+        
+        // Get user ID from auth machine
+        const authMachineActor = (window as any).authMachineActor
+        let userId = 'current-user-id' // fallback
+        
+        if (authMachineActor) {
+          const authSnapshot = authMachineActor.getSnapshot()
+          userId = authSnapshot?.context?.user?.id || userId
+          console.log('[AppInitMachine] Background sync - Got user ID from auth machine:', userId)
+        }
+        
+        const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor;
+        if (simpleNotificationSyncMachineActor && context.organizationId) {
+          console.log('[AppInitMachine] 🔗 Background sync - Sending CONNECT event to simple notification sync machine', {
+            organizationId: context.organizationId,
+            userId: userId
+          })
+          simpleNotificationSyncMachineActor.send({ 
             type: 'CONNECT', 
             organizationId: context.organizationId,
-            userId: 'current-user-id' // TODO: Get from auth context
+            userId: userId
           });
         }
       }, 100);

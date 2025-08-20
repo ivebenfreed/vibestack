@@ -16,7 +16,7 @@ import { IntegrityMonitor } from '@/components/IntegrityMonitor'
 import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
 import { appInitMachine } from '@/state-machines/machines/app-init-machine'
-import { pureLiveStoreSyncMachine } from '@/state-machines/machines/pure-livestore-sync-machine'
+import { simpleNotificationSyncMachine } from '@/state-machines/machines/simple-notification-sync-machine'
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
 import { useAuth, useSystem } from '@/state-machines'
 import React from 'react'
@@ -54,12 +54,12 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
   
   // Restore preserved actors
   ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
-  ;(window as any).pureLiveStoreSyncMachineActor = import.meta.hot.data.pureLiveStoreSyncMachineActor
+  ;(window as any).simpleNotificationSyncMachineActor = import.meta.hot.data.simpleNotificationSyncMachineActor
   ;(window as any).appInitActor = import.meta.hot.data.appInitActor
   
   // Clear from hot data
   import.meta.hot.data.authMachineActor = null
-  import.meta.hot.data.pureLiveStoreSyncMachineActor = null
+  import.meta.hot.data.simpleNotificationSyncMachineActor = null
   import.meta.hot.data.appInitActor = null
   
   console.log('[XSTATE] 🔥 HMR: Actors restored successfully')
@@ -166,41 +166,41 @@ if (!authMachineActor) {
   console.log('[AuthMachine] 🔥 HMR: Using existing auth machine actor')
 }
 
-// Create Pure LiveStore Sync Machine actor (only if not already exists from HMR)
-let pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
+// Create Simple Notification Sync Machine actor (only if not already exists from HMR)
+let simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
 
-if (!pureLiveStoreSyncMachineActor) {
-  console.log('[PureLiveStoreSyncMachine] Creating new pure LiveStore sync machine actor')
+if (!simpleNotificationSyncMachineActor) {
+  console.log('[SimpleNotificationSync] Creating new simple notification sync machine actor')
   
   // Add inspection in test/dev mode
   const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
     ? { inspect: xstateTestInspector.inspect }
     : {};
   
-  pureLiveStoreSyncMachineActor = createActor(pureLiveStoreSyncMachine, {
+  simpleNotificationSyncMachineActor = createActor(simpleNotificationSyncMachine, {
     ...inspectOptions,
-    id: 'pure-livestore-sync-machine'
+    id: 'simple-notification-sync-machine'
   })
   
-  // Pure LiveStore SyncMachine handles its own persistence internally
-  console.log('[PureLiveStoreSyncMachine] Starting (state persistence handled internally)')
-  pureLiveStoreSyncMachineActor.start()
+  // Simple sync machine handles notifications only
+  console.log('[SimpleNotificationSync] Starting (notification-only sync)')
+  simpleNotificationSyncMachineActor.start()
   
   // Store globally
-  ;(window as any).pureLiveStoreSyncMachineActor = pureLiveStoreSyncMachineActor
+  ;(window as any).simpleNotificationSyncMachineActor = simpleNotificationSyncMachineActor
   
   // Set up subscriptions for new actor
   let wasLiveSync = false
   
-  pureLiveStoreSyncMachineActor.subscribe((snapshot) => {
-    // Send SYNC_READY to app-init when sync machine enters live sync
-    if (snapshot.value === 'live_sync' && !wasLiveSync) {
+  simpleNotificationSyncMachineActor.subscribe((snapshot) => {
+    // Send SYNC_READY to app-init when sync machine connects
+    if (snapshot.value === 'connected' && !wasLiveSync) {
       wasLiveSync = true
       const currentAppInitActor = (window as any).appInitActor
       if (currentAppInitActor) {
         currentAppInitActor.send({ type: 'SYNC_LIVE' })
       }
-    } else if (snapshot.value !== 'live_sync') {
+    } else if (snapshot.value !== 'connected') {
       wasLiveSync = false
     }
   })
@@ -251,7 +251,7 @@ if (import.meta.hot) {
     
     // Store actor references in hot data to preserve across HMR
     import.meta.hot.data.authMachineActor = (window as any).authMachineActor
-    import.meta.hot.data.pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
+    import.meta.hot.data.simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
     import.meta.hot.data.appInitActor = (window as any).appInitActor
     
     // Don't stop actors - let them continue running
@@ -269,11 +269,11 @@ window.addEventListener('auth:signout', () => {
   console.log('[XSTATE] Resetting machines on sign-out (auth machine handles its own persistence cleanup)')
   // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
   
-  // Reset pure LiveStore sync machine to idle state for fresh initialization on next sign-in
-  const pureLiveStoreSyncMachineActor = (window as any).pureLiveStoreSyncMachineActor
-  if (pureLiveStoreSyncMachineActor) {
-    console.log('[XSTATE] Resetting pure LiveStore sync machine on sign-out')
-    pureLiveStoreSyncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
+  // Reset simple notification sync machine to idle state for fresh initialization on next sign-in
+  const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
+  if (simpleNotificationSyncMachineActor) {
+    console.log('[XSTATE] Resetting simple notification sync machine on sign-out')
+    simpleNotificationSyncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
   }
   
   // Reset app init machine to idle state for fresh initialization on next sign-in

@@ -1,5 +1,25 @@
 # CLAUDE.md
 
+## ✅ API Authentication Testing
+
+**Working curl commands for backend API testing:**
+
+```bash
+# Login with test user
+curl -X POST "http://localhost:8787/api/auth/sign-in/email" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\": \"ceo@widecorp.com\", \"password\": \"WideCorp2024!CEO\"}" \
+  -c cookies.txt
+
+# Test protected API endpoints
+curl -X GET "http://localhost:8787/api/organizations" -b cookies.txt
+```
+
+**Key points:**
+- Correct endpoint: `/api/auth/sign-in/email` (not `/sign-in`)
+- Proper JSON escaping in bash
+- Cookie authentication works for all protected endpoints
+
 ## Current Configuration
 
 **This is the main staging branch with the following default ports:**
@@ -58,6 +78,42 @@ CREATE TABLE neon_control_plane.endpoints (
 ```
 
 Without this table, all Kysely/Neon connections will fail with "Console request failed" errors.
+
+### Common Database Connection Issues
+
+If you see repeated `NeonHTTPDriver: Failed to connect` errors in the server logs:
+
+1. **Start Docker containers** (if not running):
+   ```bash
+   docker compose up -d  # Starts postgres + neon-proxy
+   ```
+
+2. **Create missing control plane table** (if missing):
+   ```bash
+   docker exec vibestack-postgres psql -U postgres -d vibestack_dev -c \
+     "CREATE SCHEMA IF NOT EXISTS neon_control_plane; 
+      CREATE TABLE IF NOT EXISTS neon_control_plane.endpoints (
+        endpoint_id VARCHAR(255) PRIMARY KEY, 
+        allowed_ips VARCHAR(255)
+      );"
+   ```
+
+3. **Fix SSL issues** - Ensure DATABASE_URL includes `?sslmode=disable`:
+   ```bash
+   # In apps/server/.env.local, use:
+   DATABASE_URL=postgres://postgres:postgres@db.localtest.me:4444/vibestack_dev?sslmode=disable
+   ```
+
+4. **Restart dev servers** to pick up config changes:
+   ```bash
+   # Kill existing servers and restart
+   pnpm dev
+   ```
+
+**Error patterns to look for:**
+- `Error: Network connection lost` → Docker containers not running
+- `invalid hostname: Common name inferred from SNI` → SSL certificate issue, add `?sslmode=disable`
+- `Console request failed` → Missing neon_control_plane.endpoints table
 
 ## Database Synchronization
 

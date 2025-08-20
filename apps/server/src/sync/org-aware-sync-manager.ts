@@ -239,7 +239,7 @@ export class OrgAwareSyncManager {
   }
 
   /**
-   * Filter changes by organization and permissions
+   * Filter changes by organization - only return changes for the user's organization
    */
   async filterChangesByOrg(
     changes: TableChange[],
@@ -250,19 +250,19 @@ export class OrgAwareSyncManager {
       const filteredChanges: TableChange[] = [];
 
       for (const change of changes) {
-        // Validate each change against user's organization and permissions
-        const hasAccess = await this.validateTableAccess(connection, change.table, action);
+        // Extract organization ID from table name
+        const orgMatch = change.table.match(/^org_([0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})_(.+)$/i);
         
-        if (hasAccess) {
-          filteredChanges.push(change);
+        if (orgMatch) {
+          const tableOrgId = orgMatch[1].replace(/_/g, '-');
+          
+          // Only include changes for the user's organization
+          if (tableOrgId === connection.organizationId) {
+            filteredChanges.push(change);
+          }
         } else {
-          syncLogger.debug('Change filtered due to insufficient permissions', {
-            userId: connection.userId,
-            organizationId: connection.organizationId,
-            table: change.table,
-            action,
-            changeId: change.id
-          }, MODULE_NAME);
+          // Include non-org tables (system tables, etc.)
+          filteredChanges.push(change);
         }
       }
 

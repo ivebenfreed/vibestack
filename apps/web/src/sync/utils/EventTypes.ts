@@ -52,7 +52,8 @@ export type ChangeProcessingEvents =
   | { type: 'OUTGOING_CHANGES_ACKNOWLEDGED'; changeIds: string[] }
   | { type: 'OUTGOING_CHANGES_ERROR'; error: Error; context?: string }
   | { type: 'CHANGES_CONFLICT_DETECTED'; conflicts: any[] }
-  | { type: 'CHANGES_BATCH_COMPLETED'; batchId: string; changeCount: number };
+  | { type: 'CHANGES_BATCH_COMPLETED'; batchId: string; changeCount: number }
+  | { type: 'TABLE_UPDATE_NOTIFICATION'; tables: string[]; source: 'websocket' | 'manual' };
 
 // ============================================================================
 // LSN Events - Log Sequence Number management
@@ -169,7 +170,8 @@ export const EVENT_CATEGORIES = {
   CHANGES: [
     'INCOMING_CHANGES', 'INCOMING_CHANGES_PROCESSED', 'INCOMING_CHANGES_ERROR',
     'OUTGOING_CHANGES_QUEUED', 'OUTGOING_CHANGES_SENT', 'OUTGOING_CHANGES_ACKNOWLEDGED',
-    'OUTGOING_CHANGES_ERROR', 'CHANGES_CONFLICT_DETECTED', 'CHANGES_BATCH_COMPLETED'
+    'OUTGOING_CHANGES_ERROR', 'CHANGES_CONFLICT_DETECTED', 'CHANGES_BATCH_COMPLETED',
+    'TABLE_UPDATE_NOTIFICATION'
   ],
   LSN: [
     'LSN_UPDATE', 'LSN_SYNC_REQUIRED', 'LSN_CONFLICT_DETECTED', 'LSN_RESET'

@@ -26,7 +26,8 @@ const appState$ = observable({
 class LegendStateChangeNotificationSystem {
   private eventListenerSetup = false;
   private syncMachineActor: any = null;
-  private subscription: any = null;
+  private webSocketService: any = null;
+  private originalOnMessage: any = null;
 
   constructor() {
     this.setupExistingSyncEventListeners();
@@ -34,67 +35,103 @@ class LegendStateChangeNotificationSystem {
 
   private setupExistingSyncEventListeners() {
     try {
-      // Listen to the existing WebSocket for table change notifications
-      this.connectToExistingWebSocket();
-      appState$.websocketConnected.set(true);
-      console.log('✅ Legend State: Connected to existing sync WebSocket');
+      // Connect to the actual running sync system
+      this.connectToExistingSyncMachine();
+      console.log('✅ Legend State: Attempting to connect to existing sync system');
     } catch (error) {
       console.error('❌ Legend State: Failed to connect to existing sync', error);
       appState$.error.set('Failed to connect to existing sync system');
     }
   }
 
-  private connectToExistingWebSocket() {
-    // In a real implementation, we would hook into the existing WebSocket connection
-    // For this POC, we'll listen to window events that the sync system might emit
-    
-    // Listen for WebSocket messages from the existing sync system
-    window.addEventListener('message', (event) => {
-      if (event.data?.type === 'srv_table_change_notification') {
-        this.handleTableChangeNotification(event.data);
-      }
-    });
-
-    // Also check for global sync system access
-    const checkForSyncSystem = () => {
-      // Try to access the existing sync machine or WebSocket
-      if (window.vibestackSync) {
-        this.hookIntoExistingSync(window.vibestackSync);
+  private connectToExistingSyncMachine() {
+    // Check for the actual sync machine actor (updated for simple notification sync machine)
+    const checkForSyncMachine = () => {
+      // Try to access the simpleNotificationSyncMachineActor
+      const syncActor = (window as any).simpleNotificationSyncMachineActor;
+      
+      if (syncActor) {
+        console.log('🔗 Legend State: Found simpleNotificationSyncMachineActor', syncActor);
+        this.syncMachineActor = syncActor;
+        this.hookIntoSyncMachine();
+        appState$.websocketConnected.set(true);
       } else {
+        console.log('⏳ Legend State: Waiting for simple notification sync machine actor...');
         // Retry after a short delay
-        setTimeout(checkForSyncSystem, 1000);
+        setTimeout(checkForSyncMachine, 1000);
       }
     };
 
-    checkForSyncSystem();
+    checkForSyncMachine();
   }
 
-  private hookIntoExistingSync(syncSystem: any) {
+  private hookIntoSyncMachine() {
     try {
-      console.log('🔗 Legend State: Found existing sync system', syncSystem);
+      const snapshot = this.syncMachineActor.getSnapshot();
+      console.log('📊 Legend State: Simple notification sync machine state:', snapshot.value);
+      console.log('📊 Legend State: Simple notification sync machine context:', snapshot.context);
       
-      // Listen for WebSocket messages
-      if (syncSystem.webSocket) {
-        const originalOnMessage = syncSystem.webSocket.onmessage;
-        syncSystem.webSocket.onmessage = (event) => {
-          // Call original handler first
-          if (originalOnMessage) {
-            originalOnMessage.call(syncSystem.webSocket, event);
-          }
-          
-          // Parse and check for our message types
-          try {
-            const message = JSON.parse(event.data);
-            if (message.type === 'srv_table_change_notification') {
-              this.handleTableChangeNotification(message);
-            }
-          } catch (e) {
-            // Ignore parsing errors for non-JSON messages
-          }
-        };
+      // Hook directly into the WebSocket from the simple notification sync machine context
+      const webSocket = snapshot.context.webSocket;
+      if (webSocket) {
+        console.log('🔗 Legend State: Found WebSocket in simple notification sync machine context');
+        this.hookIntoWebSocketMessages(webSocket);
+      } else {
+        console.log('⚠️ Legend State: WebSocket not yet available in simple notification sync machine context');
       }
+
+      // Listen for sync machine state changes to detect when WebSocket becomes available
+      this.syncMachineActor.subscribe((state: any) => {
+        console.log('📡 Legend State: Simple notification sync machine state changed:', state.value);
+        
+        if (state.value === 'connected' && state.context.webSocket) {
+          console.log('✅ Legend State: Simple notification sync machine connected with WebSocket - hooking into messages');
+          this.hookIntoWebSocketMessages(state.context.webSocket);
+        }
+      });
+      
     } catch (error) {
-      console.error('❌ Legend State: Failed to hook into existing sync', error);
+      console.error('❌ Legend State: Failed to hook into simple notification sync machine', error);
+    }
+  }
+
+  private hookIntoWebSocketMessages(webSocket: WebSocket) {
+    try {
+      if (!webSocket) {
+        console.log('⚠️ Legend State: WebSocket not available yet');
+        return;
+      }
+
+      console.log('🔗 Legend State: Hooking into WebSocket messages');
+      
+      // Store the original message handler
+      this.originalOnMessage = webSocket.onmessage;
+      
+      // Override with our handler that also processes table change notifications
+      webSocket.onmessage = (event: MessageEvent) => {
+        // Call the original handler first to maintain sync functionality
+        if (this.originalOnMessage) {
+          this.originalOnMessage.call(webSocket, event);
+        }
+        
+        // Parse and check for our table change notification messages
+        try {
+          const message = JSON.parse(event.data);
+          console.log('📨 Legend State: WebSocket message received:', message.type);
+          
+          if (message.type === 'srv_table_change_notification') {
+            console.log('🎯 Legend State: Table change notification received!', message);
+            this.handleTableChangeNotification(message);
+          }
+        } catch (e) {
+          // Ignore parsing errors for non-JSON messages
+        }
+      };
+      
+      console.log('✅ Legend State: Successfully hooked into WebSocket messages');
+      
+    } catch (error) {
+      console.error('❌ Legend State: Failed to hook into WebSocket messages', error);
     }
   }
 
@@ -205,8 +242,17 @@ class LegendStateChangeNotificationSystem {
   }
 
   disconnect() {
-    // Clean up event listeners
-    window.removeEventListener('message', this.handleTableChangeNotification);
+    // Restore original WebSocket message handler
+    if (this.webSocketService?.ws && this.originalOnMessage) {
+      this.webSocketService.ws.onmessage = this.originalOnMessage;
+      console.log('🔄 Legend State: Restored original WebSocket message handler');
+    }
+    
+    // Clean up references
+    this.syncMachineActor = null;
+    this.webSocketService = null;
+    this.originalOnMessage = null;
+    
     appState$.websocketConnected.set(false);
     console.log('🔌 Legend State: Disconnected from existing sync system');
   }
@@ -286,18 +332,37 @@ function LegendStateWebSocketPOC() {
     lastChangeNotification: null as Date | null,
     error: null as string | null
   });
+  const [loading, setLoading] = useState({
+    creating: false,
+    updating: false,
+    refreshing: false
+  });
 
   const [changeNotificationSystem] = useState(() => new LegendStateChangeNotificationSystem());
 
+  // Debug: Log React state changes
+  useEffect(() => {
+    console.log('📊 React state - Projects count:', projects.length);
+  }, [projects]);
+
+  useEffect(() => {
+    console.log('📊 React state - Clients count:', clients.length);  
+  }, [clients]);
+
   // Subscribe to Legend State observables
   useEffect(() => {
+    console.log('🔧 Setting up Legend State observers...');
+    
     const unsubscribeProjects = observe(projects$, ({ value }) => {
-      console.log('🎯 Legend State: Projects observable changed', value.length);
-      setProjects([...value]);
+      console.log('🎯 Legend State: Projects observable changed', value.length, 'projects');
+      console.log('🔍 Current projects observable value:', value);
+      const newProjects = [...value];
+      console.log('🔄 Setting React state to:', newProjects.length, 'projects');
+      setProjects(newProjects);
     });
 
     const unsubscribeClients = observe(clients$, ({ value }) => {
-      console.log('🎯 Legend State: Clients observable changed', value.length);
+      console.log('🎯 Legend State: Clients observable changed', value.length, 'clients');
       setClients([...value]);
     });
 
@@ -322,6 +387,9 @@ function LegendStateWebSocketPOC() {
   }, [changeNotificationSystem]);
 
   const handleCreateSampleProject = async () => {
+    setLoading(prev => ({ ...prev, creating: true }));
+    appState$.error.set(null);
+    
     try {
       const sampleProject = {
         name: `WebSocket Project ${Date.now()}`,
@@ -331,16 +399,23 @@ function LegendStateWebSocketPOC() {
         budget: 75000.00
       };
       
-      await apiClient.createProject(appState$.orgId.get(), sampleProject);
-      // No manual refetch needed - WebSocket notification will trigger automatic update!
+      console.log('🔄 Creating project:', sampleProject);
+      const result = await apiClient.createProject(appState$.orgId.get(), sampleProject);
+      console.log('✅ Project created successfully:', result);
+      console.log('⏳ Waiting for WebSocket notification to update UI...');
       
     } catch (error) {
-      console.error('Failed to create project:', error);
+      console.error('❌ Failed to create project:', error);
       appState$.error.set(`Failed to create project: ${error.message}`);
+    } finally {
+      setLoading(prev => ({ ...prev, creating: false }));
     }
   };
 
   const handleUpdateRandomProject = async () => {
+    setLoading(prev => ({ ...prev, updating: true }));
+    appState$.error.set(null);
+    
     try {
       if (projects.length === 0) {
         appState$.error.set('No projects available to update');
@@ -355,12 +430,32 @@ function LegendStateWebSocketPOC() {
         budget: (randomProject.budget || 50000) * 1.05
       };
       
-      await apiClient.updateProject(appState$.orgId.get(), randomProject.id, updateData);
-      // No manual refetch needed - WebSocket notification will trigger automatic update!
+      console.log('🔄 Updating project:', randomProject.id, updateData);
+      const result = await apiClient.updateProject(appState$.orgId.get(), randomProject.id, updateData);
+      console.log('✅ Project updated successfully:', result);
+      console.log('⏳ Waiting for WebSocket notification to update UI...');
       
     } catch (error) {
-      console.error('Failed to update project:', error);
+      console.error('❌ Failed to update project:', error);
       appState$.error.set(`Failed to update project: ${error.message}`);
+    } finally {
+      setLoading(prev => ({ ...prev, updating: false }));
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setLoading(prev => ({ ...prev, refreshing: true }));
+    appState$.error.set(null);
+    
+    try {
+      console.log('🔄 Manual refresh requested');
+      await changeNotificationSystem.initialFetch();
+      console.log('✅ Manual refresh completed');
+    } catch (error) {
+      console.error('❌ Manual refresh failed:', error);
+      appState$.error.set(`Manual refresh failed: ${error.message}`);
+    } finally {
+      setLoading(prev => ({ ...prev, refreshing: false }));
     }
   };
 
@@ -395,9 +490,9 @@ function LegendStateWebSocketPOC() {
         {/* Controls */}
         <Card>
           <CardHeader>
-            <CardTitle>Existing Sync Integration</CardTitle>
+            <CardTitle>Live Sync Integration</CardTitle>
             <CardDescription>
-              Listens to existing sync system for srv_table_change_notification messages
+              Connected to the simpleNotificationSyncMachineActor for real-time srv_table_change_notification messages
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -405,25 +500,27 @@ function LegendStateWebSocketPOC() {
               onClick={handleCreateSampleProject}
               variant="default"
               className="w-full"
+              disabled={loading.creating}
             >
-              Create Sample Project
+              {loading.creating ? '⏳ Creating...' : '➕ Create Sample Project'}
             </Button>
 
             <Button 
               onClick={handleUpdateRandomProject}
               variant="secondary"
               className="w-full"
-              disabled={projects.length === 0}
+              disabled={projects.length === 0 || loading.updating}
             >
-              Update Random Project
+              {loading.updating ? '⏳ Updating...' : '📝 Update Random Project'}
             </Button>
 
             <Button 
-              onClick={() => changeNotificationSystem.initialFetch()}
+              onClick={handleManualRefresh}
               variant="outline"
               className="w-full"
+              disabled={loading.refreshing}
             >
-              Manual Refresh
+              {loading.refreshing ? '⏳ Refreshing...' : '🔄 Manual Refresh'}
             </Button>
 
             <div className="text-xs text-muted-foreground space-y-1">
@@ -451,8 +548,8 @@ function LegendStateWebSocketPOC() {
                   No projects found. Try creating one!
                 </div>
               ) : (
-                projects.map((project: any) => (
-                  <div key={project.id} className="p-3 bg-muted rounded-md">
+                projects.map((project: any, index: number) => (
+                  <div key={project.id || `project-${index}`} className="p-3 bg-muted rounded-md">
                     <div className="font-medium text-sm">{project.name}</div>
                     <div className="text-xs text-muted-foreground">
                       Status: {project.status} • Budget: ${project.budget || 'N/A'}
@@ -482,8 +579,8 @@ function LegendStateWebSocketPOC() {
                   No clients found.
                 </div>
               ) : (
-                clients.map((client: any) => (
-                  <div key={client.id} className="p-3 bg-muted rounded-md">
+                clients.map((client: any, index: number) => (
+                  <div key={client.id || `client-${index}`} className="p-3 bg-muted rounded-md">
                     <div className="font-medium text-sm">{client.name}</div>
                     <div className="text-xs text-muted-foreground">
                       Status: {client.status || 'unknown'} • ID: {client.id}

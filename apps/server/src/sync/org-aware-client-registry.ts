@@ -24,7 +24,6 @@ interface OrgClientInfo {
 
 export class OrgAwareClientRegistryManager {
   private static readonly ORG_CLIENT_PREFIX = 'org_clients:';
-  private static readonly GLOBAL_CLIENT_PREFIX = 'client:';
   private static readonly CLIENT_EXPIRY = 10 * 60; // 10 minutes in seconds
 
   constructor(private env: any) {}
@@ -59,16 +58,6 @@ export class OrgAwareClientRegistryManager {
       // Key format: client_to_org:{clientId}
       const clientToOrgKey = `client_to_org:${clientInfo.clientId}`;
       await this.env.CLIENT_REGISTRY.put(clientToOrgKey, clientInfo.organizationId, {
-        expirationTtl: OrgAwareClientRegistryManager.CLIENT_EXPIRY
-      });
-
-      // Backwards compatibility: Global client registry (minimal data)
-      const globalKey = `${OrgAwareClientRegistryManager.GLOBAL_CLIENT_PREFIX}${clientInfo.clientId}`;
-      await this.env.CLIENT_REGISTRY.put(globalKey, JSON.stringify({
-        clientId: clientInfo.clientId,
-        connectedAt: now,
-        organizationId: clientInfo.organizationId
-      }), {
         expirationTtl: OrgAwareClientRegistryManager.CLIENT_EXPIRY
       });
 
@@ -132,40 +121,6 @@ export class OrgAwareClientRegistryManager {
     }
   }
 
-  /**
-   * Get all active clients (across all organizations) - backwards compatibility
-   */
-  async getActiveClients(): Promise<string[]> {
-    try {
-      // Use global client registry for backwards compatibility
-      const globalKeys = await this.env.CLIENT_REGISTRY.list({ prefix: 'client:' });
-
-      const activeClients: string[] = [];
-
-      for (const key of globalKeys.keys) {
-        try {
-          const data = await this.env.CLIENT_REGISTRY.get(key.name);
-          if (data) {
-            const clientInfo = JSON.parse(data);
-            activeClients.push(clientInfo.clientId);
-          }
-        } catch (parseError) {
-          syncLogger.warn('Failed to parse global client info', {
-            key: key.name,
-            error: parseError instanceof Error ? parseError.message : String(parseError)
-          }, MODULE_NAME);
-        }
-      }
-
-      return activeClients;
-
-    } catch (error) {
-      syncLogger.error('Failed to get all active clients', {
-        error: error instanceof Error ? error.message : String(error)
-      }, MODULE_NAME);
-      return [];
-    }
-  }
 
   /**
    * Get organization context for a client (O(1) lookup via reverse index)
@@ -215,7 +170,7 @@ export class OrgAwareClientRegistryManager {
    */
   async updateClientActivity(clientId: string, organizationId: string): Promise<void> {
     try {
-      const kvKey = `${OrgAwareClientRegistryManager.KV_PREFIX}${organizationId}:${clientId}`;
+      const kvKey = `${OrgAwareClientRegistryManager.ORG_CLIENT_PREFIX}${organizationId}:${clientId}`;
       const data = await this.env.CLIENT_REGISTRY.get(kvKey);
 
       if (data) {
@@ -257,10 +212,6 @@ export class OrgAwareClientRegistryManager {
       const clientToOrgKey = `client_to_org:${clientId}`;
       await this.env.CLIENT_REGISTRY.delete(clientToOrgKey);
 
-      // Remove from global registry (backwards compatibility)
-      const globalKey = `${OrgAwareClientRegistryManager.GLOBAL_CLIENT_PREFIX}${clientId}`;
-      await this.env.CLIENT_REGISTRY.delete(globalKey);
-
       syncLogger.info('Removed client from all registries', {
         clientId,
         organizationId: organizationId || 'unknown'
@@ -276,6 +227,37 @@ export class OrgAwareClientRegistryManager {
   }
 
   /**
+   * Mark multiple clients as inactive (remove them from the registry)
+   * Used when clients can't be reached for broadcasts
+   */
+  async markClientsInactive(clientIds: string[]): Promise<void> {
+    const promises = clientIds.map(async (clientId) => {
+      try {
+        // Try to get organization context for this client
+        const clientOrg = await this.getClientOrganization(clientId);
+        if (clientOrg) {
+          await this.removeClient(clientId, clientOrg.organizationId);
+          syncLogger.debug('Marked client inactive due to broadcast failure', {
+            clientId,
+            organizationId: clientOrg.organizationId
+          }, MODULE_NAME);
+        } else {
+          syncLogger.warn('Could not find organization context for inactive client', {
+            clientId
+          }, MODULE_NAME);
+        }
+      } catch (error) {
+        syncLogger.error('Failed to mark client as inactive', {
+          clientId,
+          error: error instanceof Error ? error.message : String(error)
+        }, MODULE_NAME);
+      }
+    });
+    
+    await Promise.allSettled(promises);
+  }
+
+  /**
    * Get statistics for organization-aware client registry
    */
   async getRegistryStats(): Promise<{
@@ -284,14 +266,12 @@ export class OrgAwareClientRegistryManager {
     kvStructure: {
       orgSpecificKeys: number;
       reverseIndexKeys: number;
-      globalKeys: number;
     };
   }> {
     try {
-      const [orgKeys, reverseKeys, globalKeys] = await Promise.all([
+      const [orgKeys, reverseKeys] = await Promise.all([
         this.env.CLIENT_REGISTRY.list({ prefix: OrgAwareClientRegistryManager.ORG_CLIENT_PREFIX }),
-        this.env.CLIENT_REGISTRY.list({ prefix: 'client_to_org:' }),
-        this.env.CLIENT_REGISTRY.list({ prefix: OrgAwareClientRegistryManager.GLOBAL_CLIENT_PREFIX })
+        this.env.CLIENT_REGISTRY.list({ prefix: 'client_to_org:' })
       ]);
 
       const organizationClients: { [orgId: string]: number } = {};
@@ -312,8 +292,7 @@ export class OrgAwareClientRegistryManager {
         organizationClients,
         kvStructure: {
           orgSpecificKeys: orgKeys.keys.length,
-          reverseIndexKeys: reverseKeys.keys.length,
-          globalKeys: globalKeys.keys.length
+          reverseIndexKeys: reverseKeys.keys.length
         }
       };
 
@@ -326,8 +305,7 @@ export class OrgAwareClientRegistryManager {
         organizationClients: {},
         kvStructure: {
           orgSpecificKeys: 0,
-          reverseIndexKeys: 0,
-          globalKeys: 0
+          reverseIndexKeys: 0
         }
       };
     }

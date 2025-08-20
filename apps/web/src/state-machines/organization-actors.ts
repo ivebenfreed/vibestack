@@ -22,8 +22,8 @@ class OrganizationAPI {
     }
 
     const result = await response.json();
-    // Server returns {success: true, data: {organizations: [...]}} format
-    return result.data?.organizations || result;
+    // Server returns organizations array directly: [{org1}, {org2}]
+    return result;
   }
 
   async createOrganization(data: CreateOrganizationInput): Promise<OrganizationInfo> {
@@ -74,11 +74,17 @@ const organizationAPI = new OrganizationAPI();
 
 // Load user organizations actor
 export const loadOrganizationsActor = fromPromise(async () => {
-  console.log('[OrganizationActors] Loading user organizations...');
-  
   try {
     const organizations = await organizationAPI.getUserOrganizations();
-    console.log('[OrganizationActors] Loaded organizations:', organizations);
+    
+    if (!organizations || !Array.isArray(organizations)) {
+      console.error('[OrganizationActors] Invalid organizations response format');
+      return {
+        success: false,
+        organizations: [],
+        error: 'Invalid organizations response format'
+      };
+    }
     
     return {
       success: true,

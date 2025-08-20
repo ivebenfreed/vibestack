@@ -53,6 +53,11 @@ import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './ro
 import { Route as AuthenticatedDebugLivestoreTestSimpleRouteImport } from './routes/_authenticated/debug/livestore-test-simple'
 import { Route as AuthenticatedDebugLivestoreTestRouteImport } from './routes/_authenticated/debug/livestore-test'
 import { Route as AuthenticatedDebugLivestorePocRouteImport } from './routes/_authenticated/debug/livestore-poc'
+import { Route as AuthenticatedDebugLegendStateWebsocketPocRouteImport } from './routes/_authenticated/debug/legend-state-websocket-poc'
+import { Route as AuthenticatedDebugLegendStateSyncIntegrationRouteImport } from './routes/_authenticated/debug/legend-state-sync-integration'
+import { Route as AuthenticatedDebugLegendStateSimpleRouteImport } from './routes/_authenticated/debug/legend-state-simple'
+import { Route as AuthenticatedDebugLegendStatePocRouteImport } from './routes/_authenticated/debug/legend-state-poc'
+import { Route as AuthenticatedDebugLegendStateFullIntegrationRouteImport } from './routes/_authenticated/debug/legend-state-full-integration'
 import { Route as AuthenticatedDebugKanbanRouteImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugJunctionTablesRouteImport } from './routes/_authenticated/debug/junction-tables'
 import { Route as AuthenticatedDebugGanttTestDataRouteImport } from './routes/_authenticated/debug/gantt-test-data'
@@ -321,6 +326,36 @@ const AuthenticatedDebugLivestorePocRoute =
     path: '/livestore-poc',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugLegendStateWebsocketPocRoute =
+  AuthenticatedDebugLegendStateWebsocketPocRouteImport.update({
+    id: '/legend-state-websocket-poc',
+    path: '/legend-state-websocket-poc',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLegendStateSyncIntegrationRoute =
+  AuthenticatedDebugLegendStateSyncIntegrationRouteImport.update({
+    id: '/legend-state-sync-integration',
+    path: '/legend-state-sync-integration',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLegendStateSimpleRoute =
+  AuthenticatedDebugLegendStateSimpleRouteImport.update({
+    id: '/legend-state-simple',
+    path: '/legend-state-simple',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLegendStatePocRoute =
+  AuthenticatedDebugLegendStatePocRouteImport.update({
+    id: '/legend-state-poc',
+    path: '/legend-state-poc',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
+const AuthenticatedDebugLegendStateFullIntegrationRoute =
+  AuthenticatedDebugLegendStateFullIntegrationRouteImport.update({
+    id: '/legend-state-full-integration',
+    path: '/legend-state-full-integration',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugKanbanRoute =
   AuthenticatedDebugKanbanRouteImport.update({
     id: '/kanban',
@@ -370,6 +405,11 @@ export interface FileRoutesByFullPath {
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/debug/legend-state-full-integration': typeof AuthenticatedDebugLegendStateFullIntegrationRoute
+  '/debug/legend-state-poc': typeof AuthenticatedDebugLegendStatePocRoute
+  '/debug/legend-state-simple': typeof AuthenticatedDebugLegendStateSimpleRoute
+  '/debug/legend-state-sync-integration': typeof AuthenticatedDebugLegendStateSyncIntegrationRoute
+  '/debug/legend-state-websocket-poc': typeof AuthenticatedDebugLegendStateWebsocketPocRoute
   '/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
   '/debug/livestore-test': typeof AuthenticatedDebugLivestoreTestRoute
   '/debug/livestore-test-simple': typeof AuthenticatedDebugLivestoreTestSimpleRoute
@@ -418,6 +458,11 @@ export interface FileRoutesByTo {
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/debug/legend-state-full-integration': typeof AuthenticatedDebugLegendStateFullIntegrationRoute
+  '/debug/legend-state-poc': typeof AuthenticatedDebugLegendStatePocRoute
+  '/debug/legend-state-simple': typeof AuthenticatedDebugLegendStateSimpleRoute
+  '/debug/legend-state-sync-integration': typeof AuthenticatedDebugLegendStateSyncIntegrationRoute
+  '/debug/legend-state-websocket-poc': typeof AuthenticatedDebugLegendStateWebsocketPocRoute
   '/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
   '/debug/livestore-test': typeof AuthenticatedDebugLivestoreTestRoute
   '/debug/livestore-test-simple': typeof AuthenticatedDebugLivestoreTestSimpleRoute
@@ -470,6 +515,11 @@ export interface FileRoutesById {
   '/_authenticated/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
+  '/_authenticated/debug/legend-state-full-integration': typeof AuthenticatedDebugLegendStateFullIntegrationRoute
+  '/_authenticated/debug/legend-state-poc': typeof AuthenticatedDebugLegendStatePocRoute
+  '/_authenticated/debug/legend-state-simple': typeof AuthenticatedDebugLegendStateSimpleRoute
+  '/_authenticated/debug/legend-state-sync-integration': typeof AuthenticatedDebugLegendStateSyncIntegrationRoute
+  '/_authenticated/debug/legend-state-websocket-poc': typeof AuthenticatedDebugLegendStateWebsocketPocRoute
   '/_authenticated/debug/livestore-poc': typeof AuthenticatedDebugLivestorePocRoute
   '/_authenticated/debug/livestore-test': typeof AuthenticatedDebugLivestoreTestRoute
   '/_authenticated/debug/livestore-test-simple': typeof AuthenticatedDebugLivestoreTestSimpleRoute
@@ -522,6 +572,11 @@ export interface FileRouteTypes {
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
+    | '/debug/legend-state-full-integration'
+    | '/debug/legend-state-poc'
+    | '/debug/legend-state-simple'
+    | '/debug/legend-state-sync-integration'
+    | '/debug/legend-state-websocket-poc'
     | '/debug/livestore-poc'
     | '/debug/livestore-test'
     | '/debug/livestore-test-simple'
@@ -570,6 +625,11 @@ export interface FileRouteTypes {
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
+    | '/debug/legend-state-full-integration'
+    | '/debug/legend-state-poc'
+    | '/debug/legend-state-simple'
+    | '/debug/legend-state-sync-integration'
+    | '/debug/legend-state-websocket-poc'
     | '/debug/livestore-poc'
     | '/debug/livestore-test'
     | '/debug/livestore-test-simple'
@@ -621,6 +681,11 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/gantt-test-data'
     | '/_authenticated/debug/junction-tables'
     | '/_authenticated/debug/kanban'
+    | '/_authenticated/debug/legend-state-full-integration'
+    | '/_authenticated/debug/legend-state-poc'
+    | '/_authenticated/debug/legend-state-simple'
+    | '/_authenticated/debug/legend-state-sync-integration'
+    | '/_authenticated/debug/legend-state-websocket-poc'
     | '/_authenticated/debug/livestore-poc'
     | '/_authenticated/debug/livestore-test'
     | '/_authenticated/debug/livestore-test-simple'
@@ -985,6 +1050,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugLivestorePocRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/legend-state-websocket-poc': {
+      id: '/_authenticated/debug/legend-state-websocket-poc'
+      path: '/legend-state-websocket-poc'
+      fullPath: '/debug/legend-state-websocket-poc'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStateWebsocketPocRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-state-sync-integration': {
+      id: '/_authenticated/debug/legend-state-sync-integration'
+      path: '/legend-state-sync-integration'
+      fullPath: '/debug/legend-state-sync-integration'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStateSyncIntegrationRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-state-simple': {
+      id: '/_authenticated/debug/legend-state-simple'
+      path: '/legend-state-simple'
+      fullPath: '/debug/legend-state-simple'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStateSimpleRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-state-poc': {
+      id: '/_authenticated/debug/legend-state-poc'
+      path: '/legend-state-poc'
+      fullPath: '/debug/legend-state-poc'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStatePocRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-state-full-integration': {
+      id: '/_authenticated/debug/legend-state-full-integration'
+      path: '/legend-state-full-integration'
+      fullPath: '/debug/legend-state-full-integration'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStateFullIntegrationRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/kanban': {
       id: '/_authenticated/debug/kanban'
       path: '/kanban'
@@ -1020,6 +1120,11 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
   AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
+  AuthenticatedDebugLegendStateFullIntegrationRoute: typeof AuthenticatedDebugLegendStateFullIntegrationRoute
+  AuthenticatedDebugLegendStatePocRoute: typeof AuthenticatedDebugLegendStatePocRoute
+  AuthenticatedDebugLegendStateSimpleRoute: typeof AuthenticatedDebugLegendStateSimpleRoute
+  AuthenticatedDebugLegendStateSyncIntegrationRoute: typeof AuthenticatedDebugLegendStateSyncIntegrationRoute
+  AuthenticatedDebugLegendStateWebsocketPocRoute: typeof AuthenticatedDebugLegendStateWebsocketPocRoute
   AuthenticatedDebugLivestorePocRoute: typeof AuthenticatedDebugLivestorePocRoute
   AuthenticatedDebugLivestoreTestRoute: typeof AuthenticatedDebugLivestoreTestRoute
   AuthenticatedDebugLivestoreTestSimpleRoute: typeof AuthenticatedDebugLivestoreTestSimpleRoute
@@ -1039,6 +1144,16 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugJunctionTablesRoute:
       AuthenticatedDebugJunctionTablesRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
+    AuthenticatedDebugLegendStateFullIntegrationRoute:
+      AuthenticatedDebugLegendStateFullIntegrationRoute,
+    AuthenticatedDebugLegendStatePocRoute:
+      AuthenticatedDebugLegendStatePocRoute,
+    AuthenticatedDebugLegendStateSimpleRoute:
+      AuthenticatedDebugLegendStateSimpleRoute,
+    AuthenticatedDebugLegendStateSyncIntegrationRoute:
+      AuthenticatedDebugLegendStateSyncIntegrationRoute,
+    AuthenticatedDebugLegendStateWebsocketPocRoute:
+      AuthenticatedDebugLegendStateWebsocketPocRoute,
     AuthenticatedDebugLivestorePocRoute: AuthenticatedDebugLivestorePocRoute,
     AuthenticatedDebugLivestoreTestRoute: AuthenticatedDebugLivestoreTestRoute,
     AuthenticatedDebugLivestoreTestSimpleRoute:

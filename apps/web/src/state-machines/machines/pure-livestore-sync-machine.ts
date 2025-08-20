@@ -5,7 +5,7 @@
  * No Dexie dependencies - uses only LiveStore for all database operations.
  */
 
-import { setup, assign, fromPromise, sendParent } from 'xstate'
+import { setup, assign, fromPromise } from 'xstate'
 import { getSyncWebSocketUrl } from '../../sync/config'
 import { PureLiveStoreServiceCoordinator, type PureLiveStoreCoordinatorConfig } from '../../sync/utils/PureLiveStoreServiceCoordinator'
 import { syncLogger } from '../../sync/utils/SyncLogger'
@@ -341,7 +341,16 @@ export const pureLiveStoreSyncMachine = setup({
     },
     
     // Notify app-init machine when sync is live
-    notifyAppInitSyncLive: sendParent({ type: 'SYNC_LIVE' }),
+    notifyAppInitSyncLive: () => {
+      console.log('[PureLiveStoreSyncMachine] Sync is live - notifying app-init machine')
+      const appInitActor = (window as any).appInitActor
+      if (appInitActor) {
+        appInitActor.send({ type: 'SYNC_LIVE' })
+        console.log('[PureLiveStoreSyncMachine] ✅ Sent SYNC_LIVE to app-init machine')
+      } else {
+        console.warn('[PureLiveStoreSyncMachine] App-init machine not found - cannot send SYNC_LIVE')
+      }
+    },
     
     // Persistence (same as existing)
     persistState: ({ context }) => {
@@ -433,7 +442,7 @@ export const pureLiveStoreSyncMachine = setup({
           serverUrl: context.serverUrl!
         }),
         onDone: {
-          target: 'initial_sync',
+          target: 'determining_sync_phase',
           actions: ['markConnected']
         },
         onError: {
@@ -444,10 +453,97 @@ export const pureLiveStoreSyncMachine = setup({
       
       on: {
         WS_CONNECTED: {
-          target: 'initial_sync',
+          target: 'determining_sync_phase',
           actions: 'markConnected'
         },
         WS_ERROR: {
+          target: 'error',
+          actions: 'storeError'
+        }
+      }
+    },
+    
+    determining_sync_phase: {
+      entry: [
+        () => syncLogger.info('sync', 'Waiting for server to determine sync phase')
+      ],
+      
+      on: {
+        // Process WebSocket messages to determine sync phase
+        WS_MESSAGE: [
+          {
+            guard: ({ event }) => event.message?.type === 'srv_live_start',
+            target: 'live_sync',
+            actions: [
+              assign({ syncPhase: 'live' as const }),
+              () => console.log('[PureLiveStoreSyncMachine] ✅ Server sent srv_live_start - going to live sync'),
+              'notifyAppInitSyncLive'
+            ]
+          },
+          {
+            actions: [
+              ({ event }) => {
+                const message = event.message
+                console.log('[PureLiveStoreSyncMachine] Received message in determining_sync_phase:', message?.type)
+                
+                // Handle sync errors from server
+                if (message?.type === 'sync-error') {
+                  console.error('[PureLiveStoreSyncMachine] Sync error received:', message)
+                } else if (message?.type === 'srv_table_change_notification') {
+                  syncLogger.info('sync', `🔔 TABLE CHANGE NOTIFICATION RECEIVED (determining_sync_phase): ${JSON.stringify(message.tables)} for org ${message.organizationId}`)
+                  console.log('🔔 [PureLiveStoreSyncMachine] TABLE CHANGE NOTIFICATION (determining_sync_phase):', {
+                    tables: message.tables,
+                    organizationId: message.organizationId,
+                    lsn: message.lsn,
+                    source: message.source,
+                    messageId: message.messageId,
+                    timestamp: message.timestamp
+                  });
+                  
+                  // TODO: Trigger data refresh for the affected tables
+                  // This is where we'll integrate with Legend State later
+                }
+              }
+            ]
+          }
+        ],
+        
+        // Handle LSN updates during sync phase determination 
+        LSN_UPDATE: {
+          actions: ['updateLSN', 'persistState']
+        },
+        
+        // Server determines what sync phase is needed
+        START_INITIAL_SYNC: {
+          target: 'initial_sync',
+          actions: [
+            assign({ syncPhase: 'initial' as const }),
+            () => console.log('[PureLiveStoreSyncMachine] 🚀 Server determined: Initial sync required')
+          ]
+        },
+        
+        START_CATCHUP_SYNC: {
+          target: 'catchup_sync', 
+          actions: [
+            assign({ syncPhase: 'catchup' as const }),
+            () => console.log('[PureLiveStoreSyncMachine] 🔄 Server determined: Catchup sync required')
+          ]
+        },
+        
+        START_LIVE_SYNC: {
+          target: 'live_sync',
+          actions: [
+            assign({ syncPhase: 'live' as const }),
+            () => console.log('[PureLiveStoreSyncMachine] ✅ Server determined: Already current, going to live sync'),
+            'notifyAppInitSyncLive'
+          ]
+        },
+        
+        WS_DISCONNECTED: {
+          target: 'connecting',
+          actions: 'markDisconnected'
+        },
+        SERVICE_ERROR: {
           target: 'error',
           actions: 'storeError'
         }
@@ -594,6 +690,18 @@ export const pureLiveStoreSyncMachine = setup({
               const message = event.message
               if (message.type === 'srv_send_changes') {
                 syncLogger.info('sync', `Received ${message.changes?.length || 0} live changes`)
+              } else if (message.type === 'srv_table_change_notification') {
+                syncLogger.info('sync', `🔔 TABLE CHANGE NOTIFICATION RECEIVED: ${JSON.stringify(message.tables)} for org ${message.organizationId}`)
+                console.log('🔔 [PureLiveStoreSyncMachine] TABLE CHANGE NOTIFICATION:', {
+                  tables: message.tables,
+                  organizationId: message.organizationId,
+                  lsn: message.lsn,
+                  source: message.source,
+                  messageId: message.messageId
+                });
+                
+                // TODO: Trigger data refresh for the affected tables
+                // This is where we'll integrate with Legend State later
               }
             }
           ]

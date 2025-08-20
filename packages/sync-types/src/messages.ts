@@ -19,6 +19,7 @@ export type SrvMessageType =
   | 'srv_sync_stats'      // Server sends sync statistics
   | 'srv_integrity_reset' // Server sends integrity reset command
   | 'srv_integrity_validation_response' // Server responds to integrity validation
+  | 'srv_table_change_notification' // Server notifies of table changes for Legend State integration
   | 'srv_schema_updated'   // Server notifies schema change
   | 'srv_schema_migration' // Server notifies schema migration
   | 'srv_schema_validated' // Server validates schema change
@@ -257,6 +258,19 @@ export interface ServerSyncStatsMessage extends ServerMessage {
   };
 }
 
+/**
+ * Server table change notification message for Legend State integration
+ * Notifies clients about table changes with org-aware filtering already applied
+ */
+export interface ServerTableChangeNotificationMessage extends ServerMessage {
+  type: 'srv_table_change_notification';
+  organizationId: string;  // Organization that owns these changes
+  tables: string[];        // List of table names that changed (e.g., ['Project', 'Client'])
+  lsn: string;            // LSN when changes occurred
+  source: 'wal' | 'api' | 'manual'; // Source of the change notification
+  timestamp: number;      // Timestamp when changes were detected
+}
+
 // Client message interfaces
 export interface ClientMessage extends BaseMessage {
   type: CltMessageType;
@@ -341,6 +355,7 @@ export type Message =
   | ServerHeartbeatMessage
   | ServerIntegrityResetMessage
   | ServerIntegrityValidationResponseMessage
+  | ServerTableChangeNotificationMessage
   | ClientMessage
   | ClientIntegrityValidationMessage
   | ClientIntegrityResetAckMessage;

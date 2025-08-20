@@ -5,25 +5,16 @@ import { replicationLogger } from '../middleware/logger';
 import { getDBClient, sql } from '../lib/db';
 import type { MinimalContext } from '../types/hono';
 import type { TableChange } from '@repo/sync-types';
-import { processChanges } from './process-changes';
 import { StateManager } from './state-manager';
 import type { DurableObjectState } from '../types/cloudflare';
 import type { WALData } from '../types/wal';
-import { compareLSN } from '../lib/sync-common';
-
 // ====== Types and Interfaces ======
 const MODULE_NAME = 'polling';
 
 // ====== Constants ======
 const DEFAULT_POLL_INTERVAL = 1000; // 1 second
-const DEFAULT_BATCH_SIZE = 2000;    // Maximum changes to peek per cycle
-const DEFAULT_CONSUME_SIZE = 2000;  // Maximum changes to consume per cycle
+const DEFAULT_BATCH_SIZE = 2000;    // Maximum changes to consume per cycle
 const HEARTBEAT_INTERVAL = 60;      // Log a heartbeat every 60 polls (approx 1 minute)
-
-// ====== Helper Functions ======
-function compareLSNs(lsn1: string, lsn2: string): boolean {
-  return compareLSN(lsn1, lsn2) > 0;
-}
 
 // ====== Core Polling Class ======
 export class PollingManager {
@@ -139,9 +130,7 @@ export class PollingManager {
     this.isPolling = true;
     
     try {
-      const currentLSN = await this.stateManager.getLSN();
-      replicationLogger.info('First poll starting with LSN details', {
-        currentStoredLSN: currentLSN,
+      replicationLogger.info('First poll starting - consuming live WAL changes', {
         slot: this.config.slot,
         batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
       }, MODULE_NAME);
@@ -149,8 +138,7 @@ export class PollingManager {
       const changes = await this.pollForChanges();
       
       if (!changes || changes.length === 0) {
-        replicationLogger.info('First poll completed - no changes found', {
-          currentStoredLSN: currentLSN,
+        replicationLogger.info('First poll completed - no new changes to consume', {
           slot: this.config.slot
         }, MODULE_NAME);
         return {
@@ -162,20 +150,14 @@ export class PollingManager {
         };
       }
 
-      // Process the changes and get the results
-      const result = await processChanges(
-        changes,
-        this.env,
-        this.c,
-        this.stateManager,
-        this.config.storeBatchSize
-      );
+      // Process the changes for table notifications only (consistent with ongoing polling)
+      const result = await this.processChangesForNotifications(changes);
 
       return {
-        success: result.success,
+        success: true,
         changesFound: true,
-        changeCount: result.changeCount || 0,
-        filteredCount: result.filteredCount || 0,
+        changeCount: result.clientsNotified,
+        filteredCount: result.tablesChanged.length,
         walEntries: changes.length
       };
     } catch (error) {
@@ -219,11 +201,9 @@ export class PollingManager {
         this.pollCounter++;
         
         if (this.pollCounter % HEARTBEAT_INTERVAL === 0) {
-          const currentLSN = await this.stateManager.getLSN();
-          replicationLogger.info('Polling heartbeat', {
+          replicationLogger.info('Polling heartbeat - consuming live changes', {
             counter: this.pollCounter,
-            intervalMs: pollInterval,
-            currentLSN
+            intervalMs: pollInterval
           }, MODULE_NAME);
         }
         
@@ -250,9 +230,7 @@ export class PollingManager {
           const firstLSN = changes[0]?.lsn;
           const lastLSN = changes[changes.length - 1]?.lsn;
           
-          // Remove redundant parsing - this is already done in processChanges
-          // Let processChanges handle the actual parsing and counting
-          replicationLogger.debug('WAL changes found', {
+          replicationLogger.info('🔥 SIMPLIFIED WAL CHANGES DETECTED', {
             walEntries: changes.length,
             lsnRange: {
               first: firstLSN,
@@ -260,21 +238,14 @@ export class PollingManager {
             }
           }, MODULE_NAME);
 
-          // Process the changes and get accurate counts from the result
-          const result = await processChanges(
-            changes,
-            this.env,
-            this.c,
-            this.stateManager,
-            this.config.storeBatchSize
-          );
+          // Process changes for table notifications only (no storing in change_history)
+          const result = await this.processChangesForNotifications(changes);
           
-          replicationLogger.debug('Polling cycle completed', {
+          replicationLogger.info('✅ SIMPLIFIED NOTIFICATION CYCLE COMPLETED', {
             walEntriesProcessed: changes.length,
-            entityChangesProcessed: result.changeCount || 0,
-            entityChangesFiltered: result.filteredCount || 0,
-            storedSuccessfully: result.storedChanges,
-            lastLSN: result.lastLSN,
+            tablesChanged: result.tablesChanged,
+            organizationsNotified: result.organizationsNotified,
+            clientsNotified: result.clientsNotified,
             nextPollIn: this.config.pollingInterval || DEFAULT_POLL_INTERVAL
           }, MODULE_NAME);
           
@@ -293,14 +264,182 @@ export class PollingManager {
     }
   }
 
+  private async processChangesForNotifications(changes: WALData[]): Promise<{
+    tablesChanged: string[];
+    organizationsNotified: string[];
+    clientsNotified: number;
+  }> {
+    const tablesChanged = new Set<string>();
+    const organizationsNotified = new Set<string>();
+    let clientsNotified = 0;
+
+    try {
+      // Parse WAL changes to extract table names and organization IDs
+      for (const change of changes) {
+        try {
+          const changeData = JSON.parse(change.data);
+          const walChanges = changeData.change || [];
+
+          for (const walChange of walChanges) {
+            if (walChange.table) {
+              const tableName = walChange.table;
+              
+              // Extract organization ID from table name (e.g., "org_01920000_1000_7000_8000_000000000001_project")
+              const orgMatch = tableName.match(/^org_([0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})_(.+)$/i);
+              if (orgMatch) {
+                const orgId = orgMatch[1].replace(/_/g, '-'); // Convert to UUID format
+                const entityName = orgMatch[2]; // e.g., "project"
+                
+                tablesChanged.add(entityName);
+                organizationsNotified.add(orgId);
+                
+                replicationLogger.debug('Extracted table change info', {
+                  tableName,
+                  orgId,
+                  entityName,
+                  lsn: change.lsn
+                }, MODULE_NAME);
+                
+                // Send table change notification to connected clients for this org
+                const notificationsSent = await this.sendTableChangeNotification(orgId, [entityName], change.lsn);
+                clientsNotified += notificationsSent;
+              }
+            }
+          }
+        } catch (parseError) {
+          replicationLogger.warn('Failed to parse WAL change', {
+            error: parseError instanceof Error ? parseError.message : String(parseError),
+            changeData: change.data.substring(0, 200)
+          }, MODULE_NAME);
+        }
+      }
+
+      return {
+        tablesChanged: Array.from(tablesChanged),
+        organizationsNotified: Array.from(organizationsNotified),
+        clientsNotified
+      };
+
+    } catch (error) {
+      replicationLogger.error('Error processing changes for notifications', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
+      return {
+        tablesChanged: [],
+        organizationsNotified: [],
+        clientsNotified: 0
+      };
+    }
+  }
+
+  private async sendTableChangeNotification(organizationId: string, tables: string[], lsn: string): Promise<number> {
+    try {
+      // Use the existing broadcast system - get active clients for org and notify them directly
+      const { OrgAwareClientRegistryManager } = await import('../sync/org-aware-client-registry');
+      
+      const orgRegistry = new OrgAwareClientRegistryManager(this.env);
+      const clientIds = await orgRegistry.getOrgActiveClients(organizationId);
+      
+      if (clientIds.length === 0) {
+        replicationLogger.debug('No active clients for organization', {
+          organizationId,
+          tables
+        }, MODULE_NAME);
+        return 0;
+      }
+
+      // Create the notification message
+      const message = {
+        type: 'srv_table_change_notification',
+        organizationId,
+        tables,
+        lsn,
+        source: 'wal',
+        timestamp: Date.now(),
+        messageId: `table-change-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clientId: 'server'
+      };
+
+      // Send to each client directly using existing pattern
+      let successCount = 0;
+      for (const clientId of clientIds) {
+        try {
+          replicationLogger.info('🚀 SENDING TABLE CHANGE NOTIFICATION TO CLIENT DO', {
+            clientId,
+            organizationId,
+            tables,
+            messageType: message.type,
+            messageId: message.messageId
+          }, MODULE_NAME);
+
+          const clientDoId = this.env.SYNC.idFromName(`client:${clientId}`);
+          const clientDo = this.env.SYNC.get(clientDoId);
+          
+          const response = await clientDo.fetch(
+            `https://internal/table-change-notification?clientId=${encodeURIComponent(clientId)}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(message)
+            }
+          );
+
+          replicationLogger.info('📨 CLIENT DO FETCH RESPONSE', {
+            clientId,
+            responseStatus: response.status,
+            responseOk: response.ok,
+            responseStatusText: response.statusText
+          }, MODULE_NAME);
+
+          if (response.ok) {
+            successCount++;
+            replicationLogger.info('✅ TABLE CHANGE NOTIFICATION SENT SUCCESSFULLY', {
+              clientId,
+              organizationId,
+              tables
+            }, MODULE_NAME);
+          } else {
+            const responseText = await response.text().catch(() => 'Unable to read response');
+            replicationLogger.warn('❌ TABLE CHANGE NOTIFICATION FAILED', {
+              clientId,
+              organizationId,
+              responseStatus: response.status,
+              responseText
+            }, MODULE_NAME);
+          }
+        } catch (clientError) {
+          replicationLogger.warn('Failed to notify client of table change', {
+            clientId,
+            organizationId,
+            error: clientError instanceof Error ? clientError.message : String(clientError)
+          }, MODULE_NAME);
+        }
+      }
+      
+      replicationLogger.debug('Table change notification sent', {
+        organizationId,
+        tables,
+        totalClients: clientIds.length,
+        successfulNotifications: successCount
+      }, MODULE_NAME);
+
+      return successCount;
+    } catch (error) {
+      replicationLogger.error('Error broadcasting table change notification', {
+        organizationId,
+        tables,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      return 0;
+    }
+  }
+
   private async pollForChanges(): Promise<WALData[] | null> {
     let client;
     
-    try {
-      const currentLSN = await this.stateManager.getLSN();
-      
+    try {      
       replicationLogger.debug('Polling for changes', {
-        currentLSN,
         slot: this.config.slot,
         batchSize: this.config.walBatchSize || DEFAULT_BATCH_SIZE
       }, MODULE_NAME);
@@ -310,20 +449,20 @@ export class PollingManager {
       
       const batchSize = this.config.walBatchSize || DEFAULT_BATCH_SIZE;
       
+      // Consume changes and advance LSN automatically - no need to track LSN state
       const query = `
         SELECT data, lsn, xid 
-        FROM pg_logical_slot_peek_changes(
+        FROM pg_logical_slot_get_changes(
           $1,
           NULL,
           NULL,
           'include-xids', '1',
           'include-timestamp', 'true'
         )
-        WHERE lsn > $2::pg_lsn
         LIMIT ${batchSize};
       `;
       
-      const result = await client.query(query, [this.config.slot, currentLSN]);
+      const result = await client.query(query, [this.config.slot]);
       
       const newChanges = result.rows.map(row => ({
         data: row.data as string,

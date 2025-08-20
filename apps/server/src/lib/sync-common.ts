@@ -305,59 +305,32 @@ export function orderChangesByDomain(changes: TableChange[]): TableChange[] {
 }
 
 /**
- * Get the latest LSN from PostgreSQL replication slot or change_history table.
+ * Get the latest LSN from PostgreSQL replication slot only (no more change_history).
  * Returns '0/0' if no LSN is found or an error occurs.
  */
 export async function getLatestChangeHistoryLSN(context: MinimalContext): Promise<string> {
   try {
-    // First, try to get LSN from replication slot (preferred method)
-    try {
-      const slotResult = await sql<{ slot_name: string; confirmed_flush_lsn: string }>(
-        context,
-        `SELECT slot_name, confirmed_flush_lsn 
-         FROM pg_replication_slots 
-         WHERE slot_name = 'vibestack_replication_slot'
-         LIMIT 1;`
-      );
-      
-      if (slotResult[0]?.confirmed_flush_lsn) {
-        syncLogger.debug('Got LSN from replication slot', {
-          lsn: slotResult[0].confirmed_flush_lsn
-        }, MODULE_NAME);
-        return slotResult[0].confirmed_flush_lsn;
-      }
-    } catch (slotError) {
-      syncLogger.debug('Replication slot not available, checking change_history table', {
-        error: slotError instanceof Error ? slotError.message : 'Unknown error'
+    // Get LSN from replication slot only
+    const slotResult = await sql<{ slot_name: string; confirmed_flush_lsn: string }>(
+      context,
+      `SELECT slot_name, confirmed_flush_lsn 
+       FROM pg_replication_slots 
+       WHERE slot_name = 'vibestack_replication_slot'
+       LIMIT 1;`
+    );
+    
+    if (slotResult[0]?.confirmed_flush_lsn) {
+      syncLogger.debug('Got LSN from replication slot', {
+        lsn: slotResult[0].confirmed_flush_lsn
       }, MODULE_NAME);
+      return slotResult[0].confirmed_flush_lsn;
     }
     
-    // Fallback to change_history table if replication slot is not available
-    try {
-      const result = await sql<{ latest_lsn: string | null }>(context,
-        'SELECT MAX(lsn::pg_lsn)::text as latest_lsn FROM change_history;'
-      );
-      
-      const fallbackLSN = result[0]?.latest_lsn;
-      
-      if (fallbackLSN) {
-        syncLogger.debug('Got LSN from change_history table', {
-          lsn: fallbackLSN
-        }, MODULE_NAME);
-        return fallbackLSN;
-      }
-    } catch (tableError) {
-      // Table might be empty on fresh install
-      syncLogger.debug('change_history table empty or error', {
-        error: tableError instanceof Error ? tableError.message : 'Unknown error'
-      }, MODULE_NAME);
-    }
-    
-    // Return default for fresh installations
-    syncLogger.debug('No LSN found, returning default for initial sync', {}, MODULE_NAME);
+    // Return default for fresh installations or if slot is not available
+    syncLogger.debug('No replication slot LSN found, returning default for initial sync', {}, MODULE_NAME);
     return '0/0';
   } catch (error) {
-    syncLogger.error('Error getting latest LSN', {
+    syncLogger.error('Error getting LSN from replication slot', {
       error: error instanceof Error ? error.message : 'Unknown error'
     }, MODULE_NAME);
     return '0/0'; // Return default on error

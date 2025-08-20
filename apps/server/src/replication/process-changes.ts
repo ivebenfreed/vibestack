@@ -312,41 +312,34 @@ replicationLogger.info('Dynamic replication tracking initialized', {
 }, MODULE_NAME);
 
 /**
- * Get list of all client IDs from KV
- * Filters out inactive clients to prevent repeated notification attempts
+ * Get list of all active client IDs from org-aware client registry
+ * Returns clients from all organizations
  */
 export async function getAllClientIds(env: Env, timeout = 10 * 60 * 1000): Promise<string[]> {
   try {
-    const { keys } = await env.CLIENT_REGISTRY.list({ prefix: 'client:' });
-    const clientIds: string[] = [];
+    const { OrgAwareClientRegistryManager } = await import('../sync/org-aware-client-registry');
+    const orgAwareRegistry = new OrgAwareClientRegistryManager(env);
+    const stats = await orgAwareRegistry.getRegistryStats();
     
-    for (const key of keys) {
-      const value = await env.CLIENT_REGISTRY.get(key.name);
-      if (!value) continue;
+    // Get all active clients from all organizations
+    const allClientIds: string[] = [];
+    for (const [orgId] of Object.entries(stats.organizationClients)) {
+      const orgClients = await orgAwareRegistry.getOrgActiveClients(orgId);
+      allClientIds.push(...orgClients);
       
-      try {
-        const state = JSON.parse(value);
-        const clientId = key.name.replace('client:', '');
-        
-        // Only include active clients to prevent notifying disconnected clients
-        if (state.active === true) {
-          clientIds.push(clientId);
-        } else {
-          // Log when we skip inactive clients for debugging
-          replicationLogger.debug('Skipping inactive client', {
-            clientId,
-            active: state.active,
-            disconnectedAt: state.disconnectedAt
-          }, MODULE_NAME);
-        }
-      } catch (err) {
-        replicationLogger.error('Client parse error', {
-          key: key.name
-        }, MODULE_NAME);
-      }
+      replicationLogger.debug('Retrieved clients for organization', {
+        organizationId: orgId,
+        clientCount: orgClients.length,
+        clients: orgClients
+      }, MODULE_NAME);
     }
     
-    return clientIds;
+    replicationLogger.debug('Retrieved all active client IDs from org-aware registry', {
+      totalClients: allClientIds.length,
+      organizationCount: Object.keys(stats.organizationClients).length
+    }, MODULE_NAME);
+    
+    return allClientIds;
   } catch (error) {
     replicationLogger.error('Client retrieval failed', {
       error: error instanceof Error ? error.message : String(error)
@@ -1018,21 +1011,12 @@ export async function processChanges(
       // Continue to store in database even if notifications fail
     }
 
-    // Step 3: Store changes in database
-    const storedSuccessfully = await storeChangesInHistory(context, tableChanges, storeBatchSize || DEFAULT_STORE_BATCH_SIZE);
-    
-    if (!storedSuccessfully) {
-      replicationLogger.warn('Failed to store changes in history', {
-        lastLSN
-      }, MODULE_NAME);
-    }
-
-    // Step 4: Update LSN
+    // Step 3: Update LSN (no more storing in change_history)
     await stateManager.setLSN(lastLSN);
     
     return { 
       success: true, 
-      storedChanges: storedSuccessfully,
+      storedChanges: false, // No longer storing in change_history
       changeCount: tableChanges.length,
       filteredCount,
       lastLSN

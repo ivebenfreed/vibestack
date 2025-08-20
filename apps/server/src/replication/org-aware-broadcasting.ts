@@ -1,6 +1,7 @@
 import type { TableChange } from '@repo/sync-types';
 import type { Env } from '../types/env';
 import { replicationLogger } from '../middleware/logger';
+import { OrgAwareClientRegistryManager } from '../sync/org-aware-client-registry';
 
 const MODULE_NAME = 'org-aware-broadcasting';
 
@@ -13,34 +14,12 @@ interface BroadcastResult {
 }
 
 /**
- * Get active client IDs for a specific organization
+ * Get active client IDs for a specific organization using OrgAwareClientRegistry
  */
 async function getOrganizationClientIds(env: Env, organizationId: string): Promise<string[]> {
   try {
-    const { keys } = await env.CLIENT_REGISTRY.list({ prefix: 'client:' });
-    const orgClientIds: string[] = [];
-
-    for (const key of keys) {
-      const clientId = key.name.replace('client:', '');
-      
-      // Get client's organization context
-      const authData = await env.CLIENT_REGISTRY.get(`auth:${clientId}`);
-      if (authData) {
-        try {
-          const authContext = JSON.parse(authData);
-          if (authContext.organizationId === organizationId && authContext.active === true) {
-            orgClientIds.push(clientId);
-          }
-        } catch (parseError) {
-          replicationLogger.warn('Failed to parse client auth context', {
-            clientId,
-            error: parseError instanceof Error ? parseError.message : String(parseError)
-          }, MODULE_NAME);
-        }
-      }
-    }
-
-    return orgClientIds;
+    const orgAwareRegistry = new OrgAwareClientRegistryManager(env);
+    return await orgAwareRegistry.getOrgActiveClients(organizationId);
   } catch (error) {
     replicationLogger.error('Failed to get organization client IDs', {
       organizationId,
@@ -163,25 +142,17 @@ export async function broadcastChangesToOrganizations(
 
 async function getAllActiveClientIds(env: Env): Promise<string[]> {
   try {
-    const { keys } = await env.CLIENT_REGISTRY.list({ prefix: 'client:' });
-    const activeClientIds: string[] = [];
-
-    for (const key of keys) {
-      const value = await env.CLIENT_REGISTRY.get(key.name);
-      if (!value) continue;
-
-      try {
-        const state = JSON.parse(value);
-        if (state.active === true) {
-          const clientId = key.name.replace('client:', '');
-          activeClientIds.push(clientId);
-        }
-      } catch (parseError) {
-        // Skip invalid entries
-      }
+    const orgAwareRegistry = new OrgAwareClientRegistryManager(env);
+    const stats = await orgAwareRegistry.getRegistryStats();
+    
+    // Get all active clients from all organizations
+    const allClientIds: string[] = [];
+    for (const [orgId] of Object.entries(stats.organizationClients)) {
+      const orgClients = await orgAwareRegistry.getOrgActiveClients(orgId);
+      allClientIds.push(...orgClients);
     }
-
-    return activeClientIds;
+    
+    return allClientIds;
   } catch (error) {
     replicationLogger.error('Failed to get all active client IDs', {
       error: error instanceof Error ? error.message : String(error)

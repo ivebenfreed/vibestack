@@ -8,7 +8,6 @@
 import type { TableChange } from '@repo/sync-types';
 import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
-import type { ClientRegistryManager } from './client-registry-manager';
 import type { OrgAwareClientRegistryManager } from './org-aware-client-registry';
 import { getLatestChangeHistoryLSN } from '../lib/sync-common';
 import type { MinimalContext } from '../types/hono';
@@ -18,9 +17,8 @@ const MODULE_NAME = 'BroadcastManager';
 export interface BroadcastManagerContext {
   env: Env;
   clientId: string;
-  clientRegistryManager: ClientRegistryManager;
-  orgAwareClientRegistry?: OrgAwareClientRegistryManager;
-  getOrganizationContext?: () => { organizationId: string } | null;
+  orgAwareClientRegistry: OrgAwareClientRegistryManager;
+  getOrganizationContext: () => { organizationId: string } | null;
   getContext: () => MinimalContext;
 }
 
@@ -47,23 +45,20 @@ export class BroadcastManager {
       const orgContext = this.context.getOrganizationContext?.();
       let activeClients: string[] = [];
 
-      if (orgContext && this.context.orgAwareClientRegistry) {
-        // Organization-aware: Only get clients from the same organization
+      if (orgContext) {
+        // Get clients from the same organization only
         activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(orgContext.organizationId);
         
-        syncLogger.debug('Using organization-aware client lookup', {
+        syncLogger.debug('Broadcasting to organization clients', {
           originClientId,
           organizationId: orgContext.organizationId,
           orgClientCount: activeClients.length
         }, MODULE_NAME);
       } else {
-        // Fallback: Use global client registry (backwards compatibility)
-        activeClients = await this.context.clientRegistryManager.getActiveClients();
-        
-        syncLogger.warn('Using global client registry - no organization context available', {
-          originClientId,
-          globalClientCount: activeClients.length
+        syncLogger.error('No organization context available for broadcast - skipping', {
+          originClientId
         }, MODULE_NAME);
+        return;
       }
       
       syncLogger.debug('Active clients found for broadcast', {
@@ -144,8 +139,14 @@ export class BroadcastManager {
         conflictTables: [...new Set(conflictedChanges.map(c => c.table))]
       }, MODULE_NAME);
 
-      // Get all registered clients from KV registry (including originator for authoritative resolution)
-      const activeClients = await this.context.clientRegistryManager.getActiveClients();
+      // Get all registered clients from org-aware registry (including originator for authoritative resolution)
+      const orgContext = this.context.getOrganizationContext();
+      if (!orgContext) {
+        syncLogger.error('No organization context for conflict resolution broadcast', { originClientId }, MODULE_NAME);
+        return;
+      }
+      
+      const activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(orgContext.organizationId);
       
       if (activeClients.length === 0) {
         syncLogger.debug('No active clients for conflict resolution broadcast', { originClientId }, MODULE_NAME);
@@ -258,7 +259,7 @@ export class BroadcastManager {
       }, MODULE_NAME);
       
       // Mark the failed client as inactive using "mark inactive on fail" approach
-      await this.context.clientRegistryManager.markClientsInactive([targetClientId]);
+      await this.context.orgAwareClientRegistry.markClientsInactive([targetClientId]);
       
       throw error;
     }
@@ -307,7 +308,7 @@ export class BroadcastManager {
       }, MODULE_NAME);
       
       // Mark the failed client as inactive using "mark inactive on fail" approach
-      await this.context.clientRegistryManager.markClientsInactive([targetClientId]);
+      await this.context.orgAwareClientRegistry.markClientsInactive([targetClientId]);
       
       throw error;
     }
@@ -363,6 +364,107 @@ export class BroadcastManager {
   }
 
   /**
+   * Broadcast a server message to all clients in an organization
+   * Used for Legend State table change notifications
+   */
+  async broadcastToOrganization(message: any, organizationId: string): Promise<void> {
+    try {
+      syncLogger.debug('Broadcasting message to organization', {
+        messageType: message.type,
+        organizationId,
+        messageId: message.messageId
+      }, MODULE_NAME);
+
+      // Get organization-aware client list
+      if (!this.context.orgAwareClientRegistry) {
+        syncLogger.warn('Organization-aware client registry not available', {
+          organizationId,
+          messageType: message.type
+        }, MODULE_NAME);
+        return;
+      }
+
+      const activeClients = await this.context.orgAwareClientRegistry.getOrgActiveClients(organizationId);
+      
+      if (activeClients.length === 0) {
+        syncLogger.debug('No active clients in organization for broadcast', {
+          organizationId,
+          messageType: message.type
+        }, MODULE_NAME);
+        return;
+      }
+
+      syncLogger.debug('Broadcasting to organization clients', {
+        organizationId,
+        messageType: message.type,
+        activeClientCount: activeClients.length,
+        clients: activeClients
+      }, MODULE_NAME);
+
+      // Send message to each client's SyncDO via WebSocket
+      const broadcastPromises = activeClients.map(async (clientId) => {
+        try {
+          await this.sendMessageToClient(clientId, message);
+        } catch (error) {
+          syncLogger.error('Failed to send message to client', {
+            clientId,
+            organizationId,
+            messageType: message.type,
+            error: error instanceof Error ? error.message : String(error)
+          }, MODULE_NAME);
+          
+          // Mark failed client as inactive
+          await this.context.orgAwareClientRegistry.markClientsInactive([clientId]);
+        }
+      });
+
+      await Promise.allSettled(broadcastPromises);
+
+    } catch (error) {
+      syncLogger.error('Error broadcasting to organization', {
+        organizationId,
+        messageType: message.type,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
+  /**
+   * Send a server message directly to a specific client via WebSocket
+   */
+  private async sendMessageToClient(clientId: string, message: any): Promise<void> {
+    try {
+      const id = this.context.env.SYNC.idFromName(`client:${clientId}`);
+      const syncDO = this.context.env.SYNC.get(id);
+
+      // Use a direct WebSocket send endpoint (we'll need to add this to SyncDO)
+      const response = await syncDO.fetch('http://internal/send-message', {
+        method: 'POST',
+        body: JSON.stringify(message)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send message to client ${clientId}: ${response.status}`);
+      }
+
+      syncLogger.debug('Message sent to client successfully', {
+        clientId,
+        messageType: message.type,
+        messageId: message.messageId
+      }, MODULE_NAME);
+
+    } catch (error) {
+      syncLogger.error('Error sending message to client', {
+        clientId,
+        messageType: message.type,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      throw error;
+    }
+  }
+
+  /**
    * Get broadcast statistics
    */
   async getBroadcastStats(): Promise<{
@@ -370,11 +472,11 @@ export class BroadcastManager {
     canBroadcast: boolean;
   }> {
     try {
-      const stats = await this.context.clientRegistryManager.getRegistryStats();
+      const stats = await this.context.orgAwareClientRegistry.getRegistryStats();
       
       return {
-        activeClientCount: stats.activeClients,
-        canBroadcast: stats.activeClients > 1 // Need at least one other client
+        activeClientCount: stats.totalClients,
+        canBroadcast: stats.totalClients > 1 // Need at least one other client
       };
     } catch (error) {
       syncLogger.error('Error getting broadcast statistics', {

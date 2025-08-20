@@ -15,7 +15,6 @@ import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProces
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
 import crypto from 'crypto';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';
-import { ClientRegistryManager, type ClientRegistryManagerContext } from './client-registry-manager';
 import { OrgAwareClientRegistryManager } from './org-aware-client-registry';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
 import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
@@ -25,13 +24,14 @@ import type {
   ServerMessage, 
   ClientMessage,
   ClientChangesMessage,
-  TableChange
+  TableChange,
+  ServerTableChangeNotificationMessage
 } from '@repo/sync-types';
 import type { MinimalContext } from '../types/hono';
 import type { Env } from '../types/env';
 import { syncLogger } from '../middleware/logger';
 import type { WebSocketHandler } from './types';
-import { compareLSN, deduplicateChanges, getLatestChangeHistoryLSN } from '../lib/sync-common';
+import { compareLSN, deduplicateChanges } from '../lib/sync-common';
 import { getDBClient } from '../lib/db';
 
 const MODULE_NAME = 'SyncDO';
@@ -62,7 +62,6 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   private stateManager: SyncStateManager;
   private messageHandlerRegistry!: MessageHandlerRegistry;
   private webSocketManager!: WebSocketManager;
-  private clientRegistryManager!: ClientRegistryManager;
   private orgAwareClientRegistry!: OrgAwareClientRegistryManager;
   private broadcastManager!: BroadcastManager;
   private syncStrategyAnalyzer!: SyncStrategyAnalyzer;
@@ -108,13 +107,6 @@ export class SyncDO implements DurableObject, WebSocketHandler {
    * Initialize all service modules with proper dependency injection
    */
   private initializeServices(): void {
-    // Client Registry Manager
-    const registryContext: ClientRegistryManagerContext = {
-      env: this.env,
-      state: this.state
-    };
-    this.clientRegistryManager = new ClientRegistryManager(registryContext);
-
     // Organization-Aware Client Registry Manager
     this.orgAwareClientRegistry = new OrgAwareClientRegistryManager(this.env);
 
@@ -139,7 +131,6 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     const broadcastContext: BroadcastManagerContext = {
       env: this.env,
       clientId: this.clientId,
-      clientRegistryManager: this.clientRegistryManager,
       orgAwareClientRegistry: this.orgAwareClientRegistry,
       getOrganizationContext: () => this.syncConnection ? { organizationId: this.syncConnection.organizationId } : null,
       getContext: () => this.getContext()
@@ -195,6 +186,10 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         return await this.handleWebSocketUpgrade(request);
       } else if (path === '/new-changes') {
         return await this.handleNewChanges(request);
+      } else if (path === '/table-change-notification') {
+        return await this.handleTableChangeNotification(request);
+      } else if (path === '/send-message') {
+        return await this.handleSendMessage(request);
       } else if (path === '/metrics') {
         return await this.handleMetrics();
       } else {
@@ -308,7 +303,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         clientLSN
       }, MODULE_NAME);
 
-      // Register client with organization-aware registry for proper broadcasting isolation
+      // Register client with organization-aware registry
       await this.orgAwareClientRegistry.registerClient({
         clientId,
         organizationId: this.syncConnection.organizationId,
@@ -328,9 +323,15 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       // Ensure replication is active
       await this.ensureReplicationActive();
       
-      // Determine sync strategy and perform org-aware sync
-      const { strategy, serverLSN } = await this.syncStrategyAnalyzer.determineSyncStrategy(clientId, clientLSN);
-      await this.performOrgAwareSync(strategy, serverLSN, clientId, clientLSN);
+      // BYPASS SYNC STRATEGY - Go straight to live sync
+      syncLogger.info('Bypassing sync strategy determination - going straight to live sync', {
+        clientId,
+        clientLSN,
+        organizationId: this.syncConnection?.organizationId
+      }, MODULE_NAME);
+      
+      // Start live sync directly (no LSN needed since we don't use change_history)
+      await this.performOrgAwareSync(SyncStrategy.LIVE, '0/0', clientId, clientLSN);
       
     } catch (error) {
       syncLogger.error('Organization-aware sync error', {
@@ -586,10 +587,165 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         }
       }
 
+      // Send table change notifications for Legend State integration
+      if (orgFilteredChanges.length > 0 && this.syncConnection?.organizationId) {
+        await this.sendTableChangeNotifications(orgFilteredChanges, providedLSN || '0/0');
+      }
+
       return new Response('OK', { status: 200 });
       
     } catch (error) {
       syncLogger.error('Error handling new changes', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
+      return new Response('Internal Server Error', { status: 500 });
+    }
+  }
+
+  /**
+   * Handle table change notification from WAL polling
+   */
+  private async handleTableChangeNotification(request: Request): Promise<Response> {
+    try {
+      const clientId = getQueryParam(request, 'clientId');
+      
+      syncLogger.info('🎯 SYNCDO RECEIVED TABLE CHANGE NOTIFICATION REQUEST', {
+        clientId,
+        url: request.url,
+        method: request.method
+      }, MODULE_NAME);
+
+      // Ensure handlers are registered (hibernation recovery)
+      if (!this.isHandlerRegistered) {
+        syncLogger.debug('DO woke from hibernation via HTTP request, registering message handlers', {
+          clientId,
+        }, MODULE_NAME);
+        this.registerMessageHandlers();
+      }
+      
+      if (!clientId) {
+        return new Response('Missing clientId parameter', { status: 400 });
+      }
+
+      const body = await request.text();
+      let data;
+      
+      try {
+        data = JSON.parse(body);
+        syncLogger.info('📨 PARSED TABLE CHANGE NOTIFICATION DATA', {
+          clientId,
+          messageType: data.type,
+          organizationId: data.organizationId,
+          tables: data.tables,
+          lsn: data.lsn,
+          source: data.source
+        }, MODULE_NAME);
+      } catch (parseError) {
+        syncLogger.error('Invalid JSON in table-change-notification request', {
+          clientId,
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        }, MODULE_NAME);
+        return new Response('Invalid JSON', { status: 400 });
+      }
+
+      const { organizationId, tables, lsn, source, timestamp } = data;
+      
+      if (!organizationId || !tables || !Array.isArray(tables)) {
+        return new Response('Invalid notification data', { status: 400 });
+      }
+
+      // Verify this client belongs to the specified organization
+      if (this.syncConnection?.organizationId !== organizationId) {
+        syncLogger.debug('Table change notification for different organization', {
+          clientId,
+          clientOrg: this.syncConnection?.organizationId,
+          notificationOrg: organizationId
+        }, MODULE_NAME);
+        return new Response('OK', { status: 200 }); // Silently ignore - not an error
+      }
+
+      // Create table change notification message
+      const notification: ServerTableChangeNotificationMessage = {
+        type: 'srv_table_change_notification',
+        messageId: crypto.randomUUID(),
+        timestamp: Date.now(),
+        clientId,
+        organizationId,
+        tables,
+        lsn,
+        source: source || 'wal'
+      };
+
+      // Send notification to client via WebSocket
+      syncLogger.info('🚀 SENDING TABLE CHANGE NOTIFICATION VIA WEBSOCKET', {
+        clientId,
+        organizationId,
+        tables,
+        messageId: notification.messageId,
+        isConnected: this.isConnected(),
+        webSocketCount: this.ctx.getWebSockets().length
+      }, MODULE_NAME);
+      
+      await this.send(notification);
+
+      syncLogger.info('✅ TABLE CHANGE NOTIFICATION SENT VIA WEBSOCKET', {
+        clientId,
+        organizationId,
+        tables,
+        messageId: notification.messageId,
+        lsn,
+        source
+      }, MODULE_NAME);
+
+      return new Response('OK', { status: 200 });
+      
+    } catch (error) {
+      syncLogger.error('Error handling table change notification', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+      
+      return new Response('Internal Server Error', { status: 500 });
+    }
+  }
+
+  /**
+   * Handle direct message sending to client via WebSocket
+   * Used for broadcasting server messages like table change notifications
+   */
+  private async handleSendMessage(request: Request): Promise<Response> {
+    try {
+      const body = await request.text();
+      let message;
+      
+      try {
+        message = JSON.parse(body);
+      } catch (parseError) {
+        syncLogger.error('Invalid JSON in send-message request', {
+          clientId: this.clientId,
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        }, MODULE_NAME);
+        return new Response('Invalid JSON', { status: 400 });
+      }
+
+      if (!message.type) {
+        return new Response('Missing message type', { status: 400 });
+      }
+
+      syncLogger.debug('Sending direct message to client', {
+        clientId: this.clientId,
+        messageType: message.type,
+        messageId: message.messageId
+      }, MODULE_NAME);
+
+      // Send message directly via WebSocket
+      await this.webSocketManager.send(message);
+
+      return new Response('OK', { status: 200 });
+      
+    } catch (error) {
+      syncLogger.error('Error handling send message', {
+        clientId: this.clientId,
         error: error instanceof Error ? error.message : String(error)
       }, MODULE_NAME);
       
@@ -794,6 +950,91 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         syncId: this.syncId
       }, MODULE_NAME);
     }
+  }
+
+  /**
+   * Send table change notifications for Legend State integration
+   * Extracts table names from changes and broadcasts org-aware notifications
+   */
+  private async sendTableChangeNotifications(changes: TableChange[], lsn: string): Promise<void> {
+    if (!this.syncConnection?.organizationId) {
+      return;
+    }
+
+    try {
+      // Extract unique table names from changes
+      const tableNames = this.extractTableNamesFromChanges(changes);
+      
+      if (tableNames.length === 0) {
+        return;
+      }
+
+      syncLogger.debug('Sending table change notifications for Legend State', {
+        organizationId: this.syncConnection.organizationId,
+        tables: tableNames,
+        lsn,
+        changeCount: changes.length
+      }, MODULE_NAME);
+
+      // Create table change notification message
+      const notification: ServerTableChangeNotificationMessage = {
+        type: 'srv_table_change_notification',
+        messageId: crypto.randomUUID(),
+        timestamp: Date.now(),
+        clientId: this.clientId,
+        organizationId: this.syncConnection.organizationId,
+        tables: tableNames,
+        lsn,
+        source: 'wal'
+      };
+
+      // Send to all clients in this organization
+      await this.broadcastManager.broadcastToOrganization(notification, this.syncConnection.organizationId);
+
+    } catch (error) {
+      syncLogger.error('Failed to send table change notifications', {
+        organizationId: this.syncConnection?.organizationId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+  }
+
+  /**
+   * Extract entity table names from TableChange objects
+   * Converts database table names to entity names (e.g., "org_xxx_project" -> "Project")
+   */
+  private extractTableNamesFromChanges(changes: TableChange[]): string[] {
+    const tableNames = new Set<string>();
+    
+    for (const change of changes) {
+      const entityName = this.tableNameToEntityName(change.table);
+      if (entityName) {
+        tableNames.add(entityName);
+      }
+    }
+    
+    return Array.from(tableNames);
+  }
+
+  /**
+   * Convert database table names to entity names for Legend State
+   */
+  private tableNameToEntityName(tableName: string): string | null {
+    // Convert table names like "org_01920000_1000_7000_8000_000000000001_project" to "Project"
+    if (tableName.includes('_project')) return 'Project';
+    if (tableName.includes('_client')) return 'Client'; 
+    if (tableName.includes('_task')) return 'Task';
+    if (tableName.includes('_user')) return 'User';
+    if (tableName.includes('_organization')) return 'Organization';
+    if (tableName.includes('_comment')) return 'Comment';
+    if (tableName.includes('_attachment')) return 'Attachment';
+    if (tableName.includes('_milestone')) return 'Milestone';
+    if (tableName.includes('_time_entry')) return 'TimeEntry';
+    if (tableName.includes('_invoice')) return 'Invoice';
+    if (tableName.includes('_expense')) return 'Expense';
+    if (tableName.includes('_tag')) return 'Tag';
+    // Add more table mappings as needed
+    return null;
   }
 
   /**
@@ -1006,7 +1247,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // Cleanup from both registries - don't wait for completion
     this.state.waitUntil(this.stateManager.cleanupConnection());
     
-    // Remove from organization-aware registry if we have context
+    // Remove from organization-aware registry
     if (this.clientId && this.syncConnection) {
       this.state.waitUntil(this.orgAwareClientRegistry.removeClient(
         this.clientId,
