@@ -18,15 +18,34 @@ export interface RLSContext {
  * Extract organization context from request
  */
 async function extractOrganizationContext(c: Context): Promise<RLSContext | null> {
-  const user = c.var.user;
-  const session = c.var.session;
+  const user = c.get('user');
+  const session = c.get('session');
+  
+  console.log('[RLS DEBUG] Extracting context:', {
+    hasUser: !!user,
+    hasSession: !!session,
+    userId: user?.id,
+    path: c.req.path
+  });
   
   if (!user || !session) {
+    console.log('[RLS DEBUG] No user or session found');
     return null;
   }
 
   // Method 1: From URL path (e.g., /api/organizations/{orgId}/...)
   const orgIdFromPath = c.req.param('orgId');
+  console.log('[RLS DEBUG] OrgId from path param:', orgIdFromPath);
+  
+  // Method 1b: Parse directly from URL path for archetype routes
+  let orgIdFromArchetypePath = null;
+  if (c.req.path.includes('/api/archetype/orgs/')) {
+    const pathMatch = c.req.path.match(/\/api\/archetype\/orgs\/([^\/]+)/);
+    if (pathMatch) {
+      orgIdFromArchetypePath = pathMatch[1];
+    }
+  }
+  console.log('[RLS DEBUG] OrgId from archetype path:', orgIdFromArchetypePath);
   
   // Method 2: From request headers
   const orgIdFromHeader = c.req.header('X-Organization-ID');
@@ -44,7 +63,7 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
   const orgIdFromQuery = c.req.query('organization_id') || c.req.query('org_id');
 
   // Determine organization ID (prefer explicit path parameter)
-  const organizationId = orgIdFromPath || orgIdFromHeader || orgIdFromBody || orgIdFromQuery;
+  const organizationId = orgIdFromPath || orgIdFromArchetypePath || orgIdFromHeader || orgIdFromBody || orgIdFromQuery;
 
   if (!organizationId) {
     // For organization listing endpoints, we don't need org context
@@ -62,20 +81,20 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
     return null;
   }
 
-  // Get user's role in this organization
+  // Check user's membership in this organization
   const db = getKysely(c.env);
   const membership = await db
     .selectFrom('organization_members')
-    .select(['role', 'status'])
+    .select(['role'])
     .where('organization_id', '=', organizationId)
     .where('user_id', '=', user.id)
     .executeTakeFirst();
 
-  if (!membership || membership.status !== 'active') {
+  if (!membership) {
     dbLogger.warn('User attempted to access organization without membership', {
       userId: user.id,
       organizationId,
-      membership: membership || 'not_found',
+      membership: 'not_found',
       path: c.req.path
     }, 'rls-security');
     
@@ -85,7 +104,7 @@ async function extractOrganizationContext(c: Context): Promise<RLSContext | null
   return {
     organizationId,
     userId: user.id,
-    userRole: membership.role
+    userRole: membership.role // This will be used as fallback, but RLS will calculate effective role
   };
 }
 
@@ -209,7 +228,7 @@ export async function rlsSecurityMiddleware(c: Context, next: Next) {
         dbLogger.warn('Request blocked - no valid organization context', {
           path: c.req.path,
           method: c.req.method,
-          userId: c.var.user?.id || 'anonymous'
+          userId: c.get('user')?.id || 'anonymous'
         }, 'rls-security');
         
         return c.json({

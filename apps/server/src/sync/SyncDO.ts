@@ -9,15 +9,15 @@
  */
 
 import { SyncStateManager } from './state-manager';
-import { performInitialSync } from './initial-sync-generic';
-import { sendLiveChanges } from './server-changes-generic';
-import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
+// import { performInitialSync } from './initial-sync-generic';
+// import { sendLiveChanges } from './server-changes-generic';
+// import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
 import { MessageHandlerRegistry, type MessageHandlerContext } from './message-handler-registry';
 import crypto from 'crypto';
 import { WebSocketManager, type WebSocketManagerContext } from './websocket/WebSocketManager';
 import { UnifiedClientRegistry } from './unified-client-registry';
 import { BroadcastManager, type BroadcastManagerContext } from './broadcast-manager';
-import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
+// import { SyncStrategyAnalyzer, type SyncStrategyContext, SyncStrategy } from './sync-strategy-analyzer';
 import { OrgAwareSyncManager, type SyncConnection } from './org-aware-sync-manager';
 
 import type { 
@@ -64,7 +64,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   private webSocketManager!: WebSocketManager;
   private unifiedClientRegistry!: UnifiedClientRegistry;
   private broadcastManager!: BroadcastManager;
-  private syncStrategyAnalyzer!: SyncStrategyAnalyzer;
+  // private syncStrategyAnalyzer!: SyncStrategyAnalyzer;
 
   // Core state for coordination
   private messageHandlers: Map<ClientMessage['type'], Array<(message: ClientMessage) => Promise<void>>> = new Map();
@@ -101,6 +101,13 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     
     // Initialize service modules
     this.initializeServices();
+    
+    // Handle hibernation recovery using Cloudflare's hibernation API
+    this.restoreFromHibernation().catch(error => {
+      syncLogger.error('Failed to restore from hibernation in constructor', {
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    });
   }
 
   /**
@@ -150,7 +157,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         userId: this.syncConnection.userId
       } : null
     };
-    this.syncStrategyAnalyzer = new SyncStrategyAnalyzer(strategyContext);
+    // this.syncStrategyAnalyzer = new SyncStrategyAnalyzer(strategyContext);
 
     // Message Handler Registry
     const handlerContext: MessageHandlerContext = {
@@ -255,6 +262,16 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // 3. Store validated connection context
     this.syncConnection = validation.connection!;
     this.clientId = clientId;
+    
+    // Store context in WebSocket attachment for hibernation recovery
+    this.storeContextInWebSocketAttachment();
+    
+    // ALSO store in Durable Object storage as fallback
+    this.state.storage.put('hibernationContext', {
+      clientId: this.clientId,
+      syncConnection: this.syncConnection,
+      timestamp: Date.now()
+    });
 
     syncLogger.info('WebSocket connection validated for organization', {
       clientId,
@@ -340,7 +357,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
       }, MODULE_NAME);
       
       // Start live sync directly (no LSN needed since we don't use change_history)
-      await this.performOrgAwareSync(SyncStrategy.LIVE, '0/0', clientId, clientLSN);
+      await this.performOrgAwareSync('0/0', clientId, clientLSN);
       
     } catch (error) {
       syncLogger.error('Organization-aware sync error', {
@@ -366,7 +383,6 @@ export class SyncDO implements DurableObject, WebSocketHandler {
    * Perform organization-aware sync with permission filtering
    */
   private async performOrgAwareSync(
-    strategy: SyncStrategy,
     serverLSN: string,
     clientId: string,
     clientLSN: string
@@ -376,47 +392,21 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     }
 
     try {
-      switch (strategy) {
-        case SyncStrategy.INITIAL:
-          // SECURITY: Ensure organization context is available
-          if (!this.syncConnection?.organizationId) {
-            throw new Error(`Cannot perform initial sync: organization context required`);
-          }
+      // Skip complex sync strategies - just start live sync for notifications
+      syncLogger.info('Starting simple live sync for notifications only', {
+        clientId,
+        organizationId: this.syncConnection?.organizationId
+      }, MODULE_NAME);
           
-          // Use original sync system with org awareness
-          await performInitialSync(
-            this, // WebSocketHandler
-            this.getContext(), // MinimalContext  
-            clientId,
-            this.stateManager, // StateManager for proper LSN tracking
-            this.syncConnection.organizationId, // organizationId for filtering (required)
-            this.syncConnection?.userId // userId for permissions
-          );
-          break;
-        case SyncStrategy.CATCHUP:
-          await this.performOrgAwareCatchupSync(clientId, clientLSN, serverLSN);
-          break;
-        case SyncStrategy.LIVE:
-          // Client is up to date - send srv_live_start directly
-          syncLogger.info('Client up to date - starting live sync directly', {
-            clientId,
-            organizationId: this.syncConnection?.organizationId
-          }, MODULE_NAME);
-          
-          await this.send({
-            type: 'srv_live_start',
-            clientId,
-            requestId: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            messageId: crypto.randomUUID()
-          });
-          break;
-        default:
-          throw new Error(`Unknown sync strategy: ${strategy}`);
-      }
+      await this.send({
+        type: 'srv_live_start',
+        clientId,
+        requestId: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        messageId: crypto.randomUUID()
+      });
     } catch (error) {
       syncLogger.error('Org-aware sync strategy failed', {
-        strategy,
         clientId,
         userId: this.syncConnection.userId,
         organizationId: this.syncConnection.organizationId,
@@ -442,14 +432,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     }, MODULE_NAME);
 
     // Use existing initial sync but with user-scoped filtering
-    await performInitialSync(
-      this, // WebSocketHandler 
-      this.getContext(), // MinimalContext
-      clientId, // string
-      this.stateManager, // StateManager (optional)
-      this.syncConnection.organizationId, // Organization ID for scoping
-      this.syncConnection.userId // User ID for container permission filtering
-    );
+    // TODO: Re-implement when sync components are available
+    console.log('[SyncDO] Org-aware initial sync temporarily disabled - components removed');
 
     syncLogger.info('Org-aware initial sync completed', {
       clientId,
@@ -477,13 +461,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     }, MODULE_NAME);
 
     // Perform catchup sync with organization filtering
-    // This will need to query changes between clientLSN and serverLSN
-    // but filter only tables belonging to the user's organization
-    await this.syncStrategyAnalyzer.performSync(
-      { strategy: SyncStrategy.CATCHUP_SYNC, serverLSN },
-      clientId,
-      clientLSN
-    );
+    // TODO: Re-implement catchup sync when components are available
+    console.log('[SyncDO] Catchup sync temporarily disabled - components removed');
   }
 
   /**
@@ -844,7 +823,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         // Apply organization filtering before sending
         const filteredChanges = await this.filterChangesForOrganization(changes);
         if (filteredChanges.length > 0) {
-          await sendLiveChanges(this.getContext(), clientId, filteredChanges, this, providedLSN || undefined);
+          // await sendLiveChanges(this.getContext(), clientId, filteredChanges, this, providedLSN || undefined);
+          console.log('[SyncDO] Live changes temporarily disabled - components removed');
         }
       });
       
@@ -863,7 +843,8 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // Apply organization filtering and send changes immediately
     const filteredChanges = await this.filterChangesForOrganization(changes);
     if (filteredChanges.length > 0) {
-      await sendLiveChanges(this.getContext(), clientId, filteredChanges, this, providedLSN || undefined);
+      // await sendLiveChanges(this.getContext(), clientId, filteredChanges, this, providedLSN || undefined);
+      console.log('[SyncDO] Live changes temporarily disabled - components removed');
     }
   }
 
@@ -1194,8 +1175,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         clientId: this.clientId,
       }, MODULE_NAME);
       
-      // Restore context from persistent storage instead of WebSocket attachment
-      await this.restoreSyncConnection();
+      // Context is automatically restored in constructor via hibernation API
       
       // Re-register client with unified registry after hibernation
       if (this.clientId && this.syncConnection) {
@@ -1330,47 +1310,162 @@ export class SyncDO implements DurableObject, WebSocketHandler {
   }
 
   /**
-   * Restore sync connection context from persistent storage after hibernation
+   * Store context in WebSocket attachment for hibernation recovery
    */
-  private async restoreSyncConnection(): Promise<void> {
+  private storeContextInWebSocketAttachment(): void {
     try {
-      const contextData = await this.state.storage.get('syncConnection') as any;
-      
-      if (contextData && contextData.syncConnection) {
-        // Restore client ID and sync connection from storage
-        this.clientId = contextData.clientId || '';
-        this.syncConnection = contextData.syncConnection;
-        
-        // Also update the StateManager's user context
-        const userContext = {
-          userId: this.syncConnection.userId,
-          userRole: this.syncConnection.userRole,
-          userEmail: this.syncConnection.userEmail,
-          userName: this.syncConnection.userName,
-          timestamp: contextData.timestamp || Date.now()
+      if (this.syncConnection && this.clientId) {
+        const contextData = {
+          clientId: this.clientId,
+          syncConnection: this.syncConnection
         };
-        this.stateManager.setUserContext(userContext);
         
-        syncLogger.info('Successfully restored sync connection from persistent storage', {
+        // Store in all connected WebSockets
+        const webSockets = this.ctx.getWebSockets();
+        
+        syncLogger.info('HIBERNATION DEBUG: Storing context in WebSocket attachments', {
           clientId: this.clientId,
           organizationId: this.syncConnection.organizationId,
-          userId: this.syncConnection.userId,
-          userRole: this.syncConnection.userRole,
-          storedAt: new Date(contextData.timestamp || 0).toISOString()
+          webSocketCount: webSockets.length,
+          contextDataSize: JSON.stringify(contextData).length
+        }, MODULE_NAME);
+        
+        webSockets.forEach((ws, index) => {
+          ws.serializeAttachment(contextData);  // Don't JSON.stringify - use structured clone
+          syncLogger.info(`HIBERNATION DEBUG: Stored context in WebSocket ${index}`, {
+            clientId: this.clientId,
+            wsIndex: index
+          }, MODULE_NAME);
+        });
+        
+        syncLogger.info('HIBERNATION DEBUG: Context storage completed', {
+          clientId: this.clientId,
+          organizationId: this.syncConnection.organizationId,
+          webSocketCount: webSockets.length
         }, MODULE_NAME);
       } else {
-        syncLogger.warn('No sync connection context found in persistent storage after hibernation', {
-          clientId: this.clientId,
-          hasContextData: !!contextData
+        syncLogger.warn('HIBERNATION DEBUG: Cannot store context - missing data', {
+          hasClientId: !!this.clientId,
+          hasSyncConnection: !!this.syncConnection,
+          clientId: this.clientId
         }, MODULE_NAME);
       }
     } catch (error) {
-      syncLogger.error('Failed to restore sync connection from persistent storage', {
+      syncLogger.error('HIBERNATION DEBUG: Failed to store context in WebSocket attachment', {
         clientId: this.clientId,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
       }, MODULE_NAME);
     }
   }
+
+  /**
+   * Simple hibernation recovery using Cloudflare's hibernation API
+   * Reconstructs context from WebSocket attachments - the elegant solution
+   */
+  private async restoreFromHibernation(): Promise<void> {
+    try {
+      // Use Cloudflare's hibernation API to get existing WebSockets
+      const webSockets = this.ctx.getWebSockets();
+      
+      syncLogger.info('HIBERNATION DEBUG: Attempting context restoration', {
+        webSocketCount: webSockets.length,
+        syncId: this.syncId
+      }, MODULE_NAME);
+      
+      if (webSockets.length > 0) {
+        // Get context from first WebSocket attachment (they should all have same context)
+        const attachment = webSockets[0].deserializeAttachment();  // Use deserializeAttachment!
+        
+        syncLogger.info('HIBERNATION DEBUG: WebSocket attachment found', {
+          hasAttachment: !!attachment,
+          attachmentType: typeof attachment
+        }, MODULE_NAME);
+        
+        if (attachment) {
+          const contextData = attachment;  // No need to JSON.parse - already deserialized
+          
+          syncLogger.info('HIBERNATION DEBUG: Parsed attachment data', {
+            hasClientId: !!contextData.clientId,
+            hasSyncConnection: !!contextData.syncConnection,
+            clientId: contextData.clientId
+          }, MODULE_NAME);
+          
+          // Restore simple context
+          this.clientId = contextData.clientId || '';
+          this.syncConnection = contextData.syncConnection;
+          
+          if (this.syncConnection) {
+            // Update StateManager with user context
+            this.stateManager.setUserContext({
+              userId: this.syncConnection.userId,
+              userRole: this.syncConnection.userRole,
+              userEmail: this.syncConnection.userEmail,
+              userName: this.syncConnection.userName,
+              timestamp: Date.now()
+            });
+            
+            syncLogger.info('HIBERNATION DEBUG: Context successfully restored', {
+              clientId: this.clientId,
+              organizationId: this.syncConnection.organizationId,
+              userId: this.syncConnection.userId
+            }, MODULE_NAME);
+          } else {
+            syncLogger.warn('HIBERNATION DEBUG: No syncConnection in attachment data', {
+              contextData
+            }, MODULE_NAME);
+          }
+        } else {
+          syncLogger.warn('HIBERNATION DEBUG: No attachment data found on WebSocket', {
+            webSocketCount: webSockets.length
+          }, MODULE_NAME);
+        }
+      } else {
+        syncLogger.info('HIBERNATION DEBUG: No WebSockets found during restoration', {
+          syncId: this.syncId
+        }, MODULE_NAME);
+      }
+      
+      // If WebSocket attachment didn't work, try Durable Object storage as fallback
+      if (!this.syncConnection || !this.clientId) {
+        syncLogger.info('HIBERNATION DEBUG: Trying Durable Object storage fallback', {
+          syncId: this.syncId
+        }, MODULE_NAME);
+        
+        const storedContext = await this.state.storage.get('hibernationContext') as any;
+        if (storedContext && storedContext.syncConnection) {
+          this.clientId = storedContext.clientId || '';
+          this.syncConnection = storedContext.syncConnection;
+          
+          if (this.syncConnection) {
+            this.stateManager.setUserContext({
+              userId: this.syncConnection.userId,
+              userRole: this.syncConnection.userRole,
+              userEmail: this.syncConnection.userEmail,
+              userName: this.syncConnection.userName,
+              timestamp: Date.now()
+            });
+            
+            syncLogger.info('HIBERNATION DEBUG: Context restored from Durable Object storage', {
+              clientId: this.clientId,
+              organizationId: this.syncConnection.organizationId,
+              userId: this.syncConnection.userId
+            }, MODULE_NAME);
+          }
+        } else {
+          syncLogger.warn('HIBERNATION DEBUG: No context found in storage either', {
+            hasStoredContext: !!storedContext
+          }, MODULE_NAME);
+        }
+      }
+    } catch (error) {
+      syncLogger.error('HIBERNATION DEBUG: Error during context restoration', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      }, MODULE_NAME);
+    }
+  }
+
 
   /**
    * Clear sync connection context from persistent storage

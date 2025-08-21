@@ -55,26 +55,12 @@ universalArchetypeRouter.post('/orgs/:orgId/entities', async (c) => {
       return c.json({ error: 'entityName, definition, and archetype are required' }, 400);
     }
 
-    // Check ContainerPermission access control
+    // Access control is now handled by RLS policies
+    // RLS middleware has already set the database context
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
-    
     const kysely = getKysely(c.env);
-    const accessService = new ArchetypeAccessService(kysely);
     
-    const accessResult = await accessService.canCreateEntity(user?.id || '', orgId);
-    if (!accessResult.allowed) {
-      console.log(`[Universal Archetype] Access denied for ${user?.email}: ${accessResult.reason}`);
-      return c.json({
-        error: 'Access denied',
-        code: 'FORBIDDEN', 
-        message: accessResult.reason,
-        requiredRole: accessResult.requiredRole,
-        userRole: accessResult.userRole
-      }, 403);
-    }
-    
-    console.log(`[Universal Archetype] Access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    console.log(`[Universal Archetype] User ${user?.email || 'unknown'} creating entity in org ${orgId} - access controlled by RLS`);
 
     // Lazy load additional components
     const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
@@ -108,6 +94,10 @@ universalArchetypeRouter.post('/orgs/:orgId/entities', async (c) => {
         await sql`${sql.raw(statement)}`.execute(kysely);
       }
     }
+    
+    // Apply RLS policies to the newly created table
+    await sql`SELECT apply_entity_table_rls(${tableName})`.execute(kysely);
+    console.log(`✅ Applied RLS policies to table: ${tableName}`);
     
     // Store entity definition for future queries
     await storeEntityDefinition(c, orgId, entityName, definition, tableName);
@@ -152,26 +142,12 @@ universalArchetypeRouter.post('/orgs/:orgId/data/:entityName', async (c) => {
     // Log user action for audit trail
     console.log(`[Universal Archetype] User ${user?.email || 'anonymous'} saving data to ${entityName} in org ${orgId}`);
 
-    // Check ContainerPermission access control
+    // Access control is now handled by RLS policies
+    // RLS middleware has already set the database context
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
-    
     const kysely = getKysely(c.env);
-    const accessService = new ArchetypeAccessService(kysely);
     
-    const accessResult = await accessService.canSaveData(user?.id || '', orgId, entityName);
-    if (!accessResult.allowed) {
-      console.log(`[Universal Archetype] Save access denied for ${user?.email}: ${accessResult.reason}`);
-      return c.json({
-        error: 'Access denied',
-        code: 'FORBIDDEN',
-        message: accessResult.reason,
-        requiredRole: accessResult.requiredRole,
-        userRole: accessResult.userRole
-      }, 403);
-    }
-    
-    console.log(`[Universal Archetype] Save access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    console.log(`[Universal Archetype] User ${user?.email || 'unknown'} saving ${entityName} in org ${orgId} - access controlled by RLS`);
     
     const { getDBClient } = await import('../lib/db');
     const client = getDBClient(c);
@@ -246,26 +222,12 @@ universalArchetypeRouter.put('/orgs/:orgId/data/:entityName/:id', async (c) => {
     
     console.log(`[Universal Archetype] User ${user?.email || 'anonymous'} updating ${entityName}/${recordId} in org ${orgId}`);
 
-    // Check ContainerPermission access control
+    // Access control is now handled by RLS policies
+    // RLS middleware has already set the database context
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
-    
     const kysely = getKysely(c.env);
-    const accessService = new ArchetypeAccessService(kysely);
     
-    const accessResult = await accessService.canSaveData(user?.id || '', orgId, entityName);
-    if (!accessResult.allowed) {
-      console.log(`[Universal Archetype] Update access denied for ${user?.email}: ${accessResult.reason}`);
-      return c.json({
-        error: 'Access denied',
-        code: 'FORBIDDEN',
-        message: accessResult.reason,
-        requiredRole: accessResult.requiredRole,
-        userRole: accessResult.userRole
-      }, 403);
-    }
-    
-    console.log(`[Universal Archetype] Update access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    console.log(`[Universal Archetype] User ${user?.email || 'unknown'} accessing ${entityName} in org ${orgId} - access controlled by RLS`);
     
     const { getDBClient } = await import('../lib/db');
     const client = getDBClient(c);
@@ -345,26 +307,12 @@ universalArchetypeRouter.get('/orgs/:orgId/sync/:entityName', async (c) => {
       offset
     });
 
-    // Check ContainerPermission access control
+    // Access control is now handled by RLS policies
+    // RLS middleware has already set the database context
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
-    
     const kysely = getKysely(c.env);
-    const accessService = new ArchetypeAccessService(kysely);
     
-    const accessResult = await accessService.canQueryData(user?.id || '', orgId, entityName);
-    if (!accessResult.allowed) {
-      console.log(`[Sync API] Access denied for ${user?.email}: ${accessResult.reason}`);
-      return c.json({
-        error: 'Access denied',
-        code: 'FORBIDDEN',
-        message: accessResult.reason,
-        requiredRole: accessResult.requiredRole,
-        userRole: accessResult.userRole
-      }, 403);
-    }
-    
-    console.log(`[Sync API] Access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    console.log(`[Sync API] User ${user?.email || 'unknown'} accessing ${entityName} in org ${orgId} - access controlled by RLS`);
     
     const { getDBClient } = await import('../lib/db');
     const client = getDBClient(c);
@@ -477,26 +425,12 @@ universalArchetypeRouter.get('/orgs/:orgId/data/:entityName', async (c) => {
     // Log user action for audit trail
     console.log(`[Universal Archetype] User ${user?.email || 'anonymous'} querying ${entityName} in org ${orgId}`);
 
-    // Check ContainerPermission access control
+    // Access control is now handled by RLS policies  
+    // RLS middleware has already set the database context
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
-    
     const kysely = getKysely(c.env);
-    const accessService = new ArchetypeAccessService(kysely);
     
-    const accessResult = await accessService.canQueryData(user?.id || '', orgId, entityName);
-    if (!accessResult.allowed) {
-      console.log(`[Universal Archetype] Query access denied for ${user?.email}: ${accessResult.reason}`);
-      return c.json({
-        error: 'Access denied',
-        code: 'FORBIDDEN',
-        message: accessResult.reason,
-        requiredRole: accessResult.requiredRole,
-        userRole: accessResult.userRole
-      }, 403);
-    }
-    
-    console.log(`[Universal Archetype] Query access granted - User ${user.email} has ${accessResult.permission?.role} role`);
+    console.log(`[Universal Archetype] User ${user?.email || 'unknown'} accessing ${entityName} in org ${orgId} - access controlled by RLS`);
     
     const { getDBClient } = await import('../lib/db');
     const client = getDBClient(c);
@@ -580,21 +514,12 @@ universalArchetypeRouter.delete('/orgs/:orgId/entities/:entityName', async (c) =
       return c.json({ error: 'entityName is required' }, 400);
     }
 
-    // Check access control
+    // Access control is now handled by RLS policies
+    // RLS middleware has already set the database context
     const { getKysely } = await import('../lib/kysely');
-    const { ArchetypeAccessService } = await import('../services/archetype-access-service');
-    
     const kysely = getKysely(c.env);
-    const accessService = new ArchetypeAccessService(kysely);
     
-    const accessResult = await accessService.canDelete(user?.id || '', orgId, entityName);
-    if (!accessResult.allowed) {
-      return c.json({
-        error: 'Access denied',
-        code: 'FORBIDDEN',
-        message: accessResult.reason
-      }, 403);
-    }
+    console.log(`[Universal Archetype] User ${user?.email || 'unknown'} deleting ${entityName}/${entityId} in org ${orgId} - access controlled by RLS`);
 
     // Use ArchetypeEntityManager for proper deletion
     const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
