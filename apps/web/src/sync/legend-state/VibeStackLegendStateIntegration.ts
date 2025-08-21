@@ -217,7 +217,7 @@ export class VibeStackLegendStateIntegration {
   }
   
   /**
-   * Manually refresh all tables
+   * Manually refresh all tables (BATCHED - reduces server load)
    */
   public async refreshAllTables(): Promise<void> {
     if (!this.storeManager || !this.syncAdapter) {
@@ -227,20 +227,23 @@ export class VibeStackLegendStateIntegration {
     const stores = this.storeManager.getStores()
     const tableNames = Object.keys(stores)
     
-    syncLogger.info('integration', '🔄 Refreshing all tables...', { 
+    syncLogger.info('integration', '🔄 Batching refresh for all tables...', { 
       tableCount: tableNames.length,
       tables: tableNames 
     })
     
-    for (const tableName of tableNames) {
-      try {
-        await this.syncAdapter.refreshTableData(tableName)
-      } catch (error) {
-        syncLogger.error('integration', `Failed to refresh table: ${tableName}`, { error })
-      }
-    }
+    // Use batched refresh to prevent server overload
+    // All table refreshes will be batched together with 50ms debounce
+    const refreshPromises = tableNames.map(tableName => 
+      this.syncAdapter!.refreshTableData(tableName)
+    )
     
-    syncLogger.info('integration', '✅ All tables refreshed')
+    try {
+      await Promise.allSettled(refreshPromises)
+      syncLogger.info('integration', '✅ All tables refresh completed')
+    } catch (error) {
+      syncLogger.error('integration', 'Failed to refresh all tables', { error })
+    }
   }
   
   /**

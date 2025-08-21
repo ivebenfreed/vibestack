@@ -31,6 +31,8 @@ export class SyncAdapter {
   private config: SyncAdapterConfig
   private isActive = false
   private pendingRequests = new Map<string, Promise<any>>()
+  private batchTimeout: NodeJS.Timeout | null = null
+  private pendingBatchTables = new Set<string>()
   
   constructor(config: SyncAdapterConfig) {
     this.config = config
@@ -66,6 +68,13 @@ export class SyncAdapter {
   public stop(): void {
     this.isActive = false
     this.pendingRequests.clear()
+    this.pendingBatchTables.clear()
+    
+    // Clear batch timeout
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout)
+      this.batchTimeout = null
+    }
     
     // Remove event listeners
     window.removeEventListener('vibestack:table-change-notification', this.handleTableChangeNotification)
@@ -112,7 +121,7 @@ export class SyncAdapter {
   }
   
   /**
-   * Refresh data for a specific table
+   * Refresh data for a specific table with batching to prevent spam
    */
   public async refreshTableData(tableName: string, notification?: TableChangeNotification): Promise<void> {
     const storeManager = getEntityStores()
@@ -125,38 +134,83 @@ export class SyncAdapter {
     const requestKey = `refresh_${tableName}`
     if (this.pendingRequests.has(requestKey)) {
       syncLogger.debug('sync-adapter', `Refresh already in progress for table: ${tableName}`)
+      return this.pendingRequests.get(requestKey)
+    }
+    
+    // Add to batch instead of immediate execution
+    this.pendingBatchTables.add(tableName)
+    
+    // Debounce batch execution (50ms delay to collect multiple table changes)
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout)
+    }
+    
+    this.batchTimeout = setTimeout(() => {
+      this.executeBatchRefresh()
+    }, 50)
+  }
+  
+  /**
+   * Execute batched table refreshes
+   */
+  private async executeBatchRefresh(): Promise<void> {
+    if (this.pendingBatchTables.size === 0) return
+    
+    const tablesToRefresh = Array.from(this.pendingBatchTables)
+    this.pendingBatchTables.clear()
+    this.batchTimeout = null
+    
+    syncLogger.info('sync-adapter', `🔄 Executing batch refresh for tables:`, {
+      tables: tablesToRefresh,
+      count: tablesToRefresh.length
+    })
+    
+    const storeManager = getEntityStores()
+    if (!storeManager) {
+      syncLogger.error('sync-adapter', 'EntityStoreManager not found for batch refresh')
       return
     }
     
-    try {
-      syncLogger.info('sync-adapter', `🔄 Refreshing data for table: ${tableName}`)
+    // Execute all refreshes in parallel
+    const refreshPromises = tablesToRefresh.map(async (tableName) => {
+      const requestKey = `refresh_${tableName}`
       
-      // Create and store the refresh promise
-      const refreshPromise = this.performTableRefresh(tableName, storeManager)
-      this.pendingRequests.set(requestKey, refreshPromise)
-      
-      await refreshPromise
-      
-      syncLogger.info('sync-adapter', `✅ Successfully refreshed data for table: ${tableName}`)
-      
-    } catch (error) {
-      syncLogger.error('sync-adapter', `Failed to refresh data for table: ${tableName}`, { error })
-      
-      // Retry logic
-      await this.retryTableRefresh(tableName, storeManager)
-      
-    } finally {
-      this.pendingRequests.delete(requestKey)
-    }
+      try {
+        const refreshPromise = this.performTableRefresh(tableName, storeManager)
+        this.pendingRequests.set(requestKey, refreshPromise)
+        
+        await refreshPromise
+        syncLogger.debug('sync-adapter', `✅ Batch refreshed table: ${tableName}`)
+        
+      } catch (error) {
+        syncLogger.error('sync-adapter', `Failed to batch refresh table: ${tableName}`, { error })
+        // Try retry logic
+        try {
+          await this.retryTableRefresh(tableName, storeManager)
+        } catch (retryError) {
+          syncLogger.error('sync-adapter', `Retry failed for table: ${tableName}`, { error: retryError })
+        }
+      } finally {
+        this.pendingRequests.delete(requestKey)
+      }
+    })
+    
+    await Promise.allSettled(refreshPromises)
+    syncLogger.info('sync-adapter', `✅ Batch refresh completed for ${tablesToRefresh.length} tables`)
   }
   
   /**
    * Perform the actual table refresh
    */
   private async performTableRefresh(tableName: string, storeManager: any): Promise<void> {
-    const apiEndpoint = `${this.config.serverBaseUrl}/api/orgs/${this.config.organizationId}/entities/${tableName}`
+    // Convert table name to entity name format (capitalize first letter)
+    const entityName = tableName.charAt(0).toUpperCase() + tableName.slice(1, -1) // Remove 's' and capitalize
+    const apiEndpoint = `${this.config.serverBaseUrl}/api/archetype/orgs/${this.config.organizationId}/data/${entityName}`
     
-    syncLogger.debug('sync-adapter', `Fetching data from: ${apiEndpoint}`)
+    syncLogger.debug('sync-adapter', `Fetching data from: ${apiEndpoint}`, {
+      tableName,
+      entityName
+    })
     
     // Make API request with authentication
     const response = await fetch(apiEndpoint, {

@@ -1,12 +1,12 @@
 /**
- * Request-Scoped Caching Middleware
+ * Request-Scoped Caching Middleware with Cross-Request Session Cache
  * 
  * Eliminates redundant database queries within the same HTTP request by caching:
- * - Authentication session data
+ * - Authentication session data (with cross-request caching)
  * - Permission check results 
  * - Entity schema lookups
  * 
- * Cache is automatically cleared after each request to prevent stale data.
+ * Request cache is cleared after each request. Session cache persists for 5 minutes.
  */
 
 import { createMiddleware } from 'hono/factory';
@@ -170,6 +170,89 @@ export class RequestCacheUtils {
     cache.set(key, result);
     console.log('[RequestCache] 💾 Schema cache MISS - stored:', { orgId, entityName });
     return result;
+  }
+}
+
+// ============ Cross-Request Session Cache ============
+
+interface CachedSession {
+  data: any;
+  expiresAt: number;
+}
+
+// Global session cache that persists across requests (5 min TTL)
+const globalSessionCache = new Map<string, CachedSession>();
+
+// Clean up expired sessions every 30 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, cached] of globalSessionCache.entries()) {
+    if (cached.expiresAt < now) {
+      globalSessionCache.delete(key);
+    }
+  }
+}, 30000);
+
+/**
+ * Enhanced session cache utilities with cross-request persistence
+ */
+export class EnhancedSessionCache {
+  /**
+   * Get cached session with cross-request persistence (5 min TTL)
+   */
+  static async getCachedSessionPersistent<T>(
+    sessionToken: string,
+    fetcher: () => Promise<T>
+  ): Promise<T> {
+    const now = Date.now();
+    const cacheKey = `session:${sessionToken}`;
+    
+    // Check global session cache first
+    const cached = globalSessionCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      console.log('[SessionCache] ✅ Cross-request session cache HIT:', { 
+        sessionToken: sessionToken.substring(0, 8) + '...',
+        remainingMs: cached.expiresAt - now
+      });
+      return cached.data;
+    }
+    
+    // Fetch fresh data
+    const result = await fetcher();
+    
+    // Cache for 5 minutes across requests
+    globalSessionCache.set(cacheKey, {
+      data: result,
+      expiresAt: now + (5 * 60 * 1000) // 5 minutes
+    });
+    
+    console.log('[SessionCache] 💾 Cross-request session cache MISS - stored for 5min:', { 
+      sessionToken: sessionToken.substring(0, 8) + '...',
+      cacheSize: globalSessionCache.size
+    });
+    
+    return result;
+  }
+  
+  /**
+   * Clear session from cross-request cache (logout, session invalidation)
+   */
+  static clearCachedSession(sessionToken: string): void {
+    const cacheKey = `session:${sessionToken}`;
+    globalSessionCache.delete(cacheKey);
+    console.log('[SessionCache] 🗑️ Session cleared from cross-request cache:', { 
+      sessionToken: sessionToken.substring(0, 8) + '...'
+    });
+  }
+  
+  /**
+   * Get cache stats for debugging
+   */
+  static getCacheStats() {
+    return {
+      size: globalSessionCache.size,
+      keys: Array.from(globalSessionCache.keys()).map(k => k.substring(0, 16) + '...')
+    };
   }
 }
 

@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { getAuth, AuthType } from '../lib/auth'; // Assuming getAuth is the way to get runtime auth instance
 import type { AppBindings } from '../types/hono'; // Import your AppBindings if they define Variables
+import { RequestCacheUtils, EnhancedSessionCache } from './request-cache';
 
 // Define the middleware using createMiddleware for better typing
 export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
@@ -10,7 +11,14 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
   // Note: Ensure your getAuth provides an instance with the 'api' property
   if (auth.api && typeof auth.api.getSession === 'function') {
     try {
-      const sessionData = await auth.api.getSession({ headers: c.req.raw.headers });
+      // Use enhanced cross-request session cache to avoid redundant auth DB queries
+      const authHeader = c.req.header('Authorization') || '';
+      const sessionToken = authHeader.replace('Bearer ', '') || 'no-token';
+      
+      const sessionData = await EnhancedSessionCache.getCachedSessionPersistent(
+        sessionToken,
+        () => auth.api.getSession({ headers: c.req.raw.headers })
+      );
       
       if (sessionData && sessionData.user) {
         // Session found, set user and session in context
