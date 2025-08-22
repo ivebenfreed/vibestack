@@ -136,6 +136,27 @@ export const authMachine = setup({
     setUserOrganizations: assign({
       userOrganizations: ({ event }) => event.output?.organizations || [],
       organizationError: event => event.output?.error || null,
+      // Validate that currentOrganization is still valid
+      currentOrganization: ({ context, event }) => {
+        const organizations = event.output?.organizations || [];
+        const currentOrgId = context.currentOrganization?.id;
+        
+        // If no current org, return null
+        if (!currentOrgId) return null;
+        
+        // Check if current org is in the loaded organizations
+        const validOrg = organizations.find(org => org.id === currentOrgId);
+        
+        if (!validOrg) {
+          console.log('[AuthMachine] Current organization no longer valid, clearing:', currentOrgId);
+          // Clear invalid org from localStorage too
+          localStorage.removeItem('vibestack-last-organization-id');
+          return null;
+        }
+        
+        // Update with fresh org data from server
+        return validOrg;
+      },
     }),
 
     setCurrentOrganization: assign({

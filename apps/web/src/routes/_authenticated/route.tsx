@@ -22,6 +22,7 @@ if (typeof window !== 'undefined') {
 }
 
 export const Route = createFileRoute('/_authenticated')({
+  pendingComponent: UnifiedLoadingScreen,
   beforeLoad: async ({ location }) => {
     // Get auth actor - if not available, redirect to sign-in
     const authActor = (window as any).authMachineActor
