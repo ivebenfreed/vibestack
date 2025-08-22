@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { observer } from '@legendapp/state/react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
@@ -193,6 +193,7 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   } = useAuth();
   
   const currentOrgId = user?.currentOrganizationId;
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
   
   // Initialize store when organization changes
   useEffect(() => {
@@ -203,11 +204,24 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
     }
   }, [currentOrgId])
   
+  // Clear initial load flag after a brief delay to show loading screen
+  // This ensures smooth transition and prevents white flash
+  useEffect(() => {
+    if (isAuthenticatedAndReady && organizationSetupComplete) {
+      // Show loading screen for at least 1.5 seconds to allow initial data fetch
+      // This prevents the white flash while dashboard loads entity data
+      const timer = setTimeout(() => {
+        setIsInitialLoad(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticatedAndReady, organizationSetupComplete]);
+  
   // The sidebar entity groups are now automatically updated in switchToOrganization
 
   // Show unified loading screen during auth/org initialization
   // This covers both auth checking and organization loading phases
-  if (isCheckingAuth || isLoadingOrganizations || 
+  if (isCheckingAuth || isLoadingOrganizations || isInitialLoad ||
       (!isAuthenticatedAndReady && !needsOrganizationSetup && !needsOrganizationSelection)) {
     return <UnifiedLoadingScreen />;
   }

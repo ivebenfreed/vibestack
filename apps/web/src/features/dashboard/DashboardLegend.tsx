@@ -77,8 +77,16 @@ const DashboardLegend = observer(function DashboardLegend() {
             <TopNav links={topNav} className="mt-2" />
           </div>
         </div>
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">Loading dashboard data...</p>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center space-y-4">
+            <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-medium">Loading your workspace</p>
+              <p className="text-sm text-muted-foreground">Fetching organization data...</p>
+            </div>
+          </div>
         </div>
       </ContentContainer>
     );
