@@ -240,13 +240,10 @@ export async function loadOrgContext(orgId: string, userId: string) {
   }
 }
 
-// Cache entity observables to prevent recreation on every access
-let entityObservablesCache: Record<string, any> = {}
-let cachedSchemaVersion: string | null = null
-
 /**
  * Reactive entity observables - automatically recreates when schema changes
  * This creates entity observables lazily and reactively based on schema
+ * Following Legend State atomic principles - no manual caching needed
  */
 export const entities$ = observable(() => {
   const orgId = orgContext$.orgId.get()
@@ -256,39 +253,28 @@ export const entities$ = observable(() => {
     return {}
   }
   
-  const schemaVersion = schema.version || 'unknown'
+  console.log(`[Observable] Creating entity observables reactively`, {
+    orgId,
+    schemaVersion: schema.version || 'unknown',
+    entityCount: Object.keys(schema.entities).length
+  })
   
-  // Only recreate entity observables if schema version changed
-  if (cachedSchemaVersion !== schemaVersion) {
-    console.log(`[Observable] Schema change detected - recreating entity observables`, {
-      prevVersion: cachedSchemaVersion,
-      newVersion: schemaVersion,
-      entityCount: Object.keys(schema.entities).length
-    })
-    
-    // Create a reactive map of entity observables
-    const entityObservables: Record<string, any> = {}
-    
-    Object.keys(schema.entities).forEach(entityName => {
-      // Each entity gets its own observable that's created fresh when schema changes
-      entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
-    })
-    
-    // Update cache
-    entityObservablesCache = entityObservables
-    cachedSchemaVersion = schemaVersion
-    
-    console.log(`[Observable] Created ${Object.keys(entityObservables).length} entity observables for schema change`)
-  } else {
-    console.log(`[Observable] Schema unchanged - reusing cached entity observables`)
-  }
+  // Create a reactive map of entity observables - Legend State handles caching internally
+  const entityObservables: Record<string, any> = {}
   
-  return entityObservablesCache
+  Object.keys(schema.entities).forEach(entityName => {
+    // Each entity gets its own observable that's created fresh when dependencies change
+    entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
+  })
+  
+  console.log(`[Observable] Created ${Object.keys(entityObservables).length} entity observables`)
+  return entityObservables
 })
 
 /**
  * Get a specific entity observable - automatically updates when schema changes
  * Returns the actual syncedCrud observable, not wrapped data
+ * Directly accesses entities$ which is already reactive
  */
 export function getEntity$(entityName: string) {
   const allEntities = entities$.get()
@@ -320,10 +306,6 @@ export function clearContext() {
   // Clear tracking variables
   currentOrgId = null
   currentSchemaVersion = null
-  
-  // Clear entity observable cache
-  entityObservablesCache = {}
-  cachedSchemaVersion = null
   
   // Clear context - this will automatically clear all entity observables due to reactivity
   orgContext$.set({
