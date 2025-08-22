@@ -69,26 +69,19 @@ const DashboardLegend = observer(function DashboardLegend() {
   usePlaywrightReady(loading ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
 
   if (loading) {
+    // Show a full-screen loading state that prevents white flash
     return (
-      <ContentContainer>
-        <div className='mb-2 flex items-center justify-between space-y-2'>
-          <div>
-            <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
-            <TopNav links={topNav} className="mt-2" />
+      <div className="fixed inset-0 bg-background flex items-center justify-center z-40">
+        <div className="text-center space-y-4">
+          <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto">
+            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-lg font-medium">Loading your workspace</p>
+            <p className="text-sm text-muted-foreground">Fetching organization data...</p>
           </div>
         </div>
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center space-y-4">
-            <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto">
-              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-            <div className="space-y-2">
-              <p className="text-lg font-medium">Loading your workspace</p>
-              <p className="text-sm text-muted-foreground">Fetching organization data...</p>
-            </div>
-          </div>
-        </div>
-      </ContentContainer>
+      </div>
     );
   }
 

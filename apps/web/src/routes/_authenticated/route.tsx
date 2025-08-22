@@ -208,11 +208,11 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   // This ensures smooth transition and prevents white flash
   useEffect(() => {
     if (isAuthenticatedAndReady && organizationSetupComplete) {
-      // Show loading screen for at least 1.5 seconds to allow initial data fetch
-      // This prevents the white flash while dashboard loads entity data
+      // Show loading screen briefly to prevent flash
+      // Dashboard now has its own full-screen loading state
       const timer = setTimeout(() => {
         setIsInitialLoad(false);
-      }, 1500);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isAuthenticatedAndReady, organizationSetupComplete]);
