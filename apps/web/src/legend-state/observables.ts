@@ -14,6 +14,8 @@ import { createPersistenceManager, type PersistenceManager } from './helpers/Per
 // Reactive persistence configuration - created after schema loads
 let persistenceManager: PersistenceManager | null = null
 let syncedCrudWithPersistence: any = null
+let currentOrgId: string | null = null
+let currentSchemaVersion: string | null = null
 
 /**
  * Organization context observable
@@ -177,9 +179,21 @@ export async function loadOrgContext(orgId: string, userId: string) {
       throw new Error('Failed to load schema')
     }
     
-    // Initialize PersistenceManager and IndexedDB configuration with the loaded schema
+    // Initialize PersistenceManager and IndexedDB configuration only when schema changes
     const entities = schemaResult.schema.entities || {}
-    if (Object.keys(entities).length > 0) {
+    const schemaVersion = schemaResult.schema.version || 'unknown'
+    
+    // Only recreate persistence if org or schema version changed
+    if (Object.keys(entities).length > 0 && 
+        (currentOrgId !== orgId || currentSchemaVersion !== schemaVersion)) {
+      
+      console.log(`[Observable] Schema change detected - recreating persistence`, {
+        prevOrgId: currentOrgId,
+        newOrgId: orgId,
+        prevVersion: currentSchemaVersion,
+        newVersion: schemaVersion
+      })
+      
       // Create persistence manager for this organization
       persistenceManager = createPersistenceManager(orgId, userId)
       
@@ -193,7 +207,13 @@ export async function loadOrgContext(orgId: string, userId: string) {
         }
       })
       
+      // Update tracking variables
+      currentOrgId = orgId
+      currentSchemaVersion = schemaVersion
+      
       console.log(`[Observable] IndexedDB persistence configured for ${Object.keys(entities).length} entities`)
+    } else if (currentOrgId === orgId && currentSchemaVersion === schemaVersion) {
+      console.log(`[Observable] Schema unchanged - reusing existing persistence configuration`)
     }
     
     // Update context
@@ -220,6 +240,10 @@ export async function loadOrgContext(orgId: string, userId: string) {
   }
 }
 
+// Cache entity observables to prevent recreation on every access
+let entityObservablesCache: Record<string, any> = {}
+let cachedSchemaVersion: string | null = null
+
 /**
  * Reactive entity observables - automatically recreates when schema changes
  * This creates entity observables lazily and reactively based on schema
@@ -232,16 +256,34 @@ export const entities$ = observable(() => {
     return {}
   }
   
-  // Create a reactive map of entity observables
-  const entityObservables: Record<string, any> = {}
+  const schemaVersion = schema.version || 'unknown'
   
-  Object.keys(schema.entities).forEach(entityName => {
-    // Each entity gets its own observable that's created fresh when schema changes
-    entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
-  })
+  // Only recreate entity observables if schema version changed
+  if (cachedSchemaVersion !== schemaVersion) {
+    console.log(`[Observable] Schema change detected - recreating entity observables`, {
+      prevVersion: cachedSchemaVersion,
+      newVersion: schemaVersion,
+      entityCount: Object.keys(schema.entities).length
+    })
+    
+    // Create a reactive map of entity observables
+    const entityObservables: Record<string, any> = {}
+    
+    Object.keys(schema.entities).forEach(entityName => {
+      // Each entity gets its own observable that's created fresh when schema changes
+      entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
+    })
+    
+    // Update cache
+    entityObservablesCache = entityObservables
+    cachedSchemaVersion = schemaVersion
+    
+    console.log(`[Observable] Created ${Object.keys(entityObservables).length} entity observables for schema change`)
+  } else {
+    console.log(`[Observable] Schema unchanged - reusing cached entity observables`)
+  }
   
-  console.log(`[Observable] Created ${Object.keys(entityObservables).length} entity observables for schema change`)
-  return entityObservables
+  return entityObservablesCache
 })
 
 /**
@@ -274,6 +316,14 @@ export function clearContext() {
   
   // Reset persistence configuration
   syncedCrudWithPersistence = null
+  
+  // Clear tracking variables
+  currentOrgId = null
+  currentSchemaVersion = null
+  
+  // Clear entity observable cache
+  entityObservablesCache = {}
+  cachedSchemaVersion = null
   
   // Clear context - this will automatically clear all entity observables due to reactivity
   orgContext$.set({
