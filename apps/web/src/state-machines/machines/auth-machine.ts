@@ -109,6 +109,7 @@ export const authMachine = setup({
           sessionExpiry: context.sessionExpiry,
           lastActivity: context.lastActivity,
           currentOrganization: context.currentOrganization,
+          userOrganizations: context.userOrganizations, // 🔥 FIX: Persist all organizations for org switcher
           organizationSetupComplete: context.organizationSetupComplete
         },
         value: 'authenticated'

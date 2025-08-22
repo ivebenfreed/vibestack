@@ -205,19 +205,21 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   
   // The sidebar entity groups are now automatically updated in switchToOrganization
 
-  // Show loading while checking authentication
-  if (isCheckingAuth) {
-    return <UnifiedLoadingScreen message="Checking authentication..." />;
+  // Show unified loading screen during auth/org initialization
+  // This covers both auth checking and organization loading phases
+  if (isCheckingAuth || isLoadingOrganizations || 
+      (!isAuthenticatedAndReady && !needsOrganizationSetup && !needsOrganizationSelection)) {
+    return <UnifiedLoadingScreen />;
   }
 
-  // Show organization setup if needed
-  if (needsOrganizationSetup || needsOrganizationSelection || isLoadingOrganizations) {
+  // Show organization setup if needed (after loading is done)
+  if (needsOrganizationSetup || needsOrganizationSelection) {
     return <PostAuthOrganizationSetup />;
   }
 
-  // Show loading until fully ready
+  // Show loading if still not fully ready after org setup
   if (!isAuthenticatedAndReady || !organizationSetupComplete) {
-    return <UnifiedLoadingScreen message="Setting up your workspace..." />;
+    return <UnifiedLoadingScreen />;
   }
 
   // Render the main app

@@ -282,10 +282,10 @@ export const appInitMachine = setup({
       
       const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
       if (simpleNotificationSyncMachineActor) {
-        console.log('[AppInitMachine] 🔗 Sending CONNECT event to simple notification sync machine', {
-          organizationId: context.organizationId,
-          userId: userId
-        })
+        // console.log('[AppInitMachine] 🔗 Sending CONNECT event to simple notification sync machine', {
+        //   organizationId: context.organizationId,
+        //   userId: userId
+        // })
         simpleNotificationSyncMachineActor.send({ 
           type: 'CONNECT', 
           organizationId: context.organizationId,
@@ -330,7 +330,7 @@ export const appInitMachine = setup({
       }
 
       try {
-        console.log('[AppInitMachine] 📋 Loading organization schema...', context.organizationId);
+        // console.log('[AppInitMachine] 📋 Loading organization schema...', context.organizationId);
         
         // Import the schema client dynamically to avoid import cycles
         const { orgSchemaClient } = await import('@/lib/schema-client');
@@ -355,7 +355,7 @@ export const appInitMachine = setup({
     },
     
     startBackgroundInitialization: ({ context }) => {
-      console.log('[AppInitMachine] 🚀 Starting background processes (DB + Sync) in parallel');
+      // console.log('[AppInitMachine] 🚀 Starting background processes (DB + Sync) in parallel');
       
       // Start database initialization in background
       setTimeout(() => {

@@ -50,10 +50,13 @@ jobs:
         
       - name: Install dependencies
         run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          # Install native bindings for Linux in CI
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu -w
+          cd apps/web && pnpm add -D lightningcss-linux-x64-gnu
+          cd ../..
+          # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
-          # Workaround for native binding issues in CI
-          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu
-          cd ../../apps/web && pnpm add -D lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu
         
       # Temporarily disabled while we fix linting and type errors
       # - name: Run linting
@@ -108,10 +111,13 @@ jobs:
         
       - name: Install dependencies
         run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          # Install native bindings for Linux in CI
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu -w
+          cd apps/web && pnpm add -D lightningcss-linux-x64-gnu
+          cd ../..
+          # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
-          # Workaround for native binding issues in CI
-          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu
-          cd ../../apps/web && pnpm add -D lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu
         
       - name: Build Dataforge Package
         working-directory: packages/dataforge
@@ -174,10 +180,13 @@ jobs:
         
       - name: Install dependencies
         run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          # Install native bindings for Linux in CI
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu -w
+          cd apps/web && pnpm add -D lightningcss-linux-x64-gnu
+          cd ../..
+          # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
-          # Workaround for native binding issues in CI
-          cd packages/dataforge && pnpm add -D @rollup/rollup-linux-x64-gnu @swc/core-linux-x64-gnu
-          cd ../../apps/web && pnpm add -D lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu
         
       - name: Build Dataforge Package
         working-directory: packages/dataforge

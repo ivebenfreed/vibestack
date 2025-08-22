@@ -9,9 +9,10 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Building, Users, AlertCircle } from 'lucide-react';
+import { Building, Users, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/state-machines';
 import { CreateOrganizationForm } from './CreateOrganizationForm';
+import { UnifiedLoadingScreen } from '@/components/loading/UnifiedLoadingScreen';
 
 export function PostAuthOrganizationSetup() {
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -26,20 +27,9 @@ export function PostAuthOrganizationSetup() {
     reloadOrganizations
   } = useAuth();
 
-  // Loading state
+  // Loading state - use unified loading screen
   if (isLoadingOrganizations) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex items-center justify-center py-8">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <p className="text-muted-foreground">Loading your organizations...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <UnifiedLoadingScreen />;
   }
 
   // Error state
