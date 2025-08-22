@@ -3,6 +3,14 @@ import { dbLogger } from '../middleware/logger';
 import { OrganizationService } from '../services/organization/OrganizationService';
 import { OrganizationMemberService } from '../services/organization/OrganizationMemberService';
 import { OrganizationInvitationService } from '../services/organization/OrganizationInvitationService';
+import type { AppContext } from '../types/hono';
+import { 
+  hybridRLSOrgActorMiddleware,
+  requirePermission,
+  requireRole,
+  requireAdmin,
+  requireOwner
+} from '../middleware/hybrid-rls-org-actor';
 import type { 
   CreateOrganizationInput, 
   UpdateOrganizationInput,
@@ -11,53 +19,17 @@ import type {
   OrganizationRole
 } from '../types/organization';
 
-const organizationsRouter = new Hono();
+const organizationsRouter = new Hono<AppContext>();
 
-// Middleware to require authentication
-const requireAuth = async (c: any, next: any) => {
-  const user = c.var.user;
-  const session = c.var.session;
+// Apply hybrid security middleware to organization-scoped routes
+organizationsRouter.use('/:orgId/*', hybridRLSOrgActorMiddleware);
 
-  if (!user || !session) {
-    return c.json({ error: 'Authentication required' }, 401);
-  }
-
-  await next();
-};
-
-// Middleware to check organization membership and permissions
-const requireOrgPermission = (requiredRole: OrganizationRole) => {
-  return async (c: any, next: any) => {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId') || c.req.query('orgId');
-
-    if (!orgId) {
-      return c.json({ error: 'Organization ID required' }, 400);
-    }
-
-    // Get Kysely instance
-    const { getKysely } = require('../lib/kysely');
-    const db = getKysely(c.env);
-    
-    const memberService = new OrganizationMemberService(db);
-    const permission = await memberService.hasPermission(orgId, user.id, requiredRole);
-
-    if (!permission.allowed) {
-      return c.json({ 
-        error: 'Insufficient permissions',
-        required: requiredRole,
-        current: permission.currentRole,
-        reason: permission.reason
-      }, 403);
-    }
-
-    // Set organization context
-    c.set('organizationId', orgId);
-    c.set('userRole', permission.currentRole);
-    
-    await next();
-  };
-};
+// MIGRATED TO HYBRID SECURITY: Legacy custom middleware removed
+// Now using:
+// - hybridRLSOrgActorMiddleware for zero-latency permission checks
+// - requireRole(), requireAdmin(), requireOwner() for declarative access control
+// - PostgreSQL RLS for organization-level data isolation
+// - Organization Actor SQLite cache for instant role validation
 
 // ==============================================
 // ORGANIZATION CRUD ENDPOINTS
@@ -67,9 +39,11 @@ const requireOrgPermission = (requiredRole: OrganizationRole) => {
  * POST /api/organizations
  * Create a new organization
  */
-organizationsRouter.post('/', requireAuth, async (c) => {
+// Organization creation - requires authentication but no org context
+organizationsRouter.post('/', async (c) => {
   try {
-    const user = c.var.user;
+    // User already authenticated by global auth middleware
+    const user = c.get('user');
     const body = await c.req.json();
 
     // Generate slug from name if not provided
@@ -120,9 +94,11 @@ organizationsRouter.post('/', requireAuth, async (c) => {
  * GET /api/organizations
  * List user's organizations
  */
-organizationsRouter.get('/', requireAuth, async (c) => {
+// List user's organizations - requires authentication but no org context  
+organizationsRouter.get('/', async (c) => {
   try {
-    const user = c.var.user;
+    // User already authenticated by global auth middleware
+    const user = c.get('user');
     
     const orgService = new OrganizationService(c);
     const result = await orgService.getOrganizationsByUser(user.id);
@@ -143,9 +119,12 @@ organizationsRouter.get('/', requireAuth, async (c) => {
  * GET /api/organizations/:orgId
  * Get organization details
  */
-organizationsRouter.get('/:orgId', requireAuth, requireOrgPermission('viewer'), async (c) => {
+organizationsRouter.get('/:orgId', 
+  requireRole('viewer'), 
+  async (c) => {
   try {
-    const orgId = c.req.param('orgId');
+    const security = c.get('security');
+    const orgId = security.organizationId;
     
     const orgService = new OrganizationService(c);
     const result = await orgService.getOrganizationById(orgId);
@@ -166,10 +145,14 @@ organizationsRouter.get('/:orgId', requireAuth, requireOrgPermission('viewer'), 
  * PUT /api/organizations/:orgId
  * Update organization
  */
-organizationsRouter.put('/:orgId', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.put('/:orgId', 
+  requireRole('admin'),
+  async (c) => {
   try {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId');
+    // Get hybrid security context (zero-latency)
+    const security = c.get('security');
+    const user = c.get('user');
+    const orgId = security.organizationId;
     const body = await c.req.json();
 
     const data: UpdateOrganizationInput = {
@@ -218,10 +201,14 @@ organizationsRouter.put('/:orgId', requireAuth, requireOrgPermission('admin'), a
  * DELETE /api/organizations/:orgId
  * Delete organization (owner only)
  */
-organizationsRouter.delete('/:orgId', requireAuth, requireOrgPermission('owner'), async (c) => {
+organizationsRouter.delete('/:orgId', 
+  requireOwner,
+  async (c) => {
   try {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId');
+    // Get hybrid security context (zero-latency)
+    const security = c.get('security');
+    const user = c.get('user');
+    const orgId = security.organizationId;
     
     const orgService = new OrganizationService(c);
     const result = await orgService.deleteOrganization(orgId, user.id);
@@ -242,9 +229,13 @@ organizationsRouter.delete('/:orgId', requireAuth, requireOrgPermission('owner')
  * GET /api/organizations/:orgId/stats
  * Get organization statistics
  */
-organizationsRouter.get('/:orgId/stats', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.get('/:orgId/stats', 
+  requireAdmin,
+  async (c) => {
   try {
-    const orgId = c.req.param('orgId');
+    // Get organization ID from security context
+    const security = c.get('security');
+    const orgId = security.organizationId;
     
     const orgService = new OrganizationService(c);
     const result = await orgService.getOrganizationStats(orgId);
@@ -269,9 +260,13 @@ organizationsRouter.get('/:orgId/stats', requireAuth, requireOrgPermission('admi
  * GET /api/organizations/:orgId/members
  * List organization members
  */
-organizationsRouter.get('/:orgId/members', requireAuth, requireOrgPermission('viewer'), async (c) => {
+organizationsRouter.get('/:orgId/members', 
+  requireRole('viewer'),
+  async (c) => {
   try {
-    const orgId = c.req.param('orgId');
+    // Get organization ID from security context
+    const security = c.get('security');
+    const orgId = security.organizationId;
     const limit = Number(c.req.query('limit')) || 50;
     const offset = Number(c.req.query('offset')) || 0;
     const role = c.req.query('role') as OrganizationRole;
@@ -308,10 +303,14 @@ organizationsRouter.get('/:orgId/members', requireAuth, requireOrgPermission('vi
  * POST /api/organizations/:orgId/members
  * Add member to organization
  */
-organizationsRouter.post('/:orgId/members', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.post('/:orgId/members', 
+  requireAdmin,
+  async (c) => {
   try {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId');
+    // Get hybrid security context (zero-latency)
+    const security = c.get('security');
+    const user = c.get('user');
+    const orgId = security.organizationId;
     const body = await c.req.json();
 
     if (!body.user_id || !body.role) {
@@ -341,10 +340,14 @@ organizationsRouter.post('/:orgId/members', requireAuth, requireOrgPermission('a
  * PUT /api/organizations/:orgId/members/:userId
  * Update member role or details
  */
-organizationsRouter.put('/:orgId/members/:userId', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.put('/:orgId/members/:userId', 
+  requireAdmin,
+  async (c) => {
   try {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId');
+    // Get hybrid security context (zero-latency)
+    const security = c.get('security');
+    const user = c.get('user');
+    const orgId = security.organizationId;
     const userId = c.req.param('userId');
     const body = await c.req.json();
 
@@ -379,10 +382,14 @@ organizationsRouter.put('/:orgId/members/:userId', requireAuth, requireOrgPermis
  * DELETE /api/organizations/:orgId/members/:userId
  * Remove member from organization
  */
-organizationsRouter.delete('/:orgId/members/:userId', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.delete('/:orgId/members/:userId', 
+  requireAdmin,
+  async (c) => {
   try {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId');
+    // Get hybrid security context (zero-latency)
+    const security = c.get('security');
+    const user = c.get('user');
+    const orgId = security.organizationId;
     const userId = c.req.param('userId');
 
     // Get Kysely instance
@@ -412,10 +419,14 @@ organizationsRouter.delete('/:orgId/members/:userId', requireAuth, requireOrgPer
  * POST /api/organizations/:orgId/invitations
  * Create invitation
  */
-organizationsRouter.post('/:orgId/invitations', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.post('/:orgId/invitations', 
+  requireAdmin,
+  async (c) => {
   try {
-    const user = c.var.user;
-    const orgId = c.req.param('orgId');
+    // Get hybrid security context (zero-latency)
+    const security = c.get('security');
+    const user = c.get('user');
+    const orgId = security.organizationId;
     const body = await c.req.json();
 
     const data: CreateInvitationInput = {
@@ -454,9 +465,13 @@ organizationsRouter.post('/:orgId/invitations', requireAuth, requireOrgPermissio
  * GET /api/organizations/:orgId/invitations
  * List organization invitations
  */
-organizationsRouter.get('/:orgId/invitations', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.get('/:orgId/invitations', 
+  requireAdmin,
+  async (c) => {
   try {
-    const orgId = c.req.param('orgId');
+    // Get organization ID from security context
+    const security = c.get('security');
+    const orgId = security.organizationId;
     const limit = Number(c.req.query('limit')) || 50;
     const offset = Number(c.req.query('offset')) || 0;
     const status = c.req.query('status');
@@ -497,9 +512,12 @@ organizationsRouter.get('/:orgId/invitations', requireAuth, requireOrgPermission
  * DELETE /api/organizations/:orgId/invitations/:invitationId
  * Cancel invitation
  */
-organizationsRouter.delete('/:orgId/invitations/:invitationId', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.delete('/:orgId/invitations/:invitationId', 
+  requireAdmin,
+  async (c) => {
   try {
-    const user = c.var.user;
+    // User already authenticated by global auth middleware
+    const user = c.get('user');
     const invitationId = c.req.param('invitationId');
 
     // Get Kysely instance
@@ -525,9 +543,12 @@ organizationsRouter.delete('/:orgId/invitations/:invitationId', requireAuth, req
  * POST /api/organizations/:orgId/invitations/:invitationId/resend
  * Resend invitation
  */
-organizationsRouter.post('/:orgId/invitations/:invitationId/resend', requireAuth, requireOrgPermission('admin'), async (c) => {
+organizationsRouter.post('/:orgId/invitations/:invitationId/resend', 
+  requireAdmin,
+  async (c) => {
   try {
-    const user = c.var.user;
+    // User already authenticated by global auth middleware
+    const user = c.get('user');
     const invitationId = c.req.param('invitationId');
 
     // Get Kysely instance
@@ -559,9 +580,11 @@ organizationsRouter.post('/:orgId/invitations/:invitationId/resend', requireAuth
  * POST /api/invitations/accept
  * Accept invitation (public endpoint)
  */
-organizationsRouter.post('/invitations/accept', requireAuth, async (c) => {
+// Accept invitation - requires authentication but no org context
+organizationsRouter.post('/invitations/accept', async (c) => {
   try {
-    const user = c.var.user;
+    // User already authenticated by global auth middleware
+    const user = c.get('user');
     const body = await c.req.json();
 
     if (!body.token) {

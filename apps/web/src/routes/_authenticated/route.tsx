@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { observer } from '@legendapp/state/react'
 import { UnifiedLayout } from '@/components/layout/unified-layout'
 import { SearchProvider } from '@/context/search-context'
 import { PostAuthOrganizationSetup } from '@/features/auth/components/PostAuthOrganizationSetup'
@@ -8,6 +9,7 @@ import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
+import { switchToOrganization } from '@/stores/org-data-store'
 
 // Track if we've verified system readiness in this session
 let hasVerifiedSystemThisSession = false;
@@ -179,15 +181,29 @@ function RouteComponent() {
   )
 }
 
-function AuthenticatedContent() {
+const AuthenticatedContent = observer(function AuthenticatedContent() {
   const { 
     isCheckingAuth,
     needsOrganizationSetup, 
     needsOrganizationSelection,
     isLoadingOrganizations,
     isAuthenticatedAndReady,
-    organizationSetupComplete 
+    organizationSetupComplete,
+    user
   } = useAuth();
+  
+  const currentOrgId = user?.currentOrganizationId;
+  
+  // Initialize store when organization changes
+  useEffect(() => {
+    if (currentOrgId) {
+      switchToOrganization(currentOrgId).catch(error => {
+        console.error('[AuthenticatedContent] Failed to switch organization:', error)
+      })
+    }
+  }, [currentOrgId])
+  
+  // The sidebar entity groups are now automatically updated in switchToOrganization
 
   // Show loading while checking authentication
   if (isCheckingAuth) {
@@ -211,4 +227,4 @@ function AuthenticatedContent() {
       <UnifiedLayout />
     </div>
   )
-}
+})

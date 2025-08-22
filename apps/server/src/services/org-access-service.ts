@@ -53,24 +53,32 @@ export class OrgAccessService {
         return { hasAccess: false };
       }
 
-      // 2. Check cache first (OrgAdminDO)
-      if (this.env.ORG_ADMIN) {
+      // 2. Check cache first (Organization Actor)
+      if (this.env.ORGANIZATION_ACTOR) {
         try {
-          const doId = this.env.ORG_ADMIN.idFromName(org.id);
-          const doStub = this.env.ORG_ADMIN.get(doId);
+          const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${org.id}`);
+          const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
           
-          const response = await doStub.fetch(new Request(`http://localhost/access/${userId}`));
+          const response = await orgActor.fetch(new Request(`https://internal/role-check?userId=${userId}&organizationId=${org.id}`));
           if (response.ok) {
             const cacheResult = await response.json();
             
-            // If cache is fresh and user has access, return immediately
-            if (!cacheResult.needsSync && cacheResult.hasAccess) {
+            // If cache is fresh and user has role, return immediately
+            if (cacheResult.cached && cacheResult.role) {
+              console.log('🔍 OrgAccessService Organization Actor cache hit:', {
+                userId,
+                orgId: org.id,
+                orgSlug,
+                cachedRole: cacheResult.role.role,
+                cacheResult
+              });
+
               return {
                 hasAccess: true,
-                role: cacheResult.member?.role,
-                permissions: cacheResult.permissions,
+                role: cacheResult.role.role,
+                permissions: cacheResult.role.permissions,
                 organization: org,
-                member: cacheResult.member,
+                member: { userId, role: cacheResult.role.role },
                 fromCache: true
               };
             }
@@ -78,7 +86,7 @@ export class OrgAccessService {
             // Cache miss or stale - need to sync from PostgreSQL
           }
         } catch (error) {
-          console.warn('Cache lookup failed, falling back to PostgreSQL:', error);
+          console.warn('Organization Actor cache lookup failed, falling back to PostgreSQL:', error);
         }
       }
 
@@ -123,6 +131,14 @@ export class OrgAccessService {
       await this.syncOrgCache(org.id, {
         organization: org,
         members: allMembers
+      });
+
+      console.log('🔍 OrgAccessService PostgreSQL role resolution:', {
+        userId,
+        userEmail: member.user_email,
+        orgSlug,
+        resolvedRole: member.role,
+        memberData: JSON.stringify(member, null, 2)
       });
 
       return {
@@ -354,26 +370,38 @@ export class OrgAccessService {
     organization: any;
     members: any[];
   }): Promise<void> {
-    if (!this.env.ORG_ADMIN) {
-      console.warn('ORG_ADMIN binding not available for cache sync');
+    if (!this.env.ORGANIZATION_ACTOR) {
+      console.warn('ORGANIZATION_ACTOR binding not available for cache sync');
       return;
     }
 
     try {
-      const doId = this.env.ORG_ADMIN.idFromName(orgId);
-      const doStub = this.env.ORG_ADMIN.get(doId);
+      const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${orgId}`);
+      const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
       
-      const response = await doStub.fetch(new Request('http://localhost/sync', {
+      // Bulk cache all member roles
+      const roles = data.members.map(member => ({
+        userId: member.userId,
+        role: member.role,
+        permissions: this.getRolePermissions(member.role)
+      }));
+      
+      const response = await orgActor.fetch(new Request('https://internal/bulk-cache-roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          roles: roles.map(role => ({
+            ...role,
+            organizationId: orgId
+          }))
+        })
       }));
 
       if (!response.ok) {
-        console.warn('Cache sync failed:', await response.text());
+        console.warn('Organization Actor cache sync failed:', await response.text());
       }
     } catch (error) {
-      console.warn('Failed to sync org cache:', error);
+      console.warn('Failed to sync Organization Actor cache:', error);
     }
   }
 
@@ -415,24 +443,24 @@ export class OrgAccessService {
    * Invalidate organization cache
    */
   private async invalidateOrgCache(orgId: string): Promise<void> {
-    if (!this.env.ORG_ADMIN) return;
+    if (!this.env.ORGANIZATION_ACTOR) return;
 
     try {
-      const doId = this.env.ORG_ADMIN.idFromName(orgId);
-      const doStub = this.env.ORG_ADMIN.get(doId);
+      const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${orgId}`);
+      const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
       
-      // Invalidate all members to force fresh sync
-      const response = await doStub.fetch(new Request('http://localhost/invalidate', {
+      // Invalidate all cached roles to force fresh sync
+      const response = await orgActor.fetch(new Request('https://internal/invalidate-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: '*' }) // Special case for all users
+        body: JSON.stringify({ organizationId: orgId })
       }));
 
       if (!response.ok) {
-        console.warn('Cache invalidation failed:', await response.text());
+        console.warn('Organization Actor cache invalidation failed:', await response.text());
       }
     } catch (error) {
-      console.warn('Failed to invalidate cache:', error);
+      console.warn('Failed to invalidate Organization Actor cache:', error);
     }
   }
 

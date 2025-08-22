@@ -81,6 +81,16 @@ export function getApiBaseUrl(): string {
 }
 
 /**
+ * Get the Organization Actor WebSocket URL based on environment
+ */
+export function getOrgActorWebSocketUrl(organizationId: string): string {
+  // Use /api/sync route which now routes to Organization Actor on server-side
+  // This ensures proper WebSocket upgrade handling (bypasses Hono routing)
+  // Return base URL without query params - sync machine will add clientId, organizationId, lsn
+  return getSyncWebSocketUrl();
+}
+
+/**
  * Get the WebSocket URL for sync based on environment
  */
 export function getSyncWebSocketUrl(): string {

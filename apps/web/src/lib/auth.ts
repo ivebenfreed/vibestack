@@ -162,6 +162,9 @@ export const initiateSignUp = async (/* Add necessary parameters */) => {
   }
 };
 
+// Re-export useAuth hook from state machines
+export { useAuth } from '@/state-machines/hooks'
+
 // Add other necessary functions like signOut, useSession hook integration, etc.
 // Example:
 // export const signOut = async () => { 

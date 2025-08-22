@@ -47,14 +47,18 @@ function getWorktreeInfo() {
 function getProfileDir() {
   const worktreeInfo = getWorktreeInfo();
   
-  // Use a profile directory inside the worktree itself
-  // This ensures complete isolation between worktrees
-  const profileDir = path.join(worktreeInfo.path, '.playwright-profile');
+  // Match the same profile directory structure as the test configuration
+  // Use .playwright/profiles/profile-{issue} for consistency
+  const issueNumber = worktreeInfo.isWorktree ? 
+    worktreeInfo.name.replace(/^issue-/, '') : 
+    'main';
+  
+  const profileDir = path.join(worktreeInfo.path, '.playwright', 'profiles', `profile-${issueNumber}`);
   
   // Ensure directory exists
   fs.mkdirSync(profileDir, { recursive: true });
   
-  console.error(`[Playwright MCP] Using profile in worktree: ${profileDir}`);
+  console.error(`[Playwright MCP] Using persistent profile: ${profileDir}`);
   
   return profileDir;
 }
@@ -64,10 +68,9 @@ const args = process.argv.slice(2);
 const profileDir = getProfileDir();
 
 // Add user data directory to arguments
-// Use --isolated flag to allow multiple instances
+// Removed --isolated flag to use persistent profile on disk
 const playwrightArgs = [
   '@playwright/mcp',
-  '--isolated',
   `--user-data-dir=${profileDir}`,
   ...args
 ];

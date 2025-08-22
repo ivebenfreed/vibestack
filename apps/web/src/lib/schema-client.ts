@@ -260,10 +260,24 @@ export class OrgSchemaClient {
   }
 
   private cacheSchema(orgId: string, schema: OrgEntitySchema): void {
+    const timestamp = Date.now();
+    
+    // Cache in memory
     this.cache.set(orgId, {
       schema,
-      timestamp: Date.now()
+      timestamp
     });
+    
+    // 🚀 OPTIMIZED: Also cache in localStorage for faster app startup
+    try {
+      const cacheKey = `vibestack-schema-${orgId}`;
+      localStorage.setItem(cacheKey, JSON.stringify({
+        schema,
+        timestamp
+      }));
+    } catch (error) {
+      // Ignore localStorage errors
+    }
   }
 
   private generateFieldLabel(fieldName: string): string {

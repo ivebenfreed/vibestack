@@ -116,7 +116,7 @@ export const authMachine = setup({
       
       try {
         localStorage.setItem('auth-machine-state', JSON.stringify(stateToStore));
-        console.log('[AuthMachine] Persisted auth state to localStorage');
+        // Silent persistence - no logging needed for normal operation
       } catch (error) {
         console.error('[AuthMachine] Failed to persist auth state:', error);
       }
@@ -142,7 +142,6 @@ export const authMachine = setup({
         const organization = event.output?.organization || null;
         // Save the selected organization preference
         if (organization) {
-          console.log(`[AuthMachine] Saving organization preference: ${organization.name}`);
           localStorage.setItem('vibestack-last-organization-id', organization.id);
         }
         return organization;
@@ -160,7 +159,6 @@ export const authMachine = setup({
         // If exactly one org, select it
         if (context.userOrganizations.length === 1) {
           const selectedOrg = context.userOrganizations[0];
-          console.log(`[AuthMachine] Auto-selecting single organization: ${selectedOrg.name}`);
           // Save this preference
           localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
           return selectedOrg;
@@ -171,24 +169,12 @@ export const authMachine = setup({
         if (lastOrgId) {
           const foundOrg = context.userOrganizations.find(org => org.id === lastOrgId);
           if (foundOrg) {
-            console.log(`[AuthMachine] Auto-selecting last used organization: ${foundOrg.name}`);
             return foundOrg;
           }
         }
         
-        // Fallback: prefer Wide Corp Solutions for CEO user, otherwise select first organization
-        let selectedOrg = context.userOrganizations[0];
-        
-        // For CEO user, prefer Wide Corp Solutions as default
-        const wideCorp = context.userOrganizations.find(org => 
-          org.name === 'Wide Corp Solutions' || org.slug === 'wide-corp'
-        );
-        if (wideCorp) {
-          selectedOrg = wideCorp;
-          console.log(`[AuthMachine] Auto-selecting Wide Corp Solutions as default for CEO`);
-        } else {
-          console.log(`[AuthMachine] Auto-selecting first organization: ${selectedOrg.name}`);
-        }
+        // Fallback: select first organization
+        const selectedOrg = context.userOrganizations[0];
         
         localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
         return selectedOrg;
@@ -280,29 +266,8 @@ export const authMachine = setup({
   },
 }).createMachine({
   id: 'authMachine',
-  initial: 'checking',
-  
-  // Entry guard: If we have persisted valid session, go directly to authenticated
-  // Otherwise start with checking
-  entry: ({ context, self }) => {
-    // If we have persisted auth data that looks valid, skip to authenticated
-    if (context.user && context.authToken && context.sessionExpiry) {
-      const sessionExpiry = new Date(context.sessionExpiry).getTime();
-      const now = Date.now();
-      
-      // If session hasn't expired and was active recently, go to authenticated
-      if (sessionExpiry > now && context.lastActivity && (now - context.lastActivity) < 24 * 60 * 60 * 1000) {
-        console.log('[AuthMachine] Restoring valid session, going to authenticated state');
-        // Dispatch auth state change immediately for restored sessions
-        setTimeout(() => {
-          self.send({ type: 'RESTORED_SESSION' });
-        }, 0);
-        return;
-      }
-    }
-    
-    console.log('[AuthMachine] No valid persisted session, checking auth');
-  },
+  // 🚀 OPTIMIZED: Use XState's context to determine initial state
+  initial: 'determiningInitialState',
   
   context: ({ input }: { input?: { user?: UserInfo; authToken?: string; sessionExpiry?: string } }) => {
     // Try to load persisted state first
@@ -312,7 +277,7 @@ export const authMachine = setup({
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed?.context) {
-          console.log('[AuthMachine] Loading persisted context from localStorage');
+          // Found persisted context - will be logged when determining initial state
           persistedContext = parsed.context;
         }
       }
@@ -350,14 +315,66 @@ export const authMachine = setup({
   },
   
   states: {
-    checking: {
-      entry: ({ context }) => {
-        console.log('[AuthMachine] Checking authentication status');
-        // If we have persisted auth data, validate it first
-        if (context.user && context.authToken) {
-          console.log('[AuthMachine] Found persisted auth data, validating session...');
+    // 🚀 OPTIMIZED: Determine initial state based on persisted context
+    determiningInitialState: {
+      always: [
+        {
+          // If we have valid session and organization, go straight to ready
+          guard: ({ context }) => {
+            if (!context.user || !context.authToken || !context.sessionExpiry) {
+              return false;
+            }
+            
+            const sessionExpiry = new Date(context.sessionExpiry).getTime();
+            const now = Date.now();
+            const sessionValid = sessionExpiry > now && context.lastActivity && 
+                                (now - context.lastActivity) < 24 * 60 * 60 * 1000;
+            
+            const orgReady = !!context.currentOrganization && context.organizationSetupComplete;
+            
+            return sessionValid && orgReady;
+          },
+          target: 'authenticated.ready',
+          actions: [
+            ({ context }) => console.log(`[AuthMachine] ✅ Restored session: ${context.user?.email}, org: ${context.currentOrganization?.name}`),
+            { 
+              type: 'dispatchAuthStateChange',
+              params: { authenticated: true, reason: 'session-restored-with-org' }
+            }
+          ]
+        },
+        {
+          // If we have valid session but no org, go to authenticated (will load orgs)
+          guard: ({ context }) => {
+            if (!context.user || !context.authToken || !context.sessionExpiry) {
+              return false;
+            }
+            
+            const sessionExpiry = new Date(context.sessionExpiry).getTime();
+            const now = Date.now();
+            
+            return sessionExpiry > now && context.lastActivity && 
+                   (now - context.lastActivity) < 24 * 60 * 60 * 1000;
+          },
+          target: 'authenticated',
+          actions: [
+            ({ context }) => console.log(`[AuthMachine] Valid session for ${context.user?.email}, loading organizations`),
+            { 
+              type: 'dispatchAuthStateChange',
+              params: { authenticated: true, reason: 'session-restored-needs-org' }
+            }
+          ]
+        },
+        {
+          // Otherwise, check auth
+          target: 'checking',
+          actions: () => console.log('[AuthMachine] No persisted session, checking auth status')
         }
-      },
+      ]
+    },
+    
+    checking: {
+      // No entry logging - determiningInitialState already logged what's happening
       
       invoke: {
         src: 'checkAuth',
@@ -498,7 +515,6 @@ export const authMachine = setup({
     
     authenticated: {
       entry: ({ context }) => {
-        console.log('[AuthMachine] User authenticated, checking organization setup');
         // Always dispatch auth state change when entering authenticated state
         setTimeout(() => {
           const event = new CustomEvent('auth:state-changed', {
@@ -512,9 +528,35 @@ export const authMachine = setup({
         }, 0);
       },
 
-      initial: 'loadingOrganizations',
+      // 🚀 OPTIMIZED: Use guards to determine initial state based on context
+      initial: 'checkingOrganizationState',
       
       states: {
+        // 🚀 OPTIMIZED: Determine where to start based on existing context without redundant checks
+        checkingOrganizationState: {
+          always: [
+            {
+              // If org is already setup (from persisted state), go straight to ready
+              guard: ({ context }) => 
+                !!context.currentOrganization && context.organizationSetupComplete,
+              target: 'ready'
+              // No logging here - we already logged in determiningInitialState if this was from persistence
+            },
+            {
+              // If we have orgs loaded but none selected, need selection
+              guard: ({ context }) => 
+                context.userOrganizations.length > 0 && !context.currentOrganization,
+              target: 'needsOrganizationSelection',
+              actions: () => console.log('[AuthMachine] Have organizations but none selected')
+            },
+            {
+              // Otherwise, need to load organizations (fresh login, no persisted orgs)
+              target: 'loadingOrganizations',
+              actions: () => console.log('[AuthMachine] Loading organizations for authenticated user')
+            }
+          ]
+        },
+        
         loadingOrganizations: {
           entry: 'setLoadingOrganizations',
           invoke: {
@@ -679,7 +721,8 @@ export const authMachine = setup({
 
         ready: {
           entry: ({ context }) => {
-            console.log('[AuthMachine] Organization setup complete, user ready');
+            // 🚀 OPTIMIZED: Only log if we're reaching ready for the first time (not from restoration)
+            // The determiningInitialState already logged if we restored directly to ready
             // Dispatch event that the full auth + org flow is complete
             window.dispatchEvent(new CustomEvent('auth:ready', {
               detail: {
@@ -717,7 +760,7 @@ export const authMachine = setup({
     },
     
     unauthenticated: {
-      entry: () => console.log('[AuthMachine] User not authenticated'),
+      // entry: () => console.log('[AuthMachine] User not authenticated'),
       
       on: {
         SIGN_IN: {
@@ -744,7 +787,7 @@ export const authMachine = setup({
     },
     
     signingIn: {
-      entry: () => console.log('[AuthMachine] Starting sign-in process'),
+      // entry: () => console.log('[AuthMachine] Starting sign-in process'),
       
       invoke: {
         src: 'signIn',
@@ -796,7 +839,7 @@ export const authMachine = setup({
     },
     
     signingOut: {
-      entry: () => console.log('[AuthMachine] Starting sign-out process'),
+      // entry: () => console.log('[AuthMachine] Starting sign-out process'),
       
       invoke: {
         src: 'signOut',

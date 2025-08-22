@@ -7,6 +7,7 @@
 
 import { ContainerPermission, ContainerPermissionUtilities } from '../dataforge/entities/foundation/access/ContainerPermission';
 import type { Kysely } from 'kysely';
+import { RequestCacheUtils, type RequestCache } from '../middleware/request-cache';
 
 export interface ArchetypeAccessResult {
   allowed: boolean;
@@ -17,7 +18,10 @@ export interface ArchetypeAccessResult {
 }
 
 export class ArchetypeAccessService {
-  constructor(private kysely: Kysely<any>) {}
+  constructor(
+    private kysely: Kysely<any>, 
+    private requestCache?: RequestCache
+  ) {}
 
   /**
    * Check if user can create archetype entities in organization
@@ -179,46 +183,65 @@ export class ArchetypeAccessService {
    */
   private async getUserHighestPermission(userId: string, containerType: string, containerId: string): Promise<ContainerPermission | null> {
     try {
-      const results = await this.kysely
-        .selectFrom('container_permission')
-        .selectAll()
-        .where('user_id', '=', userId)
-        .where('permission_container_type', '=', containerType)
-        .where('permission_container_id', '=', containerId)
-        .where('status', '=', 'active')
-        .where((eb) =>
-          eb.or([
-            eb('expires_at', 'is', null),
-            eb('expires_at', '>', new Date())
-          ])
-        )
-        .execute();
-
-      if (results.length === 0) {
-        return null;
+      // Use request cache to avoid redundant permission queries
+      if (this.requestCache) {
+        return await RequestCacheUtils.getCachedPermission(
+          this.requestCache,
+          userId,
+          containerType,
+          containerId,
+          'highest',
+          () => this.fetchUserHighestPermission(userId, containerType, containerId)
+        );
       }
-
-      // Convert to ContainerPermission instances and find highest
-      const permissions = results.map(row => new ContainerPermission({
-        id: row.id,
-        user_id: row.user_id,
-        permission_container_type: row.permission_container_type,
-        permission_container_id: row.permission_container_id,
-        role: row.role,
-        granted_at: row.granted_at,
-        granted_by_id: row.granted_by_id,
-        expires_at: row.expires_at,
-        restrictions: row.restrictions,
-        status: row.status,
-        created_at: row.created_at,
-        updated_at: row.updated_at
-      }));
-
-      return ContainerPermissionUtilities.getHighestPermission(permissions, userId, containerType, containerId);
+      
+      return await this.fetchUserHighestPermission(userId, containerType, containerId);
     } catch (error) {
       console.error('Error fetching user permissions:', error);
       return null;
     }
+  }
+
+  /**
+   * Actual database fetch for user permissions (separated for caching)
+   */
+  private async fetchUserHighestPermission(userId: string, containerType: string, containerId: string): Promise<ContainerPermission | null> {
+    const results = await this.kysely
+      .selectFrom('container_permission')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('permission_container_type', '=', containerType)
+      .where('permission_container_id', '=', containerId)
+      .where('status', '=', 'active')
+      .where((eb) =>
+        eb.or([
+          eb('expires_at', 'is', null),
+          eb('expires_at', '>', new Date())
+        ])
+      )
+      .execute();
+
+    if (results.length === 0) {
+      return null;
+    }
+
+    // Convert to ContainerPermission instances and find highest
+    const permissions = results.map(row => new ContainerPermission({
+      id: row.id,
+      user_id: row.user_id,
+      permission_container_type: row.permission_container_type,
+      permission_container_id: row.permission_container_id,
+      role: row.role,
+      granted_at: row.granted_at,
+      granted_by_id: row.granted_by_id,
+      expires_at: row.expires_at,
+      restrictions: row.restrictions,
+      status: row.status,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    }));
+
+    return ContainerPermissionUtilities.getHighestPermission(permissions, userId, containerType, containerId);
   }
 
   /**

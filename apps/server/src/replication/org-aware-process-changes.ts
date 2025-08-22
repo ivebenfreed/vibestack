@@ -28,7 +28,7 @@ function extractOrganizationContext(tableName: string, data: Record<string, unkn
   }
   
   // Case 2: Base tables with organization_id field
-  const baseTables = ['users', 'organization_member', 'session', 'account'];
+  const baseTables = ['users', 'organization_member', 'organization_members', 'member', 'container_permission', 'session', 'account'];
   if (baseTables.includes(tableName)) {
     const orgId = data.organization_id || data.organizationId;
     return {

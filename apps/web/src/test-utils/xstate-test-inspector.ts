@@ -40,7 +40,7 @@ class XStateTestInspector {
     // Only enable in test/development mode
     if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
       this.enabled = true;
-      console.log('[XState Test Inspector] Initialized');
+      // Silent initialization - no console spam
     }
   }
 
@@ -59,7 +59,7 @@ class XStateTestInspector {
         if (actorRef) {
           const id = actorRef.id || 'unknown';
           this.actors.set(id, actorRef);
-          console.log(`[XState Inspector] Actor registered: ${id}`);
+          // Silent actor registration
         }
         break;
 
@@ -77,7 +77,7 @@ class XStateTestInspector {
           
           // Log significant events
           if (this.isSignificantEvent(evt.type)) {
-            console.log(`[XState Event] ${actorRef.id}: ${evt.type} in state ${eventLog.state}`);
+            // Silent event tracking
           }
         }
         break;
@@ -215,7 +215,7 @@ class XStateTestInspector {
     this.transitions = [];
     this.events = [];
     this.markers = [];
-    console.log('[XState Test Inspector] Cleared all data');
+    // Data cleared silently
   }
 
   /**
@@ -309,23 +309,12 @@ export const xstateTestInspector = new XStateTestInspector();
 if (typeof window !== 'undefined') {
   (window as any).xstateTestInspector = xstateTestInspector;
   
-  if (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') {
-    console.log('[XState Test Inspector] Available at window.xstateTestInspector');
-    console.log('[XState Test Inspector] Methods:');
-    console.log('  - getSummary(): Get overview of all machines');
-    console.log('  - getTransitions(machineId?): Get state transitions');
-    console.log('  - getEvents(machineId?): Get events');
-    console.log('  - getCurrentState(machineId): Get current state');
-    console.log('  - waitForState(machineId, state): Wait for state');
-    console.log('  - waitForEvent(machineId, event): Wait for event');
-    console.log('  - addMarker(marker, data?): Add test marker');
-    console.log('  - clear(): Clear all data');
-  }
+  // XState Test Inspector available at window.xstateTestInspector in dev/test mode
 }
 
 // Helper function to attach inspector to an actor
 export function attachInspector(actor: Actor<any>) {
   // XState v5 uses inspect option during creation
-  console.warn('[XState Test Inspector] Actor must be created with inspect option');
+  // Actor must be created with inspect option
   console.warn('Use: createActor(machine, { inspect: xstateTestInspector.inspect })');
 }

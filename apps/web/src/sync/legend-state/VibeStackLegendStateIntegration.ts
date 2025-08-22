@@ -67,7 +67,7 @@ export class VibeStackLegendStateIntegration {
   constructor(config: VibeStackIntegrationConfig) {
     this.config = {
       serverBaseUrl: 'http://localhost:8787',
-      webSocketUrl: 'ws://localhost:8787/websocket',
+      webSocketUrl: `ws://localhost:8787/api/org-actor/${config.organizationId}/websocket`,
       enableOptimisticUpdates: true,
       enablePersistence: true,
       debugMode: true,

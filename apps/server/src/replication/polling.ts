@@ -361,7 +361,54 @@ export class PollingManager {
         clientId: 'server'
       };
 
-      // Send to each client directly using existing pattern
+      // STEP 1: Notify Organization Actor about table changes for cache invalidation
+      try {
+        const orgActorId = this.env.ORGANIZATION_ACTOR.idFromName(`org:${organizationId}`);
+        const orgActor = this.env.ORGANIZATION_ACTOR.get(orgActorId);
+        
+        replicationLogger.info('🔄 NOTIFYING ORGANIZATION ACTOR OF TABLE CHANGES', {
+          organizationId,
+          tables,
+          lsn,
+          messageType: message.type
+        }, MODULE_NAME);
+        
+        const orgActorResponse = await orgActor.fetch('https://internal/table-change-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...message,
+            organizationId,
+            timestamp: Date.now()
+          })
+        });
+        
+        if (orgActorResponse.ok) {
+          replicationLogger.debug('✅ Organization Actor notified successfully', {
+            organizationId,
+            tables,
+            status: orgActorResponse.status
+          }, MODULE_NAME);
+        } else {
+          const responseText = await orgActorResponse.text().catch(() => 'Unable to read response');
+          replicationLogger.warn('⚠️ Organization Actor notification failed', {
+            organizationId,
+            tables,
+            status: orgActorResponse.status,
+            statusText: orgActorResponse.statusText,
+            responseBody: responseText,
+            requestUrl: 'https://internal/table-change-notification'
+          }, MODULE_NAME);
+        }
+      } catch (orgActorError) {
+        replicationLogger.error('❌ Failed to notify Organization Actor', {
+          organizationId,
+          tables,
+          error: orgActorError instanceof Error ? orgActorError.message : String(orgActorError)
+        }, MODULE_NAME);
+      }
+
+      // STEP 2: Send to each client directly using existing pattern
       let successCount = 0;
       for (const clientId of clientIds) {
         try {

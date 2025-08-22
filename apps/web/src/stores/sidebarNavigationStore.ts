@@ -3,7 +3,9 @@ import { useSelector } from '@xstate/store/react'
 import { type NavGroup } from '@/components/layout/types'
 import { 
   generateProjectsSection, 
+  generateEntitiesSection,
   globalSidebarData,
+  getSidebarDataForSection,
   type GlobalSidebarSection 
 } from '@/components/layout/data/sidebar-data'
 import { Project } from '@/db/client-entities'
@@ -11,6 +13,9 @@ import { Project } from '@/db/client-entities'
 import { Project as ProjectEntity, Task, User } from '@/db/client-entities'
 import { useMemo, useEffect, useRef } from 'react'
 import { shallowEqual } from '@xstate/store'
+import type { EntitySchema } from '@/lib/schema-client'
+import { useOrgSchema } from '@/hooks/use-org-data-store'
+import { useAuth } from '@/lib/auth'
 
 // 🎯 TYPED: Export types for components
 export type SidebarNavigation = {
@@ -88,6 +93,57 @@ export const sidebarNavigationStore = createStore({
       ...context,
       isLoading: event.isLoading
     }),
+    
+    updateNavigationWithSchema: (context, event: { projects: Project[], schema: EntitySchema | null }) => {
+      const startTime = performance.now()
+      
+      if (import.meta.env.DEV) {
+        console.log(`[SidebarNavigationStore] Recomputing navigation with schema...`, {
+          timestamp: new Date().toISOString(),
+          projectsCount: event.projects.length,
+          entitiesCount: Object.keys(event.schema?.entities || {}).length
+        })
+      }
+      
+      const sectionsMap: Record<string, NavGroup[]> = {}
+      
+      // Add static sections from globalSidebarData
+      globalSidebarData.forEach(section => {
+        sectionsMap[section.id] = section.navGroups
+      })
+      
+      // Add entities section with schema data
+      if (event.schema) {
+        const entitiesSection = generateEntitiesSection(event.schema)
+        sectionsMap['entities'] = entitiesSection.navGroups
+      }
+      
+      // Handle projects section with dynamic data (if not hidden)
+      if (event.projects.length >= 0) {
+        const projectsSection = generateProjectsSection(event.projects)
+        sectionsMap['projects'] = projectsSection.navGroups
+      }
+      
+      const endTime = performance.now()
+      const computationTime = endTime - startTime
+      
+      if (import.meta.env.DEV) {
+        console.log(`[SidebarNavigationStore] ✅ Navigation with schema computed in ${computationTime.toFixed(2)}ms`)
+      }
+      
+      const projectsHash = event.projects.map(p => `${p.id}-${p.updatedAt}`).join(',')
+      
+      return {
+        ...context,
+        navigation: {
+          sections: sectionsMap,
+          projectsCount: event.projects.length,
+          lastUpdated: Date.now(),
+          computationTime
+        },
+        lastProjectsHash: projectsHash
+      }
+    },
   }
 })
 
@@ -114,13 +170,8 @@ async function loadProjectsForSidebar() {
   // Atoms removed - using Dexie directly
   console.log('[SidebarNavigation] Using Dexie for data loading')
   
-  // ✅ FALLBACK: Only load if atoms are empty and provider is ready
-  const { isGlobalDataSourceReady } = await import('@/db/global-datasource')
-  
-  if (!isGlobalDataSourceReady()) {
-    console.log('[SidebarNavigation] Provider not ready yet, skipping atom loading')
-    return
-  }
+  // ✅ FALLBACK: Skip global data source check (removed with LiveStore)
+  console.log('[SidebarNavigation] Global data source check skipped - using Legend State')
   
   isLoadingProjects = true
   sidebarNavigationStore.trigger.setLoading({ isLoading: true })
@@ -146,19 +197,8 @@ async function loadProjectsForSidebar() {
 
 // 🎯 PERFORMANCE: Custom hook for sidebar navigation data
 export function useSidebarNavigation(): SidebarNavigation {
-  // 🎯 XSTATE SELECTOR: Get projects directly from atom with useSelector
-  const projects = useSelector(
-    projectsAtom,
-    (projectsRecord) => {
-      const projects = Object.values(projectsRecord);
-      return projects.sort((a, b) => {
-        const aTime = new Date(a.updatedAt || a.createdAt).getTime();
-        const bTime = new Date(b.updatedAt || b.createdAt).getTime();
-        return bTime - aTime; // Latest first
-      });
-    },
-    shallowEqual
-  )
+  // 🎯 SIMPLIFIED: Use empty projects array since we're moving to Legend State
+  const projects: Project[] = []
   
   // Get current navigation from store
   const navigation = useSelector(sidebarNavigationStore, (state) => state.context.navigation)
@@ -172,16 +212,9 @@ export function useSidebarNavigation(): SidebarNavigation {
     if (projects.length === 0 && typeof window !== 'undefined' && !hasTriggeredLoad.current) {
       hasTriggeredLoad.current = true
       
-      // ✅ FIXED: Check if provider is ready before loading
-      // This prevents loading during provider initialization phase
-      import('@/db/global-datasource').then(({ isGlobalDataSourceReady }) => {
-        if (isGlobalDataSourceReady()) {
-          loadProjectsForSidebar().catch(console.error)
-        } else {
-          console.log('[SidebarNavigation] Provider not ready, will wait for route-based loading')
-          hasTriggeredLoad.current = false // Reset so we can try again later
-        }
-      })
+      // ✅ FIXED: Skip provider readiness check (removed with LiveStore)
+      // Load sidebar data directly since Legend State handles initialization
+      loadProjectsForSidebar().catch(console.error)
     }
     
     // Reset flag when we have projects

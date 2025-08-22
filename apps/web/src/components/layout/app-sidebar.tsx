@@ -24,6 +24,7 @@ const DebugSidebarContent = React.memo(function DebugSidebarContent() {
         { title: "Sync Status", url: "/debug/sync", icon: RefreshCw },
         { title: "Live Query", url: "/debug/live-query", icon: Activity },
         { title: "Performance", url: "/debug/performance", icon: Zap },
+        { title: "Entity Routes", url: "/debug/entity-routes-test", icon: Grid3X3 },
       ]
     },
     {
@@ -83,7 +84,9 @@ const AppSidebarInternal = React.memo(function AppSidebarInternal({ collapsible 
   
   // ⚡ PERFORMANCE: Direct route-based section detection (no layout store)
   const activeSection = React.useMemo(() => {
-    if (location.pathname.startsWith('/projects') || location.pathname === '/tasks') {
+    if (location.pathname.startsWith('/entities')) {
+      return 'entities'
+    } else if (location.pathname.startsWith('/projects') || location.pathname === '/tasks') {
       return 'projects'
     } else if (location.pathname.startsWith('/settings')) {
       return 'settings'

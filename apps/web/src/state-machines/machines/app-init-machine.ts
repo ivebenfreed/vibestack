@@ -61,14 +61,14 @@ export type AppInitEvent =
 
 // Actor for checking local LiveStore data
 const checkLocalDataActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
-  console.log('[AppInitMachine] 🔍 Checking for local LiveStore data...');
+  // console.log('[AppInitMachine] 🔍 Checking for local LiveStore data...');
   
   if (!input.organizationId) {
     throw new Error('Organization ID required for local data check');
   }
 
   // TODO: Replace with Legend State local data checking
-  console.log(`[AppInitMachine] 📊 Skipping local data check - LiveStore removed, transitioning to Legend State`);
+  // console.log(`[AppInitMachine] 📊 Skipping local data check - LiveStore removed, transitioning to Legend State`);
   
   // Create placeholder local data object for compatibility
   const localData = {
@@ -82,7 +82,7 @@ const checkLocalDataActor = fromPromise(async ({ input }: { input: { organizatio
   // Skip local schema dispatch since we're removing LiveStore
   if (shouldUseLocal) {
     // TODO: Implement Legend State local schema
-    console.log(`[AppInitMachine] ✅ Using local schema immediately`);
+    // console.log(`[AppInitMachine] ✅ Using local schema immediately`);
     
     // Dispatch local schema ready event so components can use it
     window.dispatchEvent(new CustomEvent('schema:local-ready', {
@@ -264,9 +264,9 @@ export const appInitMachine = setup({
     // No longer needed - using event-driven initialization
     
     startSync: ({ context }: { context: AppInitContext }) => {
-      console.log('[AppInitMachine] Starting pure LiveStore sync machine with org context:', {
-        organizationId: context.organizationId
-      })
+      // console.log('[AppInitMachine] Starting pure LiveStore sync machine with org context:', {
+      //   organizationId: context.organizationId
+      // })
       
       // Get user ID from auth machine
       const authMachineActor = (window as any).authMachineActor
@@ -275,7 +275,7 @@ export const appInitMachine = setup({
       if (authMachineActor) {
         const authSnapshot = authMachineActor.getSnapshot()
         userId = authSnapshot?.context?.user?.id || userId
-        console.log('[AppInitMachine] Got user ID from auth machine:', userId)
+        // console.log('[AppInitMachine] Got user ID from auth machine:', userId)
       } else {
         console.warn('[AppInitMachine] Auth machine actor not available, using fallback user ID')
       }
@@ -313,7 +313,7 @@ export const appInitMachine = setup({
     }),
     
     startLiveStore: () => {
-      console.log('[AppInitMachine] Starting LiveStore initialization');
+      // console.log('[AppInitMachine] Starting LiveStore initialization');
       // Dispatch event to trigger LiveStore initialization
       window.dispatchEvent(new CustomEvent('livestore:init'));
     },
@@ -398,23 +398,54 @@ export const appInitMachine = setup({
   
   // Machine starts in idle and waits for START_INIT event
   
-  context: ({ input }: { input?: { persistedData?: Partial<AppInitContext> } }) => ({
-    isDatabaseInitialized: false,
-    databaseError: null,
-    isOnline: navigator.onLine,
-    connectionStatus: 'disconnected' as const,
-    organizationId: null,
-    hasLocalData: false,
-    localDataChecked: false,
-    localSchemaAvailable: false,
-    isSyncReady: false,
-    syncError: null,
-    isLiveStoreReady: false,
-    liveStoreError: null,
-    liveChangesStatus: 'idle' as const,
-    initStartTime: Date.now(),
-    lastActivity: Date.now(),
-  }),
+  context: ({ input }: { input?: { persistedData?: Partial<AppInitContext> } }) => {
+    // 🚀 OPTIMIZED: Check for cached org data to skip some initialization steps
+    let cachedOrgId = null;
+    let hasLocalSchema = false;
+    
+    try {
+      // Check if we have cached organization schema
+      const authState = localStorage.getItem('auth-machine-state');
+      if (authState) {
+        const parsed = JSON.parse(authState);
+        cachedOrgId = parsed?.context?.currentOrganization?.id;
+      }
+      
+      // Check if we have cached schema for this org
+      if (cachedOrgId) {
+        const schemaKey = `vibestack-schema-${cachedOrgId}`;
+        const cachedSchema = localStorage.getItem(schemaKey);
+        if (cachedSchema) {
+          const schema = JSON.parse(cachedSchema);
+          // Check if schema is recent (less than 1 hour old)
+          if (schema.timestamp && Date.now() - schema.timestamp < 60 * 60 * 1000) {
+            hasLocalSchema = true;
+            console.log('[AppInitMachine] Found cached schema for org:', cachedOrgId);
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore cache errors
+    }
+    
+    return {
+      isDatabaseInitialized: false,
+      databaseError: null,
+      isOnline: navigator.onLine,
+      connectionStatus: 'disconnected' as const,
+      organizationId: cachedOrgId,
+      hasLocalData: false,
+      localDataChecked: false,
+      localSchemaAvailable: hasLocalSchema,
+      isSyncReady: false,
+      syncError: null,
+      isLiveStoreReady: false,
+      liveStoreError: null,
+      liveChangesStatus: 'idle' as const,
+      initStartTime: Date.now(),
+      lastActivity: Date.now(),
+    };
+  },
   
   // DISABLED - TypeORM removal
   // Invoke child machines at root level to persist across state transitions

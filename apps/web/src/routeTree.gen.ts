@@ -46,6 +46,8 @@ import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
+import { Route as AuthenticatedEntitiesEntityNameOldRouteImport } from './routes/_authenticated/entities/$entityName-old'
+import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
 import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_authenticated/debug/vibegantt-test'
 import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
@@ -61,6 +63,7 @@ import { Route as AuthenticatedDebugLegendStateFullIntegrationRouteImport } from
 import { Route as AuthenticatedDebugKanbanRouteImport } from './routes/_authenticated/debug/kanban'
 import { Route as AuthenticatedDebugJunctionTablesRouteImport } from './routes/_authenticated/debug/junction-tables'
 import { Route as AuthenticatedDebugGanttTestDataRouteImport } from './routes/_authenticated/debug/gantt-test-data'
+import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
 import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
 
 const AuthenticatedDebugSyncLazyRouteImport = createFileRoute(
@@ -284,6 +287,18 @@ const AuthenticatedProjectsProjectIdRoute =
     path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedEntitiesEntityNameOldRoute =
+  AuthenticatedEntitiesEntityNameOldRouteImport.update({
+    id: '/entities/$entityName-old',
+    path: '/entities/$entityName-old',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedEntitiesEntityNameRoute =
+  AuthenticatedEntitiesEntityNameRouteImport.update({
+    id: '/entities/$entityName',
+    path: '/entities/$entityName',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDebugVibeganttTestRoute =
   AuthenticatedDebugVibeganttTestRouteImport.update({
     id: '/vibegantt-test',
@@ -374,6 +389,12 @@ const AuthenticatedDebugGanttTestDataRoute =
     path: '/gantt-test-data',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
+const AuthenticatedDebugEntityRoutesTestRoute =
+  AuthenticatedDebugEntityRoutesTestRouteImport.update({
+    id: '/entity-routes-test',
+    path: '/entity-routes-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedSettingsAdminUsersRoute =
   AuthenticatedSettingsAdminUsersRouteImport.update({
     id: '/admin/users',
@@ -402,6 +423,7 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/': typeof AuthenticatedIndexRoute
+  '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
@@ -417,6 +439,8 @@ export interface FileRoutesByFullPath {
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
+  '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
+  '/entities/$entityName-old': typeof AuthenticatedEntitiesEntityNameOldRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -455,6 +479,7 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/': typeof AuthenticatedIndexRoute
+  '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
@@ -470,6 +495,8 @@ export interface FileRoutesByTo {
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
+  '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
+  '/entities/$entityName-old': typeof AuthenticatedEntitiesEntityNameOldRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -512,6 +539,7 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/_authenticated/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
   '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
@@ -527,6 +555,8 @@ export interface FileRoutesById {
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
   '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/_authenticated/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
+  '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
+  '/_authenticated/entities/$entityName-old': typeof AuthenticatedEntitiesEntityNameOldRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -569,6 +599,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/dynamic-schema-test'
     | '/'
+    | '/debug/entity-routes-test'
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
@@ -584,6 +615,8 @@ export interface FileRouteTypes {
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
     | '/debug/vibegantt-test'
+    | '/entities/$entityName'
+    | '/entities/$entityName-old'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -622,6 +655,7 @@ export interface FileRouteTypes {
     | '/503'
     | '/dynamic-schema-test'
     | '/'
+    | '/debug/entity-routes-test'
     | '/debug/gantt-test-data'
     | '/debug/junction-tables'
     | '/debug/kanban'
@@ -637,6 +671,8 @@ export interface FileRouteTypes {
     | '/debug/state-machine-test'
     | '/debug/vibegantt'
     | '/debug/vibegantt-test'
+    | '/entities/$entityName'
+    | '/entities/$entityName-old'
     | '/projects/$projectId'
     | '/settings/account'
     | '/settings/appearance'
@@ -678,6 +714,7 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/dynamic-schema-test'
     | '/_authenticated/'
+    | '/_authenticated/debug/entity-routes-test'
     | '/_authenticated/debug/gantt-test-data'
     | '/_authenticated/debug/junction-tables'
     | '/_authenticated/debug/kanban'
@@ -693,6 +730,8 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/state-machine-test'
     | '/_authenticated/debug/vibegantt'
     | '/_authenticated/debug/vibegantt-test'
+    | '/_authenticated/entities/$entityName'
+    | '/_authenticated/entities/$entityName-old'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -1001,6 +1040,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/entities/$entityName-old': {
+      id: '/_authenticated/entities/$entityName-old'
+      path: '/entities/$entityName-old'
+      fullPath: '/entities/$entityName-old'
+      preLoaderRoute: typeof AuthenticatedEntitiesEntityNameOldRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/entities/$entityName': {
+      id: '/_authenticated/entities/$entityName'
+      path: '/entities/$entityName'
+      fullPath: '/entities/$entityName'
+      preLoaderRoute: typeof AuthenticatedEntitiesEntityNameRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/debug/vibegantt-test': {
       id: '/_authenticated/debug/vibegantt-test'
       path: '/vibegantt-test'
@@ -1106,6 +1159,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugGanttTestDataRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/entity-routes-test': {
+      id: '/_authenticated/debug/entity-routes-test'
+      path: '/entity-routes-test'
+      fullPath: '/debug/entity-routes-test'
+      preLoaderRoute: typeof AuthenticatedDebugEntityRoutesTestRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/settings/admin/users': {
       id: '/_authenticated/settings/admin/users'
       path: '/admin/users'
@@ -1117,6 +1177,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedDebugRouteRouteChildren {
+  AuthenticatedDebugEntityRoutesTestRoute: typeof AuthenticatedDebugEntityRoutesTestRoute
   AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
   AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
@@ -1140,6 +1201,8 @@ interface AuthenticatedDebugRouteRouteChildren {
 
 const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren =
   {
+    AuthenticatedDebugEntityRoutesTestRoute:
+      AuthenticatedDebugEntityRoutesTestRoute,
     AuthenticatedDebugGanttTestDataRoute: AuthenticatedDebugGanttTestDataRoute,
     AuthenticatedDebugJunctionTablesRoute:
       AuthenticatedDebugJunctionTablesRoute,
@@ -1205,6 +1268,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedDynamicSchemaTestRoute: typeof AuthenticatedDynamicSchemaTestRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedEntitiesEntityNameRoute: typeof AuthenticatedEntitiesEntityNameRoute
+  AuthenticatedEntitiesEntityNameOldRoute: typeof AuthenticatedEntitiesEntityNameOldRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
   AuthenticatedTasksKanbanRoute: typeof AuthenticatedTasksKanbanRoute
   AuthenticatedTasksTimelineRoute: typeof AuthenticatedTasksTimelineRoute
@@ -1220,6 +1285,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedDynamicSchemaTestRoute: AuthenticatedDynamicSchemaTestRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedEntitiesEntityNameRoute: AuthenticatedEntitiesEntityNameRoute,
+  AuthenticatedEntitiesEntityNameOldRoute:
+    AuthenticatedEntitiesEntityNameOldRoute,
   AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
   AuthenticatedTasksKanbanRoute: AuthenticatedTasksKanbanRoute,
   AuthenticatedTasksTimelineRoute: AuthenticatedTasksTimelineRoute,

@@ -172,10 +172,11 @@ export class UnifiedClientRegistry {
         }
       }
 
-      syncLogger.debug('Retrieved org active clients', {
+      syncLogger.info('🔍 REGISTRY DEBUG: Retrieved org active clients', {
         organizationId,
         activeClientCount: activeClientIds.length,
-        clientIds: activeClientIds
+        clientIds: activeClientIds,
+        allKeysFound: listResult.keys.map(k => k.name)
       }, MODULE_NAME);
 
       return activeClientIds;

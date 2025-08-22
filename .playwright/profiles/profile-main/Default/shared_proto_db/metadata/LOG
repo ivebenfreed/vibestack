@@ -1,3 +1,3 @@
-2025/08/17-19:27:41.985 24956e Reusing MANIFEST /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/shared_proto_db/metadata/MANIFEST-000001
-2025/08/17-19:27:41.987 24956e Recovering log #3
-2025/08/17-19:27:41.988 24956e Reusing old log /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/shared_proto_db/metadata/000003.log 
+2025/08/21-15:05:06.412 d4582 Reusing MANIFEST /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/shared_proto_db/metadata/MANIFEST-000001
+2025/08/21-15:05:06.413 d4582 Recovering log #3
+2025/08/21-15:05:06.413 d4582 Reusing old log /home/ben-freed/dev/vibestack/.playwright/profiles/profile-main/Default/shared_proto_db/metadata/000003.log 

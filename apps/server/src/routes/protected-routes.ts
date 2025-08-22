@@ -6,21 +6,34 @@
  */
 
 import { Hono } from 'hono';
-import type { Env } from '../types/env';
+import type { AppContext } from '../types/hono';
+import { 
+  hybridRLSOrgActorMiddleware,
+  requirePermission,
+  requireRole,
+  requireAdmin,
+  requireOwner
+} from '../middleware/hybrid-rls-org-actor';
+import { apiLogger } from '../middleware/logger';
+
+// Legacy context validation imports kept for backward compatibility
 import { 
   requireUser, 
   requireUserAndOrg, 
-  requirePermission,
   getUserContext,
   getOrgContext,
   getBothContexts
 } from '../middleware/context-validation';
-import { apiLogger } from '../middleware/logger';
 
-// Create route groups with different protection levels
-export const userRoutes = new Hono<{ Bindings: Env }>();
-export const orgRoutes = new Hono<{ Bindings: Env }>();
-export const adminRoutes = new Hono<{ Bindings: Env }>();
+// Create route groups with hybrid security middleware
+export const userRoutes = new Hono<AppContext>();
+export const orgRoutes = new Hono<AppContext>();
+export const adminRoutes = new Hono<AppContext>();
+
+// Apply hybrid security to organization-scoped routes
+// Routes will be mounted as /api/org/:orgId/* to enable automatic context extraction
+orgRoutes.use('/:orgId/*', hybridRLSOrgActorMiddleware);
+adminRoutes.use('/:orgId/*', hybridRLSOrgActorMiddleware);
 
 // =============================================================================
 // USER-ONLY ROUTES (require user context only)
@@ -55,92 +68,113 @@ userRoutes.get('/organizations', async (c) => {
 // ORGANIZATION ROUTES (require user + org context)
 // =============================================================================
 
-// Apply user + org context validation to ALL org routes
-orgRoutes.use('*', requireUserAndOrg());
-
-orgRoutes.get('/dashboard', async (c) => {
-  const { user, org } = getBothContexts(c);
+// Organization dashboard - requires organization context
+orgRoutes.get('/:orgId/dashboard', async (c) => {
+  // Hybrid security context provides zero-latency access
+  const security = c.get('security');
+  const user = c.get('user');
   
   return c.json({
-    message: 'Organization dashboard accessed',
+    message: 'Organization dashboard accessed via hybrid security',
     user: {
-      id: user.userId,
-      role: org.userOrgRole
+      id: security.userId,
+      email: user?.email,
+      role: security.roleInfo?.role
     },
     organization: {
-      id: org.organizationId,
-      slug: org.organizationSlug,
-      name: org.organizationName
+      id: security.organizationId,
+      permissions: security.roleInfo?.permissions || []
     }
   });
 });
 
-orgRoutes.get('/projects', async (c) => {
-  const { user, org } = getBothContexts(c);
-  
-  // All projects queries automatically scoped to user's org
-  return c.json({
-    message: 'Projects retrieved for organization',
-    organizationId: org.organizationId,
-    userRole: org.userOrgRole,
-    projects: [] // Implementation would fetch org projects
-  });
-});
+orgRoutes.get('/:orgId/projects', 
+  requirePermission('entities:read'),
+  async (c) => {
+    // Zero-latency permission check already performed
+    const security = c.get('security');
+    
+    return c.json({
+      message: 'Projects retrieved with hybrid security',
+      organizationId: security.organizationId,
+      userRole: security.roleInfo?.role,
+      permissions: security.roleInfo?.permissions,
+      projects: [] // Implementation would fetch org projects with RLS filtering
+    });
+  }
+);
 
-orgRoutes.post('/projects', requirePermission('entities:write'), async (c) => {
-  const { user, org } = getBothContexts(c);
-  
-  // User has been validated to have entities:write permission
-  return c.json({
-    message: 'Project created',
-    createdBy: user.userId,
-    organizationId: org.organizationId
-  });
-});
+orgRoutes.post('/:orgId/projects', 
+  requirePermission('entities:write'), 
+  async (c) => {
+    // Zero-latency permission validation already performed
+    const security = c.get('security');
+    
+    return c.json({
+      message: 'Project created with hybrid security',
+      createdBy: security.userId,
+      organizationId: security.organizationId,
+      userRole: security.roleInfo?.role
+    });
+  }
+);
 
-orgRoutes.get('/members', requirePermission('members:read'), async (c) => {
-  const { user, org } = getBothContexts(c);
-  
-  return c.json({
-    message: 'Organization members retrieved',
-    organizationId: org.organizationId,
-    requestedBy: user.userId
-  });
-});
+orgRoutes.get('/:orgId/members', 
+  requirePermission('members:read'), 
+  async (c) => {
+    // Instant permission check via SQLite cache
+    const security = c.get('security');
+    
+    return c.json({
+      message: 'Organization members retrieved with hybrid security',
+      organizationId: security.organizationId,
+      requestedBy: security.userId,
+      requestedByRole: security.roleInfo?.role
+    });
+  }
+);
 
 // =============================================================================
 // ADMIN ROUTES (require admin permissions)
 // =============================================================================
 
-// Apply user + org context + admin permission to ALL admin routes
-adminRoutes.use('*', requireUserAndOrg());
-adminRoutes.use('*', requirePermission('org:admin'));
+// Admin settings - requires admin role
+adminRoutes.get('/:orgId/settings', 
+  requireAdmin,
+  async (c) => {
+    // Zero-latency admin permission check via SQLite cache
+    const security = c.get('security');
+    
+    return c.json({
+      message: 'Admin settings accessed with hybrid security',
+      organizationId: security.organizationId,
+      adminUserId: security.userId,
+      adminRole: security.roleInfo?.role,
+      isAdmin: security.isAdmin()
+    });
+  }
+);
 
-adminRoutes.get('/settings', async (c) => {
-  const { user, org } = getBothContexts(c);
-  
-  return c.json({
-    message: 'Admin settings accessed',
-    organizationId: org.organizationId,
-    adminUserId: user.userId
-  });
-});
-
-adminRoutes.post('/invite-user', requirePermission('members:admin'), async (c) => {
-  const { user, org } = getBothContexts(c);
-  
-  return c.json({
-    message: 'User invitation sent',
-    invitedBy: user.userId,
-    organizationId: org.organizationId
-  });
-});
+adminRoutes.post('/:orgId/invite-user', 
+  requirePermission('members:admin'), 
+  async (c) => {
+    // Instant permission validation for member management
+    const security = c.get('security');
+    
+    return c.json({
+      message: 'User invitation sent with hybrid security',
+      invitedBy: security.userId,
+      organizationId: security.organizationId,
+      invitedByRole: security.roleInfo?.role
+    });
+  }
+);
 
 // =============================================================================
 // SYNC ROUTES (special handling for WebSocket upgrades)
 // =============================================================================
 
-export const syncRoutes = new Hono<{ Bindings: Env }>();
+export const syncRoutes = new Hono<AppContext>();
 
 // Sync routes need special handling because WebSocket upgrades
 // happen before middleware can run in some cases
@@ -168,11 +202,16 @@ syncRoutes.get('/connect/:organizationSlug', async (c) => {
 // ROUTE MOUNTING HELPER
 // =============================================================================
 
-export function mountProtectedRoutes(app: Hono<{ Bindings: Env }>) {
-  // Mount route groups with their protection levels
+export function mountProtectedRoutes(app: Hono<AppContext>) {
+  // Mount route groups with hybrid security middleware
+  // User routes remain unchanged (no org context needed)
   app.route('/api/user', userRoutes);
+  
+  // Organization and admin routes now use /:orgId pattern for automatic context extraction
   app.route('/api/org', orgRoutes);  
   app.route('/api/admin', adminRoutes);
+  
+  // Sync routes use special handling for WebSocket upgrades
   app.route('/api/sync', syncRoutes);
 
   // Add global error handler for context validation failures

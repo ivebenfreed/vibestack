@@ -1,7 +1,6 @@
 import React from 'react';
 import { ContentContainer } from '@/components/layout/content-container';
 import { SyncDebugPanel } from '@/components/debug/SyncDebugPanel';
-import { LocalChangesInspector } from '@/components/debug/LocalChangesInspector';
 import { SyncVisualizer } from '../sync/components/SyncVisualizer';
 
 export function SyncPage() {
@@ -42,9 +41,6 @@ export function SyncPage() {
           </div>
           
           <SyncDebugPanel />
-          
-          {/* Local Changes Inspector */}
-          <LocalChangesInspector />
         </div>
         
         {/* Legacy Sync Visualizer - DISABLED */}

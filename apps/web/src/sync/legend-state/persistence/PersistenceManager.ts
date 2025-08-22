@@ -6,7 +6,7 @@
  */
 
 import { type Observable } from '@legendapp/state'
-import { persistObservable, type PersistOptions } from '@legendapp/state/persist'
+import { type PersistOptions } from '@legendapp/state/sync'
 import { ObservablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
 import { syncLogger } from '../../utils/SyncLogger'
 
@@ -62,23 +62,22 @@ export class PersistenceManager {
   ): Observable<T> {
     const persistKey = `${this.organizationId}_${tableName}`
     
-    const persistOptions: PersistOptions = {
-      local: {
-        name: persistKey,
-        ...options.local
-      },
-      ...options
-    }
-    
-    // Set up IndexedDB persistence
-    const persistentObservable = persistObservable(observable$, {
-      ...persistOptions,
-      local: ObservablePersistIndexedDB({
+    // Set up IndexedDB persistence using v3 pattern
+    // Note: In Legend State v3, persistence is configured through the observable's persist property
+    // This function now serves more as a factory/configuration helper
+    const persistConfig = {
+      name: persistKey,
+      plugin: new ObservablePersistIndexedDB({
         databaseName: this.dbName,
         version: this.dbVersion,
         tableNames: [tableName, 'metadata', 'sync_state']
-      })
-    })
+      }),
+      ...options
+    }
+    
+    // In v3, the observable should have persistence configured when created
+    // Return the observable (persistence should be configured at creation time)
+    const persistentObservable = observable$
     
     // Initialize sync state for this table
     this.initializeSyncState(tableName)

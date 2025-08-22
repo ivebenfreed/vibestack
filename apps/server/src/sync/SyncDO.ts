@@ -480,7 +480,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
     // Live sync is already handled by the message handlers
     // The filtering will happen in sendLiveChangesWithLSN
     try {
-      syncLogger.info('Sending srv_live_start message to client', {
+      syncLogger.debug('Sending srv_live_start message to client', {
         clientId,
         messageType: 'srv_live_start',
         organizationId: this.syncConnection.organizationId,
@@ -495,7 +495,7 @@ export class SyncDO implements DurableObject, WebSocketHandler {
         messageId: crypto.randomUUID()
       } as any);
 
-      syncLogger.info('Successfully sent srv_live_start message to client', {
+      syncLogger.debug('Successfully sent srv_live_start message to client', {
         clientId,
         messageType: 'srv_live_start'
       }, MODULE_NAME);

@@ -182,16 +182,7 @@ interface CachedSession {
 
 // Global session cache that persists across requests (5 min TTL)
 const globalSessionCache = new Map<string, CachedSession>();
-
-// Clean up expired sessions every 30 seconds
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, cached] of globalSessionCache.entries()) {
-    if (cached.expiresAt < now) {
-      globalSessionCache.delete(key);
-    }
-  }
-}, 30000);
+let lastCleanup = 0;
 
 /**
  * Enhanced session cache utilities with cross-request persistence

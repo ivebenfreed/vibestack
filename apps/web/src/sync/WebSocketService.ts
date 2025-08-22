@@ -326,8 +326,8 @@ export class WebSocketService {
         syncLogger.warn('connection', 'Failed to get current LSN from sync machine, using config value', error);
       }
       
-      // Use info level instead of debug to ensure visibility
-      syncLogger.info('connection', 'Heartbeat timer fired', {
+      // Heartbeat timer fired at debug level
+      syncLogger.debug('connection', 'Heartbeat timer fired', {
         isConnected: this.isConnected(),
         clientId: this.config.clientId,
         configLSN: this.config.lsn,
@@ -346,7 +346,8 @@ export class WebSocketService {
             messageId: `heartbeat_${Date.now()}`,
             timestamp: Date.now()
           });
-          syncLogger.info('connection', `Heartbeat sent successfully with LSN: ${currentLSN}`);
+          // Heartbeat sent at debug level
+          syncLogger.debug('connection', `Heartbeat sent successfully with LSN: ${currentLSN}`);
         } catch (error) {
           syncLogger.error('connection', 'Error sending heartbeat', error);
         }

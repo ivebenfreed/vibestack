@@ -30,11 +30,12 @@ const LegendStateFullIntegration = observer(() => {
     setInitError(null);
     
     try {
+      const organizationId = '01920000-1000-7000-8000-000000000001'; // Wide Corp
       const config: VibeStackIntegrationConfig = {
-        organizationId: '01920000-1000-7000-8000-000000000001', // Wide Corp
+        organizationId,
         userId: '0198b046-c453-72d9-b71a-092e1f75601a', // Alice CEO
         serverBaseUrl: 'http://localhost:8787',
-        webSocketUrl: 'ws://localhost:8787/websocket',
+        webSocketUrl: 'ws://localhost:8787/api/sync',
         enableOptimisticUpdates: true,
         enablePersistence: true,
         debugMode: true,

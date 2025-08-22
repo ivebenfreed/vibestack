@@ -11,7 +11,7 @@
  */
 
 import { setup, assign, fromPromise } from 'xstate'
-import { getSyncWebSocketUrl } from '../../sync/config'
+import { getSyncWebSocketUrl, getOrgActorWebSocketUrl } from '../../sync/config'
 import { syncLogger } from '../../sync/utils/SyncLogger'
 
 // Simple context for table notifications only
@@ -99,6 +99,15 @@ export const simpleNotificationSyncMachine = setup({
         try {
           const message = JSON.parse(event.data)
           
+          // DEBUG: Log incoming messages at debug level
+          if (message.type !== 'srv_heartbeat') {
+            syncLogger.debug('notification-sync', '🔄 RAW WebSocket message received', {
+              type: message.type,
+              messageId: message.messageId,
+              fullMessage: message
+            });
+          }
+          
           // Send message to the XState machine for proper state management
           self.send({ type: 'WS_MESSAGE', message })
           
@@ -127,8 +136,15 @@ export const simpleNotificationSyncMachine = setup({
             }));
             
           } else if (message.type === 'srv_heartbeat') {
-            // Silent heartbeat handling
+            // Silent heartbeat handling at debug level
             syncLogger.debug('notification-sync', 'Heartbeat received')
+          } else if (message.type === 'srv_live_start') {
+            // Live sync session started at debug level
+            syncLogger.debug('notification-sync', 'Live sync session started', {
+              messageId: message.messageId,
+              organizationId: message.organizationId,
+              clientId: message.clientId
+            });
           } else {
             syncLogger.debug('notification-sync', `Unknown message type: ${message.type}`)
           }
@@ -166,7 +182,8 @@ export const simpleNotificationSyncMachine = setup({
             };
             
             context.webSocket.send(JSON.stringify(heartbeatMessage));
-            syncLogger.info('notification-sync', `💓 Heartbeat sent - triggering replication`);
+            // Heartbeat sent at debug level
+            syncLogger.debug('notification-sync', `💓 Heartbeat sent - triggering replication`);
           } catch (error) {
             syncLogger.error('notification-sync', `Failed to send heartbeat: ${error}`)
           }
@@ -247,7 +264,7 @@ export const simpleNotificationSyncMachine = setup({
                 }
                 return persistentClientId
               },
-              serverUrl: () => getSyncWebSocketUrl()
+              serverUrl: ({ event }) => getOrgActorWebSocketUrl(event.organizationId)
             })
           ]
         }
@@ -300,19 +317,21 @@ export const simpleNotificationSyncMachine = setup({
       on: {
         WS_MESSAGE: {
           actions: [
-            ({ event }) => {
+            assign(({ event }) => {
               const message = event.message
               if (message.type === 'srv_table_change_notification') {
                 // Update context with last notification
-                assign({
+                return {
                   lastNotification: {
                     tables: message.tables,
                     organizationId: message.organizationId,
                     timestamp: Date.now()
                   }
-                })
+                }
               }
-            }
+              // Return empty object if not a table change notification
+              return {}
+            })
           ]
         },
         

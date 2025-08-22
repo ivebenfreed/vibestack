@@ -5,7 +5,7 @@
  * Extracts complex message handling logic from the main SyncDO class.
  */
 
-import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
+// import { IncomingChangeProcessor } from './incoming-changes/IncomingChangeProcessor';
 import type { 
   ServerMessage, 
   ClientMessage,

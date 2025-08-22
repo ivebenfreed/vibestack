@@ -1,5 +1,13 @@
 // Dexie uses native IndexedDB, no patches or decorators needed
 
+// Enable Legend State React tracking for automatic component updates
+import { enableReactTracking } from '@legendapp/state/config/enableReactTracking';
+
+enableReactTracking({
+  auto: true,
+  warnUnobserved: true
+});
+
 // Debug utilities (only in development)
 if (process.env.NODE_ENV === 'development') {
   // Commented out - file needs to be updated for new architecture

@@ -11,7 +11,7 @@ import { Actor } from '@cloudflare/actors';
 export interface CachedMember {
   id: string;
   userId: string;
-  role: 'admin' | 'member' | 'viewer';
+  role: 'owner' | 'admin' | 'manager' | 'member' | 'contributor' | 'viewer';
   status: 'active' | 'suspended' | 'pending';
   joinedAt: string;
   lastActiveAt?: string;

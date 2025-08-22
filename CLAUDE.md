@@ -211,17 +211,69 @@ pnpm type-check
 3. Build artifacts and generated files are ignored
 4. Run essential baseline tests (see Testing section below)
 
-## Playwright Testing with Persistent Browser Profiles
+## Browser Automation with MCP Playwright Tools
 
-### Browser Profile Persistence
+### IMPORTANT: Use MCP Tools, Not Test Files
 
-Each worktree uses a **persistent browser profile** that maintains login state across test runs:
+**For browser automation and testing during development, use the MCP Playwright tools directly in Claude Code instead of writing Playwright test files.**
+
+The MCP Playwright tools provide immediate browser control with persistent profiles:
+- `mcp__playwright__browser_navigate` - Navigate to URLs
+- `mcp__playwright__browser_click` - Click elements
+- `mcp__playwright__browser_type` - Type text into forms
+- `mcp__playwright__browser_snapshot` - Get page state
+- `mcp__playwright__browser_take_screenshot` - Take screenshots
+- And many more browser control tools
+
+### MCP Playwright Setup
+
+The MCP Playwright is configured with persistent browser profiles:
 - Login once per worktree, stay logged in forever
 - Full browser state persistence (cookies, localStorage, IndexedDB)
 - Realistic testing environment like a real user
 - Profile stored in `.playwright/profiles/profile-{issue}/`
 
-#### Quick Start
+#### Configuration
+
+The MCP Playwright wrapper (`scripts/playwright-mcp-wrapper.js`) automatically:
+- Detects the current worktree/branch
+- Uses the persistent profile at `.playwright/profiles/profile-main/` (or `profile-{issue}` for worktrees)
+- Maintains browser state across Claude Code sessions
+- **NO `--isolated` flag** - uses persistent storage on disk
+
+#### Using MCP Tools Instead of Writing Tests
+
+**DON'T write test files:**
+```javascript
+// ❌ Don't create test files like this:
+import { test, expect } from '@playwright/test';
+test('my test', async ({ page }) => {
+  await page.goto('/');
+  await page.click('button');
+});
+```
+
+**DO use MCP tools directly:**
+```bash
+# ✅ Use MCP tools in Claude Code:
+mcp__playwright__browser_navigate(url="http://localhost:5173")
+mcp__playwright__browser_click(element="Sign In button", ref="e23")
+mcp__playwright__browser_type(element="Email input", ref="e45", text="ceo@widecorp.com")
+mcp__playwright__browser_snapshot()  # Get current page state
+```
+
+#### Benefits of MCP Tools
+- **Immediate execution** - No need to save files and run tests
+- **Persistent browser** - Stays logged in between commands
+- **Visual feedback** - See the browser window (not headless by default)
+- **Interactive debugging** - Pause and inspect at any point
+- **Same profile as tests** - Uses the same `.playwright/profiles/` directory
+
+### When Playwright Test Files ARE Needed
+
+For CI/CD pipelines or automated test suites, test files are still used. **But for development and debugging, prefer MCP tools.**
+
+#### Running Test Files
 
 **IMPORTANT**: Always use `./scripts/playwright-test.sh` wrapper script instead of `npx playwright test` directly. The wrapper script automatically:
 - Detects the correct issue number and ports for worktrees

@@ -17,27 +17,17 @@ export function UnifiedLoadingScreen({ routeName }: UnifiedLoadingScreenProps) {
     isReady 
   } = useAppInit();
   
-  // 🎯 OPTIMIZED: Only show loading for essential steps, allow progressive loading
-  // Now we show dashboard faster and load data progressively in the background
-  const shouldShow = !isSystemReady && (isCheckingAuth || isSigningIn);
+  // 🎯 OPTIMIZED: Show loading for auth and initial org setup
+  // Once system is ready, dashboard shows with progressive data loading
+  const shouldShow = !isSystemReady && (
+    isCheckingAuth || 
+    isSigningIn || 
+    isCheckingRequirements ||
+    isInitializingDatabase ||
+    isStartingSync
+  );
 
-  // Debug logging in development - log every render
-  if (import.meta.env.MODE === 'development') {
-    console.log('[UnifiedLoadingScreen] Render:', {
-      isSystemReady,
-      shouldShow,
-      isAuthenticated,
-      isCheckingAuth,
-      appInitStates: {
-        isCheckingRequirements,
-        isInitializingDatabase,
-        isStartingSync,
-        isStartingLiveChanges,
-        isReady
-      },
-      timestamp: Date.now()
-    });
-  }
+  // Silent rendering - no console spam
 
   // Simple loading state - no complex phase detection
   const getLoadingState = () => {

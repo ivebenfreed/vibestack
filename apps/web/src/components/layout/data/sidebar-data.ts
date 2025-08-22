@@ -25,7 +25,9 @@ import {
 } from '@tabler/icons-react'
 import { Dot, AudioWaveform, Command, GalleryVerticalEnd, FolderOpen, Folder, FolderClosed } from 'lucide-react'
 import { type SidebarData, type NavGroup, type NavItem } from '../types'
-import { Project, ProjectStatus } from '@repo/dataforge/client-entities'
+import { Project, ProjectStatus } from '@/db/client-entities'
+import { generateDynamicSidebarData, shouldHideBusinessRoutes } from './dynamic-sidebar-data'
+import type { EntitySchema } from '@/lib/schema-client'
 
 /**
  * Global sidebar sections with their submenu items
@@ -162,6 +164,53 @@ export function generateProjectsSection(projects: Project[] = []): GlobalSidebar
   }
 }
 
+function getHomeNavItems(): NavItem[] {
+  const hideBusinessRoutes = shouldHideBusinessRoutes()
+  
+  const allItems: NavItem[] = [
+    {
+      title: 'Dashboard',
+      url: '/',
+      icon: IconLayoutDashboard,
+    },
+    {
+      title: 'Tasks',
+      url: '/tasks',
+      icon: IconChecklist,
+    },
+    {
+      title: 'Tasks Kanban',
+      url: '/tasks/kanban',
+      icon: IconChecklist,
+    },
+    {
+      title: 'Apps',
+      url: '/apps',
+      icon: IconPackages,
+    },
+    {
+      title: 'Chats',
+      url: '/chats',
+      badge: '3',
+      icon: IconMessages,
+    },
+    {
+      title: 'Users',
+      url: '/users',
+      icon: IconUsers,
+    },
+  ]
+  
+  if (hideBusinessRoutes) {
+    return allItems.filter(item => 
+      !item.url?.includes('/tasks') && 
+      !item.url?.includes('/projects')
+    )
+  }
+  
+  return allItems
+}
+
 export const globalSidebarData: GlobalSidebarSection[] = [
   {
     id: 'home',
@@ -171,44 +220,14 @@ export const globalSidebarData: GlobalSidebarSection[] = [
     navGroups: [
       {
         title: 'General',
-        items: [
-          {
-            title: 'Dashboard',
-            url: '/',
-            icon: IconLayoutDashboard,
-          },
-          {
-            title: 'Tasks',
-            url: '/tasks',
-            icon: IconChecklist,
-          },
-          {
-            title: 'Tasks Kanban',
-            url: '/tasks/kanban',
-            icon: IconChecklist,
-          },
-          {
-            title: 'Apps',
-            url: '/apps',
-            icon: IconPackages,
-          },
-          {
-            title: 'Chats',
-            url: '/chats',
-            badge: '3',
-            icon: IconMessages,
-          },
-          {
-            title: 'Users',
-            url: '/users',
-            icon: IconUsers,
-          },
-        ],
+        items: getHomeNavItems(),
       },
     ],
   },
-  // Projects section will be dynamically generated
-  generateProjectsSection(), // Default empty projects section
+  // Projects section will be dynamically generated (hidden when using entity routes)
+  ...(!shouldHideBusinessRoutes() ? [generateProjectsSection()] : []),
+  // Entities section shown when business routes are hidden
+  ...(shouldHideBusinessRoutes() ? [generateEntitiesSection(null)] : []),
   {
     id: 'settings',
     title: 'Settings',
@@ -404,8 +423,27 @@ export const sidebarData: SidebarData = {
   navGroups: globalSidebarData[0].navGroups, // Default to home section
 }
 
+/**
+ * Generate dynamic entities section from organization schema
+ */
+export function generateEntitiesSection(schema: EntitySchema | null): GlobalSidebarSection {
+  return {
+    id: 'entities',
+    title: 'Organization Entities',
+    icon: IconFolder,
+    showMainSidebar: true,
+    navGroups: generateDynamicSidebarData(schema)
+  }
+}
+
 // Helper function to get sidebar data for a specific global section
-export function getSidebarDataForSection(sectionId: string, projects: Project[] = []): NavGroup[] {
+export function getSidebarDataForSection(sectionId: string, projects: Project[] = [], schema: EntitySchema | null = null): NavGroup[] {
+  if (sectionId === 'entities') {
+    // Generate dynamic entities section with schema data
+    const entitiesSection = generateEntitiesSection(schema)
+    return entitiesSection.navGroups
+  }
+  
   if (sectionId === 'projects') {
     // Generate dynamic projects section with actual project data
     const projectsSection = generateProjectsSection(projects)

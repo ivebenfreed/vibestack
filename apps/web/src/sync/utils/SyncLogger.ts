@@ -224,7 +224,7 @@ export class SyncLogger {
 // Export singleton instance for V3
 export const syncLogger = new SyncLogger({
   prefix: '[SyncMachineV3]',
-  level: process.env.NODE_ENV === 'development' ? 'debug' : 'info'
+  level: 'info' // Use info level by default to filter debug messages
 });
 
 // Export factory for creating loggers with different prefixes

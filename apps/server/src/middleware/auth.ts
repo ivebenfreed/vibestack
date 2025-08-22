@@ -13,7 +13,14 @@ export const authMiddleware = createMiddleware<AppBindings>(async (c, next) => {
     try {
       // Use enhanced cross-request session cache to avoid redundant auth DB queries
       const authHeader = c.req.header('Authorization') || '';
-      const sessionToken = authHeader.replace('Bearer ', '') || 'no-token';
+      let sessionToken = authHeader.replace('Bearer ', '');
+      
+      // If no Bearer token, check for cookie-based session token
+      if (!sessionToken) {
+        const cookieHeader = c.req.header('Cookie') || '';
+        const cookieMatch = cookieHeader.match(/better-auth\.session_token=([^;]+)/);
+        sessionToken = cookieMatch ? decodeURIComponent(cookieMatch[1]) : 'no-token';
+      }
       
       const sessionData = await EnhancedSessionCache.getCachedSessionPersistent(
         sessionToken,

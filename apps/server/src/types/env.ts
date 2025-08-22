@@ -46,6 +46,11 @@ export interface Env {
   // Durable Object bindings (from wrangler.toml)
   SYNC: DurableObjectNamespace; 
   REPLICATION: DurableObjectNamespace;
+  ORGANIZATION_ACTOR: DurableObjectNamespace;
+  ORG_SCHEMA: DurableObjectNamespace;
+  SUPER_ADMIN: DurableObjectNamespace;
+  ORG_ADMIN: DurableObjectNamespace;
+  ORG_OPS: DurableObjectNamespace;
   
   // KV namespace bindings (from wrangler.toml)
   CLIENT_REGISTRY: KVNamespace;

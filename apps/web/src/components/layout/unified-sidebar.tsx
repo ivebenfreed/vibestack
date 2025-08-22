@@ -15,7 +15,13 @@ import { Separator } from '@/components/ui/separator'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
+import { observer } from '@legendapp/state/react'
 import { Project, ProjectStatus } from '@/db/client-entities'
+import { sidebar$ } from '@/stores/org-data-store'
+// Import from Legend Central for entity groups
+import { entityGroups$ as legendEntityGroups$ } from '@/stores/vibestack-legend-central'
+import { shouldHideBusinessRoutes } from './data/dynamic-sidebar-data'
+import type { NavGroup } from './types'
 import { 
   Home, 
   FolderKanban, 
@@ -35,7 +41,15 @@ import {
   RefreshCw,
   Activity,
   Zap,
-  Grid3X3
+  Grid3X3,
+  FileText,
+  Building,
+  Users,
+  Calendar,
+  ClipboardList,
+  DollarSign,
+  Clock,
+  Database
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -57,12 +71,15 @@ interface NavSection {
   items: NavItem[]
 }
 
-const mainNavigation: NavItem[] = [
+const staticNavigation: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, href: '/' },
-  { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/projects' },
-  { id: 'tasks', label: 'Tasks', icon: CheckSquare, href: '/tasks' },
   { id: 'apps', label: 'Apps', icon: Package, href: '/apps' },
   { id: 'chats', label: 'Chats', icon: MessageSquare, href: '/chats', badge: '3' },
+]
+
+const businessNavigation: NavItem[] = [
+  { id: 'projects', label: 'Projects', icon: FolderKanban, href: '/projects' },
+  { id: 'tasks', label: 'Tasks', icon: CheckSquare, href: '/tasks' },
 ]
 
 const bottomNavigation: NavItem[] = [
@@ -71,9 +88,22 @@ const bottomNavigation: NavItem[] = [
   { id: 'debug', label: 'Debug', icon: Bug, href: '/debug' },
 ]
 
-export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
+export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation()
-  const { isAdmin, isSuperAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin, user, currentOrganization } = useAuth()
+  const currentOrgId = currentOrganization?.id
+  
+  // Get entity groups from Legend Central computed observable - automatically updates when schema changes
+  const entityNavGroups = legendEntityGroups$.get()
+  
+  // Entity nav groups come directly from the computed observable
+  const navGroups = entityNavGroups || []
+  
+  // Determine which navigation to show
+  const hideBusinessRoutes = shouldHideBusinessRoutes()
+  const mainNavigation = hideBusinessRoutes 
+    ? staticNavigation 
+    : [...staticNavigation, ...businessNavigation]
   
   const isActive = (href: string) => {
     if (href === '/') {
@@ -142,6 +172,26 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
               />
             ))}
           </div>
+          
+          {/* Dynamic Entity Navigation */}
+          {entityNavGroups && entityNavGroups.length > 0 && (
+            <div className="space-y-1 mb-6">
+              <div className="text-xs text-muted-foreground px-3 mb-2">Entities</div>
+              {entityNavGroups.map((entity) => (
+                <NavItem
+                  key={entity.name}
+                  item={{
+                    id: entity.name,
+                    label: entity.name,
+                    href: entity.path,
+                    icon: Database
+                  }}
+                  isActive={isActive(entity.path)}
+                  isCollapsed={isCollapsed}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Context-sensitive content - but NOT debug */}
           {!location.pathname.startsWith('/debug') && (
@@ -180,12 +230,12 @@ export function UnifiedSidebar({ isCollapsed, onToggle }: SidebarProps) {
       </div>
     </div>
   )
-}
+})
 
 function NavItem({ item, isActive, isCollapsed }: {
   item: NavItem
   isActive: boolean
-  isCollapsed: boolean
+  isCollapsed: boolean | undefined
 }) {
   const content = (
     <Link
@@ -230,6 +280,83 @@ function NavItem({ item, isActive, isCollapsed }: {
   }
 
   return content
+}
+
+function EntityNavGroup({ navGroup, isActive, isCollapsed }: {
+  navGroup: NavGroup
+  isActive: (href: string) => boolean
+  isCollapsed: boolean
+}) {
+  const [isExpanded, setIsExpanded] = React.useState(true)
+  
+  if (isCollapsed) {
+    // In collapsed mode, show items directly without grouping
+    return (
+      <div className="space-y-1">
+        {navGroup.items.map((item) => (
+          <TooltipProvider key={item.url}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  to={item.url}
+                  className={cn(
+                    'flex items-center justify-center rounded-md p-2 text-sm transition-colors',
+                    'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    isActive(item.url)
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground'
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {item.title}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-sidebar-accent/50 rounded-md transition-colors"
+      >
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {navGroup.title}
+        </span>
+        {isExpanded ? (
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        )}
+      </button>
+      {isExpanded && (
+        <div className="space-y-1 mt-1">
+          {navGroup.items.map((item) => (
+            <Link
+              key={item.url}
+              to={item.url}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ml-2",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                isActive(item.url)
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "text-sidebar-foreground"
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{item.title}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ContextualNavigation({ location, isCollapsed }: {

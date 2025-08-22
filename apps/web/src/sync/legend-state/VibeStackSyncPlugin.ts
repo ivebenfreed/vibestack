@@ -12,8 +12,10 @@
  * - Organization-aware data scoping
  */
 
-import { configureObservablePersistence, type ObservablePersistPlugin } from '@legendapp/state/persist'
+import { configureObservableSync, type ObservablePersistPlugin, type PersistOptions } from '@legendapp/state/sync'
 import { ObservablePersistIndexedDB } from '@legendapp/state/persist-plugins/indexeddb'
+import { synced } from '@legendapp/state/sync'
+import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { syncLogger } from '../utils/SyncLogger'
 
 export interface VibeStackSyncConfig {
@@ -77,9 +79,11 @@ class VibeStackSyncPlugin {
     }
     
     try {
-      // Configure Legend State persistence globally
-      configureObservablePersistence({
-        pluginLocal: this.persistencePlugin
+      // Configure Legend State sync and persistence globally
+      configureObservableSync({
+        persist: {
+          plugin: this.persistencePlugin
+        }
       })
       
       // Set up WebSocket event listeners for table change notifications
@@ -357,7 +361,7 @@ export function createDefaultSyncConfig(organizationId: string, userId: string):
     organizationId,
     userId,
     serverBaseUrl: 'http://localhost:8787',
-    webSocketUrl: 'ws://localhost:8787/websocket',
+    webSocketUrl: `ws://localhost:8787/api/org-actor/${organizationId}/websocket`,
     indexedDbName: 'vibestack',
     indexedDbVersion: 1,
     enableOptimisticUpdates: true,
@@ -405,6 +409,251 @@ export function registerBusinessEntityTables(syncPlugin: VibeStackSyncPlugin): v
   syncLogger.info('legend-state', `Registered ${businessEntities.length} business entities for differential sync`, {
     entities: businessEntities
   })
+}
+
+/**
+ * Create a synced Legend State observable for a specific entity using syncedCrud
+ * This is the main function used by components to create reactive data stores
+ * Uses Legend State v3 syncedCrud API for proper CRUD operations
+ */
+export function syncedVibeStack(config: {
+  orgId: string
+  entityName: string
+  initial?: any[]
+}) {
+  console.log('[syncedVibeStack] Creating syncedCrud observable with v3 API:', config)
+  
+  const baseUrl = `http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}`
+  
+  // Use syncedCrud for proper CRUD operations with v3 compatibility
+  return syncedCrud({
+    // List all items
+    list: async () => {
+      console.log(`[syncedVibeStack] Fetching data for ${config.entityName}`)
+      
+      const response = await fetch(baseUrl, {
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        console.warn(`[syncedVibeStack] Failed to fetch ${config.entityName}:`, response.status)
+        return []
+      }
+      
+      const result = await response.json()
+      console.log(`[syncedVibeStack] Fetched ${config.entityName} data:`, result)
+      
+      if (result.success && Array.isArray(result.data)) {
+        return result.data
+      }
+      
+      return []
+    },
+    
+    // Create new item
+    create: async (item: any) => {
+      console.log(`[syncedVibeStack] Creating ${config.entityName}:`, item)
+      
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(item)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create ${config.entityName}: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      return result.success ? result.data : item
+    },
+    
+    // Update existing item
+    update: async (item: any) => {
+      console.log(`[syncedVibeStack] Updating ${config.entityName}:`, item)
+      
+      const response = await fetch(`${baseUrl}/${item.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(item)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update ${config.entityName}: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      return result.success ? result.data : item
+    },
+    
+    // Delete item
+    delete: async (item: any) => {
+      console.log(`[syncedVibeStack] Deleting ${config.entityName}:`, item)
+      
+      const response = await fetch(`${baseUrl}/${item.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete ${config.entityName}: ${response.status}`)
+      }
+      
+      return undefined // Indicates successful deletion
+    },
+    
+    // Configuration
+    fieldId: 'id', // Primary key field
+    generateId: () => crypto.randomUUID(), // Generate UUIDs for new items
+    
+    // Enable persistence to IndexedDB  
+    persist: {
+      name: `vibestack_${config.orgId}_${config.entityName}`,
+      plugin: 'indexeddb'
+    },
+    
+    // Initial value
+    initial: config.initial || []
+  })
+}
+
+/**
+ * Alternative synced implementation for custom sync patterns
+ * Use this when you need more control over the sync process
+ */
+export function syncedVibeStackCustom(config: {
+  orgId: string
+  entityName: string
+  initial?: any[]
+}) {
+  console.log('[syncedVibeStackCustom] Creating synced observable with v3 API:', config)
+  
+  // Use the synced function with get/set operations for v3 compatibility
+  return synced({
+    get: async () => {
+      console.log(`[syncedVibeStackCustom] Fetching data for ${config.entityName}`)
+      
+      const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}`, {
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        console.warn(`[syncedVibeStackCustom] Failed to fetch ${config.entityName}:`, response.status)
+        return []
+      }
+      
+      const result = await response.json()
+      console.log(`[syncedVibeStackCustom] Fetched ${config.entityName} data:`, result)
+      
+      if (result.success && Array.isArray(result.data)) {
+        return result.data
+      }
+      
+      return []
+    },
+    
+    set: async ({ value, changes }) => {
+      console.log(`[syncedVibeStackCustom] Sync changes for ${config.entityName}:`, { value, changes })
+      
+      // Handle different types of changes
+      if (changes) {
+        for (const change of changes) {
+          if (change.path.length === 1 && typeof change.path[0] === 'number') {
+            // Array index change
+            const index = change.path[0]
+            const item = change.value
+            
+            if (change.valueAtPath === undefined && item) {
+              // New item
+              await createItem(config, item)
+            } else if (change.valueAtPath === undefined) {
+              // Deleted item
+              const originalItem = (value as any[])[index]
+              if (originalItem?.id) {
+                await deleteItem(config, originalItem)
+              }
+            } else {
+              // Updated item
+              await updateItem(config, item)
+            }
+          }
+        }
+      }
+      
+      return { value }
+    },
+    
+    // Enable persistence to IndexedDB  
+    persist: {
+      name: `vibestack_${config.orgId}_${config.entityName}`,
+      plugin: 'indexeddb'
+    },
+    
+    // Initial value
+    initial: config.initial || []
+  })
+}
+
+// Helper methods for CRUD operations
+async function createItem(config: { orgId: string, entityName: string }, item: any) {
+  console.log(`[syncedVibeStack] Creating ${config.entityName}:`, item)
+  
+  const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(item)
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to create ${config.entityName}: ${response.status}`)
+  }
+  
+  const result = await response.json()
+  return result.success ? result.data : item
+}
+
+async function updateItem(config: { orgId: string, entityName: string }, item: any) {
+  console.log(`[syncedVibeStack] Updating ${config.entityName}:`, item)
+  
+  const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}/${item.id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include',
+    body: JSON.stringify(item)
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to update ${config.entityName}: ${response.status}`)
+  }
+  
+  const result = await response.json()
+  return result.success ? result.data : item
+}
+
+async function deleteItem(config: { orgId: string, entityName: string }, item: any) {
+  console.log(`[syncedVibeStack] Deleting ${config.entityName}:`, item)
+  
+  const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}/${item.id}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Failed to delete ${config.entityName}: ${response.status}`)
+  }
+  
+  return undefined // Indicates successful deletion
 }
 
 export { VibeStackSyncPlugin }

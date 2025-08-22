@@ -1,6 +1,9 @@
 import type { Context as HonoContext } from 'hono';
 import type { Env, ExecutionContext } from './env';
 import type { AuthType } from '../lib/auth';
+import type { RequestCache } from '../middleware/request-cache';
+import type { HybridSecurityContext } from '../middleware/hybrid-rls-org-actor';
+import type { OrganizationActorCacheService } from '../lib/organization-actor-cache';
 
 /**
  * Type for Hono bindings that includes our environment
@@ -8,7 +11,11 @@ import type { AuthType } from '../lib/auth';
  */
 export type AppBindings = {
   Bindings: Env;
-  Variables: AuthType['Variables'];
+  Variables: AuthType['Variables'] & {
+    requestCache?: RequestCache;
+    security?: HybridSecurityContext;
+    orgActorCache?: OrganizationActorCacheService;
+  };
 };
 
 /**

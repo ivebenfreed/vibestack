@@ -14,6 +14,7 @@ import type { AppBindings } from './types/hono';
 import type { Env, ExecutionContext } from './types/env';
 import { SyncDO } from './sync/SyncDO';
 import { ReplicationDO } from './replication/ReplicationDO';
+import { OrganizationActor } from './actors/OrganizationActor';
 import { OrgSchemaDO } from './dataforge/durable-objects/OrgSchemaDO';
 import { SuperAdminDO } from './dataforge/durable-objects/SuperAdminDO';
 import { OrgAdminDO } from './dataforge/durable-objects/OrgAdminDO';
@@ -27,6 +28,7 @@ import polarWebhooksRouter from './api/polar-webhooks';
 import debugBillingRouter from './api/debug-billing';
 import { mountProtectedRoutes } from './routes/protected-routes';
 import { cloudflareSecurityStack } from './middleware/cloudflare-security';
+import { organizationActorRouter } from './routes/organization-actor';
 
 // Remove temporary auth instance
 
@@ -74,6 +76,10 @@ apiApp.use('*', cors({
 
 // Use our structured logger middleware
 apiApp.use('*', createStructuredLogger());
+
+// Add request-scoped caching middleware after logging
+import { requestCacheMiddleware } from './middleware/request-cache';
+apiApp.use('*', requestCacheMiddleware);
 
 // Add Cloudflare security middleware stack after CORS and logging
 cloudflareSecurityStack.forEach(middleware => {
@@ -200,6 +206,11 @@ apiApp.route('/', debugBillingRouter);
 // for routes mounted AFTER this middleware.
 apiApp.use('*', authMiddleware);
 
+// Apply RLS security middleware after authentication
+// DISABLED: Now using hybrid RLS+OrgActor middleware for better performance
+// import { rlsSecurityMiddleware } from './middleware/rls-security';
+// apiApp.use('*', rlsSecurityMiddleware);
+
 // Mount the auth router (which will be protected by authMiddleware)
 apiApp.route('/auth', authRouter);
 
@@ -209,6 +220,9 @@ apiApp.route('/admin', adminRouter);
 
 // Mount protected routes with mandatory context validation
 mountProtectedRoutes(apiApp);
+
+// Mount Organization Actor routes (gradual migration alongside existing sync)
+apiApp.route('/org-actor', organizationActorRouter);
 
 // Mount OTHER public API routes (which will also be protected by authMiddleware)
 apiApp.route('/', api);
@@ -253,6 +267,8 @@ const worker = {
      * 1. They need to be routed to specific Durable Object instances
      * 2. They require special response handling (101 status code)
      * 3. They use Cloudflare's WebSocket Hibernation API
+     * 
+     * Routes to Organization Actor instead of SyncDO for better per-org caching
      */
     if (url.pathname === '/api/sync') {
       // --- BEGIN CORS CHECK for /api/sync ---
@@ -350,9 +366,10 @@ const worker = {
       }
       
       // Store user context in KV for SyncDO to retrieve (now that we have clientId)
+      // NOTE: We don't store userRole here because that comes from organization_members table,
+      // not from the Better Auth user object. The SyncDO will look up the org-specific role.
       const userContext = {
         userId: authenticatedUser?.id,
-        userRole: authenticatedUser?.role,
         userEmail: authenticatedUser?.email,
         userName: authenticatedUser?.name,
         timestamp: Date.now()
@@ -463,5 +480,5 @@ const worker = {
   }
 };
 
-export { SyncDO, ReplicationDO, OrgSchemaDO, SuperAdminDO, OrgAdminDO, OrgOpsDO };
+export { SyncDO, ReplicationDO, OrganizationActor, OrgSchemaDO, SuperAdminDO, OrgAdminDO, OrgOpsDO };
 export default worker; 

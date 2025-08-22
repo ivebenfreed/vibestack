@@ -152,11 +152,11 @@ export const selectOrganizationActor = fromPromise(async ({ input }: { input: { 
 
 // Load billing info actor
 export const loadBillingActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
-  console.log('[OrganizationActors] Loading billing info for:', input.organizationId);
+  // Silently attempt to load billing info
   
   try {
     const billingInfo = await organizationAPI.getBillingInfo(input.organizationId);
-    console.log('[OrganizationActors] Loaded billing info:', billingInfo);
+    // Billing info loaded successfully
     
     return {
       success: true,
@@ -167,7 +167,10 @@ export const loadBillingActor = fromPromise(async ({ input }: { input: { organiz
       error: null
     };
   } catch (error) {
-    console.error('[OrganizationActors] Failed to load billing info:', error);
+    // Billing endpoint may not exist yet (404 is expected for new orgs)
+    if (error instanceof Error && !error.message.includes('404')) {
+      console.warn('[OrganizationActors] Billing info not available');
+    }
     
     return {
       success: false,

@@ -216,8 +216,19 @@ export class WebSocketManager {
       // Get all active WebSocket connections
       const webSockets = this.context.ctx.getWebSockets();
       
+      // Only log WebSocket send debug for non-heartbeat messages
+      if (message.type !== 'srv_heartbeat') {
+        syncLogger.info('🔍 WEBSOCKET SEND DEBUG', {
+          type: message.type,
+          messageId: message.messageId,
+          clientId: this.context.clientId,
+          webSocketCount: webSockets.length,
+          hasWebSockets: webSockets.length > 0
+        }, MODULE_NAME);
+      }
+      
       if (webSockets.length === 0) {
-        syncLogger.warn('No active WebSocket connections', {
+        syncLogger.warn('❌ NO ACTIVE WEBSOCKET CONNECTIONS', {
           type: message.type,
           messageId: message.messageId,
           clientId: this.context.clientId
@@ -265,13 +276,16 @@ export class WebSocketManager {
         try {
           ws.send(JSON.stringify(message));
           
-          // Log success only at debug level to reduce noise
-          syncLogger.debug('Message sent successfully', {
-            type: message.type,
-            messageId: message.messageId,
-            clientId: this.context.clientId,
-            wsReadyState: ws.readyState
-          }, MODULE_NAME);
+          // Only log successful sends for non-heartbeat messages
+          if (message.type !== 'srv_heartbeat') {
+            syncLogger.info('✅ MESSAGE SENT SUCCESSFULLY', {
+              type: message.type,
+              messageId: message.messageId,
+              clientId: this.context.clientId,
+              wsReadyState: ws.readyState,
+              messageSize: JSON.stringify(message).length
+            }, MODULE_NAME);
+          }
         } catch (sendError) {
           syncLogger.error('Error sending message to WebSocket', {
             type: message.type,

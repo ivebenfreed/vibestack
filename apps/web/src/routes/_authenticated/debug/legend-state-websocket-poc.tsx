@@ -162,6 +162,18 @@ function hookIntoWebSocket(webSocket: WebSocket) {
     
     // Override to handle table change notifications
     webSocket.onmessage = (event: MessageEvent) => {
+      // DEBUG: Log all incoming messages at POC level
+      try {
+        const message = JSON.parse(event.data);
+        console.log('🎯 [POC] WebSocket message received:', {
+          type: message.type,
+          messageId: message.messageId,
+          hasOriginalHandler: !!originalOnMessage
+        });
+      } catch (e) {
+        console.log('🎯 [POC] Non-JSON WebSocket message:', event.data);
+      }
+      
       // Call original handler first
       if (originalOnMessage) {
         originalOnMessage.call(webSocket, event);

@@ -72,7 +72,7 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
 let authMachineActor = (window as any).authMachineActor
 
 if (!authMachineActor) {
-  console.log('[AuthMachine] Creating new auth machine actor')
+  // Creating new auth machine actor
   
   // Add inspection in test/dev mode
   const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
@@ -85,7 +85,7 @@ if (!authMachineActor) {
   })
   
   // XState 5: Auth machine handles its own persistence - just start normally
-  console.log('[AuthMachine] Starting (persistence handled by auth machine internally)')
+  // Starting auth machine
   authMachineActor.start()
   
   // Store globally
@@ -100,28 +100,27 @@ if (!authMachineActor) {
                    snapshot.value === 'unauthenticated' ? 'unauthenticated' :
                    snapshot.value === 'signingOut' ? 'signing-out' : 'checking'
     
-    console.log('[AuthMachine] State changed:', { authenticated, reason })
+    // Auth state changed - track for initialization
     
     // 🚀 ULTRA-FAST INITIALIZATION: Start local data checking immediately when auth completes
-    if (authenticated && snapshot.matches('authenticated')) {
-      console.log('[AuthMachine] ✅ Authentication complete - starting ultra-fast initialization')
+    if (authenticated && (snapshot.matches('authenticated') || snapshot.matches('authenticated.ready'))) {
+      // Authentication complete - starting initialization
       
       const currentOrganization = snapshot.context.currentOrganization
       const hasOrganization = !!currentOrganization?.id
       
       const currentAppInitActor = (window as any).appInitActor
       if (currentAppInitActor) {
-        if (hasOrganization) {
-          console.log('[AuthMachine] 🏢 Organization ready - starting local data check for ultra-fast loading')
+        const appInitSnapshot = currentAppInitActor.getSnapshot()
+        
+        // Only send START_INIT if still idle
+        if (hasOrganization && appInitSnapshot.value === 'idle') {
+          // Organization ready - starting local data check
           // Start with organization context for local data introspection
           currentAppInitActor.send({ 
             type: 'START_INIT',
             organizationId: currentOrganization.id 
           })
-        } else {
-          console.log('[AuthMachine] ⚡ No organization yet - will trigger after organization selection')
-          // Don't start yet - wait for organization to be available
-          // The app init will be triggered when organization context is updated
         }
       } else {
         console.warn('[AuthMachine] App init actor not found - START_INIT not sent')
@@ -132,14 +131,14 @@ if (!authMachineActor) {
     if (authenticated && snapshot.matches('authenticated.ready')) {
       const currentOrganization = snapshot.context.currentOrganization
       if (currentOrganization?.id) {
-        console.log('[AuthMachine] 🏢 Organization now available - starting ultra-fast initialization')
+        // Organization now available - starting initialization
         const currentAppInitActor = (window as any).appInitActor
         if (currentAppInitActor) {
           const appInitSnapshot = currentAppInitActor.getSnapshot()
           
           // If app init is still idle and organization just became available, start initialization
           if (appInitSnapshot.value === 'idle') {
-            console.log('[AuthMachine] 🚀 Starting app initialization with organization:', currentOrganization.name)
+            // Starting app initialization with organization
             currentAppInitActor.send({ 
               type: 'START_INIT',
               organizationId: currentOrganization.id 
@@ -147,7 +146,7 @@ if (!authMachineActor) {
           } 
           // If already running but with different organization, update it
           else if (appInitSnapshot.context.organizationId !== currentOrganization.id) {
-            console.log('[AuthMachine] Updating app init with organization:', currentOrganization.name)
+            // Updating app init with organization
             currentAppInitActor.send({ 
               type: 'UPDATE_ORGANIZATION',
               organizationId: currentOrganization.id 
@@ -163,14 +162,14 @@ if (!authMachineActor) {
     }))
   })
 } else {
-  console.log('[AuthMachine] 🔥 HMR: Using existing auth machine actor')
+  // HMR: Using existing auth machine actor
 }
 
 // Create Simple Notification Sync Machine actor (only if not already exists from HMR)
 let simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
 
 if (!simpleNotificationSyncMachineActor) {
-  console.log('[SimpleNotificationSync] Creating new simple notification sync machine actor')
+  // Creating simple notification sync machine
   
   // Add inspection in test/dev mode
   const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
@@ -183,7 +182,7 @@ if (!simpleNotificationSyncMachineActor) {
   })
   
   // Simple sync machine handles notifications only
-  console.log('[SimpleNotificationSync] Starting (notification-only sync)')
+  // Starting notification sync
   simpleNotificationSyncMachineActor.start()
   
   // Store globally
@@ -212,7 +211,7 @@ if (!simpleNotificationSyncMachineActor) {
 let appInitActor = (window as any).appInitActor
 
 if (!appInitActor) {
-  console.log('[APP INIT] Creating new app init machine actor')
+  // Creating app init machine
   appInitActor = createAppInitActor()
   
   // Store globally
@@ -235,8 +234,31 @@ if (!appInitActor) {
       }))
     }
   })
+  
+  // 🚀 OPTIMIZED: If auth is already ready, start app init immediately
+  const authSnapshot = authMachineActor.getSnapshot()
+  if (authSnapshot.matches('authenticated.ready') && authSnapshot.context.currentOrganization?.id) {
+    console.log('[APP INIT] Auth already ready, starting initialization immediately')
+    appInitActor.send({ 
+      type: 'START_INIT',
+      organizationId: authSnapshot.context.currentOrganization.id 
+    })
+  }
 } else {
-  console.log('[APP INIT] 🔥 HMR: Using existing app init machine actor')
+  // HMR: Using existing app init machine
+  
+  // 🚀 OPTIMIZED: Check if we need to start init after HMR
+  const authSnapshot = authMachineActor.getSnapshot()
+  const appInitSnapshot = appInitActor.getSnapshot()
+  if (authSnapshot.matches('authenticated.ready') && 
+      authSnapshot.context.currentOrganization?.id &&
+      appInitSnapshot.value === 'idle') {
+    console.log('[APP INIT] HMR: Auth ready but app init idle, starting initialization')
+    appInitActor.send({ 
+      type: 'START_INIT',
+      organizationId: authSnapshot.context.currentOrganization.id 
+    })
+  }
 }
 
 // Dexie uses native IndexedDB, no special error handling needed

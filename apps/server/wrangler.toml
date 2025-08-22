@@ -66,10 +66,14 @@ class_name = "OrgAdminDO"
 name = "ORG_OPS"
 class_name = "OrgOpsDO"
 
+[[durable_objects.bindings]]
+name = "ORGANIZATION_ACTOR"
+class_name = "OrganizationActor"
+
 # Durable Objects migrations (for free plan compatibility)
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrgSchemaDO", "SuperAdminDO", "OrgAdminDO", "OrgOpsDO"]
+new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrgSchemaDO", "SuperAdminDO", "OrgAdminDO", "OrgOpsDO", "OrganizationActor"]
 
 # Cron triggers
 [triggers]
@@ -127,6 +131,10 @@ class_name = "OrgAdminDO"
 name = "ORG_OPS"
 class_name = "OrgOpsDO"
 
+[[env.staging.durable_objects.bindings]]
+name = "ORGANIZATION_ACTOR"
+class_name = "OrganizationActor"
+
 [env.staging.vars]
 ENVIRONMENT = "staging"
 NODE_ENV = "staging"
@@ -180,6 +188,10 @@ class_name = "OrgAdminDO"
 [[env.production.durable_objects.bindings]]
 name = "ORG_OPS"
 class_name = "OrgOpsDO"
+
+[[env.production.durable_objects.bindings]]
+name = "ORGANIZATION_ACTOR"
+class_name = "OrganizationActor"
 
 [env.production.vars]
 ENVIRONMENT = "production"

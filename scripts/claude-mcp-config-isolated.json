@@ -2,7 +2,7 @@
   "mcpServers": {
     "playwright": {
       "command": "node",
-      "args": ["/home/benfreed/vibestack/scripts/playwright-mcp-wrapper.js"],
+      "args": ["/home/ben-freed/dev/vibestack/scripts/playwright-mcp-wrapper.js"],
       "env": {}
     },
     "neon": {
