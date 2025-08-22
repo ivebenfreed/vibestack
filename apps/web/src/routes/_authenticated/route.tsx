@@ -183,6 +183,7 @@ function RouteComponent() {
 }
 
 const AuthenticatedContent = observer(function AuthenticatedContent() {
+  console.log('[AuthenticatedContent] Rendering at', Date.now());
   const { 
     isCheckingAuth,
     needsOrganizationSetup, 
@@ -192,6 +193,13 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
     organizationSetupComplete,
     user
   } = useAuth();
+  
+  console.log('[AuthenticatedContent] Auth states:', {
+    isCheckingAuth,
+    isLoadingOrganizations,
+    isAuthenticatedAndReady,
+    organizationSetupComplete
+  });
   
   const currentOrgId = user?.currentOrganizationId;
   const [isInitialLoad, setIsInitialLoad] = React.useState(true);

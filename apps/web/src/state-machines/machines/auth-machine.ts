@@ -136,26 +136,36 @@ export const authMachine = setup({
     setUserOrganizations: assign({
       userOrganizations: ({ event }) => event.output?.organizations || [],
       organizationError: event => event.output?.error || null,
-      // Validate that currentOrganization is still valid
+      // Set or validate currentOrganization
       currentOrganization: ({ context, event }) => {
         const organizations = event.output?.organizations || [];
-        const currentOrgId = context.currentOrganization?.id;
         
-        // If no current org, return null
-        if (!currentOrgId) return null;
-        
-        // Check if current org is in the loaded organizations
-        const validOrg = organizations.find(org => org.id === currentOrgId);
-        
-        if (!validOrg) {
-          console.log('[AuthMachine] Current organization no longer valid, clearing:', currentOrgId);
-          // Clear invalid org from localStorage too
+        // First, try to restore from localStorage (might have been set by org switcher)
+        const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
+        if (lastOrgId) {
+          const validOrg = organizations.find(org => org.id === lastOrgId);
+          if (validOrg) {
+            console.log('[AuthMachine] Restored last selected organization:', validOrg.name);
+            return validOrg;
+          }
+          // Clear invalid org from localStorage
+          console.log('[AuthMachine] Last organization no longer valid, clearing:', lastOrgId);
           localStorage.removeItem('vibestack-last-organization-id');
-          return null;
         }
         
-        // Update with fresh org data from server
-        return validOrg;
+        // If we have a current org in context (shouldn't happen with our fix), validate it
+        const currentOrgId = context.currentOrganization?.id;
+        if (currentOrgId) {
+          const validOrg = organizations.find(org => org.id === currentOrgId);
+          if (validOrg) {
+            return validOrg;
+          }
+          console.log('[AuthMachine] Current organization no longer valid, clearing:', currentOrgId);
+        }
+        
+        // No valid org found - don't auto-select, let user choose
+        console.log('[AuthMachine] No valid organization found, user needs to select one');
+        return null;
       },
     }),
 
@@ -317,9 +327,10 @@ export const authMachine = setup({
       lastActivity: persistedContext?.lastActivity || Date.now(),
       errorRetryCount: 0,
       
-      // Organization context from persisted state
-      currentOrganization: persistedContext?.currentOrganization || null,
-      userOrganizations: persistedContext?.userOrganizations || [],
+      // Organization context - DON'T restore currentOrganization until we validate it exists
+      // This prevents the org mismatch bug when localStorage is cleared but auth persists
+      currentOrganization: null, // Will be set after loading organizations
+      userOrganizations: [], // Will be loaded fresh
       organizationError: null,
       isLoadingOrganizations: false,
       organizationSetupComplete: persistedContext?.organizationSetupComplete || false,

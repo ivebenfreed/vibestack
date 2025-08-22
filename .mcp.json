@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "node",
+      "args": ["./scripts/playwright-mcp-wrapper.js"],
+      "env": {}
+    }
+  }
+}

@@ -48,6 +48,7 @@ const topNav = [
 const DashboardLegend = observer(function DashboardLegend() {
   const [activeTab, setActiveTab] = React.useState('overview');
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [dataReady, setDataReady] = React.useState(false);
   const { currentOrganization, user } = useAuth();
   const currentOrgId = currentOrganization?.id;
   const userId = user?.id;
@@ -65,23 +66,56 @@ const DashboardLegend = observer(function DashboardLegend() {
     }
   }, [currentOrgId, userId])
 
-  // Signal that the Dashboard is ready for Playwright tests
-  usePlaywrightReady(loading ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
+  // Track when schema is ready - don't wait for data loading
+  useEffect(() => {
+    if (!schema?.entities || loading) {
+      setDataReady(false);
+      return;
+    }
 
-  if (loading) {
-    // Show a full-screen loading state that prevents white flash
+    const entityNames = Object.keys(schema.entities);
+    
+    // Trigger entity store creation which will load cached data immediately
+    // and fetch updates in the background
+    entityNames.forEach(entityName => {
+      const store = entity$(entityName);
+      // Access the store to trigger the initial fetch (cached data loads immediately)
+      store.get();
+    });
+
+    // Mark as ready immediately since cached data loads synchronously
+    // The stores will update themselves when fresh data arrives
+    setDataReady(true);
+  }, [schema, loading]);
+
+  // Signal that the Dashboard is ready for Playwright tests
+  usePlaywrightReady(loading || !dataReady ? undefined : '[PLAYWRIGHT_READY] Dashboard loaded');
+
+  // Show loading until schema AND entity data is loaded
+  if (loading || !dataReady) {
+    // Use UnifiedLoadingScreen for consistency
     return (
-      <div className="fixed inset-0 bg-background flex items-center justify-center z-40">
-        <div className="text-center space-y-4">
-          <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto">
-            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-          <div className="space-y-2">
-            <p className="text-lg font-medium">Loading your workspace</p>
-            <p className="text-sm text-muted-foreground">Fetching organization data...</p>
+      <ContentContainer>
+        <div className='mb-2 flex items-center justify-between space-y-2'>
+          <div>
+            <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
+            <TopNav links={topNav} className="mt-2" />
           </div>
         </div>
-      </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-medium">Loading your workspace</p>
+              <p className="text-sm text-muted-foreground">
+                {loading ? 'Fetching organization schema...' : 'Loading entity data...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </ContentContainer>
     );
   }
 

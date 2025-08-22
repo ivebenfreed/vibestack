@@ -72,7 +72,7 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
 let authMachineActor = (window as any).authMachineActor
 
 if (!authMachineActor) {
-  // Creating new auth machine actor
+  console.log('[ROOT] Creating new auth machine actor at', Date.now());
   
   // Add inspection in test/dev mode
   const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
@@ -84,8 +84,7 @@ if (!authMachineActor) {
     id: 'auth-machine'
   })
   
-  // XState 5: Auth machine handles its own persistence - just start normally
-  // Starting auth machine
+  console.log('[ROOT] Auth machine created, starting...');
   authMachineActor.start()
   
   // Store globally
@@ -312,17 +311,17 @@ window.addEventListener('auth:signout', () => {
 export const Route = createRootRouteWithContext<RouterContext>()({
   // 🎯 LOADING COMPONENT: Show loading during navigation (intent preloading)
   pendingComponent: () => (
-    <div className="h-svh w-full flex items-center justify-center">
-      <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+    <div className="h-svh w-full flex items-center justify-center bg-zinc-950">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
         <div className="flex items-center gap-3 mb-4">
-          <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <h1 className="text-xl font-semibold">Loading Page</h1>
+          <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <h1 className="text-xl font-semibold text-zinc-100">Loading Page</h1>
         </div>
         <div className="text-center space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">
+          <p className="text-sm font-medium text-zinc-400">
             Loading components...
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-zinc-500">
             This will be faster next time
           </p>
         </div>
@@ -330,6 +329,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     </div>
   ),
   component: function RootComponent() {
+    console.log('[ROOT] RootComponent rendering at', Date.now());
     return (
       <InitializationErrorBoundary>
         {/* 🔥 FIXED: No provider needed - using direct actor access */}
@@ -342,6 +342,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 
 function RootComponentInternal() {
+  console.log('[ROOT] RootComponentInternal rendering at', Date.now());
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
   
@@ -370,10 +371,12 @@ function RootComponentInternal() {
 }
 
 function AppWithInitialization() {
+  console.log('[ROOT] AppWithInitialization rendering at', Date.now());
   const navigate = useNavigate()
   const router = useRouter()
   const { isSystemReady } = useSystem()
   const { isAuthenticated } = useAuth()
+  console.log('[ROOT] AppWithInitialization states:', { isSystemReady, isAuthenticated });
   
   // Listen for auth state changes to handle navigation
   React.useEffect(() => {

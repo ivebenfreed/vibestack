@@ -8,6 +8,9 @@ enableReactTracking({
   warnUnobserved: true
 });
 
+// Note: Legend State persistence is initialized in app-init-machine
+// during the database initialization phase for proper sequencing
+
 // Debug utilities (only in development)
 if (process.env.NODE_ENV === 'development') {
   // Commented out - file needs to be updated for new architecture
@@ -177,7 +180,9 @@ function AppWithRouterContext() {
 
 function renderApp(rootElement: HTMLElement) {
   console.log("🔍 [MAIN] Creating React root and rendering app");
+  
   const root = ReactDOM.createRoot(rootElement)
+  
   root.render(
     <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
       <FontProvider>

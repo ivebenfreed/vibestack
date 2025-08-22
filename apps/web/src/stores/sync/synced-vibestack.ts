@@ -8,8 +8,8 @@
  * - All CRUD operations use standard VibeStack API endpoints
  */
 
-import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { type SyncedCrudOptions } from '@legendapp/state/sync-plugins/crud'
+import { getConfiguredSyncedCrud } from './configure-legend-state'
 
 export interface VibeStackSyncConfig {
   orgId: string
@@ -17,6 +17,7 @@ export interface VibeStackSyncConfig {
   schema?: any // Will use schema observable to derive endpoints
   softDelete?: boolean
   optimisticUpdates?: boolean
+  onDataLoaded?: (entityName: string, data: any[]) => void
 }
 
 /**
@@ -24,13 +25,20 @@ export interface VibeStackSyncConfig {
  * Uses Legend State's built-in differential sync with proper mode handling
  */
 export function syncedVibeStack(config: VibeStackSyncConfig): SyncedCrudOptions {
-  const { orgId, entityName, schema, softDelete = true, optimisticUpdates = true } = config
+  const { orgId, entityName, schema, softDelete = true, optimisticUpdates = true, onDataLoaded } = config
   
   // Derive URL from schema if available, otherwise use standard pattern
   const baseUrl = schema?.endpoints?.[entityName]?.base || 
                   `/api/archetype/orgs/${orgId}/data/${entityName}`
   
-  return syncedCrud({
+  // Get all entity names from schema for IndexedDB table configuration
+  const entityNames = schema?.entities ? Object.keys(schema.entities) : [entityName]
+  
+  // Get configured syncedCrud with IndexedDB persistence
+  const configuredSyncedCrud = getConfiguredSyncedCrud(orgId, entityNames)
+  
+  // Use the configured syncedCrud with our custom settings
+  return configuredSyncedCrud({
     // LIST - Let Legend State handle differential sync automatically
     list: async (params) => {
       console.log(`[syncedVibeStack] Loading ${entityName} data...`, { 
@@ -71,6 +79,12 @@ export function syncedVibeStack(config: VibeStackSyncConfig): SyncedCrudOptions 
         const data = result.data || []
         
         console.log(`[syncedVibeStack] Loaded ${data.length} ${entityName} records`)
+        
+        // Notify when data is loaded
+        if (onDataLoaded) {
+          onDataLoaded(entityName, data)
+        }
+        
         return data
         
       } catch (error) {
@@ -194,6 +208,8 @@ export function syncedVibeStack(config: VibeStackSyncConfig): SyncedCrudOptions 
     },
     
     // Enable Legend State's built-in differential sync
+    // This will store the last sync timestamp in localStorage
+    // and only fetch changes since that time on subsequent loads
     changesSince: 'last-sync',
     
     // Field configuration for built-in differential sync and soft deletes
@@ -205,14 +221,14 @@ export function syncedVibeStack(config: VibeStackSyncConfig): SyncedCrudOptions 
     // Generate IDs client-side for optimistic updates
     generateId: () => crypto.randomUUID(),
     
-    // Persistence disabled due to WeakMap compatibility issues
-    // persist: {
-    //   name: `vibestack_${orgId}_${entityName}`,
-    //   plugin: 'indexeddb'
-    // },
+    // Persistence is already configured in getConfiguredSyncedCrud
+    // Just specify the table name for this entity
+    persist: {
+      name: entityName // Use entity name as the IndexedDB table name
+    },
     
-    // Configure for array-based data
-    as: 'array',
+    // Configure for object-based data (keys are IDs)
+    as: 'object',
     
     // Enable optimistic updates for instant UI feedback
     updateLocal: optimisticUpdates,
@@ -231,8 +247,8 @@ export function syncedVibeStack(config: VibeStackSyncConfig): SyncedCrudOptions 
       save: 1000
     },
     
-    // Initial value - empty array for array-based syncedCrud
-    initial: []
+    // Initial value - empty object for object-based syncedCrud
+    initial: {}
   })
 }
 
@@ -257,6 +273,7 @@ export function syncedVibeStackWithSchema(
     schema,
     softDelete: entityConfig.softDelete ?? overrides?.softDelete ?? true,
     optimisticUpdates: entityConfig.optimisticUpdates ?? overrides?.optimisticUpdates ?? true,
+    onDataLoaded: overrides?.onDataLoaded,
     ...overrides
   }
   

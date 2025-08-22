@@ -80,25 +80,26 @@ export function entity$(entityName: string) {
       {
         changesSince: 'last-sync',  // Enable diff syncing
         softDelete: true,            // Enable soft deletes
-        optimisticUpdates: true      // Enable optimistic updates
+        optimisticUpdates: true,     // Enable optimistic updates
+        onDataLoaded: (name, data) => {
+          // Mark as loaded when data arrives
+          if (name === entityName) {
+            batch(() => {
+              loadingState.isLoading.set(false)
+              loadingState.hasLoaded.set(true)
+              loadingState.error.set(null)
+            })
+            console.log(`[Legend Central] Entity ${entityName} marked as loaded with ${data.length} records`)
+          }
+        }
       }
     )
     
-    // Don't wrap the list function - let syncedCrud handle its own activation
-    // Instead, track loading state through subscription
+    // Create the store with syncConfig
     const store = observable(syncConfig)
     
-    // Track loading state through the observable itself
-    observe(() => {
-      const data = store.get()
-      const hasData = data && typeof data === 'object' && Object.keys(data).length > 0
-      
-      batch(() => {
-        loadingState.isLoading.set(false)
-        loadingState.hasLoaded.set(true)
-        loadingState.error.set(null)
-      })
-    })
+    // Don't mark as loaded yet - wait for actual data
+    // The loadingState will be updated when data arrives
     
     entityStores.set(storeKey, store)
   }

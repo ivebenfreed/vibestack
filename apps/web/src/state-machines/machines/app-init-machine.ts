@@ -357,10 +357,32 @@ export const appInitMachine = setup({
     startBackgroundInitialization: ({ context }) => {
       // console.log('[AppInitMachine] 🚀 Starting background processes (DB + Sync) in parallel');
       
-      // Start database initialization in background
+      // Start Legend State persistence initialization in background
       setTimeout(() => {
-        console.log('[AppInitMachine] 📊 Background: Starting database initialization');
-        window.dispatchEvent(new CustomEvent('database:init'));
+        console.log('[AppInitMachine] 📊 Background: Starting Legend State persistence initialization');
+        
+        // Initialize Legend State persistence with dynamic schema
+        import('../../stores/sync/configure-legend-state').then(({ initializePersistence }) => {
+          // Get the schema from org context
+          const orgContext = (window as any).legendCentral?.orgContext$;
+          const orgId = context.organizationId;
+          const schema = orgContext?.schema?.get();
+          
+          if (orgId && schema) {
+            initializePersistence(orgId, schema);
+            console.log('[AppInitMachine] ✅ Legend State persistence initialized with schema entities');
+          } else {
+            console.warn('[AppInitMachine] ⚠️ Missing orgId or schema for persistence initialization');
+          }
+          
+          // Dispatch database ready event since persistence is our "database"
+          window.dispatchEvent(new CustomEvent('database:ready'));
+        }).catch((error) => {
+          console.error('[AppInitMachine] ❌ Failed to initialize Legend State persistence:', error);
+          window.dispatchEvent(new CustomEvent('database:error', { 
+            detail: { error: error.message || 'Failed to initialize persistence' }
+          }));
+        });
       }, 0);
       
       // Start sync after a brief delay to allow database to begin
