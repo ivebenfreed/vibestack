@@ -8,14 +8,14 @@ import { TopNav } from '@/components/layout/top-nav'
 import { useAuth } from '@/lib/auth'
 import { EntityCreationDialog } from './EntityCreationDialog'
 import { EntityCard } from './EntityCard'
+import { QuickEntityCreate } from './QuickEntityCreate'
 import { PlusCircle } from 'lucide-react'
 import { 
-  orgContext$, 
-  entity$,
-  entityLoading$,
-  entityGroups$, 
-  loadOrgContext 
-} from '@/stores/vibestack-legend-central'
+  orgContext$,
+  getEntity$,
+  loadOrgContext
+} from '@/legend-state'
+import { deleteEntitySchema } from '@/stores/mutation-helpers'
 import { use$ } from '@legendapp/state/react'
 
 const topNav = [
@@ -75,16 +75,8 @@ const DashboardLegend = observer(function DashboardLegend() {
 
     const entityNames = Object.keys(schema.entities);
     
-    // Trigger entity store creation which will load cached data immediately
-    // and fetch updates in the background
-    entityNames.forEach(entityName => {
-      const store = entity$(entityName);
-      // Access the store to trigger the initial fetch (cached data loads immediately)
-      store.get();
-    });
-
-    // Mark as ready immediately since cached data loads synchronously
-    // The stores will update themselves when fresh data arrives
+    // Entity observables are created lazily by getEntity$ when components access them
+    // No need to pre-trigger them here as syncedCrud will handle loading automatically
     setDataReady(true);
   }, [schema, loading]);
 
@@ -127,7 +119,8 @@ const DashboardLegend = observer(function DashboardLegend() {
           <TopNav links={topNav} className="mt-2" />
         </div>
         <div className='flex items-center space-x-2'>
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <QuickEntityCreate />
+          <Button onClick={() => setCreateDialogOpen(true)} variant="outline">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Entity Type
           </Button>
@@ -169,9 +162,10 @@ const DashboardLegend = observer(function DashboardLegend() {
 })
 
 const DashboardContent = observer(function DashboardContent() {
-  // Use Legend State observables directly
+  // Use the schema from the observable
   const schema = use$(orgContext$.schema)
-  const entityGroups = use$(entityGroups$)
+
+  console.log('[Dashboard] Using schema:', schema)
 
   if (!schema?.entities) {
     return (
@@ -182,6 +176,7 @@ const DashboardContent = observer(function DashboardContent() {
   }
 
   const entityList = Object.keys(schema.entities)
+  console.log('[Dashboard] Entity list from schema:', entityList)
 
   if (entityList.length === 0) {
     return (
@@ -212,14 +207,16 @@ const EntityCardWithData = observer(function EntityCardWithData({
   entityName: string
   entityDef: any
 }) {
+  const { currentOrganization } = useAuth()
+  
   // Access the entity store which triggers loading
-  const entityStore = entity$(entityName)
-  const loadingState = entityLoading$(entityName)
+  const entityStore = getEntity$(entityName)
   
   // Get the data - this triggers the syncedCrud fetch
   const data = use$(entityStore)
-  const isLoading = use$(loadingState.isLoading)
-  const hasLoaded = use$(loadingState.hasLoaded)
+  // Note: Loading state is handled internally by syncedCrud
+  const isLoading = false // Simplified for now
+  const hasLoaded = true // Simplified for now
   
   // syncedCrud returns an object with IDs as keys, not an array
   let count = 0
@@ -232,11 +229,29 @@ const EntityCardWithData = observer(function EntityCardWithData({
   // This prevents the "0 records" flash on reload
   const displayCount = !hasLoaded && isLoading ? '...' : count.toString()
   
+  // Handle entity deletion using Legend State optimistic updates
+  const handleDelete = async (entityName: string) => {
+    console.log(`[Dashboard] Deleting entity type: ${entityName}`)
+    
+    try {
+      // Use Legend State optimistic delete - UI updates immediately
+      await deleteEntitySchema(entityName)
+      console.log(`[Dashboard] Successfully deleted entity type: ${entityName}`)
+      
+      // The entity disappears immediately due to optimistic updates
+      // Background sync will handle the server-side deletion
+    } catch (error) {
+      console.error(`[Dashboard] Failed to delete entity ${entityName}:`, error)
+      throw error
+    }
+  }
+  
   return (
     <EntityCard 
       entityName={entityName}
       entityDef={entityDef}
       count={displayCount}
+      onDelete={handleDelete}
     />
   )
 })
