@@ -39,7 +39,7 @@ export interface SchemaLoadResult {
 export class OrgSchemaClient {
   private cache = new Map<string, { schema: OrgEntitySchema; timestamp: number }>();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private readonly BASE_URL = '/api/archetype';
+  private readonly BASE_URL = '/api/dataforge';
 
 
   /**

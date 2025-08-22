@@ -8,8 +8,8 @@ enableReactTracking({
   warnUnobserved: true
 });
 
-// Note: Legend State persistence is initialized in app-init-machine
-// during the database initialization phase for proper sequencing
+// Note: Legend State persistence is configured per-observable in observables.ts
+// using configureSynced(syncedCrud, persistOptions) pattern
 
 // Debug utilities (only in development)
 if (process.env.NODE_ENV === 'development') {

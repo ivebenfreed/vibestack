@@ -12,8 +12,7 @@ import { QuickEntityCreate } from './QuickEntityCreate'
 import { PlusCircle } from 'lucide-react'
 import { 
   orgContext$,
-  getEntity$,
-  loadOrgContext
+  getEntity$
 } from '@/legend-state'
 import { deleteEntitySchema } from '@/stores/mutation-helpers'
 import { use$ } from '@legendapp/state/react'
@@ -57,14 +56,8 @@ const DashboardLegend = observer(function DashboardLegend() {
   const loading = use$(orgContext$.loading);
   const schema = use$(orgContext$.schema);
 
-  // Initialize Legend State store when organization changes
-  useEffect(() => {
-    if (currentOrgId && userId) {
-      loadOrgContext(currentOrgId, userId).catch(error => {
-        console.error('[Dashboard] Failed to load org context:', error)
-      })
-    }
-  }, [currentOrgId, userId])
+  // Components should only consume observables, not trigger loads
+  // Loading is handled by auth state machines
 
   // Track when schema is ready - don't wait for data loading
   useEffect(() => {

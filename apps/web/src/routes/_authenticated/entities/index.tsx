@@ -50,7 +50,7 @@ import {
   Library,
   Save
 } from 'lucide-react';
-import { orgContext$, getEntity$, loadOrgContext } from '@/legend-state';
+import { orgContext$, getEntity$ } from '@/legend-state';
 import { useAuth } from '@/lib/auth';
 import { QuickEntityCreate } from '@/features/dashboard/QuickEntityCreate';
 import { Link } from '@tanstack/react-router';
@@ -81,12 +81,8 @@ const EntitiesListPage = observer(function EntitiesListPage() {
   const schema = use$(orgContext$.schema);
   const orgId = use$(orgContext$.orgId);
   
-  // Load org context if not loaded
-  useEffect(() => {
-    if (currentOrganization?.id && user?.id && !orgId) {
-      loadOrgContext(currentOrganization.id, user.id);
-    }
-  }, [currentOrganization?.id, user?.id, orgId]);
+  // Components should only consume observables, not trigger loads
+  // Loading is handled by auth state machines
   
   // Create a computed observable that aggregates all entity data
   const entitiesData$ = useMemo(() => {

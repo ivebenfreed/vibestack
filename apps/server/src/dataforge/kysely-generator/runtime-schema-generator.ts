@@ -199,19 +199,68 @@ export interface ${this.toPascal(schema.orgId)}SyncDatabase {
   /**
    * Generate SQL DDL for creating org table
    */
-  generateCreateTableSQL(definition: OrgEntityDefinition): string {
-    const baseColumns = this.getBaseArchetypeColumns(definition.extends);
-    const customColumns = this.generateCustomColumns(definition.customFields);
+  generateCreateTableSQL(definition: any): string {
+    // Generate columns from fields array directly
+    const columns = this.generateColumnsFromFields(definition.fields);
+    
+    // Always add system columns
+    const systemColumns = `
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id TEXT NOT NULL,
+  created_by_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()`;
     
     return `
-CREATE TABLE ${definition.tableName} (
-  ${baseColumns}${customColumns ? ',\n  ' + customColumns : ''}
+CREATE TABLE ${definition.tableName} (${systemColumns},
+  ${columns}
 );
 
 -- Indexes for performance
-CREATE INDEX idx_${definition.tableName}_org_status ON ${definition.tableName}(organization_id, status);
+CREATE INDEX idx_${definition.tableName}_org_status ON ${definition.tableName}(organization_id);
 CREATE INDEX idx_${definition.tableName}_created_at ON ${definition.tableName}(created_at);
 `;
+  }
+  
+  /**
+   * Generate SQL columns from field definitions
+   */
+  private generateColumnsFromFields(fields: any[]): string {
+    return fields.map(field => {
+      const sqlType = this.mapFieldTypeToSQL(field.type);
+      const nullable = field.required ? ' NOT NULL' : '';
+      const defaultValue = field.defaultValue ? ` DEFAULT '${field.defaultValue}'` : '';
+      const columnName = this.camelToSnake(field.name);
+      return `${columnName} ${sqlType}${nullable}${defaultValue}`;
+    }).join(',\n  ');
+  }
+  
+  /**
+   * Map field types to SQL types
+   */
+  private mapFieldTypeToSQL(fieldType: string): string {
+    const typeMap: Record<string, string> = {
+      'text': 'VARCHAR(255)',
+      'longtext': 'TEXT',
+      'rich_text': 'TEXT',
+      'number': 'NUMERIC',
+      'decimal': 'DECIMAL(10,2)',
+      'integer': 'INTEGER',
+      'boolean': 'BOOLEAN',
+      'date': 'DATE',
+      'datetime': 'TIMESTAMPTZ',
+      'email': 'VARCHAR(255)',
+      'url': 'TEXT',
+      'json': 'JSONB',
+      'status_option': 'VARCHAR(50)',
+      'priority_option': 'VARCHAR(50)',
+      'category_option': 'VARCHAR(100)',
+      'discussion_type_option': 'VARCHAR(100)',
+      'user_reference': 'UUID',
+      'entity_reference': 'UUID'
+    };
+    
+    return typeMap[fieldType] || 'TEXT';
   }
 
   /**
@@ -240,7 +289,7 @@ CREATE INDEX idx_${definition.tableName}_created_at ON ${definition.tableName}(c
 
       case 'base_tasks':
         return baseColumns + `,
-  project_id UUID NOT NULL,
+  project_id UUID,
   description TEXT,
   priority VARCHAR(50) DEFAULT 'medium',
   start_date DATE,
@@ -259,6 +308,64 @@ CREATE INDEX idx_${definition.tableName}_created_at ON ${definition.tableName}(c
   email VARCHAR(255),
   phone VARCHAR(50),
   company VARCHAR(255)`;
+      
+      case 'base_records':
+        // Record archetype: structured data entities
+        return baseColumns + `,
+  description TEXT,
+  record_type VARCHAR(255) NOT NULL,
+  data JSONB,
+  parent_record_id UUID,
+  owner_id UUID`;
+      
+      case 'base_documents':
+        // Document archetype: text documents and notes
+        return baseColumns + `,
+  title VARCHAR(255) NOT NULL,
+  content TEXT,
+  category VARCHAR(100),
+  author_id UUID,
+  parent_document_id UUID`;
+      
+      case 'base_files':
+        // File archetype: file storage and assets
+        return baseColumns + `,
+  file_path TEXT NOT NULL,
+  mime_type VARCHAR(255) NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  uploaded_by UUID`;
+      
+      case 'base_activities':
+        // Activity archetype: events and logs
+        return baseColumns + `,
+  activity_type VARCHAR(100) NOT NULL,
+  description TEXT,
+  entity_type VARCHAR(100),
+  entity_id VARCHAR(255),
+  actor_id UUID,
+  metadata JSONB`;
+      
+      case 'base_discussions':
+        // Discussion archetype: conversations and threads
+        return baseColumns + `,
+  title VARCHAR(255) NOT NULL,
+  content TEXT,
+  discussion_type VARCHAR(100),
+  author_id UUID,
+  parent_discussion_id UUID`;
+      
+      case 'base_collections':
+        // Collection archetype: groups of related items
+        return baseColumns + `,
+  description TEXT,
+  collection_type VARCHAR(100) NOT NULL,
+  items JSONB,
+  owner_id UUID`;
+      
+      case 'base_entities':
+        // Generic fallback (shouldn't be used anymore)
+        return baseColumns + `,
+  description TEXT`;
 
       default:
         return baseColumns;

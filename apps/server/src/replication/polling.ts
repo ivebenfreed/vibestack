@@ -284,6 +284,28 @@ export class PollingManager {
             if (walChange.table) {
               const tableName = walChange.table;
               
+              // Special handling for entity_schemas table
+              if (tableName === 'entity_schemas') {
+                // For entity_schemas changes, notify all organizations
+                // The actual org_id is in the row data
+                if (walChange.columnvalues && walChange.columnvalues[0]) {
+                  // org_id is typically the first column
+                  const orgId = walChange.columnvalues[0];
+                  tablesChanged.add('entity_schemas');
+                  organizationsNotified.add(orgId);
+                  
+                  replicationLogger.info('Entity schema change detected', {
+                    tableName,
+                    orgId,
+                    lsn: change.lsn
+                  }, MODULE_NAME);
+                  
+                  // Send special notification for schema changes
+                  const notificationsSent = await this.sendTableChangeNotification(orgId, ['entity_schemas'], change.lsn);
+                  clientsNotified += notificationsSent;
+                }
+              }
+              
               // Extract organization ID from table name (e.g., "org_01920000_1000_7000_8000_000000000001_project")
               const orgMatch = tableName.match(/^org_([0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})_(.+)$/i);
               if (orgMatch) {

@@ -18,7 +18,8 @@ const BASE_TRACKED_TABLES = [
   'organization_member',
   'session',
   'account',
-  'verification'
+  'verification',
+  'entity_schemas'  // Track schema changes for real-time UI updates
 ];
 
 // System tables (never tracked)

@@ -164,8 +164,16 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
 
 /**
  * Load organization context and initialize entity stores
+ * This should only be called by auth state machines, not components
  */
 export async function loadOrgContext(orgId: string, userId: string) {
+  // Guard: Don't reload if already loaded with same org
+  const currentContext = orgContext$.peek()
+  if (currentContext.orgId === orgId && currentContext.userId === userId && currentContext.schema) {
+    console.log(`[Observable] Context already loaded for ${orgId}, skipping reload`)
+    return
+  }
+  
   console.log(`[Observable] Loading org context for ${orgId}`)
   
   // Update loading state

@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { orgData$, switchToOrganization } from '@/stores/org-data-store'
+import { useAuth } from '@/lib/auth'
+import { createEntitySchema } from '@/stores/mutation-helpers'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
@@ -28,15 +29,16 @@ interface EntityCreationDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-// Available archetypes for entity types
+// Available archetypes for entity types (DataForge 8 core archetypes)
 const ARCHETYPES = [
-  { value: 'project', label: 'Project-based Entity' },
-  { value: 'task', label: 'Task-based Entity' },
-  { value: 'document', label: 'Document-based Entity' },
-  { value: 'file', label: 'File-based Entity' },
-  { value: 'discussion', label: 'Discussion-based Entity' },
-  { value: 'record', label: 'Generic Record Entity' },
-  { value: 'activity', label: 'Activity-based Entity' },
+  { value: 'project', label: 'Project', icon: '📁', description: 'Manages projects and initiatives' },
+  { value: 'task', label: 'Task', icon: '✅', description: 'Individual work items and actions' },
+  { value: 'record', label: 'Record', icon: '💾', description: 'Structured data entities' },
+  { value: 'document', label: 'Document', icon: '📄', description: 'Text documents and notes' },
+  { value: 'file', label: 'File', icon: '📎', description: 'File storage and assets' },
+  { value: 'activity', label: 'Activity', icon: '⚡', description: 'Events and activity tracking' },
+  { value: 'discussion', label: 'Discussion', icon: '💬', description: 'Conversations and threads' },
+  { value: 'collection', label: 'Collection', icon: '📚', description: 'Groups of related items' },
 ]
 
 // Default fields for each archetype (excluding base fields like 'name' which are already included)
@@ -80,6 +82,11 @@ const ARCHETYPE_DEFAULT_FIELDS: Record<string, Array<{ name: string; type: strin
     { name: 'start_time', type: 'datetime' },
     { name: 'end_time', type: 'datetime' },
   ],
+  'collection': [
+    // 'name' is already in base
+    { name: 'description', type: 'longtext' },
+    { name: 'collection_type', type: 'text', required: true },
+  ],
 }
 
 export const EntityCreationDialog = observer(function EntityCreationDialog({ 
@@ -90,14 +97,14 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
   const [selectedArchetype, setSelectedArchetype] = useState<string>('')
   const [creating, setCreating] = useState(false)
   
-  const currentOrgId = orgData$.currentOrgId.get()
+  const { currentOrganization } = useAuth()
   
   const handleArchetypeChange = (archetype: string) => {
     setSelectedArchetype(archetype)
   }
   
   const handleCreate = async () => {
-    if (!entityName || !selectedArchetype || !currentOrgId) return
+    if (!entityName || !selectedArchetype || !currentOrganization) return
     
     // Validate entity name
     if (!entityName.match(/^[A-Z][a-zA-Z0-9]*$/)) {
@@ -124,36 +131,36 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
         }))
       }
       
-      const response = await fetch(`/api/archetype/orgs/${currentOrgId}/entities`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          entityName,
-          definition
-        })
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || error.message || 'Failed to create entity type')
+      // Create entity schema data that matches the entity_schemas table structure
+      const entitySchemaData = {
+        entity_name: entityName,
+        org_id: currentOrganization.id,
+        archetype: selectedArchetype,
+        table_name: `${currentOrganization.id}_${entityName.toLowerCase()}`,
+        definition: definition,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted: false
       }
       
-      const result = await response.json()
-      
-      toast.success('Entity Type Created', {
-        description: `Successfully created new entity type: ${entityName}`
+      // Use optimistic mutation - entity appears immediately in UI
+      await createEntitySchema(entitySchemaData, {
+        onSuccess: () => {
+          toast.success('Entity Type Created', {
+            description: `Successfully created new entity type: ${entityName}`
+          })
+          
+          // Reset form and close dialog
+          setEntityName('')
+          setSelectedArchetype('')
+          onOpenChange(false)
+        },
+        onError: (error) => {
+          toast.error('Creation Failed', {
+            description: error.message || 'Failed to create entity type'
+          })
+        }
       })
-      
-      // Reload the schema to show the new entity type
-      await switchToOrganization(currentOrgId)
-      
-      // Reset form and close dialog
-      setEntityName('')
-      setSelectedArchetype('')
-      onOpenChange(false)
     } catch (error) {
       toast.error('Creation Failed', {
         description: error instanceof Error ? error.message : 'Failed to create entity type'
@@ -198,7 +205,13 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
               <SelectContent>
                 {ARCHETYPES.map(archetype => (
                   <SelectItem key={archetype.value} value={archetype.value}>
-                    {archetype.label}
+                    <div className="flex items-center gap-2">
+                      <span>{archetype.icon}</span>
+                      <div>
+                        <div className="font-medium">{archetype.label}</div>
+                        <div className="text-xs text-muted-foreground">{archetype.description}</div>
+                      </div>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>

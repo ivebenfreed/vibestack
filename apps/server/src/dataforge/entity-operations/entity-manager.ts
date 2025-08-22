@@ -274,6 +274,12 @@ export class EntityManager {
           'business_metadata'
         ])
         .where('org_id', '=', orgId)
+        .where((eb) => 
+          eb.or([
+            eb('deleted', '=', false),
+            eb('deleted', 'is', null)
+          ])
+        )
         .execute();
 
       if (entities.length === 0) {

@@ -2,56 +2,53 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Plus, Settings, BarChart3 } from 'lucide-react'
+import { 
+  Plus, 
+  Settings, 
+  BarChart3,
+  FolderOpen,
+  CheckSquare,
+  Database,
+  FileText,
+  File,
+  Activity,
+  MessageCircle,
+  Layers
+} from 'lucide-react'
+
+// DataForge archetype configuration
+const ARCHETYPE_CONFIG = {
+  project: { icon: FolderOpen, color: 'bg-blue-500/10 text-blue-600 border-blue-600/20', label: 'Project' },
+  task: { icon: CheckSquare, color: 'bg-green-500/10 text-green-600 border-green-600/20', label: 'Task' },
+  record: { icon: Database, color: 'bg-purple-500/10 text-purple-600 border-purple-600/20', label: 'Record' },
+  document: { icon: FileText, color: 'bg-yellow-500/10 text-yellow-600 border-yellow-600/20', label: 'Document' },
+  file: { icon: File, color: 'bg-orange-500/10 text-orange-600 border-orange-600/20', label: 'File' },
+  activity: { icon: Activity, color: 'bg-red-500/10 text-red-600 border-red-600/20', label: 'Activity' },
+  discussion: { icon: MessageCircle, color: 'bg-pink-500/10 text-pink-600 border-pink-600/20', label: 'Discussion' },
+  collection: { icon: Layers, color: 'bg-indigo-500/10 text-indigo-600 border-indigo-600/20', label: 'Collection' },
+}
 
 interface UniversalEntityPageProps {
   entityName: string
   data?: any[]
   schema?: any
   orgId?: string
+  archetype?: string
 }
 
 export function UniversalEntityPage({ 
   entityName, 
   data = [], 
   schema,
-  orgId 
+  orgId,
+  archetype: propArchetype 
 }: UniversalEntityPageProps) {
   const displayName = entityName.charAt(0).toUpperCase() + entityName.slice(1)
   
-  // Debug schema structure to understand the format
-  console.log('[UniversalEntityPage] Schema structure:', {
-    schema,
-    schemaKeys: schema ? Object.keys(schema) : null,
-    archetype: schema?.archetype,
-    archetypeType: typeof schema?.archetype,
-    archetypeStringified: schema?.archetype ? JSON.stringify(schema.archetype) : null
-  })
-  
-  // Handle archetype more robustly - extract string value from archetype object
-  let archetype = 'unknown'
-  if (schema && schema.archetype) {
-    if (typeof schema.archetype === 'string') {
-      archetype = schema.archetype
-    } else if (typeof schema.archetype === 'object' && schema.archetype !== null) {
-      // Common archetype object patterns
-      if (schema.archetype.value) {
-        archetype = String(schema.archetype.value)
-      } else if (schema.archetype.type) {
-        archetype = String(schema.archetype.type)
-      } else if (schema.archetype.name) {
-        archetype = String(schema.archetype.name)
-      } else if (schema.archetype.category) {
-        archetype = String(schema.archetype.category)
-      } else {
-        // Fallback: use the first non-null property value or 'business_entity'
-        const values = Object.values(schema.archetype).filter(v => v != null)
-        archetype = values.length > 0 ? String(values[0]) : 'business_entity'
-      }
-    } else {
-      archetype = String(schema.archetype)
-    }
-  }
+  // Get archetype from props, schema, or default to 'record'
+  const archetype = propArchetype || schema?.archetype || 'record'
+  const archetypeConfig = ARCHETYPE_CONFIG[archetype.toLowerCase() as keyof typeof ARCHETYPE_CONFIG] || ARCHETYPE_CONFIG.record
+  const Icon = archetypeConfig.icon
   
   // Handle both plain arrays and Legend State observables
   const safeData = (() => {
@@ -88,9 +85,15 @@ export function UniversalEntityPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{displayName}</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold tracking-tight">{displayName}</h1>
+            <Badge variant="outline" className={archetypeConfig.color}>
+              <Icon className="h-3 w-3 mr-1" />
+              {archetypeConfig.label}
+            </Badge>
+          </div>
           <p className="text-muted-foreground">
-            {String(archetype)} entity • {String(count)} records
+            {String(count)} records
             {safeOrgId && <span className="ml-2">• Org: {String(safeOrgId).slice(0, 8)}...</span>}
           </p>
         </div>

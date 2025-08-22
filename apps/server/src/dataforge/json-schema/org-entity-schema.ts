@@ -26,46 +26,10 @@ export interface OrgSchema {
 }
 
 /**
- * Example org schema:
+ * Example org schema can be found in test-fixtures/test-data.ts
  * 
- * {
- *   "orgId": "acme-corp",
- *   "entities": {
- *     "SoftwareProject": {
- *       "extends": "base_projects",
- *       "tableName": "acme_corp_software_projects",
- *       "customFields": {
- *         "repositoryUrl": {
- *           "type": "url",
- *           "required": true,
- *           "syncable": true
- *         },
- *         "techStack": {
- *           "type": "json",
- *           "syncable": true
- *         },
- *         "internalNotes": {
- *           "type": "text",
- *           "syncable": false,
- *           "serverOnly": true
- *         }
- *       },
- *       "validationRules": {
- *         "rules": [
- *           {
- *             "field": "repositoryUrl",
- *             "operator": "regex",
- *             "value": "^https://github\\.com/.+",
- *             "message": "Must be a valid GitHub URL"
- *           }
- *         ]
- *       }
- *     }
- *   },
- *   "version": "1.0.0",
- *   "createdAt": "2025-08-13T12:00:00Z",
- *   "updatedAt": "2025-08-13T12:00:00Z"
- * }
+ * This keeps production code free of hardcoded company references.
+ * Use SAMPLE_SCHEMAS.exampleOrgSchema for testing.
  */
 
 export class OrgSchemaManager {
@@ -89,7 +53,7 @@ export class OrgSchemaManager {
   }
 
   /**
-   * Map extends field to base primitive (Universal Archetype System)
+   * Map extends field to base primitive (DataForge Archetype System)
    */
   private mapExtendsToPrimitive(extendsValue: string): 'Project' | 'Task' | 'Event' | 'Contact' | 'Record' | 'Document' | 'File' | 'Activity' | 'Discussion' | 'Collection' {
     switch (extendsValue) {

@@ -1,3 +1,4 @@
+import React from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   Card,
@@ -5,6 +6,24 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { 
   Database, 
   Users, 
@@ -18,29 +37,68 @@ import {
   Calendar,
   CreditCard,
   Package,
-  Settings
+  Settings,
+  Activity,
+  Layers,
+  MoreVertical,
+  Trash2,
+  Edit
 } from 'lucide-react'
 
 interface EntityCardProps {
   entityName: string
   entityDef: any
   count: number | string
+  archetype?: string
+  onDelete?: (entityName: string) => void
 }
 
-export function EntityCard({ entityName, entityDef, count }: EntityCardProps) {
-  const archetype = entityDef?.extends || 'record'
+// DataForge archetype icons and colors
+const ARCHETYPE_CONFIG = {
+  project: { icon: FolderOpen, color: 'bg-blue-500/10 text-blue-600', label: 'Project' },
+  task: { icon: CheckSquare, color: 'bg-green-500/10 text-green-600', label: 'Task' },
+  record: { icon: Database, color: 'bg-purple-500/10 text-purple-600', label: 'Record' },
+  document: { icon: FileText, color: 'bg-yellow-500/10 text-yellow-600', label: 'Document' },
+  file: { icon: File, color: 'bg-orange-500/10 text-orange-600', label: 'File' },
+  activity: { icon: Activity, color: 'bg-red-500/10 text-red-600', label: 'Activity' },
+  discussion: { icon: MessageCircle, color: 'bg-pink-500/10 text-pink-600', label: 'Discussion' },
+  collection: { icon: Layers, color: 'bg-indigo-500/10 text-indigo-600', label: 'Collection' },
+}
+
+export function EntityCard({ entityName, entityDef, count, archetype: propArchetype, onDelete }: EntityCardProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
   
-  // Get appropriate icon based on entity name or archetype
+  const archetype = propArchetype || entityDef?.archetype || entityDef?.extends || 'record'
+  const archetypeConfig = ARCHETYPE_CONFIG[archetype.toLowerCase() as keyof typeof ARCHETYPE_CONFIG] || ARCHETYPE_CONFIG.record
+  const Icon = archetypeConfig.icon
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    
+    setIsDeleting(true)
+    try {
+      await onDelete(entityName)
+      setDeleteDialogOpen(false)
+    } catch (error) {
+      console.error('Failed to delete entity:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleActionClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  
+  // Override icon for specific entity names
   const getEntityIcon = () => {
     const entityLower = entityName.toLowerCase()
-    const archetypeLower = archetype.toLowerCase()
     
+    // Special cases based on entity name
     if (entityLower.includes('client') || entityLower.includes('customer')) {
       return <Users className="text-muted-foreground h-4 w-4" />
-    } else if (entityLower.includes('project') || archetypeLower.includes('project')) {
-      return <Briefcase className="text-muted-foreground h-4 w-4" />
-    } else if (entityLower.includes('task') || archetypeLower.includes('task')) {
-      return <CheckSquare className="text-muted-foreground h-4 w-4" />
     } else if (entityLower.includes('time') || entityLower.includes('timesheet')) {
       return <Clock className="text-muted-foreground h-4 w-4" />
     } else if (entityLower.includes('invoice') || entityLower.includes('billing')) {
@@ -49,18 +107,11 @@ export function EntityCard({ entityName, entityDef, count }: EntityCardProps) {
       return <Package className="text-muted-foreground h-4 w-4" />
     } else if (entityLower.includes('event') || entityLower.includes('calendar')) {
       return <Calendar className="text-muted-foreground h-4 w-4" />
-    } else if (entityLower.includes('folder') || entityLower.includes('category')) {
-      return <FolderOpen className="text-muted-foreground h-4 w-4" />
-    } else if (entityLower.includes('document') || archetypeLower.includes('document')) {
-      return <FileText className="text-muted-foreground h-4 w-4" />
-    } else if (entityLower.includes('file') || archetypeLower.includes('file')) {
-      return <File className="text-muted-foreground h-4 w-4" />
-    } else if (archetypeLower.includes('discussion') || entityLower.includes('comment')) {
-      return <MessageCircle className="text-muted-foreground h-4 w-4" />
     } else if (entityLower.includes('setting') || entityLower.includes('config')) {
       return <Settings className="text-muted-foreground h-4 w-4" />
     } else {
-      return <Database className="text-muted-foreground h-4 w-4" />
+      // Use archetype icon
+      return <Icon className="text-muted-foreground h-4 w-4" />
     }
   }
 
@@ -82,25 +133,92 @@ export function EntityCard({ entityName, entityDef, count }: EntityCardProps) {
   }
 
   return (
-    <Link to="/entities/$entityName" params={{ entityName }}>
-      <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-        <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-          <CardTitle className='text-sm font-medium'>
-            {entityName}
-          </CardTitle>
-          {getEntityIcon()}
-        </CardHeader>
-        <CardContent>
-          <div className='text-2xl font-bold'>{count.toLocaleString()}</div>
-          <p className='text-muted-foreground text-xs'>
-            {getEntityDescription()}
-          </p>
-          <div className='text-muted-foreground text-xs mt-2 space-y-1'>
-            <p>Type: <span className='font-medium'>{archetype}</span></p>
-            <p>Table: <span className='font-medium'>{entityDef.tableName?.split('_').pop() || 'unknown'}</span></p>
-          </div>
-        </CardContent>
+    <>
+      <Card className="hover:shadow-lg transition-shadow cursor-pointer relative group">
+        <Link to="/entities/$entityName" params={{ entityName }} className="block">
+          <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+            <div className="flex items-center gap-2">
+              <CardTitle className='text-sm font-medium'>
+                {entityName}
+              </CardTitle>
+              <Badge variant="secondary" className={archetypeConfig.color}>
+                {archetypeConfig.label}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              {getEntityIcon()}
+              {onDelete && (
+                <div onClick={handleActionClick}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setDeleteDialogOpen(true)
+                        }}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Entity Type
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className='text-2xl font-bold'>{count.toLocaleString()}</div>
+            <p className='text-muted-foreground text-xs'>
+              {getEntityDescription()}
+            </p>
+            <div className='text-muted-foreground text-xs mt-2'>
+              <p>Table: <span className='font-medium'>{entityDef.tableName?.split('_').pop() || 'unknown'}</span></p>
+            </div>
+          </CardContent>
+        </Link>
       </Card>
-    </Link>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Entity Type</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the "{entityName}" entity type? This action will:
+              <br />
+              <br />
+              • Remove the entity definition from your organization
+              <br />
+              • Delete all data in the {entityDef.tableName?.split('_').pop() || 'entity'} table
+              <br />
+              • Remove the entity from all menus and dashboards
+              <br />
+              <br />
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Entity Type'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

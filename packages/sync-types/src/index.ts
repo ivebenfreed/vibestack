@@ -34,6 +34,9 @@ import type {
 export type { TableChange, RelationshipUpdate } from './table-changes';
 import type { TableChange } from './table-changes';
 
+// Export DataForge types
+export * from './dataforge';
+
 /**
  * Strongly typed record data for sync operations
  * Represents the common fields expected in all records

@@ -210,7 +210,7 @@ class VibeStackSyncPlugin {
       throw new Error(`Table ${tableName} not registered for sync`)
     }
     
-    const syncUrl = `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/sync/${tableName}`
+    const syncUrl = `${this.config.serverBaseUrl}/api/dataforge/orgs/${this.config.organizationId}/sync/${tableName}`
     
     return {
       list: {
@@ -258,7 +258,7 @@ class VibeStackSyncPlugin {
         }
       },
       create: {
-        url: `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/data/${tableName}`,
+        url: `${this.config.serverBaseUrl}/api/dataforge/orgs/${this.config.organizationId}/data/${tableName}`,
         transform: {
           save: (item: any) => {
             // Remove Legend State metadata before sending to server
@@ -269,7 +269,7 @@ class VibeStackSyncPlugin {
         }
       },
       update: {
-        url: (item: any) => `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/data/${tableName}/${item[tableConfig.primaryKey]}`,
+        url: (item: any) => `${this.config.serverBaseUrl}/api/dataforge/orgs/${this.config.organizationId}/data/${tableName}/${item[tableConfig.primaryKey]}`,
         transform: {
           save: (item: any) => {
             // Remove Legend State metadata before sending to server
@@ -280,7 +280,7 @@ class VibeStackSyncPlugin {
         }
       },
       delete: {
-        url: (item: any) => `${this.config.serverBaseUrl}/api/universal-archetype/orgs/${this.config.organizationId}/data/${tableName}/${item[tableConfig.primaryKey]}`,
+        url: (item: any) => `${this.config.serverBaseUrl}/api/dataforge/orgs/${this.config.organizationId}/data/${tableName}/${item[tableConfig.primaryKey]}`,
         transform: {
           save: () => ({ deleted: true, deleted_at: new Date().toISOString() })
         }
@@ -377,7 +377,7 @@ export function createDefaultSyncConfig(organizationId: string, userId: string):
 export function createDefaultTableConfig(tableName: string): TableSyncConfig {
   return {
     tableName,
-    apiEndpoint: `/api/universal-archetype/orgs/{orgId}/sync/${tableName}`,
+    apiEndpoint: `/api/dataforge/orgs/{orgId}/sync/${tableName}`,
     primaryKey: 'id',
     enableRealTimeSync: true,
     enablePersistence: true,
@@ -423,7 +423,7 @@ export function syncedVibeStack(config: {
 }) {
   console.log('[syncedVibeStack] Creating syncedCrud observable with v3 API:', config)
   
-  const baseUrl = `http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}`
+  const baseUrl = `http://localhost:8787/api/dataforge/orgs/${config.orgId}/data/${config.entityName}`
   
   // Use syncedCrud for proper CRUD operations with v3 compatibility
   return syncedCrud({
@@ -539,7 +539,7 @@ export function syncedVibeStackCustom(config: {
     get: async () => {
       console.log(`[syncedVibeStackCustom] Fetching data for ${config.entityName}`)
       
-      const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}`, {
+      const response = await fetch(`http://localhost:8787/api/dataforge/orgs/${config.orgId}/data/${config.entityName}`, {
         credentials: 'include'
       })
       
@@ -604,7 +604,7 @@ export function syncedVibeStackCustom(config: {
 async function createItem(config: { orgId: string, entityName: string }, item: any) {
   console.log(`[syncedVibeStack] Creating ${config.entityName}:`, item)
   
-  const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}`, {
+  const response = await fetch(`http://localhost:8787/api/dataforge/orgs/${config.orgId}/data/${config.entityName}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -624,7 +624,7 @@ async function createItem(config: { orgId: string, entityName: string }, item: a
 async function updateItem(config: { orgId: string, entityName: string }, item: any) {
   console.log(`[syncedVibeStack] Updating ${config.entityName}:`, item)
   
-  const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}/${item.id}`, {
+  const response = await fetch(`http://localhost:8787/api/dataforge/orgs/${config.orgId}/data/${config.entityName}/${item.id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json'
@@ -644,7 +644,7 @@ async function updateItem(config: { orgId: string, entityName: string }, item: a
 async function deleteItem(config: { orgId: string, entityName: string }, item: any) {
   console.log(`[syncedVibeStack] Deleting ${config.entityName}:`, item)
   
-  const response = await fetch(`http://localhost:8787/api/universal-archetype/orgs/${config.orgId}/data/${config.entityName}/${item.id}`, {
+  const response = await fetch(`http://localhost:8787/api/dataforge/orgs/${config.orgId}/data/${config.entityName}/${item.id}`, {
     method: 'DELETE',
     credentials: 'include'
   })

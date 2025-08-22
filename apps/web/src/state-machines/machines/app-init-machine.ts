@@ -362,21 +362,22 @@ export const appInitMachine = setup({
         console.log('[AppInitMachine] 📊 Background: Starting Legend State persistence initialization');
         
         // Initialize Legend State persistence with dynamic schema
-        import('../../stores/sync/configure-legend-state').then(({ initializePersistence }) => {
-          // Get the schema from org context
-          const orgContext = (window as any).legendCentral?.orgContext$;
+        import('../../legend-state').then(({ loadOrgContext }) => {
           const orgId = context.organizationId;
-          const schema = orgContext?.schema?.get();
+          const userId = context.userId;
           
-          if (orgId && schema) {
-            initializePersistence(orgId, schema);
-            console.log('[AppInitMachine] ✅ Legend State persistence initialized with schema entities');
+          if (orgId && userId) {
+            // The new simplified approach handles persistence automatically
+            loadOrgContext(orgId, userId).then(() => {
+              console.log('[AppInitMachine] ✅ Legend State initialized with automatic persistence');
+              // Dispatch database ready event
+              window.dispatchEvent(new CustomEvent('database:ready'));
+            }).catch((error) => {
+              console.error('[AppInitMachine] ❌ Failed to initialize Legend State:', error);
+            });
           } else {
-            console.warn('[AppInitMachine] ⚠️ Missing orgId or schema for persistence initialization');
+            console.warn('[AppInitMachine] ⚠️ Missing orgId or userId for Legend State initialization');
           }
-          
-          // Dispatch database ready event since persistence is our "database"
-          window.dispatchEvent(new CustomEvent('database:ready'));
         }).catch((error) => {
           console.error('[AppInitMachine] ❌ Failed to initialize Legend State persistence:', error);
           window.dispatchEvent(new CustomEvent('database:error', { 

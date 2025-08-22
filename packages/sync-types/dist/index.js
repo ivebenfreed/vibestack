@@ -20,9 +20,17 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   isClientMessageType: () => isClientMessageType,
-  isTableChange: () => isTableChange
+  isTableChange: () => isTableChange,
+  isValidArchetype: () => isValidArchetype
 });
 module.exports = __toCommonJS(index_exports);
+
+// src/dataforge.ts
+function isValidArchetype(value) {
+  return typeof value === "string" && ["project", "task", "record", "document", "file", "activity", "discussion", "collection"].includes(value);
+}
+
+// src/index.ts
 function isTableChange(payload) {
   const p = payload;
   return p && typeof p.table === "string" && ["insert", "update", "delete"].includes(p.operation) && typeof p.data === "object" && p.data !== null && (!p.lsn || typeof p.lsn === "string") && typeof p.updatedAt === "string";
@@ -33,5 +41,6 @@ function isClientMessageType(type) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   isClientMessageType,
-  isTableChange
+  isTableChange,
+  isValidArchetype
 });

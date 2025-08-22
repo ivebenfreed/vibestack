@@ -79,10 +79,10 @@ describe('Universal Archetype Auth Integration - Week 2 Day 1-2 COMPLETE', () =>
     expect(healthResponse.data).toBe('Server OK');
     
     // Test archetype health endpoint
-    const archetypeHealthResponse = await apiCall('/archetype/health');
+    const archetypeHealthResponse = await apiCall('/dataforge/health');
     expect(archetypeHealthResponse.ok).toBe(true);
     expect(archetypeHealthResponse.data).toHaveProperty('status', 'ok');
-    expect(archetypeHealthResponse.data).toHaveProperty('system', 'universal-archetype-api');
+    expect(archetypeHealthResponse.data).toHaveProperty('system', 'dataforge-api');
     
     console.log('✅ Public endpoints accessible without authentication');
   });

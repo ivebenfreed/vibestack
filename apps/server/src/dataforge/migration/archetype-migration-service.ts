@@ -1,7 +1,7 @@
 /**
- * Universal Archetype Debounced Migration Service
+ * DataForge Debounced Migration Service
  * 
- * Week 3 Day 1-2: Connects Universal Archetype system to debounced migrations.
+ * Connects DataForge archetype system to debounced migrations.
  * Batches archetype entity schema changes over 30 seconds to avoid rapid migrations.
  * Integrates with existing FoundationEntityRegistry and OrgSchemaDO.
  */
@@ -43,7 +43,7 @@ export class ArchetypeMigrationService {
    * 
    * @param organizationId - Organization ID for isolation
    * @param entityName - Custom entity name (e.g., 'client_projects')
-   * @param archetype - Universal archetype pattern (project, task, etc.)
+   * @param archetype - DataForge archetype pattern (project, task, etc.)
    * @param operation - Type of schema change
    * @param newFields - New custom fields definition
    * @param oldFields - Previous custom fields (for updates)

@@ -19,7 +19,7 @@ import { observer } from '@legendapp/state/react'
 import { Project, ProjectStatus } from '@/db/client-entities'
 import { sidebar$ } from '@/stores/org-data-store'
 // Import from Legend Central for entity groups
-import { entityGroups$ as legendEntityGroups$ } from '@/stores/vibestack-legend-central'
+import { entityGroups$ } from '@/legend-state'
 import { shouldHideBusinessRoutes } from './data/dynamic-sidebar-data'
 import type { NavGroup } from './types'
 import { 
@@ -94,7 +94,7 @@ export const UnifiedSidebar = observer(function UnifiedSidebar({ isCollapsed, on
   const currentOrgId = currentOrganization?.id
   
   // Get entity groups from Legend Central computed observable - automatically updates when schema changes
-  const entityNavGroups = legendEntityGroups$.get()
+  const entityNavGroups = entityGroups$.get()
   
   // Entity nav groups come directly from the computed observable
   const navGroups = entityNavGroups || []

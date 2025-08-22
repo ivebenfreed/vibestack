@@ -8,7 +8,7 @@ import { migrations } from './migrations'
 import authRouter from './auth'
 import organizationsRouter from './organizations'
 import { phase1TestRouter } from './phase1-tests.js'
-import { universalArchetypeRouter } from '../routes/universal-archetype-api.js'
+import { dataforgeRouter } from '../routes/dataforge-api.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
 // Custom organization routes removed - using Better Auth endpoints instead
@@ -31,7 +31,7 @@ api.route('/migrations', migrations)
 api.route('/auth', authRouter)
 api.route('/organizations', organizationsRouter)
 api.route('/test', phase1TestRouter)
-api.route('/archetype', universalArchetypeRouter)
+api.route('/dataforge', dataforgeRouter)
 api.route('/db', testDbRouter)
 api.route('/debug', debugTableDataRouter)
 

@@ -1,3 +1,8 @@
+// src/dataforge.ts
+function isValidArchetype(value) {
+  return typeof value === "string" && ["project", "task", "record", "document", "file", "activity", "discussion", "collection"].includes(value);
+}
+
 // src/index.ts
 function isTableChange(payload) {
   const p = payload;
@@ -8,5 +13,6 @@ function isClientMessageType(type) {
 }
 export {
   isClientMessageType,
-  isTableChange
+  isTableChange,
+  isValidArchetype
 };

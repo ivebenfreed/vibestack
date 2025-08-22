@@ -4,11 +4,9 @@ import { use$ } from '@legendapp/state/react'
 import { UniversalEntityPage } from '@/components/entities/UniversalEntityPage'
 import { useAuth } from '@/lib/auth'
 import { 
-  orgContext$, 
-  entity$,
-  entityLoading$, 
-  loadOrgContext 
-} from '@/stores/vibestack-legend-central'
+  orgContext$,
+  getEntity$
+} from '@/legend-state'
 import { useEffect } from 'react'
 
 export const Route = createFileRoute('/_authenticated/entities/$entityName')({
@@ -33,22 +31,15 @@ const EntityPageInner = observer(function EntityPageInner({ entityName }: { enti
   const error = use$(orgContext$.error)
   const schema = use$(orgContext$.schema)
   
-  // Initialize Legend State context when organization changes
-  useEffect(() => {
-    if (currentOrgId && userId) {
-      loadOrgContext(currentOrgId, userId).catch(error => {
-        console.error(`[${entityName}Page] Failed to load org context:`, error)
-      })
-    }
-  }, [currentOrgId, userId, entityName])
+  // Components should only consume observables, not trigger loads
+  // Loading is handled by auth state machines
   
   // Get entity store and loading state
-  const entityStore = currentOrgId && schema ? entity$(entityName) : null
-  const loadingState = currentOrgId && schema ? entityLoading$(entityName) : null
+  const entityStore = currentOrgId && schema ? getEntity$(entityName) : null
   
   const entityData = entityStore ? use$(entityStore) : null
-  const isEntityLoading = loadingState ? use$(loadingState.isLoading) : false
-  const hasEntityLoaded = loadingState ? use$(loadingState.hasLoaded) : false
+  const isEntityLoading = false // Simplified for now
+  const hasEntityLoaded = true // Simplified for now
   
   // Convert object to array for display
   const entityArray = entityData ? Object.values(entityData) : []
