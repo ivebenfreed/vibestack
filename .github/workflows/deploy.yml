@@ -168,7 +168,24 @@ jobs:
           echo "🔧 Checking wrangler.toml..."
           head -20 wrangler.toml
           echo "🚀 Deploying to staging..."
-          npx wrangler deploy --env staging --compatibility-date=2024-09-23
+          echo "🔑 Environment variables set:"
+          echo "CLOUDFLARE_API_TOKEN length: ${#CLOUDFLARE_API_TOKEN}"
+          echo "CLOUDFLARE_ACCOUNT_ID: $CLOUDFLARE_ACCOUNT_ID"
+          echo "🧪 Testing wrangler auth first..."
+          npx wrangler whoami || echo "❌ Wrangler auth failed"
+          echo "📦 Starting deployment..."
+          set -e  # Exit on any error
+          npx wrangler deploy --env staging --compatibility-date=2024-09-23 2>&1 | tee deploy-output.log || {
+            echo "❌ Deployment failed with exit code $?"
+            echo "📋 Full output:"
+            cat deploy-output.log
+            echo "🔍 Checking for common issues..."
+            echo "Environment: staging"
+            echo "Working directory: $(pwd)"
+            echo "Available files:"
+            ls -la | head -10
+            exit 1
+          }
           
       - name: Deploy Frontend to Staging
         working-directory: apps/web
