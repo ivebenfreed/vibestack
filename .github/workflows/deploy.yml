@@ -52,7 +52,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
-          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 -w
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 -w
           cd apps/web && pnpm add -D lightningcss-linux-x64-gnu
           cd ../..
           # Run postinstall scripts after native bindings are installed
@@ -113,7 +113,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
-          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 -w
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 -w
           cd apps/web && pnpm add -D lightningcss-linux-x64-gnu
           cd ../..
           # Run postinstall scripts after native bindings are installed
@@ -238,7 +238,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           # Install native bindings for Linux in CI
-          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 -w
+          pnpm add -D @swc/core-linux-x64-gnu @rollup/rollup-linux-x64-gnu @cloudflare/workerd-linux-64 @esbuild/linux-x64 -w
           cd apps/web && pnpm add -D lightningcss-linux-x64-gnu
           cd ../..
           # Run postinstall scripts after native bindings are installed
