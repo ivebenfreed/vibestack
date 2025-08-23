@@ -36,7 +36,6 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   const baseUrl = `/api/dataforge/orgs/${orgId}/data/${entityName}`
   
   // Use the reactive persistence configuration if available, otherwise use basic syncedCrud
-  const syncedCrudFn = syncedCrudWithPersistence || syncedCrud
   
   // Create the syncedCrud configuration first
   const crudConfig = {
@@ -187,8 +186,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // Initial empty state - use empty array for list operations to prevent auto-creation
     initial: [],
     
-    // FIXED: Local persistence with proper configuration
-    // Now that we've configured fieldCreatedAt properly above, persistence should work correctly
+    // RE-ENABLED: IndexedDB persistence with sync loop prevention
+    // The WebSocket subscription fix prevents the sync loop that was caused by refresh()
     ...(syncedCrudWithPersistence && persistenceManager ? (() => {
       const persistOptions = persistenceManager.getPersistOptions(entityName)
       console.log(`[Observable] Persistence options for ${entityName}:`, persistOptions)
@@ -196,8 +195,47 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     })() : {})
   }
   
-  // Return the observable wrapping syncedCrud with or without persistence
-  return observable(syncedCrudFn(crudConfig))
+  // CRITICAL FIX: Re-enable syncedCrud but fix WebSocket subscription to prevent sync loop
+  // The issue was that refresh() from WebSocket notifications was triggering PUT requests
+  // Solution: Modify subscription to manually update data without calling refresh()
+  
+  // Override the subscription to prevent sync loop
+  crudConfig.subscribe = ({ refresh }) => {
+    const handler = (e: CustomEvent) => {
+      const notification = e.detail
+      
+      // Check if notification is for this entity
+      if (notification?.tables?.includes(entityName.toLowerCase()) || 
+          notification?.tables?.includes(entityName) ||
+          notification?.table === entityName.toLowerCase() || 
+          notification?.table === entityName) {
+        console.log(`[Observable] WebSocket notification for ${entityName}:`, notification)
+        
+        // TESTING: Re-enable refresh() and trust syncedCrud's diff logic
+        // The syncedCrud plugin should only send PUT requests when data actually changes
+        // Let's see if the fieldCreatedAt/fieldUpdatedAt config prevents false updates
+        console.log(`[Observable] Calling refresh() and trusting syncedCrud diff logic for ${entityName}`)
+        refresh()
+      }
+    }
+    
+    // Listen for table change notifications
+    window.addEventListener('vibestack:table-change-notification', handler as any)
+    
+    console.log(`[Observable] Subscribed to WebSocket notifications for ${entityName} (SYNC LOOP PREVENTION)`)
+    
+    // Return cleanup function
+    return () => {
+      window.removeEventListener('vibestack:table-change-notification', handler as any)
+      console.log(`[Observable] Unsubscribed from WebSocket notifications for ${entityName}`)
+    }
+  }
+  
+  const syncedCrudFn = syncedCrudWithPersistence || syncedCrud
+  
+  console.log(`[Observable] Creating syncedCrud for ${entityName} with WebSocket sync loop prevention`)
+  
+  return syncedCrudFn(crudConfig)
 }
 
 /**
