@@ -1,0 +1,43 @@
+# Test files and scripts (exclude everything starting with test-)
+test-*
+
+# Development scripts (exclude setup, create, debug, etc.)
+setup-*
+create-*
+cleanup-*
+debug-*
+seed-*
+run-*
+platform-*
+realistic-*
+enhanced-*
+
+# Documentation and analysis files
+*.md
+*.txt
+*.html
+
+# Development configuration files
+.dev.vars*
+.env*
+cookies.txt
+*cookies.txt
+verification-*
+*.json
+!package.json
+!tsconfig.json
+
+# Development directories
+orgtest/
+cloudflared-extract/
+.turbo/
+
+# Development binaries
+*.deb
+*.rpm
+
+# Wrangler local files
+wrangler.local.toml
+
+# All SQL files (these are for local DB setup)
+*.sql
