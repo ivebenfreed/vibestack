@@ -53,8 +53,6 @@ import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authe
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugKanbanRouteImport } from './routes/_authenticated/debug/kanban'
-import { Route as AuthenticatedDebugJunctionTablesRouteImport } from './routes/_authenticated/debug/junction-tables'
-import { Route as AuthenticatedDebugGanttTestDataRouteImport } from './routes/_authenticated/debug/gantt-test-data'
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
 import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
 
@@ -334,18 +332,6 @@ const AuthenticatedDebugKanbanRoute =
     path: '/kanban',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-const AuthenticatedDebugJunctionTablesRoute =
-  AuthenticatedDebugJunctionTablesRouteImport.update({
-    id: '/junction-tables',
-    path: '/junction-tables',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
-const AuthenticatedDebugGanttTestDataRoute =
-  AuthenticatedDebugGanttTestDataRouteImport.update({
-    id: '/gantt-test-data',
-    path: '/gantt-test-data',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
 const AuthenticatedDebugEntityRoutesTestRoute =
   AuthenticatedDebugEntityRoutesTestRouteImport.update({
     id: '/entity-routes-test',
@@ -381,8 +367,6 @@ export interface FileRoutesByFullPath {
   '/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
-  '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
-  '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
@@ -430,8 +414,6 @@ export interface FileRoutesByTo {
   '/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/': typeof AuthenticatedIndexRoute
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
-  '/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
-  '/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
@@ -483,8 +465,6 @@ export interface FileRoutesById {
   '/_authenticated/dynamic-schema-test': typeof AuthenticatedDynamicSchemaTestRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
-  '/_authenticated/debug/gantt-test-data': typeof AuthenticatedDebugGanttTestDataRoute
-  '/_authenticated/debug/junction-tables': typeof AuthenticatedDebugJunctionTablesRoute
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
@@ -536,8 +516,6 @@ export interface FileRouteTypes {
     | '/dynamic-schema-test'
     | '/'
     | '/debug/entity-routes-test'
-    | '/debug/gantt-test-data'
-    | '/debug/junction-tables'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
@@ -585,8 +563,6 @@ export interface FileRouteTypes {
     | '/dynamic-schema-test'
     | '/'
     | '/debug/entity-routes-test'
-    | '/debug/gantt-test-data'
-    | '/debug/junction-tables'
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
@@ -637,8 +613,6 @@ export interface FileRouteTypes {
     | '/_authenticated/dynamic-schema-test'
     | '/_authenticated/'
     | '/_authenticated/debug/entity-routes-test'
-    | '/_authenticated/debug/gantt-test-data'
-    | '/_authenticated/debug/junction-tables'
     | '/_authenticated/debug/kanban'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
@@ -1011,20 +985,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugKanbanRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
-    '/_authenticated/debug/junction-tables': {
-      id: '/_authenticated/debug/junction-tables'
-      path: '/junction-tables'
-      fullPath: '/debug/junction-tables'
-      preLoaderRoute: typeof AuthenticatedDebugJunctionTablesRouteImport
-      parentRoute: typeof AuthenticatedDebugRouteRoute
-    }
-    '/_authenticated/debug/gantt-test-data': {
-      id: '/_authenticated/debug/gantt-test-data'
-      path: '/gantt-test-data'
-      fullPath: '/debug/gantt-test-data'
-      preLoaderRoute: typeof AuthenticatedDebugGanttTestDataRouteImport
-      parentRoute: typeof AuthenticatedDebugRouteRoute
-    }
     '/_authenticated/debug/entity-routes-test': {
       id: '/_authenticated/debug/entity-routes-test'
       path: '/entity-routes-test'
@@ -1044,8 +1004,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugEntityRoutesTestRoute: typeof AuthenticatedDebugEntityRoutesTestRoute
-  AuthenticatedDebugGanttTestDataRoute: typeof AuthenticatedDebugGanttTestDataRoute
-  AuthenticatedDebugJunctionTablesRoute: typeof AuthenticatedDebugJunctionTablesRoute
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
@@ -1062,9 +1020,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
   {
     AuthenticatedDebugEntityRoutesTestRoute:
       AuthenticatedDebugEntityRoutesTestRoute,
-    AuthenticatedDebugGanttTestDataRoute: AuthenticatedDebugGanttTestDataRoute,
-    AuthenticatedDebugJunctionTablesRoute:
-      AuthenticatedDebugJunctionTablesRoute,
     AuthenticatedDebugKanbanRoute: AuthenticatedDebugKanbanRoute,
     AuthenticatedDebugReactflowPositioningRoute:
       AuthenticatedDebugReactflowPositioningRoute,
