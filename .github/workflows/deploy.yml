@@ -143,7 +143,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env staging --verbose --log-level=debug
+          command: deploy --env staging
           workingDirectory: apps/server
           
       - name: Deploy Frontend to Staging
@@ -212,7 +212,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env production --verbose --log-level=debug
+          command: deploy --env production
           workingDirectory: apps/server
           
       - name: Deploy Frontend to Production

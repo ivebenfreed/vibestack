@@ -57,7 +57,11 @@ class_name = "OrganizationActor"
 # Durable Objects migrations (for free plan compatibility)
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["SyncDO", "ReplicationDO", "OrganizationActor"]
+new_sqlite_classes = ["SyncDO", "ReplicationDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["OrganizationActor"]
 
 # Cron triggers
 [triggers]
@@ -107,6 +111,9 @@ class_name = "OrganizationActor"
 ENVIRONMENT = "staging"
 NODE_ENV = "staging"
 TYPEORM_LOGGING = true
+BETTER_AUTH_SECRET = "NXlg2n5ouDPKtoHHOvUvc8pcQztoW8bpIN5B+jdC3Yk="
+BETTER_AUTH_URL = "https://vibestack-web-staging.pages.dev"
+RESEND_API_KEY = "re_jdbsLnkN_45KiUYXRGskuFXE7Gth6wqM6"
 
 # Rate limiting for staging
 [[env.staging.ratelimits]]
