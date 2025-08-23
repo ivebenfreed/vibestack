@@ -57,7 +57,7 @@ interface RoleCacheEntry {
   updatedAt: number;
 }
 
-export class OrganizationActor extends Actor {
+export class OrganizationActor extends Actor<Env> {
   private organizationId: string = '';
   private connections = new Map<string, ClientConnection>();
   private sqliteInitialized = false;
@@ -92,7 +92,7 @@ export class OrganizationActor extends Actor {
     
     try {
       // Use Actor's SQLite storage (synchronous)
-      this.ctx.storage.sql.exec(`
+      this.storage.sql.exec(`
         -- Permission cache for zero-latency permission checks
         CREATE TABLE IF NOT EXISTS permission_cache (
           user_id TEXT NOT NULL,
@@ -168,7 +168,7 @@ export class OrganizationActor extends Actor {
     this.initializeSQLiteCache();
     
     try {
-      const cursor = this.ctx.storage.sql.exec(`
+      const cursor = this.storage.sql.exec(`
         SELECT granted FROM permission_cache 
         WHERE user_id = ? AND resource_type = ? AND resource_id = ? AND action = ?
         AND expires_at > ?
@@ -223,7 +223,7 @@ export class OrganizationActor extends Actor {
       const expiresAt = Date.now() + ttlMs;
       const updatedAt = Date.now();
       
-      this.ctx.storage.sql.exec(`
+      this.storage.sql.exec(`
         INSERT OR REPLACE INTO permission_cache 
         (user_id, resource_type, resource_id, action, granted, expires_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -252,7 +252,7 @@ export class OrganizationActor extends Actor {
     this.initializeSQLiteCache();
     
     try {
-      const cursor = this.ctx.storage.sql.exec(`
+      const cursor = this.storage.sql.exec(`
         SELECT * FROM schema_cache 
         WHERE table_name = ?
         ORDER BY column_name
@@ -266,7 +266,7 @@ export class OrganizationActor extends Actor {
           columnCount: results.length
         }, MODULE_NAME);
         
-        return results.map(row => ({
+        return results.map((row: any) => ({
           tableName: row.table_name as string,
           columnName: row.column_name as string,
           dataType: row.data_type as string,
@@ -300,7 +300,7 @@ export class OrganizationActor extends Actor {
       
       // Clear all schema cache entries for this organization
       const orgPrefix = `org_${this.organizationId.replace(/-/g, '_')}_`;
-      this.ctx.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name LIKE ?`, `${orgPrefix}%`);
+      this.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name LIKE ?`, `${orgPrefix}%`);
       
       syncLogger.info('Schema cache invalidated', {
         organizationId: this.organizationId,
@@ -322,7 +322,7 @@ export class OrganizationActor extends Actor {
     try {
       this.initializeSQLiteCache();
       
-      this.ctx.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name = ?`, tableName);
+      this.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name = ?`, tableName);
       
       syncLogger.info('Table schema cache invalidated', {
         organizationId: this.organizationId,
@@ -358,11 +358,11 @@ export class OrganizationActor extends Actor {
       const updatedAt = Date.now();
       
       // Clear existing schema for this table
-      this.ctx.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name = ?`, tableName);
+      this.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name = ?`, tableName);
       
       // Insert new schema
       for (const column of columns) {
-        this.ctx.storage.sql.exec(`
+        this.storage.sql.exec(`
           INSERT INTO schema_cache 
           (table_name, column_name, data_type, is_nullable, constraints, relationships, schema_version, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -399,7 +399,7 @@ export class OrganizationActor extends Actor {
     this.initializeSQLiteCache();
     
     try {
-      const cursor = this.ctx.storage.sql.exec(`
+      const cursor = this.storage.sql.exec(`
         SELECT * FROM role_cache 
         WHERE user_id = ? AND organization_id = ?
       `, userId, organizationId);
@@ -455,7 +455,7 @@ export class OrganizationActor extends Actor {
       const updatedAt = Date.now();
       const permissionsJson = JSON.stringify(permissions);
       
-      this.ctx.storage.sql.exec(`
+      this.storage.sql.exec(`
         INSERT OR REPLACE INTO role_cache 
         (user_id, organization_id, role, permissions, updated_at)
         VALUES (?, ?, ?, ?, ?)
@@ -485,7 +485,7 @@ export class OrganizationActor extends Actor {
     this.initializeSQLiteCache();
     
     try {
-      const cursor = this.ctx.storage.sql.exec(`
+      const cursor = this.storage.sql.exec(`
         SELECT * FROM role_cache 
         WHERE organization_id = ?
         ORDER BY role, user_id
@@ -493,7 +493,7 @@ export class OrganizationActor extends Actor {
       
       const results = cursor.toArray();
       
-      return results.map(row => ({
+      return results.map((row: any) => ({
         userId: row.user_id as string,
         organizationId: row.organization_id as string,
         role: row.role as string,
@@ -518,7 +518,7 @@ export class OrganizationActor extends Actor {
     this.initializeSQLiteCache();
     
     try {
-      this.ctx.storage.sql.exec(`DELETE FROM role_cache WHERE user_id = ? AND organization_id = ?`, userId, organizationId);
+      this.storage.sql.exec(`DELETE FROM role_cache WHERE user_id = ? AND organization_id = ?`, userId, organizationId);
       
       syncLogger.info('Role cache invalidated', {
         userId: userId.substring(0, 8) + '...',
@@ -553,7 +553,7 @@ export class OrganizationActor extends Actor {
         try {
           const permissionsJson = JSON.stringify(roleData.permissions);
           
-          this.ctx.storage.sql.exec(`
+          this.storage.sql.exec(`
             INSERT OR REPLACE INTO role_cache 
             (user_id, organization_id, role, permissions, updated_at)
             VALUES (?, ?, ?, ?, ?)
@@ -605,7 +605,7 @@ export class OrganizationActor extends Actor {
     try {
       const now = Date.now();
       
-      const cursor = this.ctx.storage.sql.exec(`DELETE FROM permission_cache WHERE expires_at <= ?`, now);
+      const cursor = this.storage.sql.exec(`DELETE FROM permission_cache WHERE expires_at <= ?`, now);
       const result = cursor.meta;
       
       if (result.changes > 0) {
@@ -873,7 +873,7 @@ export class OrganizationActor extends Actor {
       this.initializeSQLiteCache();
       
       // Create the table if it doesn't exist
-      this.ctx.storage.sql.exec(`
+      this.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS org_schema_cache (
           cache_key TEXT PRIMARY KEY,
           data TEXT NOT NULL,
@@ -883,7 +883,7 @@ export class OrganizationActor extends Actor {
       
       // Check if we have cached org schema data
       const cacheKey = `org_schema_${this.organizationId}`;
-      const cursor = this.ctx.storage.sql.exec(`
+      const cursor = this.storage.sql.exec(`
         SELECT data, cached_at
         FROM org_schema_cache 
         WHERE cache_key = ?
@@ -966,7 +966,7 @@ export class OrganizationActor extends Actor {
       const now = Date.now();
       
       // Create the table if it doesn't exist
-      this.ctx.storage.sql.exec(`
+      this.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS org_schema_cache (
           cache_key TEXT PRIMARY KEY,
           data TEXT NOT NULL,
@@ -975,7 +975,7 @@ export class OrganizationActor extends Actor {
       `);
       
       // Store the schema data
-      this.ctx.storage.sql.exec(`
+      this.storage.sql.exec(`
         INSERT OR REPLACE INTO org_schema_cache (cache_key, data, cached_at)
         VALUES (?, ?, ?)
       `, cacheKey, JSON.stringify(schema), now);
@@ -1255,8 +1255,8 @@ export class OrganizationActor extends Actor {
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
     
-    // Accept the WebSocket connection
-    this.ctx.acceptWebSocket(server);
+    // Accept the WebSocket connection  
+    this.acceptWebSocket(server);
     
     // Store connection info
     this.connections.set(clientId, {
@@ -1708,7 +1708,7 @@ export class OrganizationActor extends Actor {
         connectedAt: conn.connectedAt,
         socketState: conn.socket.readyState
       })),
-      uptime: Date.now() - (this.ctx.storage ? 0 : Date.now()), // Simplified uptime
+      uptime: Date.now() - (this.storage ? 0 : Date.now()), // Simplified uptime
       actorType: 'OrganizationActor'
     };
     
