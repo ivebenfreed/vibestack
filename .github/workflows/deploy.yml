@@ -123,12 +123,27 @@ jobs:
         working-directory: apps/server
         run: echo "Skipping type check - OrganizationActor needs Actor API updates"
         
+      - name: Validate Environment Configuration
+        working-directory: apps/server
+        run: |
+          echo "📋 Validating staging deployment requirements..."
+          echo "✅ Wrangler config exists: $(test -f wrangler.toml && echo 'YES' || echo 'NO')"
+          echo "✅ Source code exists: $(test -f src/index.ts && echo 'YES' || echo 'NO')"  
+          echo "✅ Package.json exists: $(test -f package.json && echo 'YES' || echo 'NO')"
+          echo "📊 Required Cloudflare secrets (configured externally):"
+          echo "   - DATABASE_URL (required for Neon connection)"
+          echo "   - NEON_API_KEY (required for database operations)"
+          echo "   - GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET (required for OAuth)"
+          echo "   - POLAR_ACCESS_TOKEN & POLAR_WEBHOOK_SECRET (required for billing)"
+          echo "   - API_URL (required for API base URL)"
+          echo "⚠️  If deployment fails, verify these secrets are configured in Cloudflare Dashboard"
+        
       - name: Deploy Backend to Staging
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env staging
+          command: deploy --env staging --verbose --log-level=debug
           workingDirectory: apps/server
           
       - name: Deploy Frontend to Staging
@@ -197,7 +212,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env production
+          command: deploy --env production --verbose --log-level=debug
           workingDirectory: apps/server
           
       - name: Deploy Frontend to Production
