@@ -1,6 +1,6 @@
 import { setup, assign } from 'xstate';
 import { checkAuthActor, signInActor, signOutActor } from '../auth-actors';
-import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor } from '../organization-actors';
+import { loadOrganizationsActor, createOrganizationActor, selectOrganizationActor, loadBillingActor, upgradeSubscriptionActor, switchOrganizationActor } from '../organization-actors';
 import type { UserInfo, OrganizationInfo, CreateOrganizationInput } from '../types';
 
 export interface AuthContext {
@@ -69,6 +69,7 @@ export const authMachine = setup({
     selectOrganization: selectOrganizationActor,
     loadBilling: loadBillingActor,
     upgradeSubscription: upgradeSubscriptionActor,
+    switchOrganization: switchOrganizationActor,
   },
   
   actions: {
@@ -100,28 +101,6 @@ export const authMachine = setup({
       }));
     },
     
-    persistAuthState: ({ context }) => {
-      // Persist auth state to localStorage for recovery
-      const stateToStore = {
-        context: {
-          user: context.user,
-          authToken: context.authToken,
-          sessionExpiry: context.sessionExpiry,
-          lastActivity: context.lastActivity,
-          currentOrganization: context.currentOrganization,
-          userOrganizations: context.userOrganizations, // 🔥 FIX: Persist all organizations for org switcher
-          organizationSetupComplete: context.organizationSetupComplete
-        },
-        value: 'authenticated'
-      };
-      
-      try {
-        localStorage.setItem('auth-machine-state', JSON.stringify(stateToStore));
-        // Silent persistence - no logging needed for normal operation
-      } catch (error) {
-        console.error('[AuthMachine] Failed to persist auth state:', error);
-      }
-    },
 
     // Organization actions
     setLoadingOrganizations: assign({
@@ -140,17 +119,13 @@ export const authMachine = setup({
       currentOrganization: ({ context, event }) => {
         const organizations = event.output?.organizations || [];
         
-        // First, try to restore from localStorage (might have been set by org switcher)
-        const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
-        if (lastOrgId) {
-          const validOrg = organizations.find(org => org.id === lastOrgId);
+        // Try to restore from context (from persisted snapshot)
+        if (context.currentOrganization) {
+          const validOrg = organizations.find(org => org.id === context.currentOrganization.id);
           if (validOrg) {
-            console.log('[AuthMachine] Restored last selected organization:', validOrg.name);
+            console.log('[AuthMachine] Restored last selected organization from context:', validOrg.name);
             return validOrg;
           }
-          // Clear invalid org from localStorage
-          console.log('[AuthMachine] Last organization no longer valid, clearing:', lastOrgId);
-          localStorage.removeItem('vibestack-last-organization-id');
         }
         
         // If we have a current org in context (shouldn't happen with our fix), validate it
@@ -172,10 +147,6 @@ export const authMachine = setup({
     setCurrentOrganization: assign({
       currentOrganization: ({ event }) => {
         const organization = event.output?.organization || null;
-        // Save the selected organization preference
-        if (organization) {
-          localStorage.setItem('vibestack-last-organization-id', organization.id);
-        }
         return organization;
       },
       organizationSetupComplete: true,
@@ -183,33 +154,26 @@ export const authMachine = setup({
     
     autoSelectOrganization: assign({
       currentOrganization: ({ context }) => {
-        // Auto-select logic: prefer single org, then last used, then first
+        // Auto-select logic: prefer persisted org, then single org, then first
         if (!context.userOrganizations || context.userOrganizations.length === 0) {
           return null;
         }
         
-        // If exactly one org, select it
-        if (context.userOrganizations.length === 1) {
-          const selectedOrg = context.userOrganizations[0];
-          // Save this preference
-          localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
-          return selectedOrg;
-        }
-        
-        // Check for last used organization
-        const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
-        if (lastOrgId) {
-          const foundOrg = context.userOrganizations.find(org => org.id === lastOrgId);
+        // If we already have a current org from persisted context, validate it
+        if (context.currentOrganization) {
+          const foundOrg = context.userOrganizations.find(org => org.id === context.currentOrganization.id);
           if (foundOrg) {
             return foundOrg;
           }
         }
         
-        // Fallback: select first organization
-        const selectedOrg = context.userOrganizations[0];
+        // If exactly one org, select it
+        if (context.userOrganizations.length === 1) {
+          return context.userOrganizations[0];
+        }
         
-        localStorage.setItem('vibestack-last-organization-id', selectedOrg.id);
-        return selectedOrg;
+        // Fallback: select first organization
+        return context.userOrganizations[0];
       },
       organizationSetupComplete: true,
     }),
@@ -275,10 +239,9 @@ export const authMachine = setup({
         return false;
       }
       
-      // Multiple organizations - check if we have a clear preference to auto-select
-      const lastOrgId = localStorage.getItem('vibestack-last-organization-id');
-      if (lastOrgId) {
-        const foundOrg = context.userOrganizations.find(org => org.id === lastOrgId);
+      // Multiple organizations - check if we have persisted organization preference
+      if (context.currentOrganization) {
+        const foundOrg = context.userOrganizations.find(org => org.id === context.currentOrganization.id);
         if (foundOrg) {
           return false; // We can auto-select the preferred org
         }
@@ -302,41 +265,25 @@ export const authMachine = setup({
   initial: 'determiningInitialState',
   
   context: ({ input }: { input?: { user?: UserInfo; authToken?: string; sessionExpiry?: string } }) => {
-    // Try to load persisted state first
-    let persistedContext = null;
-    try {
-      const stored = localStorage.getItem('auth-machine-state');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.context) {
-          // Found persisted context - will be logged when determining initial state
-          persistedContext = parsed.context;
-        }
-      }
-    } catch (error) {
-      console.warn('[AuthMachine] Failed to load persisted context:', error);
-      localStorage.removeItem('auth-machine-state');
-    }
-    
-    // Use persisted context if available, otherwise use input or defaults
+    // Use input or defaults - snapshot restoration will handle persisted context
+    console.log('[AuthMachine] Initializing context with input:', input?.user?.email || 'no user');
     return {
-      user: persistedContext?.user || input?.user || null,
-      authToken: persistedContext?.authToken || input?.authToken || null,
+      user: input?.user || null,
+      authToken: input?.authToken || null,
       authError: null,
-      sessionExpiry: persistedContext?.sessionExpiry || input?.sessionExpiry || null,
-      lastActivity: persistedContext?.lastActivity || Date.now(),
+      sessionExpiry: input?.sessionExpiry || null,
+      lastActivity: Date.now(),
       errorRetryCount: 0,
       
-      // Organization context - DON'T restore currentOrganization until we validate it exists
-      // This prevents the org mismatch bug when localStorage is cleared but auth persists
-      currentOrganization: null, // Will be set after loading organizations
-      userOrganizations: [], // Will be loaded fresh
+      // Organization context
+      currentOrganization: null,
+      userOrganizations: [],
       organizationError: null,
       isLoadingOrganizations: false,
-      organizationSetupComplete: persistedContext?.organizationSetupComplete || false,
+      organizationSetupComplete: false,
       needsOrganizationSetup: false,
       
-      // Billing context (reset on startup)
+      // Billing context
       subscriptionInfo: null,
       billingError: null,
       isLoadingBilling: false,
@@ -424,6 +371,10 @@ export const authMachine = setup({
                 authError: ({ event }) => event.output.fromPersisted ? 
                   `Using cached session (${event.output.error})` : null,
                 lastActivity: () => Date.now(),
+                // Set organization from session if available
+                currentOrganization: ({ event }) => event.output.organization || null,
+                organizationSetupComplete: ({ event }) => !!event.output.organization,
+                needsOrganizationSetup: ({ event }) => !event.output.organization,
               }),
               { 
                 type: 'dispatchAuthStateChange',
@@ -432,7 +383,6 @@ export const authMachine = setup({
                   reason: event.output.fromPersisted ? 'restored-from-persisted' : 'check-success' 
                 })
               },
-              'persistAuthState'
             ]
           },
           {
@@ -478,7 +428,6 @@ export const authMachine = setup({
                 type: 'dispatchAuthStateChange',
                 params: { authenticated: true, reason: 'persisted-during-error' }
               },
-              'persistAuthState' // Make sure we persist the state
             ]
           },
           {
@@ -596,11 +545,11 @@ export const authMachine = setup({
             src: 'loadOrganizations',
             onDone: {
               target: 'loadingBilling',
-              actions: ['setUserOrganizations', 'clearLoadingOrganizations', 'persistAuthState']
+              actions: ['setUserOrganizations', 'clearLoadingOrganizations']
             },
             onError: {
               target: 'checkingOrganizationSetup',
-              actions: ['setOrganizationError', 'persistAuthState']
+              actions: ['setOrganizationError']
             }
           }
         },
@@ -625,11 +574,11 @@ export const authMachine = setup({
             input: ({ context }) => ({ organizationId: context.currentOrganization?.id }),
             onDone: {
               target: 'checkingOrganizationSetup',
-              actions: ['setBillingInfo', 'clearLoadingBilling', 'persistAuthState']
+              actions: ['setBillingInfo', 'clearLoadingBilling']
             },
             onError: {
               target: 'checkingOrganizationSetup',
-              actions: ['setBillingError', 'clearLoadingBilling', 'persistAuthState']
+              actions: ['setBillingError', 'clearLoadingBilling']
             }
           }
         },
@@ -647,12 +596,12 @@ export const authMachine = setup({
             {
               target: 'ready',
               guard: ({ context }) => !!context.currentOrganization,
-              actions: ['persistAuthState']
+              actions: []
             },
             {
               // Auto-select organization and go to ready - this is the fast path
               target: 'ready',
-              actions: ['autoSelectOrganization', 'persistAuthState']
+              actions: ['autoSelectOrganization']
             }
           ]
         },
@@ -670,7 +619,7 @@ export const authMachine = setup({
         },
 
         needsOrganizationSelection: {
-          entry: 'persistAuthState', // Persist state even when waiting for org selection
+          entry: [], // Ready for organization selection
           on: {
             SELECT_ORGANIZATION: {
               target: 'selectingOrganization'
@@ -690,11 +639,11 @@ export const authMachine = setup({
             input: ({ event }) => event.organizationData,
             onDone: {
               target: 'ready',
-              actions: ['setCurrentOrganization', 'markSetupComplete', 'persistAuthState']
+              actions: ['setCurrentOrganization', 'markSetupComplete']
             },
             onError: {
               target: 'needsOrganizationSetup',
-              actions: ['setOrganizationError', 'persistAuthState']
+              actions: ['setOrganizationError']
             }
           }
         },
@@ -709,11 +658,11 @@ export const authMachine = setup({
             },
             onDone: {
               target: 'loadingBilling',
-              actions: ['setCurrentOrganization', 'persistAuthState']
+              actions: ['setCurrentOrganization']
             },
             onError: {
               target: 'needsOrganizationSelection',
-              actions: ['setOrganizationError', 'persistAuthState']
+              actions: ['setOrganizationError']
             }
           }
         },
@@ -752,6 +701,34 @@ export const authMachine = setup({
           }
         },
 
+        switchingOrganization: {
+          invoke: {
+            src: 'switchOrganization',
+            input: ({ event }) => ({
+              organizationId: event.type === 'SWITCH_ORGANIZATION' ? event.organizationId : ''
+            }),
+            onDone: {
+              target: 'ready',
+              actions: [
+                assign({
+                  user: ({ event }) => event.output.user,
+                  authToken: ({ event }) => event.output.authToken,
+                  sessionExpiry: ({ event }) => event.output.sessionExpiry,
+                  currentOrganization: ({ event }) => event.output.organization,
+                  organizationSetupComplete: true,
+                  organizationError: null,
+                }),
+                ]
+            },
+            onError: {
+              target: 'ready',
+              actions: assign({
+                organizationError: ({ event }) => event.error?.message || 'Failed to switch organization'
+              })
+            }
+          }
+        },
+
         ready: {
           entry: ({ context }) => {
             // 🚀 OPTIMIZED: Only log if we're reaching ready for the first time (not from restoration)
@@ -777,7 +754,7 @@ export const authMachine = setup({
               target: 'selectingOrganization'
             },
             SWITCH_ORGANIZATION: {
-              target: 'selectingOrganization'
+              target: 'switchingOrganization'
             },
             UPGRADE_SUBSCRIPTION: {
               target: 'upgradingSubscription'
@@ -842,6 +819,10 @@ export const authMachine = setup({
                 sessionExpiry: ({ event }) => event.output.sessionExpiry,
                 authError: () => null,
                 lastActivity: () => Date.now(),
+                // Set organization from session if available
+                currentOrganization: ({ event }) => event.output.organization || null,
+                organizationSetupComplete: ({ event }) => !!event.output.organization,
+                needsOrganizationSetup: ({ event }) => !event.output.organization,
               }),
               { 
                 type: 'dispatchAuthStateChange',

@@ -361,11 +361,26 @@ export const appInitMachine = setup({
       setTimeout(() => {
         console.log('[AppInitMachine] 📊 Background: Starting Legend State persistence initialization');
         
+        // Get orgId and userId directly from auth machine
+        const authMachineActor = (window as any).authMachineActor;
+        let orgId = context.organizationId;
+        let userId = null;
+        
+        if (authMachineActor) {
+          const authSnapshot = authMachineActor.getSnapshot();
+          userId = authSnapshot?.context?.user?.id;
+          // Double-check orgId from auth machine too
+          const authOrgId = authSnapshot?.context?.currentOrganization?.id;
+          if (authOrgId) {
+            orgId = authOrgId;
+          }
+          console.log('[AppInitMachine] Got orgId and userId from auth machine:', { orgId, userId });
+        } else {
+          console.warn('[AppInitMachine] Auth machine actor not available for Legend State init');
+        }
+        
         // Initialize Legend State persistence with dynamic schema
         import('../../legend-state').then(({ loadOrgContext }) => {
-          const orgId = context.organizationId;
-          const userId = context.userId;
-          
           if (orgId && userId) {
             // The new simplified approach handles persistence automatically
             loadOrgContext(orgId, userId).then(() => {
@@ -374,9 +389,15 @@ export const appInitMachine = setup({
               window.dispatchEvent(new CustomEvent('database:ready'));
             }).catch((error) => {
               console.error('[AppInitMachine] ❌ Failed to initialize Legend State:', error);
+              window.dispatchEvent(new CustomEvent('database:error', { 
+                detail: { error: error.message || 'Failed to initialize persistence' }
+              }));
             });
           } else {
-            console.warn('[AppInitMachine] ⚠️ Missing orgId or userId for Legend State initialization');
+            console.warn('[AppInitMachine] ⚠️ Missing orgId or userId for Legend State initialization', { orgId, userId });
+            window.dispatchEvent(new CustomEvent('database:error', { 
+              detail: { error: 'Missing orgId or userId for Legend State initialization' }
+            }));
           }
         }).catch((error) => {
           console.error('[AppInitMachine] ❌ Failed to initialize Legend State persistence:', error);
@@ -496,6 +517,7 @@ export const appInitMachine = setup({
     },
     
     UPDATE_ORGANIZATION: {
+      target: '.checkingLocalData',
       actions: 'updateOrganizationId'
     },
   },

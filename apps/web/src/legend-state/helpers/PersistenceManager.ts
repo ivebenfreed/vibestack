@@ -50,6 +50,29 @@ export class PersistenceManager {
       dbVersion: this.dbVersion
     })
   }
+
+  /**
+   * Generate database version based on entity schema to ensure IndexedDB upgrades
+   */
+  private generateSchemaVersion(entityNames: string[]): number {
+    // Use timestamp-based version to ensure monotonic increase
+    // This prevents IndexedDB version downgrade errors when entities are deleted
+    const currentTime = Date.now()
+    
+    // Store the last version used for this org in localStorage to ensure monotonic increase
+    const versionKey = `vibestack_db_version_${this.organizationId}`
+    const lastVersion = parseInt(localStorage.getItem(versionKey) || '0', 10)
+    
+    // Use the larger of current time or last version + 1 to ensure we never go backwards
+    const newVersion = Math.max(currentTime, lastVersion + 1)
+    
+    // Store the new version
+    localStorage.setItem(versionKey, newVersion.toString())
+    
+    console.log(`[PersistenceManager] Version progression: ${lastVersion} -> ${newVersion}`)
+    
+    return newVersion
+  }
   
   /**
    * Create IndexedDB configuration for all entity tables
@@ -62,13 +85,29 @@ export class PersistenceManager {
       'sync_state'
     ]
     
-    console.log(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
+    // Generate dynamic version based on schema to trigger IndexedDB upgrades when needed
+    const schemaVersion = this.generateSchemaVersion(entityNames)
     
-    return new ObservablePersistIndexedDB({
-      databaseName: this.dbName,
-      version: this.dbVersion,
-      tableNames: tableNames
-    })
+    console.log(`[PersistenceManager] Creating IndexedDB config with ${tableNames.length} tables:`, tableNames)
+    console.log(`[PersistenceManager] Using dynamic schema version: ${schemaVersion} (based on entity list)`)
+    
+    try {
+      return new ObservablePersistIndexedDB({
+        databaseName: this.dbName,
+        version: schemaVersion,
+        tableNames: tableNames
+      })
+    } catch (error) {
+      console.warn(`[PersistenceManager] Failed to create IndexedDB plugin, falling back to no-op:`, error)
+      // Return a no-op plugin that doesn't break the application
+      return {
+        loadTable: async () => ({}),
+        saveTable: async () => {},
+        deleteTable: async () => {},
+        getMetadata: async () => ({}),
+        setMetadata: async () => {}
+      }
+    }
   }
   
   /**
@@ -79,7 +118,7 @@ export class PersistenceManager {
     
     return {
       name: persistKey,
-      retrySync: true
+      retrySync: false // Disable automatic retry to prevent flooding
     }
   }
   

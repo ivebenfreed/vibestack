@@ -2,16 +2,15 @@ import { useState, useEffect, useMemo } from 'react'
 import { observable, Observable } from '@legendapp/state'
 import { useObservable } from '@legendapp/state/react'
 import { switchToOrganization, getOrgDataStore, clearOrgDataStore, loadEntityData } from '@/stores/org-data-store'
+import { useAuth } from '@/state-machines'
 
-export function useOrgDataStore(orgId?: string) {
-  const [store, setStore] = useState(() => {
-    if (!orgId) return null
-    return getOrgDataStore()
-  })
+export function useOrgDataStore() {
+  const { currentOrganization } = useAuth()
+  const [store, setStore] = useState(() => getOrgDataStore())
   
   useEffect(() => {
-    if (orgId) {
-      switchToOrganization(orgId).then(() => {
+    if (currentOrganization?.id) {
+      switchToOrganization(currentOrganization.id).then(() => {
         setStore(getOrgDataStore())
       }).catch(error => {
         console.error('[useOrgDataStore] Failed to switch organization:', error)
@@ -21,13 +20,14 @@ export function useOrgDataStore(orgId?: string) {
       clearOrgDataStore()
       setStore(null)
     }
-  }, [orgId])
+  }, [currentOrganization?.id])
   
   return store
 }
 
-export function useEntityData(entityName: string, orgId?: string) {
-  const store = useOrgDataStore(orgId)
+export function useEntityData(entityName: string) {
+  const { currentOrganization } = useAuth()
+  const store = useOrgDataStore()
   
   // Create a stable fallback observable that won't change between renders
   const fallbackObservable = useMemo(() => observable([]), [])
@@ -53,15 +53,15 @@ export function useEntityData(entityName: string, orgId?: string) {
   
   // Trigger lazy loading when the observable is accessed
   useEffect(() => {
-    if (store && orgId && targetObservable !== fallbackObservable) {
+    if (store && currentOrganization?.id && targetObservable !== fallbackObservable) {
       const currentData = targetObservable.peek()
       // Only load if data is empty and we haven't loaded before
       if (Array.isArray(currentData) && currentData.length === 0) {
         console.log(`[useEntityData] Lazy loading data for ${entityName}`)
-        loadEntityData(orgId, entityName, targetObservable)
+        loadEntityData(currentOrganization.id, entityName, targetObservable)
       }
     }
-  }, [store, orgId, entityName, targetObservable, fallbackObservable])
+  }, [store, currentOrganization?.id, entityName, targetObservable, fallbackObservable])
 
   // Debug the observable value to see what's happening
   useEffect(() => {
@@ -97,8 +97,8 @@ export function useEntityData(entityName: string, orgId?: string) {
   return actualData
 }
 
-export function useOrgSchema(orgId?: string) {
-  const store = useOrgDataStore(orgId)
+export function useOrgSchema() {
+  const store = useOrgDataStore()
   
   // Create a stable fallback observable for the schema
   const fallbackSchemaObservable = useMemo(() => observable(null), [])

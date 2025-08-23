@@ -20,6 +20,14 @@ export const checkAuthActor = fromPromise(async () => {
         image: session.data.user.image,
       };
       
+      // Extract organization data from session (automatically injected by customSession plugin)
+      const organization = session.data.session?.organization ? {
+        id: session.data.session.organization.id,
+        name: session.data.session.organization.name,
+        slug: session.data.session.organization.slug,
+        role: session.data.session.organization.role,
+      } : null;
+      
       // Extract session expiry if available
       const sessionExpiry = session.data.session?.expiresAt ? 
         new Date(session.data.session.expiresAt).toISOString() : 
@@ -28,18 +36,22 @@ export const checkAuthActor = fromPromise(async () => {
       console.log('[checkAuthActor] Session data:', {
         hasUser: !!session.data.user,
         hasSession: !!session.data.session,
+        hasOrganization: !!organization,
+        organizationName: organization?.name,
         userRole: user.role,
+        orgRole: organization?.role,
         sessionExpiry,
         tokenPresent: !!session.data.session?.token,
-        rawUserData: session.data.user, // Debug: log raw user data to see available fields
-        extractedRole: (session.data.user as any).role // Debug: log the extracted role specifically
+        rawUserData: session.data.user,
+        rawOrganizationData: session.data.session?.organization
       });
       
       return {
         authenticated: true,
         user,
+        organization, // Include organization from session
         authToken: session.data.session?.token || 'authenticated',
-        sessionExpiry, // Include session expiry
+        sessionExpiry,
       };
     }
     

@@ -12,9 +12,10 @@ import { QuickEntityCreate } from './QuickEntityCreate'
 import { PlusCircle } from 'lucide-react'
 import { 
   orgContext$,
-  getEntity$
+  getEntity$,
+  removeEntityFromSchema
 } from '@/legend-state'
-import { deleteEntitySchema } from '@/stores/mutation-helpers'
+import { orgSchemaClient } from '@/lib/schema-client'
 import { use$ } from '@legendapp/state/react'
 
 const topNav = [
@@ -222,17 +223,30 @@ const EntityCardWithData = observer(function EntityCardWithData({
   // This prevents the "0 records" flash on reload
   const displayCount = !hasLoaded && isLoading ? '...' : count.toString()
   
-  // Handle entity deletion using Legend State optimistic updates
+  // Handle entity deletion using new schema client API
   const handleDelete = async (entityName: string) => {
     console.log(`[Dashboard] Deleting entity type: ${entityName}`)
     
     try {
-      // Use Legend State optimistic delete - UI updates immediately
-      await deleteEntitySchema(entityName)
+      const orgId = currentOrganization?.id
+      if (!orgId) {
+        throw new Error('No organization ID available')
+      }
+      
+      // First remove from local observable for immediate UI update
+      removeEntityFromSchema(entityName)
+      
+      // Then make API call (optimistic update pattern)
+      const result = await orgSchemaClient.deleteEntitySchema(orgId, entityName)
+      
+      if (!result.success) {
+        // If API fails, we'd need to rollback the optimistic update
+        // For now, just throw the error
+        throw new Error(result.error || 'Failed to delete entity schema')
+      }
+      
       console.log(`[Dashboard] Successfully deleted entity type: ${entityName}`)
       
-      // The entity disappears immediately due to optimistic updates
-      // Background sync will handle the server-side deletion
     } catch (error) {
       console.error(`[Dashboard] Failed to delete entity ${entityName}:`, error)
       throw error

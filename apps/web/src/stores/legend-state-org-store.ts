@@ -86,33 +86,65 @@ export function getEntityStore$(entityName: string) {
       throw new Error('Organization ID not set')
     }
     
+    // Validate entity exists in schema
+    const entities = orgSchema$.entities.get()
+    if (!entities[entityName]) {
+      console.warn(`[Legend State] Entity ${entityName} not found in schema, creating placeholder store`)
+      // Return a placeholder observable that will be replaced when schema loads
+      entityStores[entityName] = observable([])
+      return entityStores[entityName]
+    }
+    
+    console.log(`[Legend State] Creating synced store for entity: ${entityName}`)
+    
     // Create a synced observable for this entity with CRUD operations
     entityStores[entityName] = observable(
       syncedCrud({
-        list: () => fetch(`/api/archetype/orgs/${orgId}/data/${entityName}`, {
+        list: () => fetch(`/api/dataforge/orgs/${orgId}/data/${entityName}`, {
           credentials: 'include',
-        }).then(r => r.json()).then(r => r.data || []),
+        }).then(async r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`)
+          }
+          const data = await r.json()
+          return data.data || []
+        }),
         
-        create: (item: any) => fetch(`/api/archetype/orgs/${orgId}/data/${entityName}`, {
+        create: (item: any) => fetch(`/api/dataforge/orgs/${orgId}/data/${entityName}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(item),
-        }).then(r => r.json()),
+        }).then(async r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`)
+          }
+          return r.json()
+        }),
         
-        update: (item: any) => fetch(`/api/archetype/orgs/${orgId}/data/${entityName}/${item.id}`, {
+        update: (item: any) => fetch(`/api/dataforge/orgs/${orgId}/data/${entityName}/${item.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(item),
-        }).then(r => r.json()),
+        }).then(async r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`)
+          }
+          return r.json()
+        }),
         
-        delete: (item: any) => fetch(`/api/archetype/orgs/${orgId}/data/${entityName}/${item.id}`, {
+        delete: (item: any) => fetch(`/api/dataforge/orgs/${orgId}/data/${entityName}/${item.id}`, {
           method: 'DELETE',
           credentials: 'include',
-        }).then(r => r.json()),
+        }).then(async r => {
+          if (!r.ok) {
+            throw new Error(`HTTP ${r.status}: ${r.statusText}`)
+          }
+          return r.json()
+        }),
         
-        // Persistence configuration
+        // Persistence configuration with entity validation
         persist: {
           name: `vibestack_${orgId}_${entityName}`,
           plugin: ObservablePersistIndexedDB,
@@ -121,10 +153,39 @@ export function getEntityStore$(entityName: string) {
         // Optimistic updates
         updateLocal: true,
         
-        // Retry configuration
+        // Retry configuration with backoff
         retry: {
           times: 3,
+          delay: 1000, // Start with 1 second delay
+          backoff: 'exponential', // Exponential backoff
+          maxDelay: 30000, // Max 30 seconds
         },
+        
+        // Error handling for various error types
+        onError: (error) => {
+          console.error(`[Legend State] Error in entity store ${entityName}:`, error)
+          
+          // Handle different error types
+          if (error.message?.includes('500') || error.message?.includes('Internal Server Error')) {
+            console.warn(`[Legend State] Server error for ${entityName}, stopping retries to prevent spam`)
+            // Stop retrying on 500 errors to prevent infinite loops
+            return { retry: false }
+          }
+          
+          if (error.message?.includes('404') || error.message?.includes('not found')) {
+            console.warn(`[Legend State] Entity ${entityName} not found, removing from stores`)
+            delete entityStores[entityName]
+            return { retry: false }
+          }
+          
+          if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+            console.warn(`[Legend State] Rate limited for ${entityName}, using longer delay`)
+            return { retry: true, delay: 60000 } // Wait 1 minute on rate limits
+          }
+          
+          // Default: allow retry with exponential backoff
+          return { retry: true }
+        }
       })
     )
   }
@@ -174,6 +235,13 @@ export async function loadOrgSchema(orgId: string) {
  * Legend State observables automatically update all subscribers
  */
 export function handleWebSocketNotification(notification: any) {
+  // Handle schema change notifications first
+  if (notification.type === 'schema_change') {
+    console.log('[Legend State] Schema change detected:', notification)
+    handleSchemaChangeNotification(notification)
+    return
+  }
+  
   if (notification.table && entityStores[notification.table]) {
     const store$ = entityStores[notification.table]
     
@@ -182,7 +250,7 @@ export function handleWebSocketNotification(notification: any) {
       case 'INSERT':
         // Fetch the new record and add it
         const orgId = orgSchema$.orgId.get()
-        fetch(`/api/archetype/orgs/${orgId}/data/${notification.table}/${notification.id}`, {
+        fetch(`/api/dataforge/orgs/${orgId}/data/${notification.table}/${notification.id}`, {
           credentials: 'include',
         })
           .then(r => r.json())
@@ -198,7 +266,7 @@ export function handleWebSocketNotification(notification: any) {
         if (index !== -1) {
           // Fetch updated record
           const orgId = orgSchema$.orgId.get()
-          fetch(`/api/archetype/orgs/${orgId}/data/${notification.table}/${notification.id}`, {
+          fetch(`/api/dataforge/orgs/${orgId}/data/${notification.table}/${notification.id}`, {
             credentials: 'include',
           })
             .then(r => r.json())
@@ -215,6 +283,97 @@ export function handleWebSocketNotification(notification: any) {
         store$.set(filteredItems)
         break
     }
+  }
+}
+
+/**
+ * Handle schema change notifications from entity operations
+ */
+export function handleSchemaChangeNotification(notification: {
+  orgId: string
+  entityName: string
+  operation: 'create' | 'update' | 'delete'
+}) {
+  const currentOrgId = orgSchema$.orgId.get()
+  
+  // Only process if it's for the current organization
+  if (notification.orgId !== currentOrgId) {
+    return
+  }
+  
+  console.log(`[Legend State] Handling schema change: ${notification.operation} on ${notification.entityName}`)
+  
+  switch (notification.operation) {
+    case 'create':
+      // Reload entire schema to pick up new entity
+      reloadOrgSchema(currentOrgId).then(() => {
+        // Create the new entity store immediately after schema reload
+        recreateEntityStore(notification.entityName)
+      })
+      break
+      
+    case 'update':
+      // Clear entity store cache and reload schema
+      if (entityStores[notification.entityName]) {
+        console.log(`[Legend State] Clearing store for updated entity: ${notification.entityName}`)
+        delete entityStores[notification.entityName]
+      }
+      reloadOrgSchema(currentOrgId).then(() => {
+        // Recreate the entity store with updated schema
+        recreateEntityStore(notification.entityName)
+      })
+      break
+      
+    case 'delete':
+      // Remove entity from stores and schema
+      if (entityStores[notification.entityName]) {
+        console.log(`[Legend State] Removing store for deleted entity: ${notification.entityName}`)
+        delete entityStores[notification.entityName]
+      }
+      reloadOrgSchema(currentOrgId)
+      break
+  }
+}
+
+/**
+ * Recreate entity store after schema change
+ */
+function recreateEntityStore(entityName: string) {
+  // Force recreate the entity store to pick up new schema
+  if (entityStores[entityName]) {
+    delete entityStores[entityName]
+  }
+  
+  try {
+    // This will create a new store with the updated schema
+    const newStore = getEntityStore$(entityName)
+    console.log(`[Legend State] Recreated entity store for: ${entityName}`)
+  } catch (error) {
+    console.error(`[Legend State] Failed to recreate store for ${entityName}:`, error)
+  }
+}
+
+/**
+ * Reload organization schema and update all dependent observables
+ */
+async function reloadOrgSchema(orgId: string) {
+  console.log(`[Legend State] Reloading schema for org ${orgId}`)
+  
+  try {
+    // Force reload schema from server
+    const result = await orgSchemaClient.loadOrgSchema(orgId)
+    if (result.success && result.schema) {
+      // Update schema observable
+      orgSchema$.merge({
+        entities: result.schema.entities,
+        error: null,
+      })
+      
+      console.log(`[Legend State] Schema reloaded: ${Object.keys(result.schema.entities).length} entities`)
+    }
+  } catch (error) {
+    console.error('[Legend State] Failed to reload schema:', error)
+    orgSchema$.error.set(error instanceof Error ? error.message : 'Failed to reload schema')
   }
 }
 

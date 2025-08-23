@@ -134,7 +134,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow cursor-pointer relative group">
+      <Card className="hover:shadow-lg transition-shadow cursor-pointer relative group overflow-visible">
         <Link to="/entities/$entityName" params={{ entityName }} className="block">
           <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
             <div className="flex items-center gap-2">
@@ -159,7 +159,7 @@ export function EntityCard({ entityName, entityDef, count, archetype: propArchet
                         <MoreVertical className="h-3 w-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" sideOffset={5} className="z-50">
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.preventDefault()

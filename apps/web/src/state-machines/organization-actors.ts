@@ -6,6 +6,7 @@
 
 import { fromPromise } from 'xstate';
 import type { OrganizationInfo, CreateOrganizationInput } from './types';
+import { authClient } from '@/lib/auth';
 
 // Mock organization API - replace with actual API calls
 class OrganizationAPI {
@@ -22,8 +23,8 @@ class OrganizationAPI {
     }
 
     const result = await response.json();
-    // Server returns organizations array directly: [{org1}, {org2}]
-    return result;
+    // Server returns {organizations: [...]} format
+    return result.organizations || result;
   }
 
   async createOrganization(data: CreateOrganizationInput): Promise<OrganizationInfo> {
@@ -67,6 +68,22 @@ class OrganizationAPI {
     }
 
     return response.json();
+  }
+
+  async switchOrganization(organizationId: string): Promise<OrganizationInfo> {
+    const response = await fetch(`${this.baseUrl}/organizations/switch`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationId })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to switch organization: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.organization;
   }
 }
 
@@ -219,6 +236,56 @@ export const upgradeSubscriptionActor = fromPromise(async ({ input }: { input: {
       billingInfo: null,
       trialInfo: null,
       error: error instanceof Error ? error.message : 'Failed to upgrade subscription'
+    };
+  }
+});
+
+// Simple organization switching actor
+export const switchOrganizationActor = fromPromise(async ({ input }: { input: { organizationId: string } }) => {
+  console.log('[OrganizationActors] Switching to organization:', input.organizationId);
+  
+  try {
+    // 1. Call the organization switch API
+    await organizationAPI.switchOrganization(input.organizationId);
+    
+    // 2. Refresh the session to get updated organization context
+    const session = await authClient.getSession();
+    
+    if (!session?.data?.user) {
+      throw new Error('Session lost after organization switch');
+    }
+
+    // Extract user and organization data from refreshed session
+    const user = {
+      id: session.data.user.id,
+      email: session.data.user.email,
+      name: session.data.user.name || session.data.user.email?.split('@')[0] || 'User',
+      role: (session.data.user as any).role || 'member',
+      emailVerified: session.data.user.emailVerified || false,
+      image: session.data.user.image,
+    };
+    
+    const organization = session.data.session?.organization ? {
+      id: session.data.session.organization.id,
+      name: session.data.session.organization.name,
+      slug: session.data.session.organization.slug,
+      role: session.data.session.organization.role,
+    } : null;
+
+    return {
+      success: true,
+      user,
+      organization,
+      authToken: session.data.session?.token || 'authenticated',
+      sessionExpiry: session.data.session?.expiresAt ? 
+        new Date(session.data.session.expiresAt).toISOString() : null,
+    };
+  } catch (error) {
+    console.error('[OrganizationActors] Failed to switch organization:', error);
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to switch organization'
     };
   }
 });
