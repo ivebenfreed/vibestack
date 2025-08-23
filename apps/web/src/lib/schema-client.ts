@@ -84,15 +84,8 @@ export class OrgSchemaClient {
       // Cache the schema
       this.cacheSchema(orgId, schema);
       
-      // 🎯 CRITICAL: Notify app init that schema is ready for ultra-fast initialization
-      console.log('[Schema] ✅ Organization schema loaded - triggering app initialization');
-      const appInitActor = (window as any).appInitActor;
-      if (appInitActor) {
-        appInitActor.send({ type: 'SCHEMA_READY' });
-        console.log('[Schema] 📤 Sent SCHEMA_READY event to app init machine');
-      } else {
-        console.warn('[Schema] ⚠️ App init actor not found - cannot trigger initialization');
-      }
+      // Schema loaded - Legend State handles initialization automatically
+      console.log('[Schema] ✅ Organization schema loaded - Legend State will handle initialization');
 
       return {
         success: true,

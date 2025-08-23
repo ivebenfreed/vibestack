@@ -33,13 +33,13 @@ import './index.css'
 import { routeTree } from './routeTree.gen'
 // TODO: Migrate to Dexie - these imports need to be updated to use the new domain services
 
-// 🔥 DEXIE INTEGRATION FLOW:
+// 🔥 SIMPLIFIED INTEGRATION FLOW:
 // 1. main.tsx: Creates router and renders root providers
-// 2. __root.tsx: Creates XState actors and provides them globally  
-// 3. AuthAwareProviders: Mounts DexieProvider when user is authenticated
-// 4. VibestackDexieProvider: Dispatches database:ready events to XState
-// 5. app-init-machine: Coordinates auth → database → sync → liveChanges → routes
-// 6. UnifiedLoadingScreen: Shows appropriate loading state for each phase
+// 2. __root.tsx: Creates XState actors (auth + sync) and provides them globally  
+// 3. AuthAwareProviders: Provides IndexedDB context when user is authenticated
+// 4. Auth machine: Directly calls Legend State loadOrgContext() when ready
+// 5. Legend State: Handles lazy initialization and persistence automatically
+// 6. UnifiedLoadingScreen: Shows loading state based on Legend State observables
 
 // Global instances for HMR persistence
 let router: ReturnType<typeof createRouter>;

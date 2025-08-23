@@ -11,15 +11,7 @@ import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
 import { switchToOrganization } from '@/stores/org-data-store'
 
-// Track if we've verified system readiness in this session
-let hasVerifiedSystemThisSession = false;
-
-// Reset on sign-out
-if (typeof window !== 'undefined') {
-  window.addEventListener('auth:signout', () => {
-    hasVerifiedSystemThisSession = false;
-  });
-}
+// Removed session tracking - components handle their own initialization state
 
 export const Route = createFileRoute('/_authenticated')({
   pendingComponent: UnifiedLoadingScreen,
@@ -100,76 +92,9 @@ export const Route = createFileRoute('/_authenticated')({
       return
     }
     
-    // Only check system ready once per session (after sign-in)
-    if (!hasVerifiedSystemThisSession) {
-      const appInitActor = (window as any).appInitActor
-      if (appInitActor) {
-        // Get app init machine directly
-        const appInitMachine = appInitActor
-        
-        if (!appInitMachine) {
-          console.error('[AuthenticatedRoute] App init machine not found')
-          return
-        }
-        
-        const appInitSnapshot = appInitMachine.getSnapshot()
-        const isSystemReady = appInitSnapshot?.value === 'ready' || false
-        
-        console.log('[AuthenticatedRoute] System check:', {
-          hasAppInitMachine: !!appInitMachine,
-          appInitState: appInitSnapshot?.value,
-          isSystemReady
-        })
-        
-        if (!isSystemReady) {
-          console.log('[AuthenticatedRoute] First access this session - waiting for system initialization...')
-          
-          await new Promise<void>((resolve) => {
-            let resolved = false
-            
-            // Subscribe directly to app init machine changes
-            const subscription = appInitMachine.subscribe((snapshot: any) => {
-              // Also check sync machine state when we're in sync state
-              let syncMachineInfo = ''
-              if (snapshot?.value === 'sync') {
-                const appInitSnapshot = appInitActor.getSnapshot()
-                const syncMachine = appInitSnapshot?.children?.syncMachine
-                if (syncMachine) {
-                  const syncSnapshot = syncMachine.getSnapshot()
-                  syncMachineInfo = ` | Sync: ${syncSnapshot?.value} (phase: ${syncSnapshot?.context?.syncPhase})`
-                }
-              }
-              
-              console.log('[AuthenticatedRoute] App init machine change:', {
-                state: snapshot?.value,
-                isReady: snapshot?.value === 'ready',
-                syncInfo: syncMachineInfo
-              })
-              
-              if (!resolved && snapshot?.value === 'ready') {
-                console.log('[AuthenticatedRoute] ✅ App init machine reached ready state!')
-                resolved = true
-                subscription.unsubscribe()
-                resolve()
-              }
-            })
-            
-            // Check again immediately in case it resolved while setting up subscription
-            const currentSnapshot = appInitMachine.getSnapshot()
-            if (currentSnapshot?.value === 'ready') {
-              console.log('[AuthenticatedRoute] ✅ Already ready during subscription setup')
-              resolved = true
-              subscription.unsubscribe()
-              resolve()
-            }
-          })
-        }
-        
-        // Mark as verified for this session
-        hasVerifiedSystemThisSession = true;
-        console.log('[AuthenticatedRoute] System verified for this session')
-      }
-    }
+    // FIXED: Removed blocking Legend State check from beforeLoad to prevent white screen
+    // Components will handle their own loading states using UnifiedLoadingScreen
+    console.log('[AuthenticatedRoute] Route loading - components will handle Legend State initialization')
   },
   component: RouteComponent,
 })
@@ -202,7 +127,6 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   });
   
   const currentOrgId = user?.currentOrganizationId;
-  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
   const [hasInitializedOrg, setHasInitializedOrg] = React.useState(false);
   
   // Initialize store ONLY on first load, not when organization changes
@@ -213,28 +137,16 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
         setHasInitializedOrg(true);
       }).catch(error => {
         console.error('[AuthenticatedContent] Failed to initialize organization:', error)
+        setHasInitializedOrg(true); // Continue anyway to prevent infinite loading
       })
     }
   }, [currentOrgId, hasInitializedOrg])
   
-  // Clear initial load flag after a brief delay to show loading screen
-  // This ensures smooth transition and prevents white flash
-  useEffect(() => {
-    if (isAuthenticatedAndReady && organizationSetupComplete) {
-      // Show loading screen briefly to prevent flash
-      // Dashboard now has its own full-screen loading state
-      const timer = setTimeout(() => {
-        setIsInitialLoad(false);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isAuthenticatedAndReady, organizationSetupComplete]);
-  
   // The sidebar entity groups are now automatically updated in switchToOrganization
 
   // Show unified loading screen during auth/org initialization
-  // This covers both auth checking and organization loading phases
-  if (isCheckingAuth || isLoadingOrganizations || isInitialLoad ||
+  // Simplified loading logic - removed artificial delay that caused flickering
+  if (isCheckingAuth || isLoadingOrganizations ||
       (!isAuthenticatedAndReady && !needsOrganizationSetup && !needsOrganizationSelection)) {
     return <UnifiedLoadingScreen />;
   }
@@ -251,7 +163,7 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
 
   // Render the main app
   return (
-    <div data-testid="authenticated-content">
+    <div data-testid="authenticated-content" className="min-h-screen bg-background">
       {/* <SkipToMain /> - Disabled: phantom component issue */}
       <UnifiedLayout />
     </div>

@@ -281,102 +281,76 @@ export function useAuth() {
   };
 }
 
-// App initialization hook - directly from AppInitMachine
+// Legend State system readiness hook - replaces app init machine
 export function useAppInit() {
-  // Get AppInitMachine directly from window (it's started independently)
-  const actor = useMemo(() => {
-    return (window as any).appInitActor;
+  // Legend State handles its own initialization - check observables directly
+  const [isReady, setIsReady] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  
+  React.useEffect(() => {
+    // Dynamic import to avoid circular dependencies
+    import('../legend-state').then(({ orgContext$ }) => {
+      // Subscribe to org context loading state
+      const unsubscribe = orgContext$.onChange(() => {
+        // Get the full context on each change - onChange only passes changed values
+        const fullContext = orgContext$.peek();
+        const hasOrgAndUser = !!(fullContext.orgId && fullContext.userId);
+        const hasSchema = !!(fullContext.schema && Object.keys(fullContext.schema.entities || {}).length > 0);
+        const isLoading = fullContext.loading;
+        const error = fullContext.error;
+        
+        // System is ready when we have org, user, and schema loaded
+        setIsReady(hasOrgAndUser && hasSchema && !isLoading);
+        setError(error);
+      });
+      
+      return unsubscribe;
+    }).catch((err) => {
+      console.error('[useAppInit] Failed to import Legend State:', err);
+      setError('Failed to load Legend State');
+    });
   }, []);
 
-  // Safety check: only proceed if actor exists
-  if (!actor) {
-    return {
-      isDatabaseInitialized: false,
-      databaseError: null,
-      isSyncReady: false,
-      syncError: null,
-      connectionStatus: 'disconnected' as const,
-      liveChangesStatus: 'idle' as const,
-      isCheckingRequirements: true,
-      isInitializingDatabase: false,
-      isStartingSync: false,
-      isReady: false,
-      hasError: false,
-      retryInit: () => console.error('[useAppInit] AppInitMachine not available'),
-      restartSync: () => console.error('[useAppInit] AppInitMachine not available'),
-    };
-  }
-  
-  // Get data directly from app init machine snapshot
-  const initMachineSnapshot = useSelector(actor, (state) => state);
-  
-  const isDatabaseInitialized = initMachineSnapshot?.context?.isDatabaseInitialized || false;
-  const databaseError = initMachineSnapshot?.context?.databaseError || null;
-  const isSyncReady = initMachineSnapshot?.context?.isSyncReady || false;
-  const syncError = initMachineSnapshot?.context?.syncError || null;
-  const connectionStatus = initMachineSnapshot?.context?.connectionStatus || 'disconnected';
-  const liveChangesStatus = initMachineSnapshot?.context?.liveChangesStatus || 'idle';
-
-  // Get AppInitMachine state directly
-  const appInitState = initMachineSnapshot?.value || 'idle';
-  
-  const isCheckingRequirements = appInitState === 'idle';
-  const isInitializingDatabase = appInitState === 'database';
-  const isStartingSync = appInitState === 'sync';
-  const isStartingLiveChanges = appInitState === 'live_changes';
-  const isReady = appInitState === 'ready';
-  const hasError = !!(databaseError || syncError);
-
-  const retryInit = useMemo(() => () => {
-    if (actor) {
-      console.log('[useAppInit] Sending RETRY to AppInitMachine');
-      actor.send({ type: 'RETRY' });
-    } else {
-      console.error('[useAppInit] AppInitMachine actor not available');
-    }
-  }, [actor]);
-
-  const restartSync = useMemo(() => () => {
-    if (actor) {
-      console.log('[useAppInit] Sending RESTART_SYNC to AppInitMachine');
-      actor.send({ type: 'RESTART_SYNC' });
-    } else {
-      console.error('[useAppInit] AppInitMachine actor not available');
-    }
-  }, [actor]);
-
   return {
-    // Core states
-    isDatabaseInitialized,
-    databaseError,
-    isSyncReady,
-    syncError,
-    connectionStatus,
-    liveChangesStatus,
+    // Core states (simplified - Legend State manages complexity internally)
+    isDatabaseInitialized: isReady,
+    databaseError: error,
+    isSyncReady: isReady,
+    syncError: null, // Sync machine handles its own errors
+    connectionStatus: 'connected' as const, // Simplified - sync machine manages this
+    liveChangesStatus: 'connected' as const, // Simplified
     
     // UI state flags
-    isCheckingRequirements,
-    isInitializingDatabase,
-    isStartingSync,
-    isStartingLiveChanges,
+    isCheckingRequirements: !isReady && !error,
+    isInitializingDatabase: !isReady && !error,
+    isStartingSync: false, // Sync is independent
+    isStartingLiveChanges: false,
     isReady,
-    hasError,
+    hasError: !!error,
     
-    // Actions
-    retryInit,
-    restartSync,
+    // Actions (simplified - Legend State handles retries internally)
+    retryInit: () => {
+      console.log('[useAppInit] Legend State handles retries automatically');
+    },
+    restartSync: () => {
+      console.log('[useAppInit] Use sync machine directly for restart');
+      const syncActor = (window as any).simpleNotificationSyncMachineActor;
+      if (syncActor) {
+        syncActor.send({ type: 'RECONNECT' });
+      }
+    },
   };
 }
 
-// System hook - simple readiness check
+// System hook - Legend State readiness check
 export function useSystem() {
-  // AppInit machine includes system readiness
-  const { isReady } = useAppInit();
+  // Use Legend State readiness instead of app init machine
+  const { isReady, hasError, databaseError } = useAppInit();
   
   return {
     isSystemReady: isReady,
-    isSystemError: false, // AppInit handles errors
-    systemError: null, // AppInit handles errors
+    isSystemError: hasError,
+    systemError: databaseError,
   };
 }
 

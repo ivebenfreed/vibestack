@@ -119,27 +119,20 @@ export const authMachine = setup({
       currentOrganization: ({ context, event }) => {
         const organizations = event.output?.organizations || [];
         
-        // Try to restore from context (from persisted snapshot)
+        // If we already have a valid currentOrganization, preserve it and validate against the loaded list
         if (context.currentOrganization) {
           const validOrg = organizations.find(org => org.id === context.currentOrganization.id);
           if (validOrg) {
-            console.log('[AuthMachine] Restored last selected organization from context:', validOrg.name);
-            return validOrg;
+            console.log('[AuthMachine] Current organization validated against loaded organizations:', validOrg.name);
+            return validOrg; // Return the org from the list (may have updated info)
+          } else {
+            console.log('[AuthMachine] Current organization no longer valid, clearing:', context.currentOrganization.id);
+            return null;
           }
         }
         
-        // If we have a current org in context (shouldn't happen with our fix), validate it
-        const currentOrgId = context.currentOrganization?.id;
-        if (currentOrgId) {
-          const validOrg = organizations.find(org => org.id === currentOrgId);
-          if (validOrg) {
-            return validOrg;
-          }
-          console.log('[AuthMachine] Current organization no longer valid, clearing:', currentOrgId);
-        }
-        
-        // No valid org found - don't auto-select, let user choose
-        console.log('[AuthMachine] No valid organization found, user needs to select one');
+        // No current organization - don't auto-select, let the state machine handle selection logic
+        console.log('[AuthMachine] No current organization - organizations loaded for selection');
         return null;
       },
     }),
@@ -518,11 +511,18 @@ export const authMachine = setup({
         checkingOrganizationState: {
           always: [
             {
-              // If org is already setup (from persisted state), go straight to ready
+              // If org is already setup AND we have userOrganizations loaded, go straight to ready
               guard: ({ context }) => 
-                !!context.currentOrganization && context.organizationSetupComplete,
+                !!context.currentOrganization && context.organizationSetupComplete && context.userOrganizations.length > 0,
               target: 'ready'
               // No logging here - we already logged in determiningInitialState if this was from persistence
+            },
+            {
+              // If we have currentOrg but no userOrganizations list, load organizations first
+              guard: ({ context }) => 
+                !!context.currentOrganization && context.userOrganizations.length === 0,
+              target: 'loadingOrganizations',
+              actions: () => console.log('[AuthMachine] Have current org but missing organizations list - loading organizations')
             },
             {
               // If we have orgs loaded but none selected, need selection
@@ -543,10 +543,19 @@ export const authMachine = setup({
           entry: 'setLoadingOrganizations',
           invoke: {
             src: 'loadOrganizations',
-            onDone: {
-              target: 'loadingBilling',
-              actions: ['setUserOrganizations', 'clearLoadingOrganizations']
-            },
+            onDone: [
+              {
+                // If we already have a current organization, go straight to ready
+                target: 'ready',
+                guard: ({ context }) => !!context.currentOrganization && context.organizationSetupComplete,
+                actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+              },
+              {
+                // Otherwise, continue with the normal flow
+                target: 'loadingBilling',
+                actions: ['setUserOrganizations', 'clearLoadingOrganizations']
+              }
+            ],
             onError: {
               target: 'checkingOrganizationSetup',
               actions: ['setOrganizationError']
@@ -741,6 +750,23 @@ export const authMachine = setup({
                 setupComplete: true
               }
             }));
+            
+            // 🔄 SYNC: Connect sync machine when auth is fully ready
+            const syncActor = (window as any).simpleNotificationSyncMachineActor;
+            if (syncActor && context.user?.id && context.currentOrganization?.id) {
+              console.log('[AuthMachine] ✅ Triggering sync connection - auth ready');
+              syncActor.send({ 
+                type: 'CONNECT', 
+                organizationId: context.currentOrganization.id,
+                userId: context.user.id
+              });
+            } else {
+              console.warn('[AuthMachine] ⚠️ Sync actor not found or missing org/user data', {
+                syncActor: !!syncActor,
+                userId: context.user?.id,
+                orgId: context.currentOrganization?.id
+              });
+            }
           },
           
           on: {

@@ -15,7 +15,6 @@ import { IntegrityMonitor } from '@/components/IntegrityMonitor'
 // 🔥 NEW: Import XState machines directly (no orchestrator needed)
 import { createActor } from 'xstate'
 import { authMachine } from '@/state-machines/machines/auth-machine'
-import { appInitMachine } from '@/state-machines/machines/app-init-machine'
 import { simpleNotificationSyncMachine } from '@/state-machines/machines/simple-notification-sync-machine'
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector'
 import { useAuth, useSystem } from '@/state-machines'
@@ -30,22 +29,8 @@ interface RouterContext {
   setUserAtoms: (users: User[]) => void
 }
 
-// Create app init machine actor directly (no orchestrator needed)
-const createAppInitActor = () => {
-  console.log('[XSTATE] Creating app init machine actor...')
-  
-  // Add inspection in test/dev mode
-  const inspectOptions = (import.meta.env.MODE === 'development' || import.meta.env.MODE === 'test') 
-    ? { inspect: xstateTestInspector.inspect }
-    : {};
-  
-  const actor = createActor(appInitMachine, {
-    ...inspectOptions,
-    id: 'app-init-machine'
-  })
-  actor.start()
-  return actor
-}
+// App init machine removed - Legend State handles initialization lazily
+// Auth machine now directly calls loadOrgContext() when ready
 
 
 // 🔥 HMR FIX: Check for preserved actors from previous module
@@ -55,12 +40,10 @@ if (import.meta.hot && import.meta.hot.data.authMachineActor) {
   // Restore preserved actors
   ;(window as any).authMachineActor = import.meta.hot.data.authMachineActor
   ;(window as any).simpleNotificationSyncMachineActor = import.meta.hot.data.simpleNotificationSyncMachineActor
-  ;(window as any).appInitActor = import.meta.hot.data.appInitActor
   
   // Clear from hot data
   import.meta.hot.data.authMachineActor = null
   import.meta.hot.data.simpleNotificationSyncMachineActor = null
-  import.meta.hot.data.appInitActor = null
   
   console.log('[XSTATE] 🔥 HMR: Actors restored successfully')
 }
@@ -122,59 +105,25 @@ if (!authMachineActor) {
                    snapshot.value === 'unauthenticated' ? 'unauthenticated' :
                    snapshot.value === 'signingOut' ? 'signing-out' : 'checking'
     
-    // Auth state changed - track for initialization
-    
-    // 🚀 ULTRA-FAST INITIALIZATION: Start local data checking immediately when auth completes
-    if (authenticated && (snapshot.matches('authenticated') || snapshot.matches('authenticated.ready'))) {
-      // Authentication complete - starting initialization
-      
-      const currentOrganization = snapshot.context.currentOrganization
-      const hasOrganization = !!currentOrganization?.id
-      
-      const currentAppInitActor = (window as any).appInitActor
-      if (currentAppInitActor) {
-        const appInitSnapshot = currentAppInitActor.getSnapshot()
-        
-        // Only send START_INIT if still idle
-        if (hasOrganization && appInitSnapshot.value === 'idle') {
-          // Organization ready - starting local data check
-          // Start with organization context for local data introspection
-          currentAppInitActor.send({ 
-            type: 'START_INIT',
-            organizationId: currentOrganization.id 
-          })
-        }
-      } else {
-        console.warn('[AuthMachine] App init actor not found - START_INIT not sent')
-      }
-    }
-    
-    // Handle organization updates during initialization  
+    // 🚀 DIRECT LEGEND STATE INITIALIZATION: Load org context when auth completes
     if (authenticated && snapshot.matches('authenticated.ready')) {
       const currentOrganization = snapshot.context.currentOrganization
-      if (currentOrganization?.id) {
-        // Organization now available - starting initialization
-        const currentAppInitActor = (window as any).appInitActor
-        if (currentAppInitActor) {
-          const appInitSnapshot = currentAppInitActor.getSnapshot()
-          
-          // If app init is still idle and organization just became available, start initialization
-          if (appInitSnapshot.value === 'idle') {
-            // Starting app initialization with organization
-            currentAppInitActor.send({ 
-              type: 'START_INIT',
-              organizationId: currentOrganization.id 
-            })
-          } 
-          // If already running but with different organization, update it
-          else if (appInitSnapshot.context.organizationId !== currentOrganization.id) {
-            // Updating app init with organization
-            currentAppInitActor.send({ 
-              type: 'UPDATE_ORGANIZATION',
-              organizationId: currentOrganization.id 
-            })
-          }
-        }
+      const user = snapshot.context.user
+      
+      if (currentOrganization?.id && user?.id) {
+        // Load Legend State org context directly - no app init machine needed
+        console.log('[ROOT] Auth ready - loading Legend State org context:', currentOrganization.id)
+        
+        // Dynamic import to avoid circular dependencies
+        import('../legend-state').then(({ loadOrgContext }) => {
+          loadOrgContext(currentOrganization.id, user.id).then(() => {
+            console.log('[ROOT] Legend State org context loaded successfully')
+          }).catch((error) => {
+            console.error('[ROOT] Failed to load Legend State org context:', error)
+          })
+        }).catch((error) => {
+          console.error('[ROOT] Failed to import Legend State:', error)
+        })
       }
     }
     
@@ -183,6 +132,43 @@ if (!authMachineActor) {
       detail: { authenticated, reason }
     }))
   })
+  
+  // Check initial state after setting up subscription (for restored snapshots)
+  const initialSnapshot = authMachineActor.getSnapshot()
+  if (initialSnapshot.matches('authenticated.ready')) {
+    const currentOrganization = initialSnapshot.context.currentOrganization
+    const user = initialSnapshot.context.user
+    
+    if (currentOrganization?.id && user?.id) {
+      console.log('[ROOT] Initial auth already ready - loading Legend State org context:', currentOrganization.id)
+      
+      // 🔄 SYNC: Connect sync machine for restored auth state (delayed to allow sync machine creation)
+      setTimeout(() => {
+        const syncActor = (window as any).simpleNotificationSyncMachineActor;
+        if (syncActor) {
+          console.log('[ROOT] ✅ Triggering sync connection - restored auth ready (delayed)');
+          syncActor.send({ 
+            type: 'CONNECT', 
+            organizationId: currentOrganization.id,
+            userId: user.id
+          });
+        } else {
+          console.warn('[ROOT] ⚠️ Sync actor still not found after delay during restored auth connection');
+        }
+      }, 100); // Short delay to allow sync machine creation
+      
+      // Dynamic import to avoid circular dependencies
+      import('../legend-state').then(({ loadOrgContext }) => {
+        loadOrgContext(currentOrganization.id, user.id).then(() => {
+          console.log('[ROOT] Legend State org context loaded successfully (initial)')
+        }).catch((error) => {
+          console.error('[ROOT] Failed to load Legend State org context (initial):', error)
+        })
+      }).catch((error) => {
+        console.error('[ROOT] Failed to import Legend State (initial):', error)
+      })
+    }
+  }
 } else {
   // HMR: Using existing auth machine actor
 }
@@ -211,77 +197,16 @@ if (!simpleNotificationSyncMachineActor) {
   ;(window as any).simpleNotificationSyncMachineActor = simpleNotificationSyncMachineActor
   
   // Set up subscriptions for new actor
-  let wasLiveSync = false
-  
   simpleNotificationSyncMachineActor.subscribe((snapshot) => {
-    // Send SYNC_READY to app-init when sync machine connects
-    if (snapshot.value === 'connected' && !wasLiveSync) {
-      wasLiveSync = true
-      const currentAppInitActor = (window as any).appInitActor
-      if (currentAppInitActor) {
-        currentAppInitActor.send({ type: 'SYNC_LIVE' })
-      }
-    } else if (snapshot.value !== 'connected') {
-      wasLiveSync = false
-    }
+    // Sync machine is now independent - no app init coordination needed
+    console.log('[SyncMachine] State changed:', snapshot.value)
   })
 } else {
   console.log('[SyncMachine] 🔥 HMR: Using existing sync machine actor')
 }
 
-// Create app init machine actor (only if not already exists from HMR)
-let appInitActor = (window as any).appInitActor
-
-if (!appInitActor) {
-  // Creating app init machine
-  appInitActor = createAppInitActor()
-  
-  // Store globally
-  ;(window as any).appInitActor = appInitActor
-  
-  // Set up subscriptions for new actor
-  appInitActor.subscribe({
-    error: (error) => {
-      console.error('[APP INIT] Actor error:', error)
-      sessionStorage.setItem('app-init-last-error', JSON.stringify({
-        error: error.message,
-        timestamp: Date.now()
-      }))
-    },
-    complete: () => {
-      console.warn('[APP INIT] Actor completed/stopped unexpectedly')
-      sessionStorage.setItem('app-init-stopped', JSON.stringify({
-        timestamp: Date.now(),
-        reason: 'completed'
-      }))
-    }
-  })
-  
-  // 🚀 OPTIMIZED: If auth is already ready, start app init immediately
-  const authSnapshot = authMachineActor.getSnapshot()
-  if (authSnapshot.matches('authenticated.ready') && authSnapshot.context.currentOrganization?.id) {
-    console.log('[APP INIT] Auth already ready, starting initialization immediately')
-    appInitActor.send({ 
-      type: 'START_INIT',
-      organizationId: authSnapshot.context.currentOrganization.id 
-    })
-  }
-} else {
-  // HMR: Using existing app init machine
-  
-  // 🚀 OPTIMIZED: Check if we need to start init after HMR
-  const authSnapshot = authMachineActor.getSnapshot()
-  const appInitSnapshot = appInitActor.getSnapshot()
-  if (authSnapshot.matches('authenticated.ready') && 
-      authSnapshot.context.currentOrganization?.id &&
-      appInitSnapshot.value === 'idle') {
-    console.log('[APP INIT] HMR: Auth ready but app init idle, starting initialization')
-    appInitActor.send({ 
-      type: 'START_INIT',
-      organizationId: authSnapshot.context.currentOrganization.id 
-    })
-  }
-}
+// App init machine removed - Legend State handles initialization directly
+// No separate init actor needed - auth machine calls loadOrgContext() directly
 
 // Dexie uses native IndexedDB, no special error handling needed
 
@@ -296,7 +221,6 @@ if (import.meta.hot) {
     // Store actor references in hot data to preserve across HMR
     import.meta.hot.data.authMachineActor = (window as any).authMachineActor
     import.meta.hot.data.simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
-    import.meta.hot.data.appInitActor = (window as any).appInitActor
     
     // Don't stop actors - let them continue running
     console.log('[XSTATE] 🔥 HMR: Actors preserved for hot reload')
@@ -308,10 +232,9 @@ if (import.meta.hot) {
   })
 }
 
-// Reset app init and sync machines on sign-out (auth machine handles its own cleanup)
+// Reset sync machine on sign-out and clear Legend State context
 window.addEventListener('auth:signout', () => {
-  console.log('[XSTATE] Resetting machines on sign-out (auth machine handles its own persistence cleanup)')
-  // Note: sync-machine-state is preserved across sign-outs to maintain client ID and LSN
+  console.log('[XSTATE] Resetting sync machine and Legend State on sign-out')
   
   // Reset simple notification sync machine to idle state for fresh initialization on next sign-in
   const simpleNotificationSyncMachineActor = (window as any).simpleNotificationSyncMachineActor
@@ -320,12 +243,13 @@ window.addEventListener('auth:signout', () => {
     simpleNotificationSyncMachineActor.send({ type: 'DISCONNECT', reason: 'User signed out' })
   }
   
-  // Reset app init machine to idle state for fresh initialization on next sign-in
-  const appInitActor = (window as any).appInitActor
-  if (appInitActor) {
-    console.log('[XSTATE] Resetting app init machine on sign-out')
-    appInitActor.send({ type: 'RESET' })
-  }
+  // Clear Legend State context on sign-out
+  import('../legend-state').then(({ clearContext }) => {
+    clearContext()
+    console.log('[XSTATE] Legend State context cleared on sign-out')
+  }).catch((error) => {
+    console.warn('[XSTATE] Failed to clear Legend State context:', error)
+  })
 })
 
 // Note: Dexie database is initialized when user is authenticated
@@ -425,11 +349,11 @@ function AppWithInitialization() {
     }
   }, [navigate]);
   
-  // Show UnifiedLoadingScreen overlay only when authenticated but system is not ready
+  // Note: Removed root-level UnifiedLoadingScreen to prevent flickering
+  // Loading state is now handled entirely by AuthenticatedContent component
   return (
     <>
       <Outlet />
-      {isAuthenticated && !isSystemReady && <UnifiedLoadingScreen />}
       <IntegrityMonitor />
       <Toaster duration={3000} />
       {import.meta.env.MODE === 'development' && (
