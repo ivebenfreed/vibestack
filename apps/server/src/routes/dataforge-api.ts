@@ -372,12 +372,10 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
       const { sql } = await import('kysely');
       const kysely = getKysely(c.env);
       
-      console.log(`[DataForge] User ${user?.email} deleting entity ${entityName} and table ${entityDef.tableName}`);
+      console.log(`[DataForge] User ${user?.email} soft deleting entity ${entityName} (table ${entityDef.tableName} preserved for recovery)`);
       
-      // Drop the table
-      await sql`DROP TABLE IF EXISTS ${sql.raw(entityDef.tableName)} CASCADE`.execute(kysely);
-      
-      // Soft delete from entity_schemas
+      // SOFT DELETE ONLY - table and data are preserved for recovery
+      // Table can be permanently deleted later via "empty trash" functionality
       await sql`UPDATE entity_schemas 
         SET deleted = true, deleted_at = CURRENT_TIMESTAMP
         WHERE org_id = ${orgId} 
@@ -385,8 +383,10 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
       
       return c.json({
         success: true,
-        message: `Entity ${entityName} and its data have been deleted`,
-        deletedTable: entityDef.tableName
+        message: `Entity ${entityName} has been moved to trash (data preserved for recovery)`,
+        softDeleted: true,
+        tableName: entityDef.tableName,
+        recoverable: true
       });
       
     } catch (error) {
@@ -446,7 +446,7 @@ dataforgeRouter.post('/orgs/:orgId/data/:entityName',
       ...validationResult.data,
       id: crypto.randomUUID(),
       organization_id: security.organizationId,
-      created_by_id: security.userId,  // Changed from created_by to created_by_id
+      created_by: security.userId,  // Use created_by to match existing schema
       created_at: new Date(),
       updated_at: new Date()
     };
@@ -921,6 +921,192 @@ dataforgeRouter.delete('/orgs/:orgId/entities/:entityName',
     }, 500);
   }
 });
+
+// Restore (undelete) entity from trash
+dataforgeRouter.post('/orgs/:orgId/entities/:entityName/restore',
+  requirePermission('entities:admin'),
+  async (c) => {
+    try {
+      const { orgId, entityName } = c.req.param();
+      const security = c.get('security');
+      const user = c.get('user');
+      
+      // Verify org access
+      if (orgId !== security.organizationId) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+      
+      const { getKysely } = await import('../lib/kysely');
+      const { sql } = await import('kysely');
+      const kysely = getKysely(c.env);
+      
+      console.log(`[DataForge] User ${user?.email} restoring entity ${entityName} from trash`);
+      
+      // Check if entity exists in trash (deleted = true)
+      const result = await sql`SELECT entity_name, table_name, deleted_at 
+        FROM entity_schemas 
+        WHERE org_id = ${orgId} 
+        AND entity_name = ${entityName}
+        AND deleted = true`.execute(kysely);
+      
+      if (!result.rows || result.rows.length === 0) {
+        return c.json({ error: `Entity ${entityName} not found in trash` }, 404);
+      }
+      
+      const entityRow = result.rows[0] as any;
+      
+      // Restore entity by setting deleted = false
+      await sql`UPDATE entity_schemas 
+        SET deleted = false, deleted_at = NULL
+        WHERE org_id = ${orgId} 
+        AND entity_name = ${entityName}`.execute(kysely);
+      
+      return c.json({
+        success: true,
+        message: `Entity ${entityName} has been restored from trash`,
+        restored: true,
+        tableName: entityRow.table_name,
+        deletedAt: entityRow.deleted_at
+      });
+      
+    } catch (error) {
+      console.error('Error restoring entity:', error);
+      return c.json({
+        error: 'Failed to restore entity',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// Permanently delete entity and its table (empty trash)
+dataforgeRouter.delete('/orgs/:orgId/entities/:entityName/permanent',
+  requirePermission('entities:admin'),
+  async (c) => {
+    try {
+      const { orgId, entityName } = c.req.param();
+      const security = c.get('security');
+      const user = c.get('user');
+      
+      // Verify org access
+      if (orgId !== security.organizationId) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+      
+      const { getKysely } = await import('../lib/kysely');
+      const { sql } = await import('kysely');
+      const kysely = getKysely(c.env);
+      
+      console.log(`[DataForge] User ${user?.email} permanently deleting entity ${entityName} and its table`);
+      
+      // Check if entity exists in trash (deleted = true)
+      const result = await sql`SELECT entity_name, table_name, deleted_at 
+        FROM entity_schemas 
+        WHERE org_id = ${orgId} 
+        AND entity_name = ${entityName}
+        AND deleted = true`.execute(kysely);
+      
+      if (!result.rows || result.rows.length === 0) {
+        return c.json({ error: `Entity ${entityName} not found in trash` }, 404);
+      }
+      
+      const entityRow = result.rows[0] as any;
+      const tableName = entityRow.table_name;
+      
+      // PERMANENT DELETE - DROP TABLE AND REMOVE SCHEMA
+      await sql`DROP TABLE IF EXISTS ${sql.raw(tableName)} CASCADE`.execute(kysely);
+      console.log(`Permanently dropped table: ${tableName}`);
+      
+      await sql`DELETE FROM entity_schemas 
+        WHERE org_id = ${orgId} 
+        AND entity_name = ${entityName}`.execute(kysely);
+      console.log(`Permanently removed entity from entity_schemas: ${entityName}`);
+      
+      return c.json({
+        success: true,
+        message: `Entity ${entityName} and all its data have been permanently deleted`,
+        permanentlyDeleted: true,
+        tableName: tableName,
+        warning: 'This action cannot be undone'
+      });
+      
+    } catch (error) {
+      console.error('Error permanently deleting entity:', error);
+      return c.json({
+        error: 'Failed to permanently delete entity',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
+
+// List deleted entities (trash)
+dataforgeRouter.get('/orgs/:orgId/entities/trash',
+  requirePermission('entities:read'),
+  async (c) => {
+    try {
+      const { orgId } = c.req.param();
+      const security = c.get('security');
+      
+      // Verify org access
+      if (orgId !== security.organizationId) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+      
+      const { getKysely } = await import('../lib/kysely');
+      const { sql } = await import('kysely');
+      const kysely = getKysely(c.env);
+      
+      // Query deleted entities
+      const entities = await sql<any>`
+        SELECT 
+          entity_name,
+          table_name,
+          archetype,
+          business_metadata,
+          created_at,
+          deleted_at
+        FROM entity_schemas
+        WHERE org_id = ${orgId}
+          AND deleted = true
+        ORDER BY deleted_at DESC
+      `.execute(kysely);
+      
+      // Format entities for response
+      const formattedEntities = entities.rows.map((entity: any) => {
+        const metadata = typeof entity.business_metadata === 'string' 
+          ? JSON.parse(entity.business_metadata)
+          : entity.business_metadata;
+        
+        const fields = metadata.fields || {};
+        
+        return {
+          entityName: entity.entity_name,
+          tableName: entity.table_name,
+          archetype: entity.archetype,
+          fieldCount: Object.keys(fields).length,
+          createdAt: entity.created_at,
+          deletedAt: entity.deleted_at,
+          recoverable: true
+        };
+      });
+      
+      return c.json({
+        success: true,
+        data: {
+          entities: formattedEntities,
+          total: formattedEntities.length
+        }
+      });
+    } catch (error) {
+      console.error('Error listing trash:', error);
+      return c.json({ 
+        error: 'Failed to list deleted entities',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+);
 
 // Get organization schema (for debugging)
 dataforgeRouter.get('/orgs/:orgId/schema', 

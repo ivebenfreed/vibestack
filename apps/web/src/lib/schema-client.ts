@@ -241,6 +241,221 @@ export class OrgSchemaClient {
     await Promise.all(orgIds.map(orgId => this.loadOrgSchema(orgId)));
   }
 
+  /**
+   * Create a new entity schema
+   */
+  async createEntitySchema(orgId: string, entityData: any): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(entityData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Create failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error creating entity schema'
+        };
+      }
+
+      // Clear cache to force reload of schema on next access
+      this.clearCache(orgId);
+      
+      console.log(`[Schema] Successfully created entity schema: ${entityData.name}`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error('Failed to create entity schema:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Soft delete an entity schema (move to trash, preserving data)
+   */
+  async deleteEntitySchema(orgId: string, entityName: string): Promise<{ success: boolean; error?: string; softDeleted?: boolean }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities/${entityName}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Delete failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error deleting entity schema'
+        };
+      }
+
+      // Clear cache to force reload of schema on next access
+      this.clearCache(orgId);
+      
+      console.log(`[Schema] Successfully soft deleted entity schema: ${entityName} (recoverable)`);
+      return { 
+        success: true, 
+        softDeleted: result.softDeleted,
+      };
+      
+    } catch (error) {
+      console.error('Failed to delete entity schema:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Restore an entity schema from trash
+   */
+  async restoreEntitySchema(orgId: string, entityName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities/${entityName}/restore`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Restore failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error restoring entity schema'
+        };
+      }
+
+      // Clear cache to force reload of schema on next access
+      this.clearCache(orgId);
+      
+      console.log(`[Schema] Successfully restored entity schema: ${entityName}`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error('Failed to restore entity schema:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Permanently delete an entity schema and its data (empty trash)
+   */
+  async permanentlyDeleteEntitySchema(orgId: string, entityName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities/${entityName}/permanent`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Permanent delete failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error permanently deleting entity schema'
+        };
+      }
+
+      // Clear cache to force reload of schema on next access
+      this.clearCache(orgId);
+      
+      console.log(`[Schema] Successfully permanently deleted entity schema: ${entityName} (irreversible)`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error('Failed to permanently delete entity schema:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * List deleted entity schemas (trash)
+   */
+  async listTrashEntities(orgId: string): Promise<{ success: boolean; entities?: any[]; error?: string }> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/orgs/${orgId}/entities/trash`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `List trash failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Unknown error listing trash'
+        };
+      }
+
+      console.log(`[Schema] Successfully listed ${result.data.total} deleted entities`);
+      return { 
+        success: true,
+        entities: result.data.entities
+      };
+      
+    } catch (error) {
+      console.error('Failed to list trash entities:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
   // Private helper methods
 
   private getCachedSchema(orgId: string): OrgEntitySchema | null {

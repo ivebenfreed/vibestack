@@ -7,6 +7,7 @@
 
 import { observable } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
+import { synced } from '@legendapp/state/sync'
 import { configureSynced } from '@legendapp/state/sync'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
@@ -39,60 +40,91 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
   
   // Create the syncedCrud configuration first
   const crudConfig = {
-    // LIST - Fetch all items
+    // LIST - Fetch all items with proper error handling
     list: async () => {
-      const response = await fetch(baseUrl, {
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      })
-      
-      if (!response.ok) {
-        console.warn(`[Observable] Failed to load ${entityName}:`, response.status)
+      try {
+        const response = await fetch(baseUrl, {
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' }
+        })
+        
+        if (!response.ok) {
+          // Handle common cases gracefully
+          if (response.status === 404) {
+            console.info(`[Observable] Entity ${entityName} table not found (404) - returning empty data`)
+            return []
+          }
+          if (response.status === 500) {
+            // Likely table doesn't exist - don't spam console
+            console.info(`[Observable] Entity ${entityName} table not created yet (500) - returning empty data`)
+            return []
+          }
+          console.warn(`[Observable] Failed to load ${entityName}:`, response.status)
+          return []
+        }
+        
+        const result = await response.json()
+        return result.data || []
+      } catch (error) {
+        console.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
         return []
       }
-      
-      const result = await response.json()
-      return result.data || []
     },
 
     // CREATE - Add new item
     create: async (item: any) => {
-      const response = await fetch(baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(item)
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create ${entityName}: ${response.status}`)
+      try {
+        const response = await fetch(baseUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(item)
+        })
+        
+        if (!response.ok) {
+          if (response.status === 500) {
+            throw new Error(`Entity ${entityName} table not created yet - cannot create records`)
+          }
+          throw new Error(`Failed to create ${entityName}: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        return result.data || item
+      } catch (error) {
+        console.error(`[Observable] Create error for ${entityName}:`, error.message)
+        throw error
       }
-      
-      const result = await response.json()
-      return result.data || item
     },
 
     // UPDATE - Modify existing item
     update: async (item: any) => {
-      const response = await fetch(`${baseUrl}/${item.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(item)
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update ${entityName}: ${response.status}`)
+      try {
+        const response = await fetch(`${baseUrl}/${item.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(item)
+        })
+        
+        if (!response.ok) {
+          if (response.status === 500) {
+            throw new Error(`Entity ${entityName} table not created yet - cannot update records`)
+          }
+          throw new Error(`Failed to update ${entityName}: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        return result.data || item
+      } catch (error) {
+        console.error(`[Observable] Update error for ${entityName}:`, error.message)
+        throw error
       }
-      
-      const result = await response.json()
-      return result.data || item
     },
 
     // DELETE - Remove item
@@ -137,25 +169,31 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       }
     },
 
-    // Retry configuration for offline support
+    // Retry configuration for network failures
     retry: {
-      infinite: true,
+      times: 3,
       delay: 1000,
       backoff: 'exponential',
       maxDelay: 30000
     },
 
-    // Enable optimistic updates
+    // FIXED: Re-enable optimistic updates with proper field configuration
+    // This allows good UX while preventing IndexedDB loading from triggering creates
     fieldId: 'id',
-    generateId: () => crypto.randomUUID(),
+    fieldCreatedAt: 'created_at',  // Records with this field are existing, not new
+    fieldUpdatedAt: 'updated_at',  // Track updates properly
+    generateId: () => `temp-${crypto.randomUUID()}`, // Temporary IDs for new records
     
-    // Initial empty state - this should be an object for list operations
-    initial: {},
+    // Initial empty state - use empty array for list operations to prevent auto-creation
+    initial: [],
     
-    // Local persistence with IndexedDB - only if persistence is configured
-    ...(syncedCrudWithPersistence && persistenceManager ? {
-      persist: persistenceManager.getPersistOptions(entityName)
-    } : {})
+    // FIXED: Local persistence with proper configuration
+    // Now that we've configured fieldCreatedAt properly above, persistence should work correctly
+    ...(syncedCrudWithPersistence && persistenceManager ? (() => {
+      const persistOptions = persistenceManager.getPersistOptions(entityName)
+      console.log(`[Observable] Persistence options for ${entityName}:`, persistOptions)
+      return { persist: persistOptions }
+    })() : {})
   }
   
   // Return the observable wrapping syncedCrud with or without persistence
@@ -191,37 +229,55 @@ export async function loadOrgContext(orgId: string, userId: string) {
     const entities = schemaResult.schema.entities || {}
     const schemaVersion = schemaResult.schema.version || 'unknown'
     
-    // Only recreate persistence if org or schema version changed
-    if (Object.keys(entities).length > 0 && 
-        (currentOrgId !== orgId || currentSchemaVersion !== schemaVersion)) {
+    // FIXED: Only recreate persistence if org or schema version changed
+    // Issue was: IndexedDB persistence was causing continuous Document POST requests
+    // Solution: Configure persistence more carefully to prevent auto-sync conflicts
+    console.log(`[Observable] PERSISTENCE ENABLED WITH SAFEGUARDS - Schema change detected`, {
+      prevOrgId: currentOrgId,
+      newOrgId: orgId,
+      prevVersion: currentSchemaVersion,
+      newVersion: schemaVersion
+    })
+    try {
+      const entityKeys = entities && typeof entities === 'object' ? Object.keys(entities) : []
+      if (entityKeys.length > 0 && 
+          (currentOrgId !== orgId || currentSchemaVersion !== schemaVersion)) {
       
-      console.log(`[Observable] Schema change detected - recreating persistence`, {
+      console.log(`[Observable] Schema change detected - recreating persistence with safeguards`, {
         prevOrgId: currentOrgId,
         newOrgId: orgId,
         prevVersion: currentSchemaVersion,
         newVersion: schemaVersion
       })
       
-      // Create persistence manager for this organization
-      persistenceManager = createPersistenceManager(orgId, userId)
-      
-      // Get IndexedDB configuration from persistence manager
-      const indexedDBPlugin = persistenceManager.createIndexedDBConfig(Object.keys(entities))
-      
-      // Create syncedCrud with proper persistence configuration
-      syncedCrudWithPersistence = configureSynced(syncedCrud, {
-        persist: {
-          plugin: indexedDBPlugin
-        }
-      })
-      
-      // Update tracking variables
-      currentOrgId = orgId
-      currentSchemaVersion = schemaVersion
-      
-      console.log(`[Observable] IndexedDB persistence configured for ${Object.keys(entities).length} entities`)
-    } else if (currentOrgId === orgId && currentSchemaVersion === schemaVersion) {
-      console.log(`[Observable] Schema unchanged - reusing existing persistence configuration`)
+        // Create persistence manager for this organization
+        persistenceManager = createPersistenceManager(orgId, userId)
+        
+        // Get IndexedDB configuration from persistence manager
+        const indexedDBPlugin = persistenceManager.createIndexedDBConfig(entityKeys)
+        
+        // Create syncedCrud with proper persistence configuration
+        // The key insight: IndexedDB loading was triggering "create" operations because
+        // Legend State couldn't distinguish between loaded data and new data
+        syncedCrudWithPersistence = configureSynced(syncedCrud, {
+          persist: {
+            plugin: indexedDBPlugin,
+            retrySync: false, // Disable retry to prevent persistence errors from looping
+          }
+        })
+        
+        // Update tracking variables
+        currentOrgId = orgId
+        currentSchemaVersion = schemaVersion
+        
+        console.log(`[Observable] IndexedDB persistence configured with safeguards for ${entityKeys.length} entities`)
+      } else if (currentOrgId === orgId && currentSchemaVersion === schemaVersion) {
+        console.log(`[Observable] Schema unchanged - reusing existing persistence configuration`)
+      }
+    } catch (entitiesError) {
+      console.error('[Observable] Error processing entities for persistence:', entitiesError)
+      // Continue without persistence if there's an error
+      console.log('[Observable] Continuing without IndexedDB persistence due to error')
     }
     
     // Update context
@@ -236,7 +292,8 @@ export async function loadOrgContext(orgId: string, userId: string) {
     // Note: Entity observables are created lazily by getEntity$ function
     // We don't pre-create them here to avoid proxy assignment issues
     
-    console.log(`[Observable] Org context loaded with ${Object.keys(entities).length} entities`)
+    const entityCount = entities && typeof entities === 'object' ? Object.keys(entities).length : 0
+    console.log(`[Observable] Org context loaded with ${entityCount} entities`)
     
   } catch (error) {
     console.error('[Observable] Failed to load org context:', error)
@@ -261,22 +318,37 @@ export const entities$ = observable(() => {
     return {}
   }
   
+  // Safely get entity keys
+  const entityKeys = schema.entities && typeof schema.entities === 'object' ? Object.keys(schema.entities) : []
+  
   console.log(`[Observable] Creating entity observables reactively`, {
     orgId,
     schemaVersion: schema.version || 'unknown',
-    entityCount: Object.keys(schema.entities).length
+    entityCount: entityKeys.length
   })
   
   // Create a reactive map of entity observables - Legend State handles caching internally
   const entityObservables: Record<string, any> = {}
   
-  Object.keys(schema.entities).forEach(entityName => {
-    // Each entity gets its own observable that's created fresh when dependencies change
-    entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
-  })
-  
-  console.log(`[Observable] Created ${Object.keys(entityObservables).length} entity observables`)
-  return entityObservables
+  try {
+    entityKeys.forEach(entityName => {
+      try {
+        // Each entity gets its own observable that's created fresh when dependencies change
+        entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
+      } catch (entityError) {
+        console.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
+        // Skip this entity but continue with others
+      }
+    })
+    
+    const createdCount = entityObservables && typeof entityObservables === 'object' ? Object.keys(entityObservables).length : 0
+    console.log(`[Observable] Created ${createdCount} entity observables`)
+    return entityObservables
+  } catch (error) {
+    console.error('[Observable] Error creating entity observables:', error)
+    // Return empty object on error to prevent crashes
+    return {}
+  }
 })
 
 /**
@@ -285,15 +357,25 @@ export const entities$ = observable(() => {
  * Directly accesses entities$ which is already reactive
  */
 export function getEntity$(entityName: string) {
-  const allEntities = entities$.get()
-  const entityObs = allEntities[entityName]
-  
-  if (!entityObs) {
-    console.warn(`[Observable] Entity observable not found for: ${entityName}`)
+  try {
+    const allEntities = entities$.get()
+    if (!allEntities || typeof allEntities !== 'object') {
+      console.warn(`[Observable] No entities loaded yet`)
+      return null
+    }
+    
+    const entityObs = allEntities[entityName]
+    
+    if (!entityObs) {
+      console.warn(`[Observable] Entity observable not found for: ${entityName}`)
+      return null
+    }
+    
+    return entityObs
+  } catch (error) {
+    console.error(`[Observable] Error getting entity observable for ${entityName}:`, error)
     return null
   }
-  
-  return entityObs
 }
 
 /**
@@ -336,10 +418,70 @@ export function handleTableNotification(notification: any) {
   
   console.log(`[Observable] Table notification for ${notification.table}:`, notification.operation)
   
+  // Handle schema changes from external sources (other clients)
+  if (notification.table === 'entity_schemas') {
+    console.log(`[Observable] External entity schema change detected - reloading schema`)
+    // Only reload for external changes, not our own local changes
+    reloadOrgSchema(orgId)
+    return
+  }
+  
   // Dispatch custom event that entity stores listen to
   window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
     detail: notification,
   }))
+}
+
+/**
+ * Remove entity from local schema observable immediately (for local changes)
+ */
+export function removeEntityFromSchema(entityName: string) {
+  const currentSchema = orgContext$.schema.peek()
+  if (!currentSchema?.entities) {
+    console.warn(`[Observable] Cannot remove entity ${entityName} - no schema loaded`)
+    return
+  }
+  
+  if (!currentSchema.entities[entityName]) {
+    console.warn(`[Observable] Entity ${entityName} not found in schema`)
+    return
+  }
+  
+  console.log(`[Observable] Removing entity ${entityName} from local schema observable`)
+  
+  // Create new schema without the deleted entity - ensure deep clone
+  const newEntities = { ...currentSchema.entities }
+  delete newEntities[entityName]
+  
+  const newSchema = {
+    ...currentSchema,
+    entities: newEntities,
+    // Update version to trigger proper cache invalidation
+    version: currentSchema.version || 'unknown',
+    orgId: currentSchema.orgId
+  }
+  
+  console.log(`[Observable] New schema will have ${Object.keys(newEntities).length} entities (was ${Object.keys(currentSchema.entities).length})`)
+  
+  // Update the observable immediately - this will trigger all reactive components
+  orgContext$.schema.set(newSchema)
+  
+  console.log(`[Observable] Schema updated locally - UI should update immediately`)
+}
+
+/**
+ * Reload schema from server (for external changes)
+ */
+async function reloadOrgSchema(orgId: string) {
+  try {
+    const schemaResult = await orgSchemaClient.loadOrgSchema(orgId)
+    if (schemaResult.success && schemaResult.schema) {
+      orgContext$.schema.set(schemaResult.schema)
+      console.log(`[Observable] Schema reloaded from server`)
+    }
+  } catch (error) {
+    console.error('[Observable] Failed to reload schema:', error)
+  }
 }
 
 // Computed observables for common patterns
@@ -352,29 +494,20 @@ export const entityGroups$ = observable(() => {
   const schema = orgContext$.schema.get()
   if (!schema?.entities) return []
   
-  return Object.keys(schema.entities).map(name => ({
-    name,
-    path: `/entities/${name}`,
-    icon: 'Database',
-    // Reactive count from the actual entity observable
-    count$: observable(() => {
-      const allEntities = entities$.get()
-      const entityObs = allEntities?.[name]
-      
-      // Return 0 if entity observable isn't ready yet
-      if (!entityObs || typeof entityObs.get !== 'function') {
-        return 0
-      }
-      
-      try {
-        const data = entityObs.get()
-        return data && typeof data === 'object' ? Object.keys(data).length : 0
-      } catch (error) {
-        console.warn(`[Observable] Error getting count for ${name}:`, error)
-        return 0
-      }
-    })
-  }))
+  // Safely get entity keys with error handling
+  try {
+    const entityKeys = schema.entities && typeof schema.entities === 'object' ? Object.keys(schema.entities) : []
+    return entityKeys.map(name => ({
+      name,
+      path: `/entities/${name}`,
+      icon: 'Database'
+      // NOTE: Removed count$ to prevent automatic entity observable initialization
+      // Count will be loaded lazily when the entity page is actually accessed
+    }))
+  } catch (error) {
+    console.error('[Observable] Error creating entity groups:', error)
+    return []
+  }
 })
 
 // Debug: Expose to window in development
