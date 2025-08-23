@@ -119,9 +119,9 @@ jobs:
           # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
         
-      - name: Build Dataforge Package
-        working-directory: packages/dataforge
-        run: pnpm run forge:build
+      - name: Type Check Server Package
+        working-directory: apps/server
+        run: pnpm run typecheck
         
       - name: Deploy Backend to Staging
         uses: cloudflare/wrangler-action@v3
@@ -188,9 +188,9 @@ jobs:
           # Run postinstall scripts after native bindings are installed
           pnpm install --frozen-lockfile
         
-      - name: Build Dataforge Package
-        working-directory: packages/dataforge
-        run: pnpm run forge:build
+      - name: Type Check Server Package
+        working-directory: apps/server
+        run: pnpm run typecheck
         
       - name: Deploy Backend to Production
         uses: cloudflare/wrangler-action@v3
