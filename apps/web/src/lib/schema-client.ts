@@ -71,19 +71,37 @@ export class OrgSchemaClient {
       
       console.log('🔍 Schema client raw response:', rawData);
       
-      // Handle the new API format - data is returned directly as an array
-      // Convert to the expected schema format
-      if (!Array.isArray(rawData)) {
+      // Handle the new API format - check if it's the wrapped response format
+      let schemaArray: any[];
+      if (rawData && typeof rawData === 'object' && 'success' in rawData) {
+        if (!rawData.success) {
+          return {
+            success: false,
+            error: rawData.error || 'Server returned error'
+          };
+        }
+        schemaArray = rawData.schema;
+      } else if (Array.isArray(rawData)) {
+        // Legacy format - direct array
+        schemaArray = rawData;
+      } else {
         return {
           success: false,
-          error: 'Invalid schema format: expected array of entities'
+          error: 'Invalid schema format: expected wrapped response or array of entities'
+        };
+      }
+
+      if (!Array.isArray(schemaArray)) {
+        return {
+          success: false,
+          error: 'Invalid schema format: schema field must be an array'
         };
       }
 
       // Transform array of entities into schema format
       const entities: Record<string, any> = {};
       
-      rawData.forEach(entity => {
+      schemaArray.forEach(entity => {
         entities[entity.entityName] = {
           tableName: entity.tableName,
           archetype: entity.archetype,
