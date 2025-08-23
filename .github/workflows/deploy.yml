@@ -138,13 +138,37 @@ jobs:
           echo "   - API_URL (required for API base URL)"
           echo "⚠️  If deployment fails, verify these secrets are configured in Cloudflare Dashboard"
         
+      - name: Verify Cloudflare Secrets
+        run: |
+          echo "🔐 Checking Cloudflare secrets availability..."
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "❌ CLOUDFLARE_API_TOKEN is missing"
+            exit 1
+          else
+            echo "✅ CLOUDFLARE_API_TOKEN is configured (length: ${#CLOUDFLARE_API_TOKEN})"
+          fi
+          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "❌ CLOUDFLARE_ACCOUNT_ID is missing" 
+            exit 1
+          else
+            echo "✅ CLOUDFLARE_ACCOUNT_ID is configured: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          fi
+          
       - name: Deploy Backend to Staging
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env staging
-          workingDirectory: apps/server
+        working-directory: apps/server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "🔍 Validating wrangler configuration..."
+          npx wrangler --version
+          echo "📋 Current working directory: $(pwd)"
+          echo "📁 Files in directory:"
+          ls -la
+          echo "🔧 Checking wrangler.toml..."
+          head -20 wrangler.toml
+          echo "🚀 Deploying to staging..."
+          npx wrangler deploy --env staging --compatibility-date=2024-09-23
           
       - name: Deploy Frontend to Staging
         working-directory: apps/web
@@ -208,12 +232,20 @@ jobs:
         run: echo "Skipping type check - OrganizationActor needs Actor API updates"
         
       - name: Deploy Backend to Production
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --env production
-          workingDirectory: apps/server
+        working-directory: apps/server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "🔍 Validating wrangler configuration..."
+          npx wrangler --version
+          echo "📋 Current working directory: $(pwd)"
+          echo "📁 Files in directory:"
+          ls -la
+          echo "🔧 Checking wrangler.toml..."
+          head -20 wrangler.toml
+          echo "🚀 Deploying to production..."
+          npx wrangler deploy --env production --compatibility-date=2024-09-23
           
       - name: Deploy Frontend to Production
         working-directory: apps/web
