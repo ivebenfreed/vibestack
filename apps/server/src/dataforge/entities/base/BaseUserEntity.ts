@@ -20,6 +20,11 @@ export interface BaseUserEntityFields extends BaseSystemEntityFields {
   role: string;
   better_auth_user_id: string | null;
   
+  // Organization context fields
+  default_organization_id: string | null;
+  last_used_organization_id: string | null;
+  last_org_access_at: Date | null;
+  
   // Minimal domain classification (but no container - users exist at platform level)
   status: string;
 }
@@ -32,6 +37,9 @@ export abstract class BaseUserEntity extends BaseSystemEntity {
   is_super_admin!: boolean;
   role!: string;
   better_auth_user_id?: string | null;
+  default_organization_id?: string | null;
+  last_used_organization_id?: string | null;
+  last_org_access_at?: Date | null;
   status!: string;
 
   constructor(data?: Partial<BaseUserEntityFields>) {
@@ -60,6 +68,9 @@ export abstract class BaseUserEntity extends BaseSystemEntity {
       is_super_admin: 'boolean',
       role: 'varchar(50)',
       better_auth_user_id: 'varchar(255)',
+      default_organization_id: 'text',
+      last_used_organization_id: 'text',
+      last_org_access_at: 'timestamp',
       status: 'varchar(50)'
     } as const;
   }

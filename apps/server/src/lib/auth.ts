@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { google, microsoft } from "better-auth/providers";
-import { admin, emailOTP, oneTimeToken, twoFactor } from "better-auth/plugins";
+import { admin, emailOTP, oneTimeToken, twoFactor, customSession } from "better-auth/plugins";
 import { polar, checkout, portal, usage, webhooks } from "@polar-sh/better-auth";
 import { Polar } from "@polar-sh/sdk";
 // import { jwt } from "better-auth/plugins"; // Removed JWT plugin import
@@ -476,6 +476,79 @@ export function initializeAuth(env: Env) {
     // Custom organization system - no Better Auth organization plugin
     plugins: [
       admin(),
+      // Custom session plugin to include organization data
+      customSession(async ({ user, session }, ctx) => {
+        if (!user || !session) {
+          return { user, session };
+        }
+
+        try {
+          // Get Kysely instance from the auth instance
+          const db = ctx.context.env?.database?.db || kyselyInstance;
+          
+          // Get user's organization context, prioritizing last_used over default
+          const userContext = await db
+            .selectFrom('user')
+            .select([
+              'user.default_organization_id',
+              'user.last_used_organization_id', 
+              'user.last_org_access_at'
+            ])
+            .where('user.id', '=', user.id)
+            .executeTakeFirst();
+
+          // Determine which organization to use: last_used takes priority over default
+          const targetOrgId = userContext?.last_used_organization_id || userContext?.default_organization_id;
+          
+          let orgData = null;
+          if (targetOrgId) {
+            // Get organization and membership info for the target org
+            orgData = await db
+              .selectFrom('organizations')
+              .leftJoin('organization_members', (join) => join
+                .onRef('organization_members.organization_id', '=', 'organizations.id')
+                .on('organization_members.user_id', '=', user.id)
+              )
+              .select([
+                'organizations.id as org_id',
+                'organizations.name as org_name',
+                'organizations.slug as org_slug',
+                'organization_members.role as org_role'
+              ])
+              .where('organizations.id', '=', targetOrgId)
+              .executeTakeFirst();
+          }
+
+          // Note: We don't update last_org_access_at here in the session plugin
+          // to avoid side effects. This will be updated by the organization switching API.
+
+          return {
+            user: {
+              ...user,
+              default_organization_id: userContext?.default_organization_id || null,
+              last_used_organization_id: userContext?.last_used_organization_id || null,
+              last_org_access_at: userContext?.last_org_access_at || null,
+            },
+            session: {
+              ...session,
+              organization: orgData?.org_id ? {
+                id: orgData.org_id,
+                name: orgData.org_name,
+                slug: orgData.org_slug,
+                role: orgData.org_role,
+              } : null,
+            },
+          };
+        } catch (error) {
+          dbLogger.error('Failed to fetch organization data for session', {
+            userId: user.id,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          
+          // Return basic session data if organization fetch fails
+          return { user, session };
+        }
+      }),
       // Polar billing integration
       polar({
         client: new Polar({

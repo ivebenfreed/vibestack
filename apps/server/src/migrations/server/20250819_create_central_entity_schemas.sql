@@ -69,5 +69,5 @@ INSERT INTO entity_schemas (org_id, entity_name, table_name, archetype, business
 
 -- Add a comment for tracking
 COMMENT ON TABLE entity_schemas IS 'Central registry for all organization entity schemas, replacing Durable Object approach';
-COMMENT ON COLUMN entity_schemas.archetype IS 'Maps to Universal Archetype patterns: project, task, record, document, file, activity, discussion, collection';
+COMMENT ON COLUMN entity_schemas.archetype IS 'Maps to DataForge archetype patterns: project, task, record, document, file, activity, discussion, collection';
 COMMENT ON COLUMN entity_schemas.business_metadata IS 'JSONB field containing validation rules, field definitions, and business logic';

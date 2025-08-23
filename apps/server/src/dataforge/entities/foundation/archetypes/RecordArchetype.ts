@@ -29,7 +29,7 @@ export class Record extends BaseDomainEntity {
   description?: string | null;
   record_type!: string; // contact, company, product, asset, etc.
   status!: string; // active, inactive, archived, deleted
-  parent_record_id?: string | null; // For hierarchical records (Company → Contacts)
+  parent_record_id?: string | null; // For hierarchical records (Organization → Contacts)
   owner_id?: string | null; // Who manages this record
   data?: any; // Flexible JSON storage for record-specific data
   tags?: string[] | null; // Quick categorization

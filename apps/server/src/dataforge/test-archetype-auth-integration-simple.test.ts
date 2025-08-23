@@ -1,5 +1,5 @@
 /**
- * Simple Auth Integration Test for Universal Archetype System
+ * Simple Auth Integration Test for DataForge System
  * 
  * Week 2 Day 1-2 COMPLETE: Tests auth middleware blocking unauthenticated requests
  */
@@ -33,7 +33,7 @@ async function apiCall(path: string, options: RequestInit = {}) {
   };
 }
 
-describe('Universal Archetype Auth Integration - Week 2 Day 1-2 COMPLETE', () => {
+describe('DataForge Auth Integration - Week 2 Day 1-2 COMPLETE', () => {
   it('should block unauthenticated archetype requests', async () => {
     const orgId = 'auth-block-test-' + Date.now();
     

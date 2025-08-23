@@ -21,7 +21,150 @@ import type {
 
 const organizationsRouter = new Hono<AppContext>();
 
+// IMPORTANT: Organization switching endpoints must come BEFORE the middleware
+// so they don't get caught by the /:orgId/* pattern
+
+/**
+ * POST /api/organizations/switch
+ * Switch user's active organization
+ */
+organizationsRouter.post('/switch', async (c) => {
+  try {
+    const user = c.get('user');
+    const body = await c.req.json();
+    const { organizationId } = body;
+
+    if (!organizationId) {
+      return c.json({ error: 'Organization ID is required.' }, 400);
+    }
+
+    // Get Kysely instance
+    const { getKysely } = require('../lib/kysely');
+    const db = getKysely(c.env);
+
+    // Verify user is a member of the organization
+    const membership = await db
+      .selectFrom('organization_members')
+      .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
+      .select([
+        'organization_members.role',
+        'organizations.id',
+        'organizations.name',
+        'organizations.slug'
+      ])
+      .where('organization_members.user_id', '=', user.id)
+      .where('organization_members.organization_id', '=', organizationId)
+      .executeTakeFirst();
+
+    if (!membership) {
+      return c.json({ error: 'You are not a member of this organization.' }, 403);
+    }
+
+    // Update user's last used organization
+    await db
+      .updateTable('user')
+      .set({
+        last_used_organization_id: organizationId,
+        last_org_access_at: new Date()
+      })
+      .where('id', '=', user.id)
+      .execute();
+
+    dbLogger.info('User switched organizations', {
+      userId: user.id,
+      userEmail: user.email,
+      organizationId: organizationId,
+      organizationName: membership.name
+    });
+
+    return c.json({
+      message: "Organization switched successfully.",
+      organization: {
+        id: membership.id,
+        name: membership.name,
+        slug: membership.slug,
+        role: membership.role
+      }
+    });
+
+  } catch (error) {
+    dbLogger.error('Error switching organizations', error);
+    return c.json({ error: 'Failed to switch organization.' }, 500);
+  }
+});
+
+/**
+ * POST /api/organizations/set-default
+ * Set user's default organization
+ */
+organizationsRouter.post('/set-default', async (c) => {
+  try {
+    const user = c.get('user');
+    const body = await c.req.json();
+    const { organizationId } = body;
+
+    if (!organizationId) {
+      return c.json({ error: 'Organization ID is required.' }, 400);
+    }
+
+    // Get Kysely instance
+    const { getKysely } = require('../lib/kysely');
+    const db = getKysely(c.env);
+
+    // Verify user is a member of the organization
+    const membership = await db
+      .selectFrom('organization_members')
+      .innerJoin('organizations', 'organizations.id', 'organization_members.organization_id')
+      .select([
+        'organization_members.role',
+        'organizations.id',
+        'organizations.name',
+        'organizations.slug'
+      ])
+      .where('organization_members.user_id', '=', user.id)
+      .where('organization_members.organization_id', '=', organizationId)
+      .executeTakeFirst();
+
+    if (!membership) {
+      return c.json({ error: 'You are not a member of this organization.' }, 403);
+    }
+
+    // Update user's default organization
+    await db
+      .updateTable('user')
+      .set({
+        default_organization_id: organizationId,
+        last_used_organization_id: organizationId,
+        last_org_access_at: new Date()
+      })
+      .where('id', '=', user.id)
+      .execute();
+
+    dbLogger.info('User set default organization', {
+      userId: user.id,
+      userEmail: user.email,
+      organizationId: organizationId,
+      organizationName: membership.name
+    });
+
+    return c.json({
+      message: "Default organization set successfully.",
+      organization: {
+        id: membership.id,
+        name: membership.name,
+        slug: membership.slug,
+        role: membership.role
+      }
+    });
+
+  } catch (error) {
+    dbLogger.error('Error setting default organization', error);
+    return c.json({ error: 'Failed to set default organization.' }, 500);
+  }
+});
+
 // Apply hybrid security middleware to organization-scoped routes
+// This must come AFTER the switching endpoints to avoid conflicts
 organizationsRouter.use('/:orgId/*', hybridRLSOrgActorMiddleware);
 
 // MIGRATED TO HYBRID SECURITY: Legacy custom middleware removed
@@ -107,7 +250,29 @@ organizationsRouter.get('/', async (c) => {
       return c.json({ error: result.error }, 400);
     }
 
-    return c.json(result.data);
+    // Get Kysely instance to fetch user's default organization info
+    const { getKysely } = require('../lib/kysely');
+    const db = getKysely(c.env);
+    
+    const userInfo = await db
+      .selectFrom('user')
+      .select(['default_organization_id', 'last_used_organization_id', 'last_org_access_at'])
+      .where('id', '=', user.id)
+      .executeTakeFirst();
+
+    // Enhance organization data with user context
+    const enhancedOrgs = result.data.map((org: any) => ({
+      ...org,
+      isDefault: org.id === userInfo?.default_organization_id,
+      isLastUsed: org.id === userInfo?.last_used_organization_id
+    }));
+
+    return c.json({
+      organizations: enhancedOrgs,
+      defaultOrganizationId: userInfo?.default_organization_id,
+      lastUsedOrganizationId: userInfo?.last_used_organization_id,
+      lastOrgAccessAt: userInfo?.last_org_access_at
+    });
 
   } catch (error) {
     dbLogger.error('Error in GET /organizations', error);

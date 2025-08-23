@@ -84,7 +84,7 @@ export interface ${this.toPascal(schema.orgId)}SyncDatabase {
   organization_id: string | null;
   name: string;
   status: Generated<string>;
-  created_by_id: string | null;
+  created_by: string | null;
   client_id: string | null;
   custom_fields: Generated<any>;
   created_at: Generated<Date>;
@@ -207,7 +207,7 @@ export interface ${this.toPascal(schema.orgId)}SyncDatabase {
     const systemColumns = `
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id TEXT NOT NULL,
-  created_by_id UUID,
+  created_by UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()`;
     
@@ -272,7 +272,7 @@ CREATE INDEX idx_${definition.tableName}_created_at ON ${definition.tableName}(c
   organization_id TEXT NOT NULL,
   name VARCHAR(255) NOT NULL,
   status VARCHAR(50) DEFAULT 'active',
-  created_by_id UUID,
+  created_by UUID,
   client_id UUID,
   custom_fields JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),

@@ -1,7 +1,7 @@
 /**
  * Archetype Entity Manager
  * 
- * Extends EntityManager with Universal Archetype support for organization-specific entity creation.
+ * Extends EntityManager with DataForge archetype support for organization-specific entity creation.
  * Integrates archetype patterns with the existing multi-org DataForge infrastructure.
  */
 
@@ -138,6 +138,9 @@ export class ArchetypeEntityManager extends EntityManager {
           customFields
         );
 
+        // Notify Legend State of schema change immediately
+        this.notifySchemaChange(orgId, tableName, 'create');
+        
         return {
           success: true,
           tableName,
@@ -176,6 +179,9 @@ export class ArchetypeEntityManager extends EntityManager {
           };
         }
 
+        // Notify Legend State of schema change immediately
+        this.notifySchemaChange(orgId, tableName, 'create');
+        
         return {
           success: true,
           tableName,
@@ -256,6 +262,9 @@ export class ArchetypeEntityManager extends EntityManager {
           oldCustomFields
         );
 
+        // Notify Legend State of schema evolution immediately
+        this.notifySchemaChange(orgId, tableName, 'update');
+        
         return {
           success: true,
           tableName,
@@ -275,6 +284,9 @@ export class ArchetypeEntityManager extends EntityManager {
           };
         }
 
+        // Notify Legend State of schema evolution immediately
+        this.notifySchemaChange(orgId, tableName, 'update');
+        
         return {
           success: true,
           tableName,
@@ -850,5 +862,16 @@ export class ArchetypeEntityManager extends EntityManager {
    */
   isDebouncedMigrationsEnabled(): boolean {
     return this.useDeboucedMigrations && !!this.migrationService;
+  }
+
+  /**
+   * Notify Legend State of schema changes to ensure proper synchronization
+   */
+  private notifySchemaChange(orgId: string, entityName: string, operation: 'create' | 'update' | 'delete'): void {
+    console.log(`[ArchetypeEntityManager] Schema change notification: ${operation} on ${orgId}.${entityName}`);
+    
+    // TODO: Integrate with WebSocket system to notify Legend State clients
+    // This ensures Legend State invalidates caches and reloads entity definitions
+    // when schema changes occur in the archetype system
   }
 }
