@@ -67,18 +67,42 @@ export class OrgSchemaClient {
         throw new Error(`Schema loading failed: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const rawData = await response.json();
       
-      console.log('🔍 Schema client raw response:', result);
+      console.log('🔍 Schema client raw response:', rawData);
       
-      if (!result.success) {
+      // Handle the new API format - data is returned directly as an array
+      // Convert to the expected schema format
+      if (!Array.isArray(rawData)) {
         return {
           success: false,
-          error: result.error || 'Unknown error loading schema'
+          error: 'Invalid schema format: expected array of entities'
         };
       }
 
-      const schema = result.schema as OrgEntitySchema;
+      // Transform array of entities into schema format
+      const entities: Record<string, any> = {};
+      
+      rawData.forEach(entity => {
+        entities[entity.entityName] = {
+          tableName: entity.tableName,
+          archetype: entity.archetype,
+          syncableFields: {
+            // Default fields that all entities have
+            name: { type: 'text', required: true, syncable: true },
+            description: { type: 'text', required: false, syncable: true },
+            status: { type: 'text', required: false, syncable: true },
+            created_at: { type: 'timestamp', required: false, syncable: false },
+            updated_at: { type: 'timestamp', required: false, syncable: false }
+          }
+        };
+      });
+
+      const schema: OrgEntitySchema = {
+        orgId: orgId,
+        version: Date.now().toString(),
+        entities
+      };
       console.log('🔍 Schema client processed schema:', schema);
       
       // Cache the schema

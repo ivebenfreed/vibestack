@@ -15,10 +15,9 @@ import type { Env, ExecutionContext } from './types/env';
 import { SyncDO } from './sync/SyncDO';
 import { ReplicationDO } from './replication/ReplicationDO';
 import { OrganizationActor } from './actors/OrganizationActor';
-import { OrgSchemaDO } from './dataforge/durable-objects/OrgSchemaDO';
-import { SuperAdminDO } from './dataforge/durable-objects/SuperAdminDO';
-import { OrgAdminDO } from './dataforge/durable-objects/OrgAdminDO';
-import { OrgOpsDO } from './dataforge/durable-objects/OrgOpsDO';
+// OrgSchemaDO functionality replaced by OrganizationActor
+// SuperAdminDO removed - will handle super admin differently
+// OrgOpsDO archived - sync system is now pull-based
 import { getAuth, AuthType, initializeAuth } from './lib/auth';
 import { serverLogger as log } from './middleware/logger';
 import { authMiddleware } from './middleware/auth'; // <-- Import the new middleware
@@ -480,5 +479,5 @@ const worker = {
   }
 };
 
-export { SyncDO, ReplicationDO, OrganizationActor, OrgSchemaDO, SuperAdminDO, OrgAdminDO, OrgOpsDO };
+export { SyncDO, ReplicationDO, OrganizationActor };
 export default worker; 

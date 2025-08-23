@@ -13,5 +13,11 @@ export {
   clearContext,
   handleTableNotification,
   removeEntityFromSchema,
-  entityGroups$
+  entityGroups$,
+  // Enhanced mutation utilities
+  batchOperations,
+  entityOperations,
+  // Error classes
+  ValidationError,
+  ConflictError
 } from './observables'

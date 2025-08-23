@@ -24,8 +24,9 @@ CREATE INDEX IF NOT EXISTS idx_entity_schemas_table_name ON entity_schemas(table
 INSERT INTO entity_schemas (org_id, entity_name, table_name, archetype, business_metadata) VALUES
 
 -- Project-based entities (business initiatives, certifications, contracts, proposals)
+-- UNIFIED FORMAT: Using fields array format for consistency with API and RuntimeSchemaGenerator
 ('01920000-1000-7000-8000-000000000001', 'Project', 'org_01920000_1000_7000_8000_000000000001_project', 'project', 
- '{"syncable": true, "description": "Core business projects and initiatives", "fields": {"name": {"type": "string", "required": true}, "status": {"type": "string", "enum": ["active", "completed", "on_hold"]}, "budget": {"type": "number"}}}'),
+ '{"syncable": true, "description": "Core business projects and initiatives", "fields": [{"name": "name", "type": "string", "required": true, "syncable": true}, {"name": "status", "type": "string", "enum": ["active", "completed", "on_hold"], "required": false, "syncable": true}, {"name": "budget", "type": "number", "required": false, "syncable": true}]}'),
 
 ('01920000-1000-7000-8000-000000000001', 'Certification', 'org_01920000_1000_7000_8000_000000000001_certification', 'project', 
  '{"syncable": true, "description": "Professional certifications and training programs", "fields": {"certification_name": {"type": "string", "required": true}, "provider": {"type": "string"}, "expiry_date": {"type": "date"}}}'),

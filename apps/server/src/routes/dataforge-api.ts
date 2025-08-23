@@ -208,26 +208,26 @@ dataforgeRouter.post('/orgs/:orgId/entities',
     };
     
     if (!entityName || !archetype) {
-      return c.json({ error: 'entityName and archetype are required' }, 400);
+      // Enhanced error message to guide developers toward correct structure
+      const hasNestedDefinition = body && typeof body === 'object' && 'definition' in body;
+      const errorMessage = hasNestedDefinition 
+        ? 'entityName and archetype must be at the top level, not nested under "definition". See /docs/dataforge/ENTITY_CREATION_API.md for correct format.'
+        : 'entityName and archetype are required at the top level. See /docs/dataforge/ENTITY_CREATION_API.md for correct format.';
+      
+      return c.json({ error: errorMessage }, 400);
     }
     
-    // Validate archetype using ArchetypeRegistry
-    const { ArchetypeRegistry } = await import('../dataforge/ArchetypeRegistry');
+    // Validate archetype using NEW ArchetypeRegistry
+    const { ArchetypeRegistry } = await import('../dataforge/archetypes');
     
-    if (!ArchetypeRegistry.validateArchetype(archetype)) {
+    const validArchetypes = ArchetypeRegistry.getAvailableArchetypes();
+    if (!validArchetypes.includes(archetype as any)) {
       return c.json({ 
-        error: `Invalid archetype '${archetype}'. Valid archetypes: ${ArchetypeRegistry.getArchetypeNames().join(', ')}`
+        error: `Invalid archetype '${archetype}'. Valid archetypes: ${validArchetypes.join(', ')}`
       }, 400);
     }
     
-    // Validate custom fields
-    const validation = ArchetypeRegistry.validateCustomFields(archetype as any, customFields);
-    if (!validation.valid) {
-      return c.json({
-        error: 'Invalid custom fields',
-        details: validation.errors
-      }, 400);
-    }
+    // We'll validate after combining archetype base fields + custom fields
 
     // Check if entity already exists
     const existingEntity = await getEntityDefinition(c, security.organizationId, entityName);
@@ -256,40 +256,87 @@ dataforgeRouter.post('/orgs/:orgId/entities',
     
     const schemaGenerator = new RuntimeSchemaGenerator();
     
-    // Create entity definition using ArchetypeRegistry
-    const entityDefinition = ArchetypeRegistry.createEntityDefinition(
-      security.organizationId,
-      entityName,
-      archetype as any,
-      customFields
-    );
+    // Generate table name using clean naming convention
+    let cleanOrgId = security.organizationId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const cleanEntityName = entityName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     
-    // Generate table name using security context
-    const tableName = entityDefinition.tableName;
+    // Ensure table name starts with letter (not number)
+    if (/^[0-9]/.test(cleanOrgId)) {
+      cleanOrgId = `org_${cleanOrgId}`;
+    }
     
-    // Convert to database schema using ONLY custom fields
-    // Base fields are added by the "extends" mechanism
+    const tableName = `${cleanOrgId}_${cleanEntityName}s`;
+    
+    // Get archetype definition from our new clean system
+    const archetypeDefinition = ArchetypeRegistry.getArchetype(archetype as any);
+    if (!archetypeDefinition) {
+      return c.json({ error: `Archetype '${archetype}' not found` }, 400);
+    }
+    
+    // Get base fields from archetype with proper defaults applied
+    const baseFields = archetypeDefinition.getFieldsArray();
+    const baseFieldNames = new Set(baseFields.map(f => f.name));
+    
+    // Filter out custom fields that duplicate archetype fields and apply defaults
+    const customFieldsWithDefaults = customFields
+      .filter(customField => {
+        if (baseFieldNames.has(customField.name)) {
+          console.log(`⚠️  Ignoring duplicate custom field '${customField.name}' - already exists in ${archetype} archetype`);
+          return false;
+        }
+        return true;
+      })
+      .map(customField => {
+        const archetypeField = archetypeDefinition.getField(customField.name);
+        return {
+          name: customField.name,
+          type: customField.type,
+          required: customField.required ?? archetypeField?.required ?? false,
+          syncable: customField.syncable ?? archetypeField?.syncable ?? true,
+          serverOnly: customField.serverOnly ?? archetypeField?.serverOnly ?? false,
+          defaultValue: customField.defaultValue ?? archetypeField?.defaultValue,
+          enum: customField.enum ?? archetypeField?.enum,
+          validation: customField.validation ?? archetypeField?.validation
+        };
+      });
+    
+    // Combine base archetype fields + unique custom fields
+    const allFields = [...baseFields, ...customFieldsWithDefaults];
+    
+    // Validate the complete entity definition
+    const requiredFields = archetypeDefinition.getRequiredFields();
+    const providedFields = allFields.map(f => f.name);
+    const missingFields = requiredFields.filter(rf => !providedFields.includes(rf));
+    
+    if (missingFields.length > 0) {
+      return c.json({
+        error: 'Missing required archetype fields',
+        details: missingFields.map(f => `Missing required field: ${f}`)
+      }, 400);
+    }
+    
     console.log('Creating entity with archetype:', { 
       entityName, 
       archetype, 
       tableName, 
-      baseFieldCount: entityDefinition.baseFields.length,
-      customFieldCount: entityDefinition.customFields.length 
+      baseFieldCount: baseFields.length,
+      customFieldCount: customFieldsWithDefaults.length,
+      totalFields: allFields.length,
+      requiredFields,
+      providedFields
     });
-    
-    // Use ALL fields (base + custom) for table creation
-    // No need for "extends" - just create all columns directly
-    const allFields = [...entityDefinition.baseFields, ...entityDefinition.customFields];
-    const fullDefinition = {
-      archetype,
-      fields: allFields, // All fields for both table creation and storage
-      syncable: true
-    };
     
     const tableDefinition = {
       name: entityName,
       tableName,
-      fields: allFields // Pass all fields directly, no "extends" needed
+      archetype,
+      fields: allFields // All fields with proper archetype defaults applied
+    };
+    
+    const fullDefinition = {
+      archetype,
+      fields: allFields,
+      syncable: true
     };
     console.log('Table definition:', tableDefinition);
     
@@ -1108,12 +1155,45 @@ dataforgeRouter.get('/orgs/:orgId/entities/trash',
   }
 );
 
-// Get organization schema (for debugging)
+// Get organization schema (cache-first with PostgreSQL fallback)
 dataforgeRouter.get('/orgs/:orgId/schema', 
   requirePermission('entities:read'),
   async (c) => {
   try {
     const security = c.get('security');
+    const startTime = Date.now();
+    
+    // 1. First try OrganizationActor cache
+    try {
+      if (c.env.ORGANIZATION_ACTOR) {
+        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
+        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
+        
+        // Try to get schema from cache
+        const cacheResponse = await orgActor.fetch(new Request('https://internal/org-schema'));
+        
+        if (cacheResponse.ok) {
+          const cacheResult = await cacheResponse.json();
+          
+          if (cacheResult.cached && cacheResult.schema && cacheResult.schema.length > 0) {
+            console.log(`[Schema Cache] ✅ CACHE HIT - served from OrganizationActor SQLite cache (${Date.now() - startTime}ms)`);
+            
+            return c.json({
+              success: true,
+              schema: cacheResult.schema,
+              cached: true,
+              source: 'organization_actor_cache',
+              responseTime: Date.now() - startTime
+            });
+          }
+        }
+      }
+    } catch (cacheError) {
+      console.warn('[Schema Cache] Cache lookup failed, falling back to PostgreSQL:', cacheError);
+    }
+    
+    // 2. Cache miss - fallback to PostgreSQL and populate cache
+    console.log(`[Schema Cache] ❌ CACHE MISS - fetching from PostgreSQL`);
     
     const { getKysely } = await import('../lib/kysely');
     const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
@@ -1139,10 +1219,38 @@ dataforgeRouter.get('/orgs/:orgId/schema',
     if (!schema) {
       return c.json({ error: `No schema found for org ${security.organizationId}` }, 404);
     }
+    
+    // 3. Populate cache with fresh data
+    try {
+      if (c.env.ORGANIZATION_ACTOR) {
+        const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${security.organizationId}`);
+        const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
+        
+        const cacheRequest = new Request('https://internal/cache-org-schema', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: security.organizationId,
+            schema: schema
+          })
+        });
+        
+        await orgActor.fetch(cacheRequest);
+        console.log(`[Schema Cache] 📦 CACHE POPULATED - stored fresh schema from PostgreSQL`);
+      }
+    } catch (populateError) {
+      console.warn('[Schema Cache] Failed to populate cache:', populateError);
+      // Don't fail the request if cache population fails
+    }
 
+    console.log(`[Schema Cache] ✅ PostgreSQL response served (${Date.now() - startTime}ms)`);
+    
     return c.json({
       success: true,
-      schema: schema
+      schema: schema,
+      cached: false,
+      source: 'postgresql_with_cache_population',
+      responseTime: Date.now() - startTime
     });
   } catch (error) {
     console.error('Schema retrieval error:', error);
@@ -1363,6 +1471,498 @@ function validateUniversalArchetypeData(data: any, entityDef: any) {
   };
 }
 
+// =============================================================================
+// 4. BULK OPERATIONS ENDPOINTS - Batch operations for efficiency
+// =============================================================================
+
+// Bulk create records
+dataforgeRouter.post('/orgs/:orgId/data/:entityName/bulk', 
+  requirePermission('entities:write'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const entityName = c.req.param('entityName');
+    const body = await c.req.json();
+    const { records, options = {} } = body;
+    
+    const user = c.get('user');
+    console.log(`[DataForge] User ${user?.email || 'anonymous'} bulk creating ${records?.length || 0} records in ${entityName}`);
+
+    if (!records || !Array.isArray(records)) {
+      return c.json({ error: 'records array is required' }, 400);
+    }
+
+    if (records.length === 0) {
+      return c.json({ success: true, created: [], errors: [], summary: { total: 0, created: 0, failed: 0 } });
+    }
+
+    // Use ArchetypeEntityManager following the established pattern
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
+    const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
+    const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
+
+    const kysely = getKysely(c.env);
+    const rulesEngine = new JsonRulesEngine();
+    const schemaManager = new OrgSchemaManager();
+    const schemaGenerator = new RuntimeSchemaGenerator();
+
+    const entityManager = new ArchetypeEntityManager({
+      kysely,
+      rulesEngine,
+      schemaGenerator,
+      schemaManager,
+      env: c.env
+    });
+
+    const result = await entityManager.bulkCreateRecords(
+      security.organizationId,
+      entityName,
+      records,
+      options
+    );
+
+    return c.json(result);
+
+  } catch (error) {
+    console.error('Bulk create error:', error);
+    return c.json({ 
+      error: 'Failed to process bulk create', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Bulk update records
+dataforgeRouter.put('/orgs/:orgId/data/:entityName/bulk', 
+  requirePermission('entities:write'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const entityName = c.req.param('entityName');
+    const body = await c.req.json();
+    const { filter, updates } = body;
+    
+    const user = c.get('user');
+    console.log(`[DataForge] User ${user?.email || 'anonymous'} bulk updating records in ${entityName}`);
+
+    if (!filter || !updates) {
+      return c.json({ error: 'filter and updates are required' }, 400);
+    }
+
+    // Use ArchetypeEntityManager following the established pattern
+    const { getKysely } = await import('../lib/kysely');
+    const { ArchetypeEntityManager } = await import('../dataforge/entity-operations/ArchetypeEntityManager');
+    const { JsonRulesEngine } = await import('../dataforge/rules/json-rules-engine');
+    const { OrgSchemaManager } = await import('../dataforge/json-schema/org-entity-schema');
+    const { RuntimeSchemaGenerator } = await import('../dataforge/kysely-generator/runtime-schema-generator');
+
+    const kysely = getKysely(c.env);
+    const rulesEngine = new JsonRulesEngine();
+    const schemaManager = new OrgSchemaManager();
+    const schemaGenerator = new RuntimeSchemaGenerator();
+
+    const entityManager = new ArchetypeEntityManager({
+      kysely,
+      rulesEngine,
+      schemaGenerator,
+      schemaManager,
+      env: c.env
+    });
+
+    const result = await entityManager.bulkUpdateRecords(
+      security.organizationId,
+      entityName,
+      filter,
+      updates
+    );
+
+    return c.json(result);
+
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    return c.json({ 
+      error: 'Failed to process bulk update', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Bulk delete records
+dataforgeRouter.delete('/orgs/:orgId/data/:entityName/bulk', 
+  requirePermission('entities:write'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const entityName = c.req.param('entityName');
+    const body = await c.req.json();
+    const { filter, permanent = false } = body;
+    
+    const user = c.get('user');
+    console.log(`[DataForge] User ${user?.email || 'anonymous'} bulk deleting records in ${entityName} (permanent: ${permanent})`);
+
+    if (!filter) {
+      return c.json({ error: 'filter is required' }, 400);
+    }
+
+    const { getKysely } = await import('../lib/kysely');
+    const kysely = getKysely(c.env);
+
+    // Get entity definition
+    const entityDef = await getEntityDefinition(c, security.organizationId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+
+    // Build WHERE clause (similar to bulk update)
+    const whereConditions = [];
+    const params = [];
+    let paramIndex = 1;
+
+    for (const [field, value] of Object.entries(filter)) {
+      if (typeof value === 'object' && value !== null) {
+        for (const [operator, operatorValue] of Object.entries(value)) {
+          switch (operator) {
+            case 'contains':
+              whereConditions.push(`${field} ILIKE $${paramIndex}`);
+              params.push(`%${operatorValue}%`);
+              paramIndex++;
+              break;
+            case 'in':
+              const inValues = Array.isArray(operatorValue) ? operatorValue : [operatorValue];
+              const placeholders = inValues.map(() => `$${paramIndex++}`).join(', ');
+              whereConditions.push(`${field} IN (${placeholders})`);
+              params.push(...inValues);
+              break;
+          }
+        }
+      } else {
+        whereConditions.push(`${field} = $${paramIndex}`);
+        params.push(value);
+        paramIndex++;
+      }
+    }
+
+    let deleteQuery;
+    if (permanent) {
+      // Hard delete
+      deleteQuery = `
+        DELETE FROM ${entityDef.tableName} 
+        WHERE ${whereConditions.join(' AND ')} AND organization_id = $${paramIndex}
+        RETURNING id, name
+      `;
+    } else {
+      // Soft delete (if status field exists)
+      deleteQuery = `
+        UPDATE ${entityDef.tableName} 
+        SET status = 'deleted', updated_at = NOW()
+        WHERE ${whereConditions.join(' AND ')} AND organization_id = $${paramIndex} AND status != 'deleted'
+        RETURNING id, name
+      `;
+    }
+    params.push(security.organizationId);
+
+    const result = await kysely.executeQuery({
+      sql: deleteQuery,
+      parameters: params
+    });
+
+    return c.json({
+      success: true,
+      deleted_count: result.rows?.length || 0,
+      deleted_records: result.rows?.map((row: any) => ({
+        id: row.id,
+        name: row.name
+      })) || []
+    });
+
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+    return c.json({ 
+      error: 'Failed to process bulk delete', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// =============================================================================
+// 5. SCHEMA MODIFICATION ENDPOINTS - Dynamic entity field management
+// =============================================================================
+
+// Add fields to existing entity
+dataforgeRouter.post('/orgs/:orgId/entities/:entityName/fields', 
+  requirePermission('entities:admin'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const entityName = c.req.param('entityName');
+    const body = await c.req.json();
+    const { fields, options = {} } = body;
+    
+    const user = c.get('user');
+    console.log(`[DataForge] User ${user?.email || 'anonymous'} adding ${fields?.length || 0} fields to ${entityName}`);
+
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      return c.json({ error: 'fields array is required and must not be empty' }, 400);
+    }
+
+    // Get entity definition
+    const entityDef = await getEntityDefinition(c, security.organizationId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+
+    const { getKysely } = await import('../lib/kysely');
+    const { sql } = await import('kysely');
+    const kysely = getKysely(c.env);
+
+    const addedFields = [];
+    const errors = [];
+
+    try {
+      // Add each field to the table
+      for (const field of fields) {
+        const { name, type, required = false, defaultValue } = field;
+
+        // Validate field definition
+        if (!name || !type) {
+          errors.push(`Field must have name and type: ${JSON.stringify(field)}`);
+          continue;
+        }
+
+        // Map DataForge types to PostgreSQL types
+        let pgType;
+        switch (type.toLowerCase()) {
+          case 'text':
+            pgType = 'TEXT';
+            break;
+          case 'number':
+            pgType = 'INTEGER';
+            break;
+          case 'decimal':
+            pgType = 'DECIMAL(10,2)';
+            break;
+          case 'boolean':
+            pgType = 'BOOLEAN';
+            break;
+          case 'date':
+            pgType = 'TIMESTAMP';
+            break;
+          case 'json':
+            pgType = 'JSONB';
+            break;
+          default:
+            errors.push(`Unsupported field type: ${type}`);
+            continue;
+        }
+
+        try {
+          // Add column to table
+          let alterQuery = `ALTER TABLE ${entityDef.tableName} ADD COLUMN ${name} ${pgType}`;
+          
+          if (defaultValue !== undefined) {
+            if (typeof defaultValue === 'string') {
+              alterQuery += ` DEFAULT '${defaultValue.replace(/'/g, "''")}'`;
+            } else {
+              alterQuery += ` DEFAULT ${defaultValue}`;
+            }
+          }
+
+          if (required) {
+            alterQuery += ` NOT NULL`;
+          }
+
+          await kysely.executeQuery({
+            sql: alterQuery,
+            parameters: []
+          });
+
+          // Update entity_schemas table to include the new field
+          const currentMetadata = entityDef.definition;
+          const newFieldConfig = {
+            type: field.type,
+            required: field.required || false,
+            syncable: field.syncable !== false,
+            serverOnly: field.serverOnly || false,
+            defaultValue: field.defaultValue
+          };
+
+          // Add to metadata
+          if (!currentMetadata.fields) {
+            currentMetadata.fields = {};
+          }
+          currentMetadata.fields[field.name] = newFieldConfig;
+
+          // Update in database
+          await kysely.executeQuery({
+            sql: `UPDATE entity_schemas SET business_metadata = $1, updated_at = NOW() 
+                  WHERE org_id = $2 AND entity_name = $3`,
+            parameters: [JSON.stringify(currentMetadata), security.organizationId, entityName]
+          });
+
+          addedFields.push({
+            name: field.name,
+            type: field.type,
+            required: field.required || false,
+            defaultValue: field.defaultValue
+          });
+
+          console.log(`Added field ${field.name} (${field.type}) to ${entityName}`);
+        } catch (fieldError) {
+          errors.push(`Failed to add field ${field.name}: ${fieldError instanceof Error ? fieldError.message : 'Unknown error'}`);
+        }
+      }
+
+      return c.json({
+        success: errors.length === 0,
+        added_fields: addedFields,
+        errors: errors,
+        summary: {
+          total: fields.length,
+          added: addedFields.length,
+          failed: errors.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Schema modification error:', error);
+      return c.json({ 
+        error: 'Failed to modify schema', 
+        details: error instanceof Error ? error.message : 'Unknown error',
+        added_fields: addedFields,
+        errors: errors
+      }, 500);
+    }
+
+  } catch (error) {
+    console.error('Add fields error:', error);
+    return c.json({ 
+      error: 'Failed to process add fields request', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Modify existing field
+dataforgeRouter.put('/orgs/:orgId/entities/:entityName/fields/:fieldName', 
+  requirePermission('entities:admin'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const entityName = c.req.param('entityName');
+    const fieldName = c.req.param('fieldName');
+    const body = await c.req.json();
+    
+    const user = c.get('user');
+    console.log(`[DataForge] User ${user?.email || 'anonymous'} modifying field ${fieldName} in ${entityName}`);
+
+    // Get entity definition
+    const entityDef = await getEntityDefinition(c, security.organizationId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+
+    // Check if field exists in entity metadata
+    const currentMetadata = entityDef.definition;
+    if (!currentMetadata.fields || !currentMetadata.fields[fieldName]) {
+      return c.json({ error: `Field ${fieldName} not found in entity ${entityName}` }, 404);
+    }
+
+    const { getKysely } = await import('../lib/kysely');
+    const kysely = getKysely(c.env);
+
+    // Update the field configuration in metadata
+    const updatedFieldConfig = {
+      ...currentMetadata.fields[fieldName],
+      ...body
+    };
+
+    currentMetadata.fields[fieldName] = updatedFieldConfig;
+
+    // Update in database
+    await kysely.executeQuery({
+      sql: `UPDATE entity_schemas SET business_metadata = $1, updated_at = NOW() 
+            WHERE org_id = $2 AND entity_name = $3`,
+      parameters: [JSON.stringify(currentMetadata), security.organizationId, entityName]
+    });
+
+    return c.json({
+      success: true,
+      field: {
+        name: fieldName,
+        ...updatedFieldConfig
+      }
+    });
+
+  } catch (error) {
+    console.error('Modify field error:', error);
+    return c.json({ 
+      error: 'Failed to modify field', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
+// Remove field from entity
+dataforgeRouter.delete('/orgs/:orgId/entities/:entityName/fields/:fieldName', 
+  requirePermission('entities:admin'),
+  async (c) => {
+  try {
+    const security = c.get('security');
+    const entityName = c.req.param('entityName');
+    const fieldName = c.req.param('fieldName');
+    
+    const user = c.get('user');
+    console.log(`[DataForge] User ${user?.email || 'anonymous'} removing field ${fieldName} from ${entityName}`);
+
+    // Get entity definition
+    const entityDef = await getEntityDefinition(c, security.organizationId, entityName);
+    if (!entityDef) {
+      return c.json({ error: `Entity ${entityName} not found` }, 404);
+    }
+
+    const { getKysely } = await import('../lib/kysely');
+    const kysely = getKysely(c.env);
+
+    // Remove from PostgreSQL table (optional - can be kept for data safety)
+    try {
+      await kysely.executeQuery({
+        sql: `ALTER TABLE ${entityDef.tableName} DROP COLUMN IF EXISTS ${fieldName}`,
+        parameters: []
+      });
+    } catch (dropError) {
+      console.warn(`Could not drop column ${fieldName}:`, dropError);
+      // Continue even if column drop fails - we'll remove from metadata
+    }
+
+    // Remove from entity metadata
+    const currentMetadata = entityDef.definition;
+    if (currentMetadata.fields && currentMetadata.fields[fieldName]) {
+      delete currentMetadata.fields[fieldName];
+      
+      // Update in database
+      await kysely.executeQuery({
+        sql: `UPDATE entity_schemas SET business_metadata = $1, updated_at = NOW() 
+              WHERE org_id = $2 AND entity_name = $3`,
+        parameters: [JSON.stringify(currentMetadata), security.organizationId, entityName]
+      });
+    }
+
+    return c.json({
+      success: true,
+      removed_field: fieldName
+    });
+
+  } catch (error) {
+    console.error('Remove field error:', error);
+    return c.json({ 
+      error: 'Failed to remove field', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, 500);
+  }
+});
+
 async function storeEntityDefinition(c: any, organizationId: string, entityName: string, definition: DataForgeArchetypeDefinition, tableName: string) {
   try {
     const { getKysely } = await import('../lib/kysely');
@@ -1370,17 +1970,26 @@ async function storeEntityDefinition(c: any, organizationId: string, entityName:
     const kysely = getKysely(c.env);
 
     // Store in PostgreSQL-native entity_schemas table (replaces universal_entity_registry)
+    // UNIFIED FORMAT: Store fields as array (same format as API input and RuntimeSchemaGenerator)
+    // Import archetype defaults to avoid hardcoded values
+    const { ArchetypeRegistry } = await import('../dataforge/archetypes');
+    
     const businessMetadata = {
-      fields: definition.fields.reduce((acc: any, field) => {
-        acc[field.name] = {
+      fields: definition.fields.map(field => {
+        // Get archetype defaults for this field type
+        const archetypeField = ArchetypeRegistry.getArchetype(definition.archetype)?.getField?.(field.name);
+        
+        return {
+          name: field.name,
           type: field.type,
-          required: field.required || false,
-          syncable: field.syncable !== false,
-          serverOnly: field.serverOnly || false,
-          defaultValue: field.defaultValue
+          required: field.required ?? archetypeField?.required ?? false,
+          syncable: field.syncable ?? archetypeField?.syncable ?? true,
+          serverOnly: field.serverOnly ?? archetypeField?.serverOnly ?? false,
+          defaultValue: field.defaultValue ?? archetypeField?.defaultValue,
+          enum: field.enum ?? archetypeField?.enum,
+          validation: field.validation ?? archetypeField?.validation
         };
-        return acc;
-      }, {}),
+      }),
       description: `Entity created via DataForge API`,
       syncable: definition.syncable !== false,
       createdAt: new Date().toISOString()

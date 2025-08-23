@@ -282,7 +282,8 @@ export class DynamicSchemaPOC {
       // 4. Notify Legend State of schema changes
       if (typeof window !== 'undefined') {
         // Import dynamically to avoid SSR issues
-        const { handleSchemaChangeNotification } = await import('@/stores/legend-state-org-store');
+        // Note: handleSchemaChangeNotification was removed with legend-state-org-store cleanup
+        console.log('Schema change notification (handler removed during cleanup):', notification);
         
         for (const change of changes) {
           handleSchemaChangeNotification({

@@ -296,7 +296,7 @@ export function shouldTrackTableSync(tableName: string): boolean {
   }
   
   // Base tables - always track
-  const baseTables = ['users', 'organization', 'organization_member', 'session', 'account', 'verification', 'entity_schemas'];
+  const baseTables = ['users', 'organization', 'organization_member', 'session', 'account', 'verification', 'entity_schemas', 'schema_metadata'];
   if (baseTables.includes(normalizedTableName)) {
     return true;
   }

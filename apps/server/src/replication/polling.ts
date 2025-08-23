@@ -306,6 +306,32 @@ export class PollingManager {
                 }
               }
               
+              // Special handling for schema_metadata table
+              if (tableName === 'schema_metadata') {
+                // For schema_metadata changes, extract org_id from the key
+                if (walChange.columnvalues && walChange.columnvalues[0]) {
+                  const key = walChange.columnvalues[0];
+                  // Key format: entity_{orgId}_{entityName}_fields_modified
+                  const orgMatch = key.match(/^entity_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_/);
+                  if (orgMatch) {
+                    const orgId = orgMatch[1];
+                    tablesChanged.add('schema_metadata');
+                    organizationsNotified.add(orgId);
+                    
+                    replicationLogger.info('Schema metadata change detected', {
+                      tableName,
+                      orgId,
+                      key,
+                      lsn: change.lsn
+                    }, MODULE_NAME);
+                    
+                    // Send special notification for schema changes
+                    const notificationsSent = await this.sendTableChangeNotification(orgId, ['schema_metadata'], change.lsn);
+                    clientsNotified += notificationsSent;
+                  }
+                }
+              }
+              
               // Extract organization ID from table name (e.g., "org_01920000_1000_7000_8000_000000000001_project")
               const orgMatch = tableName.match(/^org_([0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12})_(.+)$/i);
               if (orgMatch) {

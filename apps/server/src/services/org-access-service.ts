@@ -5,12 +5,30 @@
  * PostgreSQL (truth) → Durable Objects (cache) → API (fast lookups)
  * 
  * Handles synchronization between PostgreSQL source of truth
- * and OrgAdminDO access control cache for performance.
+ * and organization access control for performance.
  */
 
 import type { Kysely } from 'kysely';
 import type { HardcodedDatabase } from '../dataforge/base/hardcoded-database';
-import type { CachedMember, CachedOrganization } from '../dataforge/durable-objects/OrgAdminDO';
+// OrgOpsDO archived - define types locally for now
+export interface CachedMember {
+  id: string;
+  userId: string;
+  role: string;
+  status: string;
+  joinedAt: string;
+  lastActiveAt?: string;
+  permissions?: string[];
+}
+
+export interface CachedOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  createdAt: string;
+  settings?: any;
+}
 
 export interface UserOrgAccess {
   hasAccess: boolean;

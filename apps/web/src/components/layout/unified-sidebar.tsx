@@ -17,8 +17,7 @@ import { useSelector } from '@xstate/store/react'
 import { shallowEqual } from '@xstate/store'
 import { observer } from '@legendapp/state/react'
 import { Project, ProjectStatus } from '@/db/client-entities'
-import { sidebar$ } from '@/stores/org-data-store'
-// Import from Legend Central for entity groups
+// Import from Legend State for entity groups
 import { entityGroups$ } from '@/legend-state'
 import { shouldHideBusinessRoutes } from './data/dynamic-sidebar-data'
 import type { NavGroup } from './types'

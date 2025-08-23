@@ -27,17 +27,12 @@ export type {
 // Entity Management
 // =============================================================================
 
-export { 
-  ArchetypeEntityManager,
-  type ArchetypeEntityData,
-  type ArchetypeCreateResult,
-  type ArchetypeQueryResult
-} from './entity-operations/ArchetypeEntityManager';
+// ArchetypeEntityManager removed during cleanup
 
 export { 
-  EntityManager,
-  type EntityManagerConfig 
-} from './entity-operations/entity-manager';
+  DataForgeEntityManager,
+  type DataForgeEntityManagerConfig 
+} from './entity-operations/EntityManager';
 
 // =============================================================================
 // Field Definitions & Rules
@@ -47,7 +42,7 @@ export {
   type FieldDefinition,
   type ValidationRule,
   type FieldType
-} from './rules/json-rules-engine';
+} from './json-rules-engine';
 
 // =============================================================================
 // Schema Management
@@ -55,24 +50,21 @@ export {
 
 export { 
   RuntimeSchemaGenerator 
-} from './kysely-generator/runtime-schema-generator';
+} from './runtime-schema-generator';
 
 export { 
   type OrgEntityDefinition,
   type OrgEntitySchema 
-} from './json-schema/org-entity-schema';
+} from './org-entity-schema';
 
+// =============================================================================  
+// DDL Generation & Services
 // =============================================================================
-// Migration Services
-// =============================================================================
 
-export { 
-  ArchetypeMigrationService 
-} from './migration/archetype-migration-service';
-
-export { 
-  DebouncedMigrationService 
-} from './migration/debounced-migration-service';
+export { DDLGenerator } from './DDLGenerator';
+export { ArchetypeService } from './ArchetypeService';
+export { BulkOperationsService } from './BulkOperationsService';
+export { SchemaModificationService } from './SchemaModificationService';
 
 // =============================================================================
 // Foundation Entities (Base Archetypes)
@@ -81,36 +73,36 @@ export {
 export { FoundationEntityRegistry } from './entities/foundation';
 
 // Project Archetype
-export { Project } from './entities/foundation/archetypes/ProjectArchetype';
-export type { ProjectFields } from './entities/foundation/archetypes/ProjectArchetype';
+export { Project } from './archetypes/ProjectArchetype';
+export type { ProjectFields } from './archetypes/ProjectArchetype';
 
-// Task Archetype
-export { Task } from './entities/foundation/archetypes/TaskArchetype';
-export type { TaskFields } from './entities/foundation/archetypes/TaskArchetype';
+// Task Archetype  
+export { Task } from './archetypes/TaskArchetype';
+export type { TaskFields } from './archetypes/TaskArchetype';
 
 // Record Archetype
-export { Record } from './entities/foundation/archetypes/RecordArchetype';
-export type { RecordFields } from './entities/foundation/archetypes/RecordArchetype';
+export { Record } from './archetypes/RecordArchetype';
+export type { RecordFields } from './archetypes/RecordArchetype';
 
 // Document Archetype
-export { Document } from './entities/foundation/archetypes/DocumentArchetype';
-export type { DocumentFields } from './entities/foundation/archetypes/DocumentArchetype';
+export { Document } from './archetypes/DocumentArchetype';
+export type { DocumentFields } from './archetypes/DocumentArchetype';
 
 // File Archetype
-export { File } from './entities/foundation/archetypes/FileArchetype';
-export type { FileFields } from './entities/foundation/archetypes/FileArchetype';
+export { File } from './archetypes/FileArchetype';
+export type { FileFields } from './archetypes/FileArchetype';
 
 // Activity Archetype
-export { Activity } from './entities/foundation/archetypes/ActivityArchetype';
-export type { ActivityFields } from './entities/foundation/archetypes/ActivityArchetype';
+export { Activity } from './archetypes/ActivityArchetype';
+export type { ActivityFields } from './archetypes/ActivityArchetype';
 
 // Discussion Archetype
-export { Discussion } from './entities/foundation/archetypes/DiscussionArchetype';
-export type { DiscussionFields } from './entities/foundation/archetypes/DiscussionArchetype';
+export { Discussion } from './archetypes/DiscussionArchetype';
+export type { DiscussionFields } from './archetypes/DiscussionArchetype';
 
 // Collection Archetype
-export { Collection } from './entities/foundation/archetypes/CollectionArchetype';
-export type { CollectionFields } from './entities/foundation/archetypes/CollectionArchetype';
+export { Collection } from './archetypes/CollectionArchetype';
+export type { CollectionFields } from './archetypes/CollectionArchetype';
 
 // =============================================================================
 // DataForge Configuration

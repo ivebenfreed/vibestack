@@ -37,7 +37,9 @@ const EntityPageInner = observer(function EntityPageInner({ entityName }: { enti
   // Get entity store and loading state
   const entityStore = currentOrgId && schema ? getEntity$(entityName) : null
   
-  const entityData = entityStore ? use$(entityStore) : null
+  // Always call use$() hook, but pass null if entityStore doesn't exist
+  // This ensures consistent hook call order per React rules
+  const entityData = use$(entityStore)
   const isEntityLoading = false // Simplified for now
   const hasEntityLoaded = true // Simplified for now
   

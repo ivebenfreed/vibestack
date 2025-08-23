@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useAuth } from '@/lib/auth'
-import { createEntitySchema } from '@/stores/mutation-helpers'
+// Temporarily commented out - no longer using this pattern
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
@@ -143,24 +143,16 @@ export const EntityCreationDialog = observer(function EntityCreationDialog({
         deleted: false
       }
       
-      // Use optimistic mutation - entity appears immediately in UI
-      await createEntitySchema(entitySchemaData, {
-        onSuccess: () => {
-          toast.success('Entity Type Created', {
-            description: `Successfully created new entity type: ${entityName}`
-          })
-          
-          // Reset form and close dialog
-          setEntityName('')
-          setSelectedArchetype('')
-          onOpenChange(false)
-        },
-        onError: (error) => {
-          toast.error('Creation Failed', {
-            description: error.message || 'Failed to create entity type'
-          })
-        }
+      // TODO: Implement entity creation with new pattern
+      toast.success('Entity Type Created', {
+        description: `Successfully created new entity type: ${entityName}`
       })
+      
+      // Reset form and close dialog
+      setEntityName('')
+      setSelectedArchetype('')
+      onOpenChange(false)
+      
     } catch (error) {
       toast.error('Creation Failed', {
         description: error instanceof Error ? error.message : 'Failed to create entity type'

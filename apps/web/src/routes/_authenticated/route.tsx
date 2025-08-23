@@ -9,7 +9,7 @@ import { useAuth } from '@/state-machines'
 // import SkipToMain from '@/components/skip-to-main' - Disabled: phantom component issue
 import { Project, Task, User } from '@/db/client-entities'
 import { getDefaultStore } from 'jotai'
-import { switchToOrganization } from '@/stores/org-data-store'
+import { loadOrgContext } from '@/legend-state'
 
 // Removed session tracking - components handle their own initialization state
 
@@ -129,20 +129,20 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   const currentOrgId = user?.currentOrganizationId;
   const [hasInitializedOrg, setHasInitializedOrg] = React.useState(false);
   
-  // Initialize store ONLY on first load, not when organization changes
+  // Initialize legend state context ONLY on first load, not when organization changes
   useEffect(() => {
-    if (currentOrgId && !hasInitializedOrg) {
+    if (currentOrgId && user?.id && !hasInitializedOrg) {
       console.log('[AuthenticatedContent] Initial organization setup:', currentOrgId);
-      switchToOrganization(currentOrgId).then(() => {
+      loadOrgContext(currentOrgId, user.id).then(() => {
         setHasInitializedOrg(true);
       }).catch(error => {
         console.error('[AuthenticatedContent] Failed to initialize organization:', error)
         setHasInitializedOrg(true); // Continue anyway to prevent infinite loading
       })
     }
-  }, [currentOrgId, hasInitializedOrg])
+  }, [currentOrgId, user?.id, hasInitializedOrg])
   
-  // The sidebar entity groups are now automatically updated in switchToOrganization
+  // The sidebar entity groups are now automatically updated in loadOrgContext
 
   // Show unified loading screen during auth/org initialization
   // Simplified loading logic - removed artificial delay that caused flickering

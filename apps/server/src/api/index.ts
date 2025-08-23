@@ -8,7 +8,7 @@ import { migrations } from './migrations'
 import authRouter from './auth'
 import organizationsRouter from './organizations'
 import { phase1TestRouter } from './phase1-tests.js'
-import { dataforgeRouter } from '../routes/dataforge-api.js'
+import { dataforgeRouter } from '../routes/dataforge-api-refactored.js'
 import { testDbRouter } from '../routes/test-db.js'
 import debugTableDataRouter from './debug/table-data'
 // Custom organization routes removed - using Better Auth endpoints instead

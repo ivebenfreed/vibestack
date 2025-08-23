@@ -292,6 +292,53 @@ export class OrganizationActor extends Actor {
   }
   
   /**
+   * Invalidate schema cache when schema changes occur
+   */
+  invalidateSchemaCache(): void {
+    try {
+      this.initializeSQLiteCache();
+      
+      // Clear all schema cache entries for this organization
+      const orgPrefix = `org_${this.organizationId.replace(/-/g, '_')}_`;
+      this.ctx.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name LIKE ?`, `${orgPrefix}%`);
+      
+      syncLogger.info('Schema cache invalidated', {
+        organizationId: this.organizationId,
+        orgPrefix
+      }, MODULE_NAME);
+      
+    } catch (error) {
+      syncLogger.error('Failed to invalidate schema cache', {
+        organizationId: this.organizationId,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+  }
+  
+  /**
+   * Invalidate schema cache for a specific table (e.g., when entity is deleted)
+   */
+  invalidateTableSchema(tableName: string): void {
+    try {
+      this.initializeSQLiteCache();
+      
+      this.ctx.storage.sql.exec(`DELETE FROM schema_cache WHERE table_name = ?`, tableName);
+      
+      syncLogger.info('Table schema cache invalidated', {
+        organizationId: this.organizationId,
+        tableName
+      }, MODULE_NAME);
+      
+    } catch (error) {
+      syncLogger.error('Failed to invalidate table schema cache', {
+        organizationId: this.organizationId,
+        tableName,
+        error: error instanceof Error ? error.message : String(error)
+      }, MODULE_NAME);
+    }
+  }
+  
+  /**
    * Cache schema information for instant future lookups
    */
   cacheSchema(
@@ -607,6 +654,18 @@ export class OrganizationActor extends Actor {
         return await this.handleCacheSchema(request);
       }
       
+      if (path === '/invalidate-schema') {
+        return await this.handleInvalidateSchema(request);
+      }
+      
+      if (path === '/org-schema') {
+        return await this.handleGetOrgSchema(request);
+      }
+      
+      if (path === '/cache-org-schema') {
+        return await this.handleCacheOrgSchema(request);
+      }
+      
       if (path === '/role-check') {
         return await this.handleRoleCheck(request);
       }
@@ -756,6 +815,187 @@ export class OrganizationActor extends Actor {
       return new Response(JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  
+  /**
+   * Handle schema cache invalidation requests (POST /invalidate-schema)
+   */
+  async handleInvalidateSchema(request: Request): Promise<Response> {
+    try {
+      const body = await request.json().catch(() => ({}));
+      const { tableName } = body;
+      
+      if (tableName) {
+        // Invalidate specific table schema
+        this.invalidateTableSchema(tableName);
+        return new Response(JSON.stringify({
+          success: true,
+          message: `Schema cache invalidated for table: ${tableName}`,
+          timestamp: Date.now()
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } else {
+        // Invalidate all schema cache for this org
+        this.invalidateSchemaCache();
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'All schema cache invalidated for organization',
+          organizationId: this.organizationId,
+          timestamp: Date.now()
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Failed to invalidate schema cache',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  
+  /**
+   * Handle get organization schema requests (GET /org-schema)
+   */
+  async handleGetOrgSchema(request: Request): Promise<Response> {
+    try {
+      this.initializeSQLiteCache();
+      
+      // Create the table if it doesn't exist
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS org_schema_cache (
+          cache_key TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          cached_at INTEGER NOT NULL
+        )
+      `);
+      
+      // Check if we have cached org schema data
+      const cacheKey = `org_schema_${this.organizationId}`;
+      const cursor = this.ctx.storage.sql.exec(`
+        SELECT data, cached_at
+        FROM org_schema_cache 
+        WHERE cache_key = ?
+      `, cacheKey);
+      
+      const results = cursor.toArray() as any[];
+      
+      if (results.length > 0) {
+        const result = results[0];
+        const cachedData = JSON.parse(result.data);
+        console.log(`[OrganizationActor] ✅ Returning cached org schema (${cachedData.length} entities)`);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          cached: true,
+          schema: cachedData,
+          organizationId: this.organizationId,
+          timestamp: result.cached_at
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      console.log(`[OrganizationActor] ❌ No cached org schema found`);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        cached: false,
+        schema: [],
+        organizationId: this.organizationId,
+        timestamp: Date.now()
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+    } catch (error) {
+      console.error(`[OrganizationActor] Error getting org schema:`, error);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Failed to get organization schema',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+  
+  /**
+   * Handle cache organization schema requests (POST /cache-org-schema)
+   */
+  async handleCacheOrgSchema(request: Request): Promise<Response> {
+    try {
+      const { organizationId, schema } = await request.json();
+      
+      if (organizationId !== this.organizationId) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Organization ID mismatch'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      if (!schema || !Array.isArray(schema)) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid schema data - must be an array'
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      this.initializeSQLiteCache();
+      
+      // Store the raw schema data in a simple org-level cache
+      const cacheKey = `org_schema_${this.organizationId}`;
+      const now = Date.now();
+      
+      // Create the table if it doesn't exist
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS org_schema_cache (
+          cache_key TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          cached_at INTEGER NOT NULL
+        )
+      `);
+      
+      // Store the schema data
+      this.ctx.storage.sql.exec(`
+        INSERT OR REPLACE INTO org_schema_cache (cache_key, data, cached_at)
+        VALUES (?, ?, ?)
+      `, cacheKey, JSON.stringify(schema), now);
+      
+      console.log(`[OrganizationActor] ✅ Cached org schema (${schema.length} entities)`);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Cached schema for ${schema.length} entities`,
+        organizationId: this.organizationId,
+        timestamp: now
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+    } catch (error) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Failed to cache organization schema',
+        details: error instanceof Error ? error.message : 'Unknown error'
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
@@ -1095,6 +1335,26 @@ export class OrganizationActor extends Actor {
             error: error.message
           }, MODULE_NAME);
         });
+      }
+      
+      // Check if any schema-related tables changed and invalidate schema cache
+      const schemaRelatedTables = ['entity_schemas', 'schema_metadata'];
+      const hasSchemaChanges = notification.tables.some(table => 
+        schemaRelatedTables.includes(table) ||
+        table.startsWith(`org_${this.organizationId.replace(/-/g, '_')}_`) // Org-specific entity tables
+      );
+      
+      if (hasSchemaChanges) {
+        syncLogger.info('Schema-related table changed, invalidating schema cache', {
+          organizationId: this.organizationId,
+          changedTables: notification.tables.filter(t => 
+            schemaRelatedTables.includes(t) || 
+            t.startsWith(`org_${this.organizationId.replace(/-/g, '_')}_`)
+          )
+        }, MODULE_NAME);
+        
+        // Clear schema cache for this organization
+        this.invalidateSchemaCache();
       }
 
       // Broadcast to all connected clients

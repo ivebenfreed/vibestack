@@ -9,7 +9,7 @@ import type { AppContext } from '../types/hono';
 
 export const adminRouter = new Hono<AppContext>();
 
-// Platform admin endpoints using SuperAdminDO
+// Platform admin endpoints using direct database operations
 
 adminRouter.post('/organizations', async (c) => {
   try {
@@ -20,12 +20,11 @@ adminRouter.post('/organizations', async (c) => {
       return c.json({ error: 'name, slug, and ownerId required' }, 400);
     }
 
-    // Get SuperAdminDO instance (singleton)
-    const adminDoId = c.env.SUPER_ADMIN.idFromName('platform');
-    const adminDoStub = c.env.SUPER_ADMIN.get(adminDoId);
+    // Use OrganizationActor for org creation
+    const orgId = c.env.ORGANIZATION_ACTORS.idFromName(slug);
+    const orgActor = c.env.ORGANIZATION_ACTORS.get(orgId);
     
-    // Create organization via SuperAdminDO
-    const response = await adminDoStub.fetch(new Request('http://localhost/organizations', {
+    const response = await orgActor.fetch(new Request('http://localhost/admin/create', {
       method: 'POST',
       body: JSON.stringify({ name, slug, ownerId, planType, settings })
     }));
@@ -46,11 +45,11 @@ adminRouter.get('/organizations/:orgId', async (c) => {
   try {
     const orgId = c.req.param('orgId');
     
-    // Get SuperAdminDO instance
-    const adminDoId = c.env.SUPER_ADMIN.idFromName('platform');
-    const adminDoStub = c.env.SUPER_ADMIN.get(adminDoId);
+    // Use OrganizationActor
+    const orgActorId = c.env.ORGANIZATION_ACTORS.idFromName(orgId || 'platform');
+    const orgActor = c.env.ORGANIZATION_ACTORS.get(orgActorId);
     
-    const response = await adminDoStub.fetch(new Request(`http://localhost/organizations/${orgId}`));
+    const response = await orgActor.fetch(new Request(`http://localhost/organizations/${orgId}`));
     const organization = await response.json();
     
     return c.json(organization, response.status);
@@ -67,11 +66,11 @@ adminRouter.get('/users/:userId/organizations', async (c) => {
   try {
     const userId = c.req.param('userId');
     
-    // Get SuperAdminDO instance
-    const adminDoId = c.env.SUPER_ADMIN.idFromName('platform');
-    const adminDoStub = c.env.SUPER_ADMIN.get(adminDoId);
+    // Use OrganizationActor
+    const orgActorId = c.env.ORGANIZATION_ACTORS.idFromName(orgId || 'platform');
+    const orgActor = c.env.ORGANIZATION_ACTORS.get(orgActorId);
     
-    const response = await adminDoStub.fetch(new Request(`http://localhost/users/${userId}/organizations`));
+    const response = await orgActor.fetch(new Request(`http://localhost/users/${userId}/organizations`));
     const organizations = await response.json();
     
     return c.json(organizations);
@@ -94,11 +93,11 @@ adminRouter.post('/organizations/:orgId/members', async (c) => {
       return c.json({ error: 'userId and role required' }, 400);
     }
 
-    // Get SuperAdminDO instance
-    const adminDoId = c.env.SUPER_ADMIN.idFromName('platform');
-    const adminDoStub = c.env.SUPER_ADMIN.get(adminDoId);
+    // Use OrganizationActor
+    const orgActorId = c.env.ORGANIZATION_ACTORS.idFromName(orgId || 'platform');
+    const orgActor = c.env.ORGANIZATION_ACTORS.get(orgActorId);
     
-    const response = await adminDoStub.fetch(new Request(`http://localhost/organizations/${orgId}/members`, {
+    const response = await orgActor.fetch(new Request(`http://localhost/organizations/${orgId}/members`, {
       method: 'POST',
       body: JSON.stringify({ userId, role })
     }));
@@ -116,11 +115,11 @@ adminRouter.post('/organizations/:orgId/members', async (c) => {
 
 adminRouter.get('/stats', async (c) => {
   try {
-    // Get SuperAdminDO instance
-    const adminDoId = c.env.SUPER_ADMIN.idFromName('platform');
-    const adminDoStub = c.env.SUPER_ADMIN.get(adminDoId);
+    // Use OrganizationActor
+    const orgActorId = c.env.ORGANIZATION_ACTORS.idFromName(orgId || 'platform');
+    const orgActor = c.env.ORGANIZATION_ACTORS.get(orgActorId);
     
-    const response = await adminDoStub.fetch(new Request('http://localhost/stats'));
+    const response = await orgActor.fetch(new Request('http://localhost/stats'));
     const stats = await response.json();
     
     return c.json(stats);
@@ -137,11 +136,11 @@ adminRouter.delete('/organizations/:orgId', async (c) => {
   try {
     const orgId = c.req.param('orgId');
     
-    // Get SuperAdminDO instance
-    const adminDoId = c.env.SUPER_ADMIN.idFromName('platform');
-    const adminDoStub = c.env.SUPER_ADMIN.get(adminDoId);
+    // Use OrganizationActor
+    const orgActorId = c.env.ORGANIZATION_ACTORS.idFromName(orgId || 'platform');
+    const orgActor = c.env.ORGANIZATION_ACTORS.get(orgActorId);
     
-    const response = await adminDoStub.fetch(new Request(`http://localhost/organizations/${orgId}`, {
+    const response = await orgActor.fetch(new Request(`http://localhost/organizations/${orgId}`, {
       method: 'DELETE'
     }));
     

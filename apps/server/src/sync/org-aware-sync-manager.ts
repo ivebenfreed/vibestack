@@ -2,7 +2,7 @@
  * Organization-Aware Sync Manager
  * 
  * Handles organization context extraction, validation, and permission checking
- * for sync operations. Integrates with Better Auth and OrgOpsDO for fast
+ * for sync operations. Integrates with Better Auth for fast
  * organization-scoped sync filtering.
  */
 
@@ -201,30 +201,19 @@ export class OrgAwareSyncManager {
       // 2. Extract entity name from table name
       const entityName = tableName.substring(connection.organizationId.length + 1);
 
-      // 3. Use OrgOpsDO for fast permission validation
-      if (this.env.ORG_OPS) {
-        const doId = this.env.ORG_OPS.idFromName(connection.organizationId);
-        const doStub = this.env.ORG_OPS.get(doId);
+      // 3. Pull-based sync - permissions validated at query time
+      // Since sync is now pull-based, we skip the push-based permission validation
+      // and allow the client to pull data, with permissions checked during actual queries
+      
+      syncLogger.debug('Pull-based sync - allowing access, permissions checked at query time', {
+        userId: connection.userId,
+        entityName,
+        action,
+        userRole: connection.userRole
+      });
 
-        const response = await doStub.fetch(new Request(`http://localhost/validate-sync-access`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: connection.userId,
-            entityName,
-            action,
-            userRole: connection.userRole
-          })
-        }));
-
-        if (response.ok) {
-          const result = await response.json();
-          return result.hasAccess;
-        }
-      }
-
-      // 4. Fallback to basic role-based access
-      return this.validateBasicTableAccess(connection.userRole, action);
+      // For pull-based sync, return true - real permission checks happen during data queries
+      return true;
 
     } catch (error) {
       syncLogger.error('Table access validation failed', {

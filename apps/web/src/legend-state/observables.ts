@@ -12,6 +12,21 @@ import { configureSynced } from '@legendapp/state/sync'
 import { orgSchemaClient } from '@/lib/schema-client'
 import { createPersistenceManager, type PersistenceManager } from './helpers/PersistenceManager'
 
+// Custom error classes for better error handling
+export class ValidationError extends Error {
+  constructor(message: string, public errors: any[] = []) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+export class ConflictError extends Error {
+  constructor(message: string, public conflictData?: any) {
+    super(message)
+    this.name = 'ConflictError'
+  }
+}
+
 // Reactive persistence configuration - created after schema loads
 let persistenceManager: PersistenceManager | null = null
 let syncedCrudWithPersistence: any = null
@@ -30,19 +45,88 @@ export const orgContext$ = observable({
 })
 
 /**
+ * Validate item against server-side validation rules
+ */
+async function validateItem(orgId: string, entityName: string, item: any, operation: 'create' | 'update'): Promise<boolean> {
+  try {
+    const baseUrl = `/api/dataforge/orgs/${orgId}/data/${entityName}`
+    const response = await fetch(`${baseUrl}/validate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Entity-Name': entityName,
+        'X-Org-Context': orgId,
+        'X-Validation-Operation': operation,
+      },
+      credentials: 'include',
+      body: JSON.stringify({ item, operation })
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        // Validation endpoint doesn't exist - skip validation
+        console.info(`[Observable] Validation endpoint not available for ${entityName} - skipping`)
+        return true
+      }
+      
+      const validation = await response.json().catch(() => ({}))
+      const errors = validation.errors || [validation.message || `Validation failed: ${response.status}`]
+      throw new ValidationError(
+        `Validation failed for ${entityName} ${operation}: ${errors.join(', ')}`,
+        errors
+      )
+    }
+
+    const result = await response.json()
+    if (!result.valid) {
+      const errors = result.errors || ['Unknown validation error']
+      throw new ValidationError(
+        `Validation failed for ${entityName} ${operation}: ${errors.join(', ')}`,
+        errors
+      )
+    }
+
+    return true
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error
+    }
+    // Network errors or other issues - don't block the operation
+    console.warn(`[Observable] Validation check failed for ${entityName} ${operation}:`, error.message)
+    return true
+  }
+}
+
+/**
  * Create a synced entity observable using Legend State patterns
  */
 function createEntityObservable(orgId: string, entityName: string, schema?: any) {
   const baseUrl = `/api/dataforge/orgs/${orgId}/data/${entityName}`
+  const syncUrl = `/api/dataforge/orgs/${orgId}/sync/${entityName}`
   
-  // Use the reactive persistence configuration if available, otherwise use basic syncedCrud
-  
-  // Create the syncedCrud configuration first
+  // Create the syncedCrud configuration with proper differential sync
   const crudConfig = {
-    // LIST - Fetch all items with proper error handling
-    list: async () => {
+    // CRITICAL: Enable Legend State's built-in differential sync
+    changesSince: 'last-sync',
+    
+    // CRITICAL: Field mappings for differential sync tracking
+    fieldId: 'id',
+    fieldCreatedAt: 'created_at',
+    fieldUpdatedAt: 'updated_at',
+    fieldDeleted: 'deleted',
+    
+    // LIST - Use differential sync endpoint when changesSince is provided
+    list: async ({ changesSince }: { changesSince?: string } = {}) => {
       try {
-        const response = await fetch(baseUrl, {
+        // Use sync endpoint for differential sync, fallback to regular endpoint
+        const url = changesSince ? 
+          `${syncUrl}?changesSince=${encodeURIComponent(changesSince)}&limit=1000` : 
+          baseUrl;
+        
+        console.log(`[Observable] ${changesSince ? 'Differential' : 'Full'} sync for ${entityName}:`, url);
+        
+        const response = await fetch(url, {
           credentials: 'include',
           headers: { 'Accept': 'application/json' }
         })
@@ -63,82 +147,249 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         }
         
         const result = await response.json()
-        return result.data || []
+        const data = result.data || []
+        
+        // Log sync results for debugging
+        if (changesSince) {
+          console.log(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${changesSince}`)
+        } else {
+          console.log(`[Observable] Full sync ${entityName}: ${data.length} total records`)
+        }
+        
+        return data
       } catch (error) {
         console.info(`[Observable] Network error loading ${entityName} - returning empty data:`, error.message)
         return []
       }
     },
 
-    // CREATE - Add new item
+    // CREATE - Add new item with enhanced error context
     create: async (item: any) => {
       try {
+        // Optional: Validate before creating
+        if (schema?.validation !== false) {
+          try {
+            await validateItem(orgId, entityName, item, 'create')
+          } catch (validationError) {
+            console.warn(`[Observable] Validation failed for ${entityName}:`, validationError.message)
+            throw validationError
+          }
+        }
+
         const response = await fetch(baseUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'X-Entity-Name': entityName, // Help server debugging
+            'X-Org-Context': orgId,      // Audit trail
+            'X-User-Context': orgContext$.userId.peek() || 'unknown', // User context
           },
           credentials: 'include',
           body: JSON.stringify(item)
         })
         
         if (!response.ok) {
+          // Enhanced error context
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
+          
           if (response.status === 500) {
             throw new Error(`Entity ${entityName} table not created yet - cannot create records`)
           }
-          throw new Error(`Failed to create ${entityName}: ${response.status}`)
+          if (response.status === 400) {
+            throw new Error(`Invalid ${entityName} data: ${errorMessage}`)
+          }
+          if (response.status === 403) {
+            throw new Error(`Permission denied: Cannot create ${entityName}`)
+          }
+          if (response.status === 409) {
+            throw new Error(`Conflict: ${entityName} already exists or violates constraints`)
+          }
+          
+          throw new Error(`Create ${entityName} failed: ${errorMessage}`)
         }
         
         const result = await response.json()
+        console.log(`[Observable] Successfully created ${entityName}:`, result.data?.id || 'unknown-id')
         return result.data || item
       } catch (error) {
-        console.error(`[Observable] Create error for ${entityName}:`, error.message)
+        // Add context to help debugging
+        console.error(`[Observable] Create error for ${entityName}:`, {
+          error: error.message,
+          item: item ? { id: item.id, ...Object.keys(item).slice(0, 3) } : 'null', // Avoid logging sensitive data
+          orgId,
+          entityName
+        })
         throw error
       }
     },
 
-    // UPDATE - Modify existing item
+    // UPDATE - Modify existing item with enhanced error context
     update: async (item: any) => {
       try {
+        // Optional: Validate before updating
+        if (schema?.validation !== false) {
+          try {
+            await validateItem(orgId, entityName, item, 'update')
+          } catch (validationError) {
+            console.warn(`[Observable] Validation failed for ${entityName} update:`, validationError.message)
+            throw validationError
+          }
+        }
+
         const response = await fetch(`${baseUrl}/${item.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'X-Entity-Name': entityName,
+            'X-Org-Context': orgId,
+            'X-User-Context': orgContext$.userId.peek() || 'unknown',
+            'X-Record-Id': item.id, // Help with server-side debugging
           },
           credentials: 'include',
           body: JSON.stringify(item)
         })
         
         if (!response.ok) {
+          // Enhanced error context
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
+          
+          if (response.status === 404) {
+            throw new Error(`${entityName} not found: Record may have been deleted`)
+          }
+          if (response.status === 409) {
+            throw new Error(`Conflict updating ${entityName}: ${errorMessage}`)
+          }
+          if (response.status === 400) {
+            throw new Error(`Invalid ${entityName} update data: ${errorMessage}`)
+          }
+          if (response.status === 403) {
+            throw new Error(`Permission denied: Cannot update ${entityName}`)
+          }
           if (response.status === 500) {
             throw new Error(`Entity ${entityName} table not created yet - cannot update records`)
           }
-          throw new Error(`Failed to update ${entityName}: ${response.status}`)
+          
+          throw new Error(`Update ${entityName} failed: ${errorMessage}`)
         }
         
         const result = await response.json()
+        console.log(`[Observable] Successfully updated ${entityName}:`, item.id)
         return result.data || item
       } catch (error) {
-        console.error(`[Observable] Update error for ${entityName}:`, error.message)
+        console.error(`[Observable] Update error for ${entityName}:`, {
+          error: error.message,
+          itemId: item?.id || 'unknown',
+          orgId,
+          entityName
+        })
         throw error
       }
     },
 
-    // DELETE - Remove item
+    // DELETE - Remove item with enhanced error context
     delete: async (item: any) => {
-      const response = await fetch(`${baseUrl}/${item.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: { 'Accept': 'application/json' }
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to delete ${entityName}: ${response.status}`)
+      try {
+        const response = await fetch(`${baseUrl}/${item.id}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 
+            'Accept': 'application/json',
+            'X-Entity-Name': entityName,
+            'X-Org-Context': orgId,
+            'X-User-Context': orgContext$.userId.peek() || 'unknown',
+            'X-Record-Id': item.id,
+          }
+        })
+        
+        if (!response.ok) {
+          // Enhanced error context
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
+          
+          if (response.status === 404) {
+            console.warn(`[Observable] ${entityName} already deleted:`, item.id)
+            return undefined // Treat as successful deletion
+          }
+          if (response.status === 403) {
+            throw new Error(`Permission denied: Cannot delete ${entityName}`)
+          }
+          if (response.status === 409) {
+            throw new Error(`Cannot delete ${entityName}: ${errorMessage}`)
+          }
+          
+          throw new Error(`Delete ${entityName} failed: ${errorMessage}`)
+        }
+        
+        console.log(`[Observable] Successfully deleted ${entityName}:`, item.id)
+        return undefined // Successful deletion
+      } catch (error) {
+        console.error(`[Observable] Delete error for ${entityName}:`, {
+          error: error.message,
+          itemId: item?.id || 'unknown',
+          orgId,
+          entityName
+        })
+        throw error
       }
-      
-      return undefined // Successful deletion
+    },
+
+    // BATCH UPDATE - Modify multiple items efficiently
+    batchUpdate: async (items: any[]) => {
+      try {
+        if (!items || items.length === 0) {
+          return []
+        }
+
+        console.log(`[Observable] Batch updating ${items.length} ${entityName} records`)
+
+        const response = await fetch(`${baseUrl}/batch`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Entity-Name': entityName,
+            'X-Org-Context': orgId,
+            'X-User-Context': orgContext$.userId.peek() || 'unknown',
+            'X-Batch-Size': items.length.toString(),
+          },
+          credentials: 'include',
+          body: JSON.stringify({ operations: items })
+        })
+
+        if (!response.ok) {
+          // Enhanced error context for batch operations
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.message || errorData.error || `HTTP ${response.status}`
+          
+          if (response.status === 400) {
+            throw new Error(`Invalid batch ${entityName} data: ${errorMessage}`)
+          }
+          if (response.status === 403) {
+            throw new Error(`Permission denied: Cannot batch update ${entityName}`)
+          }
+          if (response.status === 413) {
+            throw new Error(`Batch too large: Reduce number of ${entityName} items`)
+          }
+          
+          throw new Error(`Batch update ${entityName} failed: ${errorMessage}`)
+        }
+
+        const result = await response.json()
+        console.log(`[Observable] Successfully batch updated ${items.length} ${entityName} records`)
+        return result.data || items
+      } catch (error) {
+        console.error(`[Observable] Batch update error for ${entityName}:`, {
+          error: error.message,
+          itemCount: items?.length || 0,
+          orgId,
+          entityName
+        })
+        throw error
+      }
     },
 
     // Real-time sync via WebSocket notifications
@@ -176,23 +427,31 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       maxDelay: 30000
     },
 
-    // FIXED: Re-enable optimistic updates with proper field configuration
-    // This allows good UX while preventing IndexedDB loading from triggering creates
-    fieldId: 'id',
-    fieldCreatedAt: 'created_at',  // Records with this field are existing, not new
-    fieldUpdatedAt: 'updated_at',  // Track updates properly
-    generateId: () => `temp-${crypto.randomUUID()}`, // Temporary IDs for new records
+    // Generate temporary IDs for optimistic updates
+    generateId: () => `temp-${crypto.randomUUID()}`,
     
     // Initial empty state - use empty array for list operations to prevent auto-creation
     initial: [],
     
-    // RE-ENABLED: IndexedDB persistence with sync loop prevention
-    // The WebSocket subscription fix prevents the sync loop that was caused by refresh()
+    // PERSISTENCE: Enable IndexedDB persistence with differential sync support
+    // This is CRITICAL for changesSince to work - Legend State stores sync timestamps here
     ...(syncedCrudWithPersistence && persistenceManager ? (() => {
       const persistOptions = persistenceManager.getPersistOptions(entityName)
-      console.log(`[Observable] Persistence options for ${entityName}:`, persistOptions)
-      return { persist: persistOptions }
-    })() : {})
+      console.log(`[Observable] Persistence enabled for ${entityName} with differential sync:`, persistOptions)
+      return { 
+        persist: {
+          ...persistOptions,
+          // Ensure retrySync is enabled for differential sync
+          retrySync: true
+        }
+      }
+    })() : {
+      // Fallback: Basic persistence for differential sync even without IndexedDB
+      persist: {
+        name: `entity-${entityName}`,
+        retrySync: true
+      }
+    })
   }
   
   // CRITICAL FIX: Re-enable syncedCrud but fix WebSocket subscription to prevent sync loop
@@ -548,7 +807,192 @@ export const entityGroups$ = observable(() => {
   }
 })
 
+/**
+ * Batch operation utilities for components
+ */
+export const batchOperations = {
+  /**
+   * Update multiple items of the same entity type
+   */
+  async batchUpdate(entityName: string, updates: Array<{ id: string, data: any }>) {
+    const entity$ = getEntity$(entityName)
+    if (!entity$ || !entity$.batchUpdate) {
+      throw new Error(`Entity ${entityName} not found or doesn't support batch operations`)
+    }
+    
+    return entity$.batchUpdate(updates)
+  },
+
+  /**
+   * Delete multiple items efficiently
+   */
+  async batchDelete(entityName: string, ids: string[]) {
+    const entity$ = getEntity$(entityName)
+    if (!entity$) {
+      throw new Error(`Entity ${entityName} not found`)
+    }
+
+    // Use batch deletion if available, otherwise fall back to individual deletes
+    const items = ids.map(id => ({ id }))
+    const results = await Promise.allSettled(
+      items.map(item => entity$.delete(item))
+    )
+    
+    const failures = results
+      .map((result, index) => ({ result, id: ids[index] }))
+      .filter(({ result }) => result.status === 'rejected')
+    
+    if (failures.length > 0) {
+      console.warn(`[BatchOperations] ${failures.length}/${ids.length} deletions failed:`, failures)
+    }
+    
+    return {
+      successful: results.filter(r => r.status === 'fulfilled').length,
+      failed: failures.length,
+      failures: failures.map(f => ({ id: f.id, error: f.result.reason }))
+    }
+  },
+
+  /**
+   * Create multiple items efficiently
+   */
+  async batchCreate(entityName: string, items: any[]) {
+    const entity$ = getEntity$(entityName)
+    if (!entity$) {
+      throw new Error(`Entity ${entityName} not found`)
+    }
+
+    // Create items individually with proper error handling
+    const results = await Promise.allSettled(
+      items.map(item => entity$.create(item))
+    )
+    
+    const failures = results
+      .map((result, index) => ({ result, item: items[index] }))
+      .filter(({ result }) => result.status === 'rejected')
+    
+    if (failures.length > 0) {
+      console.warn(`[BatchOperations] ${failures.length}/${items.length} creations failed:`, failures)
+    }
+    
+    return {
+      successful: results.filter(r => r.status === 'fulfilled').length,
+      failed: failures.length,
+      failures: failures.map(f => ({ item: f.item, error: f.result.reason })),
+      created: results
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+        .map(r => r.value)
+    }
+  }
+}
+
+/**
+ * Enhanced entity operations with better error handling
+ */
+export const entityOperations = {
+  /**
+   * Safe entity creation with validation
+   */
+  async createEntity(entityName: string, data: any, options: { validate?: boolean } = {}) {
+    try {
+      const entity$ = getEntity$(entityName)
+      if (!entity$) {
+        throw new Error(`Entity ${entityName} not found`)
+      }
+
+      // Pre-validate if requested
+      if (options.validate !== false) {
+        const orgId = orgContext$.orgId.peek()
+        if (orgId) {
+          await validateItem(orgId, entityName, data, 'create')
+        }
+      }
+
+      const result = await entity$.create(data)
+      
+      // Emit success event for UI feedback
+      window.dispatchEvent(new CustomEvent('vibestack:entity-created', {
+        detail: { entityName, data: result }
+      }))
+      
+      return result
+    } catch (error) {
+      // Emit error event for UI feedback
+      window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
+        detail: { entityName, operation: 'create', error: error.message }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * Safe entity update with optimistic updates
+   */
+  async updateEntity(entityName: string, id: string, data: any, options: { validate?: boolean } = {}) {
+    try {
+      const entity$ = getEntity$(entityName)
+      if (!entity$) {
+        throw new Error(`Entity ${entityName} not found`)
+      }
+
+      const fullData = { ...data, id }
+
+      // Pre-validate if requested
+      if (options.validate !== false) {
+        const orgId = orgContext$.orgId.peek()
+        if (orgId) {
+          await validateItem(orgId, entityName, fullData, 'update')
+        }
+      }
+
+      const result = await entity$.update(fullData)
+      
+      // Emit success event for UI feedback
+      window.dispatchEvent(new CustomEvent('vibestack:entity-updated', {
+        detail: { entityName, id, data: result }
+      }))
+      
+      return result
+    } catch (error) {
+      // Emit error event for UI feedback
+      window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
+        detail: { entityName, operation: 'update', id, error: error.message }
+      }))
+      throw error
+    }
+  },
+
+  /**
+   * Safe entity deletion
+   */
+  async deleteEntity(entityName: string, id: string) {
+    try {
+      const entity$ = getEntity$(entityName)
+      if (!entity$) {
+        throw new Error(`Entity ${entityName} not found`)
+      }
+
+      const result = await entity$.delete({ id })
+      
+      // Emit success event for UI feedback
+      window.dispatchEvent(new CustomEvent('vibestack:entity-deleted', {
+        detail: { entityName, id }
+      }))
+      
+      return result
+    } catch (error) {
+      // Emit error event for UI feedback
+      window.dispatchEvent(new CustomEvent('vibestack:entity-error', {
+        detail: { entityName, operation: 'delete', id, error: error.message }
+      }))
+      throw error
+    }
+  }
+}
+
 // Debug: Expose to window in development
 if (typeof window !== 'undefined' && import.meta.env.DEV) {
   (window as any).vibestackOrgContext = orgContext$
+  ;(window as any).vibestackBatchOps = batchOperations
+  ;(window as any).vibestackEntityOps = entityOperations
 }
