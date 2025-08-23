@@ -3,13 +3,21 @@ import { orgSchemaClient } from '@/lib/schema-client'
 
 // Simple global observable for the entire org data
 export const orgData$ = observable({
-  currentOrgId: null as string | null,
   schema: null as any,
   entities: {} as Record<string, any[]>,
   entitiesLoading: {} as Record<string, boolean>,
   loading: false,
   error: null as string | null
 })
+
+// Get current organization ID from auth machine
+function getCurrentOrgId(): string | null {
+  const authActor = (window as any).authMachineActor;
+  if (!authActor) return null;
+  
+  const state = authActor.getSnapshot();
+  return state?.context?.currentOrganization?.id || null;
+}
 
 // Event emitter for table change notifications
 export const tableChangeEmitter = new EventTarget()
@@ -20,7 +28,7 @@ export function handleTableNotification(notification: any) {
     console.log(`[OrgDataStore] WebSocket notification for ${notification.table}:`, notification.operation)
     
     // Reload the affected entity data
-    const currentOrgId = orgData$.currentOrgId.get()
+    const currentOrgId = getCurrentOrgId()
     if (currentOrgId) {
       loadEntityData(currentOrgId, notification.table).catch(error => {
         console.error(`[OrgDataStore] Failed to reload ${notification.table} after notification:`, error)
@@ -59,7 +67,7 @@ export async function loadEntityData(orgId: string, entityName: string) {
     console.log(`[OrgDataStore] Loading data for ${entityName}...`)
     orgData$.entitiesLoading[entityName].set(true)
     
-    const response = await fetch(`/api/archetype/orgs/${orgId}/data/${entityName}`, {
+    const response = await fetch(`/api/dataforge/orgs/${orgId}/data/${entityName}`, {
       credentials: 'include'
     })
     
@@ -84,8 +92,11 @@ export async function loadEntityData(orgId: string, entityName: string) {
 }
 
 export async function switchToOrganization(orgId: string, options?: { preloadCounts?: boolean }) {
+  // Get current organization from auth machine for comparison
+  const currentOrgId = getCurrentOrgId()
+  
   // If already loaded this org, just return unless forced refresh
-  if (orgData$.currentOrgId.get() === orgId && orgData$.schema.get()) {
+  if (currentOrgId === orgId && orgData$.schema.get()) {
     return
   }
   
@@ -99,9 +110,8 @@ export async function switchToOrganization(orgId: string, options?: { preloadCou
       throw new Error(`Failed to load schema for organization: ${orgId}`)
     }
     
-    // Set the schema
+    // Set the schema (organization ID comes from auth machine now)
     orgData$.schema.set(schemaResult.schema)
-    orgData$.currentOrgId.set(orgId)
     
     // Initialize with empty arrays so the UI can show counts immediately
     // The arrays will be populated when data is loaded
@@ -153,7 +163,6 @@ export function getOrgDataStore() {
 export function clearOrgDataStore(): void {
   console.log('[OrgDataStore] Clearing current organization store')
   orgData$.set({
-    currentOrgId: null,
     schema: null,
     entities: {},
     entitiesLoading: {},

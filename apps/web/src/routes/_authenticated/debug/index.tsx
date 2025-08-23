@@ -75,6 +75,13 @@ function DebugIndexPage() {
       path: '/debug/junction-tables',
       color: 'border-indigo-500/20 hover:border-indigo-500/30 bg-indigo-500/5 dark:border-indigo-400/20 dark:hover:border-indigo-400/30 dark:bg-indigo-400/5',
       badge: 'RELATIONSHIPS'
+    },
+    {
+      title: '⚡ Entity Operations',
+      description: 'Test all Legend State observable operations for entity CRUD. Debug schema creation, record mutations, and real-time UI updates.',
+      path: '/debug/entity-operations',
+      color: 'border-violet-500/20 hover:border-violet-500/30 bg-violet-500/5 dark:border-violet-400/20 dark:hover:border-violet-400/30 dark:bg-violet-400/5',
+      badge: 'OBSERVABLES'
     }
   ]
 
@@ -113,6 +120,8 @@ function DebugIndexPage() {
                   ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300 border border-rose-500/20'
                   : page.badge === 'RELATIONSHIPS'
                   ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
+                  : page.badge === 'OBSERVABLES'
+                  ? 'bg-violet-500/10 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 border border-violet-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -134,6 +143,7 @@ function DebugIndexPage() {
                    : page.badge === 'VIBEGRIDDEX' ? '🔥 Open VibeGridDex Test'
                    : page.badge === 'VIBEGANTT' ? '📊 Open VibeGantt Debug'
                    : page.badge === 'RELATIONSHIPS' ? '🔗 Open Junction Tables'
+                   : page.badge === 'OBSERVABLES' ? '⚡ Open Entity Operations'
                    : 'Open Tool'}
                 </Button>
               </Link>

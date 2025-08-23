@@ -46,7 +46,7 @@ export class DynamicSchemaPOC {
       console.log('🚀 Starting Dynamic Schema POC with Wide Corp...');
       
       // 1. Load current Wide Corp schema from PostgreSQL-native Universal Archetype API
-      const schemaResponse = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/schema`);
+      const schemaResponse = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/schema`);
       const schemaData = await schemaResponse.json();
       
       console.log('🔍 PostgreSQL schema response:', schemaData);
@@ -259,10 +259,10 @@ export class DynamicSchemaPOC {
   }
 
   /**
-   * Apply schema change and update LiveStore
+   * Apply schema change and update LiveStore and Legend State
    */
   private async applySchemaChange(newSchema: OrgEntitySchema, changes: SchemaChange[]): Promise<void> {
-    console.log('🔄 Applying schema change to LiveStore...');
+    console.log('🔄 Applying schema change to LiveStore and Legend State...');
     
     try {
       // 1. Update schema in memory
@@ -279,7 +279,23 @@ export class DynamicSchemaPOC {
         await liveStoreSchemaClient.refreshOrgSchema(WIDE_CORP_ORG_ID);
       }
       
-      // 4. Notify listeners
+      // 4. Notify Legend State of schema changes
+      if (typeof window !== 'undefined') {
+        // Import dynamically to avoid SSR issues
+        const { handleSchemaChangeNotification } = await import('@/stores/legend-state-org-store');
+        
+        for (const change of changes) {
+          handleSchemaChangeNotification({
+            orgId: WIDE_CORP_ORG_ID,
+            entityName: change.entityName,
+            operation: change.type === 'entity_added' ? 'create' :
+                      change.type === 'entity_removed' ? 'delete' :
+                      'update'
+          });
+        }
+      }
+      
+      // 5. Notify listeners
       this.notifySchemaChangeListeners(changes);
       
       console.log(`✅ Schema change applied successfully (${hotSwapSuccess ? 'hot-swap' : 'full refresh'})`);
@@ -420,7 +436,7 @@ export class DynamicSchemaPOC {
       const tableName = `org_${WIDE_CORP_ORG_ID}_${entityName.toLowerCase()}s`;
       
       // Call Universal Archetype API to create the entity
-      const response = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/entities`, {
+      const response = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/entities`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -492,7 +508,7 @@ export class DynamicSchemaPOC {
     console.log('🔄 Refreshing schema from PostgreSQL...');
     
     // Load fresh schema directly from PostgreSQL
-    const schemaResponse = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/schema`);
+    const schemaResponse = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/schema`);
     const schemaData = await schemaResponse.json();
     
     if (schemaData.success && schemaData.schema) {
@@ -525,7 +541,7 @@ export class DynamicSchemaPOC {
       console.log(`🔄 Testing delete entity via API: ${entityName}`);
       
       // Call Universal Archetype API to delete the entity
-      const response = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/entities/${entityName}`, {
+      const response = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/entities/${entityName}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -584,7 +600,7 @@ export class DynamicSchemaPOC {
     try {
       console.log(`🔄 Testing save data to ${entityName}:`, testData);
       
-      const response = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/data/${entityName}`, {
+      const response = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/data/${entityName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -624,7 +640,7 @@ export class DynamicSchemaPOC {
     try {
       console.log(`🔄 Testing query data from ${entityName}`);
       
-      const response = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/data/${entityName}?limit=${limit}`, {
+      const response = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/data/${entityName}?limit=${limit}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -663,7 +679,7 @@ export class DynamicSchemaPOC {
     try {
       console.log(`🔄 Testing validate data for ${entityName}:`, testData);
       
-      const response = await fetch(`/api/archetype/orgs/${WIDE_CORP_ORG_ID}/validate/${entityName}`, {
+      const response = await fetch(`/api/dataforge/orgs/${WIDE_CORP_ORG_ID}/validate/${entityName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

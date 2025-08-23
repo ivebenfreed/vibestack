@@ -73,6 +73,9 @@ const AuthenticatedDebugSyncLazyRouteImport = createFileRoute(
 const AuthenticatedDebugIntegrityLazyRouteImport = createFileRoute(
   '/_authenticated/debug/integrity',
 )()
+const AuthenticatedDebugEntityOperationsLazyRouteImport = createFileRoute(
+  '/_authenticated/debug/entity-operations',
+)()
 const AuthenticatedDebugDatabaseLazyRouteImport = createFileRoute(
   '/_authenticated/debug/database',
 )()
@@ -243,6 +246,16 @@ const AuthenticatedDebugIntegrityLazyRoute =
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/debug/integrity.lazy').then((d) => d.Route),
+  )
+const AuthenticatedDebugEntityOperationsLazyRoute =
+  AuthenticatedDebugEntityOperationsLazyRouteImport.update({
+    id: '/entity-operations',
+    path: '/entity-operations',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/entity-operations.lazy').then(
+      (d) => d.Route,
+    ),
   )
 const AuthenticatedDebugDatabaseLazyRoute =
   AuthenticatedDebugDatabaseLazyRouteImport.update({
@@ -456,6 +469,7 @@ export interface FileRoutesByFullPath {
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
+  '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -513,6 +527,7 @@ export interface FileRoutesByTo {
   '/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
+  '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -574,6 +589,7 @@ export interface FileRoutesById {
   '/_authenticated/tasks/kanban': typeof AuthenticatedTasksKanbanRoute
   '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
+  '/_authenticated/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
   '/_authenticated/debug/integrity': typeof AuthenticatedDebugIntegrityLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
@@ -635,6 +651,7 @@ export interface FileRouteTypes {
     | '/tasks/kanban'
     | '/tasks/timeline'
     | '/debug/database'
+    | '/debug/entity-operations'
     | '/debug/integrity'
     | '/debug/sync'
     | '/apps'
@@ -692,6 +709,7 @@ export interface FileRouteTypes {
     | '/tasks/kanban'
     | '/tasks/timeline'
     | '/debug/database'
+    | '/debug/entity-operations'
     | '/debug/integrity'
     | '/debug/sync'
     | '/apps'
@@ -752,6 +770,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks/kanban'
     | '/_authenticated/tasks/timeline'
     | '/_authenticated/debug/database'
+    | '/_authenticated/debug/entity-operations'
     | '/_authenticated/debug/integrity'
     | '/_authenticated/debug/sync'
     | '/_authenticated/apps/'
@@ -1004,6 +1023,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugIntegrityLazyRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
+    '/_authenticated/debug/entity-operations': {
+      id: '/_authenticated/debug/entity-operations'
+      path: '/entity-operations'
+      fullPath: '/debug/entity-operations'
+      preLoaderRoute: typeof AuthenticatedDebugEntityOperationsLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/database': {
       id: '/_authenticated/debug/database'
       path: '/database'
@@ -1214,6 +1240,7 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
   AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
+  AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
   AuthenticatedDebugIntegrityLazyRoute: typeof AuthenticatedDebugIntegrityLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
   AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
@@ -1248,6 +1275,8 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
     AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
     AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
+    AuthenticatedDebugEntityOperationsLazyRoute:
+      AuthenticatedDebugEntityOperationsLazyRoute,
     AuthenticatedDebugIntegrityLazyRoute: AuthenticatedDebugIntegrityLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
     AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,

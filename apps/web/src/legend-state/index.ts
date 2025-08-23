@@ -12,5 +12,6 @@ export {
   getEntity$,
   clearContext,
   handleTableNotification,
+  removeEntityFromSchema,
   entityGroups$
 } from './observables'

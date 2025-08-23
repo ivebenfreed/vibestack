@@ -203,15 +203,19 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   
   const currentOrgId = user?.currentOrganizationId;
   const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+  const [hasInitializedOrg, setHasInitializedOrg] = React.useState(false);
   
-  // Initialize store when organization changes
+  // Initialize store ONLY on first load, not when organization changes
   useEffect(() => {
-    if (currentOrgId) {
-      switchToOrganization(currentOrgId).catch(error => {
-        console.error('[AuthenticatedContent] Failed to switch organization:', error)
+    if (currentOrgId && !hasInitializedOrg) {
+      console.log('[AuthenticatedContent] Initial organization setup:', currentOrgId);
+      switchToOrganization(currentOrgId).then(() => {
+        setHasInitializedOrg(true);
+      }).catch(error => {
+        console.error('[AuthenticatedContent] Failed to initialize organization:', error)
       })
     }
-  }, [currentOrgId])
+  }, [currentOrgId, hasInitializedOrg])
   
   // Clear initial load flag after a brief delay to show loading screen
   // This ensures smooth transition and prevents white flash

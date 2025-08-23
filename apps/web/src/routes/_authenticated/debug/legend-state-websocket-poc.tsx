@@ -213,7 +213,7 @@ function handleTableChangeNotification(message: any) {
     if (tableName.toLowerCase().includes('project') && projects$) {
       console.log('📊 Projects table changed - reloading data');
       try {
-        const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Project`);
+        const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Project`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && Array.isArray(data.data)) {
@@ -229,7 +229,7 @@ function handleTableChangeNotification(message: any) {
     if (tableName.toLowerCase().includes('client') && clients$) {
       console.log('📊 Clients table changed - reloading data');
       try {
-        const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Client`);
+        const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Client`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && Array.isArray(data.data)) {
@@ -250,7 +250,7 @@ async function loadInitialData() {
     console.log('🔄 Loading initial data from API...');
     
     // Load projects from the correct API endpoint
-    const projectsResponse = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Project`);
+    const projectsResponse = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Project`);
     if (projectsResponse.ok) {
       const projectsData = await projectsResponse.json();
       if (projectsData.success && Array.isArray(projectsData.data)) {
@@ -264,7 +264,7 @@ async function loadInitialData() {
     }
     
     // Load clients from the correct API endpoint
-    const clientsResponse = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Client`);
+    const clientsResponse = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Client`);
     if (clientsResponse.ok) {
       const clientsData = await clientsResponse.json();
       if (clientsData.success && Array.isArray(clientsData.data)) {
@@ -340,7 +340,7 @@ const LegendStateWebSocketPOC = observer(() => {
       console.log('🔄 Creating project via direct API call:', sampleProject);
       
       // Create project via direct API call (since we're using simple observables for now)
-      const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Project`, {
+      const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Project`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -393,7 +393,7 @@ const LegendStateWebSocketPOC = observer(() => {
       console.log('🔄 Updating project via direct API call:', randomProject.id, updateData);
       
       // Update project via direct API call (since we're using simple observables for now)
-      const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Project/${randomProject.id}`, {
+      const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Project/${randomProject.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -482,7 +482,7 @@ const LegendStateWebSocketPOC = observer(() => {
         clientName: randomClient.name
       });
       
-      const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Project/${randomProject.id}`, {
+      const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Project/${randomProject.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -538,7 +538,7 @@ const LegendStateWebSocketPOC = observer(() => {
         project: projectWithClient
       });
       
-      const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Project`, {
+      const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Project`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -587,7 +587,7 @@ const LegendStateWebSocketPOC = observer(() => {
       
       console.log('🔄 Updating client via direct API call:', randomClient.id, updateData);
       
-      const response = await fetch(`/api/archetype/orgs/${ORGANIZATION_ID}/data/Client/${randomClient.id}`, {
+      const response = await fetch(`/api/dataforge/orgs/${ORGANIZATION_ID}/data/Client/${randomClient.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

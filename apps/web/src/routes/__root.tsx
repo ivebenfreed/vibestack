@@ -79,9 +79,27 @@ if (!authMachineActor) {
     ? { inspect: xstateTestInspector.inspect }
     : {};
   
+  // Try to restore persisted snapshot
+  let persistedSnapshot = null;
+  try {
+    const stored = localStorage.getItem('auth-machine-snapshot');
+    if (stored) {
+      persistedSnapshot = JSON.parse(stored);
+      console.log('[ROOT] Restored auth machine snapshot:', persistedSnapshot?.value);
+    }
+  } catch (error) {
+    console.warn('[ROOT] Failed to restore auth machine snapshot:', error);
+    localStorage.removeItem('auth-machine-snapshot');
+  }
+  
+  // Clean up old localStorage keys to avoid conflicts
+  localStorage.removeItem('auth-machine-state');
+  localStorage.removeItem('vibestack-last-organization-id');
+  
   authMachineActor = createActor(authMachine, {
     ...inspectOptions,
-    id: 'auth-machine'
+    id: 'auth-machine',
+    snapshot: persistedSnapshot
   })
   
   console.log('[ROOT] Auth machine created, starting...');
@@ -92,7 +110,12 @@ if (!authMachineActor) {
   
   // Set up subscriptions for new actor
   authMachineActor.subscribe((snapshot) => {
-    // Auth machine handles its own persistence via persistAuthState action
+    // Persist snapshot for proper XState persistence
+    try {
+      localStorage.setItem('auth-machine-snapshot', JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn('[ROOT] Failed to persist auth snapshot:', error);
+    }
     
     const authenticated = snapshot.matches('authenticated')
     const reason = snapshot.value === 'authenticated' ? 'authenticated' : 
