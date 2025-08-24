@@ -49,7 +49,6 @@ import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_auth
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
 import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
 import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_authenticated/debug/vibegantt-test'
-import { Route as AuthenticatedDebugVibeganttRouteImport } from './routes/_authenticated/debug/vibegantt'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugKanbanRouteImport } from './routes/_authenticated/debug/kanban'
@@ -308,12 +307,6 @@ const AuthenticatedDebugVibeganttTestRoute =
     path: '/vibegantt-test',
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any)
-const AuthenticatedDebugVibeganttRoute =
-  AuthenticatedDebugVibeganttRouteImport.update({
-    id: '/vibegantt',
-    path: '/vibegantt',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
 const AuthenticatedDebugStateMachineTestRoute =
   AuthenticatedDebugStateMachineTestRouteImport.update({
     id: '/state-machine-test',
@@ -370,7 +363,6 @@ export interface FileRoutesByFullPath {
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
-  '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
@@ -417,7 +409,6 @@ export interface FileRoutesByTo {
   '/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
-  '/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
@@ -468,7 +459,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/kanban': typeof AuthenticatedDebugKanbanRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
-  '/_authenticated/debug/vibegantt': typeof AuthenticatedDebugVibeganttRoute
   '/_authenticated/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
@@ -519,7 +509,6 @@ export interface FileRouteTypes {
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
-    | '/debug/vibegantt'
     | '/debug/vibegantt-test'
     | '/entities/$entityName'
     | '/projects/$projectId'
@@ -566,7 +555,6 @@ export interface FileRouteTypes {
     | '/debug/kanban'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
-    | '/debug/vibegantt'
     | '/debug/vibegantt-test'
     | '/entities/$entityName'
     | '/projects/$projectId'
@@ -616,7 +604,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/kanban'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
-    | '/_authenticated/debug/vibegantt'
     | '/_authenticated/debug/vibegantt-test'
     | '/_authenticated/entities/$entityName'
     | '/_authenticated/projects/$projectId'
@@ -957,13 +944,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebugVibeganttTestRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
-    '/_authenticated/debug/vibegantt': {
-      id: '/_authenticated/debug/vibegantt'
-      path: '/vibegantt'
-      fullPath: '/debug/vibegantt'
-      preLoaderRoute: typeof AuthenticatedDebugVibeganttRouteImport
-      parentRoute: typeof AuthenticatedDebugRouteRoute
-    }
     '/_authenticated/debug/state-machine-test': {
       id: '/_authenticated/debug/state-machine-test'
       path: '/state-machine-test'
@@ -1007,7 +987,6 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugKanbanRoute: typeof AuthenticatedDebugKanbanRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
-  AuthenticatedDebugVibeganttRoute: typeof AuthenticatedDebugVibeganttRoute
   AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
@@ -1025,7 +1004,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
-    AuthenticatedDebugVibeganttRoute: AuthenticatedDebugVibeganttRoute,
     AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugEntityOperationsLazyRoute:
