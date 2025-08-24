@@ -1,17 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ReactFlowProvider } from '@xyflow/react'
-import { TasksTimeline } from '@/features/tasks/timeline/TasksTimeline'
+
+const TimelinePlaceholder = () => (
+  <div className="flex items-center justify-center h-96">
+    <div className="text-center">
+      <div className="text-xl font-semibold mb-4">Timeline View</div>
+      <p className="text-muted-foreground">Coming soon - timeline component is being updated</p>
+    </div>
+  </div>
+)
 
 export const Route = createFileRoute('/_authenticated/tasks/timeline')({
-  component: RouteComponent,
+  component: TimelinePlaceholder,
 })
-
-function RouteComponent() {
-  return (
-    <div className="flex flex-col h-full">
-      <ReactFlowProvider>
-        <TasksTimeline />
-      </ReactFlowProvider>
-    </div>
-  )
-}

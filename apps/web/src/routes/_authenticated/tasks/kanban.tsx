@@ -1,10 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
-import TasksKanban from '@/features/tasks/TasksKanban'
+
+const KanbanPlaceholder = () => (
+  <div className="flex items-center justify-center h-96">
+    <div className="text-center">
+      <div className="text-xl font-semibold mb-4">Kanban Board</div>
+      <p className="text-muted-foreground">Coming soon - kanban component is being updated</p>
+    </div>
+  </div>
+)
 
 export const Route = createFileRoute('/_authenticated/tasks/kanban')({
   loader: async () => {
-    // Ensure all necessary data is loaded
     return {}
   },
-  component: TasksKanban,
+  component: KanbanPlaceholder,
 })

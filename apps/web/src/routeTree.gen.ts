@@ -33,7 +33,6 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedDebugRouteRouteImport } from './routes/_authenticated/debug/route'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
-import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authenticated/projects/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedEntitiesIndexRouteImport } from './routes/_authenticated/entities/index'
 import { Route as AuthenticatedDebugIndexRouteImport } from './routes/_authenticated/debug/index'
@@ -46,7 +45,6 @@ import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
-import { Route as AuthenticatedDebugVibeganttTestRouteImport } from './routes/_authenticated/debug/vibegantt-test'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
@@ -174,12 +172,6 @@ const AuthenticatedSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-const AuthenticatedProjectsIndexRoute =
-  AuthenticatedProjectsIndexRouteImport.update({
-    id: '/projects/',
-    path: '/projects/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
@@ -275,12 +267,6 @@ const AuthenticatedEntitiesEntityNameRoute =
     path: '/entities/$entityName',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDebugVibeganttTestRoute =
-  AuthenticatedDebugVibeganttTestRouteImport.update({
-    id: '/vibegantt-test',
-    path: '/vibegantt-test',
-    getParentRoute: () => AuthenticatedDebugRouteRoute,
-  } as any)
 const AuthenticatedDebugStateMachineTestRoute =
   AuthenticatedDebugStateMachineTestRouteImport.update({
     id: '/state-machine-test',
@@ -329,7 +315,6 @@ export interface FileRoutesByFullPath {
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
-  '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -345,7 +330,6 @@ export interface FileRoutesByFullPath {
   '/debug/': typeof AuthenticatedDebugIndexRoute
   '/entities': typeof AuthenticatedEntitiesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
-  '/projects': typeof AuthenticatedProjectsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
@@ -371,7 +355,6 @@ export interface FileRoutesByTo {
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
-  '/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -387,7 +370,6 @@ export interface FileRoutesByTo {
   '/debug': typeof AuthenticatedDebugIndexRoute
   '/entities': typeof AuthenticatedEntitiesIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
-  '/projects': typeof AuthenticatedProjectsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
@@ -417,7 +399,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
-  '/_authenticated/debug/vibegantt-test': typeof AuthenticatedDebugVibeganttTestRoute
   '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -433,7 +414,6 @@ export interface FileRoutesById {
   '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
   '/_authenticated/entities/': typeof AuthenticatedEntitiesIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
-  '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/settings/admin/users': typeof AuthenticatedSettingsAdminUsersRoute
@@ -463,7 +443,6 @@ export interface FileRouteTypes {
     | '/debug/entity-routes-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
-    | '/debug/vibegantt-test'
     | '/entities/$entityName'
     | '/settings/account'
     | '/settings/appearance'
@@ -479,7 +458,6 @@ export interface FileRouteTypes {
     | '/debug/'
     | '/entities'
     | '/help-center'
-    | '/projects'
     | '/settings/'
     | '/tasks'
     | '/settings/admin/users'
@@ -505,7 +483,6 @@ export interface FileRouteTypes {
     | '/debug/entity-routes-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
-    | '/debug/vibegantt-test'
     | '/entities/$entityName'
     | '/settings/account'
     | '/settings/appearance'
@@ -521,7 +498,6 @@ export interface FileRouteTypes {
     | '/debug'
     | '/entities'
     | '/help-center'
-    | '/projects'
     | '/settings'
     | '/tasks'
     | '/settings/admin/users'
@@ -550,7 +526,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/entity-routes-test'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
-    | '/_authenticated/debug/vibegantt-test'
     | '/_authenticated/entities/$entityName'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -566,7 +541,6 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/'
     | '/_authenticated/entities/'
     | '/_authenticated/help-center/'
-    | '/_authenticated/projects/'
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
     | '/_authenticated/settings/admin/users'
@@ -748,13 +722,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/_authenticated/projects/': {
-      id: '/_authenticated/projects/'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof AuthenticatedProjectsIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
       path: '/help-center'
@@ -860,13 +827,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEntitiesEntityNameRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/debug/vibegantt-test': {
-      id: '/_authenticated/debug/vibegantt-test'
-      path: '/vibegantt-test'
-      fullPath: '/debug/vibegantt-test'
-      preLoaderRoute: typeof AuthenticatedDebugVibeganttTestRouteImport
-      parentRoute: typeof AuthenticatedDebugRouteRoute
-    }
     '/_authenticated/debug/state-machine-test': {
       id: '/_authenticated/debug/state-machine-test'
       path: '/state-machine-test'
@@ -902,7 +862,6 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugEntityRoutesTestRoute: typeof AuthenticatedDebugEntityRoutesTestRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
-  AuthenticatedDebugVibeganttTestRoute: typeof AuthenticatedDebugVibeganttTestRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
@@ -917,7 +876,6 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
-    AuthenticatedDebugVibeganttTestRoute: AuthenticatedDebugVibeganttTestRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugEntityOperationsLazyRoute:
       AuthenticatedDebugEntityOperationsLazyRoute,
@@ -966,7 +924,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedEntitiesIndexRoute: typeof AuthenticatedEntitiesIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
-  AuthenticatedProjectsIndexRoute: typeof AuthenticatedProjectsIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
 }
 
@@ -981,7 +938,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedEntitiesIndexRoute: AuthenticatedEntitiesIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
-  AuthenticatedProjectsIndexRoute: AuthenticatedProjectsIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
 }
 
