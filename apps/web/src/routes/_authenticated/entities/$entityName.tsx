@@ -34,8 +34,22 @@ const EntityPageInner = observer(function EntityPageInner({ entityName }: { enti
   // Components should only consume observables, not trigger loads
   // Loading is handled by auth state machines
   
-  // Get entity store and loading state
-  const entityStore = currentOrgId && schema ? getEntity$(entityName) : null
+  // Get entity store and loading state - use proper case from schema
+  const actualEntityName = (() => {
+    if (!schema?.entities) return entityName
+    
+    // First try exact match
+    if (schema.entities[entityName]) {
+      return entityName
+    }
+    
+    // Then try case-insensitive match
+    const entityKeys = Object.keys(schema.entities)
+    const matchedKey = entityKeys.find(key => key.toLowerCase() === entityName.toLowerCase())
+    return matchedKey || entityName
+  })()
+  
+  const entityStore = currentOrgId && schema ? getEntity$(actualEntityName) : null
   
   // Always call use$() hook, but pass null if entityStore doesn't exist
   // This ensures consistent hook call order per React rules

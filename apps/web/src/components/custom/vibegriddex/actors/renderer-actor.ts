@@ -238,6 +238,54 @@ export const rendererActor = fromCallback<RendererActorEvent, RendererActorRespo
             isInitializing = false;
             isInitialized = true;
             
+            console.log('RendererActor: Renderer created successfully', {
+              renderer: !!renderer,
+              containerAfterInit: container ? {
+                width: container.getBoundingClientRect().width,
+                height: container.getBoundingClientRect().height
+              } : null,
+              pendingEventsCount: pendingRenderEvents.length
+            });
+            
+            // Process any pending render events that were queued during initialization
+            console.log(`RendererActor: Processing ${pendingRenderEvents.length} pending events`);
+            pendingRenderEvents.forEach(pendingEvent => {
+              console.log('RendererActor: Processing queued event:', pendingEvent.type);
+              // Process the queued event
+              if (pendingEvent.type === 'RENDER_ROWS' && pendingEvent.state) {
+                console.log('RendererActor: Executing queued RENDER_ROWS with', pendingEvent.state.rows?.length || 0, 'rows');
+                renderer.render(pendingEvent.state);
+                
+                // Report back what was actually rendered
+                const actualOrder = renderer.getRenderedRowIds?.() || [];
+                const currentViewport = renderer.getCurrentViewport?.() || null;
+                
+                sendBack({ 
+                  type: 'ROWS_RENDERED',
+                  actualOrder,
+                  viewport: currentViewport
+                });
+              } else if (pendingEvent.type === 'RENDER' && pendingEvent.state) {
+                renderer.render(pendingEvent.state);
+                // Calculate and send back coordinate mapping
+                if (pendingEvent.coordinateMapping) {
+                  sendBack({
+                    type: 'COORDINATES_CALCULATED',
+                    mapping: pendingEvent.coordinateMapping,
+                    version: Date.now()
+                  });
+                }
+                sendBack({ 
+                  type: 'ROWS_RENDERED',
+                  actualOrder: renderer.getRenderedRowIds?.() || [],
+                  viewport: renderer.getCurrentViewport?.() || null
+                });
+              }
+            });
+            
+            // Clear the queue after processing
+            pendingRenderEvents = [];
+            
             // Store renderer instance on window for access by view handlers
             (window as any).__vibegridx_renderer_instance = renderer;
             

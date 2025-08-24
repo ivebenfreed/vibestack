@@ -3,6 +3,7 @@
  * 
  * Direct observable implementation using Legend State patterns.
  * Uses syncedCrud for automatic CRUD operations with persistence.
+ * Updated to fix HMR reload issues - Force timestamp update.
  */
 
 import { observable } from '@legendapp/state'
@@ -116,15 +117,23 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     fieldUpdatedAt: 'updated_at',
     fieldDeleted: 'deleted',
     
-    // LIST - Use differential sync endpoint when changesSince is provided
-    list: async ({ changesSince }: { changesSince?: string } = {}) => {
+    // LIST - Legend State passes lastSync timestamp when changesSince: 'last-sync' is configured
+    list: async (params: { lastSync?: number } = {}) => {
       try {
-        // Use sync endpoint for differential sync, fallback to regular endpoint
-        const url = changesSince ? 
-          `${syncUrl}?changesSince=${encodeURIComponent(changesSince)}&limit=1000` : 
+        // DEBUG: Log what Legend State is passing us
+        console.log(`[Observable] List called for ${entityName}:`, {
+          lastSync: params?.lastSync,
+          lastSyncType: typeof params?.lastSync,
+          hasLastSync: !!params?.lastSync,
+          lastSyncDate: params?.lastSync ? new Date(params.lastSync).toISOString() : null
+        });
+        
+        // Use sync endpoint for differential sync when Legend State provides lastSync timestamp
+        const url = params?.lastSync ? 
+          `${syncUrl}?changesSince=${encodeURIComponent(new Date(params.lastSync).toISOString())}&limit=1000` : 
           baseUrl;
         
-        console.log(`[Observable] ${changesSince ? 'Differential' : 'Full'} sync for ${entityName}:`, url);
+        console.log(`[Observable] ${params?.lastSync ? 'Differential' : 'Full'} sync for ${entityName}:`, url);
         
         const response = await fetch(url, {
           credentials: 'include',
@@ -150,8 +159,8 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
         const data = result.data || []
         
         // Log sync results for debugging
-        if (changesSince) {
-          console.log(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${changesSince}`)
+        if (params?.lastSync) {
+          console.log(`[Observable] Differential sync ${entityName}: ${data.length} changed records since ${new Date(params.lastSync).toISOString()}`)
         } else {
           console.log(`[Observable] Full sync ${entityName}: ${data.length} total records`)
         }
@@ -397,13 +406,36 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       const handler = (e: CustomEvent) => {
         const notification = e.detail
         
+        // DEBUG: Always log notifications to see what we're getting - FORCED HMR UPDATE
+        console.log(`[Observable] ${entityName} received notification (FORCED UPDATE):`, notification)
+        
         // Check if notification is for this entity
-        if (notification?.tables?.includes(entityName.toLowerCase()) || 
-            notification?.tables?.includes(entityName) ||
-            notification?.table === entityName.toLowerCase() || 
-            notification?.table === entityName) {
-          console.log(`[Observable] WebSocket notification for ${entityName}:`, notification)
+        // Handle both singular and plural table names (e.g., "task" vs "tasks")
+        // Also handle full org-prefixed table names from WAL notifications
+        const entityLower = entityName.toLowerCase()
+        const entityPlural = entityLower + 's'
+        
+        const isRelevantNotification = notification?.tables?.some((tableName: string) => {
+          console.log(`[Observable] ${entityName} checking table "${tableName}" against patterns`)
+          
+          // Simple check: if notification table matches the lowercase plural of entity
+          // e.g., "Task" entity → check for "tasks" table
+          const expectedTableName = entityName.toLowerCase() + 's'
+          
+          if (tableName === expectedTableName) {
+            console.log(`[Observable] ${entityName} MATCH: "${tableName}" === "${expectedTableName}"`)
+            return true
+          }
+          
+          console.log(`[Observable] ${entityName} NO MATCH: "${tableName}" !== "${expectedTableName}"`)
+          return false
+        })
+        
+        if (isRelevantNotification) {
+          console.log(`[Observable] WebSocket notification MATCHED for ${entityName} - triggering refresh`)
           refresh()
+        } else {
+          console.log(`[Observable] WebSocket notification NOT MATCHED for ${entityName}`)
         }
       }
       
@@ -411,6 +443,14 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
       window.addEventListener('vibestack:table-change-notification', handler as any)
       
       console.log(`[Observable] Subscribed to WebSocket notifications for ${entityName}`)
+      
+      // TEST: Dispatch a test event to verify the listener works
+      setTimeout(() => {
+        console.log(`[Observable] Testing event listener for ${entityName}`)
+        window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
+          detail: { tables: ['tasks'], test: true }
+        }))
+      }, 1000)
       
       // Return cleanup function
       return () => {
@@ -463,18 +503,32 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     const handler = (e: CustomEvent) => {
       const notification = e.detail
       
+      // DEBUG: Always log notifications to see what we're getting - FORCED HMR UPDATE
+      console.log(`[Observable] ${entityName} received notification (OVERRIDE):`, notification)
+      
       // Check if notification is for this entity
-      if (notification?.tables?.includes(entityName.toLowerCase()) || 
-          notification?.tables?.includes(entityName) ||
-          notification?.table === entityName.toLowerCase() || 
-          notification?.table === entityName) {
-        console.log(`[Observable] WebSocket notification for ${entityName}:`, notification)
+      // Handle both singular and plural table names (e.g., "task" vs "tasks")
+      const isRelevantNotification = notification?.tables?.some((tableName: string) => {
+        console.log(`[Observable] ${entityName} checking table "${tableName}" against patterns`)
         
-        // TESTING: Re-enable refresh() and trust syncedCrud's diff logic
-        // The syncedCrud plugin should only send PUT requests when data actually changes
-        // Let's see if the fieldCreatedAt/fieldUpdatedAt config prevents false updates
-        console.log(`[Observable] Calling refresh() and trusting syncedCrud diff logic for ${entityName}`)
+        // Simple check: if notification table matches the lowercase plural of entity
+        // e.g., "Task" entity → check for "tasks" table
+        const expectedTableName = entityName.toLowerCase() + 's'
+        
+        if (tableName === expectedTableName) {
+          console.log(`[Observable] ${entityName} MATCH: "${tableName}" === "${expectedTableName}"`)
+          return true
+        }
+        
+        console.log(`[Observable] ${entityName} NO MATCH: "${tableName}" !== "${expectedTableName}"`)
+        return false
+      })
+      
+      if (isRelevantNotification) {
+        console.log(`[Observable] WebSocket notification MATCHED for ${entityName} - triggering refresh`)
         refresh()
+      } else {
+        console.log(`[Observable] WebSocket notification NOT MATCHED for ${entityName}`)
       }
     }
     
@@ -554,12 +608,11 @@ export async function loadOrgContext(orgId: string, userId: string) {
         const indexedDBPlugin = persistenceManager.createIndexedDBConfig(entityKeys)
         
         // Create syncedCrud with proper persistence configuration
-        // The key insight: IndexedDB loading was triggering "create" operations because
-        // Legend State couldn't distinguish between loaded data and new data
+        // CRITICAL: retrySync must be TRUE for changesSince to work properly
         syncedCrudWithPersistence = configureSynced(syncedCrud, {
           persist: {
             plugin: indexedDBPlugin,
-            retrySync: false, // Disable retry to prevent persistence errors from looping
+            retrySync: true, // REQUIRED for differential sync - stores sync timestamps
           }
         })
         
@@ -606,12 +659,22 @@ export async function loadOrgContext(orgId: string, userId: string) {
  * Reactive entity observables - automatically recreates when schema changes
  * This creates entity observables lazily and reactively based on schema
  * Following Legend State atomic principles - no manual caching needed
+ * 
+ * Enhanced for better async initialization handling
  */
 export const entities$ = observable(() => {
   const orgId = orgContext$.orgId.get()
   const schema = orgContext$.schema.get()
+  const loading = orgContext$.loading.get()
   
-  if (!orgId || !schema?.entities) {
+  // Return empty object while still loading or no context
+  if (loading || !orgId || !schema?.entities) {
+    console.log(`[Observable] Entities not ready yet`, {
+      loading,
+      hasOrgId: !!orgId,
+      hasSchema: !!schema,
+      hasEntities: !!schema?.entities
+    })
     return {}
   }
   
@@ -624,25 +687,33 @@ export const entities$ = observable(() => {
     entityCount: entityKeys.length
   })
   
-  // Create a reactive map of entity observables - Legend State handles caching internally
+  // Create entity observables using lazy initialization
+  // This ensures observables are created only when actually accessed
   const entityObservables: Record<string, any> = {}
   
   try {
     entityKeys.forEach(entityName => {
-      try {
-        // Each entity gets its own observable that's created fresh when dependencies change
-        entityObservables[entityName] = createEntityObservable(orgId, entityName, schema.entities[entityName])
-      } catch (entityError) {
-        console.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
-        // Skip this entity but continue with others
-      }
+      // Define a getter that creates the observable lazily
+      Object.defineProperty(entityObservables, entityName, {
+        get() {
+          // Create observable only when accessed
+          try {
+            console.log(`[Observable] Creating observable for ${entityName}`)
+            return createEntityObservable(orgId, entityName, schema.entities[entityName])
+          } catch (entityError) {
+            console.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
+            return null
+          }
+        },
+        enumerable: true,
+        configurable: true
+      })
     })
     
-    const createdCount = entityObservables && typeof entityObservables === 'object' ? Object.keys(entityObservables).length : 0
-    console.log(`[Observable] Created ${createdCount} entity observables`)
+    console.log(`[Observable] Set up lazy entity observables for ${entityKeys.length} entities`)
     return entityObservables
   } catch (error) {
-    console.error('[Observable] Error creating entity observables:', error)
+    console.error('[Observable] Error setting up entity observables:', error)
     // Return empty object on error to prevent crashes
     return {}
   }

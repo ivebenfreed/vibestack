@@ -2,6 +2,7 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { UltraTable } from '@/components/tables/UltraTable'
 import { 
   Plus, 
   Settings, 
@@ -13,7 +14,8 @@ import {
   File,
   Activity,
   MessageCircle,
-  Layers
+  Layers,
+  Table
 } from 'lucide-react'
 
 // DataForge archetype configuration
@@ -198,59 +200,31 @@ export function UniversalEntityPage({
         </Card>
       )}
 
-      {/* Data Preview */}
+      {/* Ultra-Performance Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Data Preview</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Table className="h-5 w-5" />
+            {displayName} Data
+          </CardTitle>
           <CardDescription>
-            Latest {Math.min(5, count)} records from {displayName}
+            High-performance virtualized table with real-time updates
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {safeData && safeData.length > 0 ? (
-            <div className="space-y-4">
-              {safeData.slice(0, 5).map((record, index) => {
-                // Ensure record is safely handled
-                const safeRecord = record && typeof record === 'object' ? record : {}
-                const recordId = String(safeRecord.id || `Record ${index + 1}`)
-                const recordUpdatedAt = safeRecord.updatedAt ? new Date(safeRecord.updatedAt).toLocaleString() : null
-                
-                return (
-                  <div key={recordId} className="border rounded p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline">{recordId}</Badge>
-                      {recordUpdatedAt && (
-                        <span className="text-xs text-muted-foreground">
-                          {recordUpdatedAt}
-                        </span>
-                      )}
-                    </div>
-                    <pre className="text-xs bg-muted p-2 rounded overflow-auto">
-                      {JSON.stringify(safeRecord, null, 2)}
-                    </pre>
-                  </div>
-                )
-              })}
-              
-              {safeData.length > 5 && (
-                <div className="text-center py-4">
-                  <Button variant="outline">
-                    View All {count} Records
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No {displayName.toLowerCase()} records found.
-              <div className="mt-4">
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First {displayName}
-                </Button>
-              </div>
-            </div>
-          )}
+        <CardContent className="p-0">
+          <UltraTable
+            entityName={entityName}
+            data={safeData}
+            schema={schema}
+            height={600}
+            options={{
+              enableSelection: true,
+              multiSelect: true,
+              overscan: 10
+            }}
+            enableEditing={true}
+            showHeader={true}
+          />
         </CardContent>
       </Card>
     </div>

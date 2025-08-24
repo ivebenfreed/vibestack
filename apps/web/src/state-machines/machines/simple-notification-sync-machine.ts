@@ -93,7 +93,11 @@ export const simpleNotificationSyncMachine = setup({
   
   actions: {
     setupWebSocketListeners: ({ context, self }) => {
-      if (!context.webSocket) return
+      console.log('🔧 [SimpleNotificationSync] Setting up WebSocket listeners')
+      if (!context.webSocket) {
+        console.log('❌ [SimpleNotificationSync] No WebSocket to set up listeners on')
+        return
+      }
       
       context.webSocket.onmessage = (event) => {
         try {
@@ -123,7 +127,17 @@ export const simpleNotificationSyncMachine = setup({
               timestamp: message.timestamp
             })
             
-            // Emit table change notification event for Legend State integration
+            // DIRECT CustomEvent dispatch in XState handler - bypass the onmessage handler
+            console.log('🚀 [SimpleNotificationSync] Dispatching CustomEvent vibestack:table-change-notification')
+            console.log('📋 [SimpleNotificationSync] Event detail:', {
+              tables: message.tables,
+              organizationId: message.organizationId,
+              lsn: message.lsn,
+              source: message.source,
+              messageId: message.messageId,
+              timestamp: message.timestamp || Date.now()
+            })
+            
             window.dispatchEvent(new CustomEvent('vibestack:table-change-notification', {
               detail: {
                 tables: message.tables,
@@ -134,6 +148,8 @@ export const simpleNotificationSyncMachine = setup({
                 timestamp: message.timestamp || Date.now()
               }
             }));
+            
+            console.log('✅ [SimpleNotificationSync] CustomEvent dispatched')
             
           } else if (message.type === 'srv_heartbeat') {
             // Silent heartbeat handling at debug level

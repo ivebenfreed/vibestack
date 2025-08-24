@@ -21,3 +21,11 @@ export {
   ValidationError,
   ConflictError
 } from './observables'
+
+// Universal hooks for entity access
+export {
+  useEntity$,
+  waitForEntity$,
+  useEntities$,
+  type UseEntityResult
+} from './hooks/use-entity'
