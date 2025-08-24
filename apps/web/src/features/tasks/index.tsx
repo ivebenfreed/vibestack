@@ -15,7 +15,7 @@ const TaskTableView: React.FC<{ theme: string }> = ({ theme }) => {
 
 // Lazy load heavy components for performance - using V2 with proper drag feedback
 const LazyKanbanView = React.lazy(() => 
-  import('./TasksKanbanV2').then(module => ({ default: module.default }))
+  import('./TasksKanban').then(module => ({ default: module.default }))
 )
 
 const LazyTimelineView = React.lazy(() => 
