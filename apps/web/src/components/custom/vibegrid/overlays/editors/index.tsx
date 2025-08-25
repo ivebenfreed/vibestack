@@ -2,14 +2,28 @@ import React from 'react';
 import { TextEditor } from './TextEditor';
 import { NumberEditor } from './NumberEditor';
 import { SelectEditor } from './SelectEditor';
+import { MultiSelectEditor } from './MultiSelectEditor';
 import { BooleanEditor } from './BooleanEditor';
 import { DateEditor } from './DateEditor';
 import { SingleRelationshipEditor } from './SingleRelationshipEditor';
 import { MultiRelationshipEditor } from './MultiRelationshipEditor';
+import { ReferenceSelectEditor } from './ReferenceSelectEditor';
+import { ReferenceMultiEditor } from './ReferenceMultiEditor';
 import type { CellRef, Column } from '../../types';
 
 // Export all editor components
-export { TextEditor, NumberEditor, SelectEditor, BooleanEditor, DateEditor, SingleRelationshipEditor, MultiRelationshipEditor };
+export { 
+  TextEditor, 
+  NumberEditor, 
+  SelectEditor,
+  MultiSelectEditor,
+  BooleanEditor, 
+  DateEditor, 
+  SingleRelationshipEditor, 
+  MultiRelationshipEditor,
+  ReferenceSelectEditor,
+  ReferenceMultiEditor
+};
 
 // Editor props interface
 export interface EditorProps {
@@ -63,6 +77,9 @@ export function createEditor(props: EditorProps): React.ReactElement {
     case 'enum':
       return <SelectEditor {...props} />;
       
+    case 'select-multi':
+      return <MultiSelectEditor {...props} />;
+      
     case 'boolean':
     case 'checkbox':
       return <BooleanEditor {...props} variant="checkbox" />;
@@ -90,6 +107,14 @@ export function createEditor(props: EditorProps): React.ReactElement {
     case 'relationship-multi':
     case 'relationship-collection':
       return <MultiRelationshipEditor {...props} />;
+      
+    case 'reference-select':
+      console.log('🔧 createEditor: Creating ReferenceSelectEditor');
+      return <ReferenceSelectEditor {...props} />;
+      
+    case 'reference-multi':
+      console.log('🔧 createEditor: Creating ReferenceMultiEditor');
+      return <ReferenceMultiEditor {...props} />;
       
     default:
       // Default to text editor for unknown types

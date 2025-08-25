@@ -4,11 +4,11 @@
 
 // Map entity field types to allowed cell types
 type FieldTypeToCellType<T> = 
-  T extends string | null | undefined ? 'text' | 'enum' | 'relationship-single' :
+  T extends string | null | undefined ? 'text' | 'select' :
   T extends number | null | undefined ? 'number' :
   T extends boolean | null | undefined ? 'boolean' :
   T extends Date | null | undefined ? 'date' :
-  T extends Array<any> ? 'relationship-multi' :
+  T extends Array<any> ? 'select-multi' :
   'text';
 
 // Type-safe column that validates cellType matches field type
@@ -28,8 +28,14 @@ export interface Column<T, K extends keyof T = keyof T> {
   relationshipTable?: string;
   relationshipDisplayField?: string;
   
-  // For enums
-  options?: Array<{ value: string; label: string }>;
+  // For enums and selects
+  options?: Array<{ value: string; label: string; color?: string; group?: string }>;
+  
+  // For system/custom references
+  referenceType?: 'system' | 'custom';
+  systemOptionType?: string; // e.g., 'priority', 'status'
+  systemArchetype?: string;  // e.g., 'project', 'task'
+  customOptionSet?: string;
 }
 
 // Helper type to make column creation easier
@@ -43,6 +49,5 @@ export type CellType =
   | 'number' 
   | 'boolean' 
   | 'date' 
-  | 'enum' 
-  | 'relationship-single' 
-  | 'relationship-multi';
+  | 'select'
+  | 'select-multi';

@@ -9,9 +9,8 @@ export const COLUMN_DEFAULTS: Record<CellType, { width: number; minWidth: number
   number: { width: 120, minWidth: 80, maxWidth: 200 },
   date: { width: 150, minWidth: 120, maxWidth: 200 },
   boolean: { width: 80, minWidth: 70, maxWidth: 100 },
-  enum: { width: 140, minWidth: 100, maxWidth: 200 },
-  'relationship-single': { width: 180, minWidth: 140, maxWidth: 300 },
-  'relationship-multi': { width: 220, minWidth: 160, maxWidth: 400 }
+  select: { width: 140, minWidth: 100, maxWidth: 200 },
+  'select-multi': { width: 200, minWidth: 150, maxWidth: 350 }
 } as const;
 
 /**

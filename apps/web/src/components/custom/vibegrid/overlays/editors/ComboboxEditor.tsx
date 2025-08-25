@@ -12,7 +12,7 @@ import React from 'react'
 import { cn } from '@/lib/utils'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Check } from 'lucide-react'
-import type { CellRef, Column, RelationshipContext } from '../../types'
+import type { CellRef, Column, RelationshipContext, EnumOption } from '../../types'
 
 export interface ComboboxEditorProps {
   cell: CellRef
