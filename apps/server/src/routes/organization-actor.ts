@@ -360,6 +360,104 @@ organizationActorRouter.post('/:orgId/cache-schema', async (c) => {
 });
 
 /**
+ * Invalidate schema cache in Organization Actor
+ * POST /api/org-actor/:orgId/invalidate-schema
+ */
+organizationActorRouter.post('/:orgId/invalidate-schema', async (c) => {
+  const orgId = c.req.param('orgId');
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+  
+  try {
+    const requestBody = await c.req.json().catch(() => ({}));
+    
+    const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${orgId}`);
+    const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
+    
+    const actorRequest = new Request('https://internal/invalidate-schema', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
+    const response = await orgActor.fetch(actorRequest);
+    const result = await response.json();
+    
+    syncLogger.info('Schema cache invalidated via Organization Actor', {
+      orgId,
+      userId: user.id,
+      result
+    }, MODULE_NAME);
+    
+    return c.json(result);
+    
+  } catch (error) {
+    syncLogger.error('Failed to invalidate schema cache via Organization Actor', {
+      orgId,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    return c.json({ 
+      error: 'Failed to invalidate schema cache',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+/**
+ * Clear organization schema cache in Organization Actor
+ * DELETE /api/org-actor/:orgId/org-schema-cache
+ */
+organizationActorRouter.delete('/:orgId/org-schema-cache', async (c) => {
+  const orgId = c.req.param('orgId');
+  const user = c.get('user');
+  
+  if (!user) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+  
+  try {
+    const orgActorId = c.env.ORGANIZATION_ACTOR.idFromName(`org:${orgId}`);
+    const orgActor = c.env.ORGANIZATION_ACTOR.get(orgActorId);
+    
+    const actorRequest = new Request('https://internal/clear-org-schema-cache', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-org-id': orgId
+      }
+    });
+    
+    const response = await orgActor.fetch(actorRequest);
+    const result = await response.json();
+    
+    syncLogger.info('Organization schema cache cleared via Organization Actor', {
+      orgId,
+      userId: user.id,
+      result
+    }, MODULE_NAME);
+    
+    return c.json(result);
+    
+  } catch (error) {
+    syncLogger.error('Failed to clear organization schema cache via Organization Actor', {
+      orgId,
+      error: error instanceof Error ? error.message : String(error)
+    }, MODULE_NAME);
+    
+    return c.json({ 
+      error: 'Failed to clear organization schema cache',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+/**
  * Check role using Organization Actor cache
  * GET /api/org-actor/:orgId/role-check
  */

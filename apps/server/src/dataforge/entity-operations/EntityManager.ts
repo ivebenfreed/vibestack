@@ -1327,7 +1327,7 @@ export class DataForgeEntityManager {
       
       const entities = await this.config.kysely
         .selectFrom('entity_schemas')
-        .select(['entity_name', 'archetype', 'table_name', 'created_at', 'updated_at'])
+        .select(['entity_name', 'archetype', 'table_name', 'business_metadata', 'created_at', 'updated_at'])
         .where('org_id', '=', orgId)
         .where('deleted', '!=', true)
         .execute();
@@ -1336,6 +1336,7 @@ export class DataForgeEntityManager {
         entityName: entity.entity_name,
         archetype: entity.archetype,
         tableName: entity.table_name,
+        businessMetadata: entity.business_metadata,
         createdAt: entity.created_at,
         updatedAt: entity.updated_at
       }));

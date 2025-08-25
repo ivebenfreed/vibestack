@@ -102,17 +102,36 @@ export class OrgSchemaClient {
       const entities: Record<string, any> = {};
       
       schemaArray.forEach(entity => {
+        // Extract fields from businessMetadata if available
+        const businessMetadata = entity.businessMetadata || {};
+        const fields = businessMetadata.fields || [];
+        
+        // Convert fields array to syncableFields object
+        const syncableFields: Record<string, any> = {};
+        
+        // Add fields from businessMetadata
+        fields.forEach((field: any) => {
+          syncableFields[field.name] = {
+            type: field.type,
+            required: field.required || false,
+            syncable: field.syncable !== false,
+            enum: field.enum || undefined,
+            defaultValue: field.defaultValue || undefined
+          };
+        });
+        
+        // Add default timestamp fields if not already present
+        if (!syncableFields.created_at) {
+          syncableFields.created_at = { type: 'timestamp', required: false, syncable: false };
+        }
+        if (!syncableFields.updated_at) {
+          syncableFields.updated_at = { type: 'timestamp', required: false, syncable: false };
+        }
+
         entities[entity.entityName] = {
           tableName: entity.tableName,
           archetype: entity.archetype,
-          syncableFields: {
-            // Default fields that all entities have
-            name: { type: 'text', required: true, syncable: true },
-            description: { type: 'text', required: false, syncable: true },
-            status: { type: 'text', required: false, syncable: true },
-            created_at: { type: 'timestamp', required: false, syncable: false },
-            updated_at: { type: 'timestamp', required: false, syncable: false }
-          }
+          syncableFields
         };
       });
 
