@@ -46,7 +46,7 @@ pnpm add @legendapp/state @legendapp/state-react
 ### 2.1 Convert Dashboard Components
 **Files to migrate:**
 - `apps/web/src/features/dashboard/index.tsx` - Main dashboard
-- `apps/web/src/components/custom/vibegriddex/VibeGridDex.tsx` - Data grid
+- `apps/web/src/components/custom/vibegrid/VibeGrid.tsx` - Data grid
 - Replace LiveStore dependencies with Legend State
 
 ### 2.2 Create Dashboard Stores  
@@ -100,12 +100,12 @@ const handleUpdate = (id, updates) => {
 - [ ] No LiveStore dependencies remain in dashboard
 - [ ] Performance improves (faster load, lower memory)
 
-## Phase 3: VibeGridDex Migration (Week 3)
+## Phase 3: VibeGrid Migration (Week 3)
 
-### 3.1 Migrate VibeGridDex Data Layer
+### 3.1 Migrate VibeGrid Data Layer
 **Files to update:**
-- `apps/web/src/components/custom/vibegriddex/stores/table-data-store-atomic.ts`
-- `apps/web/src/components/custom/vibegriddex/providers/generic-relationship-provider.ts`
+- `apps/web/src/components/custom/vibegrid/stores/table-data-store-atomic.ts`
+- `apps/web/src/components/custom/vibegrid/providers/generic-relationship-provider.ts`
 
 ### 3.2 Implement Advanced Sync Features
 ```typescript
@@ -143,7 +143,7 @@ const handleBatchUpdate = (updates) => {
 ```
 
 **Success Criteria:**
-- [ ] VibeGridDex uses Legend State for all data operations
+- [ ] VibeGrid uses Legend State for all data operations
 - [ ] Grid supports sorting, filtering, pagination via sync observables
 - [ ] Bulk operations work efficiently  
 - [ ] Relationships between entities work correctly

@@ -28,7 +28,7 @@ const UltraTableDebug = observer(function UltraTableDebug() {
             onClick={() => setTestMode('legend-state')}
             size="sm"
           >
-            Legend State Data
+            UltraTable
           </Button>
           <Button 
             variant={testMode === 'external-data' ? 'default' : 'outline'}
@@ -57,6 +57,7 @@ const UltraTableDebug = observer(function UltraTableDebug() {
           }}
         />
       )}
+
 
       {testMode === 'external-data' && (
         <UltraTable

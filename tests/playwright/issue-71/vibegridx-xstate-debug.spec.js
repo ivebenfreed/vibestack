@@ -1,5 +1,5 @@
 /**
- * XState inspection test for Issue #71 - VibeGridDex
+ * XState inspection test for Issue #71 - VibeGrid
  * 
  * This test uses XState inspection to debug the table machine state
  * and understand what's happening with selections and overlays
@@ -7,8 +7,8 @@
 
 import { test, expect } from '../helpers/fixtures/persistent-context.js';
 
-test('VibeGridDex XState inspection - debug selection states', async ({ page }) => {
-  console.log('🔍 Starting XState inspection test for VibeGridDex...');
+test('VibeGrid XState inspection - debug selection states', async ({ page }) => {
+  console.log('🔍 Starting XState inspection test for VibeGrid...');
   
   // The xstateTestInspector should already be available from the app
   // Just verify it's there
@@ -43,11 +43,11 @@ test('VibeGridDex XState inspection - debug selection states', async ({ page }) 
   await page.waitForURL('**/tasks', { timeout: 10000 });
   await page.waitForTimeout(2000);
   
-  // Wait for VibeGridDex
+  // Wait for VibeGrid
   const gridSelector = '[data-testid="vibegridx-tasks-table-v2"]';
   await page.waitForSelector(gridSelector, { timeout: 10000 });
   
-  console.log('✅ VibeGridDex loaded, checking XState actors...');
+  console.log('✅ VibeGrid loaded, checking XState actors...');
   
   // Wait a bit for XState machines to initialize
   await page.waitForTimeout(1000);

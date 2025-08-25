@@ -1,7 +1,7 @@
-# VibeGridDex Store Architecture - Implementation Complete
+# VibeGrid Store Architecture - Implementation Complete
 
 ## Overview
-This document summarizes the completed implementation of the XState Store-based architecture for VibeGridDex, addressing the performance issues with column drag operations (36ms+ forced reflows).
+This document summarizes the completed implementation of the XState Store-based architecture for VibeGrid, addressing the performance issues with column drag operations (36ms+ forced reflows).
 
 ## Architecture Changes
 
@@ -29,7 +29,7 @@ This document summarizes the completed implementation of the XState Store-based 
 - Maintains relationship usage tracking for surgical updates
 
 ### 5. Component Updates
-- Created `VibeGridDexWithSuspense` wrapper component
+- Created `VibeGridWithSuspense` wrapper component
 - Updated route components to remove loaders
 - Pass domain service object with update method
 - Added `TableSkeleton` component for loading state
@@ -45,18 +45,18 @@ This document summarizes the completed implementation of the XState Store-based 
 ## Implementation Files
 
 ### New Files
-- `/apps/web/src/components/custom/vibegriddex/stores/table-data-store.ts`
-- `/apps/web/src/components/custom/vibegriddex/hooks/useTableData.ts`
-- `/apps/web/src/components/custom/vibegriddex/components/TableSkeleton.tsx`
+- `/apps/web/src/components/custom/vibegrid/stores/table-data-store.ts`
+- `/apps/web/src/components/custom/vibegrid/hooks/useTableData.ts`
+- `/apps/web/src/components/custom/vibegrid/components/TableSkeleton.tsx`
 
 ### Modified Files
-- `/apps/web/src/components/custom/vibegriddex/machines/table-machine/index.ts`
-- `/apps/web/src/components/custom/vibegriddex/VibeGridDex.tsx`
+- `/apps/web/src/components/custom/vibegrid/machines/table-machine/index.ts`
+- `/apps/web/src/components/custom/vibegrid/VibeGrid.tsx`
 - `/apps/web/src/routes/_authenticated/tasks/index.tsx`
 - `/apps/web/src/routes/_authenticated/projects/index.tsx`
 - `/apps/web/src/features/tasks/TasksTableView.tsx`
 - `/apps/web/src/features/projects/index.tsx`
-- `/apps/web/src/routes/_authenticated/debug/vibegriddex-test.tsx`
+- `/apps/web/src/routes/_authenticated/debug/vibegrid-test.tsx`
 
 ## Usage Pattern
 
@@ -66,8 +66,8 @@ export const Route = createFileRoute('/_authenticated/tasks/')({
   component: Tasks,
 })
 
-// Component using VibeGridDexWithSuspense
-<VibeGridDexWithSuspense
+// Component using VibeGridWithSuspense
+<VibeGridWithSuspense
   tableId="tasks-table"
   entityType="task"
   columns={columns}

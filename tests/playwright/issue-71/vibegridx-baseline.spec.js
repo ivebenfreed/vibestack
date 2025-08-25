@@ -1,5 +1,5 @@
 /**
- * Baseline test for Issue #71 - VibeGridDex with Konva overlays
+ * Baseline test for Issue #71 - VibeGrid with Konva overlays
  * 
  * This test captures the current state before converting from Konva to DOM + Anime.js
  * It verifies that the table loads and selection graphics work with the Konva implementation
@@ -7,7 +7,7 @@
 
 import { test, expect } from '../helpers/fixtures/persistent-context.js';
 
-test('VibeGridDex baseline - Konva selection overlays', async ({ page }) => {
+test('VibeGrid baseline - Konva selection overlays', async ({ page }) => {
   console.log('🚀 Navigating to Tasks page...');
   
   // Go to home first
@@ -22,11 +22,11 @@ test('VibeGridDex baseline - Konva selection overlays', async ({ page }) => {
   await page.waitForURL('**/tasks', { timeout: 10000 });
   await page.waitForTimeout(2000);
   
-  // Verify VibeGridDex is loaded
+  // Verify VibeGrid is loaded
   const gridSelector = '[data-testid="vibegridx-tasks-table-v2"]';
   await page.waitForSelector(gridSelector, { timeout: 10000 });
   
-  console.log('✅ VibeGridDex loaded');
+  console.log('✅ VibeGrid loaded');
   
   // Get initial state
   const initialState = await page.evaluate(() => {
@@ -535,7 +535,7 @@ test('VibeGridDex baseline - Konva selection overlays', async ({ page }) => {
     
     // Summary
     console.log('\n✅ COMPREHENSIVE BASELINE CAPTURED:');
-    console.log('  - VibeGridDex loaded with', initialState.cellCount, 'cells');
+    console.log('  - VibeGrid loaded with', initialState.cellCount, 'cells');
     console.log('  - Konva canvas overlay:', initialState.hasKonva ? 'Present' : 'Missing');
     console.log('  - Selection graphics:', afterRangeState.konvaInfo?.shapeCount || 0, 'shapes detected');
     console.log('\n📊 Interactions tested:');

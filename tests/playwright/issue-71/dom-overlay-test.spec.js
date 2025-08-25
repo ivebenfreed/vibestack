@@ -27,17 +27,17 @@ test('DOM overlay implementation - verify DOM elements instead of Konva', async 
   await page.waitForURL('**/tasks', { timeout: 10000 });
   await page.waitForTimeout(2000);
   
-  // Wait for VibeGridDex
+  // Wait for VibeGrid
   const gridSelector = '[data-testid="vibegridx-tasks-table-v2"]';
   await page.waitForSelector(gridSelector, { timeout: 10000 });
   
-  console.log('✅ VibeGridDex loaded');
+  console.log('✅ VibeGrid loaded');
   
   // Check for DOM overlay container
   const overlayInfo = await page.evaluate(() => {
     // Look for DOM overlay container
-    const overlayContainer = document.querySelector('.vibegridx-overlay-container');
-    const selectionContainer = document.querySelector('.vibegridx-selection-container');
+    const overlayContainer = document.querySelector('.vibegrid-overlay-container');
+    const selectionContainer = document.querySelector('.vibegrid-selection-container');
     
     // Check for Konva canvas (should not exist)
     const konvaCanvas = document.querySelector('canvas');

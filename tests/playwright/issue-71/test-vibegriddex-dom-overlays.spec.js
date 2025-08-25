@@ -1,8 +1,8 @@
 /**
- * Test DOM overlays functionality in VibeGridDex after Konva removal
+ * Test DOM overlays functionality in VibeGrid after Konva removal
  * 
  * This test verifies that:
- * 1. VibeGridDex loads without Konva dependencies
+ * 1. VibeGrid loads without Konva dependencies
  * 2. DOM overlays are created and functional
  * 3. Selection overlays render properly
  * 4. Canvas overlay container exists
@@ -10,14 +10,14 @@
 
 import { test, expect } from '../helpers/fixtures/persistent-context.js';
 
-test.describe('VibeGridDx DOM Overlays', () => {
+test.describe('VibeGrid DOM Overlays', () => {
   
   test('should render DOM overlays without Konva', async ({ page }) => {
-    // Navigate to tasks page with VibeGridDex
+    // Navigate to tasks page with VibeGrid
     await page.goto('/tasks');
     
     // Wait for the grid to load
-    await page.waitForSelector('[data-testid="vibegriddx-container"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="vibegrid-container"]', { timeout: 10000 });
     
     // Check that VibeGridDx loaded successfully
     const gridContainer = page.locator('[data-testid="vibegriddx-container"]');

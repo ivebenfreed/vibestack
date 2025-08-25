@@ -3,8 +3,8 @@
 // ====================================
 
 // Main component
-export { VibeGridDex } from './VibeGridDex';
-export type { VibeGridDexProps } from './VibeGridDex';
+export { VibeGrid } from './VibeGrid';
+export type { VibeGridProps } from './VibeGrid';
 
 // Modular components removed - files don't exist
 
@@ -64,13 +64,13 @@ export { CleanTableRenderer as TableRenderer } from './renderers';
 // CANVAS OVERLAYS
 // ====================================
 
-export { CanvasOverlay } from './overlays/CanvasOverlay';
+export { CanvasOverlayDOM as CanvasOverlay } from './overlays/CanvasOverlayDOM';
 
 // ====================================
 // UTILITY HOOKS
 // ====================================
 
-// Hook exports removed - check VibeGridDex component directly
+// Hook exports removed - check VibeGrid component directly
 
 // ====================================
 // ARCHITECTURE CONSTANTS
@@ -99,9 +99,9 @@ export const VIBEGRIDX_FEATURES = {
 // ====================================
 
 /**
- * Creates a complete VibeGridDex instance with default configuration
+ * Creates a complete VibeGrid instance with default configuration
  */
-export const createVibeGridDex = (entityType: 'task' | 'project' | 'user', config?: Partial<any>) => {
+export const createVibeGrid = (entityType: 'task' | 'project' | 'user', config?: Partial<any>) => {
   return {
     entityType,
     config: {

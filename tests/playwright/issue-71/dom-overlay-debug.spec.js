@@ -32,11 +32,11 @@ test('Debug DOM overlay selection - check event flow', async ({ page }) => {
   await page.waitForURL('**/tasks', { timeout: 10000 });
   await page.waitForTimeout(2000);
   
-  // Wait for VibeGridDex
+  // Wait for VibeGrid
   const gridSelector = '[data-testid="vibegridx-tasks-table-v2"]';
   await page.waitForSelector(gridSelector, { timeout: 10000 });
   
-  console.log('✅ VibeGridDex loaded');
+  console.log('✅ VibeGrid loaded');
   
   // Check XState inspector
   const xstateInfo = await page.evaluate(() => {

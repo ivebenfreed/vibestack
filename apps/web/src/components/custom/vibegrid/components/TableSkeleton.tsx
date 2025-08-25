@@ -10,7 +10,7 @@ interface TableSkeletonProps {
 }
 
 /**
- * Loading skeleton that matches VibeGridDex table structure
+ * Loading skeleton that matches VibeGrid table structure
  * Shows animated placeholders while data is loading
  */
 export function TableSkeleton({ 
@@ -78,15 +78,15 @@ export function TableSkeleton({
  */
 export function TableRowSkeleton({ columns = 5 }: { columns?: number }) {
   return (
-    <div className="vibegridx-row flex h-10 border-b border-gray-100 dark:border-gray-800">
+    <div className="vibegrid-row flex h-10 border-b border-gray-100 dark:border-gray-800">
       {/* Selection column */}
-      <div className="vibegridx-cell w-12 px-3 py-2">
+      <div className="vibegrid-cell w-12 px-3 py-2">
         <div className="animate-pulse h-4 w-4 bg-gray-100 dark:bg-gray-800 rounded"></div>
       </div>
       
       {/* Data columns */}
       {Array.from({ length: columns }).map((_, i) => (
-        <div key={i} className="vibegridx-cell flex-1 px-3 py-2">
+        <div key={i} className="vibegrid-cell flex-1 px-3 py-2">
           <div className="animate-pulse h-4 bg-gray-100 dark:bg-gray-800 rounded w-3/4"></div>
         </div>
       ))}

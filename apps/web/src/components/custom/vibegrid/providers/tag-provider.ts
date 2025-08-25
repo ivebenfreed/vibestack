@@ -2,7 +2,7 @@ import type { RelationshipOptionsProvider, RelationshipContext } from '../types'
 
 /**
  * @deprecated This atom-based provider is deprecated.
- * VibeGridDex now uses Dexie-based providers configured in useDexieEntityConfig.
+ * VibeGrid now uses Dexie-based providers configured in useDexieEntityConfig.
  * 
  * Tag Provider
  * 
@@ -12,6 +12,6 @@ import type { RelationshipOptionsProvider, RelationshipContext } from '../types'
  * - Sorted by sortOrder
  */
 export const tagProvider: RelationshipOptionsProvider = async (context: RelationshipContext) => {
-  console.warn('⚠️ DEPRECATED: Atom-based tag provider called. VibeGridDex uses Dexie providers.');
+  console.warn('⚠️ DEPRECATED: Atom-based tag provider called. VibeGrid uses Dexie providers.');
   return [];
 };

@@ -2,7 +2,7 @@
 // TABLE MACHINE - MAIN COMPOSITION
 // ====================================
 
-import { setup, assign, spawnChild, sendTo, fromPromise, emit, raise, fromObservable } from 'xstate';
+import { setup, assign, spawnChild, sendTo, fromPromise, emit, raise } from 'xstate';
 import type { TableContext, TableEvents, TableConfig, RenderState } from '../../types';
 
 // Import slices
@@ -60,8 +60,9 @@ import { dragActor } from '../../actors/drag-actor';
 // Data subscription actor removed - using store subscription
 // No overlay actor needed - canvas subscribes directly to table machine context
 
-// Import Legend State integration
-import { createVibegriddExObservables } from '../../stores/legend-state-integration';
+// Import atomic store setup utilities  
+import { createTableStoreLogic, loadInitialData, setupGranularSubscriptions } from '../../stores/table-data-store-atomic';
+import { createActor } from 'xstate';
 import { addRelationshipProvidersToColumns } from '../../providers/relationship-provider-factory';
 
 
@@ -117,7 +118,7 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     input.columns || [],
     () => {
       // Use window fallback since we don't have context here
-      return (window as any).__vibegridx_store_actor;
+      return (window as any).__vibegrid_store_actor;
     }
   );
 
@@ -208,9 +209,8 @@ const createDefaultContext = (input: TableConfig): TableContext => {
     // Timer for batching view updates during rapid data changes
     pendingViewUpdateTimer: null,
     
-    // Legend State observables (will be created in initializing state)
-    legendStateObservables: null,
-    legendStateDataActor: null,
+    // Atomic store actor (will be created in initializing state)
+    storeActor: null,
     
     // Column widths from store (for initial render)
     columnWidths: {}
@@ -242,11 +242,6 @@ export const tableBaseMachine = setup({
     canvasActor,
     editActor,
     dragActor,
-    // Legend State observable actor
-    legendStateDataActor: fromObservable(({ input }: { input: any }) => {
-      const observables = createVibegriddExObservables(input.tableId, input.entityType, input.columns)
-      return observables.processedRows$
-    }),
   },
   
   actions: {
@@ -408,34 +403,50 @@ export const tableBaseMachine = setup({
   states: {
     initializing: {
       entry: [
-        // Create Legend State observables and spawn data actor
+        // Create store actor with atomic mutations and Promise.all loader
         assign({
-          legendStateObservables: ({ context }) => {
-            console.log('TableMachine: Creating Legend State observables for', context.entityType);
-            return createVibegriddExObservables(context.id, context.entityType, context.columns);
-          },
-          legendStateDataActor: ({ context, spawn }) => {
-            console.log('TableMachine: Spawning Legend State data observer');
-            return spawn('legendStateDataActor', {
-              input: {
-                tableId: context.id,
-                entityType: context.entityType,
-                columns: context.columns
-              }
-            });
-          }
-        })
-      ],
-      
-      on: {
-        INITIALIZE_RENDERER: {
-          actions: ({ context, event, self }) => {
-            console.log('TableMachine: INITIALIZE_RENDERER event received', {
-              hasRendererActor: !!context.actors.rendererActor,
-              optionsKeys: Object.keys(event.options || {})
+          storeActor: ({ context, self }) => {
+            console.log('TableMachine: Creating atomic store actor for', context.entityType);
+            const storeLogic = createTableStoreLogic(context.entityType, context.columns);
+            const storeActor = createActor(storeLogic);
+            storeActor.start();
+            
+            // Store in window for relationship providers
+            (window as any).__vibegrid_store_actor = storeActor;
+            
+            // Subscribe to store changes and forward to table machine
+            console.log('TableMachine: Setting up store subscription', { 
+              hasSubscribe: typeof storeActor.subscribe === 'function',
+              storeActorKeys: Object.keys(storeActor)
             });
             
-            if (context.actors.rendererActor) {
+            // Set up persistence subscription for display state changes
+            storeActor.subscribe((snapshot) => {
+              if (snapshot?.context && !snapshot.context.loading) {
+                // Debounce persistence to avoid too many writes
+                if ((context as any)._persistenceTimer) {
+                  clearTimeout((context as any)._persistenceTimer);
+                }
+                (context as any)._persistenceTimer = setTimeout(() => {
+                  import('../../stores/table-data-store-atomic').then(({ saveDisplayState }) => {
+                    saveDisplayState(context.entityType, snapshot.context);
+                  });
+                }, 500); // 500ms debounce
+              }
+            });
+            
+            // Get initial snapshot to verify structure
+            const initialSnapshot = storeActor.getSnapshot();
+            console.log('🔍 TableMachine: Initial store snapshot', {
+              initialSnapshot,
+              hasContext: !!initialSnapshot?.context,
+              contextKeys: initialSnapshot?.context ? Object.keys(initialSnapshot.context) : [],
+              entityCount: initialSnapshot?.context?.entities ? Object.keys(initialSnapshot.context.entities).length : 0
+            });
+            
+            const subscription = storeActor.subscribe((snapshot) => {
+              console.log('🔍 TableMachine: Atomic store snapshot received', {
+                snapshot,
                 hasContext: !!snapshot?.context,
                 hasEntities: !!snapshot?.context?.entities,
                 entitiesCount: snapshot?.context?.entities ? Object.keys(snapshot.context.entities).length : 0,
@@ -484,10 +495,12 @@ export const tableBaseMachine = setup({
                   const cleanup = setupGranularSubscriptions(storeActor, context.entityType, context.columns);
                   
                   // Store cleanup in global registry
-                  (window as any).__vibegridx_store_cleanup = () => {
-                    cleanup();
+                  (window as any).__vibegrid_store_cleanup = () => {
+                    if (cleanup && typeof cleanup === 'function') {
+                      cleanup();
+                    }
                     storeActor.stop();
-                    delete (window as any).__vibegridx_store_actor;
+                    delete (window as any).__vibegrid_store_actor;
                   };
                 } else {
                   console.log('📊 TableMachine: Pagination mode - live queries disabled for performance');

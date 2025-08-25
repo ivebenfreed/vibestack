@@ -1,13 +1,13 @@
 import React, { useCallback } from 'react'
-import { VibeGridDex } from '@/components/custom/vibegriddex/VibeGridDex'
+import { VibeGrid } from '@/components/custom/vibegrid/VibeGrid'
 import { domainServices } from '@/domain'
 import { useTheme } from '@/context/theme-context'
 import { createEntityTagFilter } from '@/domain/helpers/tag-filters'
 import type { Task } from '@repo/dataforge/client-entities'
-import type { Column } from '@/components/custom/vibegriddex/column-types'
+import type { Column } from '@/components/custom/vibegrid/column-types'
 
 /**
- * TasksTableView - Using VibeGridDex for Dexie-based data grid
+ * TasksTableView - Using VibeGrid for Dexie-based data grid
  */
 export default function TasksTableView() {
   
@@ -24,7 +24,7 @@ export default function TasksTableView() {
       console.log('TasksTableView: Batch update completed', { count: updates.length });
     } catch (error) {
       console.error('TasksTableView: Batch update failed', error);
-      throw error; // Re-throw to let VibeGridDex handle the error
+      throw error; // Re-throw to let VibeGrid handle the error
     }
   }, []);
 
@@ -70,7 +70,7 @@ export default function TasksTableView() {
   ]
 
   return (
-    <VibeGridDex
+    <VibeGrid
       tableId="tasks-table-v2"
       entityType="task"
       columns={columns}

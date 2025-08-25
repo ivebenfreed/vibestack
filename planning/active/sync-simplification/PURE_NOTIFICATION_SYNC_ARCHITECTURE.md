@@ -170,7 +170,7 @@ function ProjectList() {
 - Verify real-time updates work via notifications
 
 ### Phase 3: Replace Remaining Components
-- Convert VibeGridDex to use reactive store
+- Convert VibeGrid to use reactive store
 - Update all data-consuming components
 - Remove LiveStore sync infrastructure
 

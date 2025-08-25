@@ -42,7 +42,7 @@ import { addRelationshipProvidersToColumns } from './providers/relationship-prov
 // ====================================
 
 // Unified configuration - always entity-based with optional manual columns
-interface VibeGridDexProps<T = any> {
+interface VibeGridProps<T = any> {
   tableId: string;  // Unique identifier for this table instance (required for persistence)
   entityType: VibeGridXEntityType;  // Entity type (required - determines data source)
   
@@ -95,8 +95,8 @@ interface VibeGridDexProps<T = any> {
 // MAIN COMPONENT
 // ====================================
 
-export function VibeGridDex<T extends Record<string, any> = any>(
-  props: VibeGridDexProps<T>
+export function VibeGrid<T extends Record<string, any> = any>(
+  props: VibeGridProps<T>
 ): React.ReactElement {
   // ====================================
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
@@ -112,7 +112,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       const relationshipData = (props.initialData as any).relationshipData || {};
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 VibeGridDex: Preparing preloaded data', {
+        console.log('🔍 VibeGrid: Preparing preloaded data', {
           entityCount: entities.length,
           relationshipDataKeys: Object.keys(relationshipData),
           hasRelationshipData: Object.keys(relationshipData).length > 0,
@@ -254,7 +254,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   // Create machine configuration - XState will create store internally
   const machineConfig = useMemo(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 VibeGridDex: Creating machine config', {
+      console.log('🔍 VibeGrid: Creating machine config', {
         entityType: entityType,
         columnCount: columns.length,
         tableId: tableId
@@ -304,7 +304,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       // Check if xstateTestInspector is available
       if (typeof window !== 'undefined' && (window as any).xstateTestInspector) {
         options.inspect = (window as any).xstateTestInspector.inspect;
-        console.log('[VibeGridDex] XState inspection enabled for table machine');
+        console.log('[VibeGrid] XState inspection enabled for table machine');
       }
     }
     
@@ -329,13 +329,13 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       }
     },
     onColumnClick: (field: string) => {
-      console.log('VibeGridDex: Column clicked for sort:', field);
+      console.log('VibeGrid: Column clicked for sort:', field);
       // Send to table machine, not directly to store
       // The table machine will handle the toggle logic and update the store
       tableSend({ type: 'view.column.click', field });
     },
     onColumnDragEnd: (event: any) => {
-      console.log('VibeGridDex: Column drag ended, forwarding to table machine:', event);
+      console.log('VibeGrid: Column drag ended, forwarding to table machine:', event);
       // Forward the reorder event to the table machine
       tableSend(event);
     }
@@ -359,7 +359,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
         container: node
       };
       
-      (window as any).__vibegridx_renderer_options = optionsWithContainer;
+      (window as any).__vibegrid_renderer_options = optionsWithContainer;
       
       if (process.env.NODE_ENV === 'development') {
         console.log('🚀 VibeGridX: Sending INITIALIZE_RENDERER synchronously:', {
@@ -383,19 +383,19 @@ export function VibeGridDex<T extends Record<string, any> = any>(
   // Cleanup window variable on unmount and clean up EditingOverlay
   useEffect(() => {
     return () => {
-      delete (window as any).__vibegridx_renderer_options;
-      delete (window as any).__vibegridx_renderer_instance;
+      delete (window as any).__vibegrid_renderer_options;
+      delete (window as any).__vibegrid_renderer_instance;
       
       // Cleanup store if exists
-      if ((window as any).__vibegridx_store_cleanup) {
-        (window as any).__vibegridx_store_cleanup();
-        delete (window as any).__vibegridx_store_cleanup;
+      if ((window as any).__vibegrid_store_cleanup && typeof (window as any).__vibegrid_store_cleanup === 'function') {
+        (window as any).__vibegrid_store_cleanup();
+        delete (window as any).__vibegrid_store_cleanup;
       }
       
       // Import and call cleanupEditingOverlay to ensure global overlay is cleaned up
       import('./machines/table-machine/event-handlers/edit-handlers').then(({ cleanupEditingOverlay }) => {
         cleanupEditingOverlay();
-        console.log('VibeGridDex: Cleaned up EditingOverlay on unmount');
+        console.log('VibeGrid: Cleaned up EditingOverlay on unmount');
       });
     };
   }, []);
@@ -454,7 +454,7 @@ export function VibeGridDex<T extends Record<string, any> = any>(
 
   // Check if we have columns (store will be created by XState)
   if (columns.length === 0) {
-    console.log('VibeGridDex: Waiting for columns', {
+    console.log('VibeGrid: Waiting for columns', {
       columnCount: columns.length
     });
     return (
@@ -522,10 +522,10 @@ export function VibeGridDex<T extends Record<string, any> = any>(
 // ====================================
 
 // Export the main component (without Suspense for backward compatibility)
-export default VibeGridDex;
+export default VibeGrid;
 
 // Export types for external use
-export type { VibeGridDexProps };
+export type { VibeGridProps };
 
 // Re-export the hook from VibeGridXHooks
 // export { useVibeGridXRef } from './VibeGridXHooks';

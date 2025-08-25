@@ -3,7 +3,7 @@ import type { StatusDefinition } from '@repo/dataforge/client-entities';
 
 /**
  * @deprecated This atom-based provider is deprecated.
- * VibeGridDex now uses Dexie-based providers configured in useDexieEntityConfig.
+ * VibeGrid now uses Dexie-based providers configured in useDexieEntityConfig.
  * 
  * Status Definition Provider
  * 
@@ -13,6 +13,6 @@ import type { StatusDefinition } from '@repo/dataforge/client-entities';
  * - Sorted by sortOrder
  */
 export const statusDefinitionProvider: RelationshipOptionsProvider = async (context: RelationshipContext) => {
-  console.warn('⚠️ DEPRECATED: Atom-based status definition provider called. VibeGridDex uses Dexie providers.');
+  console.warn('⚠️ DEPRECATED: Atom-based status definition provider called. VibeGrid uses Dexie providers.');
   return [];
 };

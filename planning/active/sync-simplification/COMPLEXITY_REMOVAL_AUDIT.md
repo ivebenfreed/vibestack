@@ -32,8 +32,8 @@
 ### Files To Simplify (Medium Complexity)
 
 #### Data Management
-- `apps/web/src/components/custom/vibegriddex/providers/generic-relationship-provider.ts` - Simplify to direct API calls
-- `apps/web/src/components/custom/vibegriddex/stores/table-data-store-atomic.ts` - Replace with Legend State observables
+- `apps/web/src/components/custom/vibegrid/providers/generic-relationship-provider.ts` - Simplify to direct API calls
+- `apps/web/src/components/custom/vibegrid/stores/table-data-store-atomic.ts` - Replace with Legend State observables
 - `apps/web/src/components/providers/LiveStoreProvider.tsx` - Replace with simple reactive provider
 - `apps/web/src/components/providers/AuthAwareProviders.tsx` - Simplify provider chain
 

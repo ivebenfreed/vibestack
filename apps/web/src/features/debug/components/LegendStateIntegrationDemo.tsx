@@ -1,10 +1,10 @@
 /**
- * VibegriddEx with Legend State Integration
- * Using the actual VibegriddEx table component with Legend State
+ * VibeGrid with Legend State Integration
+ * Using the actual VibeGrid table component with Legend State
  */
 
 import React from 'react'
-import { VibeGridDex } from '@/components/custom/vibegriddex'
+import { VibeGrid } from '@/components/custom/vibegrid'
 import { Badge } from '@/components/ui/badge'
 
 export function LegendStateIntegrationDemo() {
@@ -64,7 +64,7 @@ export function LegendStateIntegrationDemo() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">VibegriddEx + Legend State Integration</h1>
+        <h1 className="text-2xl font-bold">VibeGrid + Legend State Integration</h1>
         <div className="flex gap-2">
           <Badge variant="outline">Full Table</Badge>
           <Badge variant="secondary">Inline Editing</Badge>
@@ -73,7 +73,7 @@ export function LegendStateIntegrationDemo() {
       </div>
 
       <div className="h-[600px] border rounded-lg">
-        <VibeGridDex
+        <VibeGrid
           entityType="Task"
           columns={columns}
           useLegendState={true}

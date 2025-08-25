@@ -1,15 +1,15 @@
-# VibeGridDex Usage Guide
+# VibeGrid Usage Guide
 
 ## Required: Route Loader Pattern
 
-All routes using VibeGridDex MUST implement a loader that pre-processes data for optimal performance. This is not optional.
+All routes using VibeGrid MUST implement a loader that pre-processes data for optimal performance. This is not optional.
 
 ### Example Implementation
 
 ```typescript
 import { createFileRoute } from '@tanstack/react-router';
 import { db } from '@repo/dataforge/dexie-schema';
-import { syncProcessView } from '@/components/custom/vibegriddex/utils/syncViewProcessor';
+import { syncProcessView } from '@/components/custom/vibegrid/utils/syncViewProcessor';
 
 export const Route = createFileRoute('/your-route')({
   loader: async () => {
@@ -70,7 +70,7 @@ function YourComponent() {
   const { initialData } = Route.useLoaderData();
   
   return (
-    <VibeGridDex
+    <VibeGrid
       tableId="unique-table-id"
       entityType="task"
       columns={columns}
@@ -90,7 +90,7 @@ function YourComponent() {
 
 ## Important Notes
 
-- The loader pattern is REQUIRED for all VibeGridDex usage
+- The loader pattern is REQUIRED for all VibeGrid usage
 - Initial data is pre-resolved, subsequent updates use XState subscriptions
 - This eliminates all relationship resolver warnings
 - Provides the best user experience with instant data display

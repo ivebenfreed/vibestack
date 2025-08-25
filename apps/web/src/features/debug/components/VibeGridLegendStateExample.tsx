@@ -1,11 +1,11 @@
 /**
- * Example of VibegriddEx with Legend State integration
+ * Example of VibeGrid with Legend State integration
  * Demonstrates onSave operations connected to Legend State mutations
  */
 
 import React, { useState } from 'react'
-import { VibeGridDex } from '@/components/custom/vibegriddex'
-import type { Column } from '@/components/custom/vibegriddex/types'
+import { VibeGrid } from '@/components/custom/vibegrid'
+import type { Column } from '@/components/custom/vibegrid/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -60,7 +60,7 @@ export function VibeGridLegendStateExample() {
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">VibegriddEx with Legend State</h2>
+        <h2 className="text-xl font-bold">VibeGrid with Legend State</h2>
         <div className="flex gap-2">
           <Badge variant="outline">Legend State Integration</Badge>
           <Badge variant="secondary">Mutation Support</Badge>
@@ -70,7 +70,7 @@ export function VibeGridLegendStateExample() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <div className="border rounded-lg">
-            <VibeGridDex
+            <VibeGrid
               tableId="legend-state-tasks"
               entityType="task"
               columns={taskColumns}

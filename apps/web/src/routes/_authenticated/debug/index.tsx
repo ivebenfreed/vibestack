@@ -49,6 +49,13 @@ function DebugIndexPage() {
       badge: 'GRID MACHINE'
     },
     {
+      title: '🔀 UltraTable + VibeGrid Merge',
+      description: 'Test merged UltraTable rendering with VibeGrid state management. Combined data loading and simple TableVirtuoso with advanced features.',
+      path: '/debug/merged-table-test',
+      color: 'border-teal-500/20 hover:border-teal-500/30 bg-teal-500/5 dark:border-teal-400/20 dark:hover:border-teal-400/30 dark:bg-teal-400/5',
+      badge: 'MERGED TABLE'
+    },
+    {
       title: '🔍 Status Test',
       description: 'Test StatusDefinition queries and task status updates to debug foreign key constraint issues in the relationship system.',
       path: '/debug/status-test',
@@ -56,11 +63,11 @@ function DebugIndexPage() {
       badge: 'STATUS DEBUG'
     },
     {
-      title: '🔥 VibeGridDex Test',
-      description: 'Test VibeGridDex component with Dexie live queries. Compare performance vs VibeGridX atomic stores and test real-time reactivity.',
-      path: '/debug/vibegriddex-test',
+      title: '🔥 VibeGrid Test',
+      description: 'Test VibeGrid component with Dexie live queries. Compare performance vs VibeGridX atomic stores and test real-time reactivity.',
+      path: '/debug/vibegrid-test',
       color: 'border-amber-500/20 hover:border-amber-500/30 bg-amber-500/5 dark:border-amber-400/20 dark:hover:border-amber-400/30 dark:bg-amber-400/5',
-      badge: 'VIBEGRIDDEX'
+      badge: 'VIBEGRID'
     },
     {
       title: '📊 VibeGantt Debug',
@@ -82,6 +89,20 @@ function DebugIndexPage() {
       path: '/debug/entity-operations',
       color: 'border-violet-500/20 hover:border-violet-500/30 bg-violet-500/5 dark:border-violet-400/20 dark:hover:border-violet-400/30 dark:bg-violet-400/5',
       badge: 'OBSERVABLES'
+    },
+    {
+      title: '🌟 VibeGrid + Legend State',
+      description: 'Test VibeGrid table component with Legend State observables instead of atomic store. Direct fromObservable integration.',
+      path: '/debug/vibegrid-legend-state',
+      color: 'border-cyan-500/20 hover:border-cyan-500/30 bg-cyan-500/5 dark:border-cyan-400/20 dark:hover:border-cyan-400/30 dark:bg-cyan-400/5',
+      badge: 'LEGEND STATE'
+    },
+    {
+      title: '📋 UltraTable Selection',
+      description: 'Test UltraTable selection overlay system. Individual cell selection, multi-selection with Ctrl+click, and visual feedback positioning.',
+      path: '/debug/ultra-table',
+      color: 'border-teal-500/20 hover:border-teal-500/30 bg-teal-500/5 dark:border-teal-400/20 dark:hover:border-teal-400/30 dark:bg-teal-400/5',
+      badge: 'ULTRA TABLE'
     }
   ]
 
@@ -96,7 +117,7 @@ function DebugIndexPage() {
           <h3 className="font-semibold text-green-900 dark:text-green-100">🧹 Debug Environment Cleaned!</h3>
           <p className="text-green-800 dark:text-green-200 text-sm mt-1">
             Essential debug tools only. All legacy patterns removed, focusing on current architecture: 
-            <strong>XState Atoms + VibeGridDex + 3-Layer Architecture</strong>.
+            <strong>XState Atoms + VibeGrid + 3-Layer Architecture</strong>.
           </p>
         </div>
       </div>
@@ -114,7 +135,7 @@ function DebugIndexPage() {
                   ? 'bg-orange-500/10 text-orange-700 dark:bg-orange-400/10 dark:text-orange-300 border border-orange-500/20'
                   : page.badge === 'STATUS DEBUG'
                   ? 'bg-yellow-500/10 text-yellow-700 dark:bg-yellow-400/10 dark:text-yellow-300 border border-yellow-500/20'
-                  : page.badge === 'VIBEGRIDDEX'
+                  : page.badge === 'VIBEGRID'
                   ? 'bg-amber-500/10 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300 border border-amber-500/20'
                   : page.badge === 'VIBEGANTT'
                   ? 'bg-rose-500/10 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300 border border-rose-500/20'
@@ -122,6 +143,8 @@ function DebugIndexPage() {
                   ? 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300 border border-indigo-500/20'
                   : page.badge === 'OBSERVABLES'
                   ? 'bg-violet-500/10 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 border border-violet-500/20'
+                  : page.badge === 'LEGEND STATE'
+                  ? 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300 border border-cyan-500/20'
                   : 'bg-muted text-muted-foreground border border-border'
               }`}>
                 {page.badge}
@@ -140,10 +163,12 @@ function DebugIndexPage() {
                    : page.badge === 'SYNC TEST' ? '🧪 Open Test Framework'
                    : page.badge === 'GRID MACHINE' ? '🎛️ Open Grid Machine'
                    : page.badge === 'STATUS DEBUG' ? '🔍 Open Status Test'
-                   : page.badge === 'VIBEGRIDDEX' ? '🔥 Open VibeGridDex Test'
+                   : page.badge === 'VIBEGRID' ? '🔥 Open VibeGrid Test'
                    : page.badge === 'VIBEGANTT' ? '📊 Open VibeGantt Debug'
                    : page.badge === 'RELATIONSHIPS' ? '🔗 Open Junction Tables'
                    : page.badge === 'OBSERVABLES' ? '⚡ Open Entity Operations'
+                   : page.badge === 'LEGEND STATE' ? '🌟 Open Legend State Test'
+                   : page.badge === 'ULTRA TABLE' ? '📋 Open UltraTable Test'
                    : 'Open Tool'}
                 </Button>
               </Link>
@@ -161,7 +186,7 @@ function DebugIndexPage() {
           <li>• <strong>Sync System</strong> - WebSocket sync, state transitions, and service testing</li>
           <li>• <strong>Database Operations</strong> - Connection testing and query performance</li>
           <li>• <strong>Data Integrity</strong> - Validation, recovery, and consistency checks</li>
-          <li>• <strong>VibeGridDex</strong> - Production table with real-time Dexie integration and declarative API</li>
+          <li>• <strong>VibeGrid</strong> - Production table with real-time Dexie integration and declarative API</li>
         </ul>
       </div>
     </div>

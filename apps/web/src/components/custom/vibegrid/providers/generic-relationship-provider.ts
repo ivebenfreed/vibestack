@@ -1,7 +1,7 @@
 import type { RelationshipOptionsProvider, RelationshipContext, EnumOption, Column } from '../types';
 
 /**
- * Generic relationship provider for VibeGridDex components.
+ * Generic relationship provider for VibeGrid components.
  */
 export function createGenericRelationshipProvider(
   column: Column,
