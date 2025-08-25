@@ -1,10 +1,7 @@
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useActorRef, useSelector } from '@xstate/react';
 // useLiveQuery removed - handled by XState store
-import { tableBaseMachine } from './machines/table-machine'; // Re-enabled with fixed syntax
-import { tableBaseMachineWithLegendState } from './machines/table-machine-legend';
-import { tableBaseMachineWithLegendStateSimple } from './machines/table-machine-hook-based';
-import { useLegendStateTableData } from './hooks/use-legend-state-table-data';
+import { tableBaseMachine } from './machines/table-machine';
 import { xstateTestInspector } from '@/test-utils/xstate-test-inspector';
 import { toast } from 'sonner';
 // InitializationRefs type moved inline since VibeGridXCore was removed
@@ -92,9 +89,6 @@ interface VibeGridDexProps<T = any> {
   
   // DOM overlay feature flag (for Issue #71)
   useDOMOverlays?: boolean;
-  
-  // Legend State integration flag  
-  useLegendState?: boolean;
 }
 
 // ====================================
@@ -317,30 +311,8 @@ export function VibeGridDex<T extends Record<string, any> = any>(
     return options;
   }, [machineConfig]);
   
-  // Choose machine based on flag - use simple hook-based approach for Legend State
-  const selectedMachine = props.useLegendState ? tableBaseMachineWithLegendStateSimple : tableBaseMachine;
-  const tableActor = useActorRef(selectedMachine, tableActorOptions);
+  const tableActor = useActorRef(tableBaseMachine, tableActorOptions);
   const tableSend = tableActor.send;
-  
-  // Legend State hook integration when useLegendState is enabled
-  const legendStateData = props.useLegendState ? 
-    useLegendStateTableData(tableId, entityType, columns) : 
-    null;
-  
-  // Sync Legend State data with the table machine
-  useEffect(() => {
-    if (props.useLegendState && legendStateData && !legendStateData.loading) {
-      console.log('🔄 VibeGridDex: Syncing Legend State data to table machine', {
-        rowCount: legendStateData.processedRows.length,
-        entityType
-      });
-      
-      tableSend({
-        type: 'external.data.update',
-        rows: legendStateData.processedRows
-      });
-    }
-  }, [props.useLegendState, legendStateData?.processedRows, legendStateData?.loading, tableSend, entityType]);
   
   // The table machine handles persistence internally via persistSnapshot action
   // No need for duplicate persistence logic here
@@ -366,37 +338,8 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       console.log('VibeGridDex: Column drag ended, forwarding to table machine:', event);
       // Forward the reorder event to the table machine
       tableSend(event);
-    },
-    // Legend State mutation handlers
-    onEntitySave: (rowId: string, updates: Record<string, any>) => {
-      console.log('VibeGridDex: Entity save via Legend State:', { rowId, updates });
-      tableSend({ type: 'entity.save', rowId, updates });
-    },
-    onEntityCreate: (data: any, insertAfter?: string) => {
-      console.log('VibeGridDex: Entity create via Legend State:', { data, insertAfter });
-      tableSend({ type: 'entity.create', data, insertAfter });
-    },
-    onEntityDelete: (rowId: string) => {
-      console.log('VibeGridDx: Entity delete via Legend State:', { rowId });
-      tableSend({ type: 'entity.delete', rowId });
-    },
-    onBatchUpdate: (updates: Array<{ id: string; updates: Record<string, any> }>) => {
-      console.log('VibeGridDx: Batch update via Legend State:', { count: updates.length });
-      tableSend({ type: 'entity.batch.update', updates });
-    },
-    onRowsCopy: (sourceRowIds: string[], targetAfter?: string) => {
-      console.log('VibeGridDx: Rows copy via Legend State:', { sourceRowIds, targetAfter });
-      tableSend({ type: 'rows.copy', sourceRowIds, targetAfter });
-    },
-    onRowsMove: (rowIds: string[], targetPosition: { afterId?: string, beforeId?: string }) => {
-      console.log('VibeGridDx: Rows move via Legend State:', { rowIds, targetPosition });
-      tableSend({ type: 'rows.move', rowIds, targetPosition });
-    },
-    onDragEnd: (rowIds: string[], targetPosition: { afterId?: string, beforeId?: string }) => {
-      console.log('VibeGridDx: Drag end via Legend State:', { rowIds, targetPosition });
-      tableSend({ type: 'rows.drag.end', rowIds, targetPosition });
     }
-  }), [enableSelectionColumn, tableSend]);
+  }), [enableSelectionColumn, tableActor]);
   
   // Store pending options for when container is ready
   pendingRendererOptionsRef.current = rendererOptions;
@@ -554,7 +497,6 @@ export function VibeGridDex<T extends Record<string, any> = any>(
       
       {/* Atomic Renderer Container */}
       <div
-        id={tableId}
         ref={containerRefCallback}
         className="vibegridx-renderer"
         data-testid={`vibegridx-renderer-${tableId}`}

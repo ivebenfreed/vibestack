@@ -64,7 +64,7 @@ export { CleanTableRenderer as TableRenderer } from './renderers';
 // CANVAS OVERLAYS
 // ====================================
 
-// Canvas overlays handled internally by renderers
+export { CanvasOverlay } from './overlays/CanvasOverlay';
 
 // ====================================
 // UTILITY HOOKS

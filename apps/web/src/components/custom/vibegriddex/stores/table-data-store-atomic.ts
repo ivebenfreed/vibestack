@@ -1,8 +1,7 @@
 import { fromStore } from '@xstate/store';
-// NOTE: @repo/dataforge/dexie-schema was deprecated - commenting out until replacement is implemented
-// import { db } from '@repo/dataforge/dexie-schema';
-import { liveQuery } from 'dexie';
-import type { Subscription } from 'dexie';
+// NOTE: @repo/dataforge/dexie-schema was deprecated - using Legend State
+import { getEntity$, orgContext$ } from '@/legend-state/observables';
+import { when } from '@legendapp/state';
 import { 
   discoverRelationships, 
   getUniqueRelationshipTables,
@@ -873,14 +872,27 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   }
   
   // First, check if we need pagination
-  const totalCount = await db[entityTableName].count();
+  const entity$ = getEntity$(entityType);
+  if (!entity$) return { entities: {}, relationships: {} };
+  
+  // Get entities from Legend State observable - try different access patterns
+  let entities: any[] = [];
+  try {
+    // Legend State syncedCrud has the data in the root observable
+    const entityData = entity$.peek?.() || entity$;
+    entities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});
+  } catch (error) {
+    console.warn('📊 TableStore: Could not access entity data, using empty array:', error.message);
+    entities = [];
+  }
+  const totalCount = entities.length;
   const columnCount = columns?.length || 10;
   const totalCells = totalCount * columnCount;
   
   // Determine if pagination is needed
   const needsPagination = totalCount > MEMORY_LIMITS.MAX_ROWS || totalCells > MEMORY_LIMITS.MAX_CELLS;
   
-  let entities: any[];
+  let paginatedEntities: any[];
   let paginationInfo = null;
   
   if (needsPagination) {
@@ -893,10 +905,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     const totalPages = Math.ceil(totalCount / pageSize);
     
     // Load only current page
-    entities = await db[entityTableName]
-      .offset(currentPage * pageSize)
-      .limit(pageSize)
-      .toArray();
+    paginatedEntities = entities.slice(currentPage * pageSize, (currentPage * pageSize) + pageSize);
     
     paginationInfo = {
       enabled: true,
@@ -911,7 +920,7 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
     }
   } else {
     // Load all data
-    entities = await db[entityTableName].toArray();
+    paginatedEntities = entities;
   }
   
   // Get relationship tables and junction tables we need to load
@@ -919,10 +928,30 @@ export async function loadInitialData(entityType: string, columns?: any[], page?
   const junctionTables = columns ? getUniqueJunctionTables(columns) : [];
   const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   
-  // Load relationships and junctions in parallel
+  // Load relationships and junctions in parallel using Legend State
   const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
-    Promise.all(relationshipTables.map(tableName => (db as any)[tableName].toArray())),
-    Promise.all(junctionTables.map(tableName => (db as any)[tableName].toArray()))
+    Promise.all(relationshipTables.map(async (tableName) => {
+      const relationshipEntity$ = getEntity$(tableName);
+      if (!relationshipEntity$) return [];
+      try {
+        const data = relationshipEntity$.peek?.() || relationshipEntity$;
+        return Array.isArray(data) ? data : Object.values(data || {});
+      } catch (error) {
+        console.warn(`📊 TableStore: Could not load relationship data for ${tableName}:`, error.message);
+        return [];
+      }
+    })),
+    Promise.all(junctionTables.map(async (tableName) => {
+      const junctionEntity$ = getEntity$(tableName);
+      if (!junctionEntity$) return [];
+      try {
+        const data = junctionEntity$.peek?.() || junctionEntity$;
+        return Array.isArray(data) ? data : Object.values(data || {});
+      } catch (error) {
+        console.warn(`📊 TableStore: Could not load junction data for ${tableName}:`, error.message);
+        return [];
+      }
+    }))
   ]);
   
   // Build relationship lookup tables
@@ -1062,21 +1091,55 @@ export async function loadPage(
     pageSize
   });
   
-  // Load entities for current page
-  const entities = await db[entityTableName]
-    .offset(page * pageSize)
-    .limit(pageSize)
-    .toArray();
+  // Load entities for current page using Legend State
+  const entity$ = getEntity$(entityTableName);
+  if (!entity$) {
+    throw new Error(`Entity ${entityTableName} not found`);
+  }
+  
+  let allEntities: any[] = [];
+  try {
+    const entityData = entity$.peek?.() || entity$;
+    allEntities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});
+  } catch (error) {
+    console.warn('📊 TableStore: Could not access entity data for pagination:', error.message);
+    allEntities = [];
+  }
+  
+  // Apply pagination manually since Legend State doesn't have offset/limit
+  const startIndex = page * pageSize;
+  const endIndex = startIndex + pageSize;
+  const entities = allEntities.slice(startIndex, endIndex);
   
   // Get relationship tables and junction tables we need to load
   const relationshipTables = columns ? getUniqueRelationshipTables(columns) : [];
   const junctionTables = columns ? getUniqueJunctionTables(columns) : [];
   const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   
-  // Load relationships and junctions in parallel
+  // Load relationships and junctions in parallel using Legend State
   const [relationshipDataArrays, junctionDataArrays] = await Promise.all([
-    Promise.all(relationshipTables.map(tableName => (db as any)[tableName].toArray())),
-    Promise.all(junctionTables.map(tableName => (db as any)[tableName].toArray()))
+    Promise.all(relationshipTables.map(async (tableName) => {
+      const relationshipEntity$ = getEntity$(tableName);
+      if (!relationshipEntity$) return [];
+      try {
+        const data = relationshipEntity$.peek?.() || relationshipEntity$;
+        return Array.isArray(data) ? data : Object.values(data || {});
+      } catch (error) {
+        console.warn(`📊 TableStore: Could not load relationship data for ${tableName}:`, error.message);
+        return [];
+      }
+    })),
+    Promise.all(junctionTables.map(async (tableName) => {
+      const junctionEntity$ = getEntity$(tableName);
+      if (!junctionEntity$) return [];
+      try {
+        const data = junctionEntity$.peek?.() || junctionEntity$;
+        return Array.isArray(data) ? data : Object.values(data || {});
+      } catch (error) {
+        console.warn(`📊 TableStore: Could not load junction data for ${tableName}:`, error.message);
+        return [];
+      }
+    }))
   ]);
   
   // Build relationship lookup tables
@@ -1226,183 +1289,137 @@ export function setupGranularSubscriptions(
     console.log('📊 TableStore: Initial load complete, enabling live updates');
   }, 100);
   
-  // Entity changes - send events to store
+  // Entity changes - send events to store using Legend State
   console.log('📊 TableStore: Creating entity subscription for', entityTableName);
   const relationshipConfigs = columns ? discoverRelationships(columns) : [];
   
-  const entitySub = liveQuery(async () => {
-    // Fetch entities
-    const entities = await db[entityTableName].toArray();
+  // Get the Legend State observable for this entity
+  const entity$ = getEntity$(entityTableName);
+  if (!entity$) {
+    console.error(`❌ TableStore: Could not get Legend State observable for ${entityTableName}`);
+    return null;
+  }
+  
+  // Subscribe to Legend State observable data changes
+  const entitySub = when(entity$, (entityData) => {
+    if (!initialLoadComplete) return;
     
-    // Fetch junction table data (like task_tags)
-    const junctionTables = columns ? getUniqueJunctionTables(columns) : [];
-    const junctionDataArrays = await Promise.all(
-      junctionTables.map(tableName => (db as any)[tableName].toArray())
-    );
+    // Convert Legend State data to array format
+    const entities = Array.isArray(entityData) ? entityData : Object.values(entityData || {});
     
-    // Process junction data to add to entities
-    const junctionsByEntity: Record<string, Record<string, string[]>> = {};
-    junctionTables.forEach((tableName, index) => {
-      const junctionData = junctionDataArrays[index];
-      const config = relationshipConfigs.find(c => c.junctionTable === tableName);
-      
-      if (config) {
-        junctionData.forEach((junction: any) => {
-          // For task_tags, the fields are taskId and tagId
-          const entityId = tableName === 'task_tags' ? junction.taskId : junction[config.junctionSourceField!];
-          const targetId = tableName === 'task_tags' ? junction.tagId : junction[config.junctionTargetField!];
-          
-          if (entityId && targetId) {
-            if (!junctionsByEntity[entityId]) {
-              junctionsByEntity[entityId] = {};
-            }
-            if (!junctionsByEntity[entityId][config.fieldName]) {
-              junctionsByEntity[entityId][config.fieldName] = [];
-            }
-            junctionsByEntity[entityId][config.fieldName].push(targetId);
-          }
-        });
-      }
+    console.log('📊 TableStore: Legend State data updated', {
+      entityCount: entities.length,
+      entityTableName
     });
     
-    // Add junction data to entities
-    let entitiesWithJunctions = 0;
+    // Get current relationships from store for resolution
+    const storeSnapshot = storeActor.getSnapshot();
+    const currentRelationships = storeSnapshot?.context?.relationships || {};
+    
+    // Create lookup map for current entities (resolved)
+    const currentEntityMap: Record<string, any> = {};
     entities.forEach(entity => {
-      const junctions = junctionsByEntity[entity.id];
-      if (junctions) {
-        Object.entries(junctions).forEach(([fieldName, targetIds]) => {
-          entity[fieldName] = targetIds;
-          entitiesWithJunctions++;
-        });
+      // Resolve entity before comparison
+      const resolvedEntity = resolveEntityRelationships(entity, currentRelationships, relationshipConfigs);
+      currentEntityMap[entity.id] = resolvedEntity;
+    });
+    
+    // Detect actual changes by comparing with previous state
+    const changedIds: string[] = [];
+    const addedIds: string[] = [];
+    const deletedIds: string[] = [];
+    
+    // Check for additions and modifications
+    Object.entries(currentEntityMap).forEach(([entityId, resolvedEntity]) => {
+      const previousEntity = previousEntities[entityId];
+      if (!previousEntity) {
+        addedIds.push(entityId);
+        storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
+      } else {
+        // Deep comparison of resolved entities
+        const prevStr = JSON.stringify(previousEntity);
+        const currStr = JSON.stringify(resolvedEntity);
+        if (prevStr !== currStr) {
+          // Debug what changed
+          if (process.env.NODE_ENV === 'development' && changedIds.length < 3) {
+            const prevKeys = Object.keys(previousEntity).sort();
+            const currKeys = Object.keys(resolvedEntity).sort();
+            
+            // Find missing and added keys
+            const missingKeys = prevKeys.filter(k => !currKeys.includes(k));
+            const addedKeys = currKeys.filter(k => !prevKeys.includes(k));
+            
+            console.log('📊 UpdateCheck: Entity change detected', {
+              entityId,
+              previousKeys: prevKeys,
+              currentKeys: currKeys,
+              missingKeys,
+              addedKeys,
+              // Show first difference
+              sample: (() => {
+                // Check all keys from both objects
+                const allKeys = new Set([...prevKeys, ...currKeys]);
+                for (const key of allKeys) {
+                  const prevVal = previousEntity[key];
+                  const currVal = resolvedEntity[key];
+                  if (JSON.stringify(prevVal) !== JSON.stringify(currVal)) {
+                    return {
+                      key,
+                      prev: prevVal,
+                      curr: currVal,
+                      prevType: prevVal === undefined ? 'undefined' : prevVal === null ? 'null' : typeof prevVal,
+                      currType: currVal === undefined ? 'undefined' : currVal === null ? 'null' : typeof currVal
+                    };
+                  }
+                }
+                return null;
+              })()
+            });
+          }
+          changedIds.push(entityId);
+          storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
+        }
       }
     });
     
-    if (process.env.NODE_ENV === 'development' && junctionTables.length > 0) {
-      console.log('📊 TableStore: LiveQuery junction processing', {
-        junctionTables,
+    // Check for deletions
+    Object.keys(previousEntities).forEach(entityId => {
+      if (!currentEntityMap[entityId]) {
+        deletedIds.push(entityId);
+        storeActor.send({ type: 'deleteEntity', entityId });
+      }
+    });
+    
+    // Only log if there were actual changes
+    if (addedIds.length > 0 || changedIds.length > 0 || deletedIds.length > 0) {
+      console.log('📊 UpdateCheck: Granular entity update summary', {
+        table: entityTableName,
         totalEntities: entities.length,
-        entitiesWithJunctions,
-        sampleEntity: entities.find(e => e.tags?.length > 0)
+        added: addedIds.length,
+        changed: changedIds.length,
+        deleted: deletedIds.length,
+        changedIds: changedIds.slice(0, 5), // Show first 5 for debugging
+        addedIds: addedIds.slice(0, 5),
+        deletedIds: deletedIds.slice(0, 5)
       });
     }
     
-    return entities;
-  }).subscribe({
-    next: (entities) => {
-      if (!initialLoadComplete) return;
-      
-      // Get current relationships from store for resolution
-      const storeSnapshot = storeActor.getSnapshot();
-      const currentRelationships = storeSnapshot?.context?.relationships || {};
-      
-      // Create lookup map for current entities (resolved)
-      const currentEntityMap: Record<string, any> = {};
-      entities.forEach(entity => {
-        // Resolve entity before comparison
-        const resolvedEntity = resolveEntityRelationships(entity, currentRelationships, relationshipConfigs);
-        currentEntityMap[entity.id] = resolvedEntity;
-      });
-      
-      // Detect actual changes by comparing with previous state
-      const changedIds: string[] = [];
-      const addedIds: string[] = [];
-      const deletedIds: string[] = [];
-      
-      // Check for additions and modifications
-      Object.entries(currentEntityMap).forEach(([entityId, resolvedEntity]) => {
-        const previousEntity = previousEntities[entityId];
-        if (!previousEntity) {
-          addedIds.push(entityId);
-          storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
-        } else {
-          // Deep comparison of resolved entities
-          const prevStr = JSON.stringify(previousEntity);
-          const currStr = JSON.stringify(resolvedEntity);
-          if (prevStr !== currStr) {
-            // Debug what changed
-            if (process.env.NODE_ENV === 'development' && changedIds.length < 3) {
-              const prevKeys = Object.keys(previousEntity).sort();
-              const currKeys = Object.keys(resolvedEntity).sort();
-              
-              // Find missing and added keys
-              const missingKeys = prevKeys.filter(k => !currKeys.includes(k));
-              const addedKeys = currKeys.filter(k => !prevKeys.includes(k));
-              
-              console.log('📊 UpdateCheck: Entity change detected', {
-                entityId,
-                previousKeys: prevKeys,
-                currentKeys: currKeys,
-                missingKeys,
-                addedKeys,
-                // Show first difference
-                sample: (() => {
-                  // Check all keys from both objects
-                  const allKeys = new Set([...prevKeys, ...currKeys]);
-                  for (const key of allKeys) {
-                    const prevVal = previousEntity[key];
-                    const currVal = resolvedEntity[key];
-                    if (JSON.stringify(prevVal) !== JSON.stringify(currVal)) {
-                      return {
-                        key,
-                        prev: prevVal,
-                        curr: currVal,
-                        prevType: prevVal === undefined ? 'undefined' : prevVal === null ? 'null' : typeof prevVal,
-                        currType: currVal === undefined ? 'undefined' : currVal === null ? 'null' : typeof currVal
-                      };
-                    }
-                  }
-                  return null;
-                })()
-              });
-            }
-            changedIds.push(entityId);
-            storeActor.send({ type: 'updateEntity', entity: resolvedEntity });
-          }
-        }
-      });
-      
-      // Check for deletions
-      Object.keys(previousEntities).forEach(entityId => {
-        if (!currentEntityMap[entityId]) {
-          deletedIds.push(entityId);
-          storeActor.send({ type: 'deleteEntity', entityId });
-        }
-      });
-      
-      // Only log if there were actual changes
-      if (addedIds.length > 0 || changedIds.length > 0 || deletedIds.length > 0) {
-        console.log('📊 UpdateCheck: Granular entity update summary', {
-          table: entityTableName,
-          totalEntities: entities.length,
-          added: addedIds.length,
-          changed: changedIds.length,
-          deleted: deletedIds.length,
-          changedIds: changedIds.slice(0, 5), // Show first 5 for debugging
-          addedIds: addedIds.slice(0, 5),
-          deletedIds: deletedIds.slice(0, 5)
-        });
-      }
-      
-      // Update previous state for next comparison
-      previousEntities = currentEntityMap;
-    },
-    error: (error) => {
-      console.error('❌ TableStore: Entity subscription error', error);
-      storeActor.send({ type: 'setError', error: error.message });
-    }
+    // Update previous state for next comparison
+    previousEntities = currentEntityMap;
   });
   
   subscriptions.push(entitySub);
   
-  // Relationship changes - send events to store
+  // Relationship changes - send events to store using Legend State
   if (columns) {
     const relationshipTables = getUniqueRelationshipTables(columns);
     console.log('📊 TableStore: Setting up relationship subscriptions for tables:', relationshipTables);
     
     relationshipTables.forEach(tableName => {
-      const table = (db as any)[tableName];
-      if (!table) {
-        console.warn('⚠️ TableStore: No table found for relationship:', tableName);
+      // Get Legend State observable for this relationship table
+      const relationshipEntity$ = getEntity$(tableName);
+      if (!relationshipEntity$) {
+        console.warn('⚠️ TableStore: No Legend State observable found for relationship:', tableName);
         return;
       }
       
@@ -1410,84 +1427,51 @@ export function setupGranularSubscriptions(
       previousRelationships[tableName] = {};
       
       console.log('📊 TableStore: Creating relationship subscription for', tableName);
-      const sub = liveQuery(() => table.toArray()).subscribe({
-        next: (data) => {
-          console.log('📊 TableStore: Relationship subscription fired for', tableName, {
-            initialLoadComplete,
-            dataCount: data.length,
-            timestamp: new Date().toISOString()
-          });
-          
-          if (!initialLoadComplete) return;
-          
-          // Create lookup map for current data
-          const currentDataMap: Record<string, any> = {};
-          data.forEach((item: any) => {
-            currentDataMap[item.id] = item;
-          });
-          
-          // Detect actual changes
-          const previousData = previousRelationships[tableName] || {};
-          let hasChanges = false;
-          
-          // Check if the number of items changed
-          if (Object.keys(previousData).length !== data.length) {
-            hasChanges = true;
-          } else {
-            // Check for modifications
-            for (const item of data) {
-              const previousItem = previousData[item.id];
-              if (!previousItem || JSON.stringify(previousItem) !== JSON.stringify(item)) {
-                hasChanges = true;
-                break;
-              }
+      const sub = when(relationshipEntity$, (relationshipData) => {
+        // Convert Legend State data to array format
+        const data = Array.isArray(relationshipData) ? relationshipData : Object.values(relationshipData || {});
+        
+        if (!initialLoadComplete) return;
+        
+        
+        // Create lookup map for current data
+        const currentDataMap: Record<string, any> = {};
+        data.forEach((item: any) => {
+          currentDataMap[item.id] = item;
+        });
+        
+        // Detect actual changes
+        const previousData = previousRelationships[tableName] || {};
+        let hasChanges = false;
+        
+        // Check if the number of items changed
+        if (Object.keys(previousData).length !== data.length) {
+          hasChanges = true;
+        } else {
+          // Check for modifications
+          for (const item of data) {
+            const previousItem = previousData[item.id];
+            if (!previousItem || JSON.stringify(previousItem) !== JSON.stringify(item)) {
+              hasChanges = true;
+              break;
             }
           }
-          
-          // Only send update if there were actual changes
-          if (hasChanges) {
-            // Enhanced logging to show what changed
-            const changeDetails = {
-              added: [] as string[],
-              updated: [] as string[],
-              removed: [] as string[]
-            };
-            
-            // Find added and updated items
-            data.forEach((item: any) => {
-              const previousItem = previousData[item.id];
-              if (!previousItem) {
-                changeDetails.added.push(item.id);
-              } else if (JSON.stringify(previousItem) !== JSON.stringify(item)) {
-                changeDetails.updated.push(item.id);
-              }
-            });
-            
-            // Find removed items
-            Object.keys(previousData).forEach(id => {
-              if (!currentDataMap[id]) {
-                changeDetails.removed.push(id);
-              }
-            });
-            
-            console.log('📊 TableStore: Granular relationship update detected', {
-              tableName,
-              count: data.length,
-              previousCount: Object.keys(previousData).length,
-              changes: changeDetails,
-              sampleItem: data[0]
-            });
-            
-            // Send event to update relationship table
-            storeActor.send({ type: 'updateRelationshipTable', table: tableName, data });
-          }
-          
-          // Update previous state for next comparison
-          previousRelationships[tableName] = currentDataMap;
-        },
-        error: (error) => {
-          console.error(`❌ TableStore: ${tableName} subscription error`, error);
         }
+        
+        // Only send update if there were actual changes
+        if (hasChanges) {
+          console.log('📊 TableStore: Granular relationship update detected', {
+            tableName,
+            count: data.length,
+            previousCount: Object.keys(previousData).length
+          });
+          
+          // Send event to update relationship table
+          storeActor.send({ type: 'updateRelationshipTable', table: tableName, data });
+        }
+        
+        // Update previous state for next comparison
+        previousRelationships[tableName] = currentDataMap;
       });
       
       subscriptions.push(sub);
