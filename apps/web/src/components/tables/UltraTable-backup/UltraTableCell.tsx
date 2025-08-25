@@ -26,7 +26,7 @@ export interface UltraTableCellProps {
   /** Is row selected */
   isSelected?: boolean
   /** Cell click handler */
-  onCellClick?: (rowIndex: number, columnIndex: number, field: string) => void
+  onCellClick?: (rowIndex: number, columnIndex: number, field: string, event?: MouseEvent) => void
   /** Cell double click handler for editing */
   onCellDoubleClick?: (rowIndex: number, columnIndex: number, field: string, currentValue: any) => void
   /** Additional CSS classes */
@@ -53,20 +53,6 @@ export const UltraTableCell = memo<UltraTableCellProps>(function UltraTableCell(
   onCellDoubleClick,
   className
 }) {
-  // Memoized event handlers to prevent re-renders
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    onCellClick?.(rowIndex, columnIndex, column.field)
-  }, [onCellClick, rowIndex, columnIndex, column.field])
-
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (onCellDoubleClick) {
-      const currentValue = getNestedValue(row$.get(), column.field)
-      onCellDoubleClick(rowIndex, columnIndex, column.field, currentValue)
-    }
-  }, [onCellDoubleClick, row$, rowIndex, columnIndex, column.field])
-
   // Use Legend State Memo for ultra-granular updates
   // This only re-renders when the specific field changes
   return (
@@ -76,6 +62,32 @@ export const UltraTableCell = memo<UltraTableCellProps>(function UltraTableCell(
         const cellValue = getNestedValue(rowData, column.field)
         const formattedValue = formatCellValue(cellValue, column.type)
         const recordId = rowData?.id
+
+        // Event handlers defined inside Memo to ensure proper closure
+        const handleClick = (e: React.MouseEvent) => {
+          e.stopPropagation()
+          console.log('UltraTableCell: Click event received', { 
+            rowIndex, 
+            columnIndex, 
+            field: column.field 
+          })
+          onCellClick?.(rowIndex, columnIndex, column.field, e.nativeEvent)
+        }
+
+        const handleDoubleClick = (e: React.MouseEvent) => {
+          e.stopPropagation()
+          console.log('UltraTableCell: Double-click event received', { 
+            rowIndex, 
+            columnIndex, 
+            field: column.field, 
+            hasHandler: !!onCellDoubleClick 
+          })
+          if (onCellDoubleClick) {
+            const currentValue = getNestedValue(rowData, column.field)
+            console.log('UltraTableCell: Calling onCellDoubleClick with', { currentValue })
+            onCellDoubleClick(rowIndex, columnIndex, column.field, currentValue)
+          }
+        }
 
         return (
           <td

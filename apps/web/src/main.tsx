@@ -15,7 +15,7 @@ enableReactTracking({
 if (process.env.NODE_ENV === 'development') {
   // Commented out - file needs to be updated for new architecture
   // import('./debug/manual-integrity-reset');
-  import('./test-utils/sync-test-helpers');
+  // import('./test-utils/sync-test-helpers'); // Removed - no longer needed
 }
 
 // Dexie uses native IndexedDB for local persistence

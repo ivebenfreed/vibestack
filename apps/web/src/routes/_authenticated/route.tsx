@@ -127,20 +127,9 @@ const AuthenticatedContent = observer(function AuthenticatedContent() {
   });
   
   const currentOrgId = user?.currentOrganizationId;
-  const [hasInitializedOrg, setHasInitializedOrg] = React.useState(false);
   
-  // Initialize legend state context ONLY on first load, not when organization changes
-  useEffect(() => {
-    if (currentOrgId && user?.id && !hasInitializedOrg) {
-      console.log('[AuthenticatedContent] Initial organization setup:', currentOrgId);
-      loadOrgContext(currentOrgId, user.id).then(() => {
-        setHasInitializedOrg(true);
-      }).catch(error => {
-        console.error('[AuthenticatedContent] Failed to initialize organization:', error)
-        setHasInitializedOrg(true); // Continue anyway to prevent infinite loading
-      })
-    }
-  }, [currentOrgId, user?.id, hasInitializedOrg])
+  // Note: Legend State context loading is now handled in __root.tsx
+  // No need for duplicate initialization here
   
   // The sidebar entity groups are now automatically updated in loadOrgContext
 

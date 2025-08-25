@@ -15,6 +15,12 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { Button } from '@/components/ui/button'
+import { CalendarIcon } from 'lucide-react'
+import { format } from 'date-fns'
 
 export interface UltraTableEditorProps {
   /** Current cell value */
@@ -26,7 +32,9 @@ export interface UltraTableEditorProps {
   /** Column index for positioning */
   columnIndex: number
   /** Value type for appropriate editor */
-  type?: 'string' | 'number' | 'boolean' | 'date' | 'text'
+  type?: 'string' | 'number' | 'boolean' | 'date' | 'text' | 'select' | 'multiselect'
+  /** Options for select/multiselect types */
+  options?: Array<{ value: string; label: string }> | string[]
   /** Completion callback */
   onComplete: (newValue: any) => void
   /** Cancel callback */
@@ -48,6 +56,7 @@ export function UltraTableEditor({
   rowIndex,
   columnIndex,
   type = 'string',
+  options = [],
   onComplete,
   onCancel
 }: UltraTableEditorProps) {
@@ -55,6 +64,12 @@ export function UltraTableEditor({
   const containerRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
   const [editValue, setEditValue] = useState(value)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
+  
+  // Normalize options array
+  const normalizedOptions = options.map(opt => 
+    typeof opt === 'string' ? { value: opt, label: opt } : opt
+  )
 
   // Find and position over the target cell
   useEffect(() => {
@@ -183,12 +198,114 @@ export function UltraTableEditor({
 
       case 'date':
         return (
-          <Input
-            {...commonProps}
-            type="date"
-            value={editValue instanceof Date ? editValue.toISOString().split('T')[0] : editValue}
-            onChange={(e) => handleValueChange(new Date(e.target.value))}
-          />
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  'w-full h-full border-2 border-primary shadow-lg',
+                  'text-sm bg-background justify-start text-left font-normal',
+                  'focus-visible:outline-none focus-visible:ring-0',
+                  !editValue && 'text-muted-foreground'
+                )}
+                onClick={() => setDatePickerOpen(true)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {editValue ? format(new Date(editValue), 'PPP') : 'Pick a date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={editValue ? new Date(editValue) : undefined}
+                onSelect={(date) => {
+                  handleValueChange(date)
+                  setDatePickerOpen(false)
+                  onComplete(date)
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        )
+
+      case 'select':
+        return (
+          <Select
+            value={String(editValue || '')}
+            onValueChange={(value) => {
+              handleValueChange(value)
+              onComplete(value)
+            }}
+            onOpenChange={(open) => {
+              if (!open && editValue !== value) {
+                onComplete(editValue)
+              }
+            }}
+          >
+            <SelectTrigger
+              className={cn(
+                'w-full h-full border-2 border-primary shadow-lg',
+                'text-sm bg-background',
+                'focus-visible:outline-none focus-visible:ring-0'
+              )}
+              onKeyDown={handleKeyDown}
+              autoFocus
+            >
+              <SelectValue placeholder="Select option..." />
+            </SelectTrigger>
+            <SelectContent>
+              {normalizedOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
+
+      case 'multiselect':
+        const multiValue = Array.isArray(editValue) ? editValue : []
+        return (
+          <div className={cn(
+            'w-full border-2 border-primary shadow-lg',
+            'text-sm bg-background p-2 max-h-40 overflow-y-auto',
+            'focus-visible:outline-none focus-visible:ring-0'
+          )}>
+            {normalizedOptions.map((option) => (
+              <div key={option.value} className="flex items-center space-x-2 py-1">
+                <Checkbox
+                  checked={multiValue.includes(option.value)}
+                  onCheckedChange={(checked) => {
+                    const newValue = checked
+                      ? [...multiValue, option.value]
+                      : multiValue.filter(v => v !== option.value)
+                    handleValueChange(newValue)
+                  }}
+                />
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  {option.label}
+                </label>
+              </div>
+            ))}
+            <div className="flex justify-end space-x-2 mt-2 pt-2 border-t">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onCancel()}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => onComplete(multiValue)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
         )
 
       case 'text':
@@ -206,6 +323,49 @@ export function UltraTableEditor({
   }
 
   // Create portal to render outside React tree
+  const getEditorDimensions = () => {
+    const baseWidth = Math.max(position.width, 120)
+    const baseHeight = position.height
+    
+    switch (type) {
+      case 'text':
+        return {
+          width: Math.max(baseWidth, 200),
+          height: 'auto',
+          minHeight: Math.max(baseHeight, 80)
+        }
+      
+      case 'multiselect':
+        return {
+          width: Math.max(baseWidth, 250),
+          height: 'auto',
+          minHeight: Math.max(baseHeight, 120),
+          maxHeight: 300
+        }
+      
+      case 'date':
+        return {
+          width: Math.max(baseWidth, 200),
+          height: baseHeight,
+          minHeight: baseHeight
+        }
+      
+      case 'select':
+        return {
+          width: Math.max(baseWidth, 150),
+          height: baseHeight,
+          minHeight: baseHeight
+        }
+      
+      default:
+        return {
+          width: baseWidth,
+          height: baseHeight,
+          minHeight: baseHeight
+        }
+    }
+  }
+
   return createPortal(
     <div
       ref={containerRef}
@@ -213,9 +373,7 @@ export function UltraTableEditor({
       style={{
         top: position.top,
         left: position.left,
-        width: Math.max(position.width, 120), // Minimum width
-        height: type === 'text' ? 'auto' : position.height,
-        minHeight: position.height
+        ...getEditorDimensions()
       }}
     >
       {renderEditor()}

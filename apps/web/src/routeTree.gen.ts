@@ -45,14 +45,23 @@ import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedEntitiesEntityNameRouteImport } from './routes/_authenticated/entities/$entityName'
+import { Route as AuthenticatedDebugVibegridLegendStateRouteImport } from './routes/_authenticated/debug/vibegrid-legend-state'
 import { Route as AuthenticatedDebugStateMachineTestRouteImport } from './routes/_authenticated/debug/state-machine-test'
 import { Route as AuthenticatedDebugReactflowPositioningRouteImport } from './routes/_authenticated/debug/reactflow-positioning'
 import { Route as AuthenticatedDebugEntityRoutesTestRouteImport } from './routes/_authenticated/debug/entity-routes-test'
 import { Route as AuthenticatedSettingsAdminUsersRouteImport } from './routes/_authenticated/settings/admin.users'
 
+const AuthenticatedDebugUltraTableLazyRouteImport = createFileRoute(
+  '/_authenticated/debug/ultra-table',
+)()
 const AuthenticatedDebugSyncLazyRouteImport = createFileRoute(
   '/_authenticated/debug/sync',
 )()
+const AuthenticatedDebugMergedTableTestLazyRouteImport = createFileRoute(
+  '/_authenticated/debug/merged-table-test',
+)()
+const AuthenticatedDebugLegendStateInvestigationLazyRouteImport =
+  createFileRoute('/_authenticated/debug/legend-state-investigation')()
 const AuthenticatedDebugEntityOperationsLazyRouteImport = createFileRoute(
   '/_authenticated/debug/entity-operations',
 )()
@@ -199,6 +208,16 @@ const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexRouteImport.update({
   path: '/apps/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDebugUltraTableLazyRoute =
+  AuthenticatedDebugUltraTableLazyRouteImport.update({
+    id: '/ultra-table',
+    path: '/ultra-table',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/ultra-table.lazy').then(
+      (d) => d.Route,
+    ),
+  )
 const AuthenticatedDebugSyncLazyRoute =
   AuthenticatedDebugSyncLazyRouteImport.update({
     id: '/sync',
@@ -206,6 +225,26 @@ const AuthenticatedDebugSyncLazyRoute =
     getParentRoute: () => AuthenticatedDebugRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/debug/sync.lazy').then((d) => d.Route),
+  )
+const AuthenticatedDebugMergedTableTestLazyRoute =
+  AuthenticatedDebugMergedTableTestLazyRouteImport.update({
+    id: '/merged-table-test',
+    path: '/merged-table-test',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/debug/merged-table-test.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+const AuthenticatedDebugLegendStateInvestigationLazyRoute =
+  AuthenticatedDebugLegendStateInvestigationLazyRouteImport.update({
+    id: '/legend-state-investigation',
+    path: '/legend-state-investigation',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any).lazy(() =>
+    import(
+      './routes/_authenticated/debug/legend-state-investigation.lazy'
+    ).then((d) => d.Route),
   )
 const AuthenticatedDebugEntityOperationsLazyRoute =
   AuthenticatedDebugEntityOperationsLazyRouteImport.update({
@@ -267,6 +306,12 @@ const AuthenticatedEntitiesEntityNameRoute =
     path: '/entities/$entityName',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDebugVibegridLegendStateRoute =
+  AuthenticatedDebugVibegridLegendStateRouteImport.update({
+    id: '/vibegrid-legend-state',
+    path: '/vibegrid-legend-state',
+    getParentRoute: () => AuthenticatedDebugRouteRoute,
+  } as any)
 const AuthenticatedDebugStateMachineTestRoute =
   AuthenticatedDebugStateMachineTestRouteImport.update({
     id: '/state-machine-test',
@@ -315,6 +360,7 @@ export interface FileRoutesByFullPath {
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -324,7 +370,10 @@ export interface FileRoutesByFullPath {
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
+  '/debug/legend-state-investigation': typeof AuthenticatedDebugLegendStateInvestigationLazyRoute
+  '/debug/merged-table-test': typeof AuthenticatedDebugMergedTableTestLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
+  '/debug/ultra-table': typeof AuthenticatedDebugUltraTableLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug/': typeof AuthenticatedDebugIndexRoute
@@ -355,6 +404,7 @@ export interface FileRoutesByTo {
   '/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -364,7 +414,10 @@ export interface FileRoutesByTo {
   '/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
+  '/debug/legend-state-investigation': typeof AuthenticatedDebugLegendStateInvestigationLazyRoute
+  '/debug/merged-table-test': typeof AuthenticatedDebugMergedTableTestLazyRoute
   '/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
+  '/debug/ultra-table': typeof AuthenticatedDebugUltraTableLazyRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/debug': typeof AuthenticatedDebugIndexRoute
@@ -399,6 +452,7 @@ export interface FileRoutesById {
   '/_authenticated/debug/entity-routes-test': typeof AuthenticatedDebugEntityRoutesTestRoute
   '/_authenticated/debug/reactflow-positioning': typeof AuthenticatedDebugReactflowPositioningRoute
   '/_authenticated/debug/state-machine-test': typeof AuthenticatedDebugStateMachineTestRoute
+  '/_authenticated/debug/vibegrid-legend-state': typeof AuthenticatedDebugVibegridLegendStateRoute
   '/_authenticated/entities/$entityName': typeof AuthenticatedEntitiesEntityNameRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
@@ -408,7 +462,10 @@ export interface FileRoutesById {
   '/_authenticated/tasks/timeline': typeof AuthenticatedTasksTimelineRoute
   '/_authenticated/debug/database': typeof AuthenticatedDebugDatabaseLazyRoute
   '/_authenticated/debug/entity-operations': typeof AuthenticatedDebugEntityOperationsLazyRoute
+  '/_authenticated/debug/legend-state-investigation': typeof AuthenticatedDebugLegendStateInvestigationLazyRoute
+  '/_authenticated/debug/merged-table-test': typeof AuthenticatedDebugMergedTableTestLazyRoute
   '/_authenticated/debug/sync': typeof AuthenticatedDebugSyncLazyRoute
+  '/_authenticated/debug/ultra-table': typeof AuthenticatedDebugUltraTableLazyRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/debug/': typeof AuthenticatedDebugIndexRoute
@@ -443,6 +500,7 @@ export interface FileRouteTypes {
     | '/debug/entity-routes-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/vibegrid-legend-state'
     | '/entities/$entityName'
     | '/settings/account'
     | '/settings/appearance'
@@ -452,7 +510,10 @@ export interface FileRouteTypes {
     | '/tasks/timeline'
     | '/debug/database'
     | '/debug/entity-operations'
+    | '/debug/legend-state-investigation'
+    | '/debug/merged-table-test'
     | '/debug/sync'
+    | '/debug/ultra-table'
     | '/apps'
     | '/chats'
     | '/debug/'
@@ -483,6 +544,7 @@ export interface FileRouteTypes {
     | '/debug/entity-routes-test'
     | '/debug/reactflow-positioning'
     | '/debug/state-machine-test'
+    | '/debug/vibegrid-legend-state'
     | '/entities/$entityName'
     | '/settings/account'
     | '/settings/appearance'
@@ -492,7 +554,10 @@ export interface FileRouteTypes {
     | '/tasks/timeline'
     | '/debug/database'
     | '/debug/entity-operations'
+    | '/debug/legend-state-investigation'
+    | '/debug/merged-table-test'
     | '/debug/sync'
+    | '/debug/ultra-table'
     | '/apps'
     | '/chats'
     | '/debug'
@@ -526,6 +591,7 @@ export interface FileRouteTypes {
     | '/_authenticated/debug/entity-routes-test'
     | '/_authenticated/debug/reactflow-positioning'
     | '/_authenticated/debug/state-machine-test'
+    | '/_authenticated/debug/vibegrid-legend-state'
     | '/_authenticated/entities/$entityName'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -535,7 +601,10 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks/timeline'
     | '/_authenticated/debug/database'
     | '/_authenticated/debug/entity-operations'
+    | '/_authenticated/debug/legend-state-investigation'
+    | '/_authenticated/debug/merged-table-test'
     | '/_authenticated/debug/sync'
+    | '/_authenticated/debug/ultra-table'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/debug/'
@@ -757,11 +826,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/debug/ultra-table': {
+      id: '/_authenticated/debug/ultra-table'
+      path: '/ultra-table'
+      fullPath: '/debug/ultra-table'
+      preLoaderRoute: typeof AuthenticatedDebugUltraTableLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/sync': {
       id: '/_authenticated/debug/sync'
       path: '/sync'
       fullPath: '/debug/sync'
       preLoaderRoute: typeof AuthenticatedDebugSyncLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/merged-table-test': {
+      id: '/_authenticated/debug/merged-table-test'
+      path: '/merged-table-test'
+      fullPath: '/debug/merged-table-test'
+      preLoaderRoute: typeof AuthenticatedDebugMergedTableTestLazyRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
+    '/_authenticated/debug/legend-state-investigation': {
+      id: '/_authenticated/debug/legend-state-investigation'
+      path: '/legend-state-investigation'
+      fullPath: '/debug/legend-state-investigation'
+      preLoaderRoute: typeof AuthenticatedDebugLegendStateInvestigationLazyRouteImport
       parentRoute: typeof AuthenticatedDebugRouteRoute
     }
     '/_authenticated/debug/entity-operations': {
@@ -827,6 +917,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEntitiesEntityNameRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/debug/vibegrid-legend-state': {
+      id: '/_authenticated/debug/vibegrid-legend-state'
+      path: '/vibegrid-legend-state'
+      fullPath: '/debug/vibegrid-legend-state'
+      preLoaderRoute: typeof AuthenticatedDebugVibegridLegendStateRouteImport
+      parentRoute: typeof AuthenticatedDebugRouteRoute
+    }
     '/_authenticated/debug/state-machine-test': {
       id: '/_authenticated/debug/state-machine-test'
       path: '/state-machine-test'
@@ -862,9 +959,13 @@ interface AuthenticatedDebugRouteRouteChildren {
   AuthenticatedDebugEntityRoutesTestRoute: typeof AuthenticatedDebugEntityRoutesTestRoute
   AuthenticatedDebugReactflowPositioningRoute: typeof AuthenticatedDebugReactflowPositioningRoute
   AuthenticatedDebugStateMachineTestRoute: typeof AuthenticatedDebugStateMachineTestRoute
+  AuthenticatedDebugVibegridLegendStateRoute: typeof AuthenticatedDebugVibegridLegendStateRoute
   AuthenticatedDebugDatabaseLazyRoute: typeof AuthenticatedDebugDatabaseLazyRoute
   AuthenticatedDebugEntityOperationsLazyRoute: typeof AuthenticatedDebugEntityOperationsLazyRoute
+  AuthenticatedDebugLegendStateInvestigationLazyRoute: typeof AuthenticatedDebugLegendStateInvestigationLazyRoute
+  AuthenticatedDebugMergedTableTestLazyRoute: typeof AuthenticatedDebugMergedTableTestLazyRoute
   AuthenticatedDebugSyncLazyRoute: typeof AuthenticatedDebugSyncLazyRoute
+  AuthenticatedDebugUltraTableLazyRoute: typeof AuthenticatedDebugUltraTableLazyRoute
   AuthenticatedDebugIndexRoute: typeof AuthenticatedDebugIndexRoute
 }
 
@@ -876,10 +977,18 @@ const AuthenticatedDebugRouteRouteChildren: AuthenticatedDebugRouteRouteChildren
       AuthenticatedDebugReactflowPositioningRoute,
     AuthenticatedDebugStateMachineTestRoute:
       AuthenticatedDebugStateMachineTestRoute,
+    AuthenticatedDebugVibegridLegendStateRoute:
+      AuthenticatedDebugVibegridLegendStateRoute,
     AuthenticatedDebugDatabaseLazyRoute: AuthenticatedDebugDatabaseLazyRoute,
     AuthenticatedDebugEntityOperationsLazyRoute:
       AuthenticatedDebugEntityOperationsLazyRoute,
+    AuthenticatedDebugLegendStateInvestigationLazyRoute:
+      AuthenticatedDebugLegendStateInvestigationLazyRoute,
+    AuthenticatedDebugMergedTableTestLazyRoute:
+      AuthenticatedDebugMergedTableTestLazyRoute,
     AuthenticatedDebugSyncLazyRoute: AuthenticatedDebugSyncLazyRoute,
+    AuthenticatedDebugUltraTableLazyRoute:
+      AuthenticatedDebugUltraTableLazyRoute,
     AuthenticatedDebugIndexRoute: AuthenticatedDebugIndexRoute,
   }
 

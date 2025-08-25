@@ -8,7 +8,7 @@
  * - Minimal React reconciliation overhead
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { TableVirtuoso } from 'react-virtuoso'
 import { use$ } from '@legendapp/state/react'
 import { observable } from '@legendapp/state'
@@ -16,6 +16,9 @@ import { cn } from '@/lib/utils'
 import { UltraTableCell } from './UltraTableCell'
 import { UltraTableEditor } from './UltraTableEditor'
 import { UltraTableSelection } from './UltraTableSelection'
+import { useUltraTableSelection } from './hooks/use-ultra-table-selection'
+import { PortalSelectionOverlay } from './components/PortalSelectionOverlay'
+import { selectionState$ } from './state/selection-state'
 import type { 
   UseTableEntityResult, 
   TableColumn, 
@@ -68,6 +71,7 @@ export function UltraTable({
   cellRenderers = {}
 }: UltraTableProps) {
   const tableRef = useRef<any>(null)
+  const tableElementRef = useRef<HTMLTableElement>(null)
   
   // Always call hooks in same order - conditionally use results
   const shouldUseLegendState = !externalData
@@ -77,20 +81,11 @@ export function UltraTable({
   const legendStateData = use$(legendStateResult.tableData$)
   const legendStateColumns = use$(legendStateResult.columns$)
   const legendStateSorting = use$(legendStateResult.sorting$)
-  const legendStateSelectedIds = use$(legendStateResult.selectedIds$)
   
   // Choose data source based on shouldUseLegendState flag
   const tableData = shouldUseLegendState ? legendStateData : (externalData || [])
   const loading = shouldUseLegendState ? legendStateResult.loading : false
   const error = shouldUseLegendState ? legendStateResult.error : null
-
-  // Local state for editing
-  const [editingCell, setEditingCell] = useState<{
-    rowIndex: number
-    columnIndex: number
-    field: string
-    value: any
-  } | null>(null)
 
   // Create simple columns from external data if provided
   const simpleColumns = useMemo(() => {
@@ -99,15 +94,32 @@ export function UltraTable({
     const sampleRow = externalData[0]
     return Object.keys(sampleRow).map(key => {
       const value = sampleRow[key]
-      const type = typeof value === 'number' ? 'number' : 
+      let type = typeof value === 'number' ? 'number' : 
             typeof value === 'boolean' ? 'boolean' :
             value instanceof Date ? 'date' : 'string'
+      
+      // Detect select fields based on content patterns
+      let options: string[] | undefined
+      if (key.toLowerCase().includes('status')) {
+        type = 'select'
+        options = ['active', 'inactive', 'pending', 'archived']
+      } else if (key.toLowerCase().includes('type')) {
+        type = 'select'
+        options = ['client', 'lead', 'prospect', 'customer', 'partner']
+      } else if (key.toLowerCase().includes('category')) {
+        type = 'select'
+        options = ['basic', 'standard', 'premium', 'enterprise']
+      } else if (key.toLowerCase().includes('industry')) {
+        type = 'select'
+        options = ['Technology', 'Finance', 'Healthcare', 'Manufacturing', 'Services', 'Retail']
+      }
       
       // Default widths based on type and content
       let defaultWidth = 120 // Base width
       if (type === 'number') defaultWidth = 100
       else if (type === 'boolean') defaultWidth = 80
       else if (type === 'date') defaultWidth = 120
+      else if (type === 'select') defaultWidth = 120
       else if (key === 'id') defaultWidth = 180
       else if (key.toLowerCase().includes('name')) defaultWidth = 200
       else if (key.toLowerCase().includes('description')) defaultWidth = 300
@@ -120,6 +132,7 @@ export function UltraTable({
         field: key,
         width: defaultWidth,
         type,
+        options,
         sortable: true,
         filterable: true
       }
@@ -129,14 +142,10 @@ export function UltraTable({
   // Choose data source based on shouldUseLegendState flag (hooks already called above)
   const columns = shouldUseLegendState ? legendStateColumns : simpleColumns
   const currentSorting = shouldUseLegendState ? legendStateSorting : null
-  const selectedIds = shouldUseLegendState ? legendStateSelectedIds : new Set()
   const totalCount = shouldUseLegendState ? legendStateResult.totalCount : (externalData ? externalData.length : 0)
   const filteredCount = shouldUseLegendState ? legendStateResult.filteredCount : (externalData ? externalData.length : 0)
   const actions = shouldUseLegendState ? legendStateResult.actions : {
     setSorting: () => {},
-    toggleRowSelection: () => {},
-    selectAll: () => {},
-    clearSelection: () => {},
     getRow$: (index: number) => externalData && externalData[index] ? observable(externalData[index]) : null
   }
 
@@ -148,19 +157,50 @@ export function UltraTable({
     }))
   }, [columns, cellRenderers])
 
+  // Local state for editing
+  const [editingCell, setEditingCell] = useState<{
+    rowIndex: number
+    columnIndex: number
+    field: string
+    value: any
+  } | null>(null)
+
+  // Enhanced selection hook - always call to maintain hook order
+  const selection = useUltraTableSelection({
+    tableData: tableData || [],
+    columns: enhancedColumns || [],
+    onCellEdit: (rowIndex, field, newValue, oldValue) => {
+      console.log('Cell edited:', { rowIndex, field, oldValue, newValue })
+    },
+    enableKeyboardShortcuts: enhancedColumns.length > 0 // Only enable shortcuts when columns are ready
+  })
+
+  // Virtualized selection overlay system
+  // Portal selection overlay that renders outside table DOM
+  const portalRef = useRef<{ updateScroll: (location: any) => void } | null>(null)
+  
+  
+
   // Event handlers optimized for performance
-  const handleCellClick = useCallback((rowIndex: number, columnIndex: number, field: string) => {
+  const handleCellClick = useCallback((rowIndex: number, columnIndex: number, field: string, event?: MouseEvent) => {
     if (options.enableSelection !== false) {
-      const row = tableData[rowIndex]
-      const id = row?.id
-      if (id) {
-        actions.toggleRowSelection(String(id))
-      }
+      // Use enhanced selection logic (cell-level, not row-level)
+      selection.handleCellClick(rowIndex, columnIndex, field, event)
+      
     }
-  }, [tableData, actions, options.enableSelection])
+  }, [tableData, options.enableSelection, selection.handleCellClick])
 
   const handleCellDoubleClick = useCallback((rowIndex: number, columnIndex: number, field: string, currentValue: any) => {
     if (!enableEditing) return
+    
+    console.log('Double-click triggered:', { rowIndex, columnIndex, field, currentValue, enableEditing })
+    
+    // Use enhanced selection double-click logic
+    selection.handleCellDoubleClick(rowIndex, columnIndex, field, currentValue)
+    
+    // Maintain existing editing logic
+    const columnConfig = enhancedColumns[columnIndex]
+    console.log('Column config for editing:', { columnIndex, field, columnConfig })
     
     setEditingCell({
       rowIndex,
@@ -168,7 +208,7 @@ export function UltraTable({
       field,
       value: currentValue
     })
-  }, [enableEditing])
+  }, [enableEditing, selection.handleCellDoubleClick, enhancedColumns])
 
   const handleHeaderClick = useCallback((column: TableColumn) => {
     if (!column.sortable) return
@@ -190,17 +230,61 @@ export function UltraTable({
   const handleEditComplete = useCallback((newValue: any) => {
     if (!editingCell) return
 
-    // TODO: Implement Legend State mutation
-    // This would typically update the entity observable directly
-    console.log('Edit complete:', {
-      rowIndex: editingCell.rowIndex,
-      field: editingCell.field,
-      oldValue: editingCell.value,
-      newValue
-    })
+    const { rowIndex, field, value: oldValue } = editingCell
+    
+    // Update Legend State observable directly
+    if (shouldUseLegendState) {
+      const row$ = actions.getRow$(rowIndex)
+      if (row$) {
+        // Get the nested observable for the field
+        const fieldPath = field.split('.')
+        let targetObservable = row$
+        
+        // Navigate to nested field if needed
+        for (let i = 0; i < fieldPath.length - 1; i++) {
+          targetObservable = targetObservable[fieldPath[i]]
+          if (!targetObservable) break
+        }
+        
+        if (targetObservable) {
+          const finalField = fieldPath[fieldPath.length - 1]
+          targetObservable[finalField].set(newValue)
+          
+          console.log('Legend State edit complete:', {
+            rowIndex,
+            field,
+            oldValue,
+            newValue
+          })
+        }
+      }
+    } else {
+      // For external data, update the array directly
+      if (externalData && externalData[rowIndex]) {
+        const fieldPath = field.split('.')
+        let target = externalData[rowIndex]
+        
+        // Navigate to nested field if needed
+        for (let i = 0; i < fieldPath.length - 1; i++) {
+          if (target[fieldPath[i]] === undefined) {
+            target[fieldPath[i]] = {}
+          }
+          target = target[fieldPath[i]]
+        }
+        
+        target[fieldPath[fieldPath.length - 1]] = newValue
+        
+        console.log('External data edit complete:', {
+          rowIndex,
+          field,
+          oldValue,
+          newValue
+        })
+      }
+    }
 
     setEditingCell(null)
-  }, [editingCell])
+  }, [editingCell, shouldUseLegendState, actions, externalData])
 
   const handleEditCancel = useCallback(() => {
     setEditingCell(null)
@@ -215,7 +299,7 @@ export function UltraTable({
     }
 
     const rowId = String(row.id || index)
-    const isSelected = selectedIds.has(rowId)
+    const isSelected = selection.isRowSelected(rowId)
     const row$ = actions.getRow$(index)
 
     if (!row$) {
@@ -236,9 +320,10 @@ export function UltraTable({
                 column={column}
                 rowIndex={index}
                 columnIndex={columnIndex}
-                isSelected={isSelected}
                 onCellClick={handleCellClick}
                 onCellDoubleClick={handleCellDoubleClick}
+                isSelected={selection.isCellSelected(index, columnIndex)}
+                isFocused={selection.isCellFocused(index, columnIndex)}
               />
             ))}
           </>
@@ -256,14 +341,15 @@ export function UltraTable({
             column={column}
             rowIndex={index}
             columnIndex={columnIndex}
-            isSelected={isSelected}
             onCellClick={handleCellClick}
             onCellDoubleClick={handleCellDoubleClick}
+            isSelected={selection.isCellSelected(index, columnIndex)}
+            isFocused={selection.isCellFocused(index, columnIndex)}
           />
         ))}
       </>
     )
-  }, [tableData, enhancedColumns, selectedIds, actions, handleCellClick, handleCellDoubleClick])
+  }, [tableData, enhancedColumns, actions, handleCellClick, handleCellDoubleClick])
 
   // Header component - returns only header cells for TableVirtuoso fixedHeaderContent
   const HeaderComponent = useCallback(() => {
@@ -377,11 +463,32 @@ export function UltraTable({
   }
 
   return (
-    <div className={cn('border rounded-lg bg-background overflow-hidden', className)}>
+    <div ref={selection.tableRef} className={cn('border rounded-lg bg-background overflow-hidden relative', className)}>
+      {/* CSS for cell selection - global scope */}
+      <style dangerouslySetInnerHTML={{__html: `
+        table td[data-selected="true"] {
+          background-color: red !important;
+          border: 5px solid blue !important;
+          box-sizing: border-box !important;
+        }
+        table td[data-focused="true"] {
+          border: 3px solid purple !important;
+          box-sizing: border-box !important;
+          position: relative !important;
+          z-index: 10 !important;
+        }
+        table td[data-in-range="true"] {
+          background-color: yellow !important;
+          border: 1px solid orange !important;
+          box-sizing: border-box !important;
+        }
+      `}} />
+      
       {/* Table Stats */}
       <div className="px-4 py-2 border-b border-border/50 bg-muted/10 text-xs text-muted-foreground">
         Showing {filteredCount} of {totalCount} records
-        {selectedIds.size > 0 && ` • ${selectedIds.size} selected`}
+        {selection.stats.rowCount > 0 && ` • ${selection.stats.rowCount} rows selected`}
+        {selection.stats.cellCount > 0 && ` • ${selection.stats.cellCount} cells selected`}
       </div>
 
       {/* Virtualized Table */}
@@ -402,6 +509,7 @@ export function UltraTable({
           Table: ({ style, ...props }) => (
             <table
               {...props}
+              ref={tableElementRef}
               style={{
                 ...style,
                 width: '100%',
@@ -424,7 +532,7 @@ export function UltraTable({
             if (!row) return <tr {...props} style={style} />
             
             const rowId = String(row.id || index)
-            const isSelected = selectedIds.has(rowId)
+            const isSelected = selection.isRowSelected(rowId)
             
             return (
               <tr
@@ -446,29 +554,45 @@ export function UltraTable({
         // Performance optimizations
         overscan={5} // Render a few extra rows for smooth scrolling
         increaseViewportBy={200} // Increase viewport for better UX
+        // Portal scroll tracking
+        onScroll={(location) => portalRef.current?.updateScroll(location)}
       />
 
+
       {/* Selection Overlay */}
-      {options.enableSelection !== false && selectedIds.size > 0 && (
+      {options.enableSelection !== false && selection.stats.rowCount > 0 && (
         <UltraTableSelection
-          selectedCount={selectedIds.size}
+          selectedCount={selection.stats.rowCount}
           totalCount={filteredCount}
-          onSelectAll={actions.selectAll}
-          onClearSelection={actions.clearSelection}
+          onSelectAll={() => {
+            const allIds = tableData.map(row => String(row.id)).filter(Boolean)
+            allIds.forEach(id => selection.selectRow(id))
+          }}
+          onClearSelection={selection.clearSelection}
         />
       )}
 
+      {/* Selection Overlay - Temporarily disabled due to React hooks issue */}
+      {/* <SelectionOverlay tableElement={tableElementRef.current} /> */}
+
       {/* Edit Overlay */}
-      {editingCell && (
-        <UltraTableEditor
-          value={editingCell.value}
-          field={editingCell.field}
-          rowIndex={editingCell.rowIndex}
-          columnIndex={editingCell.columnIndex}
-          onComplete={handleEditComplete}
-          onCancel={handleEditCancel}
-        />
-      )}
+      {editingCell && (() => {
+        const columnConfig = enhancedColumns[editingCell.columnIndex]
+        console.log('Rendering UltraTableEditor:', { editingCell, columnConfig })
+        return (
+          <UltraTableEditor
+            value={editingCell.value}
+            field={editingCell.field}
+            rowIndex={editingCell.rowIndex}
+            columnIndex={editingCell.columnIndex}
+            type={columnConfig?.type}
+            options={columnConfig?.options}
+            onComplete={handleEditComplete}
+            onCancel={handleEditCancel}
+          />
+        )
+      })()}
+
     </div>
   )
 }

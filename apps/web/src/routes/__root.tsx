@@ -111,10 +111,26 @@ if (!authMachineActor) {
       const user = snapshot.context.user
       
       if (currentOrganization?.id && user?.id) {
-        // Load Legend State org context directly - no app init machine needed
-        console.log('[ROOT] Auth ready - loading Legend State org context:', currentOrganization.id)
+        console.log('[ROOT] Auth ready - starting parallel Legend State and sync initialization:', currentOrganization.id)
         
-        // Dynamic import to avoid circular dependencies
+        // 🔄 SYNC: Connect sync machine when ready
+        const connectSync = () => {
+          const syncActor = (window as any).simpleNotificationSyncMachineActor;
+          if (syncActor) {
+            console.log('[ROOT] ✅ Triggering sync connection - auth ready');
+            syncActor.send({ 
+              type: 'CONNECT', 
+              organizationId: currentOrganization.id,
+              userId: user.id
+            });
+          } else {
+            // Retry until sync actor is available
+            setTimeout(connectSync, 10);
+          }
+        };
+        connectSync();
+        
+        // Load Legend State org context in parallel
         import('../legend-state').then(({ loadOrgContext }) => {
           loadOrgContext(currentOrganization.id, user.id).then(() => {
             console.log('[ROOT] Legend State org context loaded successfully')
@@ -142,20 +158,22 @@ if (!authMachineActor) {
     if (currentOrganization?.id && user?.id) {
       console.log('[ROOT] Initial auth already ready - loading Legend State org context:', currentOrganization.id)
       
-      // 🔄 SYNC: Connect sync machine for restored auth state (delayed to allow sync machine creation)
-      setTimeout(() => {
+      // 🔄 SYNC: Connect sync machine for restored auth state (wait for actor to be ready)
+      const connectSync = () => {
         const syncActor = (window as any).simpleNotificationSyncMachineActor;
         if (syncActor) {
-          console.log('[ROOT] ✅ Triggering sync connection - restored auth ready (delayed)');
+          console.log('[ROOT] ✅ Triggering sync connection - restored auth ready');
           syncActor.send({ 
             type: 'CONNECT', 
             organizationId: currentOrganization.id,
             userId: user.id
           });
         } else {
-          console.warn('[ROOT] ⚠️ Sync actor still not found after delay during restored auth connection');
+          // Retry until sync actor is available
+          setTimeout(connectSync, 10);
         }
-      }, 100); // Short delay to allow sync machine creation
+      };
+      connectSync();
       
       // Dynamic import to avoid circular dependencies
       import('../legend-state').then(({ loadOrgContext }) => {

@@ -6,7 +6,7 @@
  * Updated to fix HMR reload issues - Force timestamp update.
  */
 
-import { observable } from '@legendapp/state'
+import { observable, syncState, when } from '@legendapp/state'
 import { syncedCrud } from '@legendapp/state/sync-plugins/crud'
 import { synced } from '@legendapp/state/sync'
 import { configureSynced } from '@legendapp/state/sync'
@@ -470,14 +470,19 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // Generate temporary IDs for optimistic updates
     generateId: () => `temp-${crypto.randomUUID()}`,
     
-    // Initial empty state - use empty array for list operations to prevent auto-creation
-    initial: [],
+    // Remove initial: [] to allow persistence to load first
+    // Legend State will load from IndexedDB, then sync changes
+    
+    // Add waitFor to delay sync until persistence is ready
+    ...(syncedCrudWithPersistence && persistenceManager ? {
+      waitFor: new Promise(resolve => setTimeout(resolve, 100)) // Small delay for persistence
+    } : {}),
     
     // PERSISTENCE: Enable IndexedDB persistence with differential sync support
     // This is CRITICAL for changesSince to work - Legend State stores sync timestamps here
     ...(syncedCrudWithPersistence && persistenceManager ? (() => {
       const persistOptions = persistenceManager.getPersistOptions(entityName)
-      console.log(`[Observable] Persistence enabled for ${entityName} with differential sync:`, persistOptions)
+      // Persistence configured for entity (logging reduced for performance)
       return { 
         persist: {
           ...persistOptions,
@@ -535,7 +540,7 @@ function createEntityObservable(orgId: string, entityName: string, schema?: any)
     // Listen for table change notifications
     window.addEventListener('vibestack:table-change-notification', handler as any)
     
-    console.log(`[Observable] Subscribed to WebSocket notifications for ${entityName} (SYNC LOOP PREVENTION)`)
+    // WebSocket subscription configured (logging reduced for performance)
     
     // Return cleanup function
     return () => {
@@ -655,6 +660,9 @@ export async function loadOrgContext(orgId: string, userId: string) {
   }
 }
 
+// Persistent cache for entity observables across schema changes
+const globalEntityCache: Record<string, any> = {}
+
 /**
  * Reactive entity observables - automatically recreates when schema changes
  * This creates entity observables lazily and reactively based on schema
@@ -687,19 +695,28 @@ export const entities$ = observable(() => {
     entityCount: entityKeys.length
   })
   
-  // Create entity observables using lazy initialization
-  // This ensures observables are created only when actually accessed
+  // Create entity observables using lazy initialization with global caching
+  // This ensures observables persist across schema changes and are created only when accessed
   const entityObservables: Record<string, any> = {}
   
   try {
     entityKeys.forEach(entityName => {
-      // Define a getter that creates the observable lazily
+      // Define a getter that creates the observable lazily with caching
       Object.defineProperty(entityObservables, entityName, {
         get() {
-          // Create observable only when accessed
+          // Use global cache key for this org/entity combination
+          const cacheKey = `${orgId}:${entityName}`
+          
+          // Return cached observable if it exists
+          if (globalEntityCache[cacheKey]) {
+            return globalEntityCache[cacheKey]
+          }
+          
+          // Create observable only when accessed for the first time
           try {
-            console.log(`[Observable] Creating observable for ${entityName}`)
-            return createEntityObservable(orgId, entityName, schema.entities[entityName])
+            const observable = createEntityObservable(orgId, entityName, schema.entities[entityName])
+            globalEntityCache[cacheKey] = observable
+            return observable
           } catch (entityError) {
             console.error(`[Observable] Error creating observable for entity ${entityName}:`, entityError)
             return null
@@ -732,10 +749,19 @@ export function getEntity$(entityName: string) {
       return null
     }
     
+    // Access the entity to trigger lazy getter (this creates the observable)
     const entityObs = allEntities[entityName]
     
     if (!entityObs) {
-      console.warn(`[Observable] Entity observable not found for: ${entityName}`)
+      // Check if entity exists in schema but getter failed
+      const currentContext = orgContext$.peek()
+      const entityExists = currentContext.schema?.entities?.[entityName]
+      
+      if (entityExists) {
+        console.debug(`[Observable] Entity ${entityName} accessed before lazy getter triggered - will be created on retry`)
+      } else {
+        console.warn(`[Observable] Entity ${entityName} not found in schema`)
+      }
       return null
     }
     
