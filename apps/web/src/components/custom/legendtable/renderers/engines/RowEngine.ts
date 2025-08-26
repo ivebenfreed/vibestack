@@ -321,8 +321,8 @@ export class RowEngine {
     // Update row content
     this.renderRowCells(row, rowElement, state);
     
-    // Apply row state styling
-    rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata.isDirty || false);
+    // Apply row state styling - support both formats
+    rowElement.classList.toggle(CSS_CLASSES.DIRTY, row.metadata?.isDirty || false);
   }
   
   renderRowCells(row: TableRow, rowElement: HTMLElement, state?: RenderState, relationshipResolvers?: Record<string, (id: string | string[]) => string>): void {
@@ -427,7 +427,8 @@ export class RowEngine {
   
   private createDataCell(row: TableRow, column: Column, index: number, allColumns: Column[], coordinateMapping?: any): HTMLElement {
     const cellKey = `${row.id}:${column.id}`;
-    const value = row.data[column.field || column.id];
+    // Support both flat objects (entities) and wrapped TableRow format
+    const value = row.data ? row.data[column.field || column.id] : (row as any)[column.field || column.id];
     
     if (!coordinateMapping) {
       throw new Error(`RowEngine: Missing coordinate mapping for cell ${cellKey}`);
@@ -467,7 +468,8 @@ export class RowEngine {
     // Apply state classes
     const isSelected = this.config.selectionManager.isCellSelected(row.id, column.id);
     const isEditing = this.config.selectionManager.isCellEditing(row.id, column.id);
-    const isDirty = row.metadata.isDirty || false;
+    // Support both flat objects (entities) and wrapped TableRow format
+    const isDirty = row.metadata?.isDirty || false;
     
     if (isSelected) cell.classList.add(CSS_CLASSES.SELECTED);
     if (isEditing) cell.classList.add(CSS_CLASSES.EDITING);
@@ -484,8 +486,10 @@ export class RowEngine {
       overflow: 'hidden'
     });
     
-    // Create content using CellPipeline
-    const content = CellPipeline.createCellContent(value, column, row.data);
+    // Create content using CellPipeline 
+    // Support both flat objects (entities) and wrapped TableRow format
+    const rowData = row.data || row;
+    const content = CellPipeline.createCellContent(value, column, rowData);
     cell.appendChild(content);
     
     this.config.domManager.setCellElement(row.id, column.id, cell);
