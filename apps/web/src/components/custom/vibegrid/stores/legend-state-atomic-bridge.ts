@@ -239,9 +239,19 @@ export function createAtomicObservableBridge(
   // Return cleanup function that disposes all observers
   return () => {
     console.log(`🔗 AtomicBridge: Cleaning up observers for ${entityTableName}`);
-    entityDataDisposer();
-    schemaReadinessDisposer();
-    errorStateDisposer();
+    
+    // Safely dispose of observers only if they are functions
+    if (typeof entityDataDisposer === 'function') {
+      entityDataDisposer();
+    }
+    
+    if (typeof schemaReadinessDisposer === 'function') {
+      schemaReadinessDisposer();
+    }
+    
+    if (typeof errorStateDisposer === 'function') {
+      errorStateDisposer();
+    }
   };
 }
 
